@@ -85,6 +85,8 @@ bash scripts/migrate-postgres.sh
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api validate -api api/agent.api
 ```
 
+**Current branch note (2026-04-30):** `feature/agent-core-management` implements the Agent profile slice only: `api/agent.api`, `cmd/agent-api`, Agent logic/repository, and `agents` schema. Prompt CRUD remains out of scope for this branch and is still planned under later prompt/tool/skill work.
+
 ## Phase 2: Tools And Skills
 
 ### Task 5: Add tool registry schema and API

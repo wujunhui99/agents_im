@@ -1,0 +1,88 @@
+syntax = "v1"
+
+info (
+	title:   "Agent API"
+	desc:    "Agent management foundation HTTP API"
+	author:  "Codex"
+	version: "v0.1.0"
+)
+
+type Agent {
+	AgentID     string `json:"agent_id"`
+	IMUserID    string `json:"im_user_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	CreatedBy   string `json:"created_by"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+type CreateAgentReq {
+	IMUserID    string `json:"im_user_id"`
+	Name        string `json:"name"`
+	Description string `json:"description,optional"`
+	Status      string `json:"status,optional"`
+}
+
+type UpdateAgentReq {
+	AgentID     string `path:"agent_id"`
+	Name        string `json:"name,optional"`
+	Description string `json:"description,optional"`
+}
+
+type UpdateAgentStatusReq {
+	AgentID string `path:"agent_id"`
+	Status  string `json:"status"`
+}
+
+type AgentPathReq {
+	AgentID string `path:"agent_id"`
+}
+
+type ListAgentsReq {
+	Status    string `form:"status,optional"`
+	CreatedBy string `form:"created_by,optional"`
+	Limit     int64  `form:"limit,optional"`
+	Offset    int64  `form:"offset,optional"`
+}
+
+type AgentResp {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Data    Agent  `json:"data"`
+}
+
+type ListAgentsData {
+	Agents []Agent `json:"agents"`
+}
+
+type ListAgentsResp {
+	Code    string         `json:"code"`
+	Message string         `json:"message"`
+	Data    ListAgentsData `json:"data"`
+}
+
+@server (
+	jwt:   Auth
+	group: agent
+)
+service agent-api {
+	@handler createAgent
+	post /agents (CreateAgentReq) returns (AgentResp)
+
+	@handler listAgents
+	get /agents (ListAgentsReq) returns (ListAgentsResp)
+
+	@handler getAgent
+	get /agents/:agent_id (AgentPathReq) returns (AgentResp)
+
+	@handler updateAgent
+	patch /agents/:agent_id (UpdateAgentReq) returns (AgentResp)
+
+	@handler updateAgentStatus
+	patch /agents/:agent_id/status (UpdateAgentStatusReq) returns (AgentResp)
+
+	@handler deleteAgent
+	delete /agents/:agent_id (AgentPathReq) returns (AgentResp)
+}

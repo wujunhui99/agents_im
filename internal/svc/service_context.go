@@ -12,9 +12,11 @@ type ServiceContext struct {
 	FriendsLogic *logic.FriendsLogic
 	GroupsLogic  *logic.GroupsLogic
 	MessageLogic *logic.MessageLogic
+	AgentLogic   *logic.AgentLogic
 	Repo         repository.Repository
 	GroupsRepo   repository.GroupsRepository
 	MessageRepo  repository.MessageRepository
+	AgentRepo    repository.AgentRepository
 	OutboxRepo   repository.OutboxRepository
 	DeliveryRepo repository.DeliveryAttemptRepository
 }
@@ -61,6 +63,18 @@ func NewMessageServiceContextWithAuth(repo repository.MessageRepository, userExi
 		MessageRepo:  repo,
 		OutboxRepo:   outboxRepositoryFromMessageRepo(repo),
 		DeliveryRepo: deliveryAttemptRepositoryFromMessageRepo(repo),
+	}
+}
+
+func NewAgentServiceContext(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker) *ServiceContext {
+	return NewAgentServiceContextWithAuth(repo, accountTypeChecker, config.DefaultJWTAuthConfig())
+}
+
+func NewAgentServiceContextWithAuth(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker, auth config.JWTAuthConfig) *ServiceContext {
+	return &ServiceContext{
+		Auth:       normalizeAuthConfig(auth),
+		AgentLogic: logic.NewAgentLogic(repo, accountTypeChecker),
+		AgentRepo:  repo,
 	}
 }
 

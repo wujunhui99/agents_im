@@ -81,6 +81,25 @@ Agent 是由 profile、系统提示词、工具、skills、模型配置和运行
 - Agent 可以被加入单聊或群聊。
 - Agent 接收到 IM 事件后，根据策略决定是否响应。
 
+#### 当前管理基础接口
+
+`feature/agent-core-management` 只落地 Agent profile 管理基础，不实现 LLM run、prompt/tool/skill registry 或 Python 执行。
+
+当前 REST 契约见 [`../../api/agent.api`](../../api/agent.api)，覆盖：
+
+- `POST /agents`：创建 Agent profile，绑定已有 IM 用户；
+- `GET /agents`：按 `status`、`created_by` 可选过滤列表；
+- `GET /agents/:agent_id`：查询 Agent profile；
+- `PATCH /agents/:agent_id`：更新名称和描述；
+- `PATCH /agents/:agent_id/status`：更新 `draft` / `active` / `disabled` / `archived` 状态；
+- `DELETE /agents/:agent_id`：归档 Agent，等价于设置 `status=archived`。
+
+约束：
+
+- Agent 配置只写入 `agents` 表，不写入 `users` 表。
+- 创建 Agent 必须绑定 `account_type=agent` 的现有 IM 用户。
+- 当前分支尚未提供账号系统 `account_type` 持久化，因此生产 wiring 使用 fail-closed 的 `UserAccountTypeChecker`：无法验证账号类型时创建必须失败，不能静默创建假用户或假 Agent。
+
 ### Agent Skill
 
 Skill 是可复用的 Agent 能力包，通常由 Markdown、参考资料、模板或结构化文件组成。
