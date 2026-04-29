@@ -29,12 +29,16 @@ type CommandEnvelope struct {
 }
 
 type CommandACK struct {
-	RequestID string      `json:"requestId"`
-	Command   string      `json:"command"`
-	Status    string      `json:"status"`
-	Code      string      `json:"code"`
-	Message   string      `json:"message,omitempty"`
-	Payload   interface{} `json:"payload,omitempty"`
+	RequestID string        `json:"requestId"`
+	Command   string        `json:"command,omitempty"`
+	Status    string        `json:"status"`
+	Error     *CommandError `json:"error,omitempty"`
+	Payload   interface{}   `json:"payload,omitempty"`
+}
+
+type CommandError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 type CommandRPCMapping struct {

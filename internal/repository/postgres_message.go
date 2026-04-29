@@ -118,6 +118,9 @@ func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context,
 		if err := updateConversationThreadAfterMessage(ctx, session, conversationID, messageRow.ServerMsgID, nextSeq, sendTime); err != nil {
 			return err
 		}
+		if err := insertDeliveryAttemptsForMessage(ctx, session, messageRow, input); err != nil {
+			return err
+		}
 		if err := insertMessageOutboxEvent(ctx, session, messageRow, input); err != nil {
 			return err
 		}

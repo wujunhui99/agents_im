@@ -7,43 +7,98 @@ import (
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
 	messagehandler "github.com/wujunhui99/agents_im/internal/handler/message"
 	userhandler "github.com/wujunhui99/agents_im/internal/handler/user"
+	"github.com/wujunhui99/agents_im/internal/health"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/svc"
 	"github.com/zeromicro/go-zero/rest"
 )
 
 func RegisterGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
-	registerGoZeroHealthHandler(server)
+	registerGoZeroObservabilityHandlers(server, "agents-im-api", func(*http.Request) []health.Check {
+		return []health.Check{
+			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("user_logic", serverCtx != nil && serverCtx.UserLogic != nil, "configured"),
+			componentCheck("friends_logic", serverCtx != nil && serverCtx.FriendsLogic != nil, "configured"),
+			componentCheck("message_logic", serverCtx != nil && serverCtx.MessageLogic != nil, "configured"),
+			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
+			componentCheck("message_repository", serverCtx != nil && serverCtx.MessageRepo != nil, "configured"),
+		}
+	})
 	addUserRoutes(server, serverCtx)
 	addFriendsRoutes(server, serverCtx)
 	addMessageRoutes(server, serverCtx)
 }
 
 func RegisterUserGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
-	registerGoZeroHealthHandler(server)
+	registerGoZeroObservabilityHandlers(server, "user-api", func(*http.Request) []health.Check {
+		return []health.Check{
+			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("user_logic", serverCtx != nil && serverCtx.UserLogic != nil, "configured"),
+			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
+		}
+	})
 	addUserRoutes(server, serverCtx)
 }
 
 func RegisterFriendsGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
-	registerGoZeroHealthHandler(server)
+	registerGoZeroObservabilityHandlers(server, "friends-api", func(*http.Request) []health.Check {
+		return []health.Check{
+			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("friends_logic", serverCtx != nil && serverCtx.FriendsLogic != nil, "configured"),
+			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
+		}
+	})
 	addFriendsRoutes(server, serverCtx)
 }
 
 func RegisterGroupsGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
-	registerGoZeroHealthHandler(server)
+	registerGoZeroObservabilityHandlers(server, "groups-api", func(*http.Request) []health.Check {
+		return []health.Check{
+			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("groups_logic", serverCtx != nil && serverCtx.GroupsLogic != nil, "configured"),
+			componentCheck("groups_repository", serverCtx != nil && serverCtx.GroupsRepo != nil, "configured"),
+		}
+	})
 	addGroupsRoutes(server, serverCtx)
 }
 
 func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
-	registerGoZeroHealthHandler(server)
+	registerGoZeroObservabilityHandlers(server, "message-api", func(*http.Request) []health.Check {
+		return []health.Check{
+			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("message_logic", serverCtx != nil && serverCtx.MessageLogic != nil, "configured"),
+			componentCheck("message_repository", serverCtx != nil && serverCtx.MessageRepo != nil, "configured"),
+			componentCheck("outbox_repository", serverCtx != nil && serverCtx.OutboxRepo != nil, "configured"),
+		}
+	})
 	addMessageRoutes(server, serverCtx)
 }
 
-func registerGoZeroHealthHandler(server *rest.Server) {
-	server.AddRoute(rest.Route{
-		Method:  http.MethodGet,
-		Path:    "/healthz",
-		Handler: healthHandler,
+func registerGoZeroObservabilityHandlers(server *rest.Server, service string, checks func(*http.Request) []health.Check) {
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodGet,
+			Path:    "/healthz",
+			Handler: healthHandler(service),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/readyz",
+			Handler: health.ReadinessHandler(service, checks),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/metrics",
+			Handler: observability.MetricsHandler(),
+		},
 	})
+}
+
+func componentCheck(name string, ok bool, readyMessage string) health.Check {
+	if ok {
+		return health.ComponentCheck(name, true, readyMessage)
+	}
+	return health.ComponentCheck(name, false, "missing")
 }
 
 func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {

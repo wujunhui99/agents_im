@@ -239,6 +239,8 @@ Advances `has_read_seq` monotonically.
 
 ## Reconnect Sync Contract
 
+Detailed frontend reconnect behavior is defined in [`../product-specs/frontend-sync-contract.md`](../product-specs/frontend-sync-contract.md) and [`websocket-reconnect-sync.md`](./websocket-reconnect-sync.md).
+
 After reconnect:
 
 1. Client sends/calls `get_conversation_seqs`.
@@ -253,11 +255,15 @@ WebSocket delivery may be duplicated. Client must deduplicate by `serverMsgId` o
 Backend should expose or at least persist delivery attempt status for debugging and retry:
 
 - server message id
+- conversation id
 - recipient user id
-- status
+- status: `accepted`, `published`, `delivered`, `offline`, or `failed`
 - attempt count
 - last error
+- next retry time
 - timestamps
+
+`delivered` means Gateway pushed the message to at least one online connection for that recipient. It is not a read receipt; read state remains `has_read_seq`.
 
 ## Health Contract
 

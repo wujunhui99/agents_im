@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/wujunhui99/agents_im/internal/observability"
 )
 
 const (
@@ -17,6 +19,7 @@ type Worker struct {
 	consumer     EventConsumer
 	dispatcher   DeliveryDispatcher
 	idempotency  IdempotencyStore
+	recorder     DeliveryAttemptRecorder
 	workerID     string
 	pollInterval time.Duration
 	retryBackoff time.Duration
@@ -56,6 +59,12 @@ func WithIdempotencyStore(store IdempotencyStore) WorkerOption {
 		if store != nil {
 			w.idempotency = store
 		}
+	}
+}
+
+func WithDeliveryAttemptRecorder(recorder DeliveryAttemptRecorder) WorkerOption {
+	return func(w *Worker) {
+		w.recorder = recorder
 	}
 }
 
@@ -149,7 +158,13 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 }
 
-func (w *Worker) RunOnce(ctx context.Context) ProcessResult {
+func (w *Worker) RunOnce(ctx context.Context) (result ProcessResult) {
+	defer func() {
+		if result.Status != "" {
+			observability.RecordTransferEvent(string(result.Status))
+		}
+	}()
+
 	if err := ctx.Err(); err != nil {
 		return ProcessResult{Status: StatusStopped, Err: err}
 	}
@@ -164,6 +179,7 @@ func (w *Worker) RunOnce(ctx context.Context) ProcessResult {
 		}
 		return ProcessResult{Status: StatusRetryable, Retryable: true, RetryAfter: w.retryBackoff, Err: err}
 	}
+	observability.RecordTransferEvent("consumed")
 	if envelope.Attempt <= 0 {
 		envelope.Attempt = 1
 	}
@@ -200,15 +216,24 @@ func (w *Worker) RunOnce(ctx context.Context) ProcessResult {
 	}
 
 	dispatch := normalizeDispatchResult(w.dispatcher.Dispatch(ctx, envelope))
-	result := base
+	result = base
 	result.Status = dispatch.Status
 	result.Retryable = dispatch.Retryable
 	result.RetryAfter = dispatch.RetryAfter
 	result.DeliveredUserIDs = append([]string(nil), dispatch.DeliveredUserIDs...)
+	result.RecipientResults = cloneRecipientDeliveryResults(dispatch.RecipientResults)
 	result.Err = dispatch.Err
 
 	switch result.Status {
 	case StatusSucceeded:
+		if err := w.recordDeliveryAttempts(ctx, envelope, result); err != nil {
+			result.Status = StatusRetryable
+			result.Retryable = true
+			result.RetryAfter = w.retryBackoff
+			result.Err = err
+			w.markRetry(ctx, envelope, result)
+			return result
+		}
 		if err := w.idempotency.MarkProcessed(ctx, key); err != nil {
 			result.Status = StatusRetryable
 			result.Retryable = true
@@ -232,7 +257,21 @@ func (w *Worker) RunOnce(ctx context.Context) ProcessResult {
 		if w.maxAttempts > 0 && envelope.Attempt >= w.maxAttempts {
 			result.Status = StatusFailed
 			result.Retryable = false
+			result.RetryAfter = 0
+			if err := w.recordDeliveryAttempts(ctx, envelope, result); err != nil {
+				result.Status = StatusRetryable
+				result.Retryable = true
+				result.RetryAfter = w.retryBackoff
+				result.Err = err
+				w.markRetry(ctx, envelope, result)
+				return result
+			}
 			_ = w.consumer.MarkFailed(ctx, envelope, result)
+			return result
+		}
+		if err := w.recordDeliveryAttempts(ctx, envelope, result); err != nil {
+			result.Err = err
+			w.markRetry(ctx, envelope, result)
 			return result
 		}
 		w.markRetry(ctx, envelope, result)
@@ -240,9 +279,25 @@ func (w *Worker) RunOnce(ctx context.Context) ProcessResult {
 	default:
 		result.Status = StatusFailed
 		result.Retryable = false
+		result.RetryAfter = 0
+		if err := w.recordDeliveryAttempts(ctx, envelope, result); err != nil {
+			result.Status = StatusRetryable
+			result.Retryable = true
+			result.RetryAfter = w.retryBackoff
+			result.Err = err
+			w.markRetry(ctx, envelope, result)
+			return result
+		}
 		_ = w.consumer.MarkFailed(ctx, envelope, result)
 		return result
 	}
+}
+
+func (w *Worker) recordDeliveryAttempts(ctx context.Context, envelope Envelope, result ProcessResult) error {
+	if w.recorder == nil || len(result.RecipientResults) == 0 {
+		return nil
+	}
+	return w.recorder.RecordDeliveryResults(ctx, envelope, result)
 }
 
 func (w *Worker) markRetry(ctx context.Context, envelope Envelope, result ProcessResult) {

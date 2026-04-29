@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/svc"
 )
@@ -54,6 +56,8 @@ type Connection struct {
 	DeviceID    string
 	Platform    string
 	ConnectedAt time.Time
+	TraceID     string
+	RequestID   string
 
 	ws        *websocket.Conn
 	writeMu   sync.Mutex
@@ -64,17 +68,24 @@ type Connection struct {
 type commandFrame struct {
 	RequestID      string          `json:"request_id,omitempty"`
 	RequestIDCamel string          `json:"requestId,omitempty"`
+	TraceID        string          `json:"trace_id,omitempty"`
+	TraceIDCamel   string          `json:"traceId,omitempty"`
 	Type           string          `json:"type,omitempty"`
 	Command        string          `json:"command,omitempty"`
 	Payload        json.RawMessage `json:"payload,omitempty"`
 }
 
 type responseFrame struct {
-	RequestID string         `json:"request_id"`
-	Type      string         `json:"type"`
-	Status    string         `json:"status"`
-	Error     *responseError `json:"error,omitempty"`
-	Data      interface{}    `json:"data,omitempty"`
+	RequestID      string         `json:"request_id,omitempty"`
+	RequestIDCamel string         `json:"requestId,omitempty"`
+	TraceID        string         `json:"trace_id,omitempty"`
+	TraceIDCamel   string         `json:"traceId,omitempty"`
+	Type           string         `json:"type,omitempty"`
+	Command        string         `json:"command,omitempty"`
+	Status         string         `json:"status"`
+	Error          *responseError `json:"error,omitempty"`
+	Data           interface{}    `json:"data,omitempty"`
+	Payload        interface{}    `json:"payload,omitempty"`
 }
 
 type responseError struct {
@@ -169,12 +180,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	tracedRequest, traceContext := observability.EnsureHTTPTrace(r)
+	r = tracedRequest
+	observability.InjectTraceHeaders(w, traceContext)
+
 	claims, err := s.authenticate(r)
 	if err != nil {
+		log.Printf("websocket_handshake_failed trace_id=%s request_id=%s status=unauthorized remote_addr=%s", traceContext.TraceID, traceContext.RequestID, r.RemoteAddr)
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 	if s.messageLogic == nil {
+		log.Printf("websocket_handshake_failed trace_id=%s request_id=%s user_id=%s status=not_ready", traceContext.TraceID, traceContext.RequestID, claims.UserID)
 		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 		return
 	}
@@ -194,15 +211,23 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		DeviceID:    strings.TrimSpace(r.Header.Get("X-Device-ID")),
 		Platform:    clientPlatform(r),
 		ConnectedAt: now,
+		TraceID:     traceContext.TraceID,
+		RequestID:   traceContext.RequestID,
 		ws:          socket,
 		lastSeen:    now,
 	}
 	_ = s.registerPresence(r.Context(), conn)
 	s.connections.Register(conn)
+	observability.RecordWebSocketConnectionEvent("opened")
+	observability.SetWebSocketConnections(s.connections.Count())
+	log.Printf("websocket_connected trace_id=%s request_id=%s connection_id=%s user_id=%s instance_id=%s", conn.TraceID, conn.RequestID, conn.ID, conn.UserID, conn.InstanceID)
 	defer func() {
 		s.connections.Unregister(conn.ID)
+		observability.RecordWebSocketConnectionEvent("closed")
+		observability.SetWebSocketConnections(s.connections.Count())
 		_ = s.unregisterPresence(conn)
 		_ = socket.Close()
+		log.Printf("websocket_disconnected trace_id=%s request_id=%s connection_id=%s user_id=%s instance_id=%s", conn.TraceID, conn.RequestID, conn.ID, conn.UserID, conn.InstanceID)
 	}()
 
 	s.readLoop(r.Context(), conn)
@@ -298,29 +323,53 @@ func (s *Server) readLoop(ctx context.Context, conn *Connection) {
 }
 
 func (s *Server) handleCommand(ctx context.Context, conn *Connection, raw []byte) responseFrame {
+	traceContext := conn.traceContext()
 	frame, err := decodeCommandFrame(raw)
 	if err != nil {
-		return errorResponse("", "", apperror.InvalidArgument("command envelope is invalid"))
+		resp := errorResponse("", "", apperror.InvalidArgument("command envelope is invalid"))
+		resp.TraceID = traceContext.TraceID
+		logWebSocketCommand(conn, traceContext, resp)
+		return resp
 	}
 	requestID := frame.requestID()
 	commandType := frame.commandType()
+	if frameTraceID := frame.traceID(); frameTraceID != "" {
+		traceContext = observability.NewTraceContext(frameTraceID, traceContext.RequestID)
+	}
+	ctx = observability.ContextWithTrace(ctx, traceContext)
 	if strings.TrimSpace(requestID) == "" {
-		return errorResponse("", commandType, apperror.InvalidArgument("request_id is required"))
+		resp := errorResponse("", commandType, apperror.InvalidArgument("request_id is required"))
+		resp.TraceID = traceContext.TraceID
+		logWebSocketCommand(conn, traceContext, resp)
+		return resp
 	}
 	if strings.TrimSpace(commandType) == "" {
-		return errorResponse(requestID, "", apperror.InvalidArgument("type is required"))
+		resp := errorResponse(requestID, "", apperror.InvalidArgument("type is required"))
+		resp.TraceID = traceContext.TraceID
+		logWebSocketCommand(conn, traceContext, resp)
+		return resp
 	}
 
 	data, err := s.dispatch(ctx, conn, commandType, frame.Payload)
 	if err != nil {
-		return errorResponse(requestID, commandType, err)
+		resp := errorResponse(requestID, commandType, err)
+		resp.TraceID = traceContext.TraceID
+		logWebSocketCommand(conn, traceContext, resp)
+		return resp
 	}
-	return responseFrame{
-		RequestID: requestID,
-		Type:      commandType,
-		Status:    gateway.AckStatusOK,
-		Data:      data,
+	resp := responseFrame{
+		RequestID:      requestID,
+		RequestIDCamel: requestID,
+		TraceID:        traceContext.TraceID,
+		TraceIDCamel:   traceContext.TraceID,
+		Type:           commandType,
+		Command:        commandType,
+		Status:         gateway.AckStatusOK,
+		Data:           data,
+		Payload:        data,
 	}
+	logWebSocketCommand(conn, traceContext, resp)
+	return resp
 }
 
 func (s *Server) dispatch(ctx context.Context, conn *Connection, commandType string, payload json.RawMessage) (interface{}, error) {
@@ -493,20 +542,43 @@ func (f commandFrame) commandType() string {
 	return strings.TrimSpace(f.Command)
 }
 
+func (f commandFrame) traceID() string {
+	if strings.TrimSpace(f.TraceID) != "" {
+		return strings.TrimSpace(f.TraceID)
+	}
+	return strings.TrimSpace(f.TraceIDCamel)
+}
+
 func errorResponse(requestID string, commandType string, err error) responseFrame {
 	appErr := apperror.From(err)
-	code := string(appErr.Code)
-	if appErr.Code == apperror.CodeAlreadyExists && strings.Contains(strings.ToLower(appErr.Message), "idempotency") {
-		code = "IDEMPOTENCY_CONFLICT"
-	}
 	return responseFrame{
-		RequestID: requestID,
-		Type:      commandType,
-		Status:    gateway.AckStatusError,
+		RequestID:      requestID,
+		RequestIDCamel: requestID,
+		Type:           commandType,
+		Command:        commandType,
+		Status:         gateway.AckStatusError,
 		Error: &responseError{
-			Code:    code,
+			Code:    frontendErrorCode(appErr),
 			Message: appErr.Message,
 		},
+	}
+}
+
+func frontendErrorCode(appErr *apperror.Error) string {
+	if appErr == nil {
+		return "INTERNAL"
+	}
+	switch appErr.Code {
+	case apperror.CodeUnauthenticated:
+		return "UNAUTHORIZED"
+	case apperror.CodeInvalidArgument:
+		return "VALIDATION_ERROR"
+	case apperror.CodeNotFound:
+		return "NOT_FOUND"
+	case apperror.CodeAlreadyExists:
+		return "CONFLICT"
+	default:
+		return "INTERNAL"
 	}
 }
 
@@ -518,6 +590,36 @@ func unmarshalPayload(payload json.RawMessage, dst interface{}) error {
 		return apperror.InvalidArgument("command payload is invalid")
 	}
 	return nil
+}
+
+func (c *Connection) traceContext() observability.TraceContext {
+	if c == nil {
+		return observability.NewTraceContext("", "")
+	}
+	return observability.NewTraceContext(c.TraceID, c.RequestID)
+}
+
+func logWebSocketCommand(conn *Connection, traceContext observability.TraceContext, resp responseFrame) {
+	connectionID := ""
+	userID := ""
+	if conn != nil {
+		connectionID = conn.ID
+		userID = conn.UserID
+	}
+	code := ""
+	if resp.Error != nil {
+		code = resp.Error.Code
+	}
+	log.Printf(
+		"websocket_command trace_id=%s request_id=%s connection_id=%s user_id=%s command=%s status=%s error_code=%s",
+		traceContext.TraceID,
+		resp.RequestID,
+		connectionID,
+		userID,
+		resp.Type,
+		resp.Status,
+		code,
+	)
 }
 
 func toGatewayMessage(message logic.Message) gateway.MessageSnapshot {

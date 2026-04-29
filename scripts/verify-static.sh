@@ -76,10 +76,20 @@ required_files=(
   "internal/repository/message_memory.go"
   "internal/repository/message_repository.go"
   "internal/repository/message_outbox_repository.go"
+  "internal/repository/delivery_attempt_repository.go"
+  "internal/repository/delivery_attempt_memory.go"
   "internal/repository/postgres_message.go"
   "internal/repository/postgres_outbox.go"
+  "internal/repository/postgres_delivery_attempt.go"
+  "internal/repository/delivery_attempt_repository_test.go"
   "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
+  "internal/health/health.go"
+  "internal/health/health_test.go"
+  "internal/observability/metrics.go"
+  "internal/observability/metrics_test.go"
+  "internal/observability/trace.go"
+  "internal/observability/trace_test.go"
   "internal/types/types.go"
   "internal/auth/logic/authlogic.go"
   "internal/auth/logic/auth/gozero_logic.go"
@@ -100,6 +110,7 @@ required_files=(
   "internal/transfer/event.go"
   "internal/transfer/interfaces.go"
   "internal/transfer/idempotency.go"
+  "internal/transfer/delivery_attempt_recorder.go"
   "internal/transfer/memory.go"
   "internal/transfer/worker.go"
   "internal/transfer/worker_test.go"
@@ -139,6 +150,7 @@ required_files=(
   "docs/product-specs/message-chain.md"
   "docs/product-specs/message-storage.md"
   "docs/product-specs/gateway-message-contract.md"
+  "docs/product-specs/frontend-sync-contract.md"
   "docs/product-specs/read-receipts.md"
   "docs/design-docs/user-service-go-zero.md"
   "docs/design-docs/auth-service-go-zero.md"
@@ -153,14 +165,19 @@ required_files=(
   "docs/design-docs/redis-presence.md"
   "docs/design-docs/kafka-message-events.md"
   "docs/design-docs/websocket-gateway.md"
+  "docs/design-docs/websocket-reconnect-sync.md"
   "docs/design-docs/message-transfer-worker.md"
   "docs/design-docs/kafka-transfer-consumer.md"
   "docs/design-docs/gateway-push-delivery.md"
   "docs/design-docs/transfer-gateway-dispatcher.md"
+  "docs/design-docs/message-delivery-reliability.md"
   "docs/design-docs/gateway-presence-routing.md"
   "docs/exec-plans/active/backend-mvp-completion.md"
   "docs/design-docs/backend-mvp-contract.md"
+  "docs/design-docs/observability-mvp.md"
   "docs/product-specs/backend-mvp.md"
+  "docs/product-specs/frontend-backend-contract.md"
+  "docs/DEVELOPMENT.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -173,7 +190,10 @@ required_files=(
   ".env.example"
   "db/migrations/001_init_postgres.sql"
   "scripts/migrate-postgres.sh"
+  "scripts/dev-up.sh"
+  "scripts/dev-demo-data.sh"
   "tests/postgres_persistence_integration_test.go"
+  "tests/mvp_backend_test.go"
   "docs/exec-plans/active/gateway-message-contract.md"
   "docs/exec-plans/active/redis-presence.md"
   "docs/exec-plans/active/read-receipts.md"
@@ -193,6 +213,17 @@ for file in "${required_files[@]}"; do
     echo "missing required file: $file" >&2
     exit 1
   fi
+done
+
+shell_scripts=(
+  "scripts/migrate-postgres.sh"
+  "scripts/dev-up.sh"
+  "scripts/dev-demo-data.sh"
+  "scripts/verify-static.sh"
+)
+
+for script in "${shell_scripts[@]}"; do
+  bash -n "$script"
 done
 
 ci_workflow_patterns=(
@@ -332,6 +363,73 @@ message_api_patterns=(
 
 for pattern in "${message_api_patterns[@]}"; do
   rg -q "$pattern" api/message.api
+done
+
+frontend_contract_patterns=(
+  "/auth/register"
+  "/auth/login"
+  "/me"
+  "/users/exists"
+  "/friends"
+  "/groups"
+  "/messages"
+  "/ws"
+  "send_message"
+  "pull_messages"
+  "get_conversation_seqs"
+  "mark_conversation_read"
+  "message_received"
+  "message_delivered"
+  "INVALID_ARGUMENT"
+)
+
+for pattern in "${frontend_contract_patterns[@]}"; do
+  rg -qF "$pattern" docs/product-specs/frontend-backend-contract.md
+done
+
+development_doc_patterns=(
+  "scripts/dev-up.sh"
+  "scripts/dev-demo-data.sh"
+  "docker compose up -d postgres redis redpanda"
+  "bash scripts/migrate-postgres.sh"
+  "go test ./..."
+)
+
+for pattern in "${development_doc_patterns[@]}"; do
+  rg -qF "$pattern" docs/DEVELOPMENT.md
+done
+
+dev_script_patterns=(
+  "docker compose up -d postgres redis redpanda"
+  "bash scripts/migrate-postgres.sh"
+  "StorageDriver: postgres"
+  "gateway-ws"
+)
+
+for pattern in "${dev_script_patterns[@]}"; do
+  rg -qF "$pattern" scripts/dev-up.sh
+done
+
+demo_data_patterns=(
+  "/auth/register"
+  "/friends"
+  "/groups"
+  "/messages"
+  "/read"
+)
+
+for pattern in "${demo_data_patterns[@]}"; do
+  rg -qF "$pattern" scripts/dev-demo-data.sh
+done
+
+mvp_test_patterns=(
+  "TestMVPBackendAuthProfileSmoke"
+  "TestMVPBackendFriendGroupMessageSmoke"
+  "TestMVPBackendWebSocketSendPullMarkReadSmoke"
+)
+
+for pattern in "${mvp_test_patterns[@]}"; do
+  rg -q "$pattern" tests/mvp_backend_test.go
 done
 
 proto_patterns=(
@@ -553,6 +651,42 @@ rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
 rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "websocket-gateway" docs/exec-plans/active/websocket-gateway.md
 
+websocket_reconnect_sync_patterns=(
+  "requestId"
+  "status"
+  "error.code"
+  "error.message"
+  "get_conversation_seqs"
+  "pull_messages"
+  "mark_conversation_read"
+  "serverMsgId"
+  "conversationId"
+  "hasReadSeq"
+  "unreadCount"
+)
+
+for pattern in "${websocket_reconnect_sync_patterns[@]}"; do
+  rg -q "$pattern" docs/product-specs/frontend-sync-contract.md docs/design-docs/websocket-reconnect-sync.md
+done
+
+websocket_reconnect_sync_code_patterns=(
+  "RequestIDCamel"
+  "Payload"
+  "frontendErrorCode"
+  "VALIDATION_ERROR"
+  "TestWebSocketGatewayReconnectSyncFlow"
+  "TestWebSocketGatewayPullMessagesIsDuplicateSafe"
+  "TestWebSocketGatewayPullMessagesFromMissingSeq"
+  "TestWebSocketGatewayInvalidCommandReturnsFrontendErrorEnvelope"
+)
+
+for pattern in "${websocket_reconnect_sync_code_patterns[@]}"; do
+  rg -q "$pattern" internal/gateway/ws/server.go tests/websocket_gateway_test.go
+done
+
+rg -q "frontend-sync-contract.md" docs/product-specs/index.md ARCHITECTURE.md docs/design-docs/backend-mvp-contract.md
+rg -q "websocket-reconnect-sync.md" docs/design-docs/index.md ARCHITECTURE.md docs/design-docs/backend-mvp-contract.md docs/design-docs/websocket-gateway.md
+
 message_transfer_code_patterns=(
   "type MessageEvent struct"
   "type Envelope struct"
@@ -749,6 +883,58 @@ for pattern in "${transfer_gateway_dispatcher_doc_patterns[@]}"; do
 done
 
 rg -q "transfer-gateway-dispatcher.md" ARCHITECTURE.md docs/design-docs/index.md
+
+delivery_reliability_code_patterns=(
+  "DeliveryStatusAccepted"
+  "DeliveryStatusPublished"
+  "DeliveryStatusDelivered"
+  "DeliveryStatusOffline"
+  "DeliveryStatusFailed"
+  "type DeliveryAttemptRepository interface"
+  "CreateDeliveryAttemptsAccepted"
+  "MarkDeliveryAttemptsPublished"
+  "RecordDeliveryAttemptResult"
+  "ListDeliveryAttemptsByMessage"
+  "type DeliveryAttemptRecorder interface"
+  "NewRepositoryDeliveryAttemptRecorder"
+  "RecipientDeliveryResult"
+  "delivery_attempts"
+)
+
+for pattern in "${delivery_reliability_code_patterns[@]}"; do
+  rg -q "$pattern" internal/repository internal/transfer db/migrations/001_init_postgres.sql
+done
+
+delivery_reliability_test_patterns=(
+  "TestMemoryMessageRepositoryCreatesAcceptedDeliveryAttempt"
+  "TestMemoryMessageRepositoryMarksDeliveryAttemptPublishedWithOutbox"
+  "TestMemoryMessageRepositoryRecordsDeliveryAttemptResults"
+  "TestWorkerRecordsDeliveredDeliveryAttempt"
+  "TestWorkerRecordsOfflineDeliveryAttempt"
+  "TestWorkerRecordsRetryableFailedDeliveryAttempt"
+  "TestWorkerRecordsTerminalFailedDeliveryAttemptAtMaxAttempts"
+)
+
+for pattern in "${delivery_reliability_test_patterns[@]}"; do
+  rg -q "$pattern" internal/repository/delivery_attempt_repository_test.go internal/transfer/gateway/dispatcher_test.go
+done
+
+delivery_reliability_doc_patterns=(
+  "accepted"
+  "published"
+  "delivered"
+  "offline"
+  "failed"
+  "next_retry_at"
+  "has_read_seq"
+  "not a read receipt"
+)
+
+for pattern in "${delivery_reliability_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/message-delivery-reliability.md
+done
+
+rg -q "message-delivery-reliability.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-transfer-worker.md docs/design-docs/transfer-gateway-dispatcher.md docs/exec-plans/active/backend-mvp-completion.md
 
 gateway_presence_routing_code_patterns=(
   "WithPresenceStore"
@@ -1051,6 +1237,59 @@ rg -q "Salt" internal/auth/model/credential.go
 rg -q "user-rpc" docs/design-docs/groups-service-go-zero.md docs/product-specs/groups-service.md
 rg -q "client_msg_id" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md "$message_plan_file"
 rg -q "has_read_seq" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md "$message_plan_file"
+
+social_mvp_account_patterns=(
+  "AddFriend"
+  "重复添加同一有效好友"
+  "添加自己为好友"
+  "目标用户不存在"
+  "MVP 群默认允许公开加入"
+  "非成员或已退出成员发送群消息必须失败"
+)
+
+for pattern in "${social_mvp_account_patterns[@]}"; do
+  rg -q "$pattern" docs/product-specs/account-social-core.md
+done
+
+social_mvp_boundary_patterns=(
+  "MVP 业务规则"
+  "GetFriendship"
+  "FORBIDDEN"
+  "不能写入消息、推进 seq 或创建 outbox"
+  "creator 是 owner/member"
+)
+
+for pattern in "${social_mvp_boundary_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/user-auth-friends-groups-boundaries.md
+done
+
+social_mvp_code_patterns=(
+  "CodeForbidden"
+  "PermissionDenied"
+  "sender is not a group member"
+  "group membership validator is not configured"
+  "group owner cannot leave as the only active member"
+)
+
+for pattern in "${social_mvp_code_patterns[@]}"; do
+  rg -q "$pattern" internal
+done
+
+social_mvp_test_patterns=(
+  "TestFriendsLogicNeverAddedStatusIsNone"
+  "TestGroupsLogicOwnerCannotLeaveWhenOnlyActiveMember"
+  "TestMessageGroupSendRequiresActiveMembership"
+  "client-group-outsider"
+  "client-group-left"
+)
+
+for pattern in "${social_mvp_test_patterns[@]}"; do
+  rg -q "$pattern" tests
+done
+
+rg -q "NewGroupsLogic\\(repository.MustGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go
+rg -q "NewMessageLogicWithValidators" internal/rpcgen/message/internal/svc/service_context.go
+rg -q "MustGroupsRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
 pg_persistence_patterns=(
   "users"
   "auth_credentials"
@@ -1062,6 +1301,7 @@ pg_persistence_patterns=(
   "user_conversation_states"
   "message_idempotency_keys"
   "message_outbox"
+  "delivery_attempts"
 )
 
 for pattern in "${pg_persistence_patterns[@]}"; do
@@ -1148,6 +1388,59 @@ rg -q "TestPublisherMarksPublishErrorRetryable" internal/outboxpublisher/publish
 rg -q "TestPublisherMarksMalformedPayloadFailedForRetry" internal/outboxpublisher/publisher_test.go
 rg -q "TestPublisherStopsOnContextCancellationWithoutMarkingFailed" internal/outboxpublisher/publisher_test.go
 
+observability_code_patterns=(
+  "StatusReady"
+  "ReadinessHandler"
+  "MetricMessageSends"
+  "MetricDeliveryAttempts"
+  "MetricTransferEvents"
+  "MetricWebSocketCurrent"
+  "TraceMiddleware"
+  "HeaderTraceID"
+)
+
+for pattern in "${observability_code_patterns[@]}"; do
+  rg -q "$pattern" internal/health internal/observability
+done
+
+for api_main in cmd/*-api/main.go; do
+  rg -q "TraceMiddlewareFunc" "$api_main"
+done
+
+observability_wiring_patterns=(
+  "/readyz"
+  "/metrics"
+  "ReadinessHandler"
+  "MetricsHandler"
+)
+
+for pattern in "${observability_wiring_patterns[@]}"; do
+  rg -q "$pattern" internal/handler/gozero_routes.go internal/auth/handler/gozero_routes.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
+done
+
+observability_metric_hooks=(
+  "RecordMessageSend"
+  "RecordDeliveryAttempt"
+  "RecordTransferEvent"
+  "SetWebSocketConnections"
+  "RecordWebSocketConnectionEvent"
+)
+
+for pattern in "${observability_metric_hooks[@]}"; do
+  rg -q "$pattern" internal/logic/messagelogic.go internal/gateway/ws internal/transfer/worker.go
+done
+
+rg -q "Observability:" etc/message-transfer.yaml
+rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
+rg -q "observability-mvp.md" ARCHITECTURE.md docs/design-docs/index.md
+rg -q "agents_im_message_sends_total" docs/design-docs/observability-mvp.md internal/observability/metrics.go
+rg -q "trace_id" docs/design-docs/observability-mvp.md internal/gateway/ws/server.go
+
+if rg -n "RequestURI|RawQuery|DumpRequest|Authorization|password|token" internal/observability; then
+  echo "observability helpers must not log or inspect secrets, auth headers, bodies, or query strings" >&2
+  exit 1
+fi
+
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
   internal/model internal/logic internal/repository internal/handler internal/rpcgen/user internal/svc; then
@@ -1169,9 +1462,10 @@ if rg -ni "message service (owns|stores|manages|persists).*(password|password_ha
   exit 1
 fi
 
-echo "static verification passed"
 rg -q "Backend MVP" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "message_received" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "get_conversation_seqs" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "healthz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "readyz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
+
+echo "static verification passed"

@@ -21,16 +21,42 @@ import (
 )
 
 type wsResponse struct {
-	RequestID string          `json:"request_id"`
-	Type      string          `json:"type"`
-	Status    string          `json:"status"`
-	Error     *wsResponseErr  `json:"error,omitempty"`
-	Data      json.RawMessage `json:"data,omitempty"`
+	RequestID      string          `json:"request_id"`
+	RequestIDCamel string          `json:"requestId"`
+	TraceID        string          `json:"trace_id"`
+	TraceIDCamel   string          `json:"traceId"`
+	Type           string          `json:"type"`
+	Command        string          `json:"command"`
+	Status         string          `json:"status"`
+	Error          *wsResponseErr  `json:"error,omitempty"`
+	Data           json.RawMessage `json:"data,omitempty"`
+	Payload        json.RawMessage `json:"payload,omitempty"`
 }
 
 type wsResponseErr struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+func (r wsResponse) frontendRequestID() string {
+	if r.RequestIDCamel != "" {
+		return r.RequestIDCamel
+	}
+	return r.RequestID
+}
+
+func (r wsResponse) commandName() string {
+	if r.Command != "" {
+		return r.Command
+	}
+	return r.Type
+}
+
+func (r wsResponse) responsePayload() json.RawMessage {
+	if len(r.Payload) > 0 {
+		return r.Payload
+	}
+	return r.Data
 }
 
 const wsReadTimeout = 2 * time.Second
@@ -94,6 +120,9 @@ func TestWebSocketGatewayHeartbeatReturnsOK(t *testing.T) {
 	resp := readWSResponse(t, conn)
 	if resp.RequestID != "req-heartbeat" || resp.Type != gatewayws.CommandHeartbeat || resp.Status != gateway.AckStatusOK {
 		t.Fatalf("unexpected heartbeat response envelope: %+v", resp)
+	}
+	if resp.TraceID == "" {
+		t.Fatalf("heartbeat response should include trace_id: %+v", resp)
 	}
 
 	var data struct {
@@ -266,6 +295,178 @@ func TestWebSocketGatewaySendAndPullMessages(t *testing.T) {
 	}
 	if pulled.Messages[0].ServerMsgID != sent.Message.ServerMsgID || pulled.Messages[0].Seq != 1 {
 		t.Fatalf("pulled wrong message: %+v, sent %+v", pulled.Messages[0], sent.Message)
+	}
+}
+
+func TestWebSocketGatewayReconnectSyncFlow(t *testing.T) {
+	server, cleanup := newGatewayWSTestServer(t)
+	defer cleanup()
+
+	senderConn := dialGatewayWS(t, server.URL, "usr_ws_sync_sender")
+	defer senderConn.Close()
+
+	first := sendWSMessage(t, senderConn, "req-sync-send-1", "usr_ws_sync_receiver", "client-sync-1", "one")
+	second := sendWSMessage(t, senderConn, "req-sync-send-2", "usr_ws_sync_receiver", "client-sync-2", "two")
+	conversationID := first.Message.ConversationID
+	if second.Message.ConversationID != conversationID || second.Message.Seq != 2 {
+		t.Fatalf("unexpected sync setup messages: first=%+v second=%+v", first.Message, second.Message)
+	}
+
+	receiverConn := dialGatewayWS(t, server.URL, "usr_ws_sync_receiver")
+	defer receiverConn.Close()
+
+	writeCommand(t, receiverConn, map[string]interface{}{
+		"requestId": "req-sync-seqs",
+		"command":   gateway.CommandGetConversationSeqs,
+		"payload":   map[string]interface{}{},
+	})
+	seqsResp := readWSResponse(t, receiverConn)
+	if seqsResp.frontendRequestID() != "req-sync-seqs" || seqsResp.commandName() != gateway.CommandGetConversationSeqs {
+		t.Fatalf("unexpected seqs response envelope: %+v", seqsResp)
+	}
+	var seqs gateway.GetConversationSeqsCommandResponse
+	decodeRaw(t, seqsResp.responsePayload(), &seqs)
+	if len(seqs.States) != 1 {
+		t.Fatalf("got %d conversation states, want 1: %+v", len(seqs.States), seqs.States)
+	}
+	state := seqs.States[0]
+	if state.ConversationID != conversationID || state.MaxSeq != 2 || state.HasReadSeq != 0 || state.UnreadCount != 2 {
+		t.Fatalf("unexpected reconnect seq state: %+v", state)
+	}
+	if state.LastMessage == nil || state.LastMessage.Seq != 2 || state.LastMessage.ServerMsgID != second.Message.ServerMsgID {
+		t.Fatalf("unexpected reconnect last message: %+v", state.LastMessage)
+	}
+
+	writeCommand(t, receiverConn, map[string]interface{}{
+		"requestId": "req-sync-pull",
+		"command":   gateway.CommandPullMessages,
+		"payload": map[string]interface{}{
+			"conversationId": conversationID,
+			"fromSeq":        int64(1),
+			"toSeq":          state.MaxSeq,
+			"limit":          int32(10),
+			"order":          "asc",
+		},
+	})
+	pullResp := readWSResponse(t, receiverConn)
+	if pullResp.frontendRequestID() != "req-sync-pull" || pullResp.commandName() != gateway.CommandPullMessages {
+		t.Fatalf("unexpected pull response envelope: %+v", pullResp)
+	}
+	var pulled gateway.PullMessagesCommandResponse
+	decodeRaw(t, pullResp.responsePayload(), &pulled)
+	if len(pulled.Messages) != 2 || pulled.Messages[0].Seq != 1 || pulled.Messages[1].Seq != 2 {
+		t.Fatalf("unexpected reconnect pull payload: %+v", pulled)
+	}
+
+	writeCommand(t, receiverConn, map[string]interface{}{
+		"requestId": "req-sync-read",
+		"command":   gateway.CommandMarkConversationRead,
+		"payload": map[string]interface{}{
+			"conversationId": conversationID,
+			"hasReadSeq":     state.MaxSeq,
+		},
+	})
+	readResp := readWSResponse(t, receiverConn)
+	var marked gateway.MarkConversationReadCommandResponse
+	decodeRaw(t, readResp.responsePayload(), &marked)
+	if marked.ConversationID != conversationID || marked.HasReadSeq != 2 || marked.UnreadCount != 0 || !marked.Updated {
+		t.Fatalf("unexpected reconnect read payload: %+v", marked)
+	}
+}
+
+func TestWebSocketGatewayPullMessagesIsDuplicateSafe(t *testing.T) {
+	server, cleanup := newGatewayWSTestServer(t)
+	defer cleanup()
+
+	senderConn := dialGatewayWS(t, server.URL, "usr_ws_dup_sender")
+	defer senderConn.Close()
+	first := sendWSMessage(t, senderConn, "req-dup-send-1", "usr_ws_dup_receiver", "client-dup-1", "one")
+	second := sendWSMessage(t, senderConn, "req-dup-send-2", "usr_ws_dup_receiver", "client-dup-2", "two")
+
+	receiverConn := dialGatewayWS(t, server.URL, "usr_ws_dup_receiver")
+	defer receiverConn.Close()
+
+	firstPull := pullWSMessages(t, receiverConn, "req-dup-pull-1", first.Message.ConversationID, 1, 2)
+	secondPull := pullWSMessages(t, receiverConn, "req-dup-pull-2", first.Message.ConversationID, 1, 2)
+	if len(firstPull.Messages) != 2 || len(secondPull.Messages) != 2 {
+		t.Fatalf("unexpected duplicate pull sizes: first=%+v second=%+v", firstPull, secondPull)
+	}
+	if firstPull.Messages[0].ServerMsgID != secondPull.Messages[0].ServerMsgID ||
+		firstPull.Messages[1].ServerMsgID != secondPull.Messages[1].ServerMsgID ||
+		firstPull.Messages[0].ServerMsgID != first.Message.ServerMsgID ||
+		firstPull.Messages[1].ServerMsgID != second.Message.ServerMsgID {
+		t.Fatalf("duplicate pull changed message identity: first=%+v second=%+v", firstPull.Messages, secondPull.Messages)
+	}
+
+	writeCommand(t, receiverConn, map[string]interface{}{
+		"requestId": "req-dup-seqs",
+		"command":   gateway.CommandGetConversationSeqs,
+		"payload": map[string]interface{}{
+			"conversationIds": []string{first.Message.ConversationID},
+		},
+	})
+	seqsResp := readWSResponse(t, receiverConn)
+	var seqs gateway.GetConversationSeqsCommandResponse
+	decodeRaw(t, seqsResp.responsePayload(), &seqs)
+	if len(seqs.States) != 1 || seqs.States[0].HasReadSeq != 0 || seqs.States[0].UnreadCount != 2 {
+		t.Fatalf("pull should not mark read: %+v", seqs.States)
+	}
+}
+
+func TestWebSocketGatewayPullMessagesFromMissingSeq(t *testing.T) {
+	server, cleanup := newGatewayWSTestServer(t)
+	defer cleanup()
+
+	senderConn := dialGatewayWS(t, server.URL, "usr_ws_missing_sender")
+	defer senderConn.Close()
+	first := sendWSMessage(t, senderConn, "req-missing-send-1", "usr_ws_missing_receiver", "client-missing-1", "one")
+	second := sendWSMessage(t, senderConn, "req-missing-send-2", "usr_ws_missing_receiver", "client-missing-2", "two")
+	third := sendWSMessage(t, senderConn, "req-missing-send-3", "usr_ws_missing_receiver", "client-missing-3", "three")
+
+	receiverConn := dialGatewayWS(t, server.URL, "usr_ws_missing_receiver")
+	defer receiverConn.Close()
+
+	pulled := pullWSMessages(t, receiverConn, "req-missing-pull", first.Message.ConversationID, 2, 3)
+	if len(pulled.Messages) != 2 {
+		t.Fatalf("pulled %d messages, want missing seqs 2 and 3: %+v", len(pulled.Messages), pulled.Messages)
+	}
+	if pulled.Messages[0].Seq != 2 || pulled.Messages[0].ServerMsgID != second.Message.ServerMsgID ||
+		pulled.Messages[1].Seq != 3 || pulled.Messages[1].ServerMsgID != third.Message.ServerMsgID {
+		t.Fatalf("unexpected missing seq pull payload: %+v", pulled.Messages)
+	}
+	if pulled.Messages[0].ServerMsgID == first.Message.ServerMsgID {
+		t.Fatalf("missing seq pull returned already-local seq 1: %+v", pulled.Messages)
+	}
+}
+
+func TestWebSocketGatewayInvalidCommandReturnsFrontendErrorEnvelope(t *testing.T) {
+	server, cleanup := newGatewayWSTestServer(t)
+	defer cleanup()
+
+	conn := dialGatewayWS(t, server.URL, "usr_ws_invalid_command")
+	defer conn.Close()
+
+	writeCommand(t, conn, map[string]interface{}{
+		"requestId": "req-invalid-command",
+		"command":   "unknown_command",
+		"payload":   map[string]interface{}{},
+	})
+
+	resp := readWSResponseAllowError(t, conn)
+	if resp.frontendRequestID() != "req-invalid-command" {
+		t.Fatalf("requestId = %q, want req-invalid-command; full response=%+v", resp.frontendRequestID(), resp)
+	}
+	if resp.Status != gateway.AckStatusError {
+		t.Fatalf("status = %q, want error; full response=%+v", resp.Status, resp)
+	}
+	if resp.Error == nil {
+		t.Fatalf("missing error object: %+v", resp)
+	}
+	if resp.Error.Code != "VALIDATION_ERROR" || resp.Error.Message == "" {
+		t.Fatalf("unexpected error envelope: %+v", resp.Error)
+	}
+	if len(resp.Payload) != 0 {
+		t.Fatalf("error response should not include payload: %s", string(resp.Payload))
 	}
 }
 
@@ -536,13 +737,20 @@ func writeCommand(t *testing.T, conn *websocket.Conn, command map[string]interfa
 func readWSResponse(t *testing.T, conn *websocket.Conn) wsResponse {
 	t.Helper()
 
+	resp := readWSResponseAllowError(t, conn)
+	if resp.Error != nil {
+		t.Fatalf("websocket command returned error: %+v", resp.Error)
+	}
+	return resp
+}
+
+func readWSResponseAllowError(t *testing.T, conn *websocket.Conn) wsResponse {
+	t.Helper()
+
 	setReadDeadline(t, conn)
 	var resp wsResponse
 	if err := conn.ReadJSON(&resp); err != nil {
 		t.Fatalf("read websocket response: %v", err)
-	}
-	if resp.Error != nil {
-		t.Fatalf("websocket command returned error: %+v", resp.Error)
 	}
 	return resp
 }
@@ -585,6 +793,57 @@ func decodeRaw(t *testing.T, raw json.RawMessage, dst interface{}) {
 	if err := json.Unmarshal(raw, dst); err != nil {
 		t.Fatalf("decode websocket response data: %v; raw=%s", err, string(raw))
 	}
+}
+
+func sendWSMessage(t *testing.T, conn *websocket.Conn, requestID string, receiverID string, clientMsgID string, content string) gateway.SendMessageCommandResponse {
+	t.Helper()
+
+	writeCommand(t, conn, map[string]interface{}{
+		"requestId": requestID,
+		"command":   gateway.CommandSendMessage,
+		"payload": map[string]interface{}{
+			"chatType":    "single",
+			"receiverId":  receiverID,
+			"clientMsgId": clientMsgID,
+			"contentType": "text",
+			"content":     content,
+		},
+	})
+
+	resp := readWSResponse(t, conn)
+	if resp.frontendRequestID() != requestID || resp.commandName() != gateway.CommandSendMessage || resp.Status != gateway.AckStatusOK {
+		t.Fatalf("unexpected send response envelope: %+v", resp)
+	}
+	var sent gateway.SendMessageCommandResponse
+	decodeRaw(t, resp.responsePayload(), &sent)
+	if sent.Message.ServerMsgID == "" {
+		t.Fatalf("send response missing server message id: %+v", sent)
+	}
+	return sent
+}
+
+func pullWSMessages(t *testing.T, conn *websocket.Conn, requestID string, conversationID string, fromSeq int64, toSeq int64) gateway.PullMessagesCommandResponse {
+	t.Helper()
+
+	writeCommand(t, conn, map[string]interface{}{
+		"requestId": requestID,
+		"command":   gateway.CommandPullMessages,
+		"payload": map[string]interface{}{
+			"conversationId": conversationID,
+			"fromSeq":        fromSeq,
+			"toSeq":          toSeq,
+			"limit":          int32(10),
+			"order":          "asc",
+		},
+	})
+
+	resp := readWSResponse(t, conn)
+	if resp.frontendRequestID() != requestID || resp.commandName() != gateway.CommandPullMessages || resp.Status != gateway.AckStatusOK {
+		t.Fatalf("unexpected pull response envelope: %+v", resp)
+	}
+	var pulled gateway.PullMessagesCommandResponse
+	decodeRaw(t, resp.responsePayload(), &pulled)
+	return pulled
 }
 
 func responseStatus(resp *http.Response) int {

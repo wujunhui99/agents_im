@@ -214,6 +214,27 @@ func (l *GroupsLogic) LeaveGroup(ctx context.Context, req LeaveGroupRequest) (Me
 		return MemberResponse{}, err
 	}
 
+	group, err := l.repo.GetGroup(ctx, groupID)
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	if group.CreatorUserID == userID {
+		members, err := l.repo.ListActiveMembers(ctx, groupID)
+		if err != nil {
+			return MemberResponse{}, err
+		}
+		userIsActiveMember := false
+		for _, member := range members {
+			if member.UserID == userID {
+				userIsActiveMember = true
+				break
+			}
+		}
+		if userIsActiveMember && len(members) <= 1 {
+			return MemberResponse{}, apperror.Forbidden("group owner cannot leave as the only active member")
+		}
+	}
+
 	member, err := l.repo.LeaveGroup(ctx, groupID, userID)
 	if err != nil {
 		return MemberResponse{}, err

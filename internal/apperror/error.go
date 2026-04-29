@@ -11,6 +11,7 @@ const (
 	CodeOK              Code = "OK"
 	CodeInvalidArgument Code = "INVALID_ARGUMENT"
 	CodeUnauthenticated Code = "UNAUTHENTICATED"
+	CodeForbidden       Code = "FORBIDDEN"
 	CodeNotFound        Code = "NOT_FOUND"
 	CodeAlreadyExists   Code = "ALREADY_EXISTS"
 	CodeInternal        Code = "INTERNAL"
@@ -35,6 +36,10 @@ func InvalidArgument(message string) *Error {
 
 func Unauthenticated(message string) *Error {
 	return New(CodeUnauthenticated, message)
+}
+
+func Forbidden(message string) *Error {
+	return New(CodeForbidden, message)
 }
 
 func NotFound(message string) *Error {
@@ -73,6 +78,8 @@ func HTTPStatus(err error) int {
 		return http.StatusBadRequest
 	case CodeUnauthenticated:
 		return http.StatusUnauthorized
+	case CodeForbidden:
+		return http.StatusForbidden
 	case CodeNotFound:
 		return http.StatusNotFound
 	case CodeAlreadyExists:

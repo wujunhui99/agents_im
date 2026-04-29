@@ -41,9 +41,9 @@ A command ACK has:
 - `requestId`: copied from the command;
 - `command`: copied from the command;
 - `status`: `ok` or `error`;
-- `code`: stable machine-readable result code;
-- `message`: human-readable diagnostic text for failures;
-- `payload`: command-specific success payload.
+- `payload`: command-specific success payload for `status=ok`;
+- `error.code`: stable machine-readable result code for `status=error`;
+- `error.message`: human-readable diagnostic text for failures.
 
 Client-visible meaning:
 

@@ -103,6 +103,8 @@ func TestLoadMessageTransferConfig(t *testing.T) {
 Name: message-transfer-test
 WorkerID: worker-a
 DryRun: true
+StorageDriver: postgres
+DataSource: postgres://example.invalid/agents_im
 Consumer:
   Driver: memory
   Topic: message.accepted.test
@@ -113,6 +115,10 @@ Worker:
   PollIntervalMillis: 25
   RetryBackoffMillis: 250
   MaxAttempts: 3
+Observability:
+  Enabled: true
+  Host: 127.0.0.1
+  Port: 18085
 `), 0o600)
 	if err != nil {
 		t.Fatal(err)
@@ -125,6 +131,9 @@ Worker:
 	if cfg.Name != "message-transfer-test" || cfg.WorkerID != "worker-a" || !cfg.DryRun {
 		t.Fatalf("basic transfer config mismatch: %+v", cfg)
 	}
+	if cfg.StorageDriver != StorageDriverPostgres || cfg.DataSource != "postgres://example.invalid/agents_im" {
+		t.Fatalf("storage config mismatch: %+v", cfg)
+	}
 	if cfg.Consumer.Driver != TransferConsumerMemory || cfg.Consumer.Topic != "message.accepted.test" || cfg.Consumer.Group != "transfer-test" {
 		t.Fatalf("consumer config mismatch: %+v", cfg.Consumer)
 	}
@@ -133,6 +142,9 @@ Worker:
 	}
 	if cfg.Worker.PollIntervalMillis != 25 || cfg.Worker.RetryBackoffMillis != 250 || cfg.Worker.MaxAttempts != 3 {
 		t.Fatalf("worker config mismatch: %+v", cfg.Worker)
+	}
+	if !cfg.Observability.Enabled || cfg.Observability.Host != "127.0.0.1" || cfg.Observability.Port != 18085 {
+		t.Fatalf("observability config mismatch: %+v", cfg.Observability)
 	}
 }
 

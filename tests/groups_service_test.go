@@ -93,6 +93,40 @@ func TestGroupsLogicCreateJoinRepeatLeaveAndList(t *testing.T) {
 	}
 }
 
+func TestGroupsLogicOwnerCannotLeaveWhenOnlyActiveMember(t *testing.T) {
+	ctx := context.Background()
+	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
+	creator := mustCreateUser(t, userLogic, "creator_only_owner")
+	groupsLogic := logic.NewGroupsLogic(
+		repository.NewMemoryGroupsRepository(),
+		logic.NewUserLogicExistenceChecker(userLogic),
+	)
+
+	group, err := groupsLogic.CreateGroup(ctx, logic.CreateGroupRequest{
+		CreatorUserID: creator.UserID,
+		Name:          "Owner Only",
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+
+	_, err = groupsLogic.LeaveGroup(ctx, logic.LeaveGroupRequest{
+		GroupID: group.GroupID,
+		UserID:  creator.UserID,
+	})
+	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("owner-only leave error = %v, want FORBIDDEN", err)
+	}
+
+	members, err := groupsLogic.ListMembers(ctx, logic.ListMembersRequest{GroupID: group.GroupID})
+	if err != nil {
+		t.Fatalf("list members after rejected leave: %v", err)
+	}
+	if len(members.Members) != 1 || members.Members[0].UserID != creator.UserID {
+		t.Fatalf("owner should remain active after rejected leave: %+v", members.Members)
+	}
+}
+
 func TestGroupsLogicNotFoundPaths(t *testing.T) {
 	ctx := context.Background()
 	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())

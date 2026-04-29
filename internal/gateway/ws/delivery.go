@@ -7,6 +7,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/presence"
 )
 
@@ -85,42 +86,49 @@ func (d *InMemoryDeliveryDispatcher) DeliverToConversation(ctx context.Context, 
 }
 
 func (d *InMemoryDeliveryDispatcher) deliverToUser(ctx context.Context, userID string, event delivery.Event) (delivery.RecipientResult, error) {
+	record := func(recipient delivery.RecipientResult, err error) (delivery.RecipientResult, error) {
+		if recipient.Status != "" {
+			observability.RecordDeliveryAttempt(string(recipient.Status))
+		}
+		return recipient, err
+	}
+
 	if err := ctx.Err(); err != nil {
-		return delivery.RecipientResult{
+		return record(delivery.RecipientResult{
 			UserID: userID,
 			Status: delivery.StatusFailed,
 			Error:  err.Error(),
-		}, err
+		}, err)
 	}
 
 	routes, err := d.lookupRoutes(ctx, userID)
 	if err != nil {
-		return delivery.RecipientResult{
+		return record(delivery.RecipientResult{
 			UserID: userID,
 			Status: delivery.StatusFailed,
 			Error:  err.Error(),
-		}, err
+		}, err)
 	}
 	if d.presence != nil && len(routes) == 0 {
-		return delivery.RecipientResult{
+		return record(delivery.RecipientResult{
 			UserID: userID,
 			Status: delivery.StatusOffline,
-		}, nil
+		}, nil)
 	}
 
 	connections := d.connections.UserConnections(userID)
 	if len(connections) == 0 {
 		if len(routes) > 0 {
-			return delivery.RecipientResult{
+			return record(delivery.RecipientResult{
 				UserID: userID,
 				Status: delivery.StatusRouted,
 				Routes: routes,
-			}, nil
+			}, nil)
 		}
-		return delivery.RecipientResult{
+		return record(delivery.RecipientResult{
 			UserID: userID,
 			Status: delivery.StatusOffline,
-		}, nil
+		}, nil)
 	}
 
 	recipient := delivery.RecipientResult{
@@ -131,7 +139,7 @@ func (d *InMemoryDeliveryDispatcher) deliverToUser(ctx context.Context, userID s
 	for _, conn := range connections {
 		if err := ctx.Err(); err != nil {
 			recipient.Error = err.Error()
-			return recipient, err
+			return record(recipient, err)
 		}
 		if conn == nil {
 			continue
@@ -150,7 +158,7 @@ func (d *InMemoryDeliveryDispatcher) deliverToUser(ctx context.Context, userID s
 	if len(recipient.FailedConnectionIDs) == 0 {
 		recipient.Error = ""
 	}
-	return recipient, nil
+	return record(recipient, nil)
 }
 
 func (d *InMemoryDeliveryDispatcher) lookupRoutes(ctx context.Context, userID string) ([]delivery.Route, error) {

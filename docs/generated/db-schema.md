@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-第一阶段 PostgreSQL migration 已覆盖用户、认证、好友、群聊、消息和 outbox 表。
+第一阶段 PostgreSQL migration 已覆盖用户、认证、好友、群聊、消息、outbox 和 delivery attempt 表。
 
 ## 当前覆盖
 
@@ -20,6 +20,7 @@
 - user_conversation_states
 - message_idempotency_keys
 - message_outbox
+- delivery_attempts
 
 ## 后续预期覆盖
 

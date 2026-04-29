@@ -12,6 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	"github.com/wujunhui99/agents_im/internal/config"
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	userrepo "github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
 	"github.com/zeromicro/go-zero/rest"
@@ -36,6 +37,7 @@ func main() {
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
 	server := rest.MustNewServer(config.ToRestConf(cfg))
 	defer server.Stop()
+	server.Use(observability.TraceMiddlewareFunc)
 	handler.RegisterGoZeroHandlers(server, serviceContext)
 
 	log.Printf("%s listening on %s:%d", cfg.Name, cfg.Host, cfg.Port)

@@ -24,6 +24,10 @@ type IdempotencyStore interface {
 	MarkProcessed(ctx context.Context, key string) error
 }
 
+type DeliveryAttemptRecorder interface {
+	RecordDeliveryResults(ctx context.Context, envelope Envelope, result ProcessResult) error
+}
+
 type ResultStatus string
 
 const (
@@ -34,12 +38,21 @@ const (
 	StatusStopped   ResultStatus = "stopped"
 )
 
+type RecipientDeliveryStatus string
+
+const (
+	RecipientDeliveryDelivered RecipientDeliveryStatus = "delivered"
+	RecipientDeliveryOffline   RecipientDeliveryStatus = "offline"
+	RecipientDeliveryFailed    RecipientDeliveryStatus = "failed"
+)
+
 type DispatchResult struct {
 	Status           ResultStatus
 	Retryable        bool
 	RetryAfter       time.Duration
 	Err              error
 	DeliveredUserIDs []string
+	RecipientResults []RecipientDeliveryResult
 }
 
 type RetryDecision struct {
@@ -60,6 +73,17 @@ type ProcessResult struct {
 	RetryAfter       time.Duration
 	DeliveredUserIDs []string
 	Err              error
+	RecipientResults []RecipientDeliveryResult
+}
+
+type RecipientDeliveryResult struct {
+	UserID string
+	Status RecipientDeliveryStatus
+	Error  string
+}
+
+func cloneRecipientDeliveryResults(results []RecipientDeliveryResult) []RecipientDeliveryResult {
+	return append([]RecipientDeliveryResult(nil), results...)
 }
 
 func DispatchSucceeded(deliveredUserIDs ...string) DispatchResult {
