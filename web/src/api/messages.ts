@@ -1,16 +1,5 @@
+import { createApiClient, type ApiClient } from './client';
 import type { ChatType, MessageContentType } from '../models/messages';
-
-export type ApiEnvelope<T> = {
-  code: string;
-  message: string;
-  data: T;
-};
-
-export type MessageApiOptions = {
-  baseUrl?: string;
-  token?: string;
-  fetchImpl?: typeof fetch;
-};
 
 export type ServerMessage = {
   serverMsgId: string;
@@ -83,93 +72,53 @@ export type MarkReadResponse = {
   hasReadSeq?: number;
 };
 
-export class MessageApiError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-    this.name = 'MessageApiError';
-  }
+export type MessageApi = {
+  sendMessage: (request: SendMessageRequest) => Promise<SendMessageResponse>;
+  getConversationSeqs: (conversationIds: string[]) => Promise<ConversationSeqsResponse>;
+  pullMessages: (conversationId: string, request: PullMessagesRequest) => Promise<PullMessagesResponse>;
+  markRead: (conversationId: string, request: MarkReadRequest) => Promise<MarkReadResponse>;
+};
+
+export function createMessageApi(api: ApiClient = createApiClient()): MessageApi {
+  return {
+    sendMessage(request) {
+      return api.post<SendMessageResponse>('/messages', request);
+    },
+    getConversationSeqs(conversationIds) {
+      const params = new URLSearchParams();
+      params.set('conversationIds', conversationIds.join(','));
+      return api.get<ConversationSeqsResponse>(`/conversations/seqs?${params.toString()}`);
+    },
+    pullMessages(conversationId, request) {
+      const params = new URLSearchParams();
+      params.set('fromSeq', String(request.fromSeq));
+      params.set('limit', String(request.limit ?? 50));
+      params.set('order', request.order ?? 'asc');
+      if (request.toSeq !== undefined) {
+        params.set('toSeq', String(request.toSeq));
+      }
+      return api.get<PullMessagesResponse>(`/conversations/${encodeURIComponent(conversationId)}/messages?${params.toString()}`);
+    },
+    markRead(conversationId, request) {
+      return api.post<MarkReadResponse>(`/conversations/${encodeURIComponent(conversationId)}/read`, request);
+    },
+  };
 }
 
-export function sendMessage(request: SendMessageRequest, options: MessageApiOptions = {}) {
-  return requestJson<SendMessageResponse>('/messages', options, {
-    method: 'POST',
-    body: JSON.stringify(request),
-  });
+const defaultMessageApi = createMessageApi();
+
+export function sendMessage(request: SendMessageRequest) {
+  return defaultMessageApi.sendMessage(request);
 }
 
-export function getConversationSeqs(conversationIds: string[], options: MessageApiOptions = {}) {
-  const params = new URLSearchParams();
-  params.set('conversationIds', conversationIds.join(','));
-
-  return requestJson<ConversationSeqsResponse>(`/conversations/seqs?${params.toString()}`, options);
+export function getConversationSeqs(conversationIds: string[]) {
+  return defaultMessageApi.getConversationSeqs(conversationIds);
 }
 
-export function pullMessages(
-  conversationId: string,
-  request: PullMessagesRequest,
-  options: MessageApiOptions = {},
-) {
-  const params = new URLSearchParams();
-  params.set('fromSeq', String(request.fromSeq));
-  params.set('limit', String(request.limit ?? 50));
-  params.set('order', request.order ?? 'asc');
-  if (request.toSeq !== undefined) {
-    params.set('toSeq', String(request.toSeq));
-  }
-
-  return requestJson<PullMessagesResponse>(
-    `/conversations/${encodeURIComponent(conversationId)}/messages?${params.toString()}`,
-    options,
-  );
+export function pullMessages(conversationId: string, request: PullMessagesRequest) {
+  return defaultMessageApi.pullMessages(conversationId, request);
 }
 
-export function markRead(
-  conversationId: string,
-  request: MarkReadRequest,
-  options: MessageApiOptions = {},
-) {
-  return requestJson<MarkReadResponse>(`/conversations/${encodeURIComponent(conversationId)}/read`, options, {
-    method: 'POST',
-    body: JSON.stringify(request),
-  });
-}
-
-async function requestJson<T>(path: string, options: MessageApiOptions, init: RequestInit = {}): Promise<T> {
-  const response = await getFetch(options)(`${normalizeBaseUrl(options.baseUrl)}${path}`, {
-    ...init,
-    headers: buildHeaders(options, init),
-  });
-  const envelope = (await response.json()) as ApiEnvelope<T | null>;
-
-  if (!response.ok || envelope.code !== 'OK' || envelope.data === null) {
-    throw new MessageApiError(envelope.code, envelope.message, response.status);
-  }
-
-  return envelope.data;
-}
-
-function getFetch(options: MessageApiOptions) {
-  return options.fetchImpl ?? globalThis.fetch.bind(globalThis);
-}
-
-function buildHeaders(options: MessageApiOptions, init: RequestInit) {
-  const headers = new Headers(init.headers);
-
-  if (init.body && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  if (options.token) {
-    headers.set('Authorization', `Bearer ${options.token}`);
-  }
-
-  return headers;
-}
-
-function normalizeBaseUrl(baseUrl = '') {
-  return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+export function markRead(conversationId: string, request: MarkReadRequest) {
+  return defaultMessageApi.markRead(conversationId, request);
 }

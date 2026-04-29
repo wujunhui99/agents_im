@@ -16,5 +16,5 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "vitest.setup.ts", "vite.config.ts", "eslint.config.js"]
+  "include": ["src", "vitest.setup.ts", "vite.config.ts", "vite.config.test.ts", "eslint.config.js"]
 }
