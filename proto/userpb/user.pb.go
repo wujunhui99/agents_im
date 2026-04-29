@@ -32,6 +32,7 @@ type User struct {
 	Region        string                 `protobuf:"bytes,7,opt,name=region,proto3" json:"region,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	AccountType   string                 `protobuf:"bytes,10,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -129,6 +130,13 @@ func (x *User) GetUpdatedAt() string {
 	return ""
 }
 
+func (x *User) GetAccountType() string {
+	if x != nil {
+		return x.AccountType
+	}
+	return ""
+}
+
 type CreateUserRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Identifier    string                 `protobuf:"bytes,1,opt,name=identifier,proto3" json:"identifier,omitempty"`
@@ -137,6 +145,7 @@ type CreateUserRequest struct {
 	Gender        string                 `protobuf:"bytes,4,opt,name=gender,proto3" json:"gender,omitempty"`
 	Age           int32                  `protobuf:"varint,5,opt,name=age,proto3" json:"age,omitempty"`
 	Region        string                 `protobuf:"bytes,6,opt,name=region,proto3" json:"region,omitempty"`
+	AccountType   string                 `protobuf:"bytes,7,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -209,6 +218,13 @@ func (x *CreateUserRequest) GetAge() int32 {
 func (x *CreateUserRequest) GetRegion() string {
 	if x != nil {
 		return x.Region
+	}
+	return ""
+}
+
+func (x *CreateUserRequest) GetAccountType() string {
+	if x != nil {
+		return x.AccountType
 	}
 	return ""
 }
@@ -529,7 +545,7 @@ var File_proto_user_proto protoreflect.FileDescriptor
 
 const file_proto_user_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/user.proto\x12\auser.v1\"\xf6\x01\n" +
+	"\x10proto/user.proto\x12\auser.v1\"\x99\x02\n" +
 	"\x04User\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1e\n" +
 	"\n" +
@@ -543,7 +559,9 @@ const file_proto_user_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\b \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\tR\tupdatedAt\"\xac\x01\n" +
+	"updated_at\x18\t \x01(\tR\tupdatedAt\x12!\n" +
+	"\faccount_type\x18\n" +
+	" \x01(\tR\vaccountType\"\xcf\x01\n" +
 	"\x11CreateUserRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +
@@ -552,7 +570,8 @@ const file_proto_user_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
 	"\x06gender\x18\x04 \x01(\tR\x06gender\x12\x10\n" +
 	"\x03age\x18\x05 \x01(\x05R\x03age\x12\x16\n" +
-	"\x06region\x18\x06 \x01(\tR\x06region\"<\n" +
+	"\x06region\x18\x06 \x01(\tR\x06region\x12!\n" +
+	"\faccount_type\x18\a \x01(\tR\vaccountType\"<\n" +
 	"\x1aGetUserByIdentifierRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +

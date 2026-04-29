@@ -50,6 +50,12 @@
 - PG 和 memory repository 语义一致。
 - 现有注册/登录/E2E 不破坏。
 
+当前分支落地说明：
+
+- `normal`、`agent`、`admin` 作为 user domain 合法枚举写入 Go model、REST response、User RPC contract 和 PostgreSQL migration。
+- 内存与 PostgreSQL repository 均把空 `account_type` 归一化为 `normal`，非法值返回明确参数错误。
+- HTTP 公开创建与 auth 注册路径不传递请求体中的 `account_type`，避免公开注册为 `admin` 或 `agent`。
+
 ### 2. `feature/agent-core-management`
 
 职责：Agent 配置管理，不含 LLM 执行。

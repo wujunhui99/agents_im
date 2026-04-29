@@ -305,6 +305,7 @@ type User struct {
 	Gender      string `json:"gender"`
 	Age         int32  `json:"age"`
 	Region      string `json:"region"`
+	AccountType string `json:"account_type"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }

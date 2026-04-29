@@ -186,6 +186,7 @@ func userResp(profile business.UserProfile) *types.UserResp {
 			Gender:      profile.Gender,
 			Age:         profile.Age,
 			Region:      profile.Region,
+			AccountType: profile.AccountType,
 			CreatedAt:   profile.CreatedAt,
 			UpdatedAt:   profile.UpdatedAt,
 		},

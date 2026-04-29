@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-第一阶段 PostgreSQL migration 已覆盖用户、认证、好友、群聊、消息、outbox 和 delivery attempt 表。
+第一阶段 PostgreSQL migration 已覆盖用户、认证、好友、群聊、消息、outbox 和 delivery attempt 表。`users.account_type` 支持 `normal`、`agent`、`admin`，默认 `normal`。
 
 ## 当前覆盖
 
