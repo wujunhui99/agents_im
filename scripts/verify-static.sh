@@ -161,6 +161,8 @@ required_files=(
   "docs/exec-plans/active/backend-mvp-completion.md"
   "docs/design-docs/backend-mvp-contract.md"
   "docs/product-specs/backend-mvp.md"
+  "docs/product-specs/frontend-backend-contract.md"
+  "docs/DEVELOPMENT.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -173,7 +175,10 @@ required_files=(
   ".env.example"
   "db/migrations/001_init_postgres.sql"
   "scripts/migrate-postgres.sh"
+  "scripts/dev-up.sh"
+  "scripts/dev-demo-data.sh"
   "tests/postgres_persistence_integration_test.go"
+  "tests/mvp_backend_test.go"
   "docs/exec-plans/active/gateway-message-contract.md"
   "docs/exec-plans/active/redis-presence.md"
   "docs/exec-plans/active/read-receipts.md"
@@ -193,6 +198,17 @@ for file in "${required_files[@]}"; do
     echo "missing required file: $file" >&2
     exit 1
   fi
+done
+
+shell_scripts=(
+  "scripts/migrate-postgres.sh"
+  "scripts/dev-up.sh"
+  "scripts/dev-demo-data.sh"
+  "scripts/verify-static.sh"
+)
+
+for script in "${shell_scripts[@]}"; do
+  bash -n "$script"
 done
 
 ci_workflow_patterns=(
@@ -332,6 +348,73 @@ message_api_patterns=(
 
 for pattern in "${message_api_patterns[@]}"; do
   rg -q "$pattern" api/message.api
+done
+
+frontend_contract_patterns=(
+  "/auth/register"
+  "/auth/login"
+  "/me"
+  "/users/exists"
+  "/friends"
+  "/groups"
+  "/messages"
+  "/ws"
+  "send_message"
+  "pull_messages"
+  "get_conversation_seqs"
+  "mark_conversation_read"
+  "message_received"
+  "message_delivered"
+  "INVALID_ARGUMENT"
+)
+
+for pattern in "${frontend_contract_patterns[@]}"; do
+  rg -qF "$pattern" docs/product-specs/frontend-backend-contract.md
+done
+
+development_doc_patterns=(
+  "scripts/dev-up.sh"
+  "scripts/dev-demo-data.sh"
+  "docker compose up -d postgres redis redpanda"
+  "bash scripts/migrate-postgres.sh"
+  "go test ./..."
+)
+
+for pattern in "${development_doc_patterns[@]}"; do
+  rg -qF "$pattern" docs/DEVELOPMENT.md
+done
+
+dev_script_patterns=(
+  "docker compose up -d postgres redis redpanda"
+  "bash scripts/migrate-postgres.sh"
+  "StorageDriver: postgres"
+  "gateway-ws"
+)
+
+for pattern in "${dev_script_patterns[@]}"; do
+  rg -qF "$pattern" scripts/dev-up.sh
+done
+
+demo_data_patterns=(
+  "/auth/register"
+  "/friends"
+  "/groups"
+  "/messages"
+  "/read"
+)
+
+for pattern in "${demo_data_patterns[@]}"; do
+  rg -qF "$pattern" scripts/dev-demo-data.sh
+done
+
+mvp_test_patterns=(
+  "TestMVPBackendAuthProfileSmoke"
+  "TestMVPBackendFriendGroupMessageSmoke"
+  "TestMVPBackendWebSocketSendPullMarkReadSmoke"
+)
+
+for pattern in "${mvp_test_patterns[@]}"; do
+  rg -q "$pattern" tests/mvp_backend_test.go
 done
 
 proto_patterns=(

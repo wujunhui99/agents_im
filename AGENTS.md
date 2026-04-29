@@ -17,11 +17,13 @@
 - 账号/认证/好友/群聊服务边界：[`docs/design-docs/user-auth-friends-groups-boundaries.md`](./docs/design-docs/user-auth-friends-groups-boundaries.md)
 - Agent-first 核心理念：[`docs/design-docs/core-beliefs.md`](./docs/design-docs/core-beliefs.md)
 - 产品规格索引：[`docs/product-specs/index.md`](./docs/product-specs/index.md)
+- 前后端 MVP 交接契约：[`docs/product-specs/frontend-backend-contract.md`](./docs/product-specs/frontend-backend-contract.md)
 - 账号社交基础产品规格：[`docs/product-specs/account-social-core.md`](./docs/product-specs/account-social-core.md)
 - User Service 第一阶段产品规格：[`docs/product-specs/user-service.md`](./docs/product-specs/user-service.md)
 - 消息链路产品规格：[`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)
 - 消息链路接口契约：[`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)
 - User Service go-zero 实现设计：[`docs/design-docs/user-service-go-zero.md`](./docs/design-docs/user-service-go-zero.md)
+- 本地开发启动说明：[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)
 - 执行计划规范：[`docs/PLANS.md`](./docs/PLANS.md)
 - 活跃执行计划：[`docs/exec-plans/active/`](./docs/exec-plans/active/)
 - 已完成执行计划：[`docs/exec-plans/completed/`](./docs/exec-plans/completed/)
@@ -80,6 +82,7 @@ feature/* -> develop -> main
 - 涉及复杂任务时，在 `docs/exec-plans/active/` 下创建执行计划。
 - 完成任务后，将执行计划移到 `docs/exec-plans/completed/`，并补充结果与验证记录。
 - PR/MR 描述必须包含测试结果与风险说明。
+- 前端联调相关变更必须同步检查 [`docs/product-specs/frontend-backend-contract.md`](./docs/product-specs/frontend-backend-contract.md)、[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)、`scripts/dev-up.sh`、`scripts/dev-demo-data.sh` 和 `tests/mvp_backend_test.go`。
 
 ## go-zero / goctl AI Knowledge
 
@@ -92,4 +95,3 @@ This repository uses go-zero. Before any go-zero refactor or code generation tas
 - `.ai-context/zero-skills/references/database-patterns.md`
 
 Local copies of the key references are also versioned under `docs/references/go-zero/` for stable review. Follow spec-first workflow: update `.api` / `.proto`, validate with `goctl`, generate boilerplate with `goctl`, keep business logic in `internal/logic`, and verify with `go test ./...` plus `scripts/verify-static.sh`.
-

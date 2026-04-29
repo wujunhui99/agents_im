@@ -13,6 +13,7 @@
 - [message-storage.md](./message-storage.md)：消息存储的幂等、顺序、拉取与已读保证
 - [gateway-message-contract.md](./gateway-message-contract.md)：Gateway 消息命令、拉取、已读与 ACK 第一阶段客户端语义
 - [read-receipts.md](./read-receipts.md)：标记已读、未读数和已读回执客户端行为
+- [frontend-backend-contract.md](./frontend-backend-contract.md)：前端 MVP 联调的 REST、WebSocket、错误 envelope 和本地验收契约
 
 新增需求时，先在本目录创建产品规格，再进入技术设计和执行计划。
 
