@@ -109,13 +109,15 @@ func TestUserHTTPHandlers(t *testing.T) {
 		t.Fatalf("missing token status = %d", meWithoutTokenResp.Code)
 	}
 
-	headerOnlyResp := httptest.NewRecorder()
-	headerOnlyReq := httptest.NewRequest(http.MethodGet, "/me", nil)
-	headerOnlyReq.Header.Set("X-User-Id", created.Data.UserID)
-	mux.ServeHTTP(headerOnlyResp, headerOnlyReq)
-	if headerOnlyResp.Code != http.StatusUnauthorized {
-		t.Fatalf("X-User-Id bypass status = %d", headerOnlyResp.Code)
-	}
+	t.Run("rejects legacy X-User-Id header without bearer token", func(t *testing.T) {
+		headerOnlyResp := httptest.NewRecorder()
+		headerOnlyReq := httptest.NewRequest(http.MethodGet, "/me", nil)
+		setRejectedLegacyXUserIDHeader(t, headerOnlyReq, created.Data.UserID)
+		mux.ServeHTTP(headerOnlyResp, headerOnlyReq)
+		if headerOnlyResp.Code != http.StatusUnauthorized {
+			t.Fatalf("legacy X-User-Id rejection status = %d", headerOnlyResp.Code)
+		}
+	})
 
 	meResp := httptest.NewRecorder()
 	meReq := httptest.NewRequest(http.MethodGet, "/me", nil)

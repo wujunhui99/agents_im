@@ -229,13 +229,15 @@ func TestMessageHTTPHandlersUseJWTUser(t *testing.T) {
 	serviceContext := svc.NewMessageServiceContextWithAuth(repository.NewMemoryMessageRepository(), nil, nil, testJWTAuthConfig())
 	mux := newMessageGoZeroRouter(t, serviceContext)
 
-	headerOnlyResp := httptest.NewRecorder()
-	headerOnlyReq := newJSONRequest(http.MethodPost, "/messages", `{"receiverId":"usr_receiver","chatType":"single","clientMsgId":"client-http-bypass","contentType":"text","content":"hello"}`)
-	headerOnlyReq.Header.Set("X-User-Id", "usr_sender")
-	mux.ServeHTTP(headerOnlyResp, headerOnlyReq)
-	if headerOnlyResp.Code != http.StatusUnauthorized {
-		t.Fatalf("X-User-Id bypass status = %d", headerOnlyResp.Code)
-	}
+	t.Run("rejects legacy X-User-Id header without bearer token", func(t *testing.T) {
+		headerOnlyResp := httptest.NewRecorder()
+		headerOnlyReq := newJSONRequest(http.MethodPost, "/messages", `{"receiverId":"usr_receiver","chatType":"single","clientMsgId":"client-http-bypass","contentType":"text","content":"hello"}`)
+		setRejectedLegacyXUserIDHeader(t, headerOnlyReq, "usr_sender")
+		mux.ServeHTTP(headerOnlyResp, headerOnlyReq)
+		if headerOnlyResp.Code != http.StatusUnauthorized {
+			t.Fatalf("legacy X-User-Id rejection status = %d", headerOnlyResp.Code)
+		}
+	})
 
 	invalidTokenResp := httptest.NewRecorder()
 	invalidTokenReq := httptest.NewRequest(http.MethodGet, "/conversations/seqs", nil)
@@ -256,7 +258,6 @@ func TestMessageHTTPHandlersUseJWTUser(t *testing.T) {
 	sendResp := httptest.NewRecorder()
 	sendReq := newJSONRequest(http.MethodPost, "/messages", `{"receiverId":"usr_receiver","chatType":"single","clientMsgId":"client-http-send","contentType":"text","content":"hello"}`)
 	sendReq.Header.Set("Authorization", bearerTokenForUser(t, "usr_sender"))
-	sendReq.Header.Set("X-User-Id", "usr_receiver")
 	mux.ServeHTTP(sendResp, sendReq)
 	if sendResp.Code != http.StatusOK {
 		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())

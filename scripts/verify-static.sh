@@ -455,6 +455,16 @@ if rg -n "X-User-Id|CurrentUserID|currentUserID" api internal cmd; then
   exit 1
 fi
 
+legacy_x_user_id_sets="$(rg -n 'Header\.Set\("X-User-Id"' tests internal || true)"
+if [[ -n "$legacy_x_user_id_sets" ]]; then
+  disallowed_legacy_x_user_id_sets="$(printf '%s\n' "$legacy_x_user_id_sets" | rg -v 'legacy X-User-Id rejection helper' || true)"
+  if [[ -n "$disallowed_legacy_x_user_id_sets" ]]; then
+    printf '%s\n' "$disallowed_legacy_x_user_id_sets" >&2
+    echo "legacy X-User-Id header writes in tests/internal must use Authorization Bearer JWT or an explicit rejection helper/comment" >&2
+    exit 1
+  fi
+fi
+
 jwt_api_files=(
   "api/user.api"
   "api/friends.api"
@@ -491,7 +501,7 @@ jwt_test_patterns=(
   "assertLooksLikeJWT"
   "TestAuthIssuedBearerTokenAccessesMe"
   "bearerTokenForUser"
-  "X-User-Id bypass"
+  "legacy X-User-Id rejection"
   "invalid token status"
   "message sender did not use token user"
 )

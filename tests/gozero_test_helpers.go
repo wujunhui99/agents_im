@@ -97,3 +97,9 @@ func bearerTokenForUser(t *testing.T, userID string) string {
 	}
 	return "Bearer " + rawToken
 }
+
+func setRejectedLegacyXUserIDHeader(t *testing.T, req *http.Request, userID string) {
+	t.Helper()
+
+	req.Header.Set("X-User-Id", userID) // legacy X-User-Id rejection helper
+}

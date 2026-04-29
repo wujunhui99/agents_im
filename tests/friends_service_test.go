@@ -120,18 +120,19 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 	bob := createFriendTestUser(t, ctx, serviceContext.UserLogic, "bob_http")
 	aliceBearer := bearerTokenForUser(t, alice.UserID)
 
-	bypassResp := httptest.NewRecorder()
-	bypassReq := newJSONRequest(http.MethodPost, "/friends", fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID))
-	bypassReq.Header.Set("X-User-Id", alice.UserID)
-	mux.ServeHTTP(bypassResp, bypassReq)
-	if bypassResp.Code != http.StatusUnauthorized {
-		t.Fatalf("X-User-Id bypass status = %d", bypassResp.Code)
-	}
+	t.Run("rejects legacy X-User-Id header without bearer token", func(t *testing.T) {
+		bypassResp := httptest.NewRecorder()
+		bypassReq := newJSONRequest(http.MethodPost, "/friends", fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID))
+		setRejectedLegacyXUserIDHeader(t, bypassReq, alice.UserID)
+		mux.ServeHTTP(bypassResp, bypassReq)
+		if bypassResp.Code != http.StatusUnauthorized {
+			t.Fatalf("legacy X-User-Id rejection status = %d", bypassResp.Code)
+		}
+	})
 
 	addResp := httptest.NewRecorder()
 	addReq := newJSONRequest(http.MethodPost, "/friends", fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID))
 	addReq.Header.Set("Authorization", aliceBearer)
-	addReq.Header.Set("X-User-Id", bob.UserID)
 	mux.ServeHTTP(addResp, addReq)
 	if addResp.Code != http.StatusOK {
 		t.Fatalf("add status = %d, body = %s", addResp.Code, addResp.Body.String())

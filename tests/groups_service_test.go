@@ -153,18 +153,19 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	creatorBearer := bearerTokenForUser(t, creator.UserID)
 	memberBearer := bearerTokenForUser(t, member.UserID)
 
-	bypassResp := httptest.NewRecorder()
-	bypassReq := newJSONRequest(http.MethodPost, "/groups", `{"name":"Header Only"}`)
-	bypassReq.Header.Set("X-User-Id", creator.UserID)
-	mux.ServeHTTP(bypassResp, bypassReq)
-	if bypassResp.Code != http.StatusUnauthorized {
-		t.Fatalf("X-User-Id bypass status = %d", bypassResp.Code)
-	}
+	t.Run("rejects legacy X-User-Id header without bearer token", func(t *testing.T) {
+		bypassResp := httptest.NewRecorder()
+		bypassReq := newJSONRequest(http.MethodPost, "/groups", `{"name":"Header Only"}`)
+		setRejectedLegacyXUserIDHeader(t, bypassReq, creator.UserID)
+		mux.ServeHTTP(bypassResp, bypassReq)
+		if bypassResp.Code != http.StatusUnauthorized {
+			t.Fatalf("legacy X-User-Id rejection status = %d", bypassResp.Code)
+		}
+	})
 
 	createResp := httptest.NewRecorder()
 	createReq := newJSONRequest(http.MethodPost, "/groups", `{"name":"Team Chat","description":"team room"}`)
 	createReq.Header.Set("Authorization", creatorBearer)
-	createReq.Header.Set("X-User-Id", member.UserID)
 	mux.ServeHTTP(createResp, createReq)
 	if createResp.Code != http.StatusOK {
 		t.Fatalf("create group status = %d, body = %s", createResp.Code, createResp.Body.String())
