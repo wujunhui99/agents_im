@@ -47,17 +47,49 @@ type PresenceConfig struct {
 	KeyPrefix           string
 }
 
+type MessageTransferConfig struct {
+	Name       string
+	WorkerID   string
+	DryRun     bool
+	Consumer   TransferConsumerConfig
+	Dispatcher TransferDispatcherConfig
+	Worker     TransferWorkerConfig
+}
+
+type TransferConsumerConfig struct {
+	Driver string
+	Topic  string
+	Group  string
+}
+
+type TransferDispatcherConfig struct {
+	Driver string
+}
+
+type TransferWorkerConfig struct {
+	PollIntervalMillis int64
+	RetryBackoffMillis int64
+	MaxAttempts        int
+}
+
 const (
-	StorageDriverMemory   = "memory"
-	StorageDriverPostgres = "postgres"
-	PresenceDriverMemory  = "memory"
-	PresenceDriverRedis   = "redis"
+	StorageDriverMemory    = "memory"
+	StorageDriverPostgres  = "postgres"
+	PresenceDriverMemory   = "memory"
+	PresenceDriverRedis    = "redis"
+	TransferConsumerMemory = "memory"
+	TransferDispatcherNoop = "noop"
 )
 
 const (
 	defaultRedisAddr                   = "localhost:6379"
 	defaultPresenceHeartbeatTTLSeconds = 60
 	defaultPresenceRedisKeyPrefix      = "agents_im:presence"
+	defaultTransferTopic               = "message.accepted.v1"
+	defaultTransferGroup               = "message-transfer"
+	defaultTransferPollIntervalMillis  = 100
+	defaultTransferRetryBackoffMillis  = 1000
+	defaultTransferMaxAttempts         = 5
 )
 
 func DefaultAPIConfig() APIConfig {
@@ -102,6 +134,27 @@ func DefaultPresenceConfig() PresenceConfig {
 		Driver:              PresenceDriverMemory,
 		HeartbeatTTLSeconds: defaultPresenceHeartbeatTTLSeconds,
 		KeyPrefix:           defaultPresenceRedisKeyPrefix,
+	}
+}
+
+func DefaultMessageTransferConfig() MessageTransferConfig {
+	return MessageTransferConfig{
+		Name:     "message-transfer",
+		WorkerID: defaultWorkerID(),
+		DryRun:   true,
+		Consumer: TransferConsumerConfig{
+			Driver: TransferConsumerMemory,
+			Topic:  defaultTransferTopic,
+			Group:  defaultTransferGroup,
+		},
+		Dispatcher: TransferDispatcherConfig{
+			Driver: TransferDispatcherNoop,
+		},
+		Worker: TransferWorkerConfig{
+			PollIntervalMillis: defaultTransferPollIntervalMillis,
+			RetryBackoffMillis: defaultTransferRetryBackoffMillis,
+			MaxAttempts:        defaultTransferMaxAttempts,
+		},
 	}
 }
 
@@ -194,6 +247,69 @@ func LoadRPCConfig(path string) (RPCConfig, error) {
 	return cfg, nil
 }
 
+func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
+	cfg := DefaultMessageTransferConfig()
+	values, err := readFlatYAML(path)
+	if err != nil {
+		return cfg, err
+	}
+
+	if value := values["Name"]; value != "" {
+		cfg.Name = value
+	}
+	cfg.WorkerID = firstNonEmpty(values["Worker.ID"], values["WorkerID"], os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), cfg.WorkerID)
+	if value := firstNonEmpty(values["Consumer.Driver"], values["ConsumerDriver"]); value != "" {
+		cfg.Consumer.Driver = ResolveTransferConsumerDriver(value)
+	} else {
+		cfg.Consumer.Driver = ResolveTransferConsumerDriver(cfg.Consumer.Driver)
+	}
+	cfg.Consumer.Topic = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(firstNonEmpty(values["Consumer.Topic"], values["Topic"]))),
+		os.Getenv("MESSAGE_TRANSFER_TOPIC"),
+		cfg.Consumer.Topic,
+	)
+	cfg.Consumer.Group = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(firstNonEmpty(values["Consumer.Group"], values["ConsumerGroup"]))),
+		os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"),
+		cfg.Consumer.Group,
+	)
+	if value := firstNonEmpty(values["Dispatcher.Driver"], values["DispatcherDriver"]); value != "" {
+		cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(value)
+	} else {
+		cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(cfg.Dispatcher.Driver)
+	}
+	if value := firstNonEmpty(values["Worker.PollIntervalMillis"], values["PollIntervalMillis"]); value != "" {
+		interval, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Worker.PollIntervalMillis = interval
+	}
+	if value := firstNonEmpty(values["Worker.RetryBackoffMillis"], values["RetryBackoffMillis"]); value != "" {
+		backoff, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Worker.RetryBackoffMillis = backoff
+	}
+	if value := firstNonEmpty(values["Worker.MaxAttempts"], values["MaxAttempts"]); value != "" {
+		maxAttempts, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Worker.MaxAttempts = maxAttempts
+	}
+	if value := values["DryRun"]; value != "" {
+		dryRun, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.DryRun = dryRun
+	}
+	cfg = ResolveMessageTransferConfig(cfg)
+	return cfg, nil
+}
+
 func ToRestConf(cfg APIConfig) rest.RestConf {
 	var restConf rest.RestConf
 	restConf.Name = cfg.Name
@@ -226,6 +342,47 @@ func ResolvePresenceDriver(value string) string {
 	default:
 		return PresenceDriverMemory
 	}
+}
+
+func ResolveTransferConsumerDriver(value string) string {
+	value = strings.ToLower(strings.TrimSpace(os.ExpandEnv(value)))
+	if value == "" {
+		value = strings.ToLower(strings.TrimSpace(os.Getenv("MESSAGE_TRANSFER_CONSUMER_DRIVER")))
+	}
+	switch value {
+	default:
+		return TransferConsumerMemory
+	}
+}
+
+func ResolveTransferDispatcherDriver(value string) string {
+	value = strings.ToLower(strings.TrimSpace(os.ExpandEnv(value)))
+	if value == "" {
+		value = strings.ToLower(strings.TrimSpace(os.Getenv("MESSAGE_TRANSFER_DISPATCHER_DRIVER")))
+	}
+	switch value {
+	default:
+		return TransferDispatcherNoop
+	}
+}
+
+func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConfig {
+	cfg.Name = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "message-transfer")
+	cfg.WorkerID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.WorkerID)), os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), defaultWorkerID())
+	cfg.Consumer.Driver = ResolveTransferConsumerDriver(cfg.Consumer.Driver)
+	cfg.Consumer.Topic = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Topic)), os.Getenv("MESSAGE_TRANSFER_TOPIC"), defaultTransferTopic)
+	cfg.Consumer.Group = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Group)), os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"), defaultTransferGroup)
+	cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(cfg.Dispatcher.Driver)
+	if cfg.Worker.PollIntervalMillis <= 0 {
+		cfg.Worker.PollIntervalMillis = defaultTransferPollIntervalMillis
+	}
+	if cfg.Worker.RetryBackoffMillis <= 0 {
+		cfg.Worker.RetryBackoffMillis = defaultTransferRetryBackoffMillis
+	}
+	if cfg.Worker.MaxAttempts <= 0 {
+		cfg.Worker.MaxAttempts = defaultTransferMaxAttempts
+	}
+	return cfg
 }
 
 func ResolveDataSource(value string) string {
@@ -379,4 +536,11 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func defaultWorkerID() string {
+	if hostname := strings.TrimSpace(os.Getenv("HOSTNAME")); hostname != "" {
+		return hostname
+	}
+	return "message-transfer-local"
 }

@@ -52,6 +52,10 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 
 负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并为后续 Gateway、Message Transfer、Push 服务提供事件契约。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
 
+### Message Transfer Worker
+
+负责消费未来 Message Outbox 或 Kafka/Redpanda 中的 `message.accepted` 事件，并通过 Delivery Dispatcher 触发在线投递、离线推送或后续 delivery ACK 流程。第一阶段提供独立入口 `cmd/message-transfer`，默认使用 in-memory consumer 和 noop dispatcher，因此不依赖真实 Kafka、Redpanda、PostgreSQL outbox 或 Gateway fanout。Worker 不拥有消息历史、会话 seq 或已读状态；这些仍由 Message Service 和 PostgreSQL 权威维护。设计见 [`docs/design-docs/message-transfer-worker.md`](./docs/design-docs/message-transfer-worker.md)。
+
 ### IM Core Service
 
 负责 IM 核心业务链路，包括用户会话、消息收发、消息状态、会话成员管理等。
@@ -105,7 +109,8 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 2. Gateway 校验连接 JWT 身份，并把 token `user_id` 注入消息发送请求。
 3. Message Service 写入消息，生成 `server_msg_id` 和会话内递增 `seq`。
 4. Gateway 返回 command ACK。第一阶段 ACK 只表示消息业务命令完成，不表示收件端在线送达。
-5. Kafka fanout、Push worker、Redis Presence 和 delivery ACK 由后续链路补齐。
+5. Message Transfer Worker 后续从 Message Outbox 或 Kafka/Redpanda 消费 `message.accepted` 事件，并调度 Gateway/Push 投递。
+6. Redis Presence、真实 Gateway fanout、Push worker 和 delivery ACK 由后续链路补齐。
 
 ### Agent 响应消息
 

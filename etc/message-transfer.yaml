@@ -1,0 +1,16 @@
+Name: message-transfer
+WorkerID: ${HOSTNAME}
+DryRun: true
+
+Consumer:
+  Driver: memory
+  Topic: message.accepted.v1
+  Group: message-transfer
+
+Dispatcher:
+  Driver: noop
+
+Worker:
+  PollIntervalMillis: 100
+  RetryBackoffMillis: 1000
+  MaxAttempts: 5
