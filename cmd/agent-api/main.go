@@ -24,9 +24,11 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
+	userRepo := repository.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	userLogic := logic.NewUserLogic(userRepo)
 	serviceContext := svc.NewAgentServiceContextWithAuth(
 		repository.MustAgentRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
-		logic.NewFailClosedUserAccountTypeChecker(),
+		logic.NewUserLogicAccountTypeChecker(userLogic),
 		cfg.Auth,
 	)
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)

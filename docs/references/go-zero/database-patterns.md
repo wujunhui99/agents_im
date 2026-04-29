@@ -703,4 +703,4 @@ func (m *defaultUserModel) Delete(ctx context.Context, id string) error {
 - Pub/sub messaging
 - Hot data caching
 
-For Redis-specific patterns, see [Resilience Patterns](./resilience-patterns.md).
+For Redis-specific patterns, see the upstream Resilience Patterns guide; that file is not vendored in this repository.

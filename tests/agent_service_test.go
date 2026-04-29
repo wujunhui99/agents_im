@@ -86,6 +86,46 @@ func TestAgentLogicFailClosedWithoutAccountTypeChecker(t *testing.T) {
 	}
 }
 
+func TestAgentLogicUsesUserLogicAccountTypeChecker(t *testing.T) {
+	ctx := context.Background()
+	userRepo := repository.NewMemoryRepository()
+	userLogic := logic.NewUserLogic(userRepo)
+	agentUser, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
+		Identifier:  "agentuser",
+		DisplayName: "Agent User",
+		AccountType: logic.AccountTypeAgent,
+	})
+	if err != nil {
+		t.Fatalf("create agent user: %v", err)
+	}
+	normalUser, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
+		Identifier:  "normaluser",
+		DisplayName: "Normal User",
+	})
+	if err != nil {
+		t.Fatalf("create normal user: %v", err)
+	}
+
+	agentLogic := logic.NewAgentLogic(
+		repository.NewMemoryAgentRepository(),
+		logic.NewUserLogicAccountTypeChecker(userLogic),
+	)
+	if _, err := agentLogic.CreateAgent(ctx, logic.CreateAgentRequest{
+		IMUserID:  agentUser.UserID,
+		Name:      "Real Checker Bot",
+		CreatedBy: "usr_admin",
+	}); err != nil {
+		t.Fatalf("create agent with real account type checker: %v", err)
+	}
+	if _, err := agentLogic.CreateAgent(ctx, logic.CreateAgentRequest{
+		IMUserID:  normalUser.UserID,
+		Name:      "Wrong Type Bot",
+		CreatedBy: "usr_admin",
+	}); err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("normal user binding error = %v, want FORBIDDEN", err)
+	}
+}
+
 func TestAgentLogicUpdateListStatusAndArchive(t *testing.T) {
 	ctx := context.Background()
 	agentRepo := repository.NewMemoryAgentRepository()

@@ -41,6 +41,28 @@ func (FailClosedUserAccountTypeChecker) EnsureUserAccountType(context.Context, s
 	return apperror.Internal("user account_type checker is not configured")
 }
 
+type UserLogicAccountTypeChecker struct {
+	userLogic *UserLogic
+}
+
+func NewUserLogicAccountTypeChecker(userLogic *UserLogic) UserLogicAccountTypeChecker {
+	return UserLogicAccountTypeChecker{userLogic: userLogic}
+}
+
+func (c UserLogicAccountTypeChecker) EnsureUserAccountType(ctx context.Context, userID string, accountType string) error {
+	if c.userLogic == nil {
+		return apperror.Internal("user account_type checker is not configured")
+	}
+	profile, err := c.userLogic.GetUserByID(ctx, GetUserByIDRequest{UserID: userID})
+	if err != nil {
+		return err
+	}
+	if profile.AccountType != accountType {
+		return apperror.Forbidden("user account_type must be " + accountType)
+	}
+	return nil
+}
+
 type AgentLogic struct {
 	repo               repository.AgentRepository
 	accountTypeChecker UserAccountTypeChecker

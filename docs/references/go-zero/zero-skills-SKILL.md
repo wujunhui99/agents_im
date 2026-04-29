@@ -33,7 +33,7 @@ This skill organizes go-zero knowledge into focused modules. **Load specific gui
 ### Pattern Guides (Detailed Reference)
 
 #### 1. REST API Patterns
-**File**: [references/rest-api-patterns.md](references/rest-api-patterns.md)
+**File**: [rest-api-patterns.md](./rest-api-patterns.md)
 **When to load**: Creating HTTP endpoints, implementing CRUD operations, adding middleware
 **Contains**:
 - Handler → Logic → Context three-layer architecture
@@ -43,7 +43,7 @@ This skill organizes go-zero knowledge into focused modules. **Load specific gui
 - Complete CRUD examples with ✅ correct vs ❌ incorrect patterns
 
 #### 2. RPC Service Patterns
-**File**: [references/rpc-patterns.md](references/rpc-patterns.md)
+**File**: [rpc-patterns.md](./rpc-patterns.md)
 **When to load**: Building gRPC services, service-to-service communication
 **Contains**:
 - Protocol Buffers definition and code generation
@@ -53,7 +53,7 @@ This skill organizes go-zero knowledge into focused modules. **Load specific gui
 - Error handling in RPC contexts
 
 #### 3. Database Patterns
-**File**: [references/database-patterns.md](references/database-patterns.md)
+**File**: [database-patterns.md](./database-patterns.md)
 **When to load**: Implementing data persistence, caching, or complex queries
 **Contains**:
 - SQL operations with sqlx (CRUD, transactions, batch inserts)
@@ -63,7 +63,7 @@ This skill organizes go-zero knowledge into focused modules. **Load specific gui
 - Connection pooling and performance tuning
 
 #### 4. Resilience Patterns
-**File**: [references/resilience-patterns.md](references/resilience-patterns.md)
+**File**: `resilience-patterns.md` (not vendored in this repository)
 **When to load**: Production hardening, handling failures, managing system load
 **Contains**:
 - Circuit breaker configuration (Breaker)
@@ -73,7 +73,7 @@ This skill organizes go-zero knowledge into focused modules. **Load specific gui
 - Graceful shutdown and degradation
 
 #### 5. goctl Command Reference
-**File**: [references/goctl-commands.md](references/goctl-commands.md)
+**File**: [goctl-commands.md](./goctl-commands.md)
 **When to load**: Generating code with goctl, setting up new services, post-generation steps
 **Contains**:
 - goctl installation and detection
@@ -87,22 +87,22 @@ This skill organizes go-zero knowledge into focused modules. **Load specific gui
 ### Supporting Resources
 
 #### Best Practices
-**File**: [best-practices/overview.md](best-practices/overview.md)
+**File**: `best-practices/overview.md` (not vendored in this repository)
 **When to load**: Production deployment, code review, optimization
 **Contains**: Configuration management, logging, monitoring, security, performance
 
 #### Troubleshooting
-**File**: [troubleshooting/common-issues.md](troubleshooting/common-issues.md)
+**File**: `troubleshooting/common-issues.md` (not vendored in this repository)
 **When to load**: Debugging errors, configuration issues, runtime problems
 **Contains**: Common error messages, solutions, configuration pitfalls, debugging tips
 
 #### Claude Code Integration
-**File**: [getting-started/claude-code-guide.md](getting-started/claude-code-guide.md)
+**File**: `getting-started/claude-code-guide.md` (not vendored in this repository)
 **When to load**: Setting up Claude Code for zero-skills usage
 **Contains**: Installation, invocation methods, advanced features (subagents, dynamic context)
 
 #### Tool Integration Guides
-**File**: [getting-started/README.md](getting-started/README.md)
+**File**: `getting-started/README.md` (not vendored in this repository)
 **When to load**: Setting up zero-skills with Cursor, GitHub Copilot, Windsurf, or Codex
 **Contains**: Feature comparison table, per-tool setup instructions (Claude Code, Cursor, Copilot, Windsurf, Codex)
 
@@ -119,7 +119,7 @@ These workflows guide you through typical go-zero development tasks:
 4. Add validation and error handling with `httpx`
 5. Test endpoints with proper request/response handling
 
-**Detailed guide**: [references/rest-api-patterns.md](references/rest-api-patterns.md#complete-rest-api-workflow)
+**Detailed guide**: [rest-api-patterns.md](./rest-api-patterns.md#complete-rest-api-workflow)
 
 ### Implementing Database Operations
 
@@ -130,7 +130,7 @@ These workflows guide you through typical go-zero development tasks:
 4. Use sqlx methods in logic layer (`Insert`, `FindOne`, `Update`, `Delete`)
 5. Handle transactions and errors properly with `ctx` propagation
 
-**Detailed guide**: [references/database-patterns.md](references/database-patterns.md#crud-operations)
+**Detailed guide**: [database-patterns.md](./database-patterns.md#crud-operations)
 
 ### Adding Middleware
 
@@ -141,7 +141,7 @@ These workflows guide you through typical go-zero development tasks:
 4. Pass validated data through `r.Context()`
 5. Handle errors with appropriate HTTP status codes
 
-**Detailed guide**: [references/rest-api-patterns.md](references/rest-api-patterns.md#middleware-patterns)
+**Detailed guide**: [rest-api-patterns.md](./rest-api-patterns.md#middleware-patterns)
 
 ### Building an RPC Service
 
@@ -152,7 +152,7 @@ These workflows guide you through typical go-zero development tasks:
 4. Configure service discovery (etcd/consul/kubernetes)
 5. Test with RPC client and handle errors
 
-**Detailed guide**: [references/rpc-patterns.md](references/rpc-patterns.md#complete-rpc-workflow)
+**Detailed guide**: [rpc-patterns.md](./rpc-patterns.md#complete-rpc-workflow)
 
 ## ⚡ Key Principles
 
@@ -185,27 +185,27 @@ Follow this path based on your needs:
 1. **Start here**: [Official go-zero Quick Start](https://go-zero.dev/docs/quick-start)
    Install go-zero, create your first API, understand basic concepts
 
-2. **Add a database**: [references/database-patterns.md](references/database-patterns.md)
+2. **Add a database**: [database-patterns.md](./database-patterns.md)
    Connect to MySQL/PostgreSQL, generate models, implement CRUD
 
 ### 🟡 Building production services?
 
-1. **Review best practices**: [best-practices/overview.md](best-practices/overview.md)
+1. **Review best practices**: `best-practices/overview.md`
    Configuration, logging, monitoring, security checklist
 
-2. **Add resilience**: [references/resilience-patterns.md](references/resilience-patterns.md)
+2. **Add resilience**: `resilience-patterns.md`
    Circuit breakers, rate limiting, graceful degradation
 
-3. **Check common pitfalls**: [troubleshooting/common-issues.md](troubleshooting/common-issues.md)
+3. **Check common pitfalls**: `troubleshooting/common-issues.md`
    Avoid typical mistakes and know how to debug issues
 
 ### 🔵 Extending capabilities?
 
-1. **Use with Claude Code**: [getting-started/claude-code-guide.md](getting-started/claude-code-guide.md)
+1. **Use with Claude Code**: `getting-started/claude-code-guide.md`
    Learn advanced features like subagents, dynamic context, and argument passing
    Run demo projects to validate your environment
 
-2. **Verify knowledge**: [examples/verify-tutorial.sh](examples/verify-tutorial.sh)
+2. **Verify knowledge**: `examples/verify-tutorial.sh`
    Script to check if examples work correctly
 
 ## 🔗 Integration with go-zero AI Ecosystem
@@ -217,7 +217,7 @@ This skill is part of a two-layer ecosystem for AI-assisted go-zero development:
 | **[ai-context](https://github.com/zeromicro/ai-context)** | Concise workflow instructions (~5KB) | GitHub Copilot, Cursor, Windsurf |
 | **zero-skills** (this repo) | Comprehensive knowledge base + goctl reference (~45KB) | All AI tools, deep learning, reference |
 
-The AI runs `goctl` directly in the terminal for code generation — no separate MCP server needed. See [references/goctl-commands.md](references/goctl-commands.md) for the complete command reference.
+The AI runs `goctl` directly in the terminal for code generation — no separate MCP server needed. See [goctl-commands.md](./goctl-commands.md) for the complete command reference.
 
 **Usage in Claude Code:**
 - This skill loads automatically when working with go-zero projects
@@ -225,7 +225,7 @@ The AI runs `goctl` directly in the terminal for code generation — no separate
 - AI runs goctl commands directly in the terminal for code generation
 - Reference specific pattern files when needed (Claude loads them on demand)
 
-See [getting-started/claude-code-guide.md](getting-started/claude-code-guide.md) for detailed usage instructions.
+See `getting-started/claude-code-guide.md` in the upstream zero-skills source for detailed usage instructions.
 
 ## 🌐 Additional Resources
 
