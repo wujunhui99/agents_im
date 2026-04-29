@@ -4,6 +4,7 @@
 
 ## 当前规格
 
+- [agent-system.md](./agent-system.md)：Agent 账号类型、提示词、工具、skills、Python 执行和 IM 集成产品规格
 - [agent-chat.md](./agent-chat.md)：Agent 单聊与群聊
 - [agent-lifecycle.md](./agent-lifecycle.md)：Agent 创建、销毁与持久化
 - [account-social-core.md](./account-social-core.md)：账号资料、认证、好友与群聊基础能力

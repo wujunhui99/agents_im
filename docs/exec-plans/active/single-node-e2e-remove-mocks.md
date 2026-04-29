@@ -29,9 +29,9 @@
 - [x] 确认 E2E 阻塞点：消息页 mock 默认路径、联系人页硬编码 demo 数据。
 - [x] 先写/更新失败测试：App 主流程必须调用 `/conversations/seqs`、`/users/:identifier`、`/friends`、`/messages`。
 - [x] 删除生产 mock 数据源，改造消息页和联系人页走真实 API。
-- [ ] 运行完整验证并修复失败。
-- [ ] feature -> develop -> main 合并推送。
-- [ ] 本机启动真实服务并执行 E2E。
+- [x] 运行完整验证并修复失败。
+- [x] feature -> develop -> main 合并推送。
+- [x] 本机启动真实服务并执行 E2E。
 
 ## 验收标准
 
@@ -54,3 +54,17 @@ make status
 ```
 
 并通过真实后端路径完成：注册 A、注册 B、登录、A 添加 B、聊天发送消息、B 可收到或拉取消息。
+
+
+## 已完成补充修复
+
+另一个 Agent 在单机 E2E 排查中发现并修复了两个合理问题，已评审通过并并入长期文档：
+
+1. **WebSocket live delivery**：`send_message` 通过 WebSocket 持久化并 ACK 后，单聊在线接收方现在会收到同实例 `message_received` push。失败只记录日志，不回滚已持久化消息；跨实例投递仍由 Message Transfer / Delivery pipeline 负责。
+2. **本地 E2E 启动韧性**：`scripts/dev-up.sh --services-only` 可以在 Docker middleware 已运行时只重启 Go host services，并支持 `USER_API_PORT`、`AUTH_API_PORT`、`FRIENDS_API_PORT`、`MESSAGE_API_PORT`、`GATEWAY_WS_PORT`、`GROUPS_API_PORT` 覆盖，方便默认端口被 stale/root-owned 进程占用时使用备用端口。
+3. **单进程 smoke**：`go run ./cmd/single-machine-e2e` 可在不绑定外部 HTTP 端口的情况下验证注册、加好友、消息逻辑、WebSocket ACK 和在线 push。它是 smoke check，不替代完整 Docker/REST/WebSocket runtime E2E。
+
+对应长期文档位置：
+
+- `docs/DEVELOPMENT.md`
+- `docs/design-docs/websocket-gateway.md`
