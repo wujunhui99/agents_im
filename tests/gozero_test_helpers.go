@@ -47,6 +47,13 @@ func newMessageGoZeroRouter(t *testing.T, serviceContext *svc.ServiceContext) ht
 	})
 }
 
+func newAgentGoZeroRouter(t *testing.T, serviceContext *svc.ServiceContext) http.Handler {
+	t.Helper()
+	return newGoZeroRouter(t, func(server *rest.Server) {
+		handler.RegisterAgentGoZeroHandlers(server, serviceContext)
+	})
+}
+
 func newAuthGoZeroRouter(t *testing.T, serviceContext *authsvc.ServiceContext) http.Handler {
 	t.Helper()
 	return newGoZeroRouter(t, func(server *rest.Server) {

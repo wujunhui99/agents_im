@@ -72,6 +72,25 @@
 - 禁止 silent fallback 创建假 user。
 - API/logic/repository 单测通过。
 
+当前进展（2026-04-30）：
+
+- 已新增 `api/agent.api`、`cmd/agent-api`、`etc/agent-api.yaml`。
+- 已新增 `agents` 表迁移 `db/migrations/002_agent_management.sql`，Agent 配置与 `users` 表分离。
+- 已新增 Agent domain、logic、memory/PostgreSQL repository、go-zero handler/logic adapter。
+- 创建 Agent 通过 `UserAccountTypeChecker` 校验 `account_type=agent`；由于本分支尚未合入账号类型持久化，真实服务默认 fail closed，测试使用显式 test fixture checker。
+- 已覆盖 create/list/get/update/status/archive、非 agent 用户拒绝、缺失 checker 失败优先和 HTTP handler 测试。
+
+验证记录（2026-04-30）：
+
+- TDD fail-first：新增 `tests/agent_service_test.go` 后运行 `go test ./tests -run Agent -count=1`，初始失败为缺少 Agent production 类型/仓储/逻辑。
+- `goctl --version`：`goctl version 1.10.1 linux/amd64`。
+- `for f in api/*.api; do goctl api validate -api "$f"; done`：通过。
+- `gofmt -w $(find . -name '*.go' -print)`：通过。
+- `go test ./...`：通过。
+- `bash scripts/verify-static.sh`：通过。
+- `docker compose config`：通过。
+- `git diff --check`：通过。
+
 ### 3. `feature/agent-prompts-tools-skills`
 
 职责：Prompt/Tool/Skill 元数据和绑定。

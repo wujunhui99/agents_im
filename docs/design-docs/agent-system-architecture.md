@@ -51,6 +51,16 @@ Storage
 - 启用、禁用、归档；
 - 管理 API 鉴权和权限检查。
 
+当前 `feature/agent-core-management` 已落地 Agent profile 管理基础：
+
+- REST 契约：[`../../api/agent.api`](../../api/agent.api)。
+- 入口：`cmd/agent-api`，配置文件：`etc/agent-api.yaml`。
+- 业务逻辑：`internal/logic/agentlogic.go`，go-zero adapter：`internal/logic/agent/`。
+- 仓储契约：`internal/repository/agent_repository.go`，默认测试仓储：`internal/repository/agent_memory.go`，PostgreSQL 仓储：`internal/repository/postgres_agent.go`。
+- PostgreSQL schema：`db/migrations/002_agent_management.sql`。
+
+创建 Agent 时，业务逻辑先调用窄接口 `UserAccountTypeChecker` 验证绑定用户为 `account_type=agent`，再写入 `agents` 表。当前账号类型持久化尚未在本分支合入，真实 `agent-api` wiring 使用 fail-closed checker，无法验证时返回明确错误；测试只能通过显式测试 fixture checker 验证成功路径。此设计避免在 `users` 表中塞入 Agent 配置，也避免用假用户或静默 fallback 冒充账号类型能力。
+
 ### Prompt Management
 
 PostgreSQL 表建议：

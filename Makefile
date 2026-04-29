@@ -74,7 +74,7 @@ status: ## Show local frontend/backend PID files and listening ports.
 		echo "  none"; \
 	fi
 	@echo; echo "Listening ports:"; \
-	ss -ltnp 2>/dev/null | awk 'NR==1 || /:(8080|8081|8082|8083|8084|8085|5173)\b/' || true
+	ss -ltnp 2>/dev/null | awk 'NR==1 || /:(8080|8081|8082|8083|8084|8085|8086|5173)\b/' || true
 
 test: ## Run frontend tests, build, lint, and backend Go tests.
 	@npm run frontend:test

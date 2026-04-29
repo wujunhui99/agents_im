@@ -50,7 +50,7 @@ make backend-restart   # restart backend services
 make frontend-start    # start Vite dev server at http://127.0.0.1:5173
 make frontend-stop     # stop the Vite dev server started by Makefile
 make frontend-restart  # restart frontend dev server
-make status            # show PID files and ports 8080-8085/5173
+make status            # show PID files and ports 8080-8086/5173
 make test              # run frontend tests/build/lint plus Go tests
 make verify            # run test plus static checks, docker compose config, and git diff check
 ```
@@ -82,6 +82,7 @@ FRIENDS_API_PORT=18082 \
 MESSAGE_API_PORT=18083 \
 GATEWAY_WS_PORT=18084 \
 GROUPS_API_PORT=18085 \
+AGENT_API_PORT=18086 \
 AGENTS_IM_DEV_STATE_DIR=/tmp/agents-im-dev-e2e \
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH \
 scripts/dev-up.sh --services-only
@@ -135,11 +136,12 @@ Environment note from the debug session: on one local machine, default ports `80
 | Message API | `http://127.0.0.1:8083` |
 | WebSocket Gateway | `ws://127.0.0.1:8084/ws` |
 | Groups API | `http://127.0.0.1:8085` |
+| Agent API | `http://127.0.0.1:8086` |
 | PostgreSQL | `localhost:5432` |
 | Redis | `localhost:6379` |
 | Redpanda Kafka | `localhost:19092` |
 
-`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share users, credentials, friendships, groups, and message history.
+`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share users, credentials, friendships, groups, Agent profiles, and message history. Agent creation still fails closed until the account-type checker is wired to a user service that can verify `account_type=agent`.
 
 ## Demo Data
 
