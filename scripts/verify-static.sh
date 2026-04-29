@@ -7,6 +7,8 @@ required_files=(
   "api/friends.api"
   "api/groups.api"
   "api/message.api"
+  ".github/workflows/ci.yml"
+  ".github/markdown-link-check.json"
   ".ai-context/zero-skills/SKILL.md"
   ".ai-context/zero-skills/references/goctl-commands.md"
   ".ai-context/zero-skills/references/rest-api-patterns.md"
@@ -14,6 +16,7 @@ required_files=(
   ".ai-context/zero-skills/references/database-patterns.md"
   "docs/references/go-zero/codex-guide.md"
   "docs/exec-plans/active/goctl-refactor.md"
+  "docs/exec-plans/active/ci-pipeline.md"
   "proto/user.proto"
   "proto/auth.proto"
   "proto/friends.proto"
@@ -136,6 +139,40 @@ for file in "${required_files[@]}"; do
     echo "missing required file: $file" >&2
     exit 1
   fi
+done
+
+ci_workflow_patterns=(
+  "actions/checkout"
+  "actions/setup-go"
+  "go install github.com/zeromicro/go-zero/tools/goctl"
+  "protobuf-compiler"
+  "protoc-gen-go"
+  "protoc-gen-go-grpc"
+  "goctl api validate"
+  "go test ./..."
+  "bash scripts/verify-static.sh"
+  "docker compose config"
+  "markdown-link-check"
+  "postgres:16-alpine"
+  "scripts/migrate-postgres.sh --host-psql"
+  "go test -tags=integration ./tests"
+)
+
+for pattern in "${ci_workflow_patterns[@]}"; do
+  rg -qF "$pattern" .github/workflows/ci.yml
+done
+
+ci_doc_patterns=(
+  "CI Pipeline"
+  "goctl api validate"
+  "go test ./..."
+  "bash scripts/verify-static.sh"
+  "docker compose config"
+  "markdown-link-check"
+)
+
+for pattern in "${ci_doc_patterns[@]}"; do
+  rg -qF "$pattern" docs/exec-plans/active/ci-pipeline.md docs/GIT_WORKFLOW.md
 done
 
 removed_compat_paths=(
