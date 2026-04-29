@@ -1,0 +1,82 @@
+syntax = "v1"
+
+info(
+    title: "Groups API"
+    desc: "Group profile and membership service HTTP API"
+    author: "Codex"
+    version: "v0.1.0"
+)
+
+type Group {
+    GroupID string `json:"group_id"`
+    Name string `json:"name"`
+    Description string `json:"description"`
+    CreatorUserID string `json:"creator_user_id"`
+    CreatedAt string `json:"created_at"`
+    UpdatedAt string `json:"updated_at"`
+}
+
+type GroupMember {
+    GroupID string `json:"group_id"`
+    UserID string `json:"user_id"`
+    State string `json:"state"`
+    JoinedAt string `json:"joined_at"`
+    LeftAt string `json:"left_at"`
+}
+
+type CreateGroupReq {
+    Name string `json:"name"`
+    Description string `json:"description,optional"`
+}
+
+type AddMemberReq {
+    UserID string `json:"user_id,optional"`
+}
+
+type GroupResp {
+    Code string `json:"code"`
+    Message string `json:"message"`
+    Data Group `json:"data"`
+}
+
+type MemberData {
+    Member GroupMember `json:"member"`
+    AlreadyMember bool `json:"already_member"`
+}
+
+type MemberResp {
+    Code string `json:"code"`
+    Message string `json:"message"`
+    Data MemberData `json:"data"`
+}
+
+type ListMembersData {
+    GroupID string `json:"group_id"`
+    Members []GroupMember `json:"members"`
+}
+
+type ListMembersResp {
+    Code string `json:"code"`
+    Message string `json:"message"`
+    Data ListMembersData `json:"data"`
+}
+
+@server(
+    group: groups
+)
+service groups-api {
+    @handler createGroup
+    post /groups (CreateGroupReq) returns (GroupResp)
+
+    @handler getGroup
+    get /groups/:group_id returns (GroupResp)
+
+    @handler addMember
+    post /groups/:group_id/members (AddMemberReq) returns (MemberResp)
+
+    @handler leaveGroup
+    delete /groups/:group_id/members/me returns (MemberResp)
+
+    @handler listMembers
+    get /groups/:group_id/members returns (ListMembersResp)
+}

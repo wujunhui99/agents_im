@@ -5,20 +5,29 @@ required_files=(
   "api/user.api"
   "api/auth.api"
   "api/friends.api"
+  "api/groups.api"
   "proto/user.proto"
   "proto/auth.proto"
   "proto/friends.proto"
+  "proto/groups.proto"
   "cmd/user-api/main.go"
   "cmd/user-rpc/main.go"
   "cmd/auth-api/main.go"
   "cmd/auth-rpc/main.go"
   "cmd/friends-api/main.go"
   "cmd/friends-rpc/main.go"
+  "cmd/groups-api/main.go"
+  "cmd/groups-rpc/main.go"
   "internal/logic/userlogic.go"
   "internal/logic/friendslogic.go"
+  "internal/logic/groupslogic.go"
   "internal/model/friendship.go"
+  "internal/model/group.go"
   "internal/repository/memory.go"
+  "internal/repository/groups_memory.go"
+  "internal/repository/groups_repository.go"
   "internal/handler/handler.go"
+  "internal/handler/groups_handler.go"
   "internal/auth/logic/authlogic.go"
   "internal/auth/repository/memory.go"
   "internal/auth/handler/handler.go"
@@ -27,15 +36,19 @@ required_files=(
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
   "tests/friends_service_test.go"
+  "tests/groups_service_test.go"
   "docs/product-specs/user-service.md"
   "docs/product-specs/auth-service.md"
   "docs/product-specs/friends-service.md"
+  "docs/product-specs/groups-service.md"
   "docs/design-docs/user-service-go-zero.md"
   "docs/design-docs/auth-service-go-zero.md"
   "docs/design-docs/friends-service-go-zero.md"
+  "docs/design-docs/groups-service-go-zero.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
   "docs/exec-plans/active/friends-service-go-zero.md"
+  "docs/exec-plans/active/groups-service-go-zero.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -78,6 +91,18 @@ for pattern in "${friends_api_patterns[@]}"; do
   rg -q "$pattern" api/friends.api
 done
 
+groups_api_patterns=(
+  "post /groups"
+  "get /groups/:group_id"
+  "post /groups/:group_id/members"
+  "delete /groups/:group_id/members/me"
+  "get /groups/:group_id/members"
+)
+
+for pattern in "${groups_api_patterns[@]}"; do
+  rg -q "$pattern" api/groups.api
+done
+
 proto_patterns=(
   "rpc CreateUser"
   "rpc GetUserByIdentifier"
@@ -112,11 +137,25 @@ for pattern in "${friends_proto_patterns[@]}"; do
   rg -q "$pattern" proto/friends.proto
 done
 
+groups_proto_patterns=(
+  "rpc CreateGroup"
+  "rpc GetGroup"
+  "rpc AddMember"
+  "rpc JoinGroup"
+  "rpc LeaveGroup"
+  "rpc ListMembers"
+)
+
+for pattern in "${groups_proto_patterns[@]}"; do
+  rg -q "$pattern" proto/groups.proto
+done
+
 rg -q "X-User-Id" internal/handler docs
 rg -q "ExistsByIdentifier" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
 rg -q "CreateUser" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
 rg -q "PasswordHash" internal/auth/model/credential.go
 rg -q "Salt" internal/auth/model/credential.go
+rg -q "user-rpc" docs/design-docs/groups-service-go-zero.md docs/product-specs/groups-service.md
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
