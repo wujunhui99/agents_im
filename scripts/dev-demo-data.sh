@@ -80,9 +80,8 @@ main() {
   require_command curl
   require_command python3
 
-  local tmp_dir
   tmp_dir="$(mktemp -d)"
-  trap 'rm -rf "${tmp_dir}"' EXIT
+  trap 'rm -rf -- "$tmp_dir"' EXIT
 
   local alice_json="${tmp_dir}/alice.json"
   local bob_json="${tmp_dir}/bob.json"

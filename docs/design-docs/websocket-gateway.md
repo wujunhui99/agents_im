@@ -156,3 +156,29 @@ Required validation:
 - `docker compose config`
 
 Tests cover missing/invalid token rejection, valid token from header/query, heartbeat, `send_message`, and `pull_messages` with memory storage.
+
+
+## Local Live Delivery On WebSocket Send
+
+Status: Implemented for single-chat single-instance delivery.
+
+When an authenticated WebSocket client sends `send_message`, Gateway calls Message Service logic to persist the message and returns the normal command ACK. After a successful non-deduplicated send, Gateway also emits a `message_received` server push to online single-chat recipients through the in-process delivery dispatcher.
+
+Current behavior:
+
+1. sender sends `send_message` over WebSocket;
+2. Message Service persists the message and returns `server_msg_id`, `conversation_id`, and `seq`;
+3. sender receives ACK with status `ok`;
+4. for single-chat messages, Gateway derives the receiver from the stored message and excludes the sender;
+5. online receiver connections on the same Gateway instance receive `message_received` immediately;
+6. the message remains pullable through the normal pull/sync APIs.
+
+The live push is best-effort for local online delivery. If push fails, Gateway logs the delivery error with trace context but does not fail the original send ACK, because the message has already been accepted and persisted. Offline delivery, cross-instance routing, retry, and delivery attempt recording remain owned by the broader Message Transfer / Delivery pipeline.
+
+Group-chat immediate fanout is intentionally deferred until Gateway has an authoritative group-member lookup boundary for fanout recipients.
+
+Verification:
+
+```bash
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./tests -run 'TestWebSocketGatewaySendMessagePushesToOnlineReceiver|TestMVPBackendWebSocketSendPullMarkReadSmoke' -count=1
+```

@@ -72,16 +72,19 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - 在线状态维护
 - 消息下发与重试
 
-在线状态和连接元数据通过 Redis presence 层保存为短期运行状态，设计见 [`docs/design-docs/redis-presence.md`](./docs/design-docs/redis-presence.md)。第一阶段已提供独立入口 `cmd/gateway-ws`，通过 `GET /ws` 建立 WebSocket 连接；Handshake 使用与 HTTP API 一致的 JWT 配置，支持 `Authorization: Bearer ...` 和 `token` query param；连接通过内存 connection manager 按 `user_id` 注册多端 `connection_id`，并同步写入 `PresenceStore`。Gateway command router 支持 `heartbeat`、`send_message`、`pull_messages`、`get_conversation_seqs`、`mark_conversation_read`，并调用现有 Message Service 业务逻辑/仓储契约完成消息写入、拉取、seq 查询和已读推进；heartbeat 会刷新 presence TTL。Frontend reconnect sync 使用稳定 WebSocket ACK error envelope，并通过 `get_conversation_seqs`、`pull_messages`、`mark_conversation_read` 补偿缺失消息，产品契约见 [`docs/product-specs/frontend-sync-contract.md`](./docs/product-specs/frontend-sync-contract.md)，设计见 [`docs/design-docs/websocket-reconnect-sync.md`](./docs/design-docs/websocket-reconnect-sync.md)。Gateway push delivery 第一阶段提供 `internal/gateway/delivery.Dispatcher` 契约和本进程内 WebSocket fanout，可向在线连接主动下发 `message_received` / `message_delivered` event；delivery dispatcher 会先查询 presence route metadata，再执行本进程内 fanout，offline/routed/failed recipient 均返回明确状态。Gateway 不拥有消息历史、会话 seq 或已读状态；这些数据仍由 Message Service 和 PostgreSQL 权威维护。后续 Message Transfer worker 将消费 outbox/Kafka 事件并调用 dispatcher，Redis Presence route metadata 用于跨实例路由，delivery ACK 留给后续链路补齐。设计见 [`docs/design-docs/websocket-gateway.md`](./docs/design-docs/websocket-gateway.md)、[`docs/design-docs/gateway-push-delivery.md`](./docs/design-docs/gateway-push-delivery.md) 和 [`docs/design-docs/gateway-presence-routing.md`](./docs/design-docs/gateway-presence-routing.md)。
+在线状态和连接元数据通过 Redis presence 层保存为短期运行状态，设计见 [`docs/design-docs/redis-presence.md`](./docs/design-docs/redis-presence.md)。第一阶段已提供独立入口 `cmd/gateway-ws`，通过 `GET /ws` 建立 WebSocket 连接；Handshake 使用与 HTTP API 一致的 JWT 配置，支持 `Authorization: Bearer <token>` 和 `token` query param；连接通过内存 connection manager 按 `user_id` 注册多端 `connection_id`，并同步写入 `PresenceStore`。Gateway command router 支持 `heartbeat`、`send_message`、`pull_messages`、`get_conversation_seqs`、`mark_conversation_read`，并调用现有 Message Service 业务逻辑/仓储契约完成消息写入、拉取、seq 查询和已读推进；heartbeat 会刷新 presence TTL。Frontend reconnect sync 使用稳定 WebSocket ACK error envelope，并通过 `get_conversation_seqs`、`pull_messages`、`mark_conversation_read` 补偿缺失消息，产品契约见 [`docs/product-specs/frontend-sync-contract.md`](./docs/product-specs/frontend-sync-contract.md)，设计见 [`docs/design-docs/websocket-reconnect-sync.md`](./docs/design-docs/websocket-reconnect-sync.md)。Gateway push delivery 第一阶段提供 `internal/gateway/delivery.Dispatcher` 契约和本进程内 WebSocket fanout，可向在线连接主动下发 `message_received` / `message_delivered` event；delivery dispatcher 会先查询 presence route metadata，再执行本进程内 fanout，offline/routed/failed recipient 均返回明确状态。Gateway 不拥有消息历史、会话 seq 或已读状态；这些数据仍由 Message Service 和 PostgreSQL 权威维护。后续 Message Transfer worker 将消费 outbox/Kafka 事件并调用 dispatcher，Redis Presence route metadata 用于跨实例路由，delivery ACK 留给后续链路补齐。设计见 [`docs/design-docs/websocket-gateway.md`](./docs/design-docs/websocket-gateway.md)、[`docs/design-docs/gateway-push-delivery.md`](./docs/design-docs/gateway-push-delivery.md) 和 [`docs/design-docs/gateway-presence-routing.md`](./docs/design-docs/gateway-presence-routing.md)。
 
 ### Agent Service
 
-负责 Agent 生命周期和运行时能力，包括：
+负责 Agent 生命周期、配置组装、运行时能力和工具调用审计。第一版设计见 [`docs/product-specs/agent-system.md`](./docs/product-specs/agent-system.md)、[`docs/design-docs/agent-system-architecture.md`](./docs/design-docs/agent-system-architecture.md) 和 [`docs/exec-plans/active/agent-system-v0.md`](./docs/exec-plans/active/agent-system-v0.md)。核心能力包括：
 
-- Agent 创建、销毁、配置和持久化
-- Agent 单聊与群聊参与
-- Agent 工具调用编排
-- Agent 运行结果回传 IM 系统
+- 在账号系统中配合 `normal` / `agent` / `admin` 账号类型，让 Agent 账号作为 IM 会话成员参与单聊和群聊。
+- 管理系统提示词、工具、Agent skills 和 Agent 配置，并将元数据持久化在 PostgreSQL。
+- 使用系统提示词、工具和 skills 组装 Agent runtime。
+- 通过 MinIO/S3-compatible object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。
+- 管理 MCP 工具和本地工具。MCP server 和工具元数据入库；本地工具只允许服务端白名单 `handler_key`，不得从数据库执行任意脚本。
+- 第一版不提供 shell/命令行脚本执行能力；Python 执行必须通过受限沙箱、限时限资源、默认无网络，并记录审计。
+- Agent 响应必须通过 Message Service 写回 IM，不能绕过 IM 消息链路或直接推送 WebSocket。
 
 ### Webhook Dispatcher
 
@@ -132,7 +135,7 @@ Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trac
 - IM Core 与 Agent Service 解耦，避免 Agent 运行时阻塞核心消息链路。
 - 写路径优先保证可靠性，再优化延迟。
 - 长连接层只处理连接、投递和 ACK，不承载复杂业务逻辑。
-- Agent 工具调用必须可审计、可追踪、可限制权限。
+- Agent 工具调用必须可审计、可追踪、可限制权限；Python 执行必须沙箱化，第一版不提供 shell/命令行能力。
 - 所有跨服务请求必须携带 `trace_id`。
 
 ## 待细化问题
@@ -141,4 +144,4 @@ Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trac
 - 服务拆分粒度与代码仓库结构。
 - Kafka topic 设计与消息 schema 第一版见 [`docs/design-docs/kafka-message-events.md`](./docs/design-docs/kafka-message-events.md)，后续需随 outbox/transfer/push 实现继续细化。
 - PostgreSQL 表结构和迁移方案。
-- Agent 工具权限模型。
+- Agent 工具权限模型第一版见 `docs/design-docs/agent-system-architecture.md`，后续需随 MCP、MinIO skill 和 Python Executor 实现继续细化。

@@ -400,6 +400,9 @@ func (s *Server) dispatch(ctx context.Context, conn *Connection, commandType str
 		if err != nil {
 			return nil, err
 		}
+		if !result.Deduplicated {
+			s.pushNewMessage(ctx, conn.UserID, result.Message)
+		}
 		return gateway.MapSendMessageResponse(gateway.SendMessageRPCResponse{
 			Message:      toGatewayMessage(result.Message),
 			Deduplicated: result.Deduplicated,
@@ -472,6 +475,41 @@ func (s *Server) dispatch(ctx context.Context, conn *Connection, commandType str
 	default:
 		return nil, apperror.InvalidArgument("unsupported command type")
 	}
+}
+
+func (s *Server) pushNewMessage(ctx context.Context, senderID string, message logic.Message) {
+	recipients := pushRecipients(senderID, message)
+	if len(recipients) == 0 {
+		return
+	}
+	_, err := s.PushToConversation(ctx, message.ConversationID, recipients, delivery.NewMessageEvent(delivery.EventMessageReceived, toDeliveryMessage(message)))
+	if err != nil {
+		traceContext := observability.TraceContextFromContext(ctx)
+		log.Printf("websocket_push_failed trace_id=%s conversation_id=%s server_msg_id=%s error=%v", traceContext.TraceID, message.ConversationID, message.ServerMsgID, err)
+	}
+}
+
+func pushRecipients(senderID string, message logic.Message) []string {
+	senderID = strings.TrimSpace(senderID)
+	seen := map[string]struct{}{}
+	recipients := make([]string, 0, 1)
+	add := func(userID string) {
+		userID = strings.TrimSpace(userID)
+		if userID == "" || userID == senderID {
+			return
+		}
+		if _, ok := seen[userID]; ok {
+			return
+		}
+		seen[userID] = struct{}{}
+		recipients = append(recipients, userID)
+	}
+
+	switch strings.ToLower(strings.TrimSpace(message.ChatType)) {
+	case logic.MessageChatTypeSingle:
+		add(message.ReceiverID)
+	}
+	return recipients
 }
 
 func (c *Connection) Info() ConnectionInfo {
@@ -620,6 +658,23 @@ func logWebSocketCommand(conn *Connection, traceContext observability.TraceConte
 		resp.Status,
 		code,
 	)
+}
+
+func toDeliveryMessage(message logic.Message) delivery.Message {
+	return delivery.Message{
+		ServerMsgID:    message.ServerMsgID,
+		ClientMsgID:    message.ClientMsgID,
+		ConversationID: message.ConversationID,
+		Seq:            message.Seq,
+		SenderID:       message.SenderID,
+		ReceiverID:     message.ReceiverID,
+		GroupID:        message.GroupID,
+		ChatType:       message.ChatType,
+		ContentType:    message.ContentType,
+		Content:        message.Content,
+		SendTime:       message.SendTime,
+		CreatedAt:      message.CreatedAt,
+	}
 }
 
 func toGatewayMessage(message logic.Message) gateway.MessageSnapshot {

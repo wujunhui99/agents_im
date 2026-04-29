@@ -62,6 +62,69 @@ make verify            # run test plus static checks, docker compose config, and
 make frontend-start FRONTEND_HOST=127.0.0.1 FRONTEND_PORT=5174
 ```
 
+
+## Services-only Restart And Alternate Ports
+
+When Docker middleware is already running, or when middleware is managed externally, restart only the host Go services:
+
+```bash
+scripts/dev-up.sh --services-only
+```
+
+This mode skips Docker middleware startup and PostgreSQL migrations, rebuilds host binaries, and restarts only the REST APIs plus WebSocket gateway. It is useful for local E2E debugging when Postgres/Redis/Redpanda are already available.
+
+Each service port can be overridden for single-machine debugging, especially when default ports are occupied by stale/root-owned processes:
+
+```bash
+USER_API_PORT=18080 \
+AUTH_API_PORT=18081 \
+FRIENDS_API_PORT=18082 \
+MESSAGE_API_PORT=18083 \
+GATEWAY_WS_PORT=18084 \
+GROUPS_API_PORT=18085 \
+AGENTS_IM_DEV_STATE_DIR=/tmp/agents-im-dev-e2e \
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH \
+scripts/dev-up.sh --services-only
+```
+
+Use a separate `AGENTS_IM_DEV_STATE_DIR` when running alternate services so logs, PID files, configs, and binaries do not conflict with the default `.dev/` directory.
+
+## Single-machine E2E Smoke Command
+
+A fast in-process smoke command exists for the core single-machine flow when the external dev environment is unavailable or polluted by stale processes:
+
+```bash
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./cmd/single-machine-e2e
+```
+
+It uses real business logic and a real WebSocket gateway test server in one process to validate:
+
+1. register Alice;
+2. register Bob;
+3. add Bob as Alice's friend;
+4. send a single-chat message through message logic;
+5. pull the message as Bob;
+6. connect Alice and Bob to WebSocket;
+7. send `send_message` over WebSocket;
+8. assert Alice receives ACK and Bob receives live `message_received` push.
+
+This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, and Redpanda when the environment is clean.
+
+### Local E2E Debug Notes
+
+Recent single-machine E2E hardening work was consolidated into long-lived docs instead of keeping temporary fix notes under `docs/local-e2e*` or `docs/ws-live-delivery*`. The old temporary notes were removed after their durable content was merged here and into `docs/design-docs/websocket-gateway.md`.
+
+The related git commits are:
+
+```text
+bbba8fe Document local e2e commit
+a1a0b93 Add single-machine e2e fallback
+ae6922d Wire websocket send to live delivery
+e92e484 Fix dev demo cleanup trap
+```
+
+Environment note from the debug session: on one local machine, default ports `8080-8085` were occupied by root-owned `.dev/bin/*` processes. Without elevated permissions, the current user could not stop or replace those processes. Use alternate ports with `AGENTS_IM_DEV_STATE_DIR` as shown above, or clean the root-owned processes externally before using default ports.
+
 ## Ports
 
 | Service | URL |

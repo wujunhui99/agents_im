@@ -298,6 +298,28 @@ func TestWebSocketGatewaySendAndPullMessages(t *testing.T) {
 	}
 }
 
+func TestWebSocketGatewaySendMessagePushesToOnlineReceiver(t *testing.T) {
+	server, cleanup := newGatewayWSTestServer(t)
+	defer cleanup()
+
+	senderConn := dialGatewayWS(t, server.URL, "usr_ws_live_sender")
+	defer senderConn.Close()
+	receiverConn := dialGatewayWS(t, server.URL, "usr_ws_live_receiver")
+	defer receiverConn.Close()
+
+	sent := sendWSMessage(t, senderConn, "req-live-send", "usr_ws_live_receiver", "client-live-1", "live hello")
+	push := readWSPushEvent(t, receiverConn)
+	if push.Type != delivery.EventMessageReceived {
+		t.Fatalf("push type = %q, want %q", push.Type, delivery.EventMessageReceived)
+	}
+	if push.Data.ServerMsgID != sent.Message.ServerMsgID || push.Data.ConversationID != sent.Message.ConversationID || push.Data.Seq != sent.Message.Seq {
+		t.Fatalf("push message identity mismatch: push=%+v sent=%+v", push.Data, sent.Message)
+	}
+	if push.Data.SenderID != "usr_ws_live_sender" || push.Data.ReceiverID != "usr_ws_live_receiver" || push.Data.Content != "live hello" {
+		t.Fatalf("push message payload mismatch: %+v", push.Data)
+	}
+}
+
 func TestWebSocketGatewayReconnectSyncFlow(t *testing.T) {
 	server, cleanup := newGatewayWSTestServer(t)
 	defer cleanup()
