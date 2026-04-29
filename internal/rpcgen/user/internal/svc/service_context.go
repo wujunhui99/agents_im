@@ -13,7 +13,7 @@ type ServiceContext struct {
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	repo := repository.NewMemoryRepository()
+	repo := repository.MustRepositoryForStorage(c.StorageDriver, c.DataSource)
 	return &ServiceContext{
 		Config:    c,
 		UserLogic: business.NewUserLogic(repo),

@@ -1,3 +1,5 @@
 Name: friends-api
 Host: 0.0.0.0
 Port: 8082
+StorageDriver: memory
+DataSource: ${DATABASE_URL}

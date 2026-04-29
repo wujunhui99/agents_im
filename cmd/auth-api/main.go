@@ -29,9 +29,9 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
+	userLogic := userlogic.NewUserLogic(userrepo.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource))
 	serviceContext := svc.NewServiceContext(
-		authrepo.NewMemoryRepository(),
+		authrepo.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
 		useradapter.NewLogicClient(userLogic),
 		token.NewHMACTokenManager(tokenSecret(), tokenTTL()),
 	)

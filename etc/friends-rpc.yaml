@@ -1,2 +1,4 @@
 Name: friends-rpc
 ListenOn: 0.0.0.0:9092
+StorageDriver: memory
+DataSource: ${DATABASE_URL}

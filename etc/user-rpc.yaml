@@ -1,3 +1,4 @@
 Name: user-rpc
 ListenOn: 0.0.0.0:9090
-
+StorageDriver: memory
+DataSource: ${DATABASE_URL}

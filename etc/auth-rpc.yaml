@@ -1,2 +1,4 @@
 Name: auth-rpc
 ListenOn: 0.0.0.0:9091
+StorageDriver: memory
+DataSource: ${DATABASE_URL}
