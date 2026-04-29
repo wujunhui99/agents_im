@@ -206,19 +206,77 @@ agent_runs
 工具调用审计：
 
 ```text
-tool_invocations
-- invocation_id
+agent_tool_calls
+- tool_call_id
 - run_id
 - agent_id
 - tool_id
 - tool_name
-- input_json
-- output_json
+- input_summary
+- output_summary
 - status
+- error_code
 - error_message
-- latency_ms
+- duration_ms
+- trace_id
+- request_id
+- started_at
+- finished_at
 - created_at
 ```
+
+Skill 文件读取审计：
+
+```text
+agent_file_reads
+- file_read_id
+- run_id
+- agent_id
+- skill_id
+- file_id
+- object_key
+- sha256
+- status
+- byte_count
+- content_summary
+- error_code
+- error_message
+- trace_id
+- request_id
+- started_at
+- finished_at
+- created_at
+```
+
+Python 执行审计：
+
+```text
+agent_python_execs
+- python_exec_id
+- run_id
+- agent_id
+- sandbox_request_id
+- status
+- code_summary
+- resource_summary
+- stdout_summary
+- stderr_summary
+- result_summary
+- error_code
+- error_message
+- trace_id
+- request_id
+- started_at
+- finished_at
+- created_at
+```
+
+审计存储规则：
+
+- 审计表为 append-only；Repository/Logic 不提供 update/delete，PostgreSQL trigger 拒绝直接 update/delete。
+- 审计写入是 required path，失败必须返回调用方。
+- `*_summary` 字段只存脱敏或摘要后的 JSON，不保存 raw credential、token、secret 或 Python raw code。
+- Python code summary 仅包含 `sha256` 和 `size_bytes`，代码执行本身仍由后续 sandbox executor 契约负责。
 
 ## Python Executor 设计
 

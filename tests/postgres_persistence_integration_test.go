@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
@@ -291,6 +293,62 @@ func TestPostgresMessageRepositoryIdempotencyAndReadState(t *testing.T) {
 	}
 }
 
+func TestPostgresAgentAuditRepositoryAppendOnlyAndRedaction(t *testing.T) {
+	ctx := context.Background()
+	dsn := integrationPostgresDSN(t)
+	migrateAndCleanPostgres(t, ctx, dsn)
+
+	audit, err := repository.NewPostgresAgentAuditRepository(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run, err := audit.CreateAgentRun(ctx, agentaudit.CreateRunInput{
+		RunID:          "run_pg_audit_1",
+		AgentID:        "agent_pg_1",
+		ConversationID: "single:usr_pg_1:agent_pg_1",
+		Status:         agentaudit.StatusSucceeded,
+		InputSummary: agentaudit.Summary{
+			"prompt":       "hello",
+			"access_token": "must-not-leak",
+		},
+		TraceID:   "trace_pg_1",
+		RequestID: "req_pg_1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.InputSummary["access_token"] != agentaudit.RedactedValue {
+		t.Fatalf("postgres run summary did not redact token: %+v", run.InputSummary)
+	}
+
+	if _, err := audit.CreateAgentToolCall(ctx, agentaudit.CreateToolCallInput{
+		ToolCallID: "tool_pg_1",
+		RunID:      run.RunID,
+		AgentID:    run.AgentID,
+		ToolName:   "im.get_conversation_context",
+		Status:     agentaudit.StatusSucceeded,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	toolCalls, err := audit.ListAgentToolCallsByRunID(ctx, run.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(toolCalls) != 1 || toolCalls[0].ToolCallID != "tool_pg_1" {
+		t.Fatalf("postgres tool calls mismatch: %+v", toolCalls)
+	}
+
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.ExecContext(ctx, `update agent_runs set status = 'failed' where run_id = $1`, run.RunID); err == nil {
+		t.Fatal("expected append-only trigger to reject update")
+	}
+}
+
 func integrationPostgresDSN(t *testing.T) string {
 	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")
@@ -312,15 +370,26 @@ func migrateAndCleanPostgres(t *testing.T, ctx context.Context, dsn string) {
 	defer db.Close()
 
 	root := findRepoRoot(t)
-	migration, err := os.ReadFile(filepath.Join(root, "db", "migrations", "001_init_postgres.sql"))
+	migrations, err := filepath.Glob(filepath.Join(root, "db", "migrations", "*.sql"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, string(migration)); err != nil {
-		t.Fatal(err)
+	sort.Strings(migrations)
+	for _, migrationPath := range migrations {
+		migration, err := os.ReadFile(migrationPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(ctx, string(migration)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if _, err := db.ExecContext(ctx, `
 truncate table
+  agent_python_execs,
+  agent_file_reads,
+  agent_tool_calls,
+  agent_runs,
   delivery_attempts,
   message_outbox,
   message_idempotency_keys,
