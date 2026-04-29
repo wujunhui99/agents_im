@@ -10,5 +10,6 @@
 - [user-service.md](./user-service.md)：User Service 第一阶段产品规格
 - [message-chain.md](./message-chain.md)：消息发送、存储、拉取与已读链路产品规格
 - [message-storage.md](./message-storage.md)：消息存储的幂等、顺序、拉取与已读保证
+- [gateway-message-contract.md](./gateway-message-contract.md)：Gateway 消息命令、拉取、已读与 ACK 第一阶段客户端语义
 
 新增需求时，先在本目录创建产品规格，再进入技术设计和执行计划。

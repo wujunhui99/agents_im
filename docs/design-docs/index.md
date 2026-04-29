@@ -11,6 +11,7 @@
 - [user-service-go-zero.md](./user-service-go-zero.md)：User Service go-zero 实现设计
 - [message-chain-contract.md](./message-chain-contract.md)：消息链路接口契约与 OpenIM 借鉴设计
 - [message-storage.md](./message-storage.md)：消息存储 PostgreSQL/Redis 契约设计
+- [gateway-message-contract.md](./gateway-message-contract.md)：Gateway WebSocket command 到 Message Service RPC 的第一阶段映射契约
 - [im-agent-decoupling.md](./im-agent-decoupling.md)：IM 与 Agent 解耦设计
 - [websocket-reliability.md](./websocket-reliability.md)：WebSocket 可靠性设计
 - [agent-tooling.md](./agent-tooling.md)：Agent 工具调用体系设计

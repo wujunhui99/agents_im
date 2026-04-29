@@ -39,29 +39,34 @@ required_files=(
   "internal/auth/handler/handler.go"
   "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
+  "internal/gateway/contract.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
   "tests/friends_service_test.go"
   "tests/groups_service_test.go"
   "tests/message_service_test.go"
+  "tests/gateway_contract_test.go"
   "docs/product-specs/user-service.md"
   "docs/product-specs/auth-service.md"
   "docs/product-specs/friends-service.md"
   "docs/product-specs/groups-service.md"
   "docs/product-specs/message-chain.md"
   "docs/product-specs/message-storage.md"
+  "docs/product-specs/gateway-message-contract.md"
   "docs/design-docs/user-service-go-zero.md"
   "docs/design-docs/auth-service-go-zero.md"
   "docs/design-docs/friends-service-go-zero.md"
   "docs/design-docs/groups-service-go-zero.md"
   "docs/design-docs/message-chain-contract.md"
   "docs/design-docs/message-storage.md"
+  "docs/design-docs/gateway-message-contract.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
   "docs/exec-plans/active/friends-service-go-zero.md"
   "docs/exec-plans/active/groups-service-go-zero.md"
   "docs/exec-plans/active/message-storage.md"
   "internal/repository/message_storage_contract.go"
+  "docs/exec-plans/active/gateway-message-contract.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -202,6 +207,33 @@ for pattern in "${message_proto_patterns[@]}"; do
   rg -q "$pattern" proto/message.proto
 done
 
+gateway_doc_patterns=(
+  "send_message"
+  "pull_messages"
+  "get_conversation_seqs"
+  "mark_conversation_read"
+  "SendMessage"
+  "PullMessages"
+  "GetConversationSeqs"
+  "MarkConversationAsRead"
+)
+
+for pattern in "${gateway_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/gateway-message-contract.md
+  rg -q "$pattern" internal/gateway/contract.go tests/gateway_contract_test.go
+done
+
+gateway_product_patterns=(
+  "command ACK"
+  "Gateway does not store read progress"
+  "does not mean recipients have seen it"
+)
+
+for pattern in "${gateway_product_patterns[@]}"; do
+  rg -q "$pattern" docs/product-specs/gateway-message-contract.md
+done
+
+rg -q "gateway-message-contract.md" docs/design-docs/index.md docs/product-specs/index.md
 rg -q "X-User-Id" internal/handler docs
 rg -q "ExistsByIdentifier" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
 rg -q "CreateUser" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
