@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/proto/authpb";
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (AuthResponse);
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  rpc ParseToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+}
+
+message RegisterRequest {
+  string identifier = 1;
+  string password = 2;
+  string display_name = 3;
+  string name = 4;
+  string gender = 5;
+  int32 age = 6;
+  string region = 7;
+}
+
+message LoginRequest {
+  string identifier = 1;
+  string password = 2;
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message AuthResponse {
+  string user_id = 1;
+  string identifier = 2;
+  string token = 3;
+  string expires_at = 4;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string identifier = 3;
+  string expires_at = 4;
+}
