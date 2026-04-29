@@ -18,6 +18,7 @@ type APIConfig struct {
 	DataSource    string
 	Redis         RedisConfig
 	Presence      PresenceConfig
+	Kafka         KafkaConfig
 }
 
 type RPCConfig struct {
@@ -28,6 +29,7 @@ type RPCConfig struct {
 	DataSource    string
 	Redis         RedisConfig
 	Presence      PresenceConfig
+	Kafka         KafkaConfig
 }
 
 type JWTAuthConfig struct {
@@ -47,17 +49,58 @@ type PresenceConfig struct {
 	KeyPrefix           string
 }
 
+type KafkaConfig struct {
+	Brokers            []string
+	MessageEventsTopic string
+	ConsumerGroup      string
+}
+
+type MessageTransferConfig struct {
+	Name       string
+	WorkerID   string
+	DryRun     bool
+	Consumer   TransferConsumerConfig
+	Dispatcher TransferDispatcherConfig
+	Worker     TransferWorkerConfig
+}
+
+type TransferConsumerConfig struct {
+	Driver string
+	Topic  string
+	Group  string
+}
+
+type TransferDispatcherConfig struct {
+	Driver string
+}
+
+type TransferWorkerConfig struct {
+	PollIntervalMillis int64
+	RetryBackoffMillis int64
+	MaxAttempts        int
+}
+
 const (
-	StorageDriverMemory   = "memory"
-	StorageDriverPostgres = "postgres"
-	PresenceDriverMemory  = "memory"
-	PresenceDriverRedis   = "redis"
+	StorageDriverMemory    = "memory"
+	StorageDriverPostgres  = "postgres"
+	PresenceDriverMemory   = "memory"
+	PresenceDriverRedis    = "redis"
+	TransferConsumerMemory = "memory"
+	TransferDispatcherNoop = "noop"
 )
 
 const (
 	defaultRedisAddr                   = "localhost:6379"
 	defaultPresenceHeartbeatTTLSeconds = 60
 	defaultPresenceRedisKeyPrefix      = "agents_im:presence"
+	defaultKafkaBroker                 = "localhost:19092"
+	defaultKafkaMessageEventsTopic     = "message.events.v1"
+	defaultKafkaConsumerGroup          = "message-transfer-worker"
+	defaultTransferTopic               = "message.accepted.v1"
+	defaultTransferGroup               = "message-transfer"
+	defaultTransferPollIntervalMillis  = 100
+	defaultTransferRetryBackoffMillis  = 1000
+	defaultTransferMaxAttempts         = 5
 )
 
 func DefaultAPIConfig() APIConfig {
@@ -69,6 +112,7 @@ func DefaultAPIConfig() APIConfig {
 		StorageDriver: StorageDriverMemory,
 		Redis:         DefaultRedisConfig(),
 		Presence:      DefaultPresenceConfig(),
+		Kafka:         DefaultKafkaConfig(),
 	}
 }
 
@@ -80,6 +124,7 @@ func DefaultRPCConfig() RPCConfig {
 		StorageDriver: StorageDriverMemory,
 		Redis:         DefaultRedisConfig(),
 		Presence:      DefaultPresenceConfig(),
+		Kafka:         DefaultKafkaConfig(),
 	}
 }
 
@@ -102,6 +147,35 @@ func DefaultPresenceConfig() PresenceConfig {
 		Driver:              PresenceDriverMemory,
 		HeartbeatTTLSeconds: defaultPresenceHeartbeatTTLSeconds,
 		KeyPrefix:           defaultPresenceRedisKeyPrefix,
+	}
+}
+
+func DefaultKafkaConfig() KafkaConfig {
+	return KafkaConfig{
+		Brokers:            []string{defaultKafkaBroker},
+		MessageEventsTopic: defaultKafkaMessageEventsTopic,
+		ConsumerGroup:      defaultKafkaConsumerGroup,
+	}
+}
+
+func DefaultMessageTransferConfig() MessageTransferConfig {
+	return MessageTransferConfig{
+		Name:     "message-transfer",
+		WorkerID: defaultWorkerID(),
+		DryRun:   true,
+		Consumer: TransferConsumerConfig{
+			Driver: TransferConsumerMemory,
+			Topic:  defaultTransferTopic,
+			Group:  defaultTransferGroup,
+		},
+		Dispatcher: TransferDispatcherConfig{
+			Driver: TransferDispatcherNoop,
+		},
+		Worker: TransferWorkerConfig{
+			PollIntervalMillis: defaultTransferPollIntervalMillis,
+			RetryBackoffMillis: defaultTransferRetryBackoffMillis,
+			MaxAttempts:        defaultTransferMaxAttempts,
+		},
 	}
 }
 
@@ -149,6 +223,7 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+	cfg.Kafka = kafkaConfigFromValues(values)
 
 	return cfg, nil
 }
@@ -190,7 +265,71 @@ func LoadRPCConfig(path string) (RPCConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+	cfg.Kafka = kafkaConfigFromValues(values)
 
+	return cfg, nil
+}
+
+func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
+	cfg := DefaultMessageTransferConfig()
+	values, err := readFlatYAML(path)
+	if err != nil {
+		return cfg, err
+	}
+
+	if value := values["Name"]; value != "" {
+		cfg.Name = value
+	}
+	cfg.WorkerID = firstNonEmpty(values["Worker.ID"], values["WorkerID"], os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), cfg.WorkerID)
+	if value := firstNonEmpty(values["Consumer.Driver"], values["ConsumerDriver"]); value != "" {
+		cfg.Consumer.Driver = ResolveTransferConsumerDriver(value)
+	} else {
+		cfg.Consumer.Driver = ResolveTransferConsumerDriver(cfg.Consumer.Driver)
+	}
+	cfg.Consumer.Topic = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(firstNonEmpty(values["Consumer.Topic"], values["Topic"]))),
+		os.Getenv("MESSAGE_TRANSFER_TOPIC"),
+		cfg.Consumer.Topic,
+	)
+	cfg.Consumer.Group = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(firstNonEmpty(values["Consumer.Group"], values["ConsumerGroup"]))),
+		os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"),
+		cfg.Consumer.Group,
+	)
+	if value := firstNonEmpty(values["Dispatcher.Driver"], values["DispatcherDriver"]); value != "" {
+		cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(value)
+	} else {
+		cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(cfg.Dispatcher.Driver)
+	}
+	if value := firstNonEmpty(values["Worker.PollIntervalMillis"], values["PollIntervalMillis"]); value != "" {
+		interval, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Worker.PollIntervalMillis = interval
+	}
+	if value := firstNonEmpty(values["Worker.RetryBackoffMillis"], values["RetryBackoffMillis"]); value != "" {
+		backoff, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Worker.RetryBackoffMillis = backoff
+	}
+	if value := firstNonEmpty(values["Worker.MaxAttempts"], values["MaxAttempts"]); value != "" {
+		maxAttempts, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Worker.MaxAttempts = maxAttempts
+	}
+	if value := values["DryRun"]; value != "" {
+		dryRun, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.DryRun = dryRun
+	}
+	cfg = ResolveMessageTransferConfig(cfg)
 	return cfg, nil
 }
 
@@ -226,6 +365,47 @@ func ResolvePresenceDriver(value string) string {
 	default:
 		return PresenceDriverMemory
 	}
+}
+
+func ResolveTransferConsumerDriver(value string) string {
+	value = strings.ToLower(strings.TrimSpace(os.ExpandEnv(value)))
+	if value == "" {
+		value = strings.ToLower(strings.TrimSpace(os.Getenv("MESSAGE_TRANSFER_CONSUMER_DRIVER")))
+	}
+	switch value {
+	default:
+		return TransferConsumerMemory
+	}
+}
+
+func ResolveTransferDispatcherDriver(value string) string {
+	value = strings.ToLower(strings.TrimSpace(os.ExpandEnv(value)))
+	if value == "" {
+		value = strings.ToLower(strings.TrimSpace(os.Getenv("MESSAGE_TRANSFER_DISPATCHER_DRIVER")))
+	}
+	switch value {
+	default:
+		return TransferDispatcherNoop
+	}
+}
+
+func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConfig {
+	cfg.Name = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "message-transfer")
+	cfg.WorkerID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.WorkerID)), os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), defaultWorkerID())
+	cfg.Consumer.Driver = ResolveTransferConsumerDriver(cfg.Consumer.Driver)
+	cfg.Consumer.Topic = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Topic)), os.Getenv("MESSAGE_TRANSFER_TOPIC"), defaultTransferTopic)
+	cfg.Consumer.Group = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Group)), os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"), defaultTransferGroup)
+	cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(cfg.Dispatcher.Driver)
+	if cfg.Worker.PollIntervalMillis <= 0 {
+		cfg.Worker.PollIntervalMillis = defaultTransferPollIntervalMillis
+	}
+	if cfg.Worker.RetryBackoffMillis <= 0 {
+		cfg.Worker.RetryBackoffMillis = defaultTransferRetryBackoffMillis
+	}
+	if cfg.Worker.MaxAttempts <= 0 {
+		cfg.Worker.MaxAttempts = defaultTransferMaxAttempts
+	}
+	return cfg
 }
 
 func ResolveDataSource(value string) string {
@@ -268,6 +448,22 @@ func ResolvePresenceConfig(cfg PresenceConfig) (PresenceConfig, error) {
 	return cfg, nil
 }
 
+func ResolveKafkaConfig(cfg KafkaConfig) KafkaConfig {
+	brokers := brokerListFromValue(strings.Join(cfg.Brokers, ","))
+	if len(brokers) == 0 {
+		brokers = brokerListFromValue(firstNonEmpty(os.Getenv("KAFKA_BROKERS"), os.Getenv("AGENTS_IM_KAFKA_BROKERS")))
+	}
+	if len(brokers) == 0 {
+		brokers = []string{defaultKafkaBroker}
+	}
+
+	return KafkaConfig{
+		Brokers:            brokers,
+		MessageEventsTopic: firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.MessageEventsTopic)), os.Getenv("KAFKA_MESSAGE_EVENTS_TOPIC"), os.Getenv("AGENTS_IM_KAFKA_MESSAGE_EVENTS_TOPIC"), defaultKafkaMessageEventsTopic),
+		ConsumerGroup:      firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.ConsumerGroup)), os.Getenv("KAFKA_CONSUMER_GROUP"), os.Getenv("AGENTS_IM_KAFKA_CONSUMER_GROUP"), defaultKafkaConsumerGroup),
+	}
+}
+
 func redisConfigFromValues(values map[string]string) (RedisConfig, error) {
 	cfg := RedisConfig{
 		Addr:     firstNonEmpty(values["Redis.Addr"], values["RedisAddr"]),
@@ -298,6 +494,31 @@ func presenceConfigFromValues(values map[string]string) (PresenceConfig, error) 
 		cfg.HeartbeatTTLSeconds = ttl
 	}
 	return ResolvePresenceConfig(cfg)
+}
+
+func kafkaConfigFromValues(values map[string]string) KafkaConfig {
+	cfg := KafkaConfig{
+		Brokers:            brokerListFromValue(firstNonEmpty(values["Kafka.Brokers"], values["KafkaBrokers"])),
+		MessageEventsTopic: firstNonEmpty(values["Kafka.MessageEventsTopic"], values["KafkaMessageEventsTopic"]),
+		ConsumerGroup:      firstNonEmpty(values["Kafka.ConsumerGroup"], values["KafkaConsumerGroup"]),
+	}
+	return ResolveKafkaConfig(cfg)
+}
+
+func brokerListFromValue(value string) []string {
+	value = strings.TrimSpace(os.ExpandEnv(value))
+	if value == "" {
+		return nil
+	}
+	rawBrokers := strings.Split(value, ",")
+	brokers := make([]string, 0, len(rawBrokers))
+	for _, broker := range rawBrokers {
+		broker = strings.TrimSpace(broker)
+		if broker != "" {
+			brokers = append(brokers, broker)
+		}
+	}
+	return brokers
 }
 
 func resolveInt(current int, envValues ...string) (int, error) {
@@ -379,4 +600,11 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func defaultWorkerID() string {
+	if hostname := strings.TrimSpace(os.Getenv("HOSTNAME")); hostname != "" {
+		return hostname
+	}
+	return "message-transfer-local"
 }

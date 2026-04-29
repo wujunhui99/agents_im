@@ -1,15 +1,18 @@
 package tests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/wujunhui99/agents_im/internal/gateway"
+	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/svc"
@@ -27,6 +30,8 @@ type wsResponseErr struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
+
+const wsReadTimeout = 2 * time.Second
 
 func TestWebSocketGatewayRejectsMissingAndInvalidToken(t *testing.T) {
 	server, cleanup := newGatewayWSTestServer(t)
@@ -158,7 +163,142 @@ func TestWebSocketGatewaySendAndPullMessages(t *testing.T) {
 	}
 }
 
+func TestWebSocketGatewayPushFanoutDeliversToAllUserConnections(t *testing.T) {
+	app, server, cleanup := newGatewayWSAppTestServer(t)
+	defer cleanup()
+
+	connA := dialGatewayWS(t, server.URL, "usr_ws_push")
+	defer connA.Close()
+	connB := dialGatewayWS(t, server.URL, "usr_ws_push")
+	defer connB.Close()
+	waitFor(t, func() bool {
+		return app.Connections().UserCount("usr_ws_push") == 2
+	}, "two websocket connections registered")
+
+	event := delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
+		ServerMsgID:    "msg_push_1",
+		ConversationID: "single:usr_ws_sender:usr_ws_push",
+		Seq:            7,
+		SenderID:       "usr_ws_sender",
+		ReceiverID:     "usr_ws_push",
+		ChatType:       "single",
+		ContentType:    "text",
+		Content:        "pushed message",
+		ContentMetadata: map[string]interface{}{
+			"encoding": "plain",
+		},
+	})
+	result, err := app.PushToUser(context.Background(), "usr_ws_push", event)
+	if err != nil {
+		t.Fatalf("push to user: %v", err)
+	}
+	if result.DeliveredRecipients != 1 || result.DeliveredConnections != 2 || result.OfflineRecipients != 0 {
+		t.Fatalf("unexpected push result: %+v", result)
+	}
+
+	pushA := readWSPushEvent(t, connA)
+	pushB := readWSPushEvent(t, connB)
+	for name, got := range map[string]delivery.Event{"connA": pushA, "connB": pushB} {
+		if got.Type != delivery.EventMessageReceived {
+			t.Fatalf("%s push type = %q, want %q", name, got.Type, delivery.EventMessageReceived)
+		}
+		if got.Data.ServerMsgID != "msg_push_1" || got.Data.ConversationID != "single:usr_ws_sender:usr_ws_push" || got.Data.Seq != 7 {
+			t.Fatalf("%s push message mismatch: %+v", name, got.Data)
+		}
+		if got.Data.SenderID != "usr_ws_sender" || got.Data.ContentType != "text" || got.Data.ContentMetadata["encoding"] != "plain" {
+			t.Fatalf("%s push content metadata mismatch: %+v", name, got.Data)
+		}
+	}
+}
+
+func TestWebSocketGatewayPushOfflineUserReturnsOfflineStatus(t *testing.T) {
+	app := newGatewayWSApp(t)
+
+	result, err := app.PushToUser(context.Background(), "usr_ws_offline", delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
+		ServerMsgID:    "msg_offline_1",
+		ConversationID: "single:usr_ws_sender:usr_ws_offline",
+		Seq:            1,
+		SenderID:       "usr_ws_sender",
+		ReceiverID:     "usr_ws_offline",
+		ContentType:    "text",
+	}))
+	if err != nil {
+		t.Fatalf("push to offline user returned error: %v", err)
+	}
+	if result.OfflineRecipients != 1 || result.DeliveredConnections != 0 || len(result.Recipients) != 1 {
+		t.Fatalf("unexpected offline result: %+v", result)
+	}
+	if result.Recipients[0].Status != delivery.StatusOffline {
+		t.Fatalf("recipient status = %q, want %q", result.Recipients[0].Status, delivery.StatusOffline)
+	}
+}
+
+func TestWebSocketGatewayPushDoesNotBreakCommandResponses(t *testing.T) {
+	app, server, cleanup := newGatewayWSAppTestServer(t)
+	defer cleanup()
+
+	conn := dialGatewayWS(t, server.URL, "usr_ws_push_command")
+	defer conn.Close()
+
+	_, err := app.PushToUser(context.Background(), "usr_ws_push_command", delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
+		ServerMsgID:    "msg_push_command_1",
+		ConversationID: "single:usr_ws_sender:usr_ws_push_command",
+		Seq:            3,
+		SenderID:       "usr_ws_sender",
+		ReceiverID:     "usr_ws_push_command",
+		ContentType:    "text",
+		Content:        "before heartbeat",
+	}))
+	if err != nil {
+		t.Fatalf("push before command response: %v", err)
+	}
+	push := readWSPushEvent(t, conn)
+	if push.Type != delivery.EventMessageReceived || push.Data.ServerMsgID != "msg_push_command_1" {
+		t.Fatalf("unexpected push event before command: %+v", push)
+	}
+
+	writeCommand(t, conn, map[string]interface{}{
+		"request_id": "req-heartbeat-after-push",
+		"type":       gatewayws.CommandHeartbeat,
+		"payload":    map[string]interface{}{},
+	})
+	resp := readWSResponse(t, conn)
+	if resp.RequestID != "req-heartbeat-after-push" || resp.Type != gatewayws.CommandHeartbeat || resp.Status != gateway.AckStatusOK {
+		t.Fatalf("unexpected heartbeat response after push: %+v", resp)
+	}
+}
+
+func TestWebSocketGatewayConnectionCloseCleansManager(t *testing.T) {
+	app, server, cleanup := newGatewayWSAppTestServer(t)
+	defer cleanup()
+
+	conn := dialGatewayWS(t, server.URL, "usr_ws_close")
+	waitFor(t, func() bool {
+		return app.Connections().UserCount("usr_ws_close") == 1
+	}, "websocket connection registered")
+
+	_ = conn.Close()
+	waitFor(t, func() bool {
+		return app.Connections().UserCount("usr_ws_close") == 0 && app.Connections().Count() == 0
+	}, "websocket connection unregistered after close")
+}
+
 func newGatewayWSTestServer(t *testing.T) (*httptest.Server, func()) {
+	t.Helper()
+
+	_, server, cleanup := newGatewayWSAppTestServer(t)
+	return server, cleanup
+}
+
+func newGatewayWSAppTestServer(t *testing.T) (*gatewayws.Server, *httptest.Server, func()) {
+	t.Helper()
+
+	app := newGatewayWSApp(t)
+	server := httptest.NewServer(app)
+	return app, server, server.Close
+}
+
+func newGatewayWSApp(t *testing.T) *gatewayws.Server {
 	t.Helper()
 
 	serviceContext := svc.NewMessageServiceContextWithAuth(
@@ -167,8 +307,7 @@ func newGatewayWSTestServer(t *testing.T) (*httptest.Server, func()) {
 		nil,
 		testJWTAuthConfig(),
 	)
-	server := httptest.NewServer(gatewayws.NewServer(serviceContext))
-	return server, server.Close
+	return gatewayws.NewServer(serviceContext)
 }
 
 func dialGatewayWS(t *testing.T, serverURL string, userID string) *websocket.Conn {
@@ -209,6 +348,7 @@ func writeCommand(t *testing.T, conn *websocket.Conn, command map[string]interfa
 func readWSResponse(t *testing.T, conn *websocket.Conn) wsResponse {
 	t.Helper()
 
+	setReadDeadline(t, conn)
 	var resp wsResponse
 	if err := conn.ReadJSON(&resp); err != nil {
 		t.Fatalf("read websocket response: %v", err)
@@ -217,6 +357,38 @@ func readWSResponse(t *testing.T, conn *websocket.Conn) wsResponse {
 		t.Fatalf("websocket command returned error: %+v", resp.Error)
 	}
 	return resp
+}
+
+func readWSPushEvent(t *testing.T, conn *websocket.Conn) delivery.Event {
+	t.Helper()
+
+	setReadDeadline(t, conn)
+	var event delivery.Event
+	if err := conn.ReadJSON(&event); err != nil {
+		t.Fatalf("read websocket push event: %v", err)
+	}
+	return event
+}
+
+func setReadDeadline(t *testing.T, conn *websocket.Conn) {
+	t.Helper()
+
+	if err := conn.SetReadDeadline(time.Now().Add(wsReadTimeout)); err != nil {
+		t.Fatalf("set websocket read deadline: %v", err)
+	}
+}
+
+func waitFor(t *testing.T, condition func() bool, description string) {
+	t.Helper()
+
+	deadline := time.Now().Add(wsReadTimeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s", description)
 }
 
 func decodeRaw(t *testing.T, raw json.RawMessage, dst interface{}) {

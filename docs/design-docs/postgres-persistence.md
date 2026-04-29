@@ -4,6 +4,7 @@ Status: Implemented
 Owner: PostgreSQL Persistence
 Related docs:
 - [`message-storage.md`](./message-storage.md)
+- [`message-outbox.md`](./message-outbox.md)
 - [`user-auth-friends-groups-boundaries.md`](./user-auth-friends-groups-boundaries.md)
 
 ## Background
@@ -21,7 +22,7 @@ Phase 1 previously used in-memory repositories for user, auth, friends, groups, 
 ## Non-goals
 
 - JWT middleware or protected route policy changes.
-- Redis, Kafka, WebSocket delivery, push, or outbox implementation.
+- Redis, Kafka, WebSocket delivery, push, or worker implementation.
 - Host-machine PostgreSQL installation.
 - Sharding, cross-region replication, or generated goctl model adoption.
 
@@ -40,6 +41,7 @@ Phase-1 tables:
 - `messages`: immutable accepted messages.
 - `user_conversation_states`: per-user visibility and read progress.
 - `message_idempotency_keys`: explicit sender/client idempotency record.
+- `message_outbox`: transactional outbox rows for accepted message events.
 
 ## Service Boundary Constraints
 
@@ -49,6 +51,7 @@ Strong foreign keys are only used inside a service-owned aggregate:
 - `messages.conversation_id -> conversation_threads.conversation_id`
 - `user_conversation_states.conversation_id -> conversation_threads.conversation_id`
 - `message_idempotency_keys.server_msg_id -> messages.server_msg_id`
+- `message_outbox.server_msg_id -> messages.server_msg_id`
 
 Cross-service references are logical constraints:
 
@@ -101,6 +104,7 @@ Repository files:
 - `internal/auth/repository/postgres.go`
 - `internal/repository/postgres_groups.go`
 - `internal/repository/postgres_message.go`
+- `internal/repository/postgres_outbox.go`
 
 Normal tests continue to use memory repositories. PostgreSQL integration tests are build-tagged with `integration` and skip when no DSN is configured.
 
@@ -116,8 +120,11 @@ Message writes use one PostgreSQL transaction:
 6. Upsert visible `user_conversation_states`.
 7. Advance sender `has_read_seq`.
 8. Update conversation max seq and last-message fields.
+9. Insert one `message_outbox` row for the `message.created` event.
 
 The locked conversation row is the serialization point, preserving contiguous per-conversation seq values.
+
+The outbox row is committed atomically with the accepted message. It is a reliable asynchronous event source for later Kafka/Message Transfer/Push workers and does not change the synchronous send response semantics.
 
 ## goctl Model Decision
 
@@ -129,7 +136,7 @@ Follow-up command after local PG is running and migrated:
 export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
 goctl model pg datasource \
   -url "$DATABASE_URL" \
-  -table "users,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys" \
+  -table "users,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys,message_outbox" \
   -dir ./internal/model/pg \
   --style go_zero
 ```
@@ -146,4 +153,3 @@ Required validation:
 - `go test ./...`
 - `bash scripts/verify-static.sh`
 - `docker compose config` when Docker is available
-

@@ -12,6 +12,9 @@ func TestLoadAPIConfigResolvesRedisAndPresenceFromFile(t *testing.T) {
 	t.Setenv("PRESENCE_DRIVER", "")
 	t.Setenv("PRESENCE_TTL_SECONDS", "")
 	t.Setenv("PRESENCE_KEY_PREFIX", "")
+	t.Setenv("KAFKA_BROKERS", "")
+	t.Setenv("KAFKA_MESSAGE_EVENTS_TOPIC", "")
+	t.Setenv("KAFKA_CONSUMER_GROUP", "")
 
 	configPath := filepath.Join(t.TempDir(), "api.yaml")
 	err := os.WriteFile(configPath, []byte(`
@@ -28,6 +31,10 @@ Presence:
   Driver: redis
   HeartbeatTTLSeconds: 45
   KeyPrefix: agents_im:test_presence
+Kafka:
+  Brokers: redpanda:9092,localhost:19092
+  MessageEventsTopic: message.events.test
+  ConsumerGroup: message-transfer-test
 `), 0o600)
 	if err != nil {
 		t.Fatal(err)
@@ -46,6 +53,12 @@ Presence:
 	if cfg.StorageDriver != StorageDriverPostgres {
 		t.Fatalf("storage driver should remain postgres, got %q", cfg.StorageDriver)
 	}
+	if len(cfg.Kafka.Brokers) != 2 || cfg.Kafka.Brokers[0] != "redpanda:9092" || cfg.Kafka.Brokers[1] != "localhost:19092" {
+		t.Fatalf("kafka brokers mismatch: %+v", cfg.Kafka.Brokers)
+	}
+	if cfg.Kafka.MessageEventsTopic != "message.events.test" || cfg.Kafka.ConsumerGroup != "message-transfer-test" {
+		t.Fatalf("kafka config mismatch: %+v", cfg.Kafka)
+	}
 }
 
 func TestResolveRedisAndPresenceConfigFromEnv(t *testing.T) {
@@ -55,6 +68,9 @@ func TestResolveRedisAndPresenceConfigFromEnv(t *testing.T) {
 	t.Setenv("PRESENCE_DRIVER", "redis")
 	t.Setenv("PRESENCE_TTL_SECONDS", "75")
 	t.Setenv("PRESENCE_KEY_PREFIX", "agents_im:env_presence")
+	t.Setenv("KAFKA_BROKERS", "localhost:19092,redpanda:9092")
+	t.Setenv("KAFKA_MESSAGE_EVENTS_TOPIC", "message.events.env")
+	t.Setenv("KAFKA_CONSUMER_GROUP", "push-worker-env")
 
 	redisConfig, err := ResolveRedisConfig(RedisConfig{})
 	if err != nil {
@@ -70,5 +86,52 @@ func TestResolveRedisAndPresenceConfigFromEnv(t *testing.T) {
 	}
 	if presenceConfig.Driver != PresenceDriverRedis || presenceConfig.HeartbeatTTLSeconds != 75 || presenceConfig.KeyPrefix != "agents_im:env_presence" {
 		t.Fatalf("presence env config mismatch: %+v", presenceConfig)
+	}
+
+	kafkaConfig := ResolveKafkaConfig(KafkaConfig{})
+	if len(kafkaConfig.Brokers) != 2 || kafkaConfig.Brokers[0] != "localhost:19092" || kafkaConfig.Brokers[1] != "redpanda:9092" {
+		t.Fatalf("kafka env brokers mismatch: %+v", kafkaConfig.Brokers)
+	}
+	if kafkaConfig.MessageEventsTopic != "message.events.env" || kafkaConfig.ConsumerGroup != "push-worker-env" {
+		t.Fatalf("kafka env config mismatch: %+v", kafkaConfig)
+	}
+}
+
+func TestLoadMessageTransferConfig(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "message-transfer.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: message-transfer-test
+WorkerID: worker-a
+DryRun: true
+Consumer:
+  Driver: memory
+  Topic: message.accepted.test
+  Group: transfer-test
+Dispatcher:
+  Driver: noop
+Worker:
+  PollIntervalMillis: 25
+  RetryBackoffMillis: 250
+  MaxAttempts: 3
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadMessageTransferConfig(configPath)
+	if err != nil {
+		t.Fatalf("load message transfer config: %v", err)
+	}
+	if cfg.Name != "message-transfer-test" || cfg.WorkerID != "worker-a" || !cfg.DryRun {
+		t.Fatalf("basic transfer config mismatch: %+v", cfg)
+	}
+	if cfg.Consumer.Driver != TransferConsumerMemory || cfg.Consumer.Topic != "message.accepted.test" || cfg.Consumer.Group != "transfer-test" {
+		t.Fatalf("consumer config mismatch: %+v", cfg.Consumer)
+	}
+	if cfg.Dispatcher.Driver != TransferDispatcherNoop {
+		t.Fatalf("dispatcher config mismatch: %+v", cfg.Dispatcher)
+	}
+	if cfg.Worker.PollIntervalMillis != 25 || cfg.Worker.RetryBackoffMillis != 250 || cfg.Worker.MaxAttempts != 3 {
+		t.Fatalf("worker config mismatch: %+v", cfg.Worker)
 	}
 }

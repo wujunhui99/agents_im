@@ -5,9 +5,11 @@ package tests
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/wujunhui99/agents_im/internal/apperror"
@@ -205,6 +207,54 @@ func TestPostgresMessageRepositoryIdempotencyAndReadState(t *testing.T) {
 	if _, _, err := messages.SetUserHasReadSeqMax(ctx, input.ReceiverID, conversationID, 2); err == nil {
 		t.Fatal("expected read seq beyond max to fail")
 	}
+
+	outboxEvents, err := messages.PollPending(ctx, "pg-worker-1", 10, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outboxEvents) != 1 {
+		t.Fatalf("expected one outbox event, got %d: %+v", len(outboxEvents), outboxEvents)
+	}
+	outboxEvent := outboxEvents[0]
+	if outboxEvent.EventType != repository.OutboxEventTypeMessageCreated ||
+		outboxEvent.AggregateType != repository.OutboxAggregateTypeMessage ||
+		outboxEvent.AggregateID != first.ServerMsgID ||
+		outboxEvent.ServerMsgID != first.ServerMsgID ||
+		outboxEvent.ConversationID != conversationID ||
+		outboxEvent.Seq != first.Seq {
+		t.Fatalf("unexpected outbox event metadata: %+v", outboxEvent)
+	}
+	var payload repository.MessageCreatedOutboxPayload
+	if err := json.Unmarshal(outboxEvent.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Message.ServerMsgID != first.ServerMsgID || payload.Message.Content != first.Content {
+		t.Fatalf("outbox payload message mismatch: %+v", payload.Message)
+	}
+
+	if err := messages.MarkFailed(ctx, outboxEvent.EventID, "pg-worker-1", repository.OutboxFailure{
+		NextAttemptAt: time.Now().Add(-time.Second),
+		LastError:     "retryable test failure",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	retriedOutboxEvents, err := messages.PollPending(ctx, "pg-worker-2", 10, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(retriedOutboxEvents) != 1 || retriedOutboxEvents[0].AttemptCount != 1 {
+		t.Fatalf("expected retried outbox event with attempt count 1: %+v", retriedOutboxEvents)
+	}
+	if err := messages.MarkPublished(ctx, retriedOutboxEvents[0].EventID, "pg-worker-2"); err != nil {
+		t.Fatal(err)
+	}
+	remainingOutboxEvents, err := messages.PollPending(ctx, "pg-worker-3", 10, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(remainingOutboxEvents) != 0 {
+		t.Fatalf("published outbox event should not be pending: %+v", remainingOutboxEvents)
+	}
 }
 
 func integrationPostgresDSN(t *testing.T) string {
@@ -237,6 +287,7 @@ func migrateAndCleanPostgres(t *testing.T, ctx context.Context, dsn string) {
 	}
 	if _, err := db.ExecContext(ctx, `
 truncate table
+  message_outbox,
   message_idempotency_keys,
   user_conversation_states,
   messages,

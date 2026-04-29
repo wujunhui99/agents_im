@@ -22,7 +22,7 @@ message-api / message-rpc
   -> assign conversation seq
   -> store message
   -> update conversation state and read state
-  -> expose events/contracts for future gateway/push
+  -> write transactional outbox event for future gateway/push
 ```
 
 ## OpenIM design summary
@@ -64,7 +64,7 @@ Responsibilities:
 - maintain conversation `max_seq` and last message summary;
 - maintain user read state;
 - expose pull/sync/read APIs;
-- emit in-process or repository events for future gateway/push integration.
+- write `message.created` events into PostgreSQL outbox for future Kafka/Message Transfer/Push integration.
 
 #### User Service
 
@@ -470,6 +470,8 @@ Response:
 ## Event contract for future parallel work
 
 Even if phase 1 does not implement Kafka/gateway, the contract should define event shapes.
+
+Kafka-compatible topic, schema, producer abstraction, and delivery semantics are versioned in [`kafka-message-events.md`](./kafka-message-events.md). The examples below remain the phase-1 conceptual shape; the canonical transport schema is `MessageEvent`.
 
 ### message.accepted
 

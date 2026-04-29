@@ -32,6 +32,31 @@ services:
       timeout: 5s
       retries: 12
 
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
+    container_name: agents-im-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092,OUTSIDE://0.0.0.0:19092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092,OUTSIDE://localhost:19092
+    ports:
+      - "${REDPANDA_KAFKA_PORT:-19092}:19092"
+      - "${REDPANDA_ADMIN_PORT:-9644}:9644"
+    volumes:
+      - agents_im_redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
 volumes:
   agents_im_pg_data:
   agents_im_redis_data:
+  agents_im_redpanda_data:

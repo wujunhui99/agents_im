@@ -53,7 +53,9 @@ required_files=(
   "cmd/message-api/main.go"
   "cmd/message-rpc/main.go"
   "cmd/gateway-ws/main.go"
+  "cmd/message-transfer/main.go"
   "etc/gateway-ws.yaml"
+  "etc/message-transfer.yaml"
   "etc/message-rpc.yaml"
   "internal/logic/userlogic.go"
   "internal/logic/friendslogic.go"
@@ -73,7 +75,9 @@ required_files=(
   "internal/repository/postgres_groups.go"
   "internal/repository/message_memory.go"
   "internal/repository/message_repository.go"
+  "internal/repository/message_outbox_repository.go"
   "internal/repository/postgres_message.go"
+  "internal/repository/postgres_outbox.go"
   "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
   "internal/types/types.go"
@@ -93,6 +97,12 @@ required_files=(
   "internal/rpcgen/message/entry/entry.go"
   "internal/rpcgen/rpcerror/error.go"
   "internal/gateway/contract.go"
+  "internal/transfer/event.go"
+  "internal/transfer/interfaces.go"
+  "internal/transfer/idempotency.go"
+  "internal/transfer/memory.go"
+  "internal/transfer/worker.go"
+  "internal/transfer/worker_test.go"
   "internal/presence/store.go"
   "internal/presence/memory.go"
   "internal/presence/redis.go"
@@ -100,6 +110,14 @@ required_files=(
   "internal/presence/redis_integration_test.go"
   "internal/gateway/ws/connection_manager.go"
   "internal/gateway/ws/server.go"
+  "internal/messaging/event.go"
+  "internal/messaging/producer.go"
+  "internal/messaging/kafka.go"
+  "internal/messaging/event_test.go"
+  "internal/messaging/producer_test.go"
+  "internal/messaging/kafka_integration_test.go"
+  "internal/gateway/delivery/delivery.go"
+  "internal/gateway/ws/delivery.go"
   "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
@@ -125,15 +143,20 @@ required_files=(
   "docs/design-docs/message-storage.md"
   "docs/design-docs/jwt-auth-middleware.md"
   "docs/design-docs/postgres-persistence.md"
+  "docs/design-docs/message-outbox.md"
   "docs/design-docs/gateway-message-contract.md"
   "docs/design-docs/redis-presence.md"
+  "docs/design-docs/kafka-message-events.md"
   "docs/design-docs/websocket-gateway.md"
+  "docs/design-docs/message-transfer-worker.md"
+  "docs/design-docs/gateway-push-delivery.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
   "docs/exec-plans/active/friends-service-go-zero.md"
   "docs/exec-plans/active/groups-service-go-zero.md"
   "docs/exec-plans/active/message-storage.md"
+  "docs/exec-plans/active/message-outbox.md"
   "internal/repository/message_storage_contract.go"
   "docker-compose.yml"
   ".env.example"
@@ -146,6 +169,9 @@ required_files=(
   "docs/exec-plans/active/remove-handwritten-compat.md"
   "docs/exec-plans/active/jwt-auth-middleware.md"
   "docs/exec-plans/active/websocket-gateway.md"
+  "docs/exec-plans/active/kafka-redpanda-compose.md"
+  "docs/exec-plans/active/message-transfer-worker.md"
+  "docs/exec-plans/active/gateway-push-delivery.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -513,6 +539,92 @@ rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
 rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "websocket-gateway" docs/exec-plans/active/websocket-gateway.md
 
+message_transfer_code_patterns=(
+  "type MessageEvent struct"
+  "type Envelope struct"
+  "type EventConsumer interface"
+  "type DeliveryDispatcher interface"
+  "type IdempotencyStore interface"
+  "type RetryDecision struct"
+  "type Worker struct"
+  "func NewWorker"
+  "func \\(w \\*Worker\\) Start"
+  "func \\(w \\*Worker\\) RunOnce"
+  "func \\(w \\*Worker\\) Stop"
+  "NewInMemoryConsumer"
+  "type NoopDispatcher struct"
+)
+
+for pattern in "${message_transfer_code_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer
+done
+
+message_transfer_test_patterns=(
+  "TestWorkerConsumesEventAndMarksSuccessful"
+  "TestWorkerIdempotencySkipsDuplicateDispatch"
+  "TestWorkerRetryableFailureDoesNotMarkSuccessful"
+  "TestWorkerContextCancellationStopsLoop"
+)
+
+for pattern in "${message_transfer_test_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/worker_test.go
+done
+
+message_transfer_doc_patterns=(
+  "message.accepted"
+  "EventConsumer"
+  "DeliveryDispatcher"
+  "IdempotencyStore"
+  "RetryDecision"
+  "memory consumer"
+  "noop dispatcher"
+)
+
+for pattern in "${message_transfer_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/message-transfer-worker.md docs/exec-plans/active/message-transfer-worker.md
+done
+
+rg -q "LoadMessageTransferConfig" internal/config/config.go
+rg -q "message-transfer" cmd/message-transfer/main.go etc/message-transfer.yaml ARCHITECTURE.md
+rg -q "message-transfer-worker.md" docs/design-docs/index.md ARCHITECTURE.md
+rg -q "ConsumerGroup|Consumer\\.Group" etc/message-transfer.yaml internal/config/config.go
+rg -q "Topic|Consumer\\.Topic" etc/message-transfer.yaml internal/config/config.go
+rg -q "WorkerID|Worker\\.ID" etc/message-transfer.yaml internal/config/config.go
+
+gateway_delivery_code_patterns=(
+  "type Dispatcher interface"
+  "DeliverToUser"
+  "DeliverToConversation"
+  "EventMessageReceived"
+  "EventMessageDelivered"
+  "StatusOffline"
+  "NewInMemoryDeliveryDispatcher"
+  "PushToUser"
+  "PushToConversation"
+  "UserConnections"
+)
+
+for pattern in "${gateway_delivery_code_patterns[@]}"; do
+  rg -q "$pattern" internal/gateway/delivery internal/gateway/ws tests/websocket_gateway_test.go
+done
+
+gateway_delivery_doc_patterns=(
+  "Message Transfer worker"
+  "Redis Presence"
+  "message_received"
+  "message_delivered"
+  "server_msg_id"
+  "conversation_id"
+  "offline"
+  "in-memory"
+)
+
+for pattern in "${gateway_delivery_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/gateway-push-delivery.md docs/exec-plans/active/gateway-push-delivery.md
+done
+
+rg -q "gateway-push-delivery.md" ARCHITECTURE.md docs/design-docs/index.md
+
 gateway_product_patterns=(
   "command ACK"
   "Gateway does not store read progress"
@@ -537,6 +649,20 @@ for pattern in "${redis_compose_patterns[@]}"; do
   rg -q "$pattern" docker-compose.yml
 done
 
+redpanda_compose_patterns=(
+  "^  redpanda:"
+  "docker.redpanda.com/redpandadata/redpanda"
+  "agents-im-redpanda"
+  "kafka-addr"
+  "advertise-kafka-addr"
+  "REDPANDA_KAFKA_PORT"
+  "agents_im_redpanda_data"
+)
+
+for pattern in "${redpanda_compose_patterns[@]}"; do
+  rg -q "$pattern" docker-compose.yml
+done
+
 redis_env_patterns=(
   "REDIS_ADDR"
   "REDIS_PASSWORD"
@@ -550,6 +676,18 @@ for pattern in "${redis_env_patterns[@]}"; do
   rg -q "$pattern" .env.example
 done
 
+kafka_env_patterns=(
+  "KAFKA_BROKERS"
+  "KAFKA_MESSAGE_EVENTS_TOPIC"
+  "KAFKA_CONSUMER_GROUP"
+  "REDPANDA_KAFKA_PORT"
+  "REDPANDA_ADMIN_PORT"
+)
+
+for pattern in "${kafka_env_patterns[@]}"; do
+  rg -q "$pattern" .env.example
+done
+
 presence_config_patterns=(
   "type RedisConfig"
   "type PresenceConfig"
@@ -560,6 +698,19 @@ presence_config_patterns=(
 
 for pattern in "${presence_config_patterns[@]}"; do
   rg -q "$pattern" internal/config/config.go
+done
+
+kafka_config_patterns=(
+  "type KafkaConfig"
+  "DefaultKafkaConfig"
+  "ResolveKafkaConfig"
+  "KAFKA_BROKERS"
+  "KAFKA_MESSAGE_EVENTS_TOPIC"
+  "KAFKA_CONSUMER_GROUP"
+)
+
+for pattern in "${kafka_config_patterns[@]}"; do
+  rg -q "$pattern" internal/config/config.go internal/config/config_test.go
 done
 
 presence_code_patterns=(
@@ -594,6 +745,58 @@ done
 
 rg -q "redis-presence.md" ARCHITECTURE.md docs/design-docs/index.md
 rg -q "REDIS_ADDR is required.*skip|t\\.Skip" internal/presence/redis_integration_test.go
+
+message_event_schema_patterns=(
+  "type MessageEvent struct"
+  "event_id"
+  "event_type"
+  "conversation_id"
+  "server_msg_id"
+  "sender_id"
+  "chat_type"
+  "created_at"
+  "payload"
+  "message.accepted"
+  "message.read"
+)
+
+for pattern in "${message_event_schema_patterns[@]}"; do
+  rg -q "$pattern" internal/messaging/event.go internal/messaging/event_test.go docs/design-docs/kafka-message-events.md
+done
+
+producer_contract_patterns=(
+  "type Producer interface"
+  "NewNoopProducer"
+  "NewInMemoryProducer"
+  "NewKafkaProducer"
+  "ParseBrokerList"
+  "segmentio/kafka-go"
+  "KAFKA_REDPANDA_INTEGRATION"
+  "t\\.Skip"
+)
+
+for pattern in "${producer_contract_patterns[@]}"; do
+  rg -q "$pattern" internal/messaging go.mod
+done
+
+kafka_doc_patterns=(
+  "message.events.v1"
+  "conversation_id"
+  "at-least-once"
+  "outbox"
+  "Message Transfer"
+  "Gateway"
+  "Push"
+  "KAFKA_BROKERS"
+  "Redpanda"
+)
+
+for pattern in "${kafka_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/kafka-message-events.md docs/exec-plans/active/kafka-redpanda-compose.md
+done
+
+rg -q "kafka-message-events.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-chain-contract.md
+rg -q "kafka-redpanda-compose" docs/exec-plans/active/kafka-redpanda-compose.md
 read_receipt_patterns=(
   "has_read_seq"
   "unread_count"
@@ -698,6 +901,7 @@ pg_persistence_patterns=(
   "conversation_threads"
   "user_conversation_states"
   "message_idempotency_keys"
+  "message_outbox"
 )
 
 for pattern in "${pg_persistence_patterns[@]}"; do
@@ -709,6 +913,43 @@ rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go inter
 rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
 rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
 rg -q "docker compose" scripts/migrate-postgres.sh docs/design-docs/postgres-persistence.md
+
+outbox_schema_patterns=(
+  "event_id"
+  "event_type"
+  "aggregate_type"
+  "aggregate_id"
+  "conversation_id"
+  "server_msg_id"
+  "payload jsonb"
+  "attempt_count"
+  "next_attempt_at"
+  "locked_by"
+  "locked_until"
+  "published_at"
+)
+
+for pattern in "${outbox_schema_patterns[@]}"; do
+  rg -q "$pattern" db/migrations/001_init_postgres.sql docs/design-docs/message-outbox.md
+done
+
+outbox_code_patterns=(
+  "type OutboxRepository interface"
+  "OutboxEventTypeMessageCreated"
+  "PollPending"
+  "MarkPublished"
+  "MarkFailed"
+  "messageCreatedOutboxPayload"
+  "insertMessageOutboxEvent"
+  "SKIP LOCKED"
+)
+
+for pattern in "${outbox_code_patterns[@]}"; do
+  rg -q "$pattern" internal/repository/message_outbox_repository.go internal/repository/postgres_outbox.go internal/repository/postgres_message.go internal/repository/message_memory.go tests/message_service_test.go tests/postgres_persistence_integration_test.go
+done
+
+rg -q "message-outbox.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/postgres-persistence.md
+rg -q "message-outbox" docs/exec-plans/active/message-outbox.md
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
