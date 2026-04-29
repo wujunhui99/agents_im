@@ -22,6 +22,7 @@
 - [websocket-gateway.md](./websocket-gateway.md)：WebSocket Gateway 第一阶段真实入口、JWT handshake、connection manager 和 command router
 - [message-transfer-worker.md](./message-transfer-worker.md)：Message Transfer worker 第一阶段事件消费、投递调度和重试契约
 - [gateway-push-delivery.md](./gateway-push-delivery.md)：Gateway push delivery 第一阶段 dispatcher、server push envelope 和 in-memory fanout
+- [transfer-gateway-dispatcher.md](./transfer-gateway-dispatcher.md)：Transfer worker 到 Gateway delivery dispatcher 的本进程适配器契约
 - [read-receipts.md](./read-receipts.md)：已读回执状态模型、单调推进和扩展设计
 - [im-agent-decoupling.md](./im-agent-decoupling.md)：IM 与 Agent 解耦设计
 - [websocket-reliability.md](./websocket-reliability.md)：WebSocket 可靠性设计

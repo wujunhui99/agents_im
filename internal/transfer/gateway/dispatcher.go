@@ -1,0 +1,177 @@
+package transfergateway
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	gatewaydelivery "github.com/wujunhui99/agents_im/internal/gateway/delivery"
+	"github.com/wujunhui99/agents_im/internal/transfer"
+)
+
+var (
+	ErrGatewayDispatcherRequired = errors.New("transfer gateway dispatcher: gateway dispatcher is required")
+	ErrUnsupportedEventType      = errors.New("transfer gateway dispatcher: unsupported event type")
+	ErrNoRecipients              = errors.New("transfer gateway dispatcher: message.accepted has no recipients")
+	ErrGatewayDeliveryFailed     = errors.New("transfer gateway dispatcher: gateway delivery failed")
+)
+
+type Dispatcher struct {
+	gateway    gatewaydelivery.Dispatcher
+	retryAfter time.Duration
+}
+
+type Option func(*Dispatcher)
+
+func NewDispatcher(dispatcher gatewaydelivery.Dispatcher, opts ...Option) *Dispatcher {
+	d := &Dispatcher{gateway: dispatcher}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
+}
+
+func WithRetryAfter(retryAfter time.Duration) Option {
+	return func(d *Dispatcher) {
+		if retryAfter > 0 {
+			d.retryAfter = retryAfter
+		}
+	}
+}
+
+func (d *Dispatcher) Dispatch(ctx context.Context, envelope transfer.Envelope) transfer.DispatchResult {
+	if err := ctx.Err(); err != nil {
+		return d.retryable(err)
+	}
+	if d == nil || d.gateway == nil {
+		return d.retryable(ErrGatewayDispatcherRequired)
+	}
+
+	switch strings.TrimSpace(envelope.Event.EventType) {
+	case transfer.EventTypeMessageAccepted:
+		return d.dispatchMessageAccepted(ctx, envelope)
+	default:
+		return transfer.DispatchFailed(fmt.Errorf("%w %q", ErrUnsupportedEventType, envelope.Event.EventType))
+	}
+}
+
+func (d *Dispatcher) dispatchMessageAccepted(ctx context.Context, envelope transfer.Envelope) transfer.DispatchResult {
+	recipients := directRecipients(envelope.Event)
+	if len(recipients) == 0 {
+		return transfer.DispatchFailed(ErrNoRecipients)
+	}
+
+	event := messageReceivedEvent(envelope, recipients)
+	result, err := d.gateway.DeliverToConversation(ctx, envelope.Event.ConversationID, recipients, event)
+	if err != nil {
+		return d.retryable(err)
+	}
+	if result.FailedRecipients > 0 {
+		return d.retryable(failedDeliveryError(result))
+	}
+
+	return transfer.DispatchSucceeded(deliveredUserIDs(result)...)
+}
+
+func (d *Dispatcher) retryable(err error) transfer.DispatchResult {
+	retryAfter := time.Duration(0)
+	if d != nil {
+		retryAfter = d.retryAfter
+	}
+	return transfer.DispatchRetryable(err, retryAfter)
+}
+
+func directRecipients(event transfer.MessageEvent) []string {
+	seen := make(map[string]struct{}, len(event.ReceiverIDs)+1)
+	recipients := make([]string, 0, len(event.ReceiverIDs)+1)
+	for _, userID := range event.ReceiverIDs {
+		recipients = appendRecipient(recipients, seen, userID)
+	}
+	if len(recipients) == 0 {
+		recipients = appendRecipient(recipients, seen, event.ReceiverID)
+	}
+	return recipients
+}
+
+func appendRecipient(recipients []string, seen map[string]struct{}, userID string) []string {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return recipients
+	}
+	if _, ok := seen[userID]; ok {
+		return recipients
+	}
+	seen[userID] = struct{}{}
+	return append(recipients, userID)
+}
+
+func messageReceivedEvent(envelope transfer.Envelope, recipients []string) gatewaydelivery.Event {
+	event := envelope.Event
+	return gatewaydelivery.NewMessageEvent(gatewaydelivery.EventMessageReceived, gatewaydelivery.Message{
+		ServerMsgID:     event.ServerMsgID,
+		ClientMsgID:     event.ClientMsgID,
+		ConversationID:  event.ConversationID,
+		Seq:             event.Seq,
+		SenderID:        event.SenderID,
+		ReceiverID:      receiverID(event, recipients),
+		GroupID:         event.GroupID,
+		ChatType:        event.ChatType,
+		ContentType:     event.ContentType,
+		Content:         event.Content,
+		ContentMetadata: cloneMetadata(event.ContentMetadata),
+		SendTime:        event.SendTime,
+		CreatedAt:       event.CreatedAt,
+		TraceID:         event.TraceID,
+	})
+}
+
+func receiverID(event transfer.MessageEvent, recipients []string) string {
+	if receiverID := strings.TrimSpace(event.ReceiverID); receiverID != "" {
+		return receiverID
+	}
+	if len(recipients) == 1 {
+		return recipients[0]
+	}
+	return ""
+}
+
+func cloneMetadata(metadata map[string]interface{}) map[string]interface{} {
+	if metadata == nil {
+		return nil
+	}
+	clone := make(map[string]interface{}, len(metadata))
+	for key, value := range metadata {
+		clone[key] = value
+	}
+	return clone
+}
+
+func deliveredUserIDs(result gatewaydelivery.Result) []string {
+	delivered := make([]string, 0, result.DeliveredRecipients)
+	for _, recipient := range result.Recipients {
+		if recipient.Status == gatewaydelivery.StatusDelivered {
+			delivered = append(delivered, recipient.UserID)
+		}
+	}
+	return delivered
+}
+
+func failedDeliveryError(result gatewaydelivery.Result) error {
+	failures := make([]string, 0, result.FailedRecipients)
+	for _, recipient := range result.Recipients {
+		if recipient.Status != gatewaydelivery.StatusFailed {
+			continue
+		}
+		if strings.TrimSpace(recipient.Error) == "" {
+			failures = append(failures, recipient.UserID)
+			continue
+		}
+		failures = append(failures, recipient.UserID+": "+recipient.Error)
+	}
+	if len(failures) == 0 {
+		return ErrGatewayDeliveryFailed
+	}
+	return fmt.Errorf("%w: %s", ErrGatewayDeliveryFailed, strings.Join(failures, ", "))
+}
