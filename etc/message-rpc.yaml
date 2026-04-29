@@ -1,2 +1,7 @@
 Name: message-rpc
 ListenOn: 0.0.0.0:9094
+Auth:
+  AccessSecret: dev-jwt-secret-change-me
+  AccessExpire: 86400
+StorageDriver: memory
+DataSource: ${DATABASE_URL}

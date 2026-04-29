@@ -58,6 +58,9 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/me",
 			Handler: userhandler.UpdateMeHandler(serverCtx),
 		},
+	}, jwtOption(serverCtx))
+
+	server.AddRoutes([]rest.Route{
 		{
 			Method:  http.MethodPost,
 			Path:    "/users",
@@ -98,7 +101,7 @@ func addFriendsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/friends/:user_id",
 			Handler: friendshandler.GetFriendshipHandler(serverCtx),
 		},
-	})
+	}, jwtOption(serverCtx))
 }
 
 func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
@@ -109,11 +112,6 @@ func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Handler: groupshandler.CreateGroupHandler(serverCtx),
 		},
 		{
-			Method:  http.MethodGet,
-			Path:    "/groups/:group_id",
-			Handler: groupshandler.GetGroupHandler(serverCtx),
-		},
-		{
 			Method:  http.MethodPost,
 			Path:    "/groups/:group_id/members",
 			Handler: groupshandler.AddMemberHandler(serverCtx),
@@ -122,6 +120,14 @@ func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Method:  http.MethodDelete,
 			Path:    "/groups/:group_id/members/me",
 			Handler: groupshandler.LeaveGroupHandler(serverCtx),
+		},
+	}, jwtOption(serverCtx))
+
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodGet,
+			Path:    "/groups/:group_id",
+			Handler: groupshandler.GetGroupHandler(serverCtx),
 		},
 		{
 			Method:  http.MethodGet,
@@ -153,5 +159,9 @@ func addMessageRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/conversations/:conversation_id/read",
 			Handler: messagehandler.MarkConversationAsReadHandler(serverCtx),
 		},
-	})
+	}, jwtOption(serverCtx))
+}
+
+func jwtOption(serverCtx *svc.ServiceContext) rest.RouteOption {
+	return rest.WithJwt(serverCtx.Auth.AccessSecret)
 }

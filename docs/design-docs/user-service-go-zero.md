@@ -117,13 +117,13 @@ HTTP 响应格式：
 
 ## 鉴权上下文
 
-第一阶段不实现 auth token 校验。`user-api` 通过请求头 `X-User-Id` 获取当前用户身份：
+`user-api` 通过 go-zero JWT middleware 获取当前用户身份：
 
-- `GET /me` 必须携带 `X-User-Id`。
-- `PATCH /me` 必须携带 `X-User-Id`。
-- go-zero handler 将该值传入 route-level logic，再由业务 logic 调用 `GetUserByID` 或 `UpdateUserProfile`。
+- `GET /me` 必须携带 `Authorization: Bearer <access_token>`。
+- `PATCH /me` 必须携带 `Authorization: Bearer <access_token>`。
+- go-zero middleware 校验 token 后将 `user_id` claim 注入 context，再由 logic adapter 调用 `GetUserByID` 或 `UpdateUserProfile`。
 
-后续接入 gateway 后，网关负责 token 校验，并透传规范化后的用户身份和 `trace_id`。
+`X-User-Id` 不作为生产鉴权路径；测试仅验证它不能绕过 JWT。
 
 ## 测试方式
 
@@ -146,7 +146,7 @@ go run ./cmd/user-rpc -f etc/user-rpc.yaml
 - 创建用户成功。
 - 重复 `identifier` 返回 `AlreadyExists`。
 - `ExistsByIdentifier` 返回存在和不存在两种结果。
-- `/me` 缺少 `X-User-Id` 返回未认证。
+- `/me` 缺少 Bearer token 返回未认证。
 - `PATCH /me` 只能更新允许字段。
 - 资料模型和 HTTP/RPC 响应不包含密码或认证秘密。
 
@@ -155,5 +155,5 @@ go run ./cmd/user-rpc -f etc/user-rpc.yaml
 - 使用 `goctl api go` 和 `goctl rpc protoc` 重新生成骨架并对齐手写逻辑。
 - 将内存 repository 替换为 PostgreSQL repository，增加迁移脚本和唯一索引。
 - 为 `auth` 注册流程增加幂等创建、补偿或 outbox 设计。
-- 接入 gateway 鉴权、trace_id 透传和结构化日志。
+- 接入 gateway 长连接鉴权、trace_id 透传和结构化日志。
 - 当前执行环境无法写入外层 `/home/ws/project/docs/design-docs/user-service-go-zero.md`，本文件为 worktree 内可提交副本。

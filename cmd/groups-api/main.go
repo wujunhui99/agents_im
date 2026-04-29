@@ -23,13 +23,14 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
-	serviceContext := svc.NewGroupsServiceContext(
-		repository.NewMemoryGroupsRepository(),
+	userLogic := logic.NewUserLogic(repository.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource))
+	serviceContext := svc.NewGroupsServiceContextWithAuth(
+		repository.MustGroupsRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
 		logic.NewUserLogicExistenceChecker(userLogic),
+		cfg.Auth,
 	)
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
-	server := rest.MustNewServer(config.ToRestConf(cfg))
+	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()
 	handler.RegisterGroupsGoZeroHandlers(server, serviceContext)
 

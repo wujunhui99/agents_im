@@ -14,8 +14,8 @@ type ServiceContext struct {
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	userLogic := business.NewUserLogic(repository.NewMemoryRepository())
-	groupsRepo := repository.NewMemoryGroupsRepository()
+	userLogic := business.NewUserLogic(repository.MustRepositoryForStorage(c.StorageDriver, c.DataSource))
+	groupsRepo := repository.MustGroupsRepositoryForStorage(c.StorageDriver, c.DataSource)
 	return &ServiceContext{
 		Config:      c,
 		GroupsLogic: business.NewGroupsLogic(groupsRepo, business.NewUserLogicExistenceChecker(userLogic)),

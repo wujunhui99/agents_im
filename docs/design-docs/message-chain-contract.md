@@ -398,7 +398,7 @@ Response:
 }
 ```
 
-Phase 1 may use `X-User-Id` like existing services until auth gateway is wired.
+The HTTP adapter uses the authenticated token `user_id` as `senderId`. If a request body includes `senderId`, it must match the token user or the request is rejected.
 
 ### GET /conversations/:conversation_id/messages
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/svc"
 	"github.com/wujunhui99/agents_im/internal/types"
@@ -86,7 +87,7 @@ func NewGetMeLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetMeLogic 
 }
 
 func (l *GetMeLogic) GetMe(req *types.GetMeReq) (*types.UserResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func NewUpdateMeLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateMe
 }
 
 func (l *UpdateMeLogic) UpdateMe(req *types.UpdateMeReq) (*types.UserResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -157,14 +158,6 @@ func (l *UpdateMeLogic) UpdateMe(req *types.UpdateMeReq) (*types.UserResp, error
 		return nil, err
 	}
 	return userResp(profile), nil
-}
-
-func currentUserID(value string) (string, error) {
-	userID := strings.TrimSpace(value)
-	if userID == "" {
-		return "", apperror.Unauthenticated("X-User-Id header is required")
-	}
-	return userID, nil
 }
 
 func optionalString(value string) *string {

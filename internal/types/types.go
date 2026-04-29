@@ -9,8 +9,7 @@ type AddFriendData struct {
 }
 
 type AddFriendReq struct {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	UserID        string `json:"user_id"`
+	UserID string `json:"user_id"`
 }
 
 type AddFriendResp struct {
@@ -20,9 +19,8 @@ type AddFriendResp struct {
 }
 
 type AddMemberReq struct {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	GroupID       string `path:"group_id"`
-	UserID        string `json:"user_id,optional"`
+	GroupID string `path:"group_id"`
+	UserID  string `json:"user_id,optional"`
 }
 
 type AuthData struct {
@@ -52,7 +50,6 @@ type ConversationSeqsData struct {
 }
 
 type ConversationSeqsReq struct {
-	CurrentUserID   string `header:"X-User-Id,optional"`
 	ConversationIDs string `form:"conversationIds,optional"`
 }
 
@@ -63,9 +60,8 @@ type ConversationSeqsResp struct {
 }
 
 type CreateGroupReq struct {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	Name          string `json:"name"`
-	Description   string `json:"description,optional"`
+	Name        string `json:"name"`
+	Description string `json:"description,optional"`
 }
 
 type CreateUserReq struct {
@@ -104,8 +100,7 @@ type ExistsResp struct {
 }
 
 type FriendPathReq struct {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	UserID        string `path:"user_id"`
+	UserID string `path:"user_id"`
 }
 
 type Friendship struct {
@@ -131,9 +126,7 @@ type GetGroupReq struct {
 	GroupID string `path:"group_id"`
 }
 
-type GetMeReq struct {
-	CurrentUserID string `header:"X-User-Id,optional"`
-}
+type GetMeReq struct{}
 
 type GetUserByIdentifierReq struct {
 	Identifier string `path:"identifier"`
@@ -163,17 +156,14 @@ type GroupResp struct {
 }
 
 type LeaveGroupReq struct {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	GroupID       string `path:"group_id"`
+	GroupID string `path:"group_id"`
 }
 
 type ListFriendsData struct {
 	Friends []Friendship `json:"friends"`
 }
 
-type ListFriendsReq struct {
-	CurrentUserID string `header:"X-User-Id,optional"`
-}
+type ListFriendsReq struct{}
 
 type ListFriendsResp struct {
 	Code    string          `json:"code"`
@@ -210,7 +200,6 @@ type MarkConversationAsReadData struct {
 }
 
 type MarkConversationAsReadReq struct {
-	CurrentUserID  string `header:"X-User-Id,optional"`
 	ConversationID string `path:"conversation_id"`
 	HasReadSeq     int64  `json:"hasReadSeq"`
 }
@@ -254,7 +243,6 @@ type PullMessagesData struct {
 }
 
 type PullMessagesReq struct {
-	CurrentUserID  string `header:"X-User-Id,optional"`
 	ConversationID string `path:"conversation_id"`
 	FromSeq        int64  `form:"fromSeq,optional"`
 	ToSeq          int64  `form:"toSeq,optional"`
@@ -284,13 +272,13 @@ type SendMessageData struct {
 }
 
 type SendMessageReq struct {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	ReceiverID    string `json:"receiverId,optional"`
-	GroupID       string `json:"groupId,optional"`
-	ChatType      string `json:"chatType"`
-	ClientMsgID   string `json:"clientMsgId"`
-	ContentType   string `json:"contentType"`
-	Content       string `json:"content"`
+	SenderID    string `json:"senderId,optional"`
+	ReceiverID  string `json:"receiverId,optional"`
+	GroupID     string `json:"groupId,optional"`
+	ChatType    string `json:"chatType"`
+	ClientMsgID string `json:"clientMsgId"`
+	ContentType string `json:"contentType"`
+	Content     string `json:"content"`
 }
 
 type SendMessageResp struct {
@@ -300,14 +288,13 @@ type SendMessageResp struct {
 }
 
 type UpdateMeReq struct {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	UserID        string `json:"user_id,optional"`
-	Identifier    string `json:"identifier,optional"`
-	DisplayName   string `json:"display_name,optional"`
-	Name          string `json:"name,optional"`
-	Gender        string `json:"gender,optional"`
-	Age           int32  `json:"age,optional"`
-	Region        string `json:"region,optional"`
+	UserID      string `json:"user_id,optional"`
+	Identifier  string `json:"identifier,optional"`
+	DisplayName string `json:"display_name,optional"`
+	Name        string `json:"name,optional"`
+	Gender      string `json:"gender,optional"`
+	Age         int32  `json:"age,optional"`
+	Region      string `json:"region,optional"`
 }
 
 type User struct {

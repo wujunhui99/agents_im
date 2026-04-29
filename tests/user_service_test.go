@@ -65,7 +65,7 @@ func TestUserLogicCreateDuplicateExistsAndUpdate(t *testing.T) {
 }
 
 func TestUserHTTPHandlers(t *testing.T) {
-	serviceContext := svc.NewServiceContext(repository.NewMemoryRepository())
+	serviceContext := svc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
 	mux := newUserGoZeroRouter(t, serviceContext)
 
 	createBody := `{"identifier":"bob_001","display_name":"Bob","gender":"male","age":28,"region":"Beijing"}`
@@ -102,16 +102,26 @@ func TestUserHTTPHandlers(t *testing.T) {
 		t.Fatalf("unexpected exists response: %+v", exists.Data)
 	}
 
-	meWithoutHeaderResp := httptest.NewRecorder()
-	meWithoutHeaderReq := httptest.NewRequest(http.MethodGet, "/me", nil)
-	mux.ServeHTTP(meWithoutHeaderResp, meWithoutHeaderReq)
-	if meWithoutHeaderResp.Code != http.StatusUnauthorized {
-		t.Fatalf("missing X-User-Id status = %d", meWithoutHeaderResp.Code)
+	meWithoutTokenResp := httptest.NewRecorder()
+	meWithoutTokenReq := httptest.NewRequest(http.MethodGet, "/me", nil)
+	mux.ServeHTTP(meWithoutTokenResp, meWithoutTokenReq)
+	if meWithoutTokenResp.Code != http.StatusUnauthorized {
+		t.Fatalf("missing token status = %d", meWithoutTokenResp.Code)
 	}
+
+	t.Run("rejects legacy X-User-Id header without bearer token", func(t *testing.T) {
+		headerOnlyResp := httptest.NewRecorder()
+		headerOnlyReq := httptest.NewRequest(http.MethodGet, "/me", nil)
+		setRejectedLegacyXUserIDHeader(t, headerOnlyReq, created.Data.UserID)
+		mux.ServeHTTP(headerOnlyResp, headerOnlyReq)
+		if headerOnlyResp.Code != http.StatusUnauthorized {
+			t.Fatalf("legacy X-User-Id rejection status = %d", headerOnlyResp.Code)
+		}
+	})
 
 	meResp := httptest.NewRecorder()
 	meReq := httptest.NewRequest(http.MethodGet, "/me", nil)
-	meReq.Header.Set("X-User-Id", created.Data.UserID)
+	meReq.Header.Set("Authorization", bearerTokenForUser(t, created.Data.UserID))
 	mux.ServeHTTP(meResp, meReq)
 	if meResp.Code != http.StatusOK {
 		t.Fatalf("me status = %d, body = %s", meResp.Code, meResp.Body.String())
@@ -120,7 +130,7 @@ func TestUserHTTPHandlers(t *testing.T) {
 
 	patchResp := httptest.NewRecorder()
 	patchReq := newJSONRequest(http.MethodPatch, "/me", `{"name":"Bobby","region":"Hangzhou"}`)
-	patchReq.Header.Set("X-User-Id", created.Data.UserID)
+	patchReq.Header.Set("Authorization", bearerTokenForUser(t, created.Data.UserID))
 	mux.ServeHTTP(patchResp, patchReq)
 	if patchResp.Code != http.StatusOK {
 		t.Fatalf("patch status = %d, body = %s", patchResp.Code, patchResp.Body.String())
@@ -141,7 +151,7 @@ func TestUserHTTPHandlers(t *testing.T) {
 }
 
 func TestPatchRejectsImmutableFields(t *testing.T) {
-	serviceContext := svc.NewServiceContext(repository.NewMemoryRepository())
+	serviceContext := svc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
 	mux := newUserGoZeroRouter(t, serviceContext)
 
 	createResp := httptest.NewRecorder()
@@ -152,7 +162,7 @@ func TestPatchRejectsImmutableFields(t *testing.T) {
 
 	patchResp := httptest.NewRecorder()
 	identifierReq := newJSONRequest(http.MethodPatch, "/me", `{"identifier":"changed"}`)
-	identifierReq.Header.Set("X-User-Id", created.Data.UserID)
+	identifierReq.Header.Set("Authorization", bearerTokenForUser(t, created.Data.UserID))
 	mux.ServeHTTP(patchResp, identifierReq)
 	if patchResp.Code != http.StatusBadRequest {
 		t.Fatalf("immutable field patch status = %d, body = %s", patchResp.Code, patchResp.Body.String())
@@ -160,7 +170,7 @@ func TestPatchRejectsImmutableFields(t *testing.T) {
 
 	userIDResp := httptest.NewRecorder()
 	userIDReq := newJSONRequest(http.MethodPatch, "/me", `{"user_id":"usr_999999"}`)
-	userIDReq.Header.Set("X-User-Id", created.Data.UserID)
+	userIDReq.Header.Set("Authorization", bearerTokenForUser(t, created.Data.UserID))
 	mux.ServeHTTP(userIDResp, userIDReq)
 	if userIDResp.Code != http.StatusBadRequest {
 		t.Fatalf("user_id patch status = %d, body = %s", userIDResp.Code, userIDResp.Body.String())

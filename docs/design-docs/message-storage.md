@@ -1,13 +1,16 @@
 # Message Storage Design
 
-Status: Draft
+Status: Implemented for PostgreSQL phase 1
 Owner: IM backend
 Related product spec: [`../product-specs/message-storage.md`](../product-specs/message-storage.md)
 Related contract: [`./message-chain-contract.md`](./message-chain-contract.md)
+Related implementation: [`./postgres-persistence.md`](./postgres-persistence.md)
 
 ## Background
 
 Message service phase 1 owns synchronous send, pull, and read-state behavior. This document defines the future PostgreSQL and Redis storage contract behind that behavior so storage work can proceed independently from API/RPC contract work.
+
+Current implementation status: PostgreSQL schema, migration tooling, and repository implementations are available for phase 1. Redis remains a non-authoritative future cache and is not implemented in this branch.
 
 The storage layer must preserve these invariants:
 

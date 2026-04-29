@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/auth/handler"
@@ -29,11 +27,11 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
+	userLogic := userlogic.NewUserLogic(userrepo.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource))
 	serviceContext := svc.NewServiceContext(
-		authrepo.NewMemoryRepository(),
+		authrepo.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
 		useradapter.NewLogicClient(userLogic),
-		token.NewHMACTokenManager(tokenSecret(), tokenTTL()),
+		token.NewHMACTokenManager(cfg.Auth.AccessSecret, time.Duration(cfg.Auth.AccessExpire)*time.Second),
 	)
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
 	server := rest.MustNewServer(config.ToRestConf(cfg))
@@ -42,30 +40,4 @@ func main() {
 
 	log.Printf("%s listening on %s:%d", cfg.Name, cfg.Host, cfg.Port)
 	server.Start()
-}
-
-func tokenSecret() string {
-	if value := os.Getenv("AUTH_TOKEN_SECRET"); value != "" {
-		return value
-	}
-	return "dev-auth-secret-change-me"
-}
-
-func tokenTTL() time.Duration {
-	value := os.Getenv("AUTH_TOKEN_TTL")
-	if value == "" {
-		return 24 * time.Hour
-	}
-
-	ttl, err := time.ParseDuration(value)
-	if err == nil {
-		return ttl
-	}
-
-	seconds, err := strconv.Atoi(value)
-	if err == nil && seconds > 0 {
-		return time.Duration(seconds) * time.Second
-	}
-
-	return 24 * time.Hour
 }
