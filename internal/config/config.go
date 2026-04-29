@@ -59,6 +59,7 @@ type MessageTransferConfig struct {
 	Name       string
 	WorkerID   string
 	DryRun     bool
+	Kafka      KafkaConfig
 	Consumer   TransferConsumerConfig
 	Dispatcher TransferDispatcherConfig
 	Worker     TransferWorkerConfig
@@ -86,6 +87,7 @@ const (
 	PresenceDriverMemory   = "memory"
 	PresenceDriverRedis    = "redis"
 	TransferConsumerMemory = "memory"
+	TransferConsumerKafka  = "kafka"
 	TransferDispatcherNoop = "noop"
 )
 
@@ -96,8 +98,8 @@ const (
 	defaultKafkaBroker                 = "localhost:19092"
 	defaultKafkaMessageEventsTopic     = "message.events.v1"
 	defaultKafkaConsumerGroup          = "message-transfer-worker"
-	defaultTransferTopic               = "message.accepted.v1"
-	defaultTransferGroup               = "message-transfer"
+	defaultTransferTopic               = defaultKafkaMessageEventsTopic
+	defaultTransferGroup               = defaultKafkaConsumerGroup
 	defaultTransferPollIntervalMillis  = 100
 	defaultTransferRetryBackoffMillis  = 1000
 	defaultTransferMaxAttempts         = 5
@@ -163,6 +165,7 @@ func DefaultMessageTransferConfig() MessageTransferConfig {
 		Name:     "message-transfer",
 		WorkerID: defaultWorkerID(),
 		DryRun:   true,
+		Kafka:    DefaultKafkaConfig(),
 		Consumer: TransferConsumerConfig{
 			Driver: TransferConsumerMemory,
 			Topic:  defaultTransferTopic,
@@ -281,21 +284,22 @@ func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
 		cfg.Name = value
 	}
 	cfg.WorkerID = firstNonEmpty(values["Worker.ID"], values["WorkerID"], os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), cfg.WorkerID)
+	cfg.Kafka = kafkaConfigFromValues(values)
 	if value := firstNonEmpty(values["Consumer.Driver"], values["ConsumerDriver"]); value != "" {
 		cfg.Consumer.Driver = ResolveTransferConsumerDriver(value)
 	} else {
 		cfg.Consumer.Driver = ResolveTransferConsumerDriver(cfg.Consumer.Driver)
 	}
-	cfg.Consumer.Topic = firstNonEmpty(
-		strings.TrimSpace(os.ExpandEnv(firstNonEmpty(values["Consumer.Topic"], values["Topic"]))),
-		os.Getenv("MESSAGE_TRANSFER_TOPIC"),
-		cfg.Consumer.Topic,
-	)
-	cfg.Consumer.Group = firstNonEmpty(
-		strings.TrimSpace(os.ExpandEnv(firstNonEmpty(values["Consumer.Group"], values["ConsumerGroup"]))),
-		os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"),
-		cfg.Consumer.Group,
-	)
+	if value := firstNonEmpty(values["Consumer.Topic"], values["Topic"]); value != "" {
+		cfg.Consumer.Topic = strings.TrimSpace(os.ExpandEnv(value))
+	} else {
+		cfg.Consumer.Topic = ""
+	}
+	if value := firstNonEmpty(values["Consumer.Group"], values["ConsumerGroup"]); value != "" {
+		cfg.Consumer.Group = strings.TrimSpace(os.ExpandEnv(value))
+	} else {
+		cfg.Consumer.Group = ""
+	}
 	if value := firstNonEmpty(values["Dispatcher.Driver"], values["DispatcherDriver"]); value != "" {
 		cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(value)
 	} else {
@@ -373,6 +377,8 @@ func ResolveTransferConsumerDriver(value string) string {
 		value = strings.ToLower(strings.TrimSpace(os.Getenv("MESSAGE_TRANSFER_CONSUMER_DRIVER")))
 	}
 	switch value {
+	case TransferConsumerKafka, "redpanda":
+		return TransferConsumerKafka
 	default:
 		return TransferConsumerMemory
 	}
@@ -392,9 +398,10 @@ func ResolveTransferDispatcherDriver(value string) string {
 func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConfig {
 	cfg.Name = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "message-transfer")
 	cfg.WorkerID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.WorkerID)), os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), defaultWorkerID())
+	cfg.Kafka = ResolveKafkaConfig(cfg.Kafka)
 	cfg.Consumer.Driver = ResolveTransferConsumerDriver(cfg.Consumer.Driver)
-	cfg.Consumer.Topic = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Topic)), os.Getenv("MESSAGE_TRANSFER_TOPIC"), defaultTransferTopic)
-	cfg.Consumer.Group = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Group)), os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"), defaultTransferGroup)
+	cfg.Consumer.Topic = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Topic)), os.Getenv("MESSAGE_TRANSFER_TOPIC"), cfg.Kafka.MessageEventsTopic, defaultTransferTopic)
+	cfg.Consumer.Group = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Group)), os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"), cfg.Kafka.ConsumerGroup, defaultTransferGroup)
 	cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(cfg.Dispatcher.Driver)
 	if cfg.Worker.PollIntervalMillis <= 0 {
 		cfg.Worker.PollIntervalMillis = defaultTransferPollIntervalMillis

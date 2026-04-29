@@ -21,7 +21,17 @@ func main() {
 		log.Fatalf("load message transfer config: %v", err)
 	}
 
-	consumer := buildConsumer(cfg)
+	consumer, err := buildConsumer(cfg)
+	if err != nil {
+		log.Fatalf("build message transfer consumer: %v", err)
+	}
+	if closer, ok := consumer.(interface{ Close() error }); ok {
+		defer func() {
+			if err := closer.Close(); err != nil {
+				log.Printf("close message transfer consumer: %v", err)
+			}
+		}()
+	}
 	dispatcher := buildDispatcher(cfg)
 	worker := transfer.NewWorker(
 		consumer,
@@ -52,10 +62,16 @@ func main() {
 	log.Printf("%s stopped", cfg.Name)
 }
 
-func buildConsumer(cfg config.MessageTransferConfig) transfer.EventConsumer {
+func buildConsumer(cfg config.MessageTransferConfig) (transfer.EventConsumer, error) {
 	switch cfg.Consumer.Driver {
+	case config.TransferConsumerKafka:
+		return transfer.NewKafkaEventConsumer(transfer.KafkaEventConsumerConfig{
+			Brokers: cfg.Kafka.Brokers,
+			Topic:   cfg.Consumer.Topic,
+			GroupID: cfg.Consumer.Group,
+		})
 	default:
-		return transfer.NewInMemoryConsumer()
+		return transfer.NewInMemoryConsumer(), nil
 	}
 }
 
