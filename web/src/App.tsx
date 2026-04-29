@@ -7,9 +7,9 @@ import ContactsPage from './components/ContactsPage';
 import { TabBar, type TabDefinition } from './components/ui/TabBar';
 import { TopBar } from './components/ui/TopBar';
 import { mockCurrentUser } from './data/mockData';
+import { MessagesPage } from './features/messages/MessagesPage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { MePage } from './pages/MePage';
-import { MessagesPage } from './pages/MessagesPage';
 
 type TabKey = 'messages' | 'contacts' | 'discover' | 'me';
 
