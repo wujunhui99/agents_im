@@ -951,6 +951,43 @@ done
 rg -q "message-outbox.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/postgres-persistence.md
 rg -q "message-outbox" docs/exec-plans/active/message-outbox.md
 
+outbox_publisher_code_patterns=(
+  "package outboxpublisher"
+  "type Publisher struct"
+  "repository.OutboxRepository"
+  "messaging.Producer"
+  "PollPending"
+  "MessageEventFromOutbox"
+  "EventTypeMessageAccepted"
+  "DefaultMessageEventsTopic"
+  "MarkPublished"
+  "MarkFailed"
+)
+
+for pattern in "${outbox_publisher_code_patterns[@]}"; do
+  rg -q "$pattern" internal/outboxpublisher
+done
+
+outbox_publisher_doc_patterns=(
+  "outbox-kafka-publisher.md"
+  "message.events.v1"
+  "message.accepted"
+  "at-least-once"
+  "event_id"
+  "conversation_id"
+  "MarkPublished"
+  "MarkFailed"
+)
+
+for pattern in "${outbox_publisher_doc_patterns[@]}"; do
+  rg -q "$pattern" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/outbox-kafka-publisher.md docs/exec-plans/active/outbox-kafka-publisher.md
+done
+
+rg -q "TestPublisherPublishesMessageCreatedOutboxEvent" internal/outboxpublisher/publisher_test.go
+rg -q "TestPublisherMarksPublishErrorRetryable" internal/outboxpublisher/publisher_test.go
+rg -q "TestPublisherMarksMalformedPayloadFailedForRetry" internal/outboxpublisher/publisher_test.go
+rg -q "TestPublisherStopsOnContextCancellationWithoutMarkingFailed" internal/outboxpublisher/publisher_test.go
+
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
   internal/model internal/logic internal/repository internal/handler internal/rpcgen/user internal/svc; then
