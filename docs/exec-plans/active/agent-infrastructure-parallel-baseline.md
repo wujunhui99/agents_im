@@ -174,6 +174,12 @@
 - 默认未配置 executor 时明确失败。
 - 测试验证主服务没有 shell/python 直接执行路径。
 
+当前分支实现记录（2026-04-30）：
+
+- `internal/agent/pythonexec` 已提供 contract-only package：`Request`、`Response`、`Policy`、`Executor`、`DisabledExecutor`。
+- 默认 executor 只做 request/policy validation，并返回 `ErrPythonExecutorDisabled`；未实现 Python runtime、Docker runner、LLM provider 或 shell capability。
+- `tests/no_shell_execution_test.go` 和 `scripts/verify-static.sh` 覆盖生产 Go 代码不得直接导入 `os/exec`、调用 `exec.Command`/`CommandContext`，或包含 shell/Python command literal。
+
 ### 6. `feature/agent-im-integration-contract`
 
 职责：Agent 与 IM 消息链路集成契约。

@@ -87,6 +87,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - 当前 Agent registry 基线已提供 prompt/tool/skill 元数据与 Agent 白名单绑定的 Go logic/repository 和 PostgreSQL schema；该基线不执行工具、不调用 LLM、不上传或读取 MinIO 二进制内容。
 - Agent run、tool call、skill file read、Python exec 审计记录使用 append-only 审计表保存；摘要字段必须脱敏，Python 代码只保存 hash/大小摘要。
 - 第一版不提供 shell/命令行脚本执行能力；Python 执行必须通过受限沙箱、限时限资源、默认无网络，并记录审计。
+- 当前 Python executor 只提供 `internal/agent/pythonexec` 契约和 disabled 默认实现；未配置真实沙箱时必须返回 `ErrPythonExecutorDisabled`，不得在 Go 主服务进程内直接运行 Python 或 shell。
 - Agent 响应必须通过 Message Service 写回 IM，不能绕过 IM 消息链路或直接推送 WebSocket。
 
 ### Webhook Dispatcher

@@ -172,6 +172,13 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal/domain/agentaudit ./inter
 - no network by default;
 - explicit audit record for every execution.
 
+**Implementation note (2026-04-30, `feature/agent-python-sandbox-contract`):**
+
+- Added `internal/agent/pythonexec` contract types and `Executor.Execute(ctx, Request)` interface.
+- `Policy` now validates `run_id`, `audit_id`, timeout, CPU/memory limits, disabled/default network policy, explicit read-only relative file allowlist, and `max_output_bytes`.
+- `NewDefaultExecutor()` returns the disabled executor; valid requests fail with `ErrPythonExecutorDisabled` until a real sandbox service is intentionally wired.
+- Added static test and `scripts/verify-static.sh` guard to reject production Go imports/calls/literals that would directly execute shell or Python from `cmd/` or `internal/`.
+
 ## Phase 4: IM Integration
 
 ### Task 9: Connect IM event to Agent run

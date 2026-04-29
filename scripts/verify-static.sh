@@ -135,6 +135,8 @@ required_files=(
   "internal/transfer/gateway/dispatcher.go"
   "internal/transfer/gateway/dispatcher_test.go"
   "internal/domain/readreceipt/read_receipt.go"
+  "internal/agent/pythonexec/executor.go"
+  "internal/agent/pythonexec/executor_test.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
   "tests/friends_service_test.go"
@@ -143,6 +145,9 @@ required_files=(
   "tests/gateway_contract_test.go"
   "tests/websocket_gateway_test.go"
   "tests/read_receipts_test.go"
+  "tests/no_shell_execution_test.go"
+  "docs/product-specs/agent-system.md"
+  "docs/design-docs/agent-system-architecture.md"
   "docs/product-specs/user-service.md"
   "docs/product-specs/auth-service.md"
   "docs/product-specs/friends-service.md"
@@ -226,6 +231,8 @@ required_files=(
   "docs/exec-plans/active/gateway-push-delivery.md"
   "docs/exec-plans/active/transfer-gateway-dispatcher.md"
   "docs/exec-plans/active/gateway-presence-routing.md"
+  "docs/exec-plans/active/agent-system-v0.md"
+  "docs/exec-plans/active/agent-infrastructure-parallel-baseline.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -314,6 +321,11 @@ goctl --version >/dev/null
 for api_file in api/*.api; do
   goctl api validate -api "$api_file" >/dev/null
 done
+
+if rg -n '"os/exec"|exec\.Command|CommandContext\(|"(/bin/bash|/bin/sh|bash|sh|python|python3)"' cmd internal --glob '*.go' --glob '!*_test.go'; then
+  echo "production Go code must not directly execute shell or python commands" >&2
+  exit 1
+fi
 
 message_plan_file=""
 for candidate in \

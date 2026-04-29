@@ -311,6 +311,34 @@ agent_python_execs
 - stdout/stderr/result/error 全部记录。
 - 失败必须显式返回，不能伪造成功。
 
+当前仓库只实现 Go 侧 sandbox contract，不实现真实执行器。契约位于 `internal/agent/pythonexec`：
+
+```text
+Executor.Execute(ctx, Request) (*Response, error)
+
+Request
+- code
+- policy
+
+Policy
+- run_id
+- audit_id
+- timeout
+- cpu_time_limit
+- memory_limit_bytes
+- network: disabled by default
+- file_allowlist: explicit read-only relative paths
+- max_output_bytes
+
+Response
+- run_id / audit_id
+- stdout / stderr / result_json
+- exit_code / timed_out / output_truncated
+- structured error
+```
+
+默认实现为 `DisabledExecutor` / `NewDefaultExecutor()`，只校验 request 和 policy，然后返回 `ErrPythonExecutorDisabled`。它不会启动 Python、Docker、shell 或任何本地进程。后续真实 executor 必须是独立沙箱服务或隔离 worker，并在接入前补齐审计落库、资源限制验证和 opt-in 集成测试。
+
 工具接口草案：
 
 ```json
