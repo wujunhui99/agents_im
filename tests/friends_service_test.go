@@ -78,6 +78,14 @@ func TestFriendsLogicAddDuplicateDeleteAndList(t *testing.T) {
 	if friendship.Friendship.IsFriend || friendship.Friendship.Status != model.FriendshipStatusDeleted {
 		t.Fatalf("deleted friendship should be inactive: %+v", friendship.Friendship)
 	}
+
+	readded, err := friendsLogic.AddFriend(ctx, logic.AddFriendRequest{UserID: alice.UserID, FriendID: bob.UserID})
+	if err != nil {
+		t.Fatalf("re-add deleted friend: %v", err)
+	}
+	if !readded.Created || !readded.Friendship.IsFriend || readded.Friendship.Status != model.FriendshipStatusActive {
+		t.Fatalf("re-add should reactivate friendship: %+v", readded)
+	}
 }
 
 func TestFriendsLogicCannotAddSelf(t *testing.T) {
@@ -108,6 +116,23 @@ func TestFriendsLogicUserNotExists(t *testing.T) {
 	_, err = friendsLogic.AddFriend(ctx, logic.AddFriendRequest{UserID: "usr_missing", FriendID: alice.UserID})
 	if err == nil || apperror.From(err).Code != apperror.CodeNotFound {
 		t.Fatalf("missing current user error = %v, want NOT_FOUND", err)
+	}
+}
+
+func TestFriendsLogicNeverAddedStatusIsNone(t *testing.T) {
+	repo := repository.NewMemoryRepository()
+	userLogic := logic.NewUserLogic(repo)
+	friendsLogic := logic.NewFriendsLogic(repo, userLogic)
+	ctx := context.Background()
+	alice := createFriendTestUser(t, ctx, userLogic, "alice_none")
+	bob := createFriendTestUser(t, ctx, userLogic, "bob_none")
+
+	friendship, err := friendsLogic.GetFriendship(ctx, logic.GetFriendshipRequest{UserID: alice.UserID, FriendID: bob.UserID})
+	if err != nil {
+		t.Fatalf("get never-added friendship: %v", err)
+	}
+	if friendship.Friendship.IsFriend || friendship.Friendship.Status != model.FriendshipStatusNone {
+		t.Fatalf("never-added friendship should be none: %+v", friendship.Friendship)
 	}
 }
 

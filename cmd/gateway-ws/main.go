@@ -14,6 +14,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/config"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
+	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/svc"
@@ -28,10 +29,11 @@ func main() {
 		log.Fatalf("load gateway config: %v", err)
 	}
 
+	groupsLogic := logic.NewGroupsLogic(repository.MustGroupsRepositoryForStorage(cfg.StorageDriver, cfg.DataSource), nil)
 	serviceContext := svc.NewMessageServiceContextWithAuth(
 		repository.MustMessageRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
 		nil,
-		nil,
+		groupsLogic,
 		cfg.Auth,
 	)
 	presenceStore := presence.MustStore(cfg.Presence, cfg.Redis)

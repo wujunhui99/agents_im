@@ -15,9 +15,10 @@ type ServiceContext struct {
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	messageRepo := repository.MustMessageRepositoryForStorage(c.StorageDriver, c.DataSource)
+	groupsLogic := business.NewGroupsLogic(repository.MustGroupsRepositoryForStorage(c.StorageDriver, c.DataSource), nil)
 	return &ServiceContext{
 		Config:       c,
-		MessageLogic: business.NewMessageLogic(messageRepo),
+		MessageLogic: business.NewMessageLogicWithValidators(messageRepo, nil, groupsLogic),
 		MessageRepo:  messageRepo,
 		OutboxRepo:   outboxRepositoryFromMessageRepo(messageRepo),
 	}

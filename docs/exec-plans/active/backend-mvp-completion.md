@@ -75,6 +75,26 @@ docker compose config
 
 If docs changed, run markdown link check excluding `docs/references`.
 
+### feature/mvp-social-group-rules verification record
+
+Date: 2026-04-29
+
+Scope completed:
+
+- Friends MVP semantics: immediate accepted friendship, duplicate add idempotency, self-add rejection, missing-user rejection, delete/list/status behavior.
+- Groups MVP semantics: creator owner/member, open join, active-member list, owner-only leave rejection.
+- Group message membership enforcement: non-members and left members fail, active members succeed.
+
+Commands run:
+
+- `goctl --version` -> `goctl version 1.10.1 linux/amd64`
+- `for f in api/*.api; do goctl api validate -api "$f"; done` -> five `api format ok` lines.
+- `gofmt -w $(find . -name '*.go' -print)` -> passed with no output.
+- `go test ./...` -> passed; final rerun package test output ended with `ok github.com/wujunhui99/agents_im/tests (cached)`.
+- `bash scripts/verify-static.sh` -> `static verification passed`.
+- `docker compose config` -> passed and rendered postgres, redis, and redpanda services.
+- Markdown link check excluding `.ai-context` and `docs/references` -> passed.
+
 ## Merge Order
 
 1. `feature/mvp-delivery-reliability`
