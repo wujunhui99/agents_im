@@ -142,6 +142,14 @@ python.execute
 
 当前 registry 只登记工具元数据和绑定关系，不执行 handler、不启动 MCP client、不执行 Python。local tool 只接受服务端白名单 `handler_key`；builtin tool 只接受白名单 `builtin_key`；任何 `shell`、`command`、`script` tool type 或类似 handler key 都必须在 logic 层失败。
 
+当前 Agent runtime 工具解析契约位于 `internal/agentruntime/tools`。Eino runtime 不应直接读取全局工具表或自行组装工具，而应通过该 package 的 `Provider` / `Resolver` 获取当前 Agent 允许的 `ToolSpec` 和可选 `ToolAdapter`：
+
+- `ResolveAgentTools` 默认从 `agent_tool_bindings` 列出该 Agent 已绑定工具；`ResolveTool` 用于解析指定工具并检查绑定是否存在。
+- 解析时会重新校验 tool 必须为 `active` 且 `admin_configured=true`；MCP tool 还必须引用 `active` 且管理员配置的 MCP server。
+- MCP transport 仅允许 `http`、`sse`、`streamable_http`，并拒绝 stdio / local process / command-like config metadata。
+- V0 只提供 metadata contract；当 runtime 需要可调用 adapter 时必须使用 `RequireAdapters=true`，缺少显式安全 adapter 时返回明确错误。
+- 该 package 不导入 Eino、不执行 MCP 网络调用、不执行本地 handler、不调用 Python，也不提供 shell、命令、本地进程或文件系统写入能力。
+
 ### Skill Registry 与 MinIO
 
 PostgreSQL 保存 skill 元数据和文件索引，MinIO/S3-compatible object storage 保存实际文件。

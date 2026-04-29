@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -167,6 +168,22 @@ func (r *MemoryAgentRegistryRepository) GetToolBinding(_ context.Context, agentI
 		return model.AgentToolBinding{}, apperror.NotFound("tool binding not found")
 	}
 	return binding.Clone(), nil
+}
+
+func (r *MemoryAgentRegistryRepository) ListToolBindings(_ context.Context, agentID string) ([]model.AgentToolBinding, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	bindings := make([]model.AgentToolBinding, 0)
+	for _, binding := range r.toolBinds {
+		if binding.AgentID == agentID {
+			bindings = append(bindings, binding.Clone())
+		}
+	}
+	sort.Slice(bindings, func(i, j int) bool {
+		return bindings[i].ToolID < bindings[j].ToolID
+	})
+	return bindings, nil
 }
 
 func (r *MemoryAgentRegistryRepository) RegisterSkill(_ context.Context, skill model.AgentSkill) (model.AgentSkill, error) {
