@@ -3,7 +3,9 @@ package logic
 import (
 	"context"
 
+	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/message/internal/svc"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/proto/messagepb"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -24,7 +26,19 @@ func NewMarkConversationAsReadLogic(ctx context.Context, svcCtx *svc.ServiceCont
 }
 
 func (l *MarkConversationAsReadLogic) MarkConversationAsRead(in *messagepb.MarkConversationAsReadRequest) (*messagepb.MarkConversationAsReadResponse, error) {
-	// todo: add your logic here and delete this line
-
-	return &messagepb.MarkConversationAsReadResponse{}, nil
+	result, err := l.svcCtx.MessageLogic.MarkConversationAsRead(l.ctx, business.MarkConversationAsReadRequest{
+		UserID:         in.GetUserId(),
+		ConversationID: in.GetConversationId(),
+		HasReadSeq:     in.GetHasReadSeq(),
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return &messagepb.MarkConversationAsReadResponse{
+		ConversationId: result.ConversationID,
+		HasReadSeq:     result.HasReadSeq,
+		MaxSeq:         result.MaxSeq,
+		UnreadCount:    result.UnreadCount,
+		Updated:        result.Updated,
+	}, nil
 }

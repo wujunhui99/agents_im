@@ -92,9 +92,9 @@ scripts/verify-static.sh
 - 已新增 `internal/model.Friendship`，只维护好友关系状态，不包含用户资料权威字段或认证秘密。
 - 已扩展 `internal/repository`，新增 `FriendshipRepository` 和内存双向好友关系实现。
 - 已新增 `internal/logic.FriendsLogic`：添加好友、删除好友、好友列表、好友关系查询。
-- 已新增 `internal/rpc.FriendsServer`，提供手写 RPC contract wrapper。
-- 已扩展 `internal/handler`，新增 `POST /friends`、`DELETE /friends/{user_id}`、`GET /friends`、`GET /friends/{user_id}`。
-- 已将 `user-api` 入口调整为只注册 user routes，新增 `friends-api` 入口只注册 friends routes；测试入口保留组合注册。
+- 已迁移为 goctl RPC scaffold：`internal/rpcgen/friends`，旧 `internal/rpc.FriendsServer` wrapper 已移除。
+- 已扩展 goctl REST handler 结构，新增 `internal/handler/friends/*` 与 `RegisterFriendsGoZeroHandlers`。
+- 已将 `user-api` 入口调整为只注册 user routes，新增 `friends-api` 入口只注册 friends routes；测试通过 go-zero route registration 构造 router。
 - 已补充 `tests/friends_service_test.go` 覆盖添加、重复添加、删除、列表、不能添加自己、用户不存在。
 - 已更新 `scripts/verify-static.sh` 覆盖 friends 契约、源码、测试和文档。
 
@@ -126,7 +126,7 @@ go version go1.22.12 linux/amd64
 ?   	github.com/wujunhui99/agents_im/internal/model	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/repository	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/response	[no test files]
-?   	github.com/wujunhui99/agents_im/internal/rpc	[no test files]
+?   	github.com/wujunhui99/agents_im/internal/rpcgen/friends	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/svc	[no test files]
 ok  	github.com/wujunhui99/agents_im/tests	0.002s
 static verification passed

@@ -48,6 +48,8 @@ required_files=(
   "cmd/groups-api/main.go"
   "cmd/groups-rpc/main.go"
   "cmd/message-api/main.go"
+  "cmd/message-rpc/main.go"
+  "etc/message-rpc.yaml"
   "internal/logic/userlogic.go"
   "internal/logic/friendslogic.go"
   "internal/logic/groupslogic.go"
@@ -63,18 +65,22 @@ required_files=(
   "internal/repository/groups_repository.go"
   "internal/repository/message_memory.go"
   "internal/repository/message_repository.go"
-  "internal/handler/handler.go"
-  "internal/handler/groups_handler.go"
-  "internal/handler/message_handler.go"
+  "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
   "internal/types/types.go"
   "internal/auth/logic/authlogic.go"
   "internal/auth/logic/auth/gozero_logic.go"
   "internal/auth/repository/memory.go"
-  "internal/auth/handler/handler.go"
+  "internal/auth/handler/health_handler.go"
   "internal/auth/handler/gozero_routes.go"
   "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
+  "internal/rpcgen/user/entry/entry.go"
+  "internal/rpcgen/auth/entry/entry.go"
+  "internal/rpcgen/friends/entry/entry.go"
+  "internal/rpcgen/groups/entry/entry.go"
+  "internal/rpcgen/message/entry/entry.go"
+  "internal/rpcgen/rpcerror/error.go"
   "internal/gateway/contract.go"
   "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
@@ -108,6 +114,7 @@ required_files=(
   "internal/repository/message_storage_contract.go"
   "docs/exec-plans/active/gateway-message-contract.md"
   "docs/exec-plans/active/read-receipts.md"
+  "docs/exec-plans/active/remove-handwritten-compat.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -116,6 +123,31 @@ for file in "${required_files[@]}"; do
     exit 1
   fi
 done
+
+removed_compat_paths=(
+  "internal/handler/handler.go"
+  "internal/handler/user_handler.go"
+  "internal/handler/friends_handler.go"
+  "internal/handler/groups_handler.go"
+  "internal/handler/message_handler.go"
+  "internal/auth/handler/handler.go"
+  "internal/rpc/user_server.go"
+  "internal/rpc/friends_server.go"
+  "internal/rpc/groups_server.go"
+  "internal/auth/rpc/auth_server.go"
+)
+
+for path in "${removed_compat_paths[@]}"; do
+  if [[ -e "$path" ]]; then
+    echo "old handwritten compatibility layer still exists: $path" >&2
+    exit 1
+  fi
+done
+
+if [[ -d internal/rpc || -d internal/auth/rpc ]]; then
+  echo "old rpc compatibility directory still exists" >&2
+  exit 1
+fi
 
 export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
 if ! command -v goctl >/dev/null 2>&1; then
@@ -303,6 +335,51 @@ for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
   rg -q "$register_func" "$file"
 done
 
+for cmd_file in cmd/*-rpc/main.go; do
+  if rg -n '"github.com/wujunhui99/agents_im/internal/(auth/)?rpc"' "$cmd_file"; then
+    echo "rpc command imports old handwritten rpc wrapper: $cmd_file" >&2
+    exit 1
+  fi
+done
+
+rpc_entry_patterns=(
+  "cmd/user-rpc/main.go:internal/rpcgen/user/entry"
+  "cmd/auth-rpc/main.go:internal/rpcgen/auth/entry"
+  "cmd/friends-rpc/main.go:internal/rpcgen/friends/entry"
+  "cmd/groups-rpc/main.go:internal/rpcgen/groups/entry"
+  "cmd/message-rpc/main.go:internal/rpcgen/message/entry"
+)
+
+for entry_spec in "${rpc_entry_patterns[@]}"; do
+  file="${entry_spec%%:*}"
+  pattern="${entry_spec##*:}"
+  rg -q "$pattern" "$file"
+done
+
+if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" internal/rpcgen/*/internal/logic; then
+  echo "generated rpc logic still contains empty scaffold behavior" >&2
+  exit 1
+fi
+
+rpc_logic_markers=(
+  "internal/rpcgen/user/internal/logic:UserLogic"
+  "internal/rpcgen/auth/internal/logic:AuthLogic"
+  "internal/rpcgen/friends/internal/logic:FriendsLogic"
+  "internal/rpcgen/groups/internal/logic:GroupsLogic"
+  "internal/rpcgen/message/internal/logic:MessageLogic"
+)
+
+for logic_spec in "${rpc_logic_markers[@]}"; do
+  dir="${logic_spec%%:*}"
+  marker="${logic_spec##*:}"
+  rg -q "svcCtx\\.${marker}" "$dir"
+done
+
+if rg -n "RegisterHandlers|RegisterUserHandlers|RegisterFriendsHandlers|RegisterGroupsHandlers|RegisterMessageHandlers|authhandler\\.RegisterHandlers" tests; then
+  echo "tests still use old REST mux registration helpers" >&2
+  exit 1
+fi
+
 rpc_generated_proto_files=(
   "proto/userpb/user.pb.go"
   "proto/userpb/user_grpc.pb.go"
@@ -381,7 +458,7 @@ rg -q "has_read_seq" docs/product-specs/message-chain.md docs/design-docs/messag
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
-  internal/model internal/logic internal/repository internal/handler internal/rpc internal/svc; then
+  internal/model internal/logic internal/repository internal/handler internal/rpcgen/user internal/svc; then
   echo "forbidden auth secret field found in service source" >&2
   exit 1
 fi
@@ -389,7 +466,7 @@ fi
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/message.api proto/message.proto \
   internal/logic/messagelogic.go internal/repository/message_memory.go \
-  internal/repository/message_repository.go internal/handler/message_handler.go; then
+  internal/repository/message_repository.go internal/handler/message; then
   echo "forbidden auth secret field found in message contract source" >&2
   exit 1
 fi

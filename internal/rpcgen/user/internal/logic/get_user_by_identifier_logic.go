@@ -3,6 +3,8 @@ package logic
 import (
 	"context"
 
+	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/svc"
 	"github.com/wujunhui99/agents_im/proto/userpb"
 
@@ -24,7 +26,11 @@ func NewGetUserByIdentifierLogic(ctx context.Context, svcCtx *svc.ServiceContext
 }
 
 func (l *GetUserByIdentifierLogic) GetUserByIdentifier(in *userpb.GetUserByIdentifierRequest) (*userpb.UserResponse, error) {
-	// todo: add your logic here and delete this line
-
-	return &userpb.UserResponse{}, nil
+	profile, err := l.svcCtx.UserLogic.GetUserByIdentifier(l.ctx, business.GetUserByIdentifierRequest{
+		Identifier: in.GetIdentifier(),
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return toUserResponse(profile), nil
 }

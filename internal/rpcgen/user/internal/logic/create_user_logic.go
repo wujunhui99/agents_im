@@ -3,6 +3,8 @@ package logic
 import (
 	"context"
 
+	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/svc"
 	"github.com/wujunhui99/agents_im/proto/userpb"
 
@@ -24,7 +26,16 @@ func NewCreateUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Create
 }
 
 func (l *CreateUserLogic) CreateUser(in *userpb.CreateUserRequest) (*userpb.UserResponse, error) {
-	// todo: add your logic here and delete this line
-
-	return &userpb.UserResponse{}, nil
+	profile, err := l.svcCtx.UserLogic.CreateUser(l.ctx, business.CreateUserRequest{
+		Identifier:  in.GetIdentifier(),
+		DisplayName: in.GetDisplayName(),
+		Name:        in.GetName(),
+		Gender:      in.GetGender(),
+		Age:         in.GetAge(),
+		Region:      in.GetRegion(),
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return toUserResponse(profile), nil
 }

@@ -98,8 +98,8 @@ PATH=/tmp/go/bin:$PATH scripts/verify-static.sh
 - 已新增 `internal/auth/logic.AuthLogic`：`Register`、`Login`、`ValidateToken`、`ParseToken`。
 - 已新增标准库实现的 salted iterative SHA-256 password hasher，响应不暴露 hash 或 salt。
 - 已新增 HMAC/JWT-like token manager，包含 `iat`、`exp`、签名校验和过期校验。
-- 已新增 `internal/auth/handler`：`POST /auth/register`、`POST /auth/login`、`POST /auth/validate`。
-- 已新增 `internal/auth/rpc.AuthServer` 占位，等待 goctl/protoc 生成真实 RPC transport。
+- 已迁移为 goctl REST handler 结构：`internal/auth/handler/gozero_routes.go` 与 `internal/auth/handler/auth/*`。
+- 已迁移为 goctl RPC scaffold：`internal/rpcgen/auth`，旧 `internal/auth/rpc.AuthServer` wrapper 已移除。
 - 已新增 `tests/auth_service_test.go`，覆盖注册成功、重复账号、登录成功、密码错误、token 校验和 token 过期。
 - 已更新 `scripts/verify-static.sh`，保留 user 边界禁止认证秘密字段，并增加 auth 契约检查。
 
@@ -126,7 +126,7 @@ go test ./...:
 ?   	github.com/wujunhui99/agents_im/internal/auth/logic	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/auth/model	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/auth/repository	[no test files]
-?   	github.com/wujunhui99/agents_im/internal/auth/rpc	[no test files]
+?   	github.com/wujunhui99/agents_im/internal/rpcgen/auth	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/auth/svc	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/auth/token	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/auth/useradapter	[no test files]
@@ -146,7 +146,7 @@ goctl version:
 
 一致性检查：
 
-- `user` 的 `api/user.api`、`proto/user.proto`、`internal/model`、`internal/logic`、`internal/repository`、`internal/handler`、`internal/rpc`、`internal/svc` 未出现 `password`、`password_hash`、`salt` 或 `credential`。
+- `user` 的 `api/user.api`、`proto/user.proto`、`internal/model`、`internal/logic`、`internal/repository`、`internal/handler`、`internal/rpcgen/user`、`internal/svc` 未出现 `password`、`password_hash`、`salt` 或 `credential`。
 - auth 注册代码顺序为 `ExistsByIdentifier` -> `CreateUser` -> auth credential 保存。
 - `POST /auth/validate` 避免与 user 的 `/me` 冲突。
 - auth HTTP 响应和测试断言均不泄露明文密码、password hash 或 salt。

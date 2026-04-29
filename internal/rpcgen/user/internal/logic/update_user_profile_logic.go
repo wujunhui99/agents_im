@@ -3,6 +3,8 @@ package logic
 import (
 	"context"
 
+	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/svc"
 	"github.com/wujunhui99/agents_im/proto/userpb"
 
@@ -24,7 +26,16 @@ func NewUpdateUserProfileLogic(ctx context.Context, svcCtx *svc.ServiceContext) 
 }
 
 func (l *UpdateUserProfileLogic) UpdateUserProfile(in *userpb.UpdateUserProfileRequest) (*userpb.UserResponse, error) {
-	// todo: add your logic here and delete this line
-
-	return &userpb.UserResponse{}, nil
+	profile, err := l.svcCtx.UserLogic.UpdateUserProfile(l.ctx, business.UpdateUserProfileRequest{
+		UserID:      in.GetUserId(),
+		DisplayName: in.DisplayName,
+		Name:        in.Name,
+		Gender:      in.Gender,
+		Age:         in.Age,
+		Region:      in.Region,
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return toUserResponse(profile), nil
 }

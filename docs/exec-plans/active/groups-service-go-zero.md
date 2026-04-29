@@ -35,7 +35,7 @@
 - [x] Task 5：创建本执行计划并记录 Planner 结果。
 - [x] Task 6：新增 groups api/proto、配置和服务入口。
 - [x] Task 7：实现群模型、repository 接口、内存 repository、user 存在性适配器和 groups logic。
-- [x] Task 8：实现 groups-rpc contract wrapper 和 groups-api HTTP handler。
+- [x] Task 8：实现 groups-rpc goctl/zrpc scaffold 和 groups-api HTTP handler。
 - [x] Task 9：补充单元测试覆盖创建群、加群、重复加群、退群、成员列表、群不存在、用户不存在。
 - [x] Task 10：运行 `gofmt`、`go test ./...`、`scripts/verify-static.sh`，记录验证结果和 BLOCKER。
 - [x] Task 11：Evaluator 检查代码、测试、文档一致性，修复问题。
@@ -93,8 +93,8 @@ scripts/verify-static.sh
 - 已实现 `internal/repository.GroupsRepository` 和线程安全内存实现，后续可替换 PostgreSQL。
 - 已实现 `internal/logic.GroupsLogic`：创建群、查询群、加群/添加成员、退群、查询有效成员列表。
 - 已实现 `logic.UserExistenceChecker` 窄接口和 `UserLogicExistenceChecker` 适配器，当前按 user-rpc `GetUserByID` 语义校验用户存在。
-- 已实现 `internal/rpc.GroupsServer` contract wrapper。
-- 已实现 `internal/handler.RegisterGroupsHandlers`：`POST /groups`、`GET /groups/{group_id}`、`POST /groups/{group_id}/members`、`DELETE /groups/{group_id}/members/me`、`GET /groups/{group_id}/members`。
+- 已迁移为 goctl RPC scaffold：`internal/rpcgen/groups`，旧 `internal/rpc.GroupsServer` wrapper 已移除。
+- 已迁移为 goctl REST handler 结构：`internal/handler/groups/*` 与 `RegisterGroupsGoZeroHandlers`。
 - 已补充 `tests/groups_service_test.go` 覆盖创建群、加群、重复加群、退群、成员列表、群不存在和用户不存在。
 - 已更新 `scripts/verify-static.sh` 纳入 groups 契约、源码、测试和文档检查。
 
@@ -125,7 +125,7 @@ scripts/verify-static.sh
 ?   	github.com/wujunhui99/agents_im/internal/model	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/repository	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/response	[no test files]
-?   	github.com/wujunhui99/agents_im/internal/rpc	[no test files]
+?   	github.com/wujunhui99/agents_im/internal/rpcgen/groups	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/svc	[no test files]
 ok  	github.com/wujunhui99/agents_im/tests	0.003s
 

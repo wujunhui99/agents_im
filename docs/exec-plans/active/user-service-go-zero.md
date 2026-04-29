@@ -107,7 +107,7 @@ PATH=/tmp/go/bin:$PATH go test ./...
 ?   	github.com/wujunhui99/agents_im/internal/model	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/repository	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/response	[no test files]
-?   	github.com/wujunhui99/agents_im/internal/rpc	[no test files]
+?   	github.com/wujunhui99/agents_im/internal/rpcgen/user	[no test files]
 ?   	github.com/wujunhui99/agents_im/internal/svc	[no test files]
 ok  	github.com/wujunhui99/agents_im/tests	0.002s
 ```
@@ -117,7 +117,7 @@ ok  	github.com/wujunhui99/agents_im/tests	0.002s
 - user 模型和响应未包含密码或认证秘密字段。
 - `/me` 和 `PATCH /me` 使用 `X-User-Id` 作为第一阶段网关透传身份占位。
 - `identifier` 创建时规范化并保证唯一，重复创建返回 `ALREADY_EXISTS`/HTTP 409。
-- `PATCH /me` 通过严格 JSON 解码拒绝 `identifier`、`user_id` 等不可变字段。
+- `PATCH /me` 通过 go-zero request type 和 route-level logic 拒绝 `identifier`、`user_id` 等不可变字段。
 - 文档中已记录 goctl 不可用和外层文档写入受限。
 
 ## BLOCKER

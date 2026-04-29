@@ -3,7 +3,9 @@ package logic
 import (
 	"context"
 
+	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/groups/internal/svc"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/proto/groupspb"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -24,7 +26,16 @@ func NewAddMemberLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddMemb
 }
 
 func (l *AddMemberLogic) AddMember(in *groupspb.AddMemberRequest) (*groupspb.MemberResponse, error) {
-	// todo: add your logic here and delete this line
-
-	return &groupspb.MemberResponse{}, nil
+	result, err := l.svcCtx.GroupsLogic.AddMember(l.ctx, business.AddMemberRequest{
+		GroupID:        in.GetGroupId(),
+		OperatorUserID: in.GetOperatorUserId(),
+		UserID:         in.GetUserId(),
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return &groupspb.MemberResponse{
+		Member:        toGroupMember(result.Member),
+		AlreadyMember: result.AlreadyMember,
+	}, nil
 }
