@@ -4,6 +4,8 @@ Status: Accepted
 Owner: IM backend / Messaging infrastructure  
 Related docs:
 - [`message-chain-contract.md`](./message-chain-contract.md)
+- [`message-outbox.md`](./message-outbox.md)
+- [`outbox-kafka-publisher.md`](./outbox-kafka-publisher.md)
 - [`websocket-gateway.md`](./websocket-gateway.md)
 - [`redis-presence.md`](./redis-presence.md)
 - [`../product-specs/message-chain.md`](../product-specs/message-chain.md)
@@ -24,7 +26,6 @@ The next pipeline steps need a Kafka-compatible event contract before separate b
 
 ## Non-goals
 
-- Do not add an outbox table in this branch.
 - Do not implement a transfer worker consume loop.
 - Do not implement Gateway push fanout or delivery ACK persistence.
 - Do not move current Message Service writes from PostgreSQL to Kafka.
@@ -124,8 +125,8 @@ Emitted after a user's `has_read_seq` advances. Consumers should treat read even
 The intended pipeline is at-least-once:
 
 1. Message Service writes PostgreSQL in the synchronous path.
-2. A future outbox records the matching message event in the same database transaction.
-3. A future outbox publisher writes the event to Redpanda/Kafka using `conversation_id` as key.
+2. The transactional outbox records the matching message event in the same database transaction.
+3. The outbox publisher writes the event to Redpanda/Kafka using `conversation_id` as key.
 4. Message Transfer and Push consumers process events idempotently.
 
 Consumers must deduplicate by `event_id`. For message delivery, they should also tolerate repeated `server_msg_id` or repeated `conversation_id + seq`.
