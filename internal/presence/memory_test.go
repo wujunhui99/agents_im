@@ -37,7 +37,7 @@ func TestMemoryStoreConnectionLifecycle(t *testing.T) {
 	if len(connections) != 2 || connections[0].ConnectionID != "conn_a" || connections[1].ConnectionID != "conn_b" {
 		t.Fatalf("connections should be sorted by connection id: %+v", connections)
 	}
-	if connections[1].GatewayID != "gateway_1" || connections[1].Platform != "ios" {
+	if connections[1].InstanceID != "gateway_1" || connections[1].GatewayID != "gateway_1" || connections[1].Platform != "ios" {
 		t.Fatalf("connection metadata was not preserved: %+v", connections[1])
 	}
 

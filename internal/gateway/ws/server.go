@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/svc"
 )
 
@@ -34,6 +36,9 @@ type Server struct {
 	tokenManager token.Manager
 	messageLogic *logic.MessageLogic
 	connections  *ConnectionManager
+	presence     presence.PresenceStore
+	presenceTTL  time.Duration
+	instanceID   string
 	upgrader     websocket.Upgrader
 	now          func() time.Time
 }
@@ -43,6 +48,11 @@ type ServerOption func(*Server)
 type Connection struct {
 	ID          string
 	UserID      string
+	InstanceID  string
+	RemoteAddr  string
+	UserAgent   string
+	DeviceID    string
+	Platform    string
 	ConnectedAt time.Time
 
 	ws        *websocket.Conn
@@ -75,6 +85,7 @@ type responseError struct {
 type heartbeatData struct {
 	ConnectionID string `json:"connection_id"`
 	UserID       string `json:"user_id"`
+	InstanceID   string `json:"instance_id,omitempty"`
 	ServerTime   int64  `json:"server_time"`
 }
 
@@ -92,6 +103,9 @@ func NewServer(serviceContext *svc.ServiceContext, opts ...ServerOption) *Server
 		tokenManager: token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second),
 		messageLogic: messageLogic,
 		connections:  NewConnectionManager(),
+		presence:     presence.NewMemoryStore(),
+		presenceTTL:  presence.HeartbeatTTL(config.DefaultPresenceConfig()),
+		instanceID:   defaultGatewayInstanceID(),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -128,6 +142,28 @@ func WithNow(now func() time.Time) ServerOption {
 	}
 }
 
+func WithPresenceStore(store presence.PresenceStore) ServerOption {
+	return func(s *Server) {
+		s.presence = store
+	}
+}
+
+func WithPresenceTTL(ttl time.Duration) ServerOption {
+	return func(s *Server) {
+		if ttl > 0 {
+			s.presenceTTL = ttl
+		}
+	}
+}
+
+func WithInstanceID(instanceID string) ServerOption {
+	return func(s *Server) {
+		if strings.TrimSpace(instanceID) != "" {
+			s.instanceID = strings.TrimSpace(instanceID)
+		}
+	}
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.HandleWebSocket(w, r)
 }
@@ -152,13 +188,20 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn := &Connection{
 		ID:          newConnectionID(),
 		UserID:      claims.UserID,
+		InstanceID:  s.instanceID,
+		RemoteAddr:  r.RemoteAddr,
+		UserAgent:   r.UserAgent(),
+		DeviceID:    strings.TrimSpace(r.Header.Get("X-Device-ID")),
+		Platform:    clientPlatform(r),
 		ConnectedAt: now,
 		ws:          socket,
 		lastSeen:    now,
 	}
+	_ = s.registerPresence(r.Context(), conn)
 	s.connections.Register(conn)
 	defer func() {
 		s.connections.Unregister(conn.ID)
+		_ = s.unregisterPresence(conn)
 		_ = socket.Close()
 	}()
 
@@ -170,7 +213,7 @@ func (s *Server) Connections() *ConnectionManager {
 }
 
 func (s *Server) DeliveryDispatcher() delivery.Dispatcher {
-	return NewInMemoryDeliveryDispatcher(s.connections)
+	return NewPresenceAwareDeliveryDispatcher(s.connections, s.presence, s.instanceID)
 }
 
 func (s *Server) PushToUser(ctx context.Context, userID string, event delivery.Event) (delivery.Result, error) {
@@ -179,6 +222,35 @@ func (s *Server) PushToUser(ctx context.Context, userID string, event delivery.E
 
 func (s *Server) PushToConversation(ctx context.Context, conversationID string, recipientUserIDs []string, event delivery.Event) (delivery.Result, error) {
 	return s.DeliveryDispatcher().DeliverToConversation(ctx, conversationID, recipientUserIDs, event)
+}
+
+func (s *Server) registerPresence(ctx context.Context, conn *Connection) error {
+	if s.presence == nil || conn == nil {
+		return nil
+	}
+	return s.presence.RegisterConnection(ctx, conn.presenceMetadata(conn.LastSeen()), s.presenceTTL)
+}
+
+func (s *Server) refreshPresence(ctx context.Context, conn *Connection) error {
+	if s.presence == nil || conn == nil {
+		return nil
+	}
+	if err := s.presence.Heartbeat(ctx, conn.UserID, conn.ID, s.presenceTTL); err != nil {
+		if errors.Is(err, presence.ErrConnectionNotFound) {
+			return s.registerPresence(ctx, conn)
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *Server) unregisterPresence(conn *Connection) error {
+	if s.presence == nil || conn == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return s.presence.UnregisterConnection(ctx, conn.UserID, conn.ID)
 }
 
 func (s *Server) authenticate(r *http.Request) (token.Claims, error) {
@@ -204,6 +276,7 @@ func (s *Server) readLoop(ctx context.Context, conn *Connection) {
 	_ = conn.ws.SetReadDeadline(s.now().Add(defaultHeartbeatTimeout))
 	conn.ws.SetPongHandler(func(string) error {
 		conn.touch(s.now())
+		_ = s.refreshPresence(ctx, conn)
 		return conn.ws.SetReadDeadline(s.now().Add(defaultHeartbeatTimeout))
 	})
 
@@ -253,9 +326,11 @@ func (s *Server) handleCommand(ctx context.Context, conn *Connection, raw []byte
 func (s *Server) dispatch(ctx context.Context, conn *Connection, commandType string, payload json.RawMessage) (interface{}, error) {
 	switch commandType {
 	case CommandHeartbeat:
+		_ = s.refreshPresence(ctx, conn)
 		return heartbeatData{
 			ConnectionID: conn.ID,
 			UserID:       conn.UserID,
+			InstanceID:   conn.InstanceID,
 			ServerTime:   s.now().UTC().UnixMilli(),
 		}, nil
 	case gateway.CommandSendMessage:
@@ -354,8 +429,24 @@ func (c *Connection) Info() ConnectionInfo {
 	return ConnectionInfo{
 		ConnectionID: c.ID,
 		UserID:       c.UserID,
+		InstanceID:   c.InstanceID,
 		ConnectedAt:  c.ConnectedAt,
 		LastSeenAt:   c.LastSeen(),
+	}
+}
+
+func (c *Connection) presenceMetadata(lastHeartbeat time.Time) presence.ConnectionMetadata {
+	return presence.ConnectionMetadata{
+		UserID:          c.UserID,
+		ConnectionID:    c.ID,
+		InstanceID:      c.InstanceID,
+		GatewayID:       c.InstanceID,
+		DeviceID:        c.DeviceID,
+		Platform:        c.Platform,
+		RemoteAddr:      c.RemoteAddr,
+		UserAgent:       c.UserAgent,
+		ConnectedAt:     c.ConnectedAt,
+		LastHeartbeatAt: lastHeartbeat.UTC(),
 	}
 }
 
@@ -474,12 +565,39 @@ func bearerToken(headerValue string) string {
 	return ""
 }
 
+func clientPlatform(r *http.Request) string {
+	return strings.TrimSpace(firstNonEmptyString(
+		r.Header.Get("X-Client-Platform"),
+		r.Header.Get("X-Platform"),
+		r.URL.Query().Get("platform"),
+	))
+}
+
 func newConnectionID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err == nil {
 		return "conn_" + hex.EncodeToString(b[:])
 	}
 	return "conn_" + strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", "")
+}
+
+func defaultGatewayInstanceID() string {
+	if value := firstNonEmptyString(os.Getenv("GATEWAY_INSTANCE_ID"), os.Getenv("AGENTS_IM_GATEWAY_INSTANCE_ID")); value != "" {
+		return value
+	}
+	if hostname, err := os.Hostname(); err == nil && strings.TrimSpace(hostname) != "" {
+		return strings.TrimSpace(hostname)
+	}
+	return "gateway-local"
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func normalizeAuth(auth config.JWTAuthConfig) config.JWTAuthConfig {

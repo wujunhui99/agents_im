@@ -11,6 +11,7 @@ const (
 	StatusDelivered = "delivered"
 	StatusOffline   = "offline"
 	StatusFailed    = "failed"
+	StatusRouted    = "routed"
 )
 
 type Dispatcher interface {
@@ -47,6 +48,7 @@ type Result struct {
 	DeliveredConnections int               `json:"delivered_connections"`
 	OfflineRecipients    int               `json:"offline_recipients"`
 	FailedRecipients     int               `json:"failed_recipients"`
+	RoutedRecipients     int               `json:"routed_recipients"`
 }
 
 type RecipientResult struct {
@@ -54,7 +56,18 @@ type RecipientResult struct {
 	Status                 string   `json:"status"`
 	DeliveredConnectionIDs []string `json:"delivered_connection_ids,omitempty"`
 	FailedConnectionIDs    []string `json:"failed_connection_ids,omitempty"`
+	Routes                 []Route  `json:"routes,omitempty"`
 	Error                  string   `json:"error,omitempty"`
+}
+
+type Route struct {
+	UserID       string `json:"user_id"`
+	ConnectionID string `json:"connection_id"`
+	InstanceID   string `json:"instance_id,omitempty"`
+	GatewayID    string `json:"gateway_id,omitempty"`
+	DeviceID     string `json:"device_id,omitempty"`
+	Platform     string `json:"platform,omitempty"`
+	Local        bool   `json:"local"`
 }
 
 func NewMessageEvent(eventType string, message Message) Event {
@@ -74,5 +87,7 @@ func (r *Result) AddRecipient(recipient RecipientResult) {
 		r.OfflineRecipients++
 	case StatusFailed:
 		r.FailedRecipients++
+	case StatusRouted:
+		r.RoutedRecipients++
 	}
 }

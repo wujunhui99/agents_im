@@ -17,6 +17,7 @@ var (
 type ConnectionMetadata struct {
 	UserID          string
 	ConnectionID    string
+	InstanceID      string
 	GatewayID       string
 	DeviceID        string
 	Platform        string
@@ -70,6 +71,14 @@ func normalizeMetadata(metadata ConnectionMetadata, now time.Time, ttl time.Dura
 	}
 	metadata.UserID = strings.TrimSpace(metadata.UserID)
 	metadata.ConnectionID = strings.TrimSpace(metadata.ConnectionID)
+	metadata.InstanceID = strings.TrimSpace(metadata.InstanceID)
+	metadata.GatewayID = strings.TrimSpace(metadata.GatewayID)
+	if metadata.InstanceID == "" {
+		metadata.InstanceID = metadata.GatewayID
+	}
+	if metadata.GatewayID == "" {
+		metadata.GatewayID = metadata.InstanceID
+	}
 	if metadata.ConnectedAt.IsZero() {
 		metadata.ConnectedAt = now
 	}

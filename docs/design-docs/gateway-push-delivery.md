@@ -6,13 +6,14 @@ Related docs:
 - [`websocket-gateway.md`](./websocket-gateway.md)
 - [`gateway-message-contract.md`](./gateway-message-contract.md)
 - [`redis-presence.md`](./redis-presence.md)
+- [`gateway-presence-routing.md`](./gateway-presence-routing.md)
 - [`message-chain-contract.md`](./message-chain-contract.md)
 
 ## Background
 
 WebSocket Gateway phase 1 already accepts authenticated client commands and returns command ACKs. The next message-link step needs a server-side push path so the future Message Transfer worker can deliver accepted message events to online clients without changing `send_message`, `pull_messages`, or read commands.
 
-This phase adds only the local Gateway delivery surface and in-memory fanout. Durable outbox, Kafka or Redpanda consumption, a real Transfer worker, cross-process Gateway routing, Redis presence subscription, offline push, and delivery ACKs stay outside this branch.
+This phase adds only the local Gateway delivery surface and in-memory fanout. A follow-up presence-routing seam lets the dispatcher query `PresenceStore` before local fanout, but durable outbox, Kafka or Redpanda consumption, a real Transfer worker, cross-process Gateway routing, offline push, and delivery ACKs stay outside this branch.
 
 ## Goals
 
@@ -28,7 +29,7 @@ This phase adds only the local Gateway delivery surface and in-memory fanout. Du
 - No Kafka or Redpanda consumer.
 - No durable outbox reader or retry queue.
 - No Transfer worker implementation.
-- No Redis presence-based cross-instance routing.
+- No cross-instance Gateway RPC; presence route metadata is only a seam for future routing.
 - No offline mobile push or delivery ACK worker.
 - No Gateway ownership of message history, `server_msg_id`, conversation `seq`, or read state.
 
@@ -51,7 +52,7 @@ Delivery results are per-recipient and include:
 - `offline` when the user has no local connection;
 - `failed` when local connection writes fail or the context is cancelled.
 
-Offline is a normal result, not a panic or fatal error. A later cross-instance router can interpret local offline together with Redis Presence to decide whether the user is connected to another Gateway instance.
+Offline is a normal result, not a panic or fatal error. Gateway presence routing adds a `routed` recipient status when Presence has live route metadata but the current process has no local connection to write.
 
 ## Push Envelope
 
@@ -91,9 +92,10 @@ Command responses keep the existing `request_id`, `type`, `status`, `data`, and 
 
 The first implementation lives in `internal/gateway/ws` as `InMemoryDeliveryDispatcher`.
 
-- It uses `ConnectionManager.UserConnections(user_id)` to snapshot all local connections for a user.
+- It queries `PresenceStore.ListUserConnections(user_id)` when presence is configured, then uses `ConnectionManager.UserConnections(user_id)` to snapshot local connections for a user.
 - It writes the same event to every connection with the connection's existing serialized write lock.
-- If the user has no local connections, it returns `offline`.
+- If presence has no live route, it returns `offline`.
+- If presence has a route but this process has no local connection, it returns `routed` with route metadata.
 - If a write fails, it unregisters the stale connection from the local manager and records the failed connection ID in the result.
 - It never persists messages and never advances read state.
 

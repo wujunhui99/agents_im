@@ -8,6 +8,7 @@ import (
 type ConnectionInfo struct {
 	ConnectionID string
 	UserID       string
+	InstanceID   string
 	ConnectedAt  time.Time
 	LastSeenAt   time.Time
 }
