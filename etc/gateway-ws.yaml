@@ -1,0 +1,8 @@
+Name: gateway-ws
+Host: 0.0.0.0
+Port: 8084
+Auth:
+  AccessSecret: dev-jwt-secret-change-me
+  AccessExpire: 86400
+StorageDriver: memory
+DataSource: ${DATABASE_URL}
