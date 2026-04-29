@@ -80,3 +80,16 @@ feature/* -> develop -> main
 - 涉及复杂任务时，在 `docs/exec-plans/active/` 下创建执行计划。
 - 完成任务后，将执行计划移到 `docs/exec-plans/completed/`，并补充结果与验证记录。
 - PR/MR 描述必须包含测试结果与风险说明。
+
+## go-zero / goctl AI Knowledge
+
+This repository uses go-zero. Before any go-zero refactor or code generation task, Codex agents must read:
+
+- `.ai-context/zero-skills/SKILL.md`
+- `.ai-context/zero-skills/references/goctl-commands.md`
+- `.ai-context/zero-skills/references/rest-api-patterns.md`
+- `.ai-context/zero-skills/references/rpc-patterns.md`
+- `.ai-context/zero-skills/references/database-patterns.md`
+
+Local copies of the key references are also versioned under `docs/references/go-zero/` for stable review. Follow spec-first workflow: update `.api` / `.proto`, validate with `goctl`, generate boilerplate with `goctl`, keep business logic in `internal/logic`, and verify with `go test ./...` plus `scripts/verify-static.sh`.
+
