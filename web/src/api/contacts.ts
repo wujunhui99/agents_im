@@ -1,4 +1,4 @@
-import { type ApiClientOptions, requestEnvelope } from './shared';
+import { createApiClient, type ApiClient } from './client';
 
 export type Friendship = {
   user_id: string;
@@ -29,21 +29,16 @@ export type ContactsApi = {
   deleteFriend: (userId: string) => Promise<DeleteFriendData>;
 };
 
-export function createContactsApi(options: ApiClientOptions = {}): ContactsApi {
+export function createContactsApi(api: ApiClient = createApiClient()): ContactsApi {
   return {
     listFriends() {
-      return requestEnvelope<ListFriendsData>(options, '/friends', { method: 'GET' });
+      return api.get<ListFriendsData>('/friends');
     },
     addFriend(userId: string) {
-      return requestEnvelope<AddFriendData>(options, '/friends', {
-        method: 'POST',
-        body: JSON.stringify({ user_id: userId }),
-      });
+      return api.post<AddFriendData>('/friends', { user_id: userId });
     },
     deleteFriend(userId: string) {
-      return requestEnvelope<DeleteFriendData>(options, `/friends/${encodeURIComponent(userId)}`, {
-        method: 'DELETE',
-      });
+      return api.delete<DeleteFriendData>(`/friends/${encodeURIComponent(userId)}`);
     },
   };
 }

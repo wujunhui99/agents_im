@@ -61,7 +61,7 @@ Use `docs/product-specs/frontend-backend-contract.md` as the source of truth for
 
 Current local backend expectations:
 
-- Auth token: `Authorization: Bearer ***`
+- Auth token: `Authorization: Bearer ***
 - User: `/me`, `/users/exists`, `/users/:identifier`
 - Friends: `/friends`
 - Groups: `/groups`, `/groups/:id/members`
@@ -72,5 +72,5 @@ Current local backend expectations:
 
 - Keep each feature branch focused.
 - Preserve the four-tab shell unless the task explicitly changes navigation.
-- Use mock data only when the requested feature is visual-only; otherwise add a small client adapter and keep it testable.
+- Use mock data only for visual-only scaffolding, test fixtures, or explicit demo/mock modes; API integration must prove real contract paths and token flow.
 - Do not break backend MVP tests.
