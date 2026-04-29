@@ -158,6 +158,9 @@ required_files=(
   "docs/design-docs/gateway-push-delivery.md"
   "docs/design-docs/transfer-gateway-dispatcher.md"
   "docs/design-docs/gateway-presence-routing.md"
+  "docs/exec-plans/active/backend-mvp-completion.md"
+  "docs/design-docs/backend-mvp-contract.md"
+  "docs/product-specs/backend-mvp.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -1167,3 +1170,8 @@ if rg -ni "message service (owns|stores|manages|persists).*(password|password_ha
 fi
 
 echo "static verification passed"
+rg -q "Backend MVP" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
+rg -q "message_received" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
+rg -q "get_conversation_seqs" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
+rg -q "healthz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
+rg -q "readyz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md

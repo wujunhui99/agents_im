@@ -15,3 +15,5 @@
 - [read-receipts.md](./read-receipts.md)：标记已读、未读数和已读回执客户端行为
 
 新增需求时，先在本目录创建产品规格，再进入技术设计和执行计划。
+
+- [backend-mvp.md](./backend-mvp.md)：后端 MVP 范围、验收标准和非 MVP 边界
