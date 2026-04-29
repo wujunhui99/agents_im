@@ -191,12 +191,11 @@ required_files=(
   "web/src/components/ui/SearchBox.tsx"
   "web/src/components/ui/TabBar.tsx"
   "web/src/components/ui/TopBar.tsx"
-  "web/src/data/mockData.ts"
   "web/src/main.tsx"
-  "web/src/pages/ContactsPage.tsx"
+  "web/src/components/ContactsPage.tsx"
   "web/src/pages/DiscoverPage.tsx"
   "web/src/pages/MePage.tsx"
-  "web/src/pages/MessagesPage.tsx"
+  "web/src/features/messages/MessagesPage.tsx"
   "web/src/styles.css"
   "web/src/vite-env.d.ts"
   "docs/design-docs/read-receipts.md"
@@ -1501,12 +1500,19 @@ frontend_patterns=(
 frontend_files=(
   "web/src/App.tsx"
   "web/src/components/ui/TabBar.tsx"
-  "web/src/data/mockData.ts"
+  "web/src/components/ContactsPage.tsx"
+  "web/src/features/messages/MessagesPage.tsx"
+  "web/src/pages/DiscoverPage.tsx"
   "web/src/styles.css"
 )
 
 for pattern in "${frontend_patterns[@]}"; do
   rg -qF "$pattern" "${frontend_files[@]}"
 done
+
+if rg -q "mockData|mockConversations|mode=\"mock\"|sendMessageWithMock|cloneMockConversations" web/src --glob "*.ts" --glob "*.tsx"; then
+  echo "frontend production mock flow found" >&2
+  exit 1
+fi
 
 echo "static verification passed"
