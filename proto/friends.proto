@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package friends.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/proto/friendspb";
+
+service FriendsService {
+  rpc AddFriend(AddFriendRequest) returns (AddFriendResponse);
+  rpc DeleteFriend(DeleteFriendRequest) returns (DeleteFriendResponse);
+  rpc ListFriends(ListFriendsRequest) returns (ListFriendsResponse);
+  rpc GetFriendship(GetFriendshipRequest) returns (GetFriendshipResponse);
+}
+
+message Friendship {
+  string user_id = 1;
+  string friend_id = 2;
+  string status = 3;
+  bool is_friend = 4;
+  string created_at = 5;
+  string updated_at = 6;
+}
+
+message AddFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message AddFriendResponse {
+  Friendship friendship = 1;
+  bool created = 2;
+}
+
+message DeleteFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message DeleteFriendResponse {
+  Friendship friendship = 1;
+  bool deleted = 2;
+}
+
+message ListFriendsRequest {
+  string user_id = 1;
+}
+
+message ListFriendsResponse {
+  repeated Friendship friends = 1;
+}
+
+message GetFriendshipRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message GetFriendshipResponse {
+  Friendship friendship = 1;
+}

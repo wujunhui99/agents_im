@@ -21,3 +21,15 @@ type UserRepository interface {
 	GetByID(ctx context.Context, userID string) (model.User, error)
 	UpdateProfile(ctx context.Context, userID string, patch ProfilePatch) (model.User, error)
 }
+
+type FriendshipRepository interface {
+	AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
+	DeleteFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
+	ListFriends(ctx context.Context, userID string) ([]model.Friendship, error)
+	GetFriendship(ctx context.Context, userID string, friendID string) (model.Friendship, error)
+}
+
+type Repository interface {
+	UserRepository
+	FriendshipRepository
+}

@@ -14,11 +14,35 @@ import (
 )
 
 func RegisterHandlers(mux *http.ServeMux, ctx *svc.ServiceContext) {
+	registerHealthHandler(mux)
+	registerUserHandlers(mux, ctx)
+	registerFriendsHandlers(mux, ctx)
+}
+
+func RegisterUserHandlers(mux *http.ServeMux, ctx *svc.ServiceContext) {
+	registerHealthHandler(mux)
+	registerUserHandlers(mux, ctx)
+}
+
+func RegisterFriendsHandlers(mux *http.ServeMux, ctx *svc.ServiceContext) {
+	registerHealthHandler(mux)
+	registerFriendsHandlers(mux, ctx)
+}
+
+func registerHealthHandler(mux *http.ServeMux) {
 	mux.HandleFunc("/healthz", healthHandler)
+}
+
+func registerUserHandlers(mux *http.ServeMux, ctx *svc.ServiceContext) {
 	mux.HandleFunc("/me", meHandler(ctx))
 	mux.HandleFunc("/users", usersHandler(ctx))
 	mux.HandleFunc("/users/exists", existsHandler(ctx))
 	mux.HandleFunc("/users/", userByIdentifierHandler(ctx))
+}
+
+func registerFriendsHandlers(mux *http.ServeMux, ctx *svc.ServiceContext) {
+	mux.HandleFunc("/friends", friendsHandler(ctx))
+	mux.HandleFunc("/friends/", friendByUserIDHandler(ctx))
 }
 
 func healthHandler(w http.ResponseWriter, _ *http.Request) {
@@ -152,6 +176,111 @@ func userByIdentifierHandler(ctx *svc.ServiceContext) http.HandlerFunc {
 		}
 		response.WriteOK(w, user)
 	}
+}
+
+type addFriendHTTPReq struct {
+	UserID string `json:"user_id"`
+}
+
+func friendsHandler(ctx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/friends" {
+			response.WriteError(w, apperror.NotFound("route not found"))
+			return
+		}
+
+		userID, err := currentUserID(r)
+		if err != nil {
+			response.WriteError(w, err)
+			return
+		}
+
+		switch r.Method {
+		case http.MethodPost:
+			var req addFriendHTTPReq
+			if err := decodeJSON(r, &req); err != nil {
+				response.WriteError(w, err)
+				return
+			}
+
+			result, err := ctx.FriendsLogic.AddFriend(r.Context(), logic.AddFriendRequest{
+				UserID:   userID,
+				FriendID: req.UserID,
+			})
+			if err != nil {
+				response.WriteError(w, err)
+				return
+			}
+			response.WriteOK(w, result)
+		case http.MethodGet:
+			result, err := ctx.FriendsLogic.ListFriends(r.Context(), logic.ListFriendsRequest{UserID: userID})
+			if err != nil {
+				response.WriteError(w, err)
+				return
+			}
+			response.WriteOK(w, result)
+		default:
+			methodNotAllowed(w)
+		}
+	}
+}
+
+func friendByUserIDHandler(ctx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, err := currentUserID(r)
+		if err != nil {
+			response.WriteError(w, err)
+			return
+		}
+
+		friendID, err := pathUserID(r, "/friends/")
+		if err != nil {
+			response.WriteError(w, err)
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			result, err := ctx.FriendsLogic.GetFriendship(r.Context(), logic.GetFriendshipRequest{
+				UserID:   userID,
+				FriendID: friendID,
+			})
+			if err != nil {
+				response.WriteError(w, err)
+				return
+			}
+			response.WriteOK(w, result)
+		case http.MethodDelete:
+			result, err := ctx.FriendsLogic.DeleteFriend(r.Context(), logic.DeleteFriendRequest{
+				UserID:   userID,
+				FriendID: friendID,
+			})
+			if err != nil {
+				response.WriteError(w, err)
+				return
+			}
+			response.WriteOK(w, result)
+		default:
+			methodNotAllowed(w)
+		}
+	}
+}
+
+func pathUserID(r *http.Request, prefix string) (string, error) {
+	raw := strings.TrimPrefix(r.URL.Path, prefix)
+	if raw == "" || strings.Contains(raw, "/") {
+		return "", apperror.NotFound("route not found")
+	}
+
+	userID, err := url.PathUnescape(raw)
+	if err != nil {
+		return "", apperror.InvalidArgument("user_id path is invalid")
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return "", apperror.InvalidArgument("user_id is required")
+	}
+	return userID, nil
 }
 
 func currentUserID(r *http.Request) (string, error) {
