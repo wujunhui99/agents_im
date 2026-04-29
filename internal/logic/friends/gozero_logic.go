@@ -2,9 +2,9 @@ package friends
 
 import (
 	"context"
-	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/svc"
 	"github.com/wujunhui99/agents_im/internal/types"
@@ -26,7 +26,7 @@ func NewAddFriendLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddFrie
 }
 
 func (l *AddFriendLogic) AddFriend(req *types.AddFriendReq) (*types.AddFriendResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func NewDeleteFriendLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Dele
 }
 
 func (l *DeleteFriendLogic) DeleteFriend(req *types.FriendPathReq) (*types.DeleteFriendResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func NewGetFriendshipLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Get
 }
 
 func (l *GetFriendshipLogic) GetFriendship(req *types.FriendPathReq) (*types.FriendshipResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func NewListFriendsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListF
 }
 
 func (l *ListFriendsLogic) ListFriends(req *types.ListFriendsReq) (*types.ListFriendsResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -155,14 +155,6 @@ func (l *ListFriendsLogic) ListFriends(req *types.ListFriendsReq) (*types.ListFr
 		Message: "ok",
 		Data:    types.ListFriendsData{Friends: friends},
 	}, nil
-}
-
-func currentUserID(value string) (string, error) {
-	userID := strings.TrimSpace(value)
-	if userID == "" {
-		return "", apperror.Unauthenticated("X-User-Id header is required")
-	}
-	return userID, nil
 }
 
 func toFriendship(friendship business.FriendshipView) types.Friendship {

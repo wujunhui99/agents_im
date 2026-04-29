@@ -29,18 +29,16 @@ type CreateUserReq {
 }
 
 type UpdateMeReq {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	UserID        string `json:"user_id,optional"`
-	Identifier    string `json:"identifier,optional"`
-	DisplayName   string `json:"display_name,optional"`
-	Name          string `json:"name,optional"`
-	Gender        string `json:"gender,optional"`
-	Age           int32  `json:"age,optional"`
-	Region        string `json:"region,optional"`
+	UserID      string `json:"user_id,optional"`
+	Identifier  string `json:"identifier,optional"`
+	DisplayName string `json:"display_name,optional"`
+	Name        string `json:"name,optional"`
+	Gender      string `json:"gender,optional"`
+	Age         int32  `json:"age,optional"`
+	Region      string `json:"region,optional"`
 }
 
 type GetMeReq {
-	CurrentUserID string `header:"X-User-Id,optional"`
 }
 
 type ExistsReq {
@@ -69,6 +67,7 @@ type ExistsResp {
 }
 
 @server (
+	jwt:   Auth
 	group: user
 )
 service user-api {
@@ -77,7 +76,12 @@ service user-api {
 
 	@handler updateMe
 	patch /me (UpdateMeReq) returns (UserResp)
+}
 
+@server (
+	group: user
+)
+service user-api {
 	@handler createUser
 	post /users (CreateUserReq) returns (UserResp)
 
@@ -87,4 +91,3 @@ service user-api {
 	@handler getUserByIdentifier
 	get /users/:identifier (GetUserByIdentifierReq) returns (UserResp)
 }
-

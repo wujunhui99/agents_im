@@ -13,6 +13,7 @@ type APIConfig struct {
 	Name string
 	Host string
 	Port int
+	Auth JWTAuthConfig
 }
 
 type RPCConfig struct {
@@ -20,12 +21,24 @@ type RPCConfig struct {
 	ListenOn string
 }
 
+type JWTAuthConfig struct {
+	AccessSecret string
+	AccessExpire int64
+}
+
 func DefaultAPIConfig() APIConfig {
-	return APIConfig{Name: "user-api", Host: "0.0.0.0", Port: 8080}
+	return APIConfig{Name: "user-api", Host: "0.0.0.0", Port: 8080, Auth: DefaultJWTAuthConfig()}
 }
 
 func DefaultRPCConfig() RPCConfig {
 	return RPCConfig{Name: "user-rpc", ListenOn: "0.0.0.0:9090"}
+}
+
+func DefaultJWTAuthConfig() JWTAuthConfig {
+	return JWTAuthConfig{
+		AccessSecret: "dev-jwt-secret-change-me",
+		AccessExpire: 86400,
+	}
 }
 
 func LoadAPIConfig(path string) (APIConfig, error) {
@@ -47,6 +60,16 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 			return cfg, err
 		}
 		cfg.Port = port
+	}
+	if value := values["Auth.AccessSecret"]; value != "" {
+		cfg.Auth.AccessSecret = value
+	}
+	if value := values["Auth.AccessExpire"]; value != "" {
+		expire, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Auth.AccessExpire = expire
 	}
 
 	return cfg, nil
@@ -90,8 +113,10 @@ func readFlatYAML(path string) (map[string]string, error) {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	section := ""
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+		rawLine := scanner.Text()
+		line := strings.TrimSpace(rawLine)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
@@ -103,6 +128,16 @@ func readFlatYAML(path string) (map[string]string, error) {
 
 		key := strings.TrimSpace(parts[0])
 		value := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
+		if !strings.HasPrefix(rawLine, " ") && !strings.HasPrefix(rawLine, "\t") {
+			if value == "" {
+				section = key
+				continue
+			}
+			section = ""
+		}
+		if section != "" && (strings.HasPrefix(rawLine, " ") || strings.HasPrefix(rawLine, "\t")) {
+			key = section + "." + key
+		}
 		values[key] = value
 	}
 

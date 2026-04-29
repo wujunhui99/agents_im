@@ -98,7 +98,7 @@ Product behavior:
 
 When a user sends a message, the system must:
 
-1. Authenticate the sender.
+1. Authenticate the sender with JWT Bearer token and use token `user_id` as `sender_id`.
 2. Validate the target:
    - single chat target user exists;
    - group chat group exists;
@@ -106,7 +106,7 @@ When a user sends a message, the system must:
 3. Optionally validate social rules:
    - single chat can later require friendship depending on product policy.
 4. Resolve `conversation_id`.
-5. Enforce idempotency using `sender_id + client_msg_id`.
+5. Enforce idempotency using token-derived `sender_id + client_msg_id`; if the request body includes `senderId`, it must match the token user.
 6. Assign `server_msg_id` and conversation `seq`.
 7. Persist the message.
 8. Update conversation `max_seq` and last message summary.

@@ -75,6 +75,7 @@ required_files=(
   "internal/auth/handler/gozero_routes.go"
   "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
+  "internal/ctxuser/user.go"
   "internal/rpcgen/user/entry/entry.go"
   "internal/rpcgen/auth/entry/entry.go"
   "internal/rpcgen/friends/entry/entry.go"
@@ -104,6 +105,7 @@ required_files=(
   "docs/design-docs/groups-service-go-zero.md"
   "docs/design-docs/message-chain-contract.md"
   "docs/design-docs/message-storage.md"
+  "docs/design-docs/jwt-auth-middleware.md"
   "docs/design-docs/gateway-message-contract.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
@@ -115,6 +117,7 @@ required_files=(
   "docs/exec-plans/active/gateway-message-contract.md"
   "docs/exec-plans/active/read-receipts.md"
   "docs/exec-plans/active/remove-handwritten-compat.md"
+  "docs/exec-plans/active/jwt-auth-middleware.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -447,7 +450,70 @@ for pattern in "${read_receipt_code_patterns[@]}"; do
 done
 
 rg -q "read-receipts.md" docs/design-docs/index.md docs/product-specs/index.md
-rg -q "X-User-Id" internal/handler docs
+if rg -n "X-User-Id|CurrentUserID|currentUserID" api internal cmd; then
+  echo "production API/code still contains header-based current user auth" >&2
+  exit 1
+fi
+
+legacy_x_user_id_sets="$(rg -n 'Header\.Set\("X-User-Id"' tests internal || true)"
+if [[ -n "$legacy_x_user_id_sets" ]]; then
+  disallowed_legacy_x_user_id_sets="$(printf '%s\n' "$legacy_x_user_id_sets" | rg -v 'legacy X-User-Id rejection helper' || true)"
+  if [[ -n "$disallowed_legacy_x_user_id_sets" ]]; then
+    printf '%s\n' "$disallowed_legacy_x_user_id_sets" >&2
+    echo "legacy X-User-Id header writes in tests/internal must use Authorization Bearer JWT or an explicit rejection helper/comment" >&2
+    exit 1
+  fi
+fi
+
+jwt_api_files=(
+  "api/user.api"
+  "api/friends.api"
+  "api/groups.api"
+  "api/message.api"
+)
+
+for file in "${jwt_api_files[@]}"; do
+  rg -q "jwt:\\s+Auth" "$file"
+done
+
+jwt_config_files=(
+  "etc/auth-api.yaml"
+  "etc/user-api.yaml"
+  "etc/friends-api.yaml"
+  "etc/groups-api.yaml"
+  "etc/message-api.yaml"
+  "etc/auth-rpc.yaml"
+)
+
+for file in "${jwt_config_files[@]}"; do
+  rg -q "AccessSecret" "$file"
+  rg -q "AccessExpire" "$file"
+done
+
+rg -q "type JWTAuthConfig" internal/config/config.go
+rg -q "AccessSecret" internal/config/config.go internal/rpcgen/auth/internal/config/config.go
+rg -q "AccessExpire" internal/config/config.go internal/rpcgen/auth/internal/config/config.go
+rg -q "user_id" internal/auth/token/token.go internal/ctxuser/user.go
+rg -q "ctxuser\\.UserID" internal/logic/user/gozero_logic.go internal/logic/friends/gozero_logic.go internal/logic/groups/gozero_logic.go internal/logic/message/gozero_logic.go
+rg -q "sender_id must match authenticated user" internal/logic/message/gozero_logic.go
+
+jwt_test_patterns=(
+  "assertLooksLikeJWT"
+  "TestAuthIssuedBearerTokenAccessesMe"
+  "bearerTokenForUser"
+  "legacy X-User-Id rejection"
+  "invalid token status"
+  "message sender did not use token user"
+)
+
+for pattern in "${jwt_test_patterns[@]}"; do
+  rg -q "$pattern" tests
+done
+
+rg -q "jwt-auth-middleware.md" docs/design-docs/index.md
+rg -q "Auth.AccessSecret" docs/design-docs/jwt-auth-middleware.md docs/design-docs/auth-service-go-zero.md
+rg -q "senderId.*must match" docs/design-docs/jwt-auth-middleware.md docs/design-docs/message-chain-contract.md
+rg -q "JWT Bearer token" docs/product-specs/auth-service.md docs/product-specs/user-service.md docs/product-specs/friends-service.md docs/product-specs/groups-service.md docs/product-specs/message-chain.md
 rg -q "ExistsByIdentifier" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
 rg -q "CreateUser" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
 rg -q "PasswordHash" internal/auth/model/credential.go

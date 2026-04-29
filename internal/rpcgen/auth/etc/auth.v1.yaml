@@ -1,5 +1,8 @@
 Name: auth.v1.rpc
 ListenOn: 0.0.0.0:8080
+Auth:
+  AccessSecret: dev-jwt-secret-change-me
+  AccessExpire: 86400
 Etcd:
   Hosts:
   - 127.0.0.1:2379

@@ -75,11 +75,11 @@
 
 `GET /me`
 
-第一阶段通过请求头 `X-User-Id` 模拟网关或 auth token 解析后的身份透传。后续接入 auth token/gateway 后，应由网关完成鉴权并透传用户身份。
+客户端必须携带 `Authorization: Bearer <access_token>`。服务通过统一 JWT 鉴权中间件从 token `user_id` claim 获取当前用户身份。
 
 验收标准：
 
-- 缺少 `X-User-Id` 时返回未认证错误。
+- 缺少、过期或非法 token 时返回未认证错误。
 - 用户不存在时返回明确不存在错误。
 - 成功时返回当前用户资料。
 
@@ -87,11 +87,11 @@
 
 `PATCH /me`
 
-第一阶段通过 `X-User-Id` 确认当前用户，只允许更新自己的 `display_name`/`name`、`gender`、`age`、`region`。
+通过 token `user_id` 确认当前用户，只允许更新自己的 `display_name`/`name`、`gender`、`age`、`region`。
 
 验收标准：
 
-- 缺少 `X-User-Id` 时返回未认证错误。
+- 缺少、过期或非法 token 时返回未认证错误。
 - 不允许更新 `user_id`、`identifier`、创建时间、认证字段。
 - 参数非法时返回明确参数错误。
 - 成功后 `/me` 返回最新资料。
@@ -105,7 +105,6 @@
 ## 风险与待决
 
 - `identifier` 是否允许修改、是否大小写敏感，后续需要产品确认。第一阶段按小写规范化后唯一处理。
-- 第一阶段使用 `X-User-Id` 模拟身份上下文，正式环境必须接入 auth token 或 gateway 鉴权。
+- 所有需要当前用户身份的接口必须使用 JWT Bearer token；`X-User-Id` 只允许作为明确标记的测试绕过断言或历史兼容说明。
 - 第一阶段使用内存 repository 支撑本地开发和测试；生产化需要切换 PostgreSQL 并补充迁移脚本。
 - 当前执行环境无法写入外层 `/home/ws/project/docs/product-specs/user-service.md`，本文件为 worktree 内可提交副本。
-

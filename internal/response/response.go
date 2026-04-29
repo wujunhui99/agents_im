@@ -48,3 +48,7 @@ func GoZeroErrorHandler(err error) (int, any) {
 		Data:    nil,
 	}
 }
+
+func GoZeroUnauthorizedCallback(w http.ResponseWriter, _ *http.Request, _ error) {
+	WriteJSON(w, http.StatusUnauthorized, string(apperror.CodeUnauthenticated), "invalid or missing bearer token", nil)
+}

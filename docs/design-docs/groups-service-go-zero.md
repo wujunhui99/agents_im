@@ -31,7 +31,7 @@ RPC 方法：
 职责：
 
 - 对外提供 HTTP 接口。
-- 从 `X-User-Id` 读取当前用户身份，模拟 gateway 透传。
+- 从 JWT context `user_id` 读取当前用户身份。
 - 调用 groups logic 完成群和成员关系读写。
 
 HTTP 接口：
@@ -142,13 +142,13 @@ HTTP 响应沿用统一 envelope：
 
 ## 鉴权上下文
 
-第一阶段不实现 auth token 校验。`groups-api` 通过请求头 `X-User-Id` 获取当前用户身份：
+`groups-api` 通过 go-zero JWT middleware 获取当前用户身份：
 
-- `POST /groups` 必须携带 `X-User-Id`，作为创建者。
-- `POST /groups/:group_id/members` 必须携带 `X-User-Id`，请求体不传 `user_id` 时添加当前用户。
-- `DELETE /groups/:group_id/members/me` 必须携带 `X-User-Id`，表示当前用户退出。
+- `POST /groups` 必须携带 `Authorization: Bearer <access_token>`，token 用户作为创建者。
+- `POST /groups/:group_id/members` 必须携带 `Authorization: Bearer <access_token>`，请求体不传 `user_id` 时添加 token 用户。
+- `DELETE /groups/:group_id/members/me` 必须携带 `Authorization: Bearer <access_token>`，表示 token 用户退出。
 
-后续接入 gateway 后，网关负责 token 校验，并透传规范化后的用户身份和 `trace_id`。
+JWT middleware 校验 token 后将 `user_id` claim 注入 context；logic adapter 使用该 user id 调用 groups 业务逻辑。`X-User-Id` 不作为生产鉴权路径。
 
 ## 测试方式
 

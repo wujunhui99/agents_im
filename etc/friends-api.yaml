@@ -1,3 +1,6 @@
 Name: friends-api
 Host: 0.0.0.0
 Port: 8082
+Auth:
+  AccessSecret: dev-jwt-secret-change-me
+  AccessExpire: 86400

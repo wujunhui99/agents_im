@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/svc"
 	"github.com/wujunhui99/agents_im/internal/types"
@@ -26,7 +27,7 @@ func NewGetConversationSeqsLogic(ctx context.Context, svcCtx *svc.ServiceContext
 }
 
 func (l *GetConversationSeqsLogic) GetConversationSeqs(req *types.ConversationSeqsReq) (*types.ConversationSeqsResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,7 @@ func NewMarkConversationAsReadLogic(ctx context.Context, svcCtx *svc.ServiceCont
 }
 
 func (l *MarkConversationAsReadLogic) MarkConversationAsRead(req *types.MarkConversationAsReadReq) (*types.MarkConversationAsReadResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +107,7 @@ func NewPullMessagesLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Pull
 }
 
 func (l *PullMessagesLogic) PullMessages(req *types.PullMessagesReq) (*types.PullMessagesResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -153,9 +154,12 @@ func NewSendMessageLogic(ctx context.Context, svcCtx *svc.ServiceContext) *SendM
 }
 
 func (l *SendMessageLogic) SendMessage(req *types.SendMessageReq) (*types.SendMessageResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
+	}
+	if senderID := strings.TrimSpace(req.SenderID); senderID != "" && senderID != userID {
+		return nil, apperror.InvalidArgument("sender_id must match authenticated user")
 	}
 
 	result, err := l.svcCtx.MessageLogic.SendMessage(l.ctx, business.SendMessageRequest{
@@ -178,14 +182,6 @@ func (l *SendMessageLogic) SendMessage(req *types.SendMessageReq) (*types.SendMe
 			Deduplicated: result.Deduplicated,
 		},
 	}, nil
-}
-
-func currentUserID(value string) (string, error) {
-	userID := strings.TrimSpace(value)
-	if userID == "" {
-		return "", apperror.Unauthenticated("X-User-Id header is required")
-	}
-	return userID, nil
 }
 
 func splitCommaQuery(value string) []string {

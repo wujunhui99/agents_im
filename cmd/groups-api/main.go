@@ -24,12 +24,13 @@ func main() {
 	}
 
 	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
-	serviceContext := svc.NewGroupsServiceContext(
+	serviceContext := svc.NewGroupsServiceContextWithAuth(
 		repository.NewMemoryGroupsRepository(),
 		logic.NewUserLogicExistenceChecker(userLogic),
+		cfg.Auth,
 	)
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
-	server := rest.MustNewServer(config.ToRestConf(cfg))
+	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()
 	handler.RegisterGroupsGoZeroHandlers(server, serviceContext)
 
