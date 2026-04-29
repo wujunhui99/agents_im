@@ -54,7 +54,7 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 
 ### Message Transfer Worker
 
-负责消费未来 Message Outbox 或 Kafka/Redpanda 中的 `message.accepted` 事件，并通过 Delivery Dispatcher 触发在线投递、离线推送或后续 delivery ACK 流程。第一阶段提供独立入口 `cmd/message-transfer`，默认使用 in-memory consumer 和 noop dispatcher，因此不依赖真实 Kafka、Redpanda、PostgreSQL outbox 或 Gateway fanout。Worker 不拥有消息历史、会话 seq 或已读状态；这些仍由 Message Service 和 PostgreSQL 权威维护。设计见 [`docs/design-docs/message-transfer-worker.md`](./docs/design-docs/message-transfer-worker.md)。
+负责消费未来 Message Outbox 或 Kafka/Redpanda 中的 `message.accepted` 事件，并通过 Delivery Dispatcher 触发在线投递、离线推送或后续 delivery ACK 流程。第一阶段提供独立入口 `cmd/message-transfer`，默认使用 in-memory consumer 和 noop dispatcher，因此不依赖真实 Kafka、Redpanda、PostgreSQL outbox 或 Gateway fanout。当前已提供 `internal/transfer/gateway` 适配器，将 Transfer worker 的 `DeliveryDispatcher` 接口桥接到 Gateway `delivery.Dispatcher` 契约，用于本进程内 Gateway 投递集成测试和后续共址 wiring；它不实现远程 Gateway 网络调用或 Redis 跨实例路由。Worker 不拥有消息历史、会话 seq 或已读状态；这些仍由 Message Service 和 PostgreSQL 权威维护。设计见 [`docs/design-docs/message-transfer-worker.md`](./docs/design-docs/message-transfer-worker.md) 和 [`docs/design-docs/transfer-gateway-dispatcher.md`](./docs/design-docs/transfer-gateway-dispatcher.md)。
 
 ### IM Core Service
 

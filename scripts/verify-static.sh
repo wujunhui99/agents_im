@@ -118,6 +118,8 @@ required_files=(
   "internal/messaging/kafka_integration_test.go"
   "internal/gateway/delivery/delivery.go"
   "internal/gateway/ws/delivery.go"
+  "internal/transfer/gateway/dispatcher.go"
+  "internal/transfer/gateway/dispatcher_test.go"
   "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
@@ -150,6 +152,7 @@ required_files=(
   "docs/design-docs/websocket-gateway.md"
   "docs/design-docs/message-transfer-worker.md"
   "docs/design-docs/gateway-push-delivery.md"
+  "docs/design-docs/transfer-gateway-dispatcher.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -172,6 +175,7 @@ required_files=(
   "docs/exec-plans/active/kafka-redpanda-compose.md"
   "docs/exec-plans/active/message-transfer-worker.md"
   "docs/exec-plans/active/gateway-push-delivery.md"
+  "docs/exec-plans/active/transfer-gateway-dispatcher.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -624,6 +628,49 @@ for pattern in "${gateway_delivery_doc_patterns[@]}"; do
 done
 
 rg -q "gateway-push-delivery.md" ARCHITECTURE.md docs/design-docs/index.md
+
+transfer_gateway_dispatcher_code_patterns=(
+  "type Dispatcher struct"
+  "func NewDispatcher"
+  "func \\(d \\*Dispatcher\\) Dispatch"
+  "EventMessageReceived"
+  "DeliverToConversation"
+  "StatusOffline"
+  "DispatchRetryable"
+  "ErrNoRecipients"
+)
+
+for pattern in "${transfer_gateway_dispatcher_code_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/gateway
+done
+
+transfer_gateway_dispatcher_test_patterns=(
+  "TestDispatcherDeliversMessageAcceptedToGateway"
+  "TestDispatcherOfflineRecipientsAreCompletedWithoutDeliveredUsers"
+  "TestDispatcherNoRecipientsFailsWithoutCallingGateway"
+  "TestWorkerIdempotencySkipsDuplicateGatewayDispatch"
+  "TestWorkerRetryDecisionForGatewayError"
+)
+
+for pattern in "${transfer_gateway_dispatcher_test_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/gateway/dispatcher_test.go
+done
+
+transfer_gateway_dispatcher_doc_patterns=(
+  "message.accepted"
+  "message_received"
+  "delivery.Dispatcher"
+  "RetryDecision"
+  "offline"
+  "no recipients"
+  "Redis cross-instance"
+)
+
+for pattern in "${transfer_gateway_dispatcher_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/transfer-gateway-dispatcher.md docs/exec-plans/active/transfer-gateway-dispatcher.md
+done
+
+rg -q "transfer-gateway-dispatcher.md" ARCHITECTURE.md docs/design-docs/index.md
 
 gateway_product_patterns=(
   "command ACK"
