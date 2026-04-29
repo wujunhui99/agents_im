@@ -6,13 +6,16 @@ import (
 )
 
 type ServiceContext struct {
-	UserLogic *logic.UserLogic
-	Repo      repository.UserRepository
+	UserLogic    *logic.UserLogic
+	FriendsLogic *logic.FriendsLogic
+	Repo         repository.Repository
 }
 
-func NewServiceContext(repo repository.UserRepository) *ServiceContext {
+func NewServiceContext(repo repository.Repository) *ServiceContext {
+	userLogic := logic.NewUserLogic(repo)
 	return &ServiceContext{
-		UserLogic: logic.NewUserLogic(repo),
-		Repo:      repo,
+		UserLogic:    userLogic,
+		FriendsLogic: logic.NewFriendsLogic(repo, userLogic),
+		Repo:         repo,
 	}
 }

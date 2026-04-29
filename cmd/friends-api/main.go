@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	configFile := flag.String("f", "etc/user-api.yaml", "config file")
+	configFile := flag.String("f", "etc/friends-api.yaml", "config file")
 	flag.Parse()
 
 	cfg, err := config.LoadAPIConfig(*configFile)
@@ -23,7 +23,7 @@ func main() {
 
 	serviceContext := svc.NewServiceContext(repository.NewMemoryRepository())
 	mux := http.NewServeMux()
-	handler.RegisterUserHandlers(mux, serviceContext)
+	handler.RegisterFriendsHandlers(mux, serviceContext)
 
 	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 	log.Printf("%s listening on %s", cfg.Name, addr)
