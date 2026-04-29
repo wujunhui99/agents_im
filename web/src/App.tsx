@@ -3,10 +3,10 @@ import { Compass, Contact, MessageCircle, ShieldCheck, UserRound } from 'lucide-
 import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
 import { defaultUserApi, type UserApi, type UserProfile, type UserProfilePatch } from './api/user';
+import ContactsPage from './components/ContactsPage';
 import { TabBar, type TabDefinition } from './components/ui/TabBar';
 import { TopBar } from './components/ui/TopBar';
 import { mockCurrentUser } from './data/mockData';
-import { ContactsPage } from './pages/ContactsPage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { MePage } from './pages/MePage';
 import { MessagesPage } from './pages/MessagesPage';
