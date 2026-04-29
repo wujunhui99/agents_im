@@ -14,7 +14,9 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/config"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
+	"github.com/wujunhui99/agents_im/internal/health"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/svc"
@@ -48,14 +50,19 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/ws", wsServer)
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
+	mux.HandleFunc("/healthz", health.LivenessHandler(cfg.Name))
+	mux.HandleFunc("/readyz", health.ReadinessHandler(cfg.Name, func(*http.Request) []health.Check {
+		return []health.Check{
+			health.ComponentCheck("websocket_server", wsServer.Ready() == nil, readinessMessage(wsServer.Ready())),
+			health.ComponentCheck("message_logic", serviceContext != nil && serviceContext.MessageLogic != nil, "configured"),
+			health.ComponentCheck("presence_store", presenceStore != nil, "configured"),
+		}
+	}))
+	mux.HandleFunc("/metrics", observability.MetricsHandler())
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		Handler:           mux,
+		Handler:           observability.TraceMiddleware(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -108,4 +115,11 @@ func closePresenceStore(store presence.PresenceStore) {
 	if err := closer.Close(); err != nil {
 		log.Printf("close presence store: %v", err)
 	}
+}
+
+func readinessMessage(err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return "configured"
 }

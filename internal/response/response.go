@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/observability"
 )
 
 type Envelope struct {
@@ -49,6 +50,8 @@ func GoZeroErrorHandler(err error) (int, any) {
 	}
 }
 
-func GoZeroUnauthorizedCallback(w http.ResponseWriter, _ *http.Request, _ error) {
+func GoZeroUnauthorizedCallback(w http.ResponseWriter, r *http.Request, _ error) {
+	_, traceContext := observability.EnsureHTTPTrace(r)
+	observability.InjectTraceHeaders(w, traceContext)
 	WriteJSON(w, http.StatusUnauthorized, string(apperror.CodeUnauthenticated), "invalid or missing bearer token", nil)
 }

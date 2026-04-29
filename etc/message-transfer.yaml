@@ -21,3 +21,8 @@ Worker:
   PollIntervalMillis: 100
   RetryBackoffMillis: 1000
   MaxAttempts: 5
+
+Observability:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 8085

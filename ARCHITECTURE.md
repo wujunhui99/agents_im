@@ -103,6 +103,8 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - Jaeger：分布式追踪
 - `trace_id`：跨服务链路追踪 ID
 
+Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trace/request ID 传播设计见 [`docs/design-docs/observability-mvp.md`](./docs/design-docs/observability-mvp.md)。当前实现不要求本地启动 Prometheus、Grafana 或 Jaeger。
+
 ## 关键链路
 
 ### 用户发送消息

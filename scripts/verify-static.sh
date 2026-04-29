@@ -84,6 +84,12 @@ required_files=(
   "internal/repository/delivery_attempt_repository_test.go"
   "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
+  "internal/health/health.go"
+  "internal/health/health_test.go"
+  "internal/observability/metrics.go"
+  "internal/observability/metrics_test.go"
+  "internal/observability/trace.go"
+  "internal/observability/trace_test.go"
   "internal/types/types.go"
   "internal/auth/logic/authlogic.go"
   "internal/auth/logic/auth/gozero_logic.go"
@@ -168,6 +174,7 @@ required_files=(
   "docs/design-docs/gateway-presence-routing.md"
   "docs/exec-plans/active/backend-mvp-completion.md"
   "docs/design-docs/backend-mvp-contract.md"
+  "docs/design-docs/observability-mvp.md"
   "docs/product-specs/backend-mvp.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
@@ -1297,6 +1304,59 @@ rg -q "TestPublisherPublishesMessageCreatedOutboxEvent" internal/outboxpublisher
 rg -q "TestPublisherMarksPublishErrorRetryable" internal/outboxpublisher/publisher_test.go
 rg -q "TestPublisherMarksMalformedPayloadFailedForRetry" internal/outboxpublisher/publisher_test.go
 rg -q "TestPublisherStopsOnContextCancellationWithoutMarkingFailed" internal/outboxpublisher/publisher_test.go
+
+observability_code_patterns=(
+  "StatusReady"
+  "ReadinessHandler"
+  "MetricMessageSends"
+  "MetricDeliveryAttempts"
+  "MetricTransferEvents"
+  "MetricWebSocketCurrent"
+  "TraceMiddleware"
+  "HeaderTraceID"
+)
+
+for pattern in "${observability_code_patterns[@]}"; do
+  rg -q "$pattern" internal/health internal/observability
+done
+
+for api_main in cmd/*-api/main.go; do
+  rg -q "TraceMiddlewareFunc" "$api_main"
+done
+
+observability_wiring_patterns=(
+  "/readyz"
+  "/metrics"
+  "ReadinessHandler"
+  "MetricsHandler"
+)
+
+for pattern in "${observability_wiring_patterns[@]}"; do
+  rg -q "$pattern" internal/handler/gozero_routes.go internal/auth/handler/gozero_routes.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
+done
+
+observability_metric_hooks=(
+  "RecordMessageSend"
+  "RecordDeliveryAttempt"
+  "RecordTransferEvent"
+  "SetWebSocketConnections"
+  "RecordWebSocketConnectionEvent"
+)
+
+for pattern in "${observability_metric_hooks[@]}"; do
+  rg -q "$pattern" internal/logic/messagelogic.go internal/gateway/ws internal/transfer/worker.go
+done
+
+rg -q "Observability:" etc/message-transfer.yaml
+rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
+rg -q "observability-mvp.md" ARCHITECTURE.md docs/design-docs/index.md
+rg -q "agents_im_message_sends_total" docs/design-docs/observability-mvp.md internal/observability/metrics.go
+rg -q "trace_id" docs/design-docs/observability-mvp.md internal/gateway/ws/server.go
+
+if rg -n "RequestURI|RawQuery|DumpRequest|Authorization|password|token" internal/observability; then
+  echo "observability helpers must not log or inspect secrets, auth headers, bodies, or query strings" >&2
+  exit 1
+fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \

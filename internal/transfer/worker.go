@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/wujunhui99/agents_im/internal/observability"
 )
 
 const (
@@ -156,7 +158,13 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 }
 
-func (w *Worker) RunOnce(ctx context.Context) ProcessResult {
+func (w *Worker) RunOnce(ctx context.Context) (result ProcessResult) {
+	defer func() {
+		if result.Status != "" {
+			observability.RecordTransferEvent(string(result.Status))
+		}
+	}()
+
 	if err := ctx.Err(); err != nil {
 		return ProcessResult{Status: StatusStopped, Err: err}
 	}
@@ -171,6 +179,7 @@ func (w *Worker) RunOnce(ctx context.Context) ProcessResult {
 		}
 		return ProcessResult{Status: StatusRetryable, Retryable: true, RetryAfter: w.retryBackoff, Err: err}
 	}
+	observability.RecordTransferEvent("consumed")
 	if envelope.Attempt <= 0 {
 		envelope.Attempt = 1
 	}
@@ -207,7 +216,7 @@ func (w *Worker) RunOnce(ctx context.Context) ProcessResult {
 	}
 
 	dispatch := normalizeDispatchResult(w.dispatcher.Dispatch(ctx, envelope))
-	result := base
+	result = base
 	result.Status = dispatch.Status
 	result.Retryable = dispatch.Retryable
 	result.RetryAfter = dispatch.RetryAfter

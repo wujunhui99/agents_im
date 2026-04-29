@@ -23,6 +23,8 @@ import (
 type wsResponse struct {
 	RequestID      string          `json:"request_id"`
 	RequestIDCamel string          `json:"requestId"`
+	TraceID        string          `json:"trace_id"`
+	TraceIDCamel   string          `json:"traceId"`
 	Type           string          `json:"type"`
 	Command        string          `json:"command"`
 	Status         string          `json:"status"`
@@ -118,6 +120,9 @@ func TestWebSocketGatewayHeartbeatReturnsOK(t *testing.T) {
 	resp := readWSResponse(t, conn)
 	if resp.RequestID != "req-heartbeat" || resp.Type != gatewayws.CommandHeartbeat || resp.Status != gateway.AckStatusOK {
 		t.Fatalf("unexpected heartbeat response envelope: %+v", resp)
+	}
+	if resp.TraceID == "" {
+		t.Fatalf("heartbeat response should include trace_id: %+v", resp)
 	}
 
 	var data struct {

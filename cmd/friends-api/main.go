@@ -6,6 +6,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/handler"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
 	"github.com/wujunhui99/agents_im/internal/svc"
@@ -26,6 +27,7 @@ func main() {
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
 	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()
+	server.Use(observability.TraceMiddlewareFunc)
 	handler.RegisterFriendsGoZeroHandlers(server, serviceContext)
 
 	log.Printf("%s listening on %s:%d", cfg.Name, cfg.Host, cfg.Port)
