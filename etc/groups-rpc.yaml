@@ -1,0 +1,3 @@
+Name: groups-rpc
+ListenOn: 0.0.0.0:9092
+
