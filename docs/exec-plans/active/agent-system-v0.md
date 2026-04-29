@@ -91,6 +91,13 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api validate -api api/agent.api
 
 **Key rule:** Database stores `handler_key`; code owns the executable whitelist. Do not execute scripts stored in DB.
 
+**2026-04-30 progress (`feature/agent-prompts-tools-skills`):**
+
+- Added prompt/tool/skill metadata models, registry repository interface, in-memory repository, PostgreSQL repository methods, and fail-first business validation in `internal/logic`.
+- Added PostgreSQL schema for `agent_prompts`, `mcp_servers`, `agent_tools`, `agent_skills`, and prompt/tool/skill binding tables in `db/migrations/001_init_postgres.sql`.
+- Encoded first-version MCP constraints: admin-configured server/tool metadata only, no stdio command/args transport, and Agent whitelist binding required before `CanAgentUseTool` returns true.
+- API exposure remains pending for a later Agent Management API surface; current branch provides domain/repository/metadata contract only.
+
 ### Task 6: Add MinIO-backed skill registry
 
 **Objective:** Store skill metadata in PostgreSQL and skill files in MinIO/S3-compatible storage.
@@ -109,6 +116,11 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./...
 ```
 
 Integration tests requiring MinIO must skip unless explicit MinIO environment variables are set.
+
+**2026-04-30 progress (`feature/agent-prompts-tools-skills`):**
+
+- Added the skill metadata contract in PostgreSQL with required `object_key`, `sha256`, `content_type`, and `size_bytes`.
+- Did not implement MinIO binary upload/download; file content remains out of PostgreSQL and out of scope for this branch.
 
 ## Phase 3: Runtime And Python Execution
 

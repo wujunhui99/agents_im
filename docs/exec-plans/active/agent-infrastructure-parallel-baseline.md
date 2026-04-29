@@ -96,6 +96,12 @@
 - skill sha256/object key 必填。
 - binding 去重/校验。
 
+当前进展（2026-04-30）：
+
+- 已实现 prompt/tool/skill registry 的 model、logic、memory repository、PostgreSQL repository 和 migration schema。
+- 已通过测试覆盖非法 tool 类型、非管理员 MCP 配置、未知 local/builtin key、skill object metadata、binding 去重、缺失绑定目标和 MCP whitelist 使用判断。
+- 未实现工具执行、LLM 执行、MinIO 二进制上传或 Agent Management HTTP/RPC API。
+
 ### 4. `feature/agent-audit-log`
 
 职责：审计基础设施。

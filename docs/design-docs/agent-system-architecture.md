@@ -71,6 +71,8 @@ agent_prompts
 
 运行时必须记录 prompt snapshot，避免 prompt 后续编辑导致历史 run 不可复现。
 
+当前 registry 实现提供 `agent_prompts` 元数据表和 `agent_prompt_bindings` 绑定表。绑定表以 `(agent_id, prompt_id)` 去重；因 Agent profile 分支并行开发，当前不对 `agent_id` 建外键，集成 `agents` 表后可补充外键或当前 prompt 唯一策略。
+
 ### Tool Registry
 
 工具元数据存在 PostgreSQL。工具类型：
@@ -117,6 +119,8 @@ mcp_servers
 
 第一版建议只开放管理员配置的 MCP server。stdio MCP 会启动本地进程，默认不对普通用户开放。
 
+当前 registry 实现进一步收紧第一版范围：MCP server 只接受 `http`、`sse`、`streamable_http` transport，不保存 stdio `command` / `args` 元数据，避免把本地进程启动能力引入数据库配置。MCP tool 必须引用管理员配置 server；Agent 必须通过 `agent_tool_bindings` 白名单绑定后才能使用该 tool。
+
 本地工具不得从数据库读取并执行任意脚本。数据库只保存 `handler_key`，服务端代码用白名单映射 handler：
 
 ```text
@@ -125,6 +129,8 @@ im.send_agent_message
 skill.read_file
 python.execute
 ```
+
+当前 registry 只登记工具元数据和绑定关系，不执行 handler、不启动 MCP client、不执行 Python。local tool 只接受服务端白名单 `handler_key`；builtin tool 只接受白名单 `builtin_key`；任何 `shell`、`command`、`script` tool type 或类似 handler key 都必须在 logic 层失败。
 
 ### Skill Registry 与 MinIO
 
@@ -168,6 +174,8 @@ skills/{skill_id}/versions/{version}/{file_path}
 - Runtime 不持有 MinIO root credential。
 - Agent 绑定 skill 后默认可读取该 skill 下文件。
 - 每次读取写 `skill_file_reads` 或通用 audit log。
+
+当前 registry 实现将第一版 skill 文件索引压缩在 `agent_skills` 元数据表中：`object_key`、`sha256`、`content_type`、`size_bytes` 必填，PG 不保存文件内容。`agent_skill_bindings` 表记录 Agent 白名单绑定；真正的 MinIO/S3 上传、下载、读取审计链路留给后续 storage/runtime 任务。
 
 ### Agent Runtime
 

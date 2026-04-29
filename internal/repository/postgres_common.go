@@ -84,3 +84,18 @@ func MustOutboxRepositoryForStorage(driver string, dataSource string) OutboxRepo
 	}
 	return repo
 }
+
+func NewAgentRegistryRepositoryForStorage(driver string, dataSource string) (AgentRegistryRepository, error) {
+	if appconfig.ResolveStorageDriver(driver) != appconfig.StorageDriverPostgres {
+		return NewMemoryAgentRegistryRepository(), nil
+	}
+	return NewPostgresAgentRegistryRepository(appconfig.ResolveDataSource(dataSource))
+}
+
+func MustAgentRegistryRepositoryForStorage(driver string, dataSource string) AgentRegistryRepository {
+	repo, err := NewAgentRegistryRepositoryForStorage(driver, dataSource)
+	if err != nil {
+		panic(err)
+	}
+	return repo
+}
