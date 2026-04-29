@@ -66,6 +66,8 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 - 在线状态维护
 - 消息下发与重试
 
+在线状态和连接元数据通过 Redis presence 层保存为短期运行状态，设计见 [`docs/design-docs/redis-presence.md`](./docs/design-docs/redis-presence.md)。Gateway 不拥有消息历史、会话 seq 或已读状态；这些数据仍由 Message Service 和 PostgreSQL 权威维护。
+
 ### Agent Service
 
 负责 Agent 生命周期和运行时能力，包括：
@@ -86,7 +88,7 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 ### Storage Layer
 
 - PostgreSQL：持久化用户、会话、消息、Agent 配置、工具调用记录等核心数据。
-- Redis：缓存会话状态、在线状态、幂等键、热点数据和短期运行状态。
+- Redis：缓存会话状态、在线状态、幂等键、热点数据和短期运行状态。Presence 场景中 Redis 只保存连接 hash、用户连接集合和短期 online marker；丢失后由 Gateway 连接重建，不作为持久业务数据权威。
 
 ### Observability Stack
 

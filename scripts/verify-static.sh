@@ -88,6 +88,11 @@ required_files=(
   "internal/rpcgen/message/entry/entry.go"
   "internal/rpcgen/rpcerror/error.go"
   "internal/gateway/contract.go"
+  "internal/presence/store.go"
+  "internal/presence/memory.go"
+  "internal/presence/redis.go"
+  "internal/presence/memory_test.go"
+  "internal/presence/redis_integration_test.go"
   "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
@@ -113,6 +118,7 @@ required_files=(
   "docs/design-docs/jwt-auth-middleware.md"
   "docs/design-docs/postgres-persistence.md"
   "docs/design-docs/gateway-message-contract.md"
+  "docs/design-docs/redis-presence.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -126,6 +132,7 @@ required_files=(
   "scripts/migrate-postgres.sh"
   "tests/postgres_persistence_integration_test.go"
   "docs/exec-plans/active/gateway-message-contract.md"
+  "docs/exec-plans/active/redis-presence.md"
   "docs/exec-plans/active/read-receipts.md"
   "docs/exec-plans/active/remove-handwritten-compat.md"
   "docs/exec-plans/active/jwt-auth-middleware.md"
@@ -438,6 +445,76 @@ for pattern in "${gateway_product_patterns[@]}"; do
 done
 
 rg -q "gateway-message-contract.md" docs/design-docs/index.md docs/product-specs/index.md
+
+redis_compose_patterns=(
+  "^  redis:"
+  "redis:7-alpine"
+  "agents-im-redis"
+  "agents_im_redis_data"
+  "REDIS_PASSWORD"
+)
+
+for pattern in "${redis_compose_patterns[@]}"; do
+  rg -q "$pattern" docker-compose.yml
+done
+
+redis_env_patterns=(
+  "REDIS_ADDR"
+  "REDIS_PASSWORD"
+  "REDIS_DB"
+  "PRESENCE_DRIVER"
+  "PRESENCE_TTL_SECONDS"
+  "PRESENCE_KEY_PREFIX"
+)
+
+for pattern in "${redis_env_patterns[@]}"; do
+  rg -q "$pattern" .env.example
+done
+
+presence_config_patterns=(
+  "type RedisConfig"
+  "type PresenceConfig"
+  "ResolveRedisConfig"
+  "ResolvePresenceConfig"
+  "ResolvePresenceDriver"
+)
+
+for pattern in "${presence_config_patterns[@]}"; do
+  rg -q "$pattern" internal/config/config.go
+done
+
+presence_code_patterns=(
+  "type PresenceStore interface"
+  "RegisterConnection"
+  "Heartbeat"
+  "UnregisterConnection"
+  "ListUserConnections"
+  "IsUserOnline"
+  "github.com/redis/go-redis/v9"
+  ":user:"
+  ":conn:"
+)
+
+for pattern in "${presence_code_patterns[@]}"; do
+  rg -q "$pattern" internal/presence
+done
+
+presence_doc_patterns=(
+  "PostgreSQL remains the source of truth"
+  "Redis presence is non-authoritative"
+  "agents_im:presence:user"
+  "agents_im:presence:conn"
+  "Heartbeat"
+  "REDIS_ADDR"
+  "go test ./..."
+)
+
+for pattern in "${presence_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/redis-presence.md docs/exec-plans/active/redis-presence.md
+done
+
+rg -q "redis-presence.md" ARCHITECTURE.md docs/design-docs/index.md
+rg -q "REDIS_ADDR is required.*skip|t\\.Skip" internal/presence/redis_integration_test.go
 read_receipt_patterns=(
   "has_read_seq"
   "unread_count"
