@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -43,10 +44,15 @@ func NewPostgresRepositoryFromConn(conn sqlx.SqlConn) *PostgresRepository {
 }
 
 func NewRepositoryForStorage(driver string, dataSource string) (CredentialRepository, error) {
-	if appconfig.ResolveStorageDriver(driver) != appconfig.StorageDriverPostgres {
+	storageDriver := appconfig.ResolveStorageDriver(driver)
+	switch storageDriver {
+	case appconfig.StorageDriverMemory:
 		return NewMemoryRepository(), nil
+	case appconfig.StorageDriverPostgres:
+		return NewPostgresRepository(appconfig.ResolveDataSource(dataSource))
+	default:
+		return nil, fmt.Errorf("unsupported storage driver %q; use %q only for explicit dev/test memory mode or %q for PostgreSQL", storageDriver, appconfig.StorageDriverMemory, appconfig.StorageDriverPostgres)
 	}
-	return NewPostgresRepository(appconfig.ResolveDataSource(dataSource))
 }
 
 func MustRepositoryForStorage(driver string, dataSource string) CredentialRepository {

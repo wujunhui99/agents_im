@@ -378,10 +378,12 @@ func ResolveStorageDriver(value string) string {
 		value = strings.ToLower(strings.TrimSpace(os.Getenv("AGENTS_IM_STORAGE_DRIVER")))
 	}
 	switch value {
+	case "", StorageDriverMemory:
+		return StorageDriverMemory
 	case StorageDriverPostgres:
 		return StorageDriverPostgres
 	default:
-		return StorageDriverMemory
+		return value
 	}
 }
 
