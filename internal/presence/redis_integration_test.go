@@ -61,7 +61,7 @@ func TestRedisStoreConnectionLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(connections) != 1 || connections[0].ConnectionID != metadata.ConnectionID || connections[0].GatewayID != metadata.GatewayID {
+	if len(connections) != 1 || connections[0].ConnectionID != metadata.ConnectionID || connections[0].InstanceID != metadata.GatewayID || connections[0].GatewayID != metadata.GatewayID {
 		t.Fatalf("unexpected connections: %+v", connections)
 	}
 

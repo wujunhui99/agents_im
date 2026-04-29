@@ -7,12 +7,13 @@ Related docs:
 - [`message-storage.md`](./message-storage.md)
 - [`postgres-persistence.md`](./postgres-persistence.md)
 - [`websocket-gateway.md`](./websocket-gateway.md)
+- [`outbox-kafka-publisher.md`](./outbox-kafka-publisher.md)
 
 ## Background
 
 Message Service currently accepts a send command synchronously, allocates `server_msg_id` and conversation `seq`, stores the message, updates conversation/read state, and returns an ACK to HTTP or WebSocket callers. Kafka fanout, Message Transfer, and Gateway Push delivery are separate follow-up branches.
 
-The outbox adds a durable event source inside PostgreSQL so future workers can publish the already-accepted message without coupling delivery success to the send response.
+The outbox adds a durable event source inside PostgreSQL so workers can publish the already-accepted message without coupling delivery success to the send response. The first publisher module is described in [`outbox-kafka-publisher.md`](./outbox-kafka-publisher.md).
 
 ## Goals
 
@@ -140,9 +141,9 @@ The PostgreSQL implementation uses `FOR UPDATE SKIP LOCKED` so multiple workers 
 
 The in-memory message repository implements the same interface for unit tests and isolated local runs.
 
-## Worker Semantics
+## Publisher Semantics
 
-Future workers should treat outbox events as at-least-once inputs:
+Outbox publisher workers should treat outbox events as at-least-once inputs:
 
 - A published Kafka message may be retried if the worker fails before `MarkPublished`.
 - Downstream consumers must use `event_id` or `(event_type, aggregate_type, aggregate_id)` for idempotency.
@@ -159,4 +160,3 @@ Required validation for this branch:
 - `bash scripts/verify-static.sh`
 - `docker compose config`
 - markdown link check for changed docs
-

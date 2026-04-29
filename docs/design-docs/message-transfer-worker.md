@@ -7,6 +7,7 @@ Related docs:
 - [`message-storage.md`](./message-storage.md)
 - [`websocket-gateway.md`](./websocket-gateway.md)
 - [`redis-presence.md`](./redis-presence.md)
+- [`kafka-transfer-consumer.md`](./kafka-transfer-consumer.md)
 
 ## Background
 

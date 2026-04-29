@@ -217,6 +217,7 @@ func (m ConnectionMetadata) redisHash() map[string]interface{} {
 	return map[string]interface{}{
 		"user_id":                   m.UserID,
 		"connection_id":             m.ConnectionID,
+		"instance_id":               m.InstanceID,
 		"gateway_id":                m.GatewayID,
 		"device_id":                 m.DeviceID,
 		"platform":                  m.Platform,
@@ -247,6 +248,7 @@ func metadataFromRedisHash(fields map[string]string) (ConnectionMetadata, bool) 
 	metadata := ConnectionMetadata{
 		UserID:          fields["user_id"],
 		ConnectionID:    fields["connection_id"],
+		InstanceID:      firstNonEmptyString(fields["instance_id"], fields["gateway_id"]),
 		GatewayID:       fields["gateway_id"],
 		DeviceID:        fields["device_id"],
 		Platform:        fields["platform"],
@@ -257,6 +259,15 @@ func metadataFromRedisHash(fields map[string]string) (ConnectionMetadata, bool) 
 		ExpiresAt:       expiresAt,
 	}
 	return metadata, metadata.UserID != "" && metadata.ConnectionID != ""
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func unixMilliField(fields map[string]string, name string) (time.Time, error) {

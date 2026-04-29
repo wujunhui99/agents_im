@@ -12,14 +12,18 @@
 - [user-service-go-zero.md](./user-service-go-zero.md)：User Service go-zero 实现设计
 - [message-chain-contract.md](./message-chain-contract.md)：消息链路接口契约与 OpenIM 借鉴设计
 - [kafka-message-events.md](./kafka-message-events.md)：Kafka-compatible Redpanda 消息事件 topic、schema、producer abstraction 与投递语义
+- [kafka-transfer-consumer.md](./kafka-transfer-consumer.md)：Message Transfer worker 的 Kafka/Redpanda consumer、event mapping 和 offset commit 语义
 - [message-storage.md](./message-storage.md)：消息存储 PostgreSQL/Redis 契约设计
 - [postgres-persistence.md](./postgres-persistence.md)：第一阶段 PostgreSQL 持久化 schema、配置和 repository 设计
 - [message-outbox.md](./message-outbox.md)：Message Service transactional outbox 事件源与 worker 轮询契约
+- [outbox-kafka-publisher.md](./outbox-kafka-publisher.md)：Outbox `message.created` 到 Kafka `message.accepted` 的发布模块与 at-least-once 语义
 - [gateway-message-contract.md](./gateway-message-contract.md)：Gateway WebSocket command 到 Message Service RPC 的第一阶段映射契约
 - [redis-presence.md](./redis-presence.md)：Redis 在线状态与 Gateway 连接元数据契约
 - [websocket-gateway.md](./websocket-gateway.md)：WebSocket Gateway 第一阶段真实入口、JWT handshake、connection manager 和 command router
 - [message-transfer-worker.md](./message-transfer-worker.md)：Message Transfer worker 第一阶段事件消费、投递调度和重试契约
 - [gateway-push-delivery.md](./gateway-push-delivery.md)：Gateway push delivery 第一阶段 dispatcher、server push envelope 和 in-memory fanout
+- [transfer-gateway-dispatcher.md](./transfer-gateway-dispatcher.md)：Transfer worker 到 Gateway delivery dispatcher 的本进程适配器契约
+- [gateway-presence-routing.md](./gateway-presence-routing.md)：Gateway 连接生命周期接入 PresenceStore，并为未来跨实例投递提供路由 metadata
 - [read-receipts.md](./read-receipts.md)：已读回执状态模型、单调推进和扩展设计
 - [im-agent-decoupling.md](./im-agent-decoupling.md)：IM 与 Agent 解耦设计
 - [websocket-reliability.md](./websocket-reliability.md)：WebSocket 可靠性设计

@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/config"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
+	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/svc"
 )
@@ -32,7 +34,15 @@ func main() {
 		nil,
 		cfg.Auth,
 	)
-	wsServer := gatewayws.NewServer(serviceContext)
+	presenceStore := presence.MustStore(cfg.Presence, cfg.Redis)
+	defer closePresenceStore(presenceStore)
+
+	wsServer := gatewayws.NewServer(
+		serviceContext,
+		gatewayws.WithPresenceStore(presenceStore),
+		gatewayws.WithPresenceTTL(presence.HeartbeatTTL(cfg.Presence)),
+		gatewayws.WithInstanceID(gatewayInstanceID()),
+	)
 
 	mux := http.NewServeMux()
 	mux.Handle("/ws", wsServer)
@@ -69,5 +79,31 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("shutdown gateway server: %v", err)
+	}
+}
+
+func gatewayInstanceID() string {
+	if value := strings.TrimSpace(os.Getenv("GATEWAY_INSTANCE_ID")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(os.Getenv("AGENTS_IM_GATEWAY_INSTANCE_ID")); value != "" {
+		return value
+	}
+	hostname, err := os.Hostname()
+	if err != nil || strings.TrimSpace(hostname) == "" {
+		return "gateway-ws"
+	}
+	return strings.TrimSpace(hostname)
+}
+
+func closePresenceStore(store presence.PresenceStore) {
+	closer, ok := store.(interface {
+		Close() error
+	})
+	if !ok {
+		return
+	}
+	if err := closer.Close(); err != nil {
+		log.Printf("close presence store: %v", err)
 	}
 }

@@ -4,8 +4,13 @@ DryRun: true
 
 Consumer:
   Driver: memory
-  Topic: message.accepted.v1
-  Group: message-transfer
+  Topic: ${KAFKA_MESSAGE_EVENTS_TOPIC}
+  Group: ${KAFKA_CONSUMER_GROUP}
+
+Kafka:
+  Brokers: ${KAFKA_BROKERS}
+  MessageEventsTopic: ${KAFKA_MESSAGE_EVENTS_TOPIC}
+  ConsumerGroup: ${KAFKA_CONSUMER_GROUP}
 
 Dispatcher:
   Driver: noop

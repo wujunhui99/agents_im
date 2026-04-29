@@ -103,6 +103,9 @@ required_files=(
   "internal/transfer/memory.go"
   "internal/transfer/worker.go"
   "internal/transfer/worker_test.go"
+  "internal/transfer/kafka_consumer.go"
+  "internal/transfer/kafka_consumer_test.go"
+  "internal/transfer/kafka_integration_test.go"
   "internal/presence/store.go"
   "internal/presence/memory.go"
   "internal/presence/redis.go"
@@ -118,6 +121,8 @@ required_files=(
   "internal/messaging/kafka_integration_test.go"
   "internal/gateway/delivery/delivery.go"
   "internal/gateway/ws/delivery.go"
+  "internal/transfer/gateway/dispatcher.go"
+  "internal/transfer/gateway/dispatcher_test.go"
   "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
@@ -149,7 +154,10 @@ required_files=(
   "docs/design-docs/kafka-message-events.md"
   "docs/design-docs/websocket-gateway.md"
   "docs/design-docs/message-transfer-worker.md"
+  "docs/design-docs/kafka-transfer-consumer.md"
   "docs/design-docs/gateway-push-delivery.md"
+  "docs/design-docs/transfer-gateway-dispatcher.md"
+  "docs/design-docs/gateway-presence-routing.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -171,7 +179,10 @@ required_files=(
   "docs/exec-plans/active/websocket-gateway.md"
   "docs/exec-plans/active/kafka-redpanda-compose.md"
   "docs/exec-plans/active/message-transfer-worker.md"
+  "docs/exec-plans/active/kafka-transfer-consumer.md"
   "docs/exec-plans/active/gateway-push-delivery.md"
+  "docs/exec-plans/active/transfer-gateway-dispatcher.md"
+  "docs/exec-plans/active/gateway-presence-routing.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -584,6 +595,74 @@ for pattern in "${message_transfer_doc_patterns[@]}"; do
   rg -q "$pattern" docs/design-docs/message-transfer-worker.md docs/exec-plans/active/message-transfer-worker.md
 done
 
+kafka_transfer_consumer_code_patterns=(
+  "type KafkaEventConsumerConfig struct"
+  "type KafkaEventConsumer struct"
+  "func NewKafkaEventConsumer"
+  "func EnvelopeFromKafkaMessage"
+  "messaging.UnmarshalMessageEvent"
+  "DefaultMessageEventsTopic"
+  "EventTypeMessageAccepted"
+  "FetchMessage"
+  "CommitMessages"
+  "func \\(c \\*KafkaEventConsumer\\) MarkSuccessful"
+  "func \\(c \\*KafkaEventConsumer\\) MarkRetry"
+  "func \\(c \\*KafkaEventConsumer\\) MarkFailed"
+)
+
+for pattern in "${kafka_transfer_consumer_code_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/kafka_consumer.go internal/transfer/kafka_consumer_test.go
+done
+
+kafka_transfer_consumer_test_patterns=(
+  "TestEnvelopeFromKafkaMessageMapsAcceptedEvent"
+  "TestEnvelopeFromKafkaMessageRejectsInvalidEvents"
+  "TestKafkaEventConsumerConstructorDoesNotRequireLiveBroker"
+  "TestKafkaEventConsumerReceiveAndAckSemantics"
+  "TestKafkaEventConsumerConsumesRedpandaEvent"
+  "KAFKA_REDPANDA_INTEGRATION"
+  "KAFKA_BROKERS"
+  "t\\.Skip"
+)
+
+for pattern in "${kafka_transfer_consumer_test_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/kafka_consumer_test.go internal/transfer/kafka_integration_test.go
+done
+
+kafka_transfer_config_patterns=(
+  "TransferConsumerKafka"
+  "MESSAGE_TRANSFER_CONSUMER_DRIVER"
+  "Kafka\\s+KafkaConfig"
+  "cfg.Kafka = kafkaConfigFromValues"
+  "NewKafkaEventConsumer"
+  "KAFKA_MESSAGE_EVENTS_TOPIC"
+  "KAFKA_CONSUMER_GROUP"
+)
+
+for pattern in "${kafka_transfer_config_patterns[@]}"; do
+  rg -q "$pattern" internal/config/config.go internal/config/config_test.go cmd/message-transfer/main.go etc/message-transfer.yaml
+done
+
+kafka_transfer_doc_patterns=(
+  "message.events.v1"
+  "message.accepted"
+  "messaging.MessageEvent"
+  "transfer.Envelope"
+  "MarkSuccessful"
+  "MarkRetry"
+  "MarkFailed"
+  "CommitMessages"
+  "KAFKA_REDPANDA_INTEGRATION"
+  "KAFKA_BROKERS"
+)
+
+for pattern in "${kafka_transfer_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/kafka-transfer-consumer.md docs/exec-plans/active/kafka-transfer-consumer.md
+done
+
+rg -q "kafka-transfer-consumer.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-transfer-worker.md
+rg -q "kafka-transfer-consumer" docs/exec-plans/active/kafka-transfer-consumer.md
+
 rg -q "LoadMessageTransferConfig" internal/config/config.go
 rg -q "message-transfer" cmd/message-transfer/main.go etc/message-transfer.yaml ARCHITECTURE.md
 rg -q "message-transfer-worker.md" docs/design-docs/index.md ARCHITECTURE.md
@@ -624,6 +703,84 @@ for pattern in "${gateway_delivery_doc_patterns[@]}"; do
 done
 
 rg -q "gateway-push-delivery.md" ARCHITECTURE.md docs/design-docs/index.md
+
+transfer_gateway_dispatcher_code_patterns=(
+  "type Dispatcher struct"
+  "func NewDispatcher"
+  "func \\(d \\*Dispatcher\\) Dispatch"
+  "EventMessageReceived"
+  "DeliverToConversation"
+  "StatusOffline"
+  "DispatchRetryable"
+  "ErrNoRecipients"
+)
+
+for pattern in "${transfer_gateway_dispatcher_code_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/gateway
+done
+
+transfer_gateway_dispatcher_test_patterns=(
+  "TestDispatcherDeliversMessageAcceptedToGateway"
+  "TestDispatcherOfflineRecipientsAreCompletedWithoutDeliveredUsers"
+  "TestDispatcherNoRecipientsFailsWithoutCallingGateway"
+  "TestWorkerIdempotencySkipsDuplicateGatewayDispatch"
+  "TestWorkerRetryDecisionForGatewayError"
+)
+
+for pattern in "${transfer_gateway_dispatcher_test_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/gateway/dispatcher_test.go
+done
+
+transfer_gateway_dispatcher_doc_patterns=(
+  "message.accepted"
+  "message_received"
+  "delivery.Dispatcher"
+  "RetryDecision"
+  "offline"
+  "no recipients"
+  "Redis cross-instance"
+)
+
+for pattern in "${transfer_gateway_dispatcher_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/transfer-gateway-dispatcher.md docs/exec-plans/active/transfer-gateway-dispatcher.md
+done
+
+rg -q "transfer-gateway-dispatcher.md" ARCHITECTURE.md docs/design-docs/index.md
+
+gateway_presence_routing_code_patterns=(
+  "WithPresenceStore"
+  "WithPresenceTTL"
+  "WithInstanceID"
+  "RegisterConnection"
+  "Heartbeat"
+  "UnregisterConnection"
+  "ListUserConnections"
+  "InstanceID"
+  "StatusRouted"
+  "type Route struct"
+)
+
+for pattern in "${gateway_presence_routing_code_patterns[@]}"; do
+  rg -q "$pattern" internal/gateway/ws internal/gateway/delivery internal/presence tests/websocket_gateway_test.go
+done
+
+gateway_presence_routing_doc_patterns=(
+  "PresenceStore"
+  "connection_id"
+  "instance_id"
+  "heartbeat"
+  "offline"
+  "routed"
+  "in-process"
+  "cross-instance"
+)
+
+for pattern in "${gateway_presence_routing_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/gateway-presence-routing.md docs/exec-plans/active/gateway-presence-routing.md
+done
+
+rg -q "gateway-presence-routing.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/websocket-gateway.md docs/design-docs/gateway-push-delivery.md
+rg -q "Presence:" etc/gateway-ws.yaml
 
 gateway_product_patterns=(
   "command ACK"
@@ -950,6 +1107,43 @@ done
 
 rg -q "message-outbox.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/postgres-persistence.md
 rg -q "message-outbox" docs/exec-plans/active/message-outbox.md
+
+outbox_publisher_code_patterns=(
+  "package outboxpublisher"
+  "type Publisher struct"
+  "repository.OutboxRepository"
+  "messaging.Producer"
+  "PollPending"
+  "MessageEventFromOutbox"
+  "EventTypeMessageAccepted"
+  "DefaultMessageEventsTopic"
+  "MarkPublished"
+  "MarkFailed"
+)
+
+for pattern in "${outbox_publisher_code_patterns[@]}"; do
+  rg -q "$pattern" internal/outboxpublisher
+done
+
+outbox_publisher_doc_patterns=(
+  "outbox-kafka-publisher.md"
+  "message.events.v1"
+  "message.accepted"
+  "at-least-once"
+  "event_id"
+  "conversation_id"
+  "MarkPublished"
+  "MarkFailed"
+)
+
+for pattern in "${outbox_publisher_doc_patterns[@]}"; do
+  rg -q "$pattern" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/outbox-kafka-publisher.md docs/exec-plans/active/outbox-kafka-publisher.md
+done
+
+rg -q "TestPublisherPublishesMessageCreatedOutboxEvent" internal/outboxpublisher/publisher_test.go
+rg -q "TestPublisherMarksPublishErrorRetryable" internal/outboxpublisher/publisher_test.go
+rg -q "TestPublisherMarksMalformedPayloadFailedForRetry" internal/outboxpublisher/publisher_test.go
+rg -q "TestPublisherStopsOnContextCancellationWithoutMarkingFailed" internal/outboxpublisher/publisher_test.go
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
