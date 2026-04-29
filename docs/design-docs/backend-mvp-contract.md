@@ -239,6 +239,8 @@ Advances `has_read_seq` monotonically.
 
 ## Reconnect Sync Contract
 
+Detailed frontend reconnect behavior is defined in [`../product-specs/frontend-sync-contract.md`](../product-specs/frontend-sync-contract.md) and [`websocket-reconnect-sync.md`](./websocket-reconnect-sync.md).
+
 After reconnect:
 
 1. Client sends/calls `get_conversation_seqs`.

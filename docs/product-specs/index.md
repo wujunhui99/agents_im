@@ -12,6 +12,7 @@
 - [message-chain.md](./message-chain.md)：消息发送、存储、拉取与已读链路产品规格
 - [message-storage.md](./message-storage.md)：消息存储的幂等、顺序、拉取与已读保证
 - [gateway-message-contract.md](./gateway-message-contract.md)：Gateway 消息命令、拉取、已读与 ACK 第一阶段客户端语义
+- [frontend-sync-contract.md](./frontend-sync-contract.md)：前端重连、缺失消息同步、重复拉取与已读推进契约
 - [read-receipts.md](./read-receipts.md)：标记已读、未读数和已读回执客户端行为
 
 新增需求时，先在本目录创建产品规格，再进入技术设计和执行计划。

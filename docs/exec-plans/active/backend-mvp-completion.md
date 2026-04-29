@@ -91,6 +91,26 @@ docker compose config
 
 If docs changed, run markdown link check excluding `docs/references`.
 
+## Branch Result: feature/mvp-reconnect-sync
+
+Scope completed:
+
+- Added frontend reconnect sync product contract and WebSocket reconnect sync design doc.
+- Updated WebSocket command ACKs to emit frontend fields `requestId`, `command`, `payload`, and nested `error` while keeping legacy `request_id`, `type`, and `data` aliases.
+- Mapped WebSocket command errors to MVP frontend codes: `UNAUTHORIZED`, `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`, and `INTERNAL`.
+- Added WebSocket tests for reconnect sync, duplicate-safe pull, missing seq pull, and invalid command error envelope.
+- Extended static verification to require the new docs and reconnect sync test/code patterns.
+
+Verification on 2026-04-29:
+
+- `goctl --version`: passed, `goctl version 1.10.1 linux/amd64`.
+- `for f in api/*.api; do goctl api validate -api "$f"; done`: passed, five `api format ok` results.
+- `gofmt -w $(find . -name '*.go' -print)`: passed.
+- `go test ./...`: passed.
+- `bash scripts/verify-static.sh`: passed, `static verification passed`.
+- `docker compose config`: passed.
+- `npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./.ai-context/*" -not -path "./docs/references/*" -print)`: passed.
+
 ## Merge Order
 
 1. `feature/mvp-delivery-reliability`

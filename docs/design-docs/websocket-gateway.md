@@ -87,14 +87,14 @@ Canonical WebSocket request:
 
 For compatibility with the existing Gateway contract document, the server also accepts `requestId` and `command` aliases.
 
-Canonical response:
+Frontend response:
 
 ```json
 {
-  "request_id": "client-request-id",
-  "type": "send_message",
+  "requestId": "client-request-id",
+  "command": "send_message",
   "status": "ok",
-  "data": {}
+  "payload": {}
 }
 ```
 
@@ -102,15 +102,17 @@ Error response:
 
 ```json
 {
-  "request_id": "client-request-id",
-  "type": "send_message",
+  "requestId": "client-request-id",
+  "command": "send_message",
   "status": "error",
   "error": {
-    "code": "INVALID_ARGUMENT",
+    "code": "VALIDATION_ERROR",
     "message": "command payload is invalid"
   }
 }
 ```
+
+During the MVP transition, the server also emits legacy aliases `request_id`, `type`, and `data` for existing tools. New frontend code should read `requestId`, `command`, and `payload`.
 
 `status=ok` means the command was accepted by the Gateway and completed successfully in the called Message logic. It does not mean recipients have received or seen the message.
 
@@ -139,7 +141,7 @@ It supports multiple connections per user for multi-device clients. It also expo
 
 - App-level `heartbeat` is implemented in phase 1.
 - WebSocket pong updates connection last-seen time.
-- Reconnect compensation remains client-driven through `get_conversation_seqs` and `pull_messages`.
+- Reconnect compensation remains client-driven through `get_conversation_seqs` and `pull_messages`; the stable frontend contract is [`websocket-reconnect-sync.md`](./websocket-reconnect-sync.md).
 - Delivery ACK and server-pushed message fanout are future work tied to Kafka/Push/Presence integration.
 
 ## Verification
