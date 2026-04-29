@@ -4,7 +4,7 @@
 
 ## 背景
 
-`user` 服务是账号资料的权威边界。当前环境没有 `go` 和 `goctl`，因此第一阶段代码以 go-zero 目录风格和接口契约为目标，优先保证源码结构、业务逻辑、proto/api/spec/docs/tests 可维护；当工具可用时再用 `goctl` 生成或校准骨架。
+`user` 服务是账号资料的权威边界。当前 REST 与 RPC transport 已按 goctl/go-zero 生成结构校准，旧手写 HTTP mux 注册层和 `internal/rpc` wrapper 已移除；业务行为继续由 `internal/logic` 与 repository 承载。
 
 ## 服务组成
 
@@ -50,12 +50,14 @@ cmd/user-rpc/main.go
 etc/user-api.yaml
 etc/user-rpc.yaml
 internal/config
-internal/handler
+internal/handler/gozero_routes.go
+internal/handler/user
+internal/types/types.go
 internal/logic
 internal/model
 internal/repository
 internal/response
-internal/rpc
+internal/rpcgen/user
 internal/service
 internal/svc
 proto/user.proto
@@ -119,7 +121,7 @@ HTTP 响应格式：
 
 - `GET /me` 必须携带 `X-User-Id`。
 - `PATCH /me` 必须携带 `X-User-Id`。
-- handler 将该值传入 `GetUserByID` 或 `UpdateUserProfile`。
+- go-zero handler 将该值传入 route-level logic，再由业务 logic 调用 `GetUserByID` 或 `UpdateUserProfile`。
 
 后续接入 gateway 后，网关负责 token 校验，并透传规范化后的用户身份和 `trace_id`。
 
@@ -155,4 +157,3 @@ go run ./cmd/user-rpc -f etc/user-rpc.yaml
 - 为 `auth` 注册流程增加幂等创建、补偿或 outbox 设计。
 - 接入 gateway 鉴权、trace_id 透传和结构化日志。
 - 当前执行环境无法写入外层 `/home/ws/project/docs/design-docs/user-service-go-zero.md`，本文件为 worktree 内可提交副本。
-

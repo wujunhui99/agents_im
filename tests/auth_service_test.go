@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
-	authhandler "github.com/wujunhui99/agents_im/internal/auth/handler"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	authsvc "github.com/wujunhui99/agents_im/internal/auth/svc"
@@ -118,11 +116,10 @@ func TestAuthHTTPHandlers(t *testing.T) {
 		useradapter.NewLogicClient(userLogic),
 		token.NewHMACTokenManager("test-secret", time.Hour),
 	)
-	mux := http.NewServeMux()
-	authhandler.RegisterHandlers(mux, serviceContext)
+	mux := newAuthGoZeroRouter(t, serviceContext)
 
 	registerResp := httptest.NewRecorder()
-	registerReq := httptest.NewRequest(http.MethodPost, "/auth/register", strings.NewReader(`{"identifier":"bob_001","password":"correct-password","display_name":"Bob"}`))
+	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"bob_001","password":"correct-password","display_name":"Bob"}`)
 	mux.ServeHTTP(registerResp, registerReq)
 	if registerResp.Code != http.StatusOK {
 		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())
@@ -136,14 +133,14 @@ func TestAuthHTTPHandlers(t *testing.T) {
 	}
 
 	duplicateResp := httptest.NewRecorder()
-	duplicateReq := httptest.NewRequest(http.MethodPost, "/auth/register", strings.NewReader(`{"identifier":"BOB_001","password":"another-password"}`))
+	duplicateReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"BOB_001","password":"another-password"}`)
 	mux.ServeHTTP(duplicateResp, duplicateReq)
 	if duplicateResp.Code != http.StatusConflict {
 		t.Fatalf("duplicate status = %d, body = %s", duplicateResp.Code, duplicateResp.Body.String())
 	}
 
 	loginResp := httptest.NewRecorder()
-	loginReq := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(`{"identifier":"BOB_001","password":"correct-password"}`))
+	loginReq := newJSONRequest(http.MethodPost, "/auth/login", `{"identifier":"BOB_001","password":"correct-password"}`)
 	mux.ServeHTTP(loginResp, loginReq)
 	if loginResp.Code != http.StatusOK {
 		t.Fatalf("login status = %d, body = %s", loginResp.Code, loginResp.Body.String())
@@ -154,14 +151,14 @@ func TestAuthHTTPHandlers(t *testing.T) {
 	decodeEnvelope(t, loginResp.Body.Bytes(), &loggedIn)
 
 	wrongPasswordResp := httptest.NewRecorder()
-	wrongPasswordReq := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(`{"identifier":"bob_001","password":"wrong-password"}`))
+	wrongPasswordReq := newJSONRequest(http.MethodPost, "/auth/login", `{"identifier":"bob_001","password":"wrong-password"}`)
 	mux.ServeHTTP(wrongPasswordResp, wrongPasswordReq)
 	if wrongPasswordResp.Code != http.StatusUnauthorized {
 		t.Fatalf("wrong password status = %d, body = %s", wrongPasswordResp.Code, wrongPasswordResp.Body.String())
 	}
 
 	validateResp := httptest.NewRecorder()
-	validateReq := httptest.NewRequest(http.MethodPost, "/auth/validate", strings.NewReader(`{"token":"`+loggedIn.Data.Token+`"}`))
+	validateReq := newJSONRequest(http.MethodPost, "/auth/validate", `{"token":"`+loggedIn.Data.Token+`"}`)
 	mux.ServeHTTP(validateResp, validateReq)
 	if validateResp.Code != http.StatusOK {
 		t.Fatalf("validate status = %d, body = %s", validateResp.Code, validateResp.Body.String())

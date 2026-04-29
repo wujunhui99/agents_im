@@ -141,6 +141,9 @@ func (l *UpdateMeLogic) UpdateMe(req *types.UpdateMeReq) (*types.UserResp, error
 	if err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(req.UserID) != "" || strings.TrimSpace(req.Identifier) != "" {
+		return nil, apperror.InvalidArgument("immutable profile fields cannot be updated")
+	}
 
 	profile, err := l.svcCtx.UserLogic.UpdateUserProfile(l.ctx, business.UpdateUserProfileRequest{
 		UserID:      userID,

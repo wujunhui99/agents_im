@@ -4,7 +4,7 @@
 
 ## 背景
 
-`auth` 服务依赖已稳定的 `user` 契约完成注册流程。当前环境没有 `goctl`，因此第一阶段以 go-zero 目录风格手写 `auth-rpc`、`auth-api`、`api/auth.api` 和 `proto/auth.proto`，并用接口隔离真实 RPC client 与本地 user logic adapter。
+`auth` 服务依赖已稳定的 `user` 契约完成注册流程。当前 REST 与 RPC transport 已按 goctl/go-zero 生成结构校准，旧手写 `internal/auth/rpc` wrapper 已移除；业务逻辑仍通过接口隔离真实 RPC client 与本地 user logic adapter。
 
 ## 服务组成
 
@@ -52,10 +52,10 @@ internal/auth/handler
 internal/auth/logic
 internal/auth/model
 internal/auth/repository
-internal/auth/rpc
 internal/auth/svc
 internal/auth/token
 internal/auth/useradapter
+internal/rpcgen/auth
 proto/auth.proto
 tests/auth_service_test.go
 ```

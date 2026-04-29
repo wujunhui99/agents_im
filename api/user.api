@@ -29,7 +29,9 @@ type CreateUserReq {
 }
 
 type UpdateMeReq {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
+	UserID        string `json:"user_id,optional"`
+	Identifier    string `json:"identifier,optional"`
 	DisplayName   string `json:"display_name,optional"`
 	Name          string `json:"name,optional"`
 	Gender        string `json:"gender,optional"`
@@ -38,7 +40,7 @@ type UpdateMeReq {
 }
 
 type GetMeReq {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 }
 
 type ExistsReq {
@@ -85,3 +87,4 @@ service user-api {
 	@handler getUserByIdentifier
 	get /users/:identifier (GetUserByIdentifierReq) returns (UserResp)
 }
+

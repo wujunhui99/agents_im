@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -9,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/handler"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
@@ -115,15 +113,14 @@ func TestFriendsLogicUserNotExists(t *testing.T) {
 
 func TestFriendsHTTPHandlers(t *testing.T) {
 	serviceContext := svc.NewServiceContext(repository.NewMemoryRepository())
-	mux := http.NewServeMux()
-	handler.RegisterFriendsHandlers(mux, serviceContext)
+	mux := newFriendsGoZeroRouter(t, serviceContext)
 	ctx := context.Background()
 
 	alice := createFriendTestUser(t, ctx, serviceContext.UserLogic, "alice_http")
 	bob := createFriendTestUser(t, ctx, serviceContext.UserLogic, "bob_http")
 
 	addResp := httptest.NewRecorder()
-	addReq := httptest.NewRequest(http.MethodPost, "/friends", bytes.NewBufferString(fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID)))
+	addReq := newJSONRequest(http.MethodPost, "/friends", fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID))
 	addReq.Header.Set("X-User-Id", alice.UserID)
 	mux.ServeHTTP(addResp, addReq)
 	if addResp.Code != http.StatusOK {
@@ -136,7 +133,7 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 	}
 
 	duplicateResp := httptest.NewRecorder()
-	duplicateReq := httptest.NewRequest(http.MethodPost, "/friends", bytes.NewBufferString(fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID)))
+	duplicateReq := newJSONRequest(http.MethodPost, "/friends", fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID))
 	duplicateReq.Header.Set("X-User-Id", alice.UserID)
 	mux.ServeHTTP(duplicateResp, duplicateReq)
 	if duplicateResp.Code != http.StatusOK {

@@ -4,7 +4,7 @@
 
 ## 背景
 
-`friends` 服务负责好友关系维护，位于 `user` 之后开发。当前 worktree 已有手写 go-zero 风格的 `user-api`/`user-rpc` 骨架；`goctl` 可能不可用，因此 `friends` 第一阶段沿用同一目录分层，手写契约、入口、logic、repository、handler 和测试，后续再用 `goctl` 校准生成结构。
+`friends` 服务负责好友关系维护，位于 `user` 之后开发。当前 REST 与 RPC transport 已按 goctl/go-zero 生成结构校准，旧手写 RPC wrapper 已移除；业务 logic、repository 和测试继续保留。
 
 ## 服务组成
 
@@ -50,7 +50,7 @@ internal/handler/friends routes
 internal/logic/friendslogic.go
 internal/model/friendship.go
 internal/repository/friendship repository
-internal/rpc/friends_server.go
+internal/rpcgen/friends
 proto/friends.proto
 tests/friends_service_test.go
 ```

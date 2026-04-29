@@ -3,7 +3,9 @@ package logic
 import (
 	"context"
 
+	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/friends/internal/svc"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/proto/friendspb"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -24,7 +26,16 @@ func NewListFriendsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListF
 }
 
 func (l *ListFriendsLogic) ListFriends(in *friendspb.ListFriendsRequest) (*friendspb.ListFriendsResponse, error) {
-	// todo: add your logic here and delete this line
+	result, err := l.svcCtx.FriendsLogic.ListFriends(l.ctx, business.ListFriendsRequest{
+		UserID: in.GetUserId(),
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
 
-	return &friendspb.ListFriendsResponse{}, nil
+	friends := make([]*friendspb.Friendship, 0, len(result.Friends))
+	for _, friend := range result.Friends {
+		friends = append(friends, toFriendship(friend))
+	}
+	return &friendspb.ListFriendsResponse{Friends: friends}, nil
 }

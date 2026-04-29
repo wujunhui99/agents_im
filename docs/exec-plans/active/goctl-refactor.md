@@ -1,17 +1,17 @@
 # goctl-refactor
 
-状态：Active（Task 1 REST + RPC goctl generation completed; Task 2/3 deferred）
+状态：Active（Task 1 REST + RPC goctl generation completed; handwritten compatibility layers removed; Task 2/3 deferred）
 
 ## 背景
 
-当前仓库已有手写 go-zero 风格服务代码：HTTP 层使用 `net/http` mux，业务集中在 `internal/logic` 和 `internal/auth/logic`，仓储仍为内存实现。任务1要求安装并使用 goctl 对现有 REST 代码做最小重构，保持行为不变；任务2 JWT 鉴权和任务3 PostgreSQL 持久化暂不实现。
+当前仓库已有 goctl 生成/校准后的 REST 与 RPC scaffold，业务集中在 `internal/logic` 和 `internal/auth/logic`，仓储仍为内存实现。后续 cleanup 已移除旧 `net/http` mux 兼容层和 hand-written RPC wrapper；任务2 JWT 鉴权和任务3 PostgreSQL 持久化暂不实现。
 
 ## 目标
 
 - 对 `api/*.api` 全部执行 `goctl api validate`，修正为可生成且能表达现有 path/header 输入的 spec。
 - 使用 goctl 1.10.1 从 `api/*.api` 生成 REST scaffold，并把安全的 handler/types/routes 结构迁回现有项目。
 - 保留 user/auth/friends/groups/message/gateway/read/storage 现有业务逻辑和测试行为。
-- 对 `proto/*.proto` 使用 `goctl rpc protoc` 正式生成可维护的 RPC pb 与 zrpc scaffold，保留现有 hand-written RPC contract 兼容层。
+- 对 `proto/*.proto` 使用 `goctl rpc protoc` 正式生成可维护的 RPC pb 与 zrpc scaffold，并迁移删除现有 hand-written RPC contract 兼容层。
 - 更新静态校验脚本，确保 zero-skills、goctl-refactor 文档和 API validate 都在校验范围内。
 
 ## 非目标
@@ -29,9 +29,9 @@
 - [x] Generator：补齐 REST 生成所需的 header/path request fields，保持现有路由不变。
 - [x] Generator：使用 goctl 生成临时 REST scaffold，并迁移 handler/types/routes 结构到现有项目。
 - [x] Generator：保留现有业务逻辑，新增 route-level logic adapters 调用原 `internal/logic` 和 `internal/auth/logic`。
-- [x] Generator：将 API 命令入口切换到 go-zero `rest.Server`，保留旧 mux 注册函数供现有测试和兼容调用使用。
+- [x] Generator：将 API 命令入口切换到 go-zero `rest.Server`，后续 cleanup 已移除旧 mux 注册函数。
 - [x] Generator：使用 `goctl rpc protoc` 从 `proto/{user,auth,friends,groups,message}.proto` 正式生成 pb 与 zrpc scaffold。
-- [x] Generator：保留现有 hand-written RPC contract server 和 `cmd/*-rpc` healthz 行为，避免破坏现有测试。
+- [x] Generator：将 `cmd/*-rpc` 切换到 go-zero `zrpc` generated server entry，旧 hand-written RPC wrapper 已移除。
 - [x] Generator：更新静态校验脚本，检查 RPC generated scaffold、goctl marker 和 service server 注册代码。
 - [x] Evaluator：运行强制验证并修复问题。
 - [x] Evaluator：commit 并 push 到 `feature/goctl-refactor`。
@@ -46,8 +46,8 @@
 | 2026-04-29 | 新增 route-level logic adapter packages | 保持 go-zero Handler -> Logic -> ServiceContext 结构，同时复用原业务逻辑。 |
 | 2026-04-29 | 任务2 JWT 暂不做，继续保留 `X-User-Id` | 本阶段只做 goctl 结构重构，JWT 是后续明确边界。 |
 | 2026-04-29 | 任务3 PG 暂不做，PG 本地开发后续通过 docker-compose 配置 | 本阶段不新增 PostgreSQL model 或连接；后续中间件和 PG 本地依赖统一进 docker-compose。 |
-| 2026-04-29 | RPC pb 生成到 `proto/*pb`，zrpc scaffold 生成到 `internal/rpcgen/<service>` | 使用 `--go_opt=module=github.com/wujunhui99/agents_im` 避免 `github.com/...` 包路径嵌套；独立 scaffold 目录避免覆盖现有 hand-written RPC contract。 |
-| 2026-04-29 | 保留 `internal/rpc` 与 `internal/auth/rpc` 兼容层 | 当前 RPC contract 仍承载测试和现有命令入口行为；goctl scaffold 作为正式生成基线，后续可逐步把业务适配接入 generated server logic。 |
+| 2026-04-29 | RPC pb 生成到 `proto/*pb`，zrpc scaffold 生成到 `internal/rpcgen/<service>` | 使用 `--go_opt=module=github.com/wujunhui99/agents_im` 避免 `github.com/...` 包路径嵌套；独立 scaffold 目录承载正式 generated transport。 |
+| 2026-04-29 | 移除 `internal/rpc` 与 `internal/auth/rpc` 兼容层 | generated RPC logic 已接入现有业务 logic，`cmd/*-rpc` 已改为 zrpc generated server entry。 |
 
 ## 已运行的 goctl 命令
 
@@ -59,6 +59,10 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/auth.api -dir .tmp-goc
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/friends.api -dir .tmp-goctl-gen/friends --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/groups.api -dir .tmp-goctl-gen/groups --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/message.api -dir .tmp-goctl-gen/message --style go_zero
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/user.api -dir .tmp-goctl-check/user --style go_zero
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/friends.api -dir .tmp-goctl-check/friends --style go_zero
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/groups.api -dir .tmp-goctl-check/groups --style go_zero
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/message.api -dir .tmp-goctl-check/message --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/user.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/user --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/auth.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/auth --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/friends.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/friends --style go_zero
@@ -108,7 +112,7 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/message.proto --go_ou
 - `internal/logic/groupslogic.go`：群创建、成员添加/加入/退出/列表行为保留。
 - `internal/logic/messagelogic.go`：消息去重、seq、拉取、已读推进行为保留。
 - `internal/repository/*`、`internal/domain/readreceipt/*`、`internal/gateway/*` 保留，不做 PG 或 Gateway 行为重写。
-- 旧 `net/http` mux 注册函数保留，避免现有测试和兼容调用断裂。
+- 旧 `net/http` mux 注册函数已移除；测试改为通过 go-zero route registration 构造 router。
 
 ## RPC goctl 正式生成
 
@@ -133,13 +137,7 @@ protoc-gen-go-grpc --version
 - 目录策略：
   - 保留 proto 中现有 `option go_package = "github.com/wujunhui99/agents_im/proto/*pb"`。
   - `--go_out=.` / `--go-grpc_out=.` 配合 `--go_opt=module=github.com/wujunhui99/agents_im` 和 `--go-grpc_opt=module=github.com/wujunhui99/agents_im`，把 generated pb 放到 module 内的 `proto/*pb`，避免生成 `github.com/wujunhui99/agents_im/...` 嵌套目录。
-  - `--zrpc_out=internal/rpcgen/<service>` 让每个服务拥有独立 goctl scaffold，不覆盖现有 `cmd/*-rpc`、`internal/rpc`、`internal/auth/rpc`。
-- 保留兼容层：
-  - `internal/rpc/user_server.go`
-  - `internal/rpc/friends_server.go`
-  - `internal/rpc/groups_server.go`
-  - `internal/auth/rpc/auth_server.go`
-  - `cmd/{user,auth,friends,groups}-rpc/main.go`
+  - `--zrpc_out=internal/rpcgen/<service>` 让每个服务拥有独立 goctl scaffold；cleanup 阶段已删除旧 `internal/rpc`、`internal/auth/rpc`，并将 `cmd/*-rpc` 接到 zrpc generated server entry。
 
 最终 RPC 生成命令：
 
@@ -180,17 +178,18 @@ git status --short --branch
 - `protoc-gen-go --version`：`protoc-gen-go v1.36.11`
 - `protoc-gen-go-grpc --version`：`protoc-gen-go-grpc 1.6.1`
 - `for f in api/*.api; do goctl api validate -api "$f"; done`：5 个 API 均输出 `api format ok`
+- `goctl api go -api api/{user,friends,groups,message}.api -dir .tmp-goctl-check/<service> --style go_zero`：4 个受影响 API 重新生成到临时目录成功，随后删除临时输出
 - `gofmt -w $(find . -name "*.go" -print)`：完成
 - `go mod tidy`：完成，补齐 goctl zrpc scaffold 编译所需的 `go.sum` 校验和，并将 generated pb 直接导入的 `google.golang.org/grpc` / `google.golang.org/protobuf` 记录为 direct dependencies。
 - `go test ./...`：通过，包含 `tests` 包
 - `bash scripts/verify-static.sh`：`static verification passed`，包含 RPC generated scaffold 与 service server marker 检查
-- `git status --short --branch`：位于 `feature/goctl-refactor`，变更待提交；提交后推送到同名远端分支
+- `git status --short --branch`：cleanup 分支位于 `feature/remove-handwritten-compat`，变更待提交；提交后推送到同名远端分支
 
 ## 风险与回滚
 
 - go-zero 1.10.1 依赖要求 Go 1.24+；`go mod tidy` 会把 `go` directive 提升到 `1.24.0`。
-- 旧 mux 注册函数和新 go-zero handler 同时存在，短期有重复 HTTP adapter 维护成本；后续可在更多 go-zero HTTP 测试覆盖后移除旧 mux 层。
-- 若 go-zero handler 出现回归，可临时将 API 命令入口切回旧 mux 注册函数；业务逻辑未被重写，回滚范围局限在 REST adapter。
+- 旧 mux 注册函数已删除；若 go-zero handler 出现回归，应修复 generated route-level adapter 或业务 logic，不恢复旧 mux 兼容层。
+- `cmd/*-rpc` 已使用 zrpc server entry；若启动配置出错，应修正 `etc/*-rpc.yaml` 或 generated config，不恢复旧 HTTP healthz wrapper。
 
 ## 结果记录
 
@@ -199,6 +198,6 @@ git status --short --branch
 - 新增 `cmd/message-api` 和 `etc/message-api.yaml`，用于启动 message REST 层；仍使用内存仓储，不引入 PG。
 - `go.mod` 已引入 `github.com/zeromicro/go-zero v1.10.1`；该版本要求 Go 1.24+，因此 `go` directive 更新为 `1.24.0`。
 - RPC/protoc 已从临时探索升级为正式源码生成：pb 生成到 `proto/*pb`，zrpc scaffold 生成到 `internal/rpcgen/<service>`。
-- 现有 hand-written RPC contract 兼容层继续保留，避免影响现有 `cmd/*-rpc` healthz 行为和测试。
+- 现有 hand-written RPC contract 兼容层已移除；`internal/rpcgen/*/internal/logic` 已接入业务 logic，`cmd/{user,auth,friends,groups,message}-rpc` 使用 zrpc generated server entry。
 - 提交信息：`refactor(goctl): align services with generated go-zero structure`。
 - RPC 补齐提交信息：`fix(goctl): add generated rpc scaffolds`。
