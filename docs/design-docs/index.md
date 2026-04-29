@@ -10,6 +10,7 @@
 - [user-auth-friends-groups-boundaries.md](./user-auth-friends-groups-boundaries.md)：User/Auth/Friends/Groups 微服务边界
 - [user-service-go-zero.md](./user-service-go-zero.md)：User Service go-zero 实现设计
 - [message-chain-contract.md](./message-chain-contract.md)：消息链路接口契约与 OpenIM 借鉴设计
+- [read-receipts.md](./read-receipts.md)：已读回执状态模型、单调推进和扩展设计
 - [im-agent-decoupling.md](./im-agent-decoupling.md)：IM 与 Agent 解耦设计
 - [websocket-reliability.md](./websocket-reliability.md)：WebSocket 可靠性设计
 - [agent-tooling.md](./agent-tooling.md)：Agent 工具调用体系设计

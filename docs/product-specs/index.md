@@ -9,5 +9,6 @@
 - [account-social-core.md](./account-social-core.md)：账号资料、认证、好友与群聊基础能力
 - [user-service.md](./user-service.md)：User Service 第一阶段产品规格
 - [message-chain.md](./message-chain.md)：消息发送、存储、拉取与已读链路产品规格
+- [read-receipts.md](./read-receipts.md)：标记已读、未读数和已读回执客户端行为
 
 新增需求时，先在本目录创建产品规格，再进入技术设计和执行计划。

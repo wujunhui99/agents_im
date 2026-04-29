@@ -41,14 +41,17 @@ required_files=(
   "docs/product-specs/auth-service.md"
   "docs/product-specs/friends-service.md"
   "docs/product-specs/groups-service.md"
+  "docs/product-specs/read-receipts.md"
   "docs/design-docs/user-service-go-zero.md"
   "docs/design-docs/auth-service-go-zero.md"
   "docs/design-docs/friends-service-go-zero.md"
   "docs/design-docs/groups-service-go-zero.md"
+  "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
   "docs/exec-plans/active/friends-service-go-zero.md"
   "docs/exec-plans/active/groups-service-go-zero.md"
+  "docs/exec-plans/active/read-receipts.md"
 )
 
 for file in "${required_files[@]}"; do
