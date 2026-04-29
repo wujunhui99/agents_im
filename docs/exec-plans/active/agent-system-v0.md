@@ -4,6 +4,8 @@
 
 **Goal:** Build the first Agent System foundation: account types, Agent metadata, prompt/tool/skill registries, MinIO-backed skill files, and a safe Python execution seam without shell execution.
 
+**Parallel baseline:** See [`agent-infrastructure-parallel-baseline.md`](./agent-infrastructure-parallel-baseline.md) for the current multi-Codex branch split, shared contracts, quality bars, and integration order.
+
 **Architecture:** Keep IM Backend as the identity/message source of truth. Add Agent System management and runtime components that integrate through existing IM events and Message Service write-back. Store metadata in PostgreSQL, skill files in MinIO/S3-compatible storage, and execute Python only through a sandbox boundary.
 
 **Tech Stack:** Go/go-zero for existing IM backend and management APIs unless otherwise decided; PostgreSQL for metadata; MinIO for skill objects; Redis/Kafka where existing runtime/event seams apply; Python executor as a separate sandbox service or isolated worker.
