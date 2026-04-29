@@ -12,6 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/handler"
+	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
 	"github.com/wujunhui99/agents_im/internal/svc"
 	"github.com/zeromicro/go-zero/core/service"
@@ -47,6 +48,13 @@ func newMessageGoZeroRouter(t *testing.T, serviceContext *svc.ServiceContext) ht
 	})
 }
 
+func newAgentGoZeroRouter(t *testing.T, serviceContext *svc.ServiceContext) http.Handler {
+	t.Helper()
+	return newGoZeroRouter(t, func(server *rest.Server) {
+		handler.RegisterAgentGoZeroHandlers(server, serviceContext)
+	})
+}
+
 func newAuthGoZeroRouter(t *testing.T, serviceContext *authsvc.ServiceContext) http.Handler {
 	t.Helper()
 	return newGoZeroRouter(t, func(server *rest.Server) {
@@ -77,6 +85,17 @@ func newJSONRequest(method string, target string, body string) *http.Request {
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	return req
+}
+
+func performJSON(handler http.Handler, method string, target string, body string) *httptest.ResponseRecorder {
+	req := newJSONRequest(method, target, body)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	return resp
+}
+
+func newTestUserServiceContext() *svc.ServiceContext {
+	return svc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
 }
 
 func testJWTAuthConfig() config.JWTAuthConfig {

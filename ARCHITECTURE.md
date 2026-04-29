@@ -79,12 +79,17 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 负责 Agent 生命周期、配置组装、运行时能力和工具调用审计。第一版设计见 [`docs/product-specs/agent-system.md`](./docs/product-specs/agent-system.md)、[`docs/design-docs/agent-system-architecture.md`](./docs/design-docs/agent-system-architecture.md) 和 [`docs/exec-plans/active/agent-system-v0.md`](./docs/exec-plans/active/agent-system-v0.md)。核心能力包括：
 
 - 在账号系统中配合 `normal` / `agent` / `admin` 账号类型，让 Agent 账号作为 IM 会话成员参与单聊和群聊。
+- 当前 `feature/agent-core-management` 提供 `cmd/agent-api` 和 `api/agent.api` 的 Agent profile 管理基础，配置单独持久化到 `agents` 表；由于本分支尚未合入 `users.account_type`，创建 Agent 使用 fail-closed 的账号类型检查接口，不能验证 `account_type=agent` 时必须失败。
 - 管理系统提示词、工具、Agent skills 和 Agent 配置，并将元数据持久化在 PostgreSQL。
 - 使用系统提示词、工具和 skills 组装 Agent runtime。
 - 通过 MinIO/S3-compatible object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。
 - 管理 MCP 工具和本地工具。MCP server 和工具元数据入库；本地工具只允许服务端白名单 `handler_key`，不得从数据库执行任意脚本。
+- 当前 Agent registry 基线已提供 prompt/tool/skill 元数据与 Agent 白名单绑定的 Go logic/repository 和 PostgreSQL schema；该基线不执行工具、不调用 LLM、不上传或读取 MinIO 二进制内容。
+- Agent run、tool call、skill file read、Python exec 审计记录使用 append-only 审计表保存；摘要字段必须脱敏，Python 代码只保存 hash/大小摘要。
 - 第一版不提供 shell/命令行脚本执行能力；Python 执行必须通过受限沙箱、限时限资源、默认无网络，并记录审计。
+- 当前 Python executor 只提供 `internal/agent/pythonexec` 契约和 disabled 默认实现；未配置真实沙箱时必须返回 `ErrPythonExecutorDisabled`，不得在 Go 主服务进程内直接运行 Python 或 shell。
 - Agent 响应必须通过 Message Service 写回 IM，不能绕过 IM 消息链路或直接推送 WebSocket。
+- Agent-IM 第一阶段 Go 契约位于 `internal/agentim`：定义用户私聊 Agent、群聊 @Agent、管理员手动 run 三类触发，响应 writer 只依赖 `MessageLogic.SendMessage` / Message Service seam，并通过 Agent 消息元数据默认阻止递归触发。
 
 ### Webhook Dispatcher
 

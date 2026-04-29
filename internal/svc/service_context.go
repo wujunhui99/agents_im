@@ -7,16 +7,20 @@ import (
 )
 
 type ServiceContext struct {
-	Auth         config.JWTAuthConfig
-	UserLogic    *logic.UserLogic
-	FriendsLogic *logic.FriendsLogic
-	GroupsLogic  *logic.GroupsLogic
-	MessageLogic *logic.MessageLogic
-	Repo         repository.Repository
-	GroupsRepo   repository.GroupsRepository
-	MessageRepo  repository.MessageRepository
-	OutboxRepo   repository.OutboxRepository
-	DeliveryRepo repository.DeliveryAttemptRepository
+	Auth            config.JWTAuthConfig
+	UserLogic       *logic.UserLogic
+	FriendsLogic    *logic.FriendsLogic
+	GroupsLogic     *logic.GroupsLogic
+	MessageLogic    *logic.MessageLogic
+	AgentLogic      *logic.AgentLogic
+	AgentAuditLogic *logic.AgentAuditLogic
+	Repo            repository.Repository
+	GroupsRepo      repository.GroupsRepository
+	MessageRepo     repository.MessageRepository
+	AgentRepo       repository.AgentRepository
+	OutboxRepo      repository.OutboxRepository
+	DeliveryRepo    repository.DeliveryAttemptRepository
+	AgentAuditRepo  repository.AgentAuditRepository
 }
 
 func NewServiceContext(repo repository.Repository) *ServiceContext {
@@ -26,15 +30,18 @@ func NewServiceContext(repo repository.Repository) *ServiceContext {
 func NewServiceContextWithAuth(repo repository.Repository, auth config.JWTAuthConfig) *ServiceContext {
 	userLogic := logic.NewUserLogic(repo)
 	messageRepo := repository.NewMemoryMessageRepository()
+	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{
-		Auth:         normalizeAuthConfig(auth),
-		UserLogic:    userLogic,
-		FriendsLogic: logic.NewFriendsLogic(repo, userLogic),
-		MessageLogic: logic.NewMessageLogicWithValidators(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil),
-		Repo:         repo,
-		MessageRepo:  messageRepo,
-		OutboxRepo:   outboxRepositoryFromMessageRepo(messageRepo),
-		DeliveryRepo: deliveryAttemptRepositoryFromMessageRepo(messageRepo),
+		Auth:            normalizeAuthConfig(auth),
+		UserLogic:       userLogic,
+		FriendsLogic:    logic.NewFriendsLogic(repo, userLogic),
+		MessageLogic:    logic.NewMessageLogicWithValidators(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil),
+		AgentAuditLogic: logic.NewAgentAuditLogic(agentAuditRepo),
+		Repo:            repo,
+		MessageRepo:     messageRepo,
+		OutboxRepo:      outboxRepositoryFromMessageRepo(messageRepo),
+		DeliveryRepo:    deliveryAttemptRepositoryFromMessageRepo(messageRepo),
+		AgentAuditRepo:  agentAuditRepo,
 	}
 }
 
@@ -61,6 +68,25 @@ func NewMessageServiceContextWithAuth(repo repository.MessageRepository, userExi
 		MessageRepo:  repo,
 		OutboxRepo:   outboxRepositoryFromMessageRepo(repo),
 		DeliveryRepo: deliveryAttemptRepositoryFromMessageRepo(repo),
+	}
+}
+
+func NewAgentServiceContext(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker) *ServiceContext {
+	return NewAgentServiceContextWithAuth(repo, accountTypeChecker, config.DefaultJWTAuthConfig())
+}
+
+func NewAgentServiceContextWithAuth(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker, auth config.JWTAuthConfig) *ServiceContext {
+	return &ServiceContext{
+		Auth:       normalizeAuthConfig(auth),
+		AgentLogic: logic.NewAgentLogic(repo, accountTypeChecker),
+		AgentRepo:  repo,
+	}
+}
+
+func NewAgentAuditServiceContext(repo repository.AgentAuditRepository) *ServiceContext {
+	return &ServiceContext{
+		AgentAuditLogic: logic.NewAgentAuditLogic(repo),
+		AgentAuditRepo:  repo,
 	}
 }
 

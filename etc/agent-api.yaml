@@ -1,0 +1,8 @@
+Name: agent-api
+Host: 0.0.0.0
+Port: 8086
+Auth:
+  AccessSecret: dev-jwt-secret-change-me
+  AccessExpire: 86400
+StorageDriver: memory
+DataSource: ${DATABASE_URL}

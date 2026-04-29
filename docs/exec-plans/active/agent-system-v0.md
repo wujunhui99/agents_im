@@ -47,6 +47,13 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./...
 bash scripts/verify-static.sh
 ```
 
+**Feature branch note (`feature/agent-account-types`):**
+
+- `account_type` foundation is implemented only for the user domain: `normal` default plus validated internal `agent`/`admin` creation.
+- Public HTTP `POST /users` and `auth` register do not accept account type elevation and continue to create `normal` users by default.
+- No Agent config tables, prompt/tool/skill CRUD, Python executor, shell execution, or LLM integration are part of this branch.
+- Validation recorded for this branch: `goctl --version`, `goctl api validate` for all `api/*.api`, `gofmt`, `go test ./...`, `go test -tags=integration ./tests -run TestPostgresUserAuthFriendsGroupsRepositories -count=1` with no DSN, `bash scripts/verify-static.sh`, `docker compose config`, and `git diff --check`.
+
 ## Phase 1: Agent Metadata And Prompt Management
 
 ### Task 3: Add Agent and prompt schema
@@ -78,6 +85,8 @@ bash scripts/migrate-postgres.sh
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api validate -api api/agent.api
 ```
 
+**Current branch note (2026-04-30):** `feature/agent-core-management` implements the Agent profile slice only: `api/agent.api`, `cmd/agent-api`, Agent logic/repository, and `agents` schema. Prompt CRUD remains out of scope for this branch and is still planned under later prompt/tool/skill work.
+
 ## Phase 2: Tools And Skills
 
 ### Task 5: Add tool registry schema and API
@@ -90,6 +99,13 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api validate -api api/agent.api
 - Test: tool binding authorization tests
 
 **Key rule:** Database stores `handler_key`; code owns the executable whitelist. Do not execute scripts stored in DB.
+
+**2026-04-30 progress (`feature/agent-prompts-tools-skills`):**
+
+- Added prompt/tool/skill metadata models, registry repository interface, in-memory repository, PostgreSQL repository methods, and fail-first business validation in `internal/logic`.
+- Added PostgreSQL schema for `agent_prompts`, `mcp_servers`, `agent_tools`, `agent_skills`, and prompt/tool/skill binding tables in `db/migrations/001_init_postgres.sql`.
+- Encoded first-version MCP constraints: admin-configured server/tool metadata only, no stdio command/args transport, and Agent whitelist binding required before `CanAgentUseTool` returns true.
+- API exposure remains pending for a later Agent Management API surface; current branch provides domain/repository/metadata contract only.
 
 ### Task 6: Add MinIO-backed skill registry
 
@@ -110,6 +126,11 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./...
 
 Integration tests requiring MinIO must skip unless explicit MinIO environment variables are set.
 
+**2026-04-30 progress (`feature/agent-prompts-tools-skills`):**
+
+- Added the skill metadata contract in PostgreSQL with required `object_key`, `sha256`, `content_type`, and `size_bytes`.
+- Did not implement MinIO binary upload/download; file content remains out of PostgreSQL and out of scope for this branch.
+
 ## Phase 3: Runtime And Python Execution
 
 ### Task 7: Add Agent run and audit records
@@ -119,6 +140,20 @@ Integration tests requiring MinIO must skip unless explicit MinIO environment va
 **Files:**
 - Modify: migration
 - Add: repository interfaces and tests
+
+**Branch note (`feature/agent-audit-log`):**
+
+- Added append-only audit foundation for `agent_runs`, `agent_tool_calls`, `agent_file_reads`, and `agent_python_execs`.
+- Audit repository/logic supports create/get/list-by-run-id; update/delete are intentionally absent.
+- PostgreSQL migration adds append-only triggers that reject direct update/delete.
+- Summary fields are recursively redacted; Python code is stored only as `sha256` and `size_bytes`.
+- This task does not implement LLM execution, tool execution, or Python execution.
+
+**Verification target:**
+
+```bash
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal/domain/agentaudit ./internal/repository ./internal/logic -run 'AgentAudit|Redact|PythonCode' -count=1
+```
 
 ### Task 8: Add Python executor seam without shell
 
@@ -137,6 +172,13 @@ Integration tests requiring MinIO must skip unless explicit MinIO environment va
 - no network by default;
 - explicit audit record for every execution.
 
+**Implementation note (2026-04-30, `feature/agent-python-sandbox-contract`):**
+
+- Added `internal/agent/pythonexec` contract types and `Executor.Execute(ctx, Request)` interface.
+- `Policy` now validates `run_id`, `audit_id`, timeout, CPU/memory limits, disabled/default network policy, explicit read-only relative file allowlist, and `max_output_bytes`.
+- `NewDefaultExecutor()` returns the disabled executor; valid requests fail with `ErrPythonExecutorDisabled` until a real sandbox service is intentionally wired.
+- Added static test and `scripts/verify-static.sh` guard to reject production Go imports/calls/literals that would directly execute shell or Python from `cmd/` or `internal/`.
+
 ## Phase 4: IM Integration
 
 ### Task 9: Connect IM event to Agent run
@@ -147,9 +189,19 @@ Integration tests requiring MinIO must skip unless explicit MinIO environment va
 - Modify: IM-Agent contract implementation area
 - Test: single Agent receives message and writes response through Message Service
 
+**Current feature branch note (`feature/agent-im-integration-contract`):**
+
+- Added `internal/agentim` contract types for `message.created` triggers, group mentions, admin manual runs, Agent response metadata, and Message Service response writing.
+- This branch intentionally does not implement LLM runtime execution or an event consumer. It freezes the trigger/writeback contract used by later runtime wiring.
+
 ### Task 10: Add loop prevention
 
 **Objective:** Prevent Agent messages from recursively triggering Agent runs unless explicitly enabled.
+
+**Current feature branch note (`feature/agent-im-integration-contract`):**
+
+- Loop prevention is encoded in `AgentMessageMetadata`: Agent responses suppress recursive triggers unless both runtime policy and message metadata explicitly allow recursion.
+- Unit tests cover default suppression and explicit opt-in behavior.
 
 **Verification:**
 

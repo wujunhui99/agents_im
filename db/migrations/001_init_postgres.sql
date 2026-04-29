@@ -2,6 +2,10 @@ create sequence if not exists agents_im_users_id_seq;
 create sequence if not exists agents_im_groups_id_seq;
 create sequence if not exists agents_im_messages_id_seq;
 create sequence if not exists agents_im_outbox_events_id_seq;
+create sequence if not exists agents_im_agent_prompts_id_seq;
+create sequence if not exists agents_im_mcp_servers_id_seq;
+create sequence if not exists agents_im_agent_tools_id_seq;
+create sequence if not exists agents_im_agent_skills_id_seq;
 
 create table if not exists users (
   user_id text primary key default ('usr_' || lpad(nextval('agents_im_users_id_seq')::text, 6, '0')),
@@ -11,6 +15,7 @@ create table if not exists users (
   gender text not null default 'unknown',
   age integer not null default 0,
   region text not null default '',
+  account_type text not null default 'normal',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint users_identifier_uniq unique (identifier),
@@ -18,8 +23,18 @@ create table if not exists users (
   constraint users_display_name_not_blank check (display_name <> ''),
   constraint users_name_not_blank check (name <> ''),
   constraint users_gender_check check (gender in ('unknown', 'male', 'female', 'other')),
-  constraint users_age_check check (age >= 0 and age <= 150)
+  constraint users_age_check check (age >= 0 and age <= 150),
+  constraint users_account_type_check check (account_type in ('normal', 'agent', 'admin'))
 );
+
+alter table users
+  add column if not exists account_type text not null default 'normal';
+
+alter table users
+  drop constraint if exists users_account_type_check;
+
+alter table users
+  add constraint users_account_type_check check (account_type in ('normal', 'agent', 'admin'));
 
 create table if not exists auth_credentials (
   identifier text primary key,
@@ -259,3 +274,161 @@ create index if not exists delivery_attempts_conversation_recipient_idx
 create index if not exists delivery_attempts_retry_idx
   on delivery_attempts (next_retry_at, updated_at)
   where status = 'failed' and next_retry_at is not null;
+
+create table if not exists agent_prompts (
+  prompt_id text primary key default ('prompt_' || lpad(nextval('agents_im_agent_prompts_id_seq')::text, 6, '0')),
+  name text not null,
+  description text not null default '',
+  content text not null,
+  variables_schema_json jsonb not null default '{}'::jsonb,
+  version text not null,
+  status text not null,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint agent_prompts_name_not_blank check (name <> ''),
+  constraint agent_prompts_content_not_blank check (content <> ''),
+  constraint agent_prompts_version_not_blank check (version <> ''),
+  constraint agent_prompts_created_by_not_blank check (created_by <> ''),
+  constraint agent_prompts_status_check check (status in ('draft', 'active', 'archived')),
+  constraint agent_prompts_name_version_uniq unique (name, version)
+);
+
+create index if not exists agent_prompts_status_updated_idx
+  on agent_prompts (status, updated_at desc);
+
+create table if not exists mcp_servers (
+  server_id text primary key default ('mcp_srv_' || lpad(nextval('agents_im_mcp_servers_id_seq')::text, 6, '0')),
+  name text not null,
+  transport text not null,
+  url text not null,
+  config_json jsonb not null default '{}'::jsonb,
+  headers_secret_ref text not null default '',
+  timeout_seconds integer not null,
+  status text not null,
+  admin_configured boolean not null,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint mcp_servers_name_not_blank check (name <> ''),
+  constraint mcp_servers_transport_check check (transport in ('http', 'sse', 'streamable_http')),
+  constraint mcp_servers_url_not_blank check (url <> ''),
+  constraint mcp_servers_timeout_check check (timeout_seconds > 0),
+  constraint mcp_servers_status_check check (status in ('active', 'disabled', 'archived')),
+  constraint mcp_servers_admin_configured_check check (admin_configured is true),
+  constraint mcp_servers_created_by_not_blank check (created_by <> ''),
+  constraint mcp_servers_name_uniq unique (name)
+);
+
+create index if not exists mcp_servers_status_updated_idx
+  on mcp_servers (status, updated_at desc);
+
+create table if not exists agent_tools (
+  tool_id text primary key default ('tool_' || lpad(nextval('agents_im_agent_tools_id_seq')::text, 6, '0')),
+  name text not null,
+  description text not null default '',
+  tool_type text not null,
+  mcp_server_id text references mcp_servers(server_id) on delete restrict,
+  mcp_tool_name text not null default '',
+  local_handler_key text not null default '',
+  builtin_key text not null default '',
+  input_schema_json jsonb not null default '{}'::jsonb,
+  output_schema_json jsonb not null default '{}'::jsonb,
+  permission_level text not null default 'agent_bound',
+  status text not null,
+  admin_configured boolean not null,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint agent_tools_name_not_blank check (name <> ''),
+  constraint agent_tools_type_check check (tool_type in ('mcp', 'local', 'builtin')),
+  constraint agent_tools_status_check check (status in ('active', 'disabled', 'archived')),
+  constraint agent_tools_admin_configured_check check (admin_configured is true),
+  constraint agent_tools_created_by_not_blank check (created_by <> ''),
+  constraint agent_tools_permission_not_blank check (permission_level <> ''),
+  constraint agent_tools_shape_check check (
+    (tool_type = 'mcp' and mcp_server_id is not null and mcp_tool_name <> '' and local_handler_key = '' and builtin_key = '')
+    or
+    (tool_type = 'local' and mcp_server_id is null and mcp_tool_name = '' and local_handler_key <> '' and builtin_key = '')
+    or
+    (tool_type = 'builtin' and mcp_server_id is null and mcp_tool_name = '' and local_handler_key = '' and builtin_key <> '')
+  ),
+  constraint agent_tools_name_uniq unique (name)
+);
+
+create index if not exists agent_tools_status_type_idx
+  on agent_tools (status, tool_type, updated_at desc);
+
+create index if not exists agent_tools_mcp_server_idx
+  on agent_tools (mcp_server_id)
+  where mcp_server_id is not null;
+
+create table if not exists agent_skills (
+  skill_id text primary key default ('skill_' || lpad(nextval('agents_im_agent_skills_id_seq')::text, 6, '0')),
+  name text not null,
+  description text not null default '',
+  version text not null,
+  object_key text not null,
+  sha256 text not null,
+  content_type text not null,
+  size_bytes bigint not null,
+  status text not null,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint agent_skills_name_not_blank check (name <> ''),
+  constraint agent_skills_version_not_blank check (version <> ''),
+  constraint agent_skills_object_key_not_blank check (object_key <> ''),
+  constraint agent_skills_sha256_check check (sha256 ~ '^[0-9a-f]{64}$'),
+  constraint agent_skills_content_type_not_blank check (content_type <> ''),
+  constraint agent_skills_size_check check (size_bytes > 0),
+  constraint agent_skills_status_check check (status in ('draft', 'active', 'archived')),
+  constraint agent_skills_created_by_not_blank check (created_by <> ''),
+  constraint agent_skills_name_version_uniq unique (name, version),
+  constraint agent_skills_object_key_uniq unique (object_key)
+);
+
+create index if not exists agent_skills_status_updated_idx
+  on agent_skills (status, updated_at desc);
+
+create table if not exists agent_prompt_bindings (
+  agent_id text not null,
+  prompt_id text not null references agent_prompts(prompt_id) on delete restrict,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (agent_id, prompt_id),
+  constraint agent_prompt_bindings_agent_not_blank check (agent_id <> ''),
+  constraint agent_prompt_bindings_created_by_not_blank check (created_by <> '')
+);
+
+create index if not exists agent_prompt_bindings_prompt_idx
+  on agent_prompt_bindings (prompt_id);
+
+create table if not exists agent_tool_bindings (
+  agent_id text not null,
+  tool_id text not null references agent_tools(tool_id) on delete restrict,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (agent_id, tool_id),
+  constraint agent_tool_bindings_agent_not_blank check (agent_id <> ''),
+  constraint agent_tool_bindings_created_by_not_blank check (created_by <> '')
+);
+
+create index if not exists agent_tool_bindings_tool_idx
+  on agent_tool_bindings (tool_id);
+
+create table if not exists agent_skill_bindings (
+  agent_id text not null,
+  skill_id text not null references agent_skills(skill_id) on delete restrict,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (agent_id, skill_id),
+  constraint agent_skill_bindings_agent_not_blank check (agent_id <> ''),
+  constraint agent_skill_bindings_created_by_not_blank check (created_by <> '')
+);
+
+create index if not exists agent_skill_bindings_skill_idx
+  on agent_skill_bindings (skill_id);

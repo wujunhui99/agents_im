@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	agenthandler "github.com/wujunhui99/agents_im/internal/handler/agent"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
 	messagehandler "github.com/wujunhui99/agents_im/internal/handler/message"
@@ -72,6 +73,17 @@ func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceCo
 		}
 	})
 	addMessageRoutes(server, serverCtx)
+}
+
+func RegisterAgentGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
+	registerGoZeroObservabilityHandlers(server, "agent-api", func(*http.Request) []health.Check {
+		return []health.Check{
+			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("agent_logic", serverCtx != nil && serverCtx.AgentLogic != nil, "configured"),
+			componentCheck("agent_repository", serverCtx != nil && serverCtx.AgentRepo != nil, "configured"),
+		}
+	})
+	addAgentRoutes(server, serverCtx)
 }
 
 func registerGoZeroObservabilityHandlers(server *rest.Server, service string, checks func(*http.Request) []health.Check) {
@@ -213,6 +225,41 @@ func addMessageRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Method:  http.MethodPost,
 			Path:    "/conversations/:conversation_id/read",
 			Handler: messagehandler.MarkConversationAsReadHandler(serverCtx),
+		},
+	}, jwtOption(serverCtx))
+}
+
+func addAgentRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodPost,
+			Path:    "/agents",
+			Handler: agenthandler.CreateAgentHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/agents",
+			Handler: agenthandler.ListAgentsHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/agents/:agent_id",
+			Handler: agenthandler.GetAgentHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPatch,
+			Path:    "/agents/:agent_id",
+			Handler: agenthandler.UpdateAgentHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPatch,
+			Path:    "/agents/:agent_id/status",
+			Handler: agenthandler.UpdateAgentStatusHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodDelete,
+			Path:    "/agents/:agent_id",
+			Handler: agenthandler.DeleteAgentHandler(serverCtx),
 		},
 	}, jwtOption(serverCtx))
 }

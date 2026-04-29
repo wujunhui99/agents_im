@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	appconfig "github.com/wujunhui99/agents_im/internal/config"
@@ -26,7 +27,11 @@ func NewPostgresRepositoryFromConn(conn sqlx.SqlConn) *PostgresRepository {
 }
 
 func NewRepositoryForStorage(driver string, dataSource string) (Repository, error) {
-	if appconfig.ResolveStorageDriver(driver) != appconfig.StorageDriverPostgres {
+	storageDriver, err := repositoryStorageDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+	if storageDriver == appconfig.StorageDriverMemory {
 		return NewMemoryRepository(), nil
 	}
 	return NewPostgresRepository(appconfig.ResolveDataSource(dataSource))
@@ -41,7 +46,11 @@ func MustRepositoryForStorage(driver string, dataSource string) Repository {
 }
 
 func NewGroupsRepositoryForStorage(driver string, dataSource string) (GroupsRepository, error) {
-	if appconfig.ResolveStorageDriver(driver) != appconfig.StorageDriverPostgres {
+	storageDriver, err := repositoryStorageDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+	if storageDriver == appconfig.StorageDriverMemory {
 		return NewMemoryGroupsRepository(), nil
 	}
 	return NewPostgresGroupsRepository(appconfig.ResolveDataSource(dataSource))
@@ -56,7 +65,11 @@ func MustGroupsRepositoryForStorage(driver string, dataSource string) GroupsRepo
 }
 
 func NewMessageRepositoryForStorage(driver string, dataSource string) (MessageRepository, error) {
-	if appconfig.ResolveStorageDriver(driver) != appconfig.StorageDriverPostgres {
+	storageDriver, err := repositoryStorageDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+	if storageDriver == appconfig.StorageDriverMemory {
 		return NewMemoryMessageRepository(), nil
 	}
 	return NewPostgresMessageRepository(appconfig.ResolveDataSource(dataSource))
@@ -71,7 +84,11 @@ func MustMessageRepositoryForStorage(driver string, dataSource string) MessageRe
 }
 
 func NewOutboxRepositoryForStorage(driver string, dataSource string) (OutboxRepository, error) {
-	if appconfig.ResolveStorageDriver(driver) != appconfig.StorageDriverPostgres {
+	storageDriver, err := repositoryStorageDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+	if storageDriver == appconfig.StorageDriverMemory {
 		return NewMemoryMessageRepository(), nil
 	}
 	return NewPostgresMessageRepository(appconfig.ResolveDataSource(dataSource))
@@ -83,4 +100,71 @@ func MustOutboxRepositoryForStorage(driver string, dataSource string) OutboxRepo
 		panic(err)
 	}
 	return repo
+}
+
+func NewAgentRepositoryForStorage(driver string, dataSource string) (AgentRepository, error) {
+	storageDriver, err := repositoryStorageDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+	if storageDriver == appconfig.StorageDriverMemory {
+		return NewMemoryAgentRepository(), nil
+	}
+	return NewPostgresRepository(appconfig.ResolveDataSource(dataSource))
+}
+
+func MustAgentRepositoryForStorage(driver string, dataSource string) AgentRepository {
+	repo, err := NewAgentRepositoryForStorage(driver, dataSource)
+	if err != nil {
+		panic(err)
+	}
+	return repo
+}
+
+func NewAgentAuditRepositoryForStorage(driver string, dataSource string) (AgentAuditRepository, error) {
+	storageDriver, err := repositoryStorageDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+	if storageDriver == appconfig.StorageDriverMemory {
+		return NewMemoryAgentAuditRepository(), nil
+	}
+	return NewPostgresAgentAuditRepository(appconfig.ResolveDataSource(dataSource))
+}
+
+func MustAgentAuditRepositoryForStorage(driver string, dataSource string) AgentAuditRepository {
+	repo, err := NewAgentAuditRepositoryForStorage(driver, dataSource)
+	if err != nil {
+		panic(err)
+	}
+	return repo
+}
+
+func NewAgentRegistryRepositoryForStorage(driver string, dataSource string) (AgentRegistryRepository, error) {
+	storageDriver, err := repositoryStorageDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+	if storageDriver == appconfig.StorageDriverMemory {
+		return NewMemoryAgentRegistryRepository(), nil
+	}
+	return NewPostgresAgentRegistryRepository(appconfig.ResolveDataSource(dataSource))
+}
+
+func MustAgentRegistryRepositoryForStorage(driver string, dataSource string) AgentRegistryRepository {
+	repo, err := NewAgentRegistryRepositoryForStorage(driver, dataSource)
+	if err != nil {
+		panic(err)
+	}
+	return repo
+}
+
+func repositoryStorageDriver(driver string) (string, error) {
+	storageDriver := appconfig.ResolveStorageDriver(driver)
+	switch storageDriver {
+	case appconfig.StorageDriverMemory, appconfig.StorageDriverPostgres:
+		return storageDriver, nil
+	default:
+		return "", fmt.Errorf("unsupported storage driver %q; use %q only for explicit dev/test memory mode or %q for PostgreSQL", storageDriver, appconfig.StorageDriverMemory, appconfig.StorageDriverPostgres)
+	}
 }

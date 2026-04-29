@@ -50,6 +50,12 @@
 - PG 和 memory repository 语义一致。
 - 现有注册/登录/E2E 不破坏。
 
+当前分支落地说明：
+
+- `normal`、`agent`、`admin` 作为 user domain 合法枚举写入 Go model、REST response、User RPC contract 和 PostgreSQL migration。
+- 内存与 PostgreSQL repository 均把空 `account_type` 归一化为 `normal`，非法值返回明确参数错误。
+- HTTP 公开创建与 auth 注册路径不传递请求体中的 `account_type`，避免公开注册为 `admin` 或 `agent`。
+
 ### 2. `feature/agent-core-management`
 
 职责：Agent 配置管理，不含 LLM 执行。
@@ -71,6 +77,25 @@
 - 创建 Agent 时 user 不存在/不是 agent 类型必须失败。
 - 禁止 silent fallback 创建假 user。
 - API/logic/repository 单测通过。
+
+当前进展（2026-04-30）：
+
+- 已新增 `api/agent.api`、`cmd/agent-api`、`etc/agent-api.yaml`。
+- 已新增 `agents` 表迁移 `db/migrations/002_agent_management.sql`，Agent 配置与 `users` 表分离。
+- 已新增 Agent domain、logic、memory/PostgreSQL repository、go-zero handler/logic adapter。
+- 创建 Agent 通过 `UserAccountTypeChecker` 校验 `account_type=agent`；由于本分支尚未合入账号类型持久化，真实服务默认 fail closed，测试使用显式 test fixture checker。
+- 已覆盖 create/list/get/update/status/archive、非 agent 用户拒绝、缺失 checker 失败优先和 HTTP handler 测试。
+
+验证记录（2026-04-30）：
+
+- TDD fail-first：新增 `tests/agent_service_test.go` 后运行 `go test ./tests -run Agent -count=1`，初始失败为缺少 Agent production 类型/仓储/逻辑。
+- `goctl --version`：`goctl version 1.10.1 linux/amd64`。
+- `for f in api/*.api; do goctl api validate -api "$f"; done`：通过。
+- `gofmt -w $(find . -name '*.go' -print)`：通过。
+- `go test ./...`：通过。
+- `bash scripts/verify-static.sh`：通过。
+- `docker compose config`：通过。
+- `git diff --check`：通过。
 
 ### 3. `feature/agent-prompts-tools-skills`
 
@@ -96,6 +121,12 @@
 - skill sha256/object key 必填。
 - binding 去重/校验。
 
+当前进展（2026-04-30）：
+
+- 已实现 prompt/tool/skill registry 的 model、logic、memory repository、PostgreSQL repository 和 migration schema。
+- 已通过测试覆盖非法 tool 类型、非管理员 MCP 配置、未知 local/builtin key、skill object metadata、binding 去重、缺失绑定目标和 MCP whitelist 使用判断。
+- 未实现工具执行、LLM 执行、MinIO 二进制上传或 Agent Management HTTP/RPC API。
+
 ### 4. `feature/agent-audit-log`
 
 职责：审计基础设施。
@@ -113,6 +144,13 @@
 - 所有审计写入失败必须暴露；不能吞错后返回成功。
 - 提供 append-only repository/logic 测试。
 - 审计内容对敏感字段做 redaction 或 summary。
+
+当前分支实现备注：
+
+- `agent_runs`、`agent_tool_calls`、`agent_file_reads`、`agent_python_execs` 已通过 migration 建表。
+- PostgreSQL trigger 拒绝审计表 update/delete；业务 repository 只暴露 create/list/get。
+- `*_summary` 字段在 domain/repository 入口统一脱敏；Python `Code` 输入只转为 hash/长度摘要。
+- 默认 `go test ./...` 使用内存 audit repository，不依赖 PostgreSQL；PostgreSQL 覆盖保留在 `integration` build tag 下。
 
 ### 5. `feature/agent-python-sandbox-contract`
 
@@ -136,6 +174,12 @@
 - 默认未配置 executor 时明确失败。
 - 测试验证主服务没有 shell/python 直接执行路径。
 
+当前分支实现记录（2026-04-30）：
+
+- `internal/agent/pythonexec` 已提供 contract-only package：`Request`、`Response`、`Policy`、`Executor`、`DisabledExecutor`。
+- 默认 executor 只做 request/policy validation，并返回 `ErrPythonExecutorDisabled`；未实现 Python runtime、Docker runner、LLM provider 或 shell capability。
+- `tests/no_shell_execution_test.go` 和 `scripts/verify-static.sh` 覆盖生产 Go 代码不得直接导入 `os/exec`、调用 `exec.Command`/`CommandContext`，或包含 shell/Python command literal。
+
 ### 6. `feature/agent-im-integration-contract`
 
 职责：Agent 与 IM 消息链路集成契约。
@@ -146,11 +190,14 @@
 - Agent response writer interface：只允许调用 Message Service 发送消息。
 - 预留 outbox/worker trigger，不实现 LLM。
 - 文档说明 Agent 不能绕过 Message Service 直接写 messages 表。
+- 当前实现入口为 `internal/agentim`，其中 `MessageServiceResponseWriter` 只接收兼容 `MessageLogic.SendMessage` 的 `MessageSender`，不导入 message repository。
+- Loop prevention 使用 Agent message metadata，默认抑制 Agent 消息递归触发，只有全局策略和消息元数据都显式 opt-in 时允许递归。
 
 验收：
 
 - 单元测试确保 response writer 调用 MessageLogic/Message Service，而不是 repository 直写。
 - 无 LLM provider 也能编译和测试。
+- 单元测试确保空 Message Service 成功返回会被拒绝，避免 fake success。
 
 ## 共享质量规则
 

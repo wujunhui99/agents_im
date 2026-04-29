@@ -34,6 +34,7 @@
 - `gender`：性别，支持 `unknown`、`male`、`female`、`other`。
 - `age`：年龄，允许未设置。
 - `region`：地区，允许未设置。
+- `account_type`：账号类型，支持 `normal`、`agent`、`admin`；公开 HTTP 注册/创建路径默认并固定为 `normal`，内部 User RPC 可显式创建 `agent` 或 `admin`。
 - `created_at` / `updated_at`：资料创建和更新时间。
 
 ## 接口能力
@@ -42,12 +43,13 @@
 
 `POST /users`
 
-请求方通常是 `auth` 注册流程或内部管理流程。请求必须包含 `identifier`，可选 `display_name`、`name`、`gender`、`age`、`region`。
+请求方通常是 `auth` 注册流程或内部管理流程。请求必须包含 `identifier`，可选 `display_name`、`name`、`gender`、`age`、`region`。HTTP `POST /users` 不接受客户端设置 `account_type`，即使请求体包含该字段也按 `normal` 创建；需要创建 `agent` 或 `admin` 时必须走内部 User RPC/logic 能力，并通过服务端权限策略保护调用方。
 
 验收标准：
 
 - `identifier` 为空或格式非法时返回明确参数错误。
 - 重复 `identifier` 时返回明确冲突错误。
+- 非法内部 `account_type` 返回明确参数错误，错误信息包含 `account_type`。
 - 成功创建后返回完整用户资料。
 - 返回内容不包含任何密码或认证秘密字段。
 

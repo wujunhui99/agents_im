@@ -25,7 +25,8 @@ Options:
   --with-services   Start Go services after middleware. This is the default.
   --services-only   Restart only host Go services; skip Docker middleware and migrations.
                    Service ports can be overridden with USER_API_PORT, AUTH_API_PORT,
-                   FRIENDS_API_PORT, MESSAGE_API_PORT, GATEWAY_WS_PORT, GROUPS_API_PORT.
+                   FRIENDS_API_PORT, MESSAGE_API_PORT, GATEWAY_WS_PORT, GROUPS_API_PORT,
+                   and AGENT_API_PORT.
   --no-migrate      Skip PostgreSQL migrations.
   --stop            Stop host Go services started by this script.
   -h, --help        Show this help.
@@ -157,6 +158,7 @@ write_configs() {
   HeartbeatTTLSeconds: ${PRESENCE_TTL_SECONDS:-60}
   KeyPrefix: ${PRESENCE_KEY_PREFIX:-agents_im:presence}"
   write_api_config "groups-api" "${GROUPS_API_PORT:-8085}"
+  write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
 }
 
 build_service() {
@@ -238,6 +240,7 @@ main() {
   start_service "message-api"
   start_service "gateway-ws"
   start_service "groups-api"
+  start_service "agent-api"
 
   wait_http "user-api" "http://127.0.0.1:${USER_API_PORT:-8080}/healthz"
   wait_http "auth-api" "http://127.0.0.1:${AUTH_API_PORT:-8081}/healthz"
@@ -245,6 +248,7 @@ main() {
   wait_http "message-api" "http://127.0.0.1:${MESSAGE_API_PORT:-8083}/healthz"
   wait_http "gateway-ws" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
   wait_http "groups-api" "http://127.0.0.1:${GROUPS_API_PORT:-8085}/healthz"
+  wait_http "agent-api" "http://127.0.0.1:${AGENT_API_PORT:-8086}/healthz"
 
   echo "local backend is ready"
 }

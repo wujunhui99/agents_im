@@ -3,6 +3,27 @@
 
 package types
 
+type Agent struct {
+	AgentID     string `json:"agent_id"`
+	IMUserID    string `json:"im_user_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	CreatedBy   string `json:"created_by"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+type AgentPathReq struct {
+	AgentID string `path:"agent_id"`
+}
+
+type AgentResp struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Data    Agent  `json:"data"`
+}
+
 type AddFriendData struct {
 	Friendship Friendship `json:"friendship"`
 	Created    bool       `json:"created"`
@@ -62,6 +83,13 @@ type ConversationSeqsResp struct {
 type CreateGroupReq struct {
 	Name        string `json:"name"`
 	Description string `json:"description,optional"`
+}
+
+type CreateAgentReq struct {
+	IMUserID    string `json:"im_user_id"`
+	Name        string `json:"name"`
+	Description string `json:"description,optional"`
+	Status      string `json:"status,optional"`
 }
 
 type CreateUserReq struct {
@@ -157,6 +185,23 @@ type GroupResp struct {
 
 type LeaveGroupReq struct {
 	GroupID string `path:"group_id"`
+}
+
+type ListAgentsData struct {
+	Agents []Agent `json:"agents"`
+}
+
+type ListAgentsReq struct {
+	Status    string `form:"status,optional"`
+	CreatedBy string `form:"created_by,optional"`
+	Limit     int64  `form:"limit,optional"`
+	Offset    int64  `form:"offset,optional"`
+}
+
+type ListAgentsResp struct {
+	Code    string         `json:"code"`
+	Message string         `json:"message"`
+	Data    ListAgentsData `json:"data"`
 }
 
 type ListFriendsData struct {
@@ -297,6 +342,17 @@ type UpdateMeReq struct {
 	Region      string `json:"region,optional"`
 }
 
+type UpdateAgentReq struct {
+	AgentID     string `path:"agent_id"`
+	Name        string `json:"name,optional"`
+	Description string `json:"description,optional"`
+}
+
+type UpdateAgentStatusReq struct {
+	AgentID string `path:"agent_id"`
+	Status  string `json:"status"`
+}
+
 type User struct {
 	UserID      string `json:"user_id"`
 	Identifier  string `json:"identifier"`
@@ -305,6 +361,7 @@ type User struct {
 	Gender      string `json:"gender"`
 	Age         int32  `json:"age"`
 	Region      string `json:"region"`
+	AccountType string `json:"account_type"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
