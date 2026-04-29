@@ -7,6 +7,7 @@ const (
 	CommandPullMessages         = "pull_messages"
 	CommandGetConversationSeqs  = "get_conversation_seqs"
 	CommandMarkConversationRead = "mark_conversation_read"
+	CommandHeartbeat            = "heartbeat"
 )
 
 const (

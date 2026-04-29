@@ -52,6 +52,8 @@ required_files=(
   "cmd/groups-rpc/main.go"
   "cmd/message-api/main.go"
   "cmd/message-rpc/main.go"
+  "cmd/gateway-ws/main.go"
+  "etc/gateway-ws.yaml"
   "etc/message-rpc.yaml"
   "internal/logic/userlogic.go"
   "internal/logic/friendslogic.go"
@@ -96,6 +98,8 @@ required_files=(
   "internal/presence/redis.go"
   "internal/presence/memory_test.go"
   "internal/presence/redis_integration_test.go"
+  "internal/gateway/ws/connection_manager.go"
+  "internal/gateway/ws/server.go"
   "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
@@ -103,6 +107,7 @@ required_files=(
   "tests/groups_service_test.go"
   "tests/message_service_test.go"
   "tests/gateway_contract_test.go"
+  "tests/websocket_gateway_test.go"
   "tests/read_receipts_test.go"
   "docs/product-specs/user-service.md"
   "docs/product-specs/auth-service.md"
@@ -122,6 +127,7 @@ required_files=(
   "docs/design-docs/postgres-persistence.md"
   "docs/design-docs/gateway-message-contract.md"
   "docs/design-docs/redis-presence.md"
+  "docs/design-docs/websocket-gateway.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -139,6 +145,7 @@ required_files=(
   "docs/exec-plans/active/read-receipts.md"
   "docs/exec-plans/active/remove-handwritten-compat.md"
   "docs/exec-plans/active/jwt-auth-middleware.md"
+  "docs/exec-plans/active/websocket-gateway.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -460,6 +467,7 @@ gateway_doc_patterns=(
   "pull_messages"
   "get_conversation_seqs"
   "mark_conversation_read"
+  "heartbeat"
   "SendMessage"
   "PullMessages"
   "GetConversationSeqs"
@@ -470,6 +478,40 @@ for pattern in "${gateway_doc_patterns[@]}"; do
   rg -q "$pattern" docs/design-docs/gateway-message-contract.md
   rg -q "$pattern" internal/gateway/contract.go tests/gateway_contract_test.go
 done
+
+websocket_gateway_patterns=(
+  "GET /ws"
+  "Authorization: Bearer"
+  "query param"
+  "ConnectionManager"
+  "PresenceReporter"
+  "Redis Presence"
+  "Kafka fanout"
+  "Push worker"
+)
+
+for pattern in "${websocket_gateway_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/websocket-gateway.md docs/exec-plans/active/websocket-gateway.md
+done
+
+websocket_gateway_code_patterns=(
+  "HandleWebSocket"
+  "Validate\\(rawToken\\)"
+  "Register"
+  "CommandHeartbeat"
+  "CommandSendMessage"
+  "CommandPullMessages"
+  "CommandGetConversationSeqs"
+  "CommandMarkConversationRead"
+)
+
+for pattern in "${websocket_gateway_code_patterns[@]}"; do
+  rg -q "$pattern" internal/gateway/ws internal/gateway/contract.go tests/websocket_gateway_test.go
+done
+
+rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
+rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
+rg -q "websocket-gateway" docs/exec-plans/active/websocket-gateway.md
 
 gateway_product_patterns=(
   "command ACK"
