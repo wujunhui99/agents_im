@@ -18,6 +18,7 @@ type AgentRegistryRepository interface {
 	GetTool(ctx context.Context, toolID string) (model.AgentTool, error)
 	BindTool(ctx context.Context, binding model.AgentToolBinding) (model.AgentToolBinding, bool, error)
 	GetToolBinding(ctx context.Context, agentID string, toolID string) (model.AgentToolBinding, error)
+	ListToolBindings(ctx context.Context, agentID string) ([]model.AgentToolBinding, error)
 
 	RegisterSkill(ctx context.Context, skill model.AgentSkill) (model.AgentSkill, error)
 	GetSkill(ctx context.Context, skillID string) (model.AgentSkill, error)

@@ -296,6 +296,24 @@ func (r *PostgresRepository) GetToolBinding(ctx context.Context, agentID string,
 	return queryAgentToolBinding(ctx, r.conn, agentID, toolID)
 }
 
+func (r *PostgresRepository) ListToolBindings(ctx context.Context, agentID string) ([]model.AgentToolBinding, error) {
+	var rows []postgresAgentToolBindingRow
+	err := r.conn.QueryRowsCtx(ctx, &rows, `
+select agent_id, tool_id, created_by, created_at, updated_at
+from agent_tool_bindings
+where agent_id = $1
+order by tool_id
+`, agentID)
+	if err != nil {
+		return nil, err
+	}
+	bindings := make([]model.AgentToolBinding, 0, len(rows))
+	for _, row := range rows {
+		bindings = append(bindings, row.toolBinding())
+	}
+	return bindings, nil
+}
+
 func (r *PostgresRepository) RegisterSkill(ctx context.Context, skill model.AgentSkill) (model.AgentSkill, error) {
 	var row postgresAgentSkillRow
 	var err error

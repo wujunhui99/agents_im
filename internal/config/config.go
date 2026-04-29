@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -19,6 +20,7 @@ type APIConfig struct {
 	Redis         RedisConfig
 	Presence      PresenceConfig
 	Kafka         KafkaConfig
+	DeepSeek      DeepSeekConfig
 }
 
 type RPCConfig struct {
@@ -53,6 +55,12 @@ type KafkaConfig struct {
 	Brokers            []string
 	MessageEventsTopic string
 	ConsumerGroup      string
+}
+
+type DeepSeekConfig struct {
+	APIKey  string
+	BaseURL string
+	Model   string
 }
 
 type MessageTransferConfig struct {
@@ -114,7 +122,11 @@ const (
 	defaultTransferMaxAttempts         = 5
 	defaultTransferObservabilityHost   = "0.0.0.0"
 	defaultTransferObservabilityPort   = 8085
+	DefaultDeepSeekBaseURL             = "https://api.deepseek.com"
+	DefaultDeepSeekModel               = "deepseek-v4-pro"
 )
+
+var ErrDeepSeekAPIKeyMissing = errors.New("deepseek API key is required: set DEEPSEEK_API_KEY")
 
 func DefaultAPIConfig() APIConfig {
 	return APIConfig{
@@ -126,6 +138,7 @@ func DefaultAPIConfig() APIConfig {
 		Redis:         DefaultRedisConfig(),
 		Presence:      DefaultPresenceConfig(),
 		Kafka:         DefaultKafkaConfig(),
+		DeepSeek:      DefaultDeepSeekConfig(),
 	}
 }
 
@@ -168,6 +181,13 @@ func DefaultKafkaConfig() KafkaConfig {
 		Brokers:            []string{defaultKafkaBroker},
 		MessageEventsTopic: defaultKafkaMessageEventsTopic,
 		ConsumerGroup:      defaultKafkaConsumerGroup,
+	}
+}
+
+func DefaultDeepSeekConfig() DeepSeekConfig {
+	return DeepSeekConfig{
+		BaseURL: DefaultDeepSeekBaseURL,
+		Model:   DefaultDeepSeekModel,
 	}
 }
 
@@ -244,6 +264,7 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		return cfg, err
 	}
 	cfg.Kafka = kafkaConfigFromValues(values)
+	cfg.DeepSeek = deepSeekConfigFromValues(values)
 
 	return cfg, nil
 }
@@ -526,6 +547,21 @@ func ResolveKafkaConfig(cfg KafkaConfig) KafkaConfig {
 	}
 }
 
+func ResolveDeepSeekConfig(cfg DeepSeekConfig) DeepSeekConfig {
+	cfg.APIKey = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.APIKey)), os.Getenv("DEEPSEEK_API_KEY"))
+	cfg.BaseURL = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.BaseURL)), os.Getenv("DEEPSEEK_BASE_URL"), DefaultDeepSeekBaseURL)
+	cfg.Model = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Model)), os.Getenv("DEEPSEEK_MODEL"), DefaultDeepSeekModel)
+	return cfg
+}
+
+func ValidateDeepSeekConfig(cfg DeepSeekConfig) error {
+	cfg = ResolveDeepSeekConfig(cfg)
+	if strings.TrimSpace(cfg.APIKey) == "" {
+		return ErrDeepSeekAPIKeyMissing
+	}
+	return nil
+}
+
 func redisConfigFromValues(values map[string]string) (RedisConfig, error) {
 	cfg := RedisConfig{
 		Addr:     firstNonEmpty(values["Redis.Addr"], values["RedisAddr"]),
@@ -565,6 +601,15 @@ func kafkaConfigFromValues(values map[string]string) KafkaConfig {
 		ConsumerGroup:      firstNonEmpty(values["Kafka.ConsumerGroup"], values["KafkaConsumerGroup"]),
 	}
 	return ResolveKafkaConfig(cfg)
+}
+
+func deepSeekConfigFromValues(values map[string]string) DeepSeekConfig {
+	cfg := DeepSeekConfig{
+		APIKey:  firstNonEmpty(values["DeepSeek.APIKey"], values["DeepSeekAPIKey"]),
+		BaseURL: firstNonEmpty(values["DeepSeek.BaseURL"], values["DeepSeekBaseURL"]),
+		Model:   firstNonEmpty(values["DeepSeek.Model"], values["DeepSeekModel"]),
+	}
+	return ResolveDeepSeekConfig(cfg)
 }
 
 func observabilityHTTPConfigFromValues(values map[string]string, current ObservabilityHTTPConfig) (ObservabilityHTTPConfig, error) {

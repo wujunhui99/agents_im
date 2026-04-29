@@ -85,11 +85,14 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - 通过 MinIO/S3-compatible object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。
 - 管理 MCP 工具和本地工具。MCP server 和工具元数据入库；本地工具只允许服务端白名单 `handler_key`，不得从数据库执行任意脚本。
 - 当前 Agent registry 基线已提供 prompt/tool/skill 元数据与 Agent 白名单绑定的 Go logic/repository 和 PostgreSQL schema；该基线不执行工具、不调用 LLM、不上传或读取 MinIO 二进制内容。
+- 当前 Agent runtime provider 基线已提供 CloudWeGo Eino + DeepSeek ChatModel adapter/config，读取 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`；缺少 API key 时构造模型必须失败，不提供 mock/fake response。
+- 当前 Agent runtime 工具解析契约位于 `internal/agentruntime/tools`：运行时必须从 `AgentRegistryRepository` 读取 Agent 工具绑定并重新校验工具状态、管理员配置、MCP server 状态和安全 transport；该契约只产出 Eino 可适配的安全 metadata/adapter seam，不执行 MCP 网络调用，也不提供 shell、命令、本地进程、stdio MCP、Python 或文件系统写入工具。
 - Agent run、tool call、skill file read、Python exec 审计记录使用 append-only 审计表保存；摘要字段必须脱敏，Python 代码只保存 hash/大小摘要。
 - 第一版不提供 shell/命令行脚本执行能力；Python 执行必须通过受限沙箱、限时限资源、默认无网络，并记录审计。
 - 当前 Python executor 只提供 `internal/agent/pythonexec` 契约和 disabled 默认实现；未配置真实沙箱时必须返回 `ErrPythonExecutorDisabled`，不得在 Go 主服务进程内直接运行 Python 或 shell。
+- 当前 Eino runtime core 只提供 `internal/agentruntime` 本地接口、领域请求/结果类型和 fail-first 归一化校验；不导入 Eino、不调用 LLM、不执行工具、不写回 IM。设计见 [`docs/design-docs/agent-runtime-eino.md`](./docs/design-docs/agent-runtime-eino.md)。
 - Agent 响应必须通过 Message Service 写回 IM，不能绕过 IM 消息链路或直接推送 WebSocket。
-- Agent-IM 第一阶段 Go 契约位于 `internal/agentim`：定义用户私聊 Agent、群聊 @Agent、管理员手动 run 三类触发，响应 writer 只依赖 `MessageLogic.SendMessage` / Message Service seam，并通过 Agent 消息元数据默认阻止递归触发。
+- Agent-IM 第一阶段 Go 契约位于 `internal/agentim`：定义用户私聊 Agent、群聊 @Agent、管理员手动 run 三类触发；`AgentRunOrchestrator` 通过 `RuntimeRequestBuilder` 调用统一的 `internal/agentruntime.Runtime`，响应 writer 只依赖 `MessageLogic.SendMessage` / Message Service seam，并通过 Agent 消息元数据默认阻止递归触发。
 
 ### Webhook Dispatcher
 
@@ -145,7 +148,7 @@ Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trac
 
 ## 待细化问题
 
-- Agent 框架最终选择：LangChain 系列或 Google ADK。
+- 完整 Eino runtime orchestration、工具调用编排和 IM 写回 worker wiring 仍待细化；当前已落地 Eino DeepSeek 模型 adapter、工具解析契约和 Agent-IM runner seam。
 - 服务拆分粒度与代码仓库结构。
 - Kafka topic 设计与消息 schema 第一版见 [`docs/design-docs/kafka-message-events.md`](./docs/design-docs/kafka-message-events.md)，后续需随 outbox/transfer/push 实现继续细化。
 - PostgreSQL 表结构和迁移方案。

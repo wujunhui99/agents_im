@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -58,6 +59,67 @@ Kafka:
 	}
 	if cfg.Kafka.MessageEventsTopic != "message.events.test" || cfg.Kafka.ConsumerGroup != "message-transfer-test" {
 		t.Fatalf("kafka config mismatch: %+v", cfg.Kafka)
+	}
+}
+
+func TestLoadAPIConfigResolvesDeepSeekFromFileAndEnv(t *testing.T) {
+	t.Setenv("DEEPSEEK_API_KEY", "unit-test-deepseek-api-key")
+	t.Setenv("DEEPSEEK_BASE_URL", "")
+	t.Setenv("DEEPSEEK_MODEL", "")
+
+	configPath := filepath.Join(t.TempDir(), "agent-api.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: agent-api
+DeepSeek:
+  APIKey: ${DEEPSEEK_API_KEY}
+  BaseURL: https://deepseek.local
+  Model: deepseek-local-model
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if cfg.DeepSeek.APIKey != "unit-test-deepseek-api-key" {
+		t.Fatalf("deepseek api key was not resolved from env placeholder")
+	}
+	if cfg.DeepSeek.BaseURL != "https://deepseek.local" {
+		t.Fatalf("deepseek base url = %q", cfg.DeepSeek.BaseURL)
+	}
+	if cfg.DeepSeek.Model != "deepseek-local-model" {
+		t.Fatalf("deepseek model = %q", cfg.DeepSeek.Model)
+	}
+}
+
+func TestResolveDeepSeekConfigUsesDefaultsWithoutKey(t *testing.T) {
+	t.Setenv("DEEPSEEK_API_KEY", "")
+	t.Setenv("DEEPSEEK_BASE_URL", "")
+	t.Setenv("DEEPSEEK_MODEL", "")
+
+	cfg := ResolveDeepSeekConfig(DeepSeekConfig{})
+	if cfg.APIKey != "" {
+		t.Fatalf("deepseek api key should remain empty when env is unset")
+	}
+	if cfg.BaseURL != DefaultDeepSeekBaseURL {
+		t.Fatalf("deepseek base url = %q, want %q", cfg.BaseURL, DefaultDeepSeekBaseURL)
+	}
+	if cfg.Model != DefaultDeepSeekModel {
+		t.Fatalf("deepseek model = %q, want %q", cfg.Model, DefaultDeepSeekModel)
+	}
+}
+
+func TestValidateDeepSeekConfigRequiresAPIKey(t *testing.T) {
+	t.Setenv("DEEPSEEK_API_KEY", "")
+	t.Setenv("DEEPSEEK_BASE_URL", "")
+	t.Setenv("DEEPSEEK_MODEL", "")
+
+	cfg := ResolveDeepSeekConfig(DeepSeekConfig{})
+	err := ValidateDeepSeekConfig(cfg)
+	if !errors.Is(err, ErrDeepSeekAPIKeyMissing) {
+		t.Fatalf("validate deepseek config error = %v, want %v", err, ErrDeepSeekAPIKeyMissing)
 	}
 }
 
