@@ -178,6 +178,14 @@ required_files=(
   "docs/product-specs/backend-mvp.md"
   "docs/product-specs/frontend-backend-contract.md"
   "docs/DEVELOPMENT.md"
+  "docs/FRONTEND.md"
+  "web/package.json"
+  "web/index.html"
+  "web/src/App.tsx"
+  "web/src/App.test.tsx"
+  "web/src/main.tsx"
+  "web/src/styles.css"
+  "web/src/vite-env.d.ts"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -1467,5 +1475,18 @@ rg -q "message_received" docs/product-specs/backend-mvp.md docs/design-docs/back
 rg -q "get_conversation_seqs" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "healthz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "readyz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
+
+frontend_patterns=(
+  "消息"
+  "联系人"
+  "发现"
+  "我的"
+  "role=\"tab\""
+  "wechat-green"
+)
+
+for pattern in "${frontend_patterns[@]}"; do
+  rg -qF "$pattern" web/src/App.tsx web/src/styles.css
+done
 
 echo "static verification passed"
