@@ -36,6 +36,32 @@ scripts/dev-up.sh --stop
 
 The script writes generated local config, binaries, logs, and PID files under `.dev/`, which is ignored by git.
 
+## Local Makefile Shortcuts
+
+The repository also provides a `Makefile` for common local lifecycle commands:
+
+```bash
+make start             # start backend services and frontend dev server
+make stop              # stop frontend dev server and backend host services
+make restart           # restart both frontend and backend
+make backend-start     # start Docker middleware, migrations, and backend APIs/WebSocket gateway
+make backend-stop      # stop backend host services started by scripts/dev-up.sh
+make backend-restart   # restart backend services
+make frontend-start    # start Vite dev server at http://127.0.0.1:5173
+make frontend-stop     # stop the Vite dev server started by Makefile
+make frontend-restart  # restart frontend dev server
+make status            # show PID files and ports 8080-8085/5173
+make test              # run frontend tests/build/lint plus Go tests
+make verify            # run test plus static checks, docker compose config, and git diff check
+```
+
+- `make frontend-start` writes logs and PID files under `.dev/logs/frontend.log` and `.dev/pids/frontend.pid`. Override the frontend bind address or port when needed:
+- `make test` runs frontend tests/build/lint plus Go tests while excluding accidental Go packages under `web/node_modules`.
+
+```bash
+make frontend-start FRONTEND_HOST=127.0.0.1 FRONTEND_PORT=5174
+```
+
 ## Ports
 
 | Service | URL |
