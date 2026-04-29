@@ -1,0 +1,67 @@
+syntax = "v1"
+
+info(
+    title: "Auth API"
+    desc: "Authentication service HTTP API"
+    author: "Codex"
+    version: "v0.1.0"
+)
+
+type AuthData {
+    UserID string `json:"user_id"`
+    Identifier string `json:"identifier"`
+    Token string `json:"token"`
+    ExpiresAt string `json:"expires_at"`
+}
+
+type RegisterReq {
+    Identifier string `json:"identifier"`
+    Password string `json:"password"`
+    DisplayName string `json:"display_name,optional"`
+    Name string `json:"name,optional"`
+    Gender string `json:"gender,optional"`
+    Age int32 `json:"age,optional"`
+    Region string `json:"region,optional"`
+}
+
+type LoginReq {
+    Identifier string `json:"identifier"`
+    Password string `json:"password"`
+}
+
+type ValidateTokenReq {
+    Token string `json:"token"`
+}
+
+type ValidateTokenData {
+    Valid bool `json:"valid"`
+    UserID string `json:"user_id"`
+    Identifier string `json:"identifier"`
+    ExpiresAt string `json:"expires_at"`
+}
+
+type AuthResp {
+    Code string `json:"code"`
+    Message string `json:"message"`
+    Data AuthData `json:"data"`
+}
+
+type ValidateTokenResp {
+    Code string `json:"code"`
+    Message string `json:"message"`
+    Data ValidateTokenData `json:"data"`
+}
+
+@server(
+    group: auth
+)
+service auth-api {
+    @handler register
+    post /auth/register (RegisterReq) returns (AuthResp)
+
+    @handler login
+    post /auth/login (LoginReq) returns (AuthResp)
+
+    @handler validateToken
+    post /auth/validate (ValidateTokenReq) returns (ValidateTokenResp)
+}
