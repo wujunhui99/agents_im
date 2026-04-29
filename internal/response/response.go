@@ -31,3 +31,20 @@ func WriteJSON(w http.ResponseWriter, status int, code string, message string, d
 		Data:    data,
 	})
 }
+
+func GoZeroErrorHandler(err error) (int, any) {
+	appErr := apperror.From(err)
+	if appErr == nil {
+		return http.StatusOK, Envelope{
+			Code:    string(apperror.CodeOK),
+			Message: "ok",
+			Data:    nil,
+		}
+	}
+
+	return apperror.HTTPStatus(err), Envelope{
+		Code:    string(appErr.Code),
+		Message: appErr.Message,
+		Data:    nil,
+	}
+}
