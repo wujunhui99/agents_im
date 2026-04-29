@@ -84,6 +84,18 @@ feature/* -> develop -> main
 - PR/MR 描述必须包含测试结果与风险说明。
 - 前端联调相关变更必须同步检查 [`docs/product-specs/frontend-backend-contract.md`](./docs/product-specs/frontend-backend-contract.md)、[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)、`scripts/dev-up.sh`、`scripts/dev-demo-data.sh` 和 `tests/mvp_backend_test.go`。
 
+
+## Frontend AI Knowledge
+
+This repository now includes a React/Vite frontend. Before any frontend task, Codex agents must read:
+
+- `.ai-context/frontend-skills/SKILL.md`
+- `.ai-context/frontend-skills/references/react-vite-patterns.md`
+- `docs/FRONTEND.md`
+- `docs/product-specs/frontend-backend-contract.md`
+
+Follow the WeChat-style four-tab product direction: `消息`, `联系人`, `发现`, `我的`. Use TDD with Vitest + Testing Library and verify with `npm run frontend:test`, `npm run frontend:build`, `npm run frontend:lint`, backend tests, and `scripts/verify-static.sh`.
+
 ## go-zero / goctl AI Knowledge
 
 This repository uses go-zero. Before any go-zero refactor or code generation task, Codex agents must read:
