@@ -1,0 +1,13 @@
+# Product Specs Index
+
+产品规格文档只描述业务逻辑和用户可感知行为，不绑定具体技术实现。
+
+## 当前规格
+
+- [agent-chat.md](./agent-chat.md)：Agent 单聊与群聊
+- [agent-lifecycle.md](./agent-lifecycle.md)：Agent 创建、销毁与持久化
+- [account-social-core.md](./account-social-core.md)：账号资料、认证、好友与群聊基础能力
+- [user-service.md](./user-service.md)：User Service 第一阶段产品规格
+- [message-chain.md](./message-chain.md)：消息发送、存储、拉取与已读链路产品规格
+
+新增需求时，先在本目录创建产品规格，再进入技术设计和执行计划。

@@ -1,0 +1,132 @@
+# ARCHITECTURE.md
+
+本文档提供项目的顶层架构地图，帮助人类和 AI Agent 快速理解系统边界、核心模块和关键数据流。
+
+## 系统目标
+
+构建一个高性能、分布式、实时聊天系统，同时提供 Agent 服务能力。系统需要支持：
+
+- 用户单聊与群聊
+- Agent 创建、销毁、持久化和运行时管理
+- 用户与 Agent 单聊
+- 多用户与多 Agent 群聊
+- Agent 工具调用，包括代码执行、网络搜索和 IM 工具调用
+- 高可靠消息投递
+- 可观测、可追踪、可扩展的微服务架构
+
+## 参考实现
+
+本项目有明确参考实现，但参考仓库只作为设计输入，不直接决定本项目实现。
+
+- IM 系统主要参考：[`openimsdk/open-im-server`](https://github.com/openimsdk/open-im-server.git)，本地目录为 `docs/references/open-im-server/`。
+- Agent 系统参考：[`bytedance/deer-flow`](https://github.com/bytedance/deer-flow.git)，本地目录为 `docs/references/deer-flow/`。
+- Agent 系统参考：[`HKUDS/nanobot`](https://github.com/HKUDS/nanobot.git)，本地目录为 `docs/references/nanobot/`。
+
+参考仓库说明见 [`docs/references/README.md`](./docs/references/README.md)。涉及具体设计借鉴时，应在 `docs/design-docs/` 中记录取舍原因。
+
+## 系统边界
+
+IM 后端、Agent 系统和前端系统的职责边界见 [`docs/design-docs/system-boundaries.md`](./docs/design-docs/system-boundaries.md)。当前结论是：IM 后端负责实时通信底座和消息可靠性；Agent 系统负责 Agent 生命周期、推理和工具调用；前端负责用户交互和实时消息展示。IM 与 Agent 通过事件/Webhook 和消息写回接口解耦，因此 IM 后端与 Agent 系统可以基于契约并行开发。
+
+IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-agent-contract.md`](./docs/design-docs/im-agent-contract.md)。该契约参考 OpenIM webhook 设计，定义了 `callbackAfterSendSingleMsgCommand`、`callbackAfterSendGroupMsgCommand`、Agent 消息写回、会话上下文查询、幂等、签名和重试规则。
+
+## 顶层模块
+
+### User Service
+
+负责用户账号资料的权威数据，不管理密码或认证秘密。核心能力包括唯一标识符（类似微信号）、名称、性别、年龄、地区等资料维护，`/me` 查询，公开资料查询，以及供 `auth` 注册流程使用的账号存在性检查。
+
+### Auth Service
+
+负责认证和登录注册。第一阶段支持账号密码注册/登录，密码和认证秘密只归 `auth` 管理；注册时依赖 `user` 查询账号是否存在，并协作创建用户资料。手机号验证码、微信扫码等能力作为后续扩展，当前不实现。
+
+### Friends Service
+
+负责好友关系维护，包括添加好友、删除好友、查询好友列表和关系状态。好友关系不写入 `user` 的权威资料模型。
+
+### Groups Service
+
+负责群聊和群成员关系维护，包括创建群、加群、退群、查询群成员。群成员关系不写入 `user` 的权威资料模型。
+
+### Message Service
+
+负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并为后续 Gateway、Message Transfer、Push 服务提供事件契约。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
+
+### IM Core Service
+
+负责 IM 核心业务链路，包括用户会话、消息收发、消息状态、会话成员管理等。
+
+### Gateway / WebSocket Service
+
+负责客户端 WebSocket 长连接管理，包括：
+
+- 连接建立与鉴权
+- 心跳检测
+- ACK 确认
+- 在线状态维护
+- 消息下发与重试
+
+### Agent Service
+
+负责 Agent 生命周期和运行时能力，包括：
+
+- Agent 创建、销毁、配置和持久化
+- Agent 单聊与群聊参与
+- Agent 工具调用编排
+- Agent 运行结果回传 IM 系统
+
+### Webhook Dispatcher
+
+负责 IM 与 Agent 之间的异步解耦。IM 侧产生事件后，通过 Webhook 或事件投递机制通知 Agent 服务，Agent 服务处理后再将结果写回 IM。
+
+### Message Pipeline
+
+基于 Kafka 实现消息异步解耦与削峰，支撑高吞吐消息处理链路。
+
+### Storage Layer
+
+- PostgreSQL：持久化用户、会话、消息、Agent 配置、工具调用记录等核心数据。
+- Redis：缓存会话状态、在线状态、幂等键、热点数据和短期运行状态。
+
+### Observability Stack
+
+- Prometheus：指标采集
+- Grafana：监控面板
+- Jaeger：分布式追踪
+- `trace_id`：跨服务链路追踪 ID
+
+## 关键链路
+
+### 用户发送消息
+
+1. 客户端通过 WebSocket 发送消息。
+2. Gateway 校验连接和用户身份。
+3. IM Core 写入消息并生成消息事件。
+4. Kafka 接收消息事件并异步分发。
+5. Gateway 根据会话成员在线状态进行消息投递。
+6. 客户端返回 ACK，系统更新投递状态。
+
+### Agent 响应消息
+
+1. IM Core 产生会话消息事件。
+2. Webhook Dispatcher 将事件投递给 Agent Service。
+3. Agent Service 加载 Agent 配置和上下文。
+4. Agent 根据上下文推理，必要时调用工具。
+5. Agent Service 将响应写回 IM Core。
+6. IM Core 通过消息链路投递给会话成员。
+
+## 设计原则
+
+- IM Core 与 Agent Service 解耦，避免 Agent 运行时阻塞核心消息链路。
+- 写路径优先保证可靠性，再优化延迟。
+- 长连接层只处理连接、投递和 ACK，不承载复杂业务逻辑。
+- Agent 工具调用必须可审计、可追踪、可限制权限。
+- 所有跨服务请求必须携带 `trace_id`。
+
+## 待细化问题
+
+- Agent 框架最终选择：LangChain 系列或 Google ADK。
+- 服务拆分粒度与代码仓库结构。
+- Kafka topic 设计与消息 schema。
+- PostgreSQL 表结构和迁移方案。
+- Agent 工具权限模型。
