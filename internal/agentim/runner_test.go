@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
 	"github.com/wujunhui99/agents_im/internal/logic"
@@ -13,12 +14,19 @@ import (
 
 func TestAgentRunOrchestratorSuccessWritesAuditedResponse(t *testing.T) {
 	runtime := &recordingAgentRuntime{
-		result: AgentRuntimeResult{
-			FinalText:             " answer ",
-			OutputSummary:         agentaudit.Summary{"model": "test-model"},
-			AllowRecursiveTrigger: true,
+		result: agentruntime.RunResult{
+			RunID:     "run_1",
+			FinalText: " answer ",
+			Model: agentruntime.ModelMetadata{
+				Provider: "deepseek",
+				Model:    "test-model",
+			},
+			Metadata: map[string]string{"allow_recursive_trigger": "true"},
 		},
 	}
+	runtimeReq := validRuntimeRequestForTrigger(testAgentTrigger())
+	runtimeReq.Agent.Policy.AllowAgentMessageRecursion = true
+	builder := &recordingRuntimeRequestBuilder{request: runtimeReq}
 	audit := &recordingAgentRunAuditRecorder{
 		run: agentaudit.AgentRun{RunID: "run_1"},
 	}
@@ -41,7 +49,7 @@ func TestAgentRunOrchestratorSuccessWritesAuditedResponse(t *testing.T) {
 			},
 		},
 	}
-	orchestrator := newTestAgentRunOrchestrator(t, runtime, audit, writer)
+	orchestrator := newTestAgentRunOrchestrator(t, runtime, builder, audit, writer)
 
 	result, err := orchestrator.Run(context.Background(), testAgentTrigger())
 	if err != nil {
@@ -53,8 +61,11 @@ func TestAgentRunOrchestratorSuccessWritesAuditedResponse(t *testing.T) {
 	if runtime.calls != 1 {
 		t.Fatalf("runtime calls = %d, want 1", runtime.calls)
 	}
-	if runtime.lastTrigger.RequestID != "evt_1:agent_1" {
-		t.Fatalf("runtime did not receive normalized trigger: %+v", runtime.lastTrigger)
+	if runtime.lastReq.RequestID != "evt_1:agent_1" {
+		t.Fatalf("runtime did not receive normalized request: %+v", runtime.lastReq)
+	}
+	if builder.calls != 1 || builder.lastTrigger.RequestID != "evt_1:agent_1" {
+		t.Fatalf("builder did not receive normalized trigger: calls=%d trigger=%+v", builder.calls, builder.lastTrigger)
 	}
 	if audit.calls != 1 {
 		t.Fatalf("audit calls = %d, want 1", audit.calls)
@@ -65,7 +76,8 @@ func TestAgentRunOrchestratorSuccessWritesAuditedResponse(t *testing.T) {
 	if audit.lastInput.AgentID != "agent_1" || audit.lastInput.TriggerMessageID != "msg_user_1" {
 		t.Fatalf("audit input did not preserve trigger metadata: %+v", audit.lastInput)
 	}
-	if audit.lastInput.OutputSummary["final_text"] != "answer" || audit.lastInput.OutputSummary["model"] != "test-model" {
+	modelSummary, ok := audit.lastInput.OutputSummary["model"].(agentaudit.Summary)
+	if !ok || audit.lastInput.OutputSummary["final_text"] != "answer" || modelSummary["model"] != "test-model" {
 		t.Fatalf("audit output summary mismatch: %+v", audit.lastInput.OutputSummary)
 	}
 	if writer.calls != 1 {
@@ -88,11 +100,12 @@ func TestAgentRunOrchestratorSuccessWritesAuditedResponse(t *testing.T) {
 func TestAgentRunOrchestratorRuntimeFailureRecordsFailedAudit(t *testing.T) {
 	runtimeErr := errors.New("runtime unavailable")
 	runtime := &recordingAgentRuntime{err: runtimeErr}
+	builder := &recordingRuntimeRequestBuilder{request: validRuntimeRequestForTrigger(testAgentTrigger())}
 	audit := &recordingAgentRunAuditRecorder{
 		run: agentaudit.AgentRun{RunID: "run_failed_1"},
 	}
 	writer := &recordingAgentResponseWriter{}
-	orchestrator := newTestAgentRunOrchestrator(t, runtime, audit, writer)
+	orchestrator := newTestAgentRunOrchestrator(t, runtime, builder, audit, writer)
 
 	_, err := orchestrator.Run(context.Background(), testAgentTrigger())
 	if !errors.Is(err, runtimeErr) {
@@ -109,12 +122,74 @@ func TestAgentRunOrchestratorRuntimeFailureRecordsFailedAudit(t *testing.T) {
 	}
 }
 
+func TestAgentRunOrchestratorRequiresPolicyForRecursiveResponse(t *testing.T) {
+	runtime := &recordingAgentRuntime{
+		result: agentruntime.RunResult{
+			RunID:     "run_1",
+			FinalText: "answer",
+			Metadata:  map[string]string{"allow_recursive_trigger": "true"},
+		},
+	}
+	builder := &recordingRuntimeRequestBuilder{request: validRuntimeRequestForTrigger(testAgentTrigger())}
+	audit := &recordingAgentRunAuditRecorder{
+		run: agentaudit.AgentRun{RunID: "run_1"},
+	}
+	writer := &recordingAgentResponseWriter{
+		result: AgentResponseResult{
+			Message: logic.Message{
+				ServerMsgID:    "msg_agent_1",
+				ConversationID: "single:agent_1:user_1",
+				Seq:            9,
+				SenderID:       "agent_1",
+				ReceiverID:     "user_1",
+				ChatType:       ConversationTypeSingle,
+				ContentType:    ContentTypeText,
+				Content:        "answer",
+			},
+		},
+	}
+	orchestrator := newTestAgentRunOrchestrator(t, runtime, builder, audit, writer)
+
+	if _, err := orchestrator.Run(context.Background(), testAgentTrigger()); err != nil {
+		t.Fatalf("run orchestrator: %v", err)
+	}
+	if writer.lastReq.AllowRecursiveTrigger {
+		t.Fatalf("allow_recursive_trigger should require runtime policy opt-in: %+v", writer.lastReq)
+	}
+}
+
+func TestAgentRunOrchestratorRequestBuilderFailureRecordsFailedAudit(t *testing.T) {
+	builderErr := errors.New("agent config unavailable")
+	runtime := &recordingAgentRuntime{result: agentruntime.RunResult{RunID: "run_1", FinalText: "answer"}}
+	builder := &recordingRuntimeRequestBuilder{err: builderErr}
+	audit := &recordingAgentRunAuditRecorder{
+		run: agentaudit.AgentRun{RunID: "run_request_failed_1"},
+	}
+	writer := &recordingAgentResponseWriter{}
+	orchestrator := newTestAgentRunOrchestrator(t, runtime, builder, audit, writer)
+
+	_, err := orchestrator.Run(context.Background(), testAgentTrigger())
+	if !errors.Is(err, builderErr) {
+		t.Fatalf("got error %v, want builder error", err)
+	}
+	if runtime.calls != 0 {
+		t.Fatalf("runtime calls = %d, want 0", runtime.calls)
+	}
+	if audit.calls != 1 || audit.lastInput.Status != agentaudit.StatusFailed || audit.lastInput.ErrorCode != "runtime_request_error" {
+		t.Fatalf("audit did not record request build failure: calls=%d input=%+v", audit.calls, audit.lastInput)
+	}
+	if writer.calls != 0 {
+		t.Fatalf("writer calls = %d, want 0", writer.calls)
+	}
+}
+
 func TestAgentRunOrchestratorAuditFailureStopsResponseWrite(t *testing.T) {
 	auditErr := errors.New("audit database unavailable")
-	runtime := &recordingAgentRuntime{result: AgentRuntimeResult{FinalText: "answer"}}
+	runtime := &recordingAgentRuntime{result: agentruntime.RunResult{RunID: "run_1", FinalText: "answer"}}
+	builder := &recordingRuntimeRequestBuilder{request: validRuntimeRequestForTrigger(testAgentTrigger())}
 	audit := &recordingAgentRunAuditRecorder{err: auditErr}
 	writer := &recordingAgentResponseWriter{}
-	orchestrator := newTestAgentRunOrchestrator(t, runtime, audit, writer)
+	orchestrator := newTestAgentRunOrchestrator(t, runtime, builder, audit, writer)
 
 	_, err := orchestrator.Run(context.Background(), testAgentTrigger())
 	if !errors.Is(err, auditErr) {
@@ -129,12 +204,13 @@ func TestAgentRunOrchestratorAuditFailureStopsResponseWrite(t *testing.T) {
 }
 
 func TestAgentRunOrchestratorRejectsEmptyFinalText(t *testing.T) {
-	runtime := &recordingAgentRuntime{result: AgentRuntimeResult{FinalText: " \t\n "}}
+	runtime := &recordingAgentRuntime{result: agentruntime.RunResult{RunID: "run_1", FinalText: " \t\n "}}
+	builder := &recordingRuntimeRequestBuilder{request: validRuntimeRequestForTrigger(testAgentTrigger())}
 	audit := &recordingAgentRunAuditRecorder{
 		run: agentaudit.AgentRun{RunID: "run_empty_1"},
 	}
 	writer := &recordingAgentResponseWriter{}
-	orchestrator := newTestAgentRunOrchestrator(t, runtime, audit, writer)
+	orchestrator := newTestAgentRunOrchestrator(t, runtime, builder, audit, writer)
 
 	_, err := orchestrator.Run(context.Background(), testAgentTrigger())
 	if err == nil {
@@ -156,12 +232,13 @@ func TestAgentRunOrchestratorRejectsEmptyFinalText(t *testing.T) {
 
 func TestAgentRunOrchestratorPropagatesResponseWriterFailure(t *testing.T) {
 	writerErr := errors.New("message service rejected response")
-	runtime := &recordingAgentRuntime{result: AgentRuntimeResult{FinalText: "answer"}}
+	runtime := &recordingAgentRuntime{result: agentruntime.RunResult{RunID: "run_1", FinalText: "answer"}}
+	builder := &recordingRuntimeRequestBuilder{request: validRuntimeRequestForTrigger(testAgentTrigger())}
 	audit := &recordingAgentRunAuditRecorder{
 		run: agentaudit.AgentRun{RunID: "run_1"},
 	}
 	writer := &recordingAgentResponseWriter{err: writerErr}
-	orchestrator := newTestAgentRunOrchestrator(t, runtime, audit, writer)
+	orchestrator := newTestAgentRunOrchestrator(t, runtime, builder, audit, writer)
 
 	_, err := orchestrator.Run(context.Background(), testAgentTrigger())
 	if !errors.Is(err, writerErr) {
@@ -175,12 +252,13 @@ func TestAgentRunOrchestratorPropagatesResponseWriterFailure(t *testing.T) {
 	}
 }
 
-func newTestAgentRunOrchestrator(t *testing.T, runtime AgentRuntime, audit AgentRunAuditRecorder, writer ResponseWriter) *AgentRunOrchestrator {
+func newTestAgentRunOrchestrator(t *testing.T, runtime agentruntime.Runtime, builder RuntimeRequestBuilder, audit AgentRunAuditRecorder, writer ResponseWriter) *AgentRunOrchestrator {
 	t.Helper()
 	orchestrator, err := NewAgentRunOrchestrator(AgentRunOrchestratorConfig{
-		Runtime: runtime,
-		Audit:   audit,
-		Writer:  writer,
+		Runtime:        runtime,
+		RequestBuilder: builder,
+		Audit:          audit,
+		Writer:         writer,
 		Now: func() time.Time {
 			return time.Unix(100, 0)
 		},
@@ -215,19 +293,35 @@ func testAgentTrigger() AgentTrigger {
 }
 
 type recordingAgentRuntime struct {
+	calls   int
+	lastReq agentruntime.RunRequest
+	result  agentruntime.RunResult
+	err     error
+}
+
+func (r *recordingAgentRuntime) Run(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
+	r.calls++
+	r.lastReq = req
+	if r.err != nil {
+		return agentruntime.RunResult{}, r.err
+	}
+	return r.result, nil
+}
+
+type recordingRuntimeRequestBuilder struct {
 	calls       int
 	lastTrigger AgentTrigger
-	result      AgentRuntimeResult
+	request     agentruntime.RunRequest
 	err         error
 }
 
-func (r *recordingAgentRuntime) Run(_ context.Context, trigger AgentTrigger) (AgentRuntimeResult, error) {
-	r.calls++
-	r.lastTrigger = trigger
-	if r.err != nil {
-		return AgentRuntimeResult{}, r.err
+func (b *recordingRuntimeRequestBuilder) BuildRuntimeRequest(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+	b.calls++
+	b.lastTrigger = trigger
+	if b.err != nil {
+		return agentruntime.RunRequest{}, b.err
 	}
-	return r.result, nil
+	return b.request, nil
 }
 
 type recordingAgentRunAuditRecorder struct {
@@ -260,4 +354,61 @@ func (w *recordingAgentResponseWriter) WriteAgentResponse(_ context.Context, req
 		return AgentResponseResult{}, w.err
 	}
 	return w.result, nil
+}
+
+func validRuntimeRequestForTrigger(trigger AgentTrigger) agentruntime.RunRequest {
+	promptText := trigger.PromptText
+	if promptText == "" {
+		promptText = trigger.SourceMessageText
+	}
+	return agentruntime.RunRequest{
+		RequestID:          trigger.RequestID,
+		EventID:            trigger.EventID,
+		OperationID:        trigger.OperationID,
+		TraceID:            trigger.TraceID,
+		TriggerType:        trigger.TriggerType,
+		AgentUserID:        trigger.AgentUserID,
+		RequestingUserID:   trigger.RequestingUserID,
+		ConversationID:     trigger.ConversationID,
+		ConversationType:   trigger.ConversationType,
+		TriggerMessageID:   trigger.TriggerMessageID,
+		TriggerSeq:         trigger.TriggerSeq,
+		PromptText:         promptText,
+		ReplyToMessageID:   trigger.ReplyToMessageID,
+		SourceAgentRunID:   trigger.SourceAgentRunID,
+		SourceAgentUserID:  trigger.SourceAgentUserID,
+		SourceMessageID:    trigger.SourceMessageID,
+		SourceMessageSeq:   trigger.SourceMessageSeq,
+		SourceMessageText:  trigger.SourceMessageText,
+		SourceContentType:  trigger.SourceContentType,
+		TargetAgentUserIDs: append([]string(nil), trigger.TargetAgentUserIDs...),
+		Agent: agentruntime.AgentConfig{
+			AgentID:     "agent_profile_1",
+			AgentUserID: trigger.AgentUserID,
+			Name:        "Support Agent",
+			Status:      agentruntime.AgentStatusActive,
+			Prompt: agentruntime.PromptRef{
+				PromptID: "prompt_1",
+				Content:  "Answer using the configured support policy.",
+				Version:  "v1",
+			},
+			Model: agentruntime.ModelConfig{
+				Provider: "deepseek",
+				Model:    "deepseek-v4-pro",
+			},
+			Policy: agentruntime.RuntimePolicy{
+				MaxToolCalls:                   3,
+				MaxRunDuration:                 time.Minute,
+				RequireMessageServiceWriteback: true,
+			},
+		},
+		Conversation: []agentruntime.ConversationMessage{{
+			ServerMsgID: trigger.SourceMessageID,
+			Seq:         trigger.SourceMessageSeq,
+			SenderID:    trigger.RequestingUserID,
+			SenderType:  agentruntime.SenderTypeUser,
+			ContentType: trigger.SourceContentType,
+			Text:        trigger.SourceMessageText,
+		}},
+	}
 }

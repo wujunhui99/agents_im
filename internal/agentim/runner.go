@@ -6,21 +6,27 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
 )
 
-type AgentRuntime interface {
-	Run(ctx context.Context, trigger AgentTrigger) (AgentRuntimeResult, error)
+type RuntimeRequestBuilder interface {
+	BuildRuntimeRequest(ctx context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error)
 }
 
-type AgentRuntimeResult struct {
-	FinalText             string
-	OutputSummary         agentaudit.Summary
-	AllowRecursiveTrigger bool
+type RuntimeRequestBuilderFunc func(ctx context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error)
+
+func (f RuntimeRequestBuilderFunc) BuildRuntimeRequest(ctx context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+	if f == nil {
+		return agentruntime.RunRequest{}, apperror.Internal("agent runtime request builder is not configured")
+	}
+	return f(ctx, trigger)
 }
 
 type AgentRunAuditRecorder interface {
@@ -28,10 +34,11 @@ type AgentRunAuditRecorder interface {
 }
 
 type AgentRunOrchestrator struct {
-	runtime AgentRuntime
-	audit   AgentRunAuditRecorder
-	writer  ResponseWriter
-	now     func() time.Time
+	runtime        agentruntime.Runtime
+	requestBuilder RuntimeRequestBuilder
+	audit          AgentRunAuditRecorder
+	writer         ResponseWriter
+	now            func() time.Time
 }
 
 type AgentRunOrchestratorResult struct {
@@ -40,15 +47,19 @@ type AgentRunOrchestratorResult struct {
 }
 
 type AgentRunOrchestratorConfig struct {
-	Runtime AgentRuntime
-	Audit   AgentRunAuditRecorder
-	Writer  ResponseWriter
-	Now     func() time.Time
+	Runtime        agentruntime.Runtime
+	RequestBuilder RuntimeRequestBuilder
+	Audit          AgentRunAuditRecorder
+	Writer         ResponseWriter
+	Now            func() time.Time
 }
 
 func NewAgentRunOrchestrator(config AgentRunOrchestratorConfig) (*AgentRunOrchestrator, error) {
 	if config.Runtime == nil {
 		return nil, apperror.Internal("agent runtime is not configured")
+	}
+	if config.RequestBuilder == nil {
+		return nil, apperror.Internal("agent runtime request builder is not configured")
 	}
 	if config.Audit == nil {
 		return nil, apperror.Internal("agent audit recorder is not configured")
@@ -61,10 +72,11 @@ func NewAgentRunOrchestrator(config AgentRunOrchestratorConfig) (*AgentRunOrches
 		now = time.Now
 	}
 	return &AgentRunOrchestrator{
-		runtime: config.Runtime,
-		audit:   config.Audit,
-		writer:  config.Writer,
-		now:     now,
+		runtime:        config.Runtime,
+		requestBuilder: config.RequestBuilder,
+		audit:          config.Audit,
+		writer:         config.Writer,
+		now:            now,
 	}, nil
 }
 
@@ -74,6 +86,9 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	}
 	if o.audit == nil {
 		return AgentRunOrchestratorResult{}, apperror.Internal("agent audit recorder is not configured")
+	}
+	if o.requestBuilder == nil {
+		return AgentRunOrchestratorResult{}, apperror.Internal("agent runtime request builder is not configured")
 	}
 	if o.writer == nil {
 		return AgentRunOrchestratorResult{}, apperror.Internal("agent response writer is not configured")
@@ -89,7 +104,27 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 		now = time.Now
 	}
 	startedAt := now().UTC()
-	runtimeResult, err := o.runtime.Run(ctx, normalized)
+
+	runtimeReq, err := o.requestBuilder.BuildRuntimeRequest(ctx, normalized)
+	if err != nil {
+		finishedAt := now().UTC()
+		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, "runtime_request_error", err)
+		if auditErr != nil {
+			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
+		}
+		return AgentRunOrchestratorResult{}, err
+	}
+	runtimeReq, err = normalizeRuntimeRequestForTrigger(runtimeReq, normalized)
+	if err != nil {
+		finishedAt := now().UTC()
+		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, "runtime_request_invalid", err)
+		if auditErr != nil {
+			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
+		}
+		return AgentRunOrchestratorResult{}, err
+	}
+
+	runtimeResult, err := o.runtime.Run(ctx, runtimeReq)
 	finishedAt := now().UTC()
 	if err != nil {
 		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, "runtime_error", err)
@@ -98,25 +133,39 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 		}
 		return AgentRunOrchestratorResult{}, err
 	}
-
-	finalText := strings.TrimSpace(runtimeResult.FinalText)
-	if finalText == "" {
-		emptyTextErr := apperror.InvalidArgument("runtime final text is required")
-		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, "empty_final_text", emptyTextErr)
-		if auditErr != nil {
-			return AgentRunOrchestratorResult{}, errors.Join(emptyTextErr, fmt.Errorf("record failed agent run audit: %w", auditErr))
+	runtimeResult, err = agentruntime.NormalizeRunResult(runtimeResult)
+	if err != nil {
+		code := "runtime_result_invalid"
+		if strings.Contains(err.Error(), "final_text") {
+			code = "empty_final_text"
 		}
-		return AgentRunOrchestratorResult{}, emptyTextErr
+		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, code, err)
+		if auditErr != nil {
+			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
+		}
+		return AgentRunOrchestratorResult{}, err
+	}
+	runtimeResult.FinalText = strings.TrimSpace(runtimeResult.FinalText)
+	if runtimeReq.RunID != "" && runtimeResult.RunID != runtimeReq.RunID {
+		err := apperror.Internal("runtime returned mismatched run_id")
+		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, "runtime_result_invalid", err)
+		if auditErr != nil {
+			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
+		}
+		return AgentRunOrchestratorResult{}, err
 	}
 
+	finalText := runtimeResult.FinalText
+
 	auditRun, err := o.audit.RecordAgentRun(ctx, agentaudit.CreateRunInput{
+		RunID:            runtimeResult.RunID,
 		AgentID:          normalized.AgentUserID,
 		ConversationID:   normalized.ConversationID,
 		TriggerMessageID: normalized.TriggerMessageID,
 		RequestingUserID: normalized.RequestingUserID,
 		Status:           agentaudit.StatusSucceeded,
 		InputSummary:     agentRunInputSummary(normalized),
-		OutputSummary:    agentRunOutputSummary(finalText, runtimeResult.OutputSummary),
+		OutputSummary:    agentRunOutputSummary(runtimeResult),
 		TraceID:          normalized.TraceID,
 		RequestID:        normalized.RequestID,
 		StartedAt:        startedAt,
@@ -129,7 +178,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 		return AgentRunOrchestratorResult{}, apperror.Internal("agent audit returned empty run_id")
 	}
 
-	responseReq, err := buildAgentResponseRequest(normalized, auditRun.RunID, finalText, runtimeResult.AllowRecursiveTrigger)
+	responseReq, err := buildAgentResponseRequest(normalized, auditRun.RunID, finalText, allowRecursiveTriggerFromRuntimeResult(runtimeReq.Agent.Policy, runtimeResult))
 	if err != nil {
 		return AgentRunOrchestratorResult{}, err
 	}
@@ -216,6 +265,71 @@ func normalizeAgentTriggerForRun(trigger AgentTrigger) (AgentTrigger, error) {
 	trigger.SourceContentType = normalizeOptional(trigger.SourceContentType)
 	trigger.TargetAgentUserIDs = uniqueNonEmptyIDs(trigger.TargetAgentUserIDs)
 	return trigger, nil
+}
+
+func normalizeRuntimeRequestForTrigger(req agentruntime.RunRequest, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+	normalized, err := agentruntime.NormalizeRunRequest(req)
+	if err != nil {
+		return agentruntime.RunRequest{}, err
+	}
+	if normalized.RequestID != trigger.RequestID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime request_id must match trigger")
+	}
+	if normalized.EventID != trigger.EventID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime event_id must match trigger")
+	}
+	if normalized.OperationID != trigger.OperationID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime operation_id must match trigger")
+	}
+	if normalized.TraceID != trigger.TraceID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime trace_id must match trigger")
+	}
+	if normalized.TriggerType != trigger.TriggerType {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime trigger_type must match trigger")
+	}
+	if normalized.AgentUserID != trigger.AgentUserID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime agent_user_id must match trigger")
+	}
+	if normalized.RequestingUserID != trigger.RequestingUserID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime requesting_user_id must match trigger")
+	}
+	if normalized.ConversationID != trigger.ConversationID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime conversation_id must match trigger")
+	}
+	if normalized.ConversationType != trigger.ConversationType {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime conversation_type must match trigger")
+	}
+	if normalized.TriggerMessageID != trigger.TriggerMessageID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime trigger_message_id must match trigger")
+	}
+	if normalized.TriggerSeq != trigger.TriggerSeq {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime trigger_seq must match trigger")
+	}
+	if normalized.ReplyToMessageID != trigger.ReplyToMessageID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime reply_to_message_id must match trigger")
+	}
+	if normalized.SourceAgentRunID != trigger.SourceAgentRunID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime source_agent_run_id must match trigger")
+	}
+	if normalized.SourceAgentUserID != trigger.SourceAgentUserID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime source_agent_user_id must match trigger")
+	}
+	if normalized.SourceMessageID != trigger.SourceMessageID {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime source_message_id must match trigger")
+	}
+	if normalized.SourceMessageSeq != trigger.SourceMessageSeq {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime source_message_seq must match trigger")
+	}
+	if normalized.SourceMessageText != trigger.SourceMessageText {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime source_message_text must match trigger")
+	}
+	if normalized.SourceContentType != trigger.SourceContentType {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime source_content_type must match trigger")
+	}
+	if !sameStringSlice(normalized.TargetAgentUserIDs, trigger.TargetAgentUserIDs) {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("runtime target_agent_user_ids must match trigger")
+	}
+	return normalized, nil
 }
 
 func normalizeTriggerType(value string) (string, error) {
@@ -339,16 +453,84 @@ func agentRunInputSummary(trigger AgentTrigger) agentaudit.Summary {
 	}
 }
 
-func agentRunOutputSummary(finalText string, runtimeSummary agentaudit.Summary) agentaudit.Summary {
-	summary := agentaudit.Summary{
-		"final_text":       finalText,
-		"final_text_bytes": len([]byte(finalText)),
+func sameStringSlice(left []string, right []string) bool {
+	if len(left) != len(right) {
+		return false
 	}
-	for key, value := range runtimeSummary {
-		if key == "final_text" || key == "final_text_bytes" {
-			continue
+	for i := range left {
+		if left[i] != right[i] {
+			return false
 		}
-		summary[key] = value
+	}
+	return true
+}
+
+func agentRunOutputSummary(result agentruntime.RunResult) agentaudit.Summary {
+	summary := agentaudit.Summary{
+		"final_text":       result.FinalText,
+		"final_text_bytes": len([]byte(result.FinalText)),
+	}
+	if result.FinishReason != "" {
+		summary["finish_reason"] = result.FinishReason
+	}
+	if result.Model.Provider != "" || result.Model.Model != "" || result.Model.ResponseID != "" {
+		summary["model"] = agentaudit.Summary{
+			"provider":    result.Model.Provider,
+			"model":       result.Model.Model,
+			"version":     result.Model.ModelVersion,
+			"response_id": result.Model.ResponseID,
+		}
+	}
+	if result.Usage.TotalTokens > 0 || result.Usage.PromptTokens > 0 || result.Usage.CompletionTokens > 0 || result.Usage.ReasoningTokens > 0 || result.Usage.CachedTokens > 0 {
+		summary["usage"] = agentaudit.Summary{
+			"prompt_tokens":     result.Usage.PromptTokens,
+			"completion_tokens": result.Usage.CompletionTokens,
+			"reasoning_tokens":  result.Usage.ReasoningTokens,
+			"cached_tokens":     result.Usage.CachedTokens,
+			"total_tokens":      result.Usage.TotalTokens,
+		}
+	}
+	if len(result.ToolCalls) > 0 {
+		toolCalls := make([]agentaudit.Summary, 0, len(result.ToolCalls))
+		for _, call := range result.ToolCalls {
+			toolCalls = append(toolCalls, agentaudit.Summary{
+				"tool_call_id":  call.ToolCallID,
+				"tool_id":       call.ToolID,
+				"tool_name":     call.ToolName,
+				"status":        call.Status,
+				"error_code":    call.ErrorCode,
+				"duration_ms":   call.DurationMs,
+				"metadata_keys": mapKeys(call.Metadata),
+			})
+		}
+		summary["tool_calls"] = toolCalls
+	}
+	if len(result.Metadata) > 0 {
+		summary["metadata"] = result.Metadata
 	}
 	return summary
+}
+
+func allowRecursiveTriggerFromRuntimeResult(policy agentruntime.RuntimePolicy, result agentruntime.RunResult) bool {
+	if !policy.AllowAgentMessageRecursion {
+		return false
+	}
+	raw := strings.TrimSpace(result.Metadata["allow_recursive_trigger"])
+	if raw == "" {
+		return false
+	}
+	allowed, err := strconv.ParseBool(raw)
+	return err == nil && allowed
+}
+
+func mapKeys(values map[string]string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
