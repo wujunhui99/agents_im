@@ -221,6 +221,17 @@ agent_runs
 - finished_at
 ```
 
+当前 provider adapter 基线：
+
+- Go package：`internal/agentruntime/llm/deepseek`。
+- Eino component：`github.com/cloudwego/eino-ext/components/model/deepseek`。
+- 配置来源：`DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`。
+- 默认值：`DEEPSEEK_BASE_URL=https://api.deepseek.com`，`DEEPSEEK_MODEL=deepseek-v4-pro`。
+- 缺少 `DEEPSEEK_API_KEY` 时构造 ChatModel 必须返回明确错误，不能降级为 mock/fake response。
+- 默认 `go test ./...` 不请求 DeepSeek；live smoke test 只能在 `RUN_LIVE_DEEPSEEK_TESTS=1` 且存在 API key 时运行。
+
+该基线不实现 Agent runtime orchestration、工具/MCP 调用、上下文装配或 IM 写回 worker。
+
 工具调用审计：
 
 ```text
