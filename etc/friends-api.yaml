@@ -4,3 +4,5 @@ Port: 8082
 Auth:
   AccessSecret: dev-jwt-secret-change-me
   AccessExpire: 86400
+StorageDriver: memory
+DataSource: ${DATABASE_URL}

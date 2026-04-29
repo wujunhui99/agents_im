@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agents-im-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agents_im}
+      POSTGRES_USER: ${POSTGRES_USER:-agents_im}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agents_im_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - agents_im_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  agents_im_pg_data:

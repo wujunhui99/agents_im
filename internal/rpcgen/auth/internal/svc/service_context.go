@@ -20,8 +20,8 @@ type ServiceContext struct {
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
-	authRepo := authrepo.NewMemoryRepository()
+	userLogic := userlogic.NewUserLogic(userrepo.MustRepositoryForStorage(c.StorageDriver, c.DataSource))
+	authRepo := authrepo.MustRepositoryForStorage(c.StorageDriver, c.DataSource)
 	return &ServiceContext{
 		Config:    c,
 		AuthLogic: business.NewAuthLogic(authRepo, useradapter.NewLogicClient(userLogic), business.NewPasswordHasher(), token.NewHMACTokenManager(c.Auth.AccessSecret, time.Duration(c.Auth.AccessExpire)*time.Second)),

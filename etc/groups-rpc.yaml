@@ -1,3 +1,7 @@
 Name: groups-rpc
-ListenOn: 0.0.0.0:9092
-
+ListenOn: 0.0.0.0:9093
+Auth:
+  AccessSecret: dev-jwt-secret-change-me
+  AccessExpire: 86400
+StorageDriver: memory
+DataSource: ${DATABASE_URL}

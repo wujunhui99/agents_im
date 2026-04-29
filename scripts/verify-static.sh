@@ -61,16 +61,21 @@ required_files=(
   "internal/model/friendship.go"
   "internal/model/group.go"
   "internal/repository/memory.go"
+  "internal/repository/postgres_common.go"
+  "internal/repository/postgres_user_friends.go"
   "internal/repository/groups_memory.go"
   "internal/repository/groups_repository.go"
+  "internal/repository/postgres_groups.go"
   "internal/repository/message_memory.go"
   "internal/repository/message_repository.go"
+  "internal/repository/postgres_message.go"
   "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
   "internal/types/types.go"
   "internal/auth/logic/authlogic.go"
   "internal/auth/logic/auth/gozero_logic.go"
   "internal/auth/repository/memory.go"
+  "internal/auth/repository/postgres.go"
   "internal/auth/handler/health_handler.go"
   "internal/auth/handler/gozero_routes.go"
   "internal/auth/token/token.go"
@@ -106,6 +111,7 @@ required_files=(
   "docs/design-docs/message-chain-contract.md"
   "docs/design-docs/message-storage.md"
   "docs/design-docs/jwt-auth-middleware.md"
+  "docs/design-docs/postgres-persistence.md"
   "docs/design-docs/gateway-message-contract.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
@@ -114,6 +120,11 @@ required_files=(
   "docs/exec-plans/active/groups-service-go-zero.md"
   "docs/exec-plans/active/message-storage.md"
   "internal/repository/message_storage_contract.go"
+  "docker-compose.yml"
+  ".env.example"
+  "db/migrations/001_init_postgres.sql"
+  "scripts/migrate-postgres.sh"
+  "tests/postgres_persistence_integration_test.go"
   "docs/exec-plans/active/gateway-message-contract.md"
   "docs/exec-plans/active/read-receipts.md"
   "docs/exec-plans/active/remove-handwritten-compat.md"
@@ -521,6 +532,27 @@ rg -q "Salt" internal/auth/model/credential.go
 rg -q "user-rpc" docs/design-docs/groups-service-go-zero.md docs/product-specs/groups-service.md
 rg -q "client_msg_id" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md "$message_plan_file"
 rg -q "has_read_seq" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md "$message_plan_file"
+pg_persistence_patterns=(
+  "users"
+  "auth_credentials"
+  "friendships"
+  "groups"
+  "group_members"
+  "messages"
+  "conversation_threads"
+  "user_conversation_states"
+  "message_idempotency_keys"
+)
+
+for pattern in "${pg_persistence_patterns[@]}"; do
+  rg -q "$pattern" db/migrations/001_init_postgres.sql docs/design-docs/postgres-persistence.md
+done
+
+rg -q "StorageDriver" internal/config/config.go etc/*.yaml
+rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go internal/auth/repository/postgres.go
+rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
+rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
+rg -q "docker compose" scripts/migrate-postgres.sh docs/design-docs/postgres-persistence.md
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \

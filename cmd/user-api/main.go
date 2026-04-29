@@ -22,7 +22,7 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	serviceContext := svc.NewServiceContextWithAuth(repository.NewMemoryRepository(), cfg.Auth)
+	serviceContext := svc.NewServiceContextWithAuth(repository.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource), cfg.Auth)
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
 	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()

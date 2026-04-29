@@ -23,9 +23,9 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
+	userLogic := logic.NewUserLogic(repository.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource))
 	serviceContext := svc.NewGroupsServiceContextWithAuth(
-		repository.NewMemoryGroupsRepository(),
+		repository.MustGroupsRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
 		logic.NewUserLogicExistenceChecker(userLogic),
 		cfg.Auth,
 	)
