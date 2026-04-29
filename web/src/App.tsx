@@ -1,24 +1,28 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentType, type FormEvent } from 'react';
 import {
   Bell,
   ChevronRight,
   Compass,
   Contact,
+  LogOut,
   MessageCircle,
   MoreHorizontal,
   Plus,
   Search,
   Settings,
+  ShieldCheck,
   UserRound,
   UsersRound,
 } from 'lucide-react';
+import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
+import type { AuthUser } from './auth/session';
 
 type TabKey = 'messages' | 'contacts' | 'discover' | 'me';
 
 type TabDefinition = {
   key: TabKey;
   label: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
 };
 
 const tabs: TabDefinition[] = [
@@ -72,6 +76,24 @@ const friends = [
 ];
 
 function App() {
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
+  );
+}
+
+function AuthGate() {
+  const { session } = useAuth();
+
+  if (!session) {
+    return <AuthPage />;
+  }
+
+  return <AuthenticatedApp user={session.user} />;
+}
+
+function AuthenticatedApp({ user }: { user: AuthUser }) {
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
   const activeLabel = useMemo(() => tabs.find((tab) => tab.key === activeTab)?.label ?? '消息', [activeTab]);
 
@@ -90,7 +112,7 @@ function App() {
           </div>
         </header>
 
-        <section className="content-area">{renderPage(activeTab)}</section>
+        <section className="content-area">{renderPage(activeTab, user)}</section>
 
         <nav className="tab-bar" role="tablist" aria-label="主导航">
           {tabs.map((tab) => {
@@ -116,14 +138,127 @@ function App() {
   );
 }
 
-function renderPage(tab: TabKey) {
+function AuthPage() {
+  const { login, register } = useAuth();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [identifier, setIdentifier] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const isRegister = mode === 'register';
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+
+    try {
+      if (isRegister) {
+        await register({
+          identifier: identifier.trim(),
+          displayName: displayName.trim(),
+          password,
+        });
+      } else {
+        await login({
+          identifier: identifier.trim(),
+          password,
+        });
+      }
+    } catch (caughtError) {
+      setError(authErrorMessage(caughtError));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function switchMode(nextMode: 'login' | 'register') {
+    setMode(nextMode);
+    setError('');
+  }
+
+  return (
+    <main className="app-shell auth-app-shell" aria-label="Agents IM 认证">
+      <section className="phone-frame auth-frame">
+        <div className="auth-hero">
+          <div className="avatar avatar-green avatar-large">
+            <ShieldCheck size={30} />
+          </div>
+          <div>
+            <p className="auth-kicker">Agents IM</p>
+            <h1>{isRegister ? '注册 Agents IM' : '登录 Agents IM'}</h1>
+          </div>
+        </div>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <label className="auth-field" htmlFor="auth-identifier">
+            <span>账号</span>
+            <input
+              id="auth-identifier"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              autoComplete="username"
+              required
+            />
+          </label>
+
+          {isRegister ? (
+            <label className="auth-field" htmlFor="auth-display-name">
+              <span>昵称</span>
+              <input
+                id="auth-display-name"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                autoComplete="nickname"
+                required
+              />
+            </label>
+          ) : null}
+
+          <label className="auth-field" htmlFor="auth-password">
+            <span>密码</span>
+            <input
+              id="auth-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              type="password"
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              required
+            />
+          </label>
+
+          {error ? <p className="auth-error" role="alert">{error}</p> : null}
+
+          <button className="auth-submit" type="submit" disabled={submitting}>
+            {submitting ? '请稍候' : isRegister ? '注册并登录' : '登录'}
+          </button>
+        </form>
+
+        <div className="auth-switch">
+          {isRegister ? (
+            <button type="button" onClick={() => switchMode('login')}>
+              返回登录
+            </button>
+          ) : (
+            <button type="button" onClick={() => switchMode('register')}>
+              注册账号
+            </button>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function renderPage(tab: TabKey, user: AuthUser) {
   switch (tab) {
     case 'contacts':
       return <ContactsPage />;
     case 'discover':
       return <DiscoverPage />;
     case 'me':
-      return <MePage />;
+      return <MePage user={user} />;
     case 'messages':
     default:
       return <MessagesPage />;
@@ -195,15 +330,18 @@ function DiscoverPage() {
   );
 }
 
-function MePage() {
+function MePage({ user }: { user: AuthUser }) {
+  const { logout } = useAuth();
+
   return (
     <div className="page-stack me-page">
       <section className="profile-card">
-        <div className="avatar avatar-green avatar-large">J</div>
+        <div className="avatar avatar-green avatar-large">{avatarText(user.displayName)}</div>
         <div className="profile-main">
-          <strong>junhui</strong>
-          <p>微信号：alice_001</p>
-          <p>地区：Shanghai</p>
+          <strong>{user.displayName}</strong>
+          <p>微信号：{user.identifier}</p>
+          <p>地区：{user.region || '未设置'}</p>
+          <p>用户 ID：{user.userId}</p>
         </div>
         <ChevronRight size={20} />
       </section>
@@ -215,6 +353,10 @@ function MePage() {
         <ActionRow label="朋友圈" helper="我的动态" accent="blue" />
         <ActionRow label="设置" helper="账号、安全、通知" accent="gray" trailingIcon={Settings} />
       </section>
+      <button className="logout-button" type="button" onClick={logout}>
+        <LogOut size={18} />
+        <span>退出登录</span>
+      </button>
     </div>
   );
 }
@@ -237,7 +379,7 @@ function ActionRow({
   label: string;
   helper: string;
   accent: string;
-  trailingIcon?: React.ComponentType<{ size?: number }>;
+  trailingIcon?: ComponentType<{ size?: number }>;
 }) {
   return (
     <article className="action-row">
@@ -251,6 +393,14 @@ function ActionRow({
       <TrailingIcon size={18} />
     </article>
   );
+}
+
+function avatarText(displayName: string) {
+  const trimmed = displayName.trim();
+  if (!trimmed) {
+    return '我';
+  }
+  return trimmed.slice(0, 2).toUpperCase();
 }
 
 export default App;

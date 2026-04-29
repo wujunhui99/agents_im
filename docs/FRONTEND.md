@@ -1,6 +1,6 @@
 # FRONTEND.md
 
-本文档记录 `agents_im` Web 前端约定。当前阶段先搭微信风格主框架，后续再逐步接入真实接口与 WebSocket 消息链路。
+本文档记录 `agents_im` Web 前端约定。当前阶段已搭建微信风格主框架，并接入认证入口与 typed REST API client 基础；后续再逐步接入好友、群聊、消息和 WebSocket 链路。
 
 ## 技术栈
 
@@ -12,14 +12,14 @@
 
 ## 当前阶段范围
 
-前端第一阶段参考微信主框架，先完成四个一级页面：
+前端第一阶段参考微信主框架，完成四个一级页面：
 
 1. **消息**：会话列表、未读数、最近消息预览。
 2. **联系人**：新的朋友、群聊、标签、公众号入口，以及好友列表占位。
 3. **发现**：朋友圈、扫一扫、小程序等发现入口占位。
 4. **我的**：个人资料卡、服务、收藏、朋友圈、设置入口。
 
-当前页面使用本地 mock 数据，只搭信息架构和视觉骨架；真实登录、REST API、WebSocket、重连补消息和已读状态后续按 [`docs/product-specs/frontend-backend-contract.md`](./product-specs/frontend-backend-contract.md) 接入。
+当前会话、联系人和发现页仍使用本地 mock 数据；认证页按 [`docs/product-specs/frontend-backend-contract.md`](./product-specs/frontend-backend-contract.md) 调用 `/auth/login` 与 `/auth/register`。好友、群聊、消息 REST、WebSocket、重连补消息和已读状态后续按同一契约继续接入。
 
 ## 目录
 
@@ -28,11 +28,25 @@ web/
   index.html
   package.json
   src/
-    App.tsx        # 四 Tab 主框架
-    App.test.tsx   # 主导航行为测试
+    api/
+      client.ts        # typed REST API client
+      client.test.ts
+    auth/
+      AuthContext.tsx  # 轻量认证状态和登录/注册/退出动作
+      session.ts       # localStorage session 工具
+    App.tsx            # 认证入口和四 Tab 主框架
+    App.test.tsx       # 认证与主导航行为测试
     main.tsx
     styles.css
 ```
+
+## 认证与 API Client
+
+- REST client 入口为 `web/src/api/client.ts`，默认同源请求；需要跨域联调时使用 Vite env `VITE_API_BASE_URL` 覆盖，例如 `VITE_API_BASE_URL=http://127.0.0.1:8081`。
+- 后端响应必须使用统一 envelope：`{ "code": "OK", "message": "ok", "data": {} }`。`code !== "OK"` 或 HTTP 非 2xx 时抛出 typed `ApiError`。
+- 受保护接口由 client 注入 `Authorization: Bearer ***`。前端文档和示例不得记录真实 token。
+- MVP 认证状态使用 React Context 和 localStorage，key 为 `agents_im.auth.v1`。保存内容限于 access token 与当前用户展示信息；遇到损坏 session 会清理并回到登录页。
+- 未登录时显示登录/注册页；登录或注册成功后进入 `消息 / 联系人 / 发现 / 我的` 四 Tab。`我的` 页展示当前用户昵称、账号、地区和用户 ID，并提供退出登录。
 
 ## 本地命令
 
