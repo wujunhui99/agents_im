@@ -19,7 +19,15 @@
 3. **发现**：朋友圈、扫一扫、小程序等发现入口占位。
 4. **我的**：个人资料卡、服务、收藏、朋友圈、设置入口。
 
-当前页面使用本地 mock 数据，只搭信息架构和视觉骨架；真实登录、REST API、WebSocket、重连补消息和已读状态后续按 [`docs/product-specs/frontend-backend-contract.md`](./product-specs/frontend-backend-contract.md) 接入。
+当前页面使用本地 mock 数据搭信息架构和视觉骨架。消息页已具备会话列表、移动端进入聊天窗口、返回列表、文本发送 composer，以及 `sending` / `sent` / `failed` 基础状态。真实登录、重连补消息、去重缓存和完整已读状态后续按 [`docs/product-specs/frontend-backend-contract.md`](./product-specs/frontend-backend-contract.md) 接入。
+
+## 消息页边界
+
+- `web/src/features/messages/` 持有消息页组件和 mock 会话数据，当前不直接请求真实后端。
+- `web/src/models/messages.ts` 定义前端会话与消息模型，发送状态仅用于本地 UI 呈现。
+- `web/src/api/messages.ts` 是消息 REST 薄 adapter，函数签名覆盖 `sendMessage`、`pullMessages`、`getConversationSeqs`、`markRead`，字段名保持与前后端合约一致。
+- `web/src/api/websocketClient.ts` 是 WebSocket client wrapper，提供 `connect`、`send`、`close`，浏览器侧使用 `/ws?token=***` query fallback，并将后端 snake_case ACK 解析为 typed frontend ACK。
+- 当前 mock sender 会先追加 `sending` 消息，再模拟 ACK 更新为 `sent`；输入 `/fail` 可进入 `failed` 状态用于本地验收。
 
 ## 目录
 
@@ -28,8 +36,11 @@ web/
   index.html
   package.json
   src/
+    api/           # REST adapter 与 WebSocket wrapper
+    features/      # 页面级功能组件
+    models/        # typed frontend models
     App.tsx        # 四 Tab 主框架
-    App.test.tsx   # 主导航行为测试
+    App.test.tsx   # 主导航和消息页行为测试
     main.tsx
     styles.css
 ```

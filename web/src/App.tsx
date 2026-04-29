@@ -12,6 +12,7 @@ import {
   UserRound,
   UsersRound,
 } from 'lucide-react';
+import { MessagesPage } from './features/messages/MessagesPage';
 
 type TabKey = 'messages' | 'contacts' | 'discover' | 'me';
 
@@ -26,36 +27,6 @@ const tabs: TabDefinition[] = [
   { key: 'contacts', label: '联系人', icon: Contact },
   { key: 'discover', label: '发现', icon: Compass },
   { key: 'me', label: '我的', icon: UserRound },
-];
-
-const conversations = [
-  {
-    id: 'product-room',
-    title: '产品讨论群',
-    avatar: '产',
-    preview: '后端 MVP 已发布，开始搭前端主框架。',
-    time: '20:08',
-    unread: 3,
-    color: 'green',
-  },
-  {
-    id: 'junhui',
-    title: 'junhui',
-    avatar: 'J',
-    preview: '参考微信，先做四个主页面。',
-    time: '19:46',
-    unread: 1,
-    color: 'blue',
-  },
-  {
-    id: 'agent',
-    title: 'Agent 助手',
-    avatar: 'AI',
-    preview: '我可以帮你整理联系人和群聊。',
-    time: '昨天',
-    unread: 0,
-    color: 'purple',
-  },
 ];
 
 const contacts = [
@@ -128,29 +99,6 @@ function renderPage(tab: TabKey) {
     default:
       return <MessagesPage />;
   }
-}
-
-function MessagesPage() {
-  return (
-    <div className="page-stack">
-      <SearchBox placeholder="搜索" />
-      <section className="list-card conversation-list" aria-label="消息列表">
-        {conversations.map((item) => (
-          <article className="conversation-row" key={item.id}>
-            <div className={`avatar avatar-${item.color}`}>{item.avatar}</div>
-            <div className="row-main">
-              <div className="row-title-line">
-                <strong>{item.title}</strong>
-                <time>{item.time}</time>
-              </div>
-              <p>{item.preview}</p>
-            </div>
-            {item.unread > 0 ? <span className="unread-badge">{item.unread}</span> : null}
-          </article>
-        ))}
-      </section>
-    </div>
-  );
 }
 
 function ContactsPage() {
