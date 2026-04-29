@@ -150,3 +150,29 @@ If docs changed, run markdown link check excluding `docs/references`.
 5. `feature/mvp-frontend-contracts`
 
 Then verify `develop`, push, merge tested `develop` into `main`, verify again, and push.
+
+## feature/mvp-frontend-contracts Result
+
+Date: 2026-04-29
+
+Implemented:
+
+- Added frontend handoff contract at `docs/product-specs/frontend-backend-contract.md` covering auth, profile, user search, friends, groups, messages, WebSocket connect, commands, server push events, reconnect sync, and error envelopes.
+- Added local backend startup instructions at `docs/DEVELOPMENT.md`.
+- Added safe local scripts `scripts/dev-up.sh` and `scripts/dev-demo-data.sh`.
+- Added representative in-memory MVP acceptance smoke tests in `tests/mvp_backend_test.go`.
+- Updated `AGENTS.md`, `docs/product-specs/index.md`, and `scripts/verify-static.sh` so the handoff docs, scripts, and tests are part of repo navigation and static checks.
+
+Documented gap:
+
+- A dedicated `GET /groups` / `ListGroups` endpoint is not present in this worktree. The frontend handoff doc calls this out and uses create/join responses or known group IDs plus `GET /groups/:group_id/members` for the local demo flow.
+
+Verification:
+
+- `goctl --version`: `goctl version 1.10.1 linux/amd64`
+- `for f in api/*.api; do goctl api validate -api "$f"; done`: passed, five `api format ok` results.
+- `gofmt -w $(find . -name '*.go' -print)`: passed with no output.
+- `go test ./...`: passed.
+- `bash scripts/verify-static.sh`: passed, output `static verification passed`.
+- `docker compose config`: passed.
+- `npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./.ai-context/*" -not -path "./docs/references/*" -print)`: passed.
