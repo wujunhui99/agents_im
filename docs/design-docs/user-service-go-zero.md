@@ -75,6 +75,7 @@ tests/user_service_test.go
 - `Gender string`
 - `Age int32`
 - `Region string`
+- `AccountType string`
 - `CreatedAt time.Time`
 - `UpdatedAt time.Time`
 
@@ -83,6 +84,7 @@ tests/user_service_test.go
 - `Identifier` 经 `NormalizeIdentifier` 处理后唯一。
 - `Gender` 只允许空值、`unknown`、`male`、`female`、`other`。
 - `Age` 为 `0` 表示未设置；设置时范围为 `1..150`。
+- `AccountType` 只允许空值、`normal`、`agent`、`admin`；空值在 logic 和 repository 层统一归一化为 `normal`。
 - `UserID` 由 repository 生成，内存实现使用递增 ID。
 
 禁止字段：
@@ -92,6 +94,12 @@ tests/user_service_test.go
 - 验证码
 - OAuth/第三方登录凭据
 - 好友关系或群成员关系
+
+账号类型边界：
+
+- HTTP `POST /users` 不把请求体中的 `account_type` 传入业务 logic，公开创建始终得到 `normal`。
+- `auth` 注册通过 user adapter 创建用户，未传 `account_type`，因此始终得到 `normal`。
+- User RPC `CreateUserRequest.account_type` 是内部能力，可创建 `agent` 或 `admin`；非法值必须映射为 `INVALID_ARGUMENT`/gRPC `InvalidArgument`，不能降级为 `normal`。
 
 ## 错误处理
 

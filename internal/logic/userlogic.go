@@ -33,6 +33,7 @@ type UserProfile struct {
 	Gender      string `json:"gender"`
 	Age         int32  `json:"age"`
 	Region      string `json:"region"`
+	AccountType string `json:"account_type"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
@@ -44,6 +45,7 @@ type CreateUserRequest struct {
 	Gender      string `json:"gender"`
 	Age         int32  `json:"age"`
 	Region      string `json:"region"`
+	AccountType string `json:"account_type"`
 }
 
 type GetUserByIdentifierRequest struct {
@@ -97,6 +99,11 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 		return UserProfile{}, err
 	}
 
+	accountType, ok := model.NormalizeAccountType(req.AccountType)
+	if !ok {
+		return UserProfile{}, apperror.InvalidArgument("account_type must be normal, agent, or admin")
+	}
+
 	user, err := l.repo.Create(ctx, model.User{
 		Identifier:  identifier,
 		DisplayName: displayName,
@@ -104,6 +111,7 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 		Gender:      gender,
 		Age:         req.Age,
 		Region:      region,
+		AccountType: accountType,
 	})
 	if err != nil {
 		return UserProfile{}, err
@@ -307,6 +315,7 @@ func toProfile(user model.User) UserProfile {
 		Gender:      user.Gender,
 		Age:         user.Age,
 		Region:      user.Region,
+		AccountType: string(user.AccountType),
 		CreatedAt:   formatTime(user.CreatedAt),
 		UpdatedAt:   formatTime(user.UpdatedAt),
 	}

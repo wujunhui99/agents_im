@@ -47,6 +47,13 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./...
 bash scripts/verify-static.sh
 ```
 
+**Feature branch note (`feature/agent-account-types`):**
+
+- `account_type` foundation is implemented only for the user domain: `normal` default plus validated internal `agent`/`admin` creation.
+- Public HTTP `POST /users` and `auth` register do not accept account type elevation and continue to create `normal` users by default.
+- No Agent config tables, prompt/tool/skill CRUD, Python executor, shell execution, or LLM integration are part of this branch.
+- Validation recorded for this branch: `goctl --version`, `goctl api validate` for all `api/*.api`, `gofmt`, `go test ./...`, `go test -tags=integration ./tests -run TestPostgresUserAuthFriendsGroupsRepositories -count=1` with no DSN, `bash scripts/verify-static.sh`, `docker compose config`, and `git diff --check`.
+
 ## Phase 1: Agent Metadata And Prompt Management
 
 ### Task 3: Add Agent and prompt schema

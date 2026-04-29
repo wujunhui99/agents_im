@@ -18,6 +18,7 @@ type postgresUserRow struct {
 	Gender      string    `db:"gender"`
 	Age         int32     `db:"age"`
 	Region      string    `db:"region"`
+	AccountType string    `db:"account_type"`
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
 }
@@ -31,27 +32,32 @@ type postgresFriendshipRow struct {
 }
 
 func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model.User, error) {
+	accountType, ok := model.NormalizeAccountType(string(user.AccountType))
+	if !ok {
+		return model.User{}, apperror.InvalidArgument("account_type must be normal, agent, or admin")
+	}
+
 	var row postgresUserRow
 	var err error
 	if strings.TrimSpace(user.UserID) == "" {
 		err = r.conn.QueryRowCtx(ctx, &row, `
-insert into users (identifier, display_name, name, gender, age, region)
-values ($1, $2, $3, $4, $5, $6)
-returning user_id, identifier, display_name, name, gender, age, region, created_at, updated_at
-`, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region)
+insert into users (identifier, display_name, name, gender, age, region, account_type)
+values ($1, $2, $3, $4, $5, $6, $7)
+returning user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
+`, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region, accountType)
 	} else {
 		err = r.conn.QueryRowCtx(ctx, &row, `
-insert into users (user_id, identifier, display_name, name, gender, age, region)
-values ($1, $2, $3, $4, $5, $6, $7)
-returning user_id, identifier, display_name, name, gender, age, region, created_at, updated_at
-`, user.UserID, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region)
+insert into users (user_id, identifier, display_name, name, gender, age, region, account_type)
+values ($1, $2, $3, $4, $5, $6, $7, $8)
+returning user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
+`, user.UserID, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region, accountType)
 	}
 	if err != nil {
 		if isPostgresUniqueViolation(err) {
 			return model.User{}, apperror.AlreadyExists("identifier already exists")
 		}
 		if isPostgresCheckViolation(err) {
-			return model.User{}, apperror.InvalidArgument("invalid user profile")
+			return model.User{}, apperror.InvalidArgument("invalid user profile or account_type")
 		}
 		return model.User{}, err
 	}
@@ -62,7 +68,7 @@ returning user_id, identifier, display_name, name, gender, age, region, created_
 func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier string) (model.User, error) {
 	var row postgresUserRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select user_id, identifier, display_name, name, gender, age, region, created_at, updated_at
+select user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
 from users
 where identifier = $1
 `, identifier)
@@ -86,7 +92,7 @@ select exists(select 1 from users where identifier = $1)
 func (r *PostgresRepository) GetByID(ctx context.Context, userID string) (model.User, error) {
 	var row postgresUserRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select user_id, identifier, display_name, name, gender, age, region, created_at, updated_at
+select user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
 from users
 where user_id = $1
 `, userID)
@@ -131,7 +137,7 @@ func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID string, p
 update users
 set ` + strings.Join(setters, ", ") + `, updated_at = now()
 where user_id = $` + itoa(len(args)) + `
-returning user_id, identifier, display_name, name, gender, age, region, created_at, updated_at
+returning user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
 `
 	var row postgresUserRow
 	if err := r.conn.QueryRowCtx(ctx, &row, query, args...); err != nil {
@@ -283,6 +289,7 @@ func (r postgresUserRow) user() model.User {
 		Gender:      r.Gender,
 		Age:         r.Age,
 		Region:      r.Region,
+		AccountType: model.AccountType(r.AccountType),
 		CreatedAt:   r.CreatedAt,
 		UpdatedAt:   r.UpdatedAt,
 	}

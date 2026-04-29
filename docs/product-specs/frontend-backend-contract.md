@@ -115,11 +115,14 @@ Authorization: Bearer <access_token>
     "gender": "female",
     "age": 30,
     "region": "Shanghai",
+    "account_type": "normal",
     "created_at": "2026-04-29T12:00:00Z",
     "updated_at": "2026-04-29T12:00:00Z"
   }
 }
 ```
+
+`account_type` is one of `normal`, `agent`, or `admin`. Public registration and public user creation always create `normal`; clients cannot self-select `agent` or `admin` through the frontend-visible REST API.
 
 ### Update Current User
 

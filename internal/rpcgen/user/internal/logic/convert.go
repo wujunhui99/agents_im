@@ -15,6 +15,7 @@ func toUserResponse(profile business.UserProfile) *userpb.UserResponse {
 			Gender:      profile.Gender,
 			Age:         profile.Age,
 			Region:      profile.Region,
+			AccountType: profile.AccountType,
 			CreatedAt:   profile.CreatedAt,
 			UpdatedAt:   profile.UpdatedAt,
 		},

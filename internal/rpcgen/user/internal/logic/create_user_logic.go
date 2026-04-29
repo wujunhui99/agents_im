@@ -33,6 +33,7 @@ func (l *CreateUserLogic) CreateUser(in *userpb.CreateUserRequest) (*userpb.User
 		Gender:      in.GetGender(),
 		Age:         in.GetAge(),
 		Region:      in.GetRegion(),
+		AccountType: in.GetAccountType(),
 	})
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)

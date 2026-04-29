@@ -28,6 +28,7 @@ type UserProfile struct {
 	Gender      string
 	Age         int32
 	Region      string
+	AccountType string
 	CreatedAt   string
 	UpdatedAt   string
 }
@@ -84,6 +85,7 @@ func (c *LogicClient) CreateUser(ctx context.Context, req CreateUserRequest) (Us
 		Gender:      profile.Gender,
 		Age:         profile.Age,
 		Region:      profile.Region,
+		AccountType: profile.AccountType,
 		CreatedAt:   profile.CreatedAt,
 		UpdatedAt:   profile.UpdatedAt,
 	}, nil

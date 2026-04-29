@@ -46,6 +46,9 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if alice.AccountType != model.AccountTypeNormal {
+		t.Fatalf("default postgres account_type = %q, want %q", alice.AccountType, model.AccountTypeNormal)
+	}
 	bob, err := users.Create(ctx, model.User{
 		Identifier:  "pg_bob",
 		DisplayName: "Bob",
@@ -54,6 +57,41 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	pgAgent, err := users.Create(ctx, model.User{
+		Identifier:  "pg_agent",
+		DisplayName: "PG Agent",
+		Name:        "PG Agent",
+		Gender:      "unknown",
+		AccountType: model.AccountTypeAgent,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pgAgent.AccountType != model.AccountTypeAgent {
+		t.Fatalf("explicit postgres agent account_type = %q, want %q", pgAgent.AccountType, model.AccountTypeAgent)
+	}
+	pgAdmin, err := users.Create(ctx, model.User{
+		Identifier:  "pg_admin",
+		DisplayName: "PG Admin",
+		Name:        "PG Admin",
+		Gender:      "unknown",
+		AccountType: model.AccountTypeAdmin,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pgAdmin.AccountType != model.AccountTypeAdmin {
+		t.Fatalf("explicit postgres admin account_type = %q, want %q", pgAdmin.AccountType, model.AccountTypeAdmin)
+	}
+	if _, err := users.Create(ctx, model.User{
+		Identifier:  "pg_invalid_account_type",
+		DisplayName: "PG Invalid",
+		Name:        "PG Invalid",
+		Gender:      "unknown",
+		AccountType: model.AccountType("root"),
+	}); err == nil || apperror.From(err).Code != apperror.CodeInvalidArgument {
+		t.Fatalf("postgres invalid account_type error = %v, want INVALID_ARGUMENT", err)
 	}
 
 	if exists, err := users.ExistsByIdentifier(ctx, "pg_alice"); err != nil || !exists {
