@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/zeromicro/go-zero/rest"
 )
 
 type APIConfig struct {
@@ -65,6 +67,14 @@ func LoadRPCConfig(path string) (RPCConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+func ToRestConf(cfg APIConfig) rest.RestConf {
+	var restConf rest.RestConf
+	restConf.Name = cfg.Name
+	restConf.Host = cfg.Host
+	restConf.Port = cfg.Port
+	return restConf
 }
 
 func readFlatYAML(path string) (map[string]string, error) {
