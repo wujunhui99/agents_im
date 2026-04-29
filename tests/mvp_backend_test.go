@@ -13,6 +13,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	"github.com/wujunhui99/agents_im/internal/gateway"
+	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
@@ -235,6 +236,11 @@ func TestMVPBackendWebSocketSendPullMarkReadSmoke(t *testing.T) {
 	decodeRaw(t, sendResp.Data, &sent)
 	if sent.Message.ServerMsgID == "" || sent.Message.SenderID != "usr_mvp_ws_sender" || sent.Message.ReceiverID != "usr_mvp_ws_receiver" {
 		t.Fatalf("unexpected sent websocket message: %+v", sent.Message)
+	}
+
+	push := readWSPushEvent(t, receiverConn)
+	if push.Type != delivery.EventMessageReceived || push.Data.ServerMsgID != sent.Message.ServerMsgID {
+		t.Fatalf("unexpected live push: %+v, sent=%+v", push, sent.Message)
 	}
 
 	writeCommand(t, receiverConn, map[string]interface{}{
