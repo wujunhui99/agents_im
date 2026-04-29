@@ -52,7 +52,7 @@
 - 通信：gRPC / WebSocket / Webhook
 - 存储：PostgreSQL / Redis
 - 消息：Kafka
-- Agent 框架：LangChain 系列或 Google ADK，待最终确定
+- Agent 框架：CloudWeGo Eino（当前提供 DeepSeek ChatModel adapter/config；runtime orchestration 待实现）
 - Python API：FastAPI
 - 可观测性：Prometheus / Grafana / Jaeger
 - CI/CD：GitHub Actions

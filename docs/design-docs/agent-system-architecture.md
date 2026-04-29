@@ -142,6 +142,14 @@ python.execute
 
 当前 registry 只登记工具元数据和绑定关系，不执行 handler、不启动 MCP client、不执行 Python。local tool 只接受服务端白名单 `handler_key`；builtin tool 只接受白名单 `builtin_key`；任何 `shell`、`command`、`script` tool type 或类似 handler key 都必须在 logic 层失败。
 
+当前 Agent runtime 工具解析契约位于 `internal/agentruntime/tools`。Eino runtime 不应直接读取全局工具表或自行组装工具，而应通过该 package 的 `Provider` / `Resolver` 获取当前 Agent 允许的 `ToolSpec` 和可选 `ToolAdapter`：
+
+- `ResolveAgentTools` 默认从 `agent_tool_bindings` 列出该 Agent 已绑定工具；`ResolveTool` 用于解析指定工具并检查绑定是否存在。
+- 解析时会重新校验 tool 必须为 `active` 且 `admin_configured=true`；MCP tool 还必须引用 `active` 且管理员配置的 MCP server。
+- MCP transport 仅允许 `http`、`sse`、`streamable_http`，并拒绝 stdio / local process / command-like config metadata。
+- V0 只提供 metadata contract；当 runtime 需要可调用 adapter 时必须使用 `RequireAdapters=true`，缺少显式安全 adapter 时返回明确错误。
+- 该 package 不导入 Eino、不执行 MCP 网络调用、不执行本地 handler、不调用 Python，也不提供 shell、命令、本地进程或文件系统写入能力。
+
 ### Skill Registry 与 MinIO
 
 PostgreSQL 保存 skill 元数据和文件索引，MinIO/S3-compatible object storage 保存实际文件。
@@ -189,6 +197,8 @@ skills/{skill_id}/versions/{version}/{file_path}
 
 ### Agent Runtime
 
+当前 `feature/eino-runtime-core` 冻结了纯 Go 运行时接口边界，位于 `internal/agentruntime`，设计见 [`agent-runtime-eino.md`](./agent-runtime-eino.md)。该边界只定义 `Runtime.Run(ctx, RunRequest) (RunResult, error)`、请求/结果归一化、Agent 配置快照、prompt/tool/skill refs 和模型 usage 元数据；不导入 Eino、不调用 LLM、不执行工具、不写回 IM。
+
 Runtime 每次 run 组装：
 
 ```text
@@ -220,6 +230,17 @@ agent_runs
 - started_at
 - finished_at
 ```
+
+当前 provider adapter 基线：
+
+- Go package：`internal/agentruntime/llm/deepseek`。
+- Eino component：`github.com/cloudwego/eino-ext/components/model/deepseek`。
+- 配置来源：`DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`。
+- 默认值：`DEEPSEEK_BASE_URL=https://api.deepseek.com`，`DEEPSEEK_MODEL=deepseek-v4-pro`。
+- 缺少 `DEEPSEEK_API_KEY` 时构造 ChatModel 必须返回明确错误，不能降级为 mock/fake response。
+- 默认 `go test ./...` 不请求 DeepSeek；live smoke test 只能在 `RUN_LIVE_DEEPSEEK_TESTS=1` 且存在 API key 时运行。
+
+该基线不实现完整 Agent runtime orchestration、工具/MCP 调用或上下文装配；当前 Agent-IM runner seam 使用 `internal/agentruntime.Runtime`，但生产 wiring 仍必须显式组装 registry-derived `RunRequest`。
 
 工具调用审计：
 
@@ -398,7 +419,10 @@ Client -> Gateway/Message API
 Agent 响应写回使用 `MessageServiceResponseWriter`：
 
 ```text
-Agent Runtime
+AgentTrigger
+-> AgentRunOrchestrator
+-> RuntimeRequestBuilder loads Agent config/context
+-> agentruntime.Runtime
 -> agentim.ResponseWriter
 -> MessageSender interface
 -> existing MessageLogic.SendMessage / Message Service
@@ -408,6 +432,8 @@ Agent Runtime
 强制约束：
 
 - `internal/agentim` 不依赖 message repository，也不拥有 `messages` 表写入能力。
+- `AgentRunOrchestrator` 只依赖统一的 `internal/agentruntime.Runtime`，不得重新定义 provider-specific 或 Eino-specific runtime interface。
+- `RuntimeRequestBuilder` 必须从真实 Agent 配置、prompt/tool/skill 绑定和会话上下文构造 `agentruntime.RunRequest`；缺失配置、请求不匹配或 runtime result 无 `run_id` / `final_text` 必须记录失败 audit 并返回明确错误。
 - 生产实现必须注入兼容 `MessageLogic.SendMessage(ctx, logic.SendMessageRequest)` 的 Message Service seam。
 - Writer 只生成 `sender_id=agent_user_id` 的标准 `SendMessageRequest`，并复用 Message Service 的幂等、seq、outbox、投递链路。
 - Message Service 返回错误必须原样暴露；返回空 `server_msg_id`、空 `conversation_id` 或非法 `seq` 必须视为内部错误，禁止把空返回当成功。
