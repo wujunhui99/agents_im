@@ -20,7 +20,7 @@
 8. 第一版不提供 shell/命令行脚本执行能力。
 9. 第一版提供受限 Python 执行能力，并保留审计与资源限制。
 10. Agent 响应必须通过 IM Message Service 写回，不能绕过 IM 消息链路。
-11. 冻结 Agent-IM 触发契约：用户私聊 Agent、群聊 @Agent、管理员手动 run；本阶段不实现 LLM provider/framework。
+11. 冻结 Agent-IM 触发契约：用户私聊 Agent、群聊 @Agent、管理员手动 run；当前仅提供 LLM provider adapter/config 基线，不实现 Agent runtime orchestration。
 
 ## 账号类型
 
@@ -115,6 +115,18 @@ Agent 是由 profile、系统提示词、工具、skills、模型配置和运行
 - Agent 配置只写入 `agents` 表，不写入 `users` 表。
 - 创建 Agent 必须绑定 `account_type=agent` 的现有 IM 用户。
 - 生产 wiring 必须使用真实 `UserAccountTypeChecker` 验证账号类型；无法验证账号类型时创建必须失败，不能静默创建假用户或假 Agent。
+
+### Model Provider Config
+
+当前 Agent runtime provider 基线使用 CloudWeGo Eino 和 DeepSeek ChatModel adapter。它只负责构造真实 ChatModel，不执行 Agent 编排、不写回 IM、不执行工具。
+
+配置来源：
+
+- `DEEPSEEK_API_KEY`：必填；缺失时生产 adapter 必须失败。
+- `DEEPSEEK_BASE_URL`：可选，默认 `https://api.deepseek.com`。
+- `DEEPSEEK_MODEL`：可选，默认 `deepseek-v4-pro`。
+
+默认测试不得依赖真实 DeepSeek key 或网络；live DeepSeek smoke test 必须同时设置 `RUN_LIVE_DEEPSEEK_TESTS=1` 和 `DEEPSEEK_API_KEY` 才运行。
 
 ### Agent Skill
 
