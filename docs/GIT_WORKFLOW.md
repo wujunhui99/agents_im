@@ -73,6 +73,47 @@ git push -u origin develop
 7. 创建 PR/MR：`feature/* -> develop`。
 8. CI 通过后，将 feature 分支合并到 `develop`。
 
+## CI Checks
+
+GitHub Actions workflow 位于 `.github/workflows/ci.yml`，PR/MR 合入 `develop` 前必须通过默认 backend verification。当前 CI checks 包括：
+
+- `actions/checkout` 拉取仓库代码。
+- `actions/setup-go` 按 `go.mod` 配置 Go。
+- 安装 `goctl`、`protoc`、`protoc-gen-go`、`protoc-gen-go-grpc`。
+- `goctl api validate -api api/*.api` 验证 go-zero API 契约。
+- `gofmt` check，发现未格式化 Go 文件即失败。
+- `go test ./...`，默认不设置 PostgreSQL DSN，确保普通测试不依赖真实 PG。
+- `bash scripts/verify-static.sh`，检查仓库关键文件、接口、文档和 CI workflow 约束。
+- `docker compose config`，验证 Compose 配置可解析。
+- Markdown link check，排除 `docs/references/` 和 `.ai-context/`，并忽略外部 HTTP/HTTPS 链接波动。
+
+CI 还包含独立 PostgreSQL integration job。该 job 使用 GitHub Actions `postgres:16-alpine` service，设置 `DATABASE_URL`，执行 `bash scripts/migrate-postgres.sh --host-psql` 后运行：
+
+```bash
+go test -tags=integration ./tests
+```
+
+本地复现默认 backend verification：
+
+```bash
+export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
+goctl --version
+for f in api/*.api; do goctl api validate -api "$f"; done
+gofmt -w $(find . -name "*.go" -print)
+go test ./...
+bash scripts/verify-static.sh
+docker compose config
+npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./.ai-context/*" -not -path "./docs/references/*" -print)
+```
+
+如需本地复现 PostgreSQL integration job，先启动或准备 PostgreSQL，再运行：
+
+```bash
+export DATABASE_URL=postgres://agents_im:agents_im_dev_password@localhost:5432/agents_im?sslmode=disable
+bash scripts/migrate-postgres.sh --host-psql
+go test -tags=integration ./tests
+```
+
 ## develop 集成流程
 
 `develop` 可能已经包含其他 Agent 合并过的功能，因此 feature 合并前后都需要处理集成风险。

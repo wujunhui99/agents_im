@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+      - "feature/**"
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler ripgrep
+
+      - name: Install goctl
+        run: |
+          export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
+          go install github.com/zeromicro/go-zero/tools/goctl@v1.10.1
+          goctl --version
+
+      - name: Install protoc generators
+        run: |
+          export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
+          protoc --version
+          protoc-gen-go --version
+          protoc-gen-go-grpc --version
+
+      - name: Validate go-zero API specs
+        run: |
+          export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
+          for f in api/*.api; do
+            goctl api validate -api "$f"
+          done
+
+      - name: Check gofmt
+        run: |
+          mapfile -t go_files < <(find . -name "*.go" -print)
+          if ((${#go_files[@]} == 0)); then
+            exit 0
+          fi
+          unformatted="$(gofmt -l "${go_files[@]}")"
+          if [[ -n "$unformatted" ]]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
+
+      - name: Run Go tests
+        run: |
+          export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
+          go test ./...
+
+      - name: Run static verification
+        run: |
+          export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
+          bash scripts/verify-static.sh
+
+      - name: Validate Docker Compose config
+        run: docker compose config
+
+      - name: Check markdown links
+        run: |
+          mapfile -t md_files < <(
+            find . -name "*.md" \
+              -not -path "./.git/*" \
+              -not -path "./.ai-context/*" \
+              -not -path "./docs/references/*" \
+              -print
+          )
+          if ((${#md_files[@]} == 0)); then
+            exit 0
+          fi
+          npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json "${md_files[@]}"
+
+  postgres-integration:
+    name: PostgreSQL integration
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: agents_im
+          POSTGRES_USER: agents_im
+          POSTGRES_PASSWORD: agents_im_dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agents_im -d agents_im"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DATABASE_URL: postgres://agents_im:agents_im_dev_password@localhost:5432/agents_im?sslmode=disable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run PostgreSQL migrations
+        run: bash scripts/migrate-postgres.sh --host-psql
+
+      - name: Run PostgreSQL integration tests
+        run: |
+          export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
+          go test -tags=integration ./tests
