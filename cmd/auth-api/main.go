@@ -2,9 +2,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -17,6 +15,9 @@ import (
 	"github.com/wujunhui99/agents_im/internal/config"
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
 	userrepo "github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/internal/response"
+	"github.com/zeromicro/go-zero/rest"
+	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 func main() {
@@ -34,15 +35,13 @@ func main() {
 		useradapter.NewLogicClient(userLogic),
 		token.NewHMACTokenManager(tokenSecret(), tokenTTL()),
 	)
+	httpx.SetErrorHandler(response.GoZeroErrorHandler)
+	server := rest.MustNewServer(config.ToRestConf(cfg))
+	defer server.Stop()
+	handler.RegisterGoZeroHandlers(server, serviceContext)
 
-	mux := http.NewServeMux()
-	handler.RegisterHandlers(mux, serviceContext)
-
-	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
-	log.Printf("%s listening on %s", cfg.Name, addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatal(err)
-	}
+	log.Printf("%s listening on %s:%d", cfg.Name, cfg.Host, cfg.Port)
+	server.Start()
 }
 
 func tokenSecret() string {

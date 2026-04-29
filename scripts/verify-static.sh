@@ -7,6 +7,13 @@ required_files=(
   "api/friends.api"
   "api/groups.api"
   "api/message.api"
+  ".ai-context/zero-skills/SKILL.md"
+  ".ai-context/zero-skills/references/goctl-commands.md"
+  ".ai-context/zero-skills/references/rest-api-patterns.md"
+  ".ai-context/zero-skills/references/rpc-patterns.md"
+  ".ai-context/zero-skills/references/database-patterns.md"
+  "docs/references/go-zero/codex-guide.md"
+  "docs/exec-plans/active/goctl-refactor.md"
   "proto/user.proto"
   "proto/auth.proto"
   "proto/friends.proto"
@@ -20,10 +27,15 @@ required_files=(
   "cmd/friends-rpc/main.go"
   "cmd/groups-api/main.go"
   "cmd/groups-rpc/main.go"
+  "cmd/message-api/main.go"
   "internal/logic/userlogic.go"
   "internal/logic/friendslogic.go"
   "internal/logic/groupslogic.go"
   "internal/logic/messagelogic.go"
+  "internal/logic/user/gozero_logic.go"
+  "internal/logic/friends/gozero_logic.go"
+  "internal/logic/groups/gozero_logic.go"
+  "internal/logic/message/gozero_logic.go"
   "internal/model/friendship.go"
   "internal/model/group.go"
   "internal/repository/memory.go"
@@ -34,9 +46,13 @@ required_files=(
   "internal/handler/handler.go"
   "internal/handler/groups_handler.go"
   "internal/handler/message_handler.go"
+  "internal/handler/gozero_routes.go"
+  "internal/types/types.go"
   "internal/auth/logic/authlogic.go"
+  "internal/auth/logic/auth/gozero_logic.go"
   "internal/auth/repository/memory.go"
   "internal/auth/handler/handler.go"
+  "internal/auth/handler/gozero_routes.go"
   "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
   "internal/gateway/contract.go"
@@ -79,6 +95,16 @@ for file in "${required_files[@]}"; do
     echo "missing required file: $file" >&2
     exit 1
   fi
+done
+
+export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
+if ! command -v goctl >/dev/null 2>&1; then
+  echo "goctl is required for api validation" >&2
+  exit 1
+fi
+goctl --version >/dev/null
+for api_file in api/*.api; do
+  goctl api validate -api "$api_file" >/dev/null
 done
 
 message_plan_file=""

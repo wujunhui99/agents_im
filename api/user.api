@@ -1,79 +1,87 @@
 syntax = "v1"
 
-info(
-    title: "User API"
-    desc: "User profile service HTTP API"
-    author: "Codex"
-    version: "v0.1.0"
+info (
+	title:   "User API"
+	desc:    "User profile service HTTP API"
+	author:  "Codex"
+	version: "v0.1.0"
 )
 
 type User {
-    UserID string `json:"user_id"`
-    Identifier string `json:"identifier"`
-    DisplayName string `json:"display_name"`
-    Name string `json:"name"`
-    Gender string `json:"gender"`
-    Age int32 `json:"age"`
-    Region string `json:"region"`
-    CreatedAt string `json:"created_at"`
-    UpdatedAt string `json:"updated_at"`
+	UserID      string `json:"user_id"`
+	Identifier  string `json:"identifier"`
+	DisplayName string `json:"display_name"`
+	Name        string `json:"name"`
+	Gender      string `json:"gender"`
+	Age         int32  `json:"age"`
+	Region      string `json:"region"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
 }
 
 type CreateUserReq {
-    Identifier string `json:"identifier"`
-    DisplayName string `json:"display_name,optional"`
-    Name string `json:"name,optional"`
-    Gender string `json:"gender,optional"`
-    Age int32 `json:"age,optional"`
-    Region string `json:"region,optional"`
+	Identifier  string `json:"identifier"`
+	DisplayName string `json:"display_name,optional"`
+	Name        string `json:"name,optional"`
+	Gender      string `json:"gender,optional"`
+	Age         int32  `json:"age,optional"`
+	Region      string `json:"region,optional"`
 }
 
 type UpdateMeReq {
-    DisplayName string `json:"display_name,optional"`
-    Name string `json:"name,optional"`
-    Gender string `json:"gender,optional"`
-    Age int32 `json:"age,optional"`
-    Region string `json:"region,optional"`
+	CurrentUserID string `header:"X-User-Id"`
+	DisplayName   string `json:"display_name,optional"`
+	Name          string `json:"name,optional"`
+	Gender        string `json:"gender,optional"`
+	Age           int32  `json:"age,optional"`
+	Region        string `json:"region,optional"`
+}
+
+type GetMeReq {
+	CurrentUserID string `header:"X-User-Id"`
 }
 
 type ExistsReq {
-    Identifier string `form:"identifier"`
+	Identifier string `form:"identifier"`
+}
+
+type GetUserByIdentifierReq {
+	Identifier string `path:"identifier"`
 }
 
 type UserResp {
-    Code string `json:"code"`
-    Message string `json:"message"`
-    Data User `json:"data"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Data    User   `json:"data"`
 }
 
 type ExistsData {
-    Identifier string `json:"identifier"`
-    Exists bool `json:"exists"`
+	Identifier string `json:"identifier"`
+	Exists     bool   `json:"exists"`
 }
 
 type ExistsResp {
-    Code string `json:"code"`
-    Message string `json:"message"`
-    Data ExistsData `json:"data"`
+	Code    string     `json:"code"`
+	Message string     `json:"message"`
+	Data    ExistsData `json:"data"`
 }
 
-@server(
-    group: user
+@server (
+	group: user
 )
 service user-api {
-    @handler getMe
-    get /me returns (UserResp)
+	@handler getMe
+	get /me (GetMeReq) returns (UserResp)
 
-    @handler updateMe
-    patch /me (UpdateMeReq) returns (UserResp)
+	@handler updateMe
+	patch /me (UpdateMeReq) returns (UserResp)
 
-    @handler createUser
-    post /users (CreateUserReq) returns (UserResp)
+	@handler createUser
+	post /users (CreateUserReq) returns (UserResp)
 
-    @handler existsUser
-    get /users/exists (ExistsReq) returns (ExistsResp)
+	@handler existsUser
+	get /users/exists (ExistsReq) returns (ExistsResp)
 
-    @handler getUserByIdentifier
-    get /users/:identifier returns (UserResp)
+	@handler getUserByIdentifier
+	get /users/:identifier (GetUserByIdentifierReq) returns (UserResp)
 }
-

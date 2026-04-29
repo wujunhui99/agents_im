@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	configFile := flag.String("f", "etc/friends-api.yaml", "config file")
+	configFile := flag.String("f", "etc/message-api.yaml", "config file")
 	flag.Parse()
 
 	cfg, err := config.LoadAPIConfig(*configFile)
@@ -22,11 +22,11 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	serviceContext := svc.NewServiceContext(repository.NewMemoryRepository())
+	serviceContext := svc.NewMessageServiceContext(repository.NewMemoryMessageRepository(), nil, nil)
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
 	server := rest.MustNewServer(config.ToRestConf(cfg))
 	defer server.Stop()
-	handler.RegisterFriendsGoZeroHandlers(server, serviceContext)
+	handler.RegisterMessageGoZeroHandlers(server, serviceContext)
 
 	log.Printf("%s listening on %s:%d", cfg.Name, cfg.Host, cfg.Port)
 	server.Start()
