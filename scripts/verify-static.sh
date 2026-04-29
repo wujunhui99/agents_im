@@ -103,6 +103,9 @@ required_files=(
   "internal/transfer/memory.go"
   "internal/transfer/worker.go"
   "internal/transfer/worker_test.go"
+  "internal/transfer/kafka_consumer.go"
+  "internal/transfer/kafka_consumer_test.go"
+  "internal/transfer/kafka_integration_test.go"
   "internal/presence/store.go"
   "internal/presence/memory.go"
   "internal/presence/redis.go"
@@ -149,6 +152,7 @@ required_files=(
   "docs/design-docs/kafka-message-events.md"
   "docs/design-docs/websocket-gateway.md"
   "docs/design-docs/message-transfer-worker.md"
+  "docs/design-docs/kafka-transfer-consumer.md"
   "docs/design-docs/gateway-push-delivery.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
@@ -171,6 +175,7 @@ required_files=(
   "docs/exec-plans/active/websocket-gateway.md"
   "docs/exec-plans/active/kafka-redpanda-compose.md"
   "docs/exec-plans/active/message-transfer-worker.md"
+  "docs/exec-plans/active/kafka-transfer-consumer.md"
   "docs/exec-plans/active/gateway-push-delivery.md"
 )
 
@@ -583,6 +588,74 @@ message_transfer_doc_patterns=(
 for pattern in "${message_transfer_doc_patterns[@]}"; do
   rg -q "$pattern" docs/design-docs/message-transfer-worker.md docs/exec-plans/active/message-transfer-worker.md
 done
+
+kafka_transfer_consumer_code_patterns=(
+  "type KafkaEventConsumerConfig struct"
+  "type KafkaEventConsumer struct"
+  "func NewKafkaEventConsumer"
+  "func EnvelopeFromKafkaMessage"
+  "messaging.UnmarshalMessageEvent"
+  "DefaultMessageEventsTopic"
+  "EventTypeMessageAccepted"
+  "FetchMessage"
+  "CommitMessages"
+  "func \\(c \\*KafkaEventConsumer\\) MarkSuccessful"
+  "func \\(c \\*KafkaEventConsumer\\) MarkRetry"
+  "func \\(c \\*KafkaEventConsumer\\) MarkFailed"
+)
+
+for pattern in "${kafka_transfer_consumer_code_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/kafka_consumer.go internal/transfer/kafka_consumer_test.go
+done
+
+kafka_transfer_consumer_test_patterns=(
+  "TestEnvelopeFromKafkaMessageMapsAcceptedEvent"
+  "TestEnvelopeFromKafkaMessageRejectsInvalidEvents"
+  "TestKafkaEventConsumerConstructorDoesNotRequireLiveBroker"
+  "TestKafkaEventConsumerReceiveAndAckSemantics"
+  "TestKafkaEventConsumerConsumesRedpandaEvent"
+  "KAFKA_REDPANDA_INTEGRATION"
+  "KAFKA_BROKERS"
+  "t\\.Skip"
+)
+
+for pattern in "${kafka_transfer_consumer_test_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/kafka_consumer_test.go internal/transfer/kafka_integration_test.go
+done
+
+kafka_transfer_config_patterns=(
+  "TransferConsumerKafka"
+  "MESSAGE_TRANSFER_CONSUMER_DRIVER"
+  "Kafka\\s+KafkaConfig"
+  "cfg.Kafka = kafkaConfigFromValues"
+  "NewKafkaEventConsumer"
+  "KAFKA_MESSAGE_EVENTS_TOPIC"
+  "KAFKA_CONSUMER_GROUP"
+)
+
+for pattern in "${kafka_transfer_config_patterns[@]}"; do
+  rg -q "$pattern" internal/config/config.go internal/config/config_test.go cmd/message-transfer/main.go etc/message-transfer.yaml
+done
+
+kafka_transfer_doc_patterns=(
+  "message.events.v1"
+  "message.accepted"
+  "messaging.MessageEvent"
+  "transfer.Envelope"
+  "MarkSuccessful"
+  "MarkRetry"
+  "MarkFailed"
+  "CommitMessages"
+  "KAFKA_REDPANDA_INTEGRATION"
+  "KAFKA_BROKERS"
+)
+
+for pattern in "${kafka_transfer_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/kafka-transfer-consumer.md docs/exec-plans/active/kafka-transfer-consumer.md
+done
+
+rg -q "kafka-transfer-consumer.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-transfer-worker.md
+rg -q "kafka-transfer-consumer" docs/exec-plans/active/kafka-transfer-consumer.md
 
 rg -q "LoadMessageTransferConfig" internal/config/config.go
 rg -q "message-transfer" cmd/message-transfer/main.go etc/message-transfer.yaml ARCHITECTURE.md

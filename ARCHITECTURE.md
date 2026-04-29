@@ -54,7 +54,7 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 
 ### Message Transfer Worker
 
-负责消费未来 Message Outbox 或 Kafka/Redpanda 中的 `message.accepted` 事件，并通过 Delivery Dispatcher 触发在线投递、离线推送或后续 delivery ACK 流程。第一阶段提供独立入口 `cmd/message-transfer`，默认使用 in-memory consumer 和 noop dispatcher，因此不依赖真实 Kafka、Redpanda、PostgreSQL outbox 或 Gateway fanout。Worker 不拥有消息历史、会话 seq 或已读状态；这些仍由 Message Service 和 PostgreSQL 权威维护。设计见 [`docs/design-docs/message-transfer-worker.md`](./docs/design-docs/message-transfer-worker.md)。
+负责消费未来 Message Outbox 或 Kafka/Redpanda 中的 `message.accepted` 事件，并通过 Delivery Dispatcher 触发在线投递、离线推送或后续 delivery ACK 流程。第一阶段提供独立入口 `cmd/message-transfer`，默认使用 in-memory consumer 和 noop dispatcher，因此不依赖真实 Kafka、Redpanda、PostgreSQL outbox 或 Gateway fanout。Kafka consumer 分支新增 `message.events.v1` 的 Redpanda/Kafka consumer adapter，将 canonical `messaging.MessageEvent` 映射为 worker `Envelope`，成功处理后提交 offset，retry/failed hook 保留给后续 retry topic 或 dead-letter policy。Worker 不拥有消息历史、会话 seq 或已读状态；这些仍由 Message Service 和 PostgreSQL 权威维护。设计见 [`docs/design-docs/message-transfer-worker.md`](./docs/design-docs/message-transfer-worker.md) 和 [`docs/design-docs/kafka-transfer-consumer.md`](./docs/design-docs/kafka-transfer-consumer.md)。
 
 ### IM Core Service
 

@@ -12,6 +12,7 @@
 - [user-service-go-zero.md](./user-service-go-zero.md)：User Service go-zero 实现设计
 - [message-chain-contract.md](./message-chain-contract.md)：消息链路接口契约与 OpenIM 借鉴设计
 - [kafka-message-events.md](./kafka-message-events.md)：Kafka-compatible Redpanda 消息事件 topic、schema、producer abstraction 与投递语义
+- [kafka-transfer-consumer.md](./kafka-transfer-consumer.md)：Message Transfer worker 的 Kafka/Redpanda consumer、event mapping 和 offset commit 语义
 - [message-storage.md](./message-storage.md)：消息存储 PostgreSQL/Redis 契约设计
 - [postgres-persistence.md](./postgres-persistence.md)：第一阶段 PostgreSQL 持久化 schema、配置和 repository 设计
 - [message-outbox.md](./message-outbox.md)：Message Service transactional outbox 事件源与 worker 轮询契约

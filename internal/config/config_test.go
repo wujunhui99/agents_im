@@ -135,3 +135,45 @@ Worker:
 		t.Fatalf("worker config mismatch: %+v", cfg.Worker)
 	}
 }
+
+func TestLoadMessageTransferConfigMapsKafkaSettings(t *testing.T) {
+	t.Setenv("KAFKA_BROKERS", "")
+	t.Setenv("KAFKA_MESSAGE_EVENTS_TOPIC", "")
+	t.Setenv("KAFKA_CONSUMER_GROUP", "")
+	t.Setenv("MESSAGE_TRANSFER_TOPIC", "")
+	t.Setenv("MESSAGE_TRANSFER_CONSUMER_GROUP", "")
+	t.Setenv("MESSAGE_TRANSFER_CONSUMER_DRIVER", "")
+
+	configPath := filepath.Join(t.TempDir(), "message-transfer.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: message-transfer-kafka-test
+Consumer:
+  Driver: kafka
+Dispatcher:
+  Driver: noop
+Kafka:
+  Brokers: redpanda:9092, localhost:19092
+  MessageEventsTopic: message.events.test
+  ConsumerGroup: message-transfer-test
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadMessageTransferConfig(configPath)
+	if err != nil {
+		t.Fatalf("load message transfer config: %v", err)
+	}
+	if cfg.Consumer.Driver != TransferConsumerKafka {
+		t.Fatalf("consumer driver = %q, want kafka", cfg.Consumer.Driver)
+	}
+	if len(cfg.Kafka.Brokers) != 2 || cfg.Kafka.Brokers[0] != "redpanda:9092" || cfg.Kafka.Brokers[1] != "localhost:19092" {
+		t.Fatalf("kafka brokers mismatch: %+v", cfg.Kafka.Brokers)
+	}
+	if cfg.Consumer.Topic != "message.events.test" || cfg.Consumer.Group != "message-transfer-test" {
+		t.Fatalf("consumer topic/group should map from kafka config: %+v", cfg.Consumer)
+	}
+	if cfg.Kafka.MessageEventsTopic != "message.events.test" || cfg.Kafka.ConsumerGroup != "message-transfer-test" {
+		t.Fatalf("kafka config mismatch: %+v", cfg.Kafka)
+	}
+}
