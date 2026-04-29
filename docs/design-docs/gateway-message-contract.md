@@ -90,6 +90,27 @@ First-phase ACK meaning:
 | `pull_messages` | `PullMessages` | connection user as `user_id` | range validation, message read model |
 | `get_conversation_seqs` | `GetConversationSeqs` | connection user as `user_id` | `max_seq`, `has_read_seq`, `unread_count` |
 | `mark_conversation_read` | `MarkConversationAsRead` | connection user as `user_id` | monotonic read-state update |
+| `heartbeat` | none | connection liveness response | none |
+
+## `heartbeat`
+
+Command payload:
+
+```json
+{}
+```
+
+Gateway handles this command locally and does not call Message Service. The first real WebSocket Gateway implementation returns the connection id, authenticated user id, and server time:
+
+```json
+{
+  "connection_id": "conn_...",
+  "user_id": "user_a",
+  "server_time": 1710000000000
+}
+```
+
+This app-level heartbeat is separate from future server-pushed message delivery ACKs.
 
 ## `send_message`
 

@@ -16,6 +16,8 @@ type APIConfig struct {
 	Auth          JWTAuthConfig
 	StorageDriver string
 	DataSource    string
+	Redis         RedisConfig
+	Presence      PresenceConfig
 }
 
 type RPCConfig struct {
@@ -24,6 +26,8 @@ type RPCConfig struct {
 	Auth          JWTAuthConfig
 	StorageDriver string
 	DataSource    string
+	Redis         RedisConfig
+	Presence      PresenceConfig
 }
 
 type JWTAuthConfig struct {
@@ -31,23 +35,73 @@ type JWTAuthConfig struct {
 	AccessExpire int64
 }
 
+type RedisConfig struct {
+	Addr     string
+	Password string
+	DB       int
+}
+
+type PresenceConfig struct {
+	Driver              string
+	HeartbeatTTLSeconds int64
+	KeyPrefix           string
+}
+
 const (
 	StorageDriverMemory   = "memory"
 	StorageDriverPostgres = "postgres"
+	PresenceDriverMemory  = "memory"
+	PresenceDriverRedis   = "redis"
+)
+
+const (
+	defaultRedisAddr                   = "localhost:6379"
+	defaultPresenceHeartbeatTTLSeconds = 60
+	defaultPresenceRedisKeyPrefix      = "agents_im:presence"
 )
 
 func DefaultAPIConfig() APIConfig {
-	return APIConfig{Name: "user-api", Host: "0.0.0.0", Port: 8080, Auth: DefaultJWTAuthConfig(), StorageDriver: StorageDriverMemory}
+	return APIConfig{
+		Name:          "user-api",
+		Host:          "0.0.0.0",
+		Port:          8080,
+		Auth:          DefaultJWTAuthConfig(),
+		StorageDriver: StorageDriverMemory,
+		Redis:         DefaultRedisConfig(),
+		Presence:      DefaultPresenceConfig(),
+	}
 }
 
 func DefaultRPCConfig() RPCConfig {
-	return RPCConfig{Name: "user-rpc", ListenOn: "0.0.0.0:9090", Auth: DefaultJWTAuthConfig(), StorageDriver: StorageDriverMemory}
+	return RPCConfig{
+		Name:          "user-rpc",
+		ListenOn:      "0.0.0.0:9090",
+		Auth:          DefaultJWTAuthConfig(),
+		StorageDriver: StorageDriverMemory,
+		Redis:         DefaultRedisConfig(),
+		Presence:      DefaultPresenceConfig(),
+	}
 }
 
 func DefaultJWTAuthConfig() JWTAuthConfig {
 	return JWTAuthConfig{
 		AccessSecret: "dev-jwt-secret-change-me",
 		AccessExpire: 86400,
+	}
+}
+
+func DefaultRedisConfig() RedisConfig {
+	return RedisConfig{
+		Addr: defaultRedisAddr,
+		DB:   0,
+	}
+}
+
+func DefaultPresenceConfig() PresenceConfig {
+	return PresenceConfig{
+		Driver:              PresenceDriverMemory,
+		HeartbeatTTLSeconds: defaultPresenceHeartbeatTTLSeconds,
+		KeyPrefix:           defaultPresenceRedisKeyPrefix,
 	}
 }
 
@@ -87,6 +141,14 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
 	}
 	cfg.DataSource = ResolveDataSource(values["DataSource"])
+	cfg.Redis, err = redisConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Presence, err = presenceConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
 
 	return cfg, nil
 }
@@ -120,6 +182,14 @@ func LoadRPCConfig(path string) (RPCConfig, error) {
 		cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
 	}
 	cfg.DataSource = ResolveDataSource(values["DataSource"])
+	cfg.Redis, err = redisConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Presence, err = presenceConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
 
 	return cfg, nil
 }
@@ -145,6 +215,19 @@ func ResolveStorageDriver(value string) string {
 	}
 }
 
+func ResolvePresenceDriver(value string) string {
+	value = strings.ToLower(strings.TrimSpace(os.ExpandEnv(value)))
+	if value == "" {
+		value = strings.ToLower(strings.TrimSpace(os.Getenv("PRESENCE_DRIVER")))
+	}
+	switch value {
+	case PresenceDriverRedis:
+		return PresenceDriverRedis
+	default:
+		return PresenceDriverMemory
+	}
+}
+
 func ResolveDataSource(value string) string {
 	value = strings.TrimSpace(os.ExpandEnv(value))
 	if value != "" {
@@ -156,6 +239,93 @@ func ResolveDataSource(value string) string {
 		}
 	}
 	return ""
+}
+
+func ResolveRedisConfig(cfg RedisConfig) (RedisConfig, error) {
+	cfg.Addr = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Addr)), os.Getenv("REDIS_ADDR"), os.Getenv("AGENTS_IM_REDIS_ADDR"), defaultRedisAddr)
+	cfg.Password = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Password)), os.Getenv("REDIS_PASSWORD"), os.Getenv("AGENTS_IM_REDIS_PASSWORD"))
+
+	db, err := resolveInt(cfg.DB, os.Getenv("REDIS_DB"), os.Getenv("AGENTS_IM_REDIS_DB"))
+	if err != nil {
+		return cfg, err
+	}
+	cfg.DB = db
+	return cfg, nil
+}
+
+func ResolvePresenceConfig(cfg PresenceConfig) (PresenceConfig, error) {
+	cfg.Driver = ResolvePresenceDriver(cfg.Driver)
+
+	ttl, err := resolveInt64(cfg.HeartbeatTTLSeconds, os.Getenv("PRESENCE_TTL_SECONDS"), os.Getenv("AGENTS_IM_PRESENCE_TTL_SECONDS"))
+	if err != nil {
+		return cfg, err
+	}
+	if ttl <= 0 {
+		ttl = defaultPresenceHeartbeatTTLSeconds
+	}
+	cfg.HeartbeatTTLSeconds = ttl
+	cfg.KeyPrefix = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.KeyPrefix)), os.Getenv("PRESENCE_KEY_PREFIX"), os.Getenv("AGENTS_IM_PRESENCE_KEY_PREFIX"), defaultPresenceRedisKeyPrefix)
+	return cfg, nil
+}
+
+func redisConfigFromValues(values map[string]string) (RedisConfig, error) {
+	cfg := RedisConfig{
+		Addr:     firstNonEmpty(values["Redis.Addr"], values["RedisAddr"]),
+		Password: firstNonEmpty(values["Redis.Password"], values["RedisPassword"]),
+		DB:       0,
+	}
+	if value := firstNonEmpty(values["Redis.DB"], values["RedisDB"]); strings.TrimSpace(value) != "" {
+		db, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.DB = db
+	}
+	return ResolveRedisConfig(cfg)
+}
+
+func presenceConfigFromValues(values map[string]string) (PresenceConfig, error) {
+	cfg := PresenceConfig{
+		Driver:              firstNonEmpty(values["Presence.Driver"], values["PresenceDriver"]),
+		HeartbeatTTLSeconds: 0,
+		KeyPrefix:           firstNonEmpty(values["Presence.KeyPrefix"], values["PresenceKeyPrefix"]),
+	}
+	if value := firstNonEmpty(values["Presence.HeartbeatTTLSeconds"], values["PresenceTTLSeconds"]); strings.TrimSpace(value) != "" {
+		ttl, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.HeartbeatTTLSeconds = ttl
+	}
+	return ResolvePresenceConfig(cfg)
+}
+
+func resolveInt(current int, envValues ...string) (int, error) {
+	if current != 0 {
+		return current, nil
+	}
+	for _, value := range envValues {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		return strconv.Atoi(value)
+	}
+	return 0, nil
+}
+
+func resolveInt64(current int64, envValues ...string) (int64, error) {
+	if current != 0 {
+		return current, nil
+	}
+	for _, value := range envValues {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		return strconv.ParseInt(value, 10, 64)
+	}
+	return 0, nil
 }
 
 func readFlatYAML(path string) (map[string]string, error) {

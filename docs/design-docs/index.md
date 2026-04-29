@@ -14,6 +14,8 @@
 - [message-storage.md](./message-storage.md)：消息存储 PostgreSQL/Redis 契约设计
 - [postgres-persistence.md](./postgres-persistence.md)：第一阶段 PostgreSQL 持久化 schema、配置和 repository 设计
 - [gateway-message-contract.md](./gateway-message-contract.md)：Gateway WebSocket command 到 Message Service RPC 的第一阶段映射契约
+- [redis-presence.md](./redis-presence.md)：Redis 在线状态与 Gateway 连接元数据契约
+- [websocket-gateway.md](./websocket-gateway.md)：WebSocket Gateway 第一阶段真实入口、JWT handshake、connection manager 和 command router
 - [read-receipts.md](./read-receipts.md)：已读回执状态模型、单调推进和扩展设计
 - [im-agent-decoupling.md](./im-agent-decoupling.md)：IM 与 Agent 解耦设计
 - [websocket-reliability.md](./websocket-reliability.md)：WebSocket 可靠性设计

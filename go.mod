@@ -3,7 +3,9 @@ module github.com/wujunhui99/agents_im
 go 1.24.0
 
 require (
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/jackc/pgx/v5 v5.8.0
+	github.com/redis/go-redis/v9 v9.18.0
 	github.com/zeromicro/go-zero v1.10.1
 	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.11
@@ -56,7 +58,6 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
-	github.com/redis/go-redis/v9 v9.18.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/titanous/json5 v1.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect

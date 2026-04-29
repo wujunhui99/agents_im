@@ -13,6 +13,7 @@ func TestGatewayCommandNames(t *testing.T) {
 		"pull":      gateway.CommandPullMessages,
 		"seqs":      gateway.CommandGetConversationSeqs,
 		"mark_read": gateway.CommandMarkConversationRead,
+		"heartbeat": gateway.CommandHeartbeat,
 	}
 
 	want := map[string]string{
@@ -20,6 +21,7 @@ func TestGatewayCommandNames(t *testing.T) {
 		"pull":      "pull_messages",
 		"seqs":      "get_conversation_seqs",
 		"mark_read": "mark_conversation_read",
+		"heartbeat": "heartbeat",
 	}
 
 	for name, got := range tests {
