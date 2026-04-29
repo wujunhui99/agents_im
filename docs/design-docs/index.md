@@ -29,6 +29,7 @@
 - [websocket-reliability.md](./websocket-reliability.md)：WebSocket 可靠性设计
 - [agent-tooling.md](./agent-tooling.md)：Agent 工具调用体系设计
 
+- [backend-mvp-contract.md](./backend-mvp-contract.md)：前端开工前后端 MVP 接口契约、WebSocket 命令和投递语义
 ## 状态说明
 
 - Draft：草案，尚未实现或未评审

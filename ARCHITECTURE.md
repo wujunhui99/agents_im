@@ -30,6 +30,8 @@ IM 后端、Agent 系统和前端系统的职责边界见 [`docs/design-docs/sys
 
 IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-agent-contract.md`](./docs/design-docs/im-agent-contract.md)。该契约参考 OpenIM webhook 设计，定义了 `callbackAfterSendSingleMsgCommand`、`callbackAfterSendGroupMsgCommand`、Agent 消息写回、会话上下文查询、幂等、签名和重试规则。
 
+IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md`](./docs/product-specs/backend-mvp.md) 与 [`docs/design-docs/backend-mvp-contract.md`](./docs/design-docs/backend-mvp-contract.md)。
+
 ## 顶层模块
 
 ### User Service
