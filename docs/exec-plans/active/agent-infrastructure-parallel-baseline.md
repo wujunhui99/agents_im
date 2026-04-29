@@ -145,6 +145,13 @@
 - 提供 append-only repository/logic 测试。
 - 审计内容对敏感字段做 redaction 或 summary。
 
+当前分支实现备注：
+
+- `agent_runs`、`agent_tool_calls`、`agent_file_reads`、`agent_python_execs` 已通过 migration 建表。
+- PostgreSQL trigger 拒绝审计表 update/delete；业务 repository 只暴露 create/list/get。
+- `*_summary` 字段在 domain/repository 入口统一脱敏；Python `Code` 输入只转为 hash/长度摘要。
+- 默认 `go test ./...` 使用内存 audit repository，不依赖 PostgreSQL；PostgreSQL 覆盖保留在 `integration` build tag 下。
+
 ### 5. `feature/agent-python-sandbox-contract`
 
 职责：Python 沙箱执行契约，不在 Go 主服务内执行任意 Python。

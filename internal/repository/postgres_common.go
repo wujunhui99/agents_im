@@ -121,6 +121,25 @@ func MustAgentRepositoryForStorage(driver string, dataSource string) AgentReposi
 	return repo
 }
 
+func NewAgentAuditRepositoryForStorage(driver string, dataSource string) (AgentAuditRepository, error) {
+	storageDriver, err := repositoryStorageDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+	if storageDriver == appconfig.StorageDriverMemory {
+		return NewMemoryAgentAuditRepository(), nil
+	}
+	return NewPostgresAgentAuditRepository(appconfig.ResolveDataSource(dataSource))
+}
+
+func MustAgentAuditRepositoryForStorage(driver string, dataSource string) AgentAuditRepository {
+	repo, err := NewAgentAuditRepositoryForStorage(driver, dataSource)
+	if err != nil {
+		panic(err)
+	}
+	return repo
+}
+
 func NewAgentRegistryRepositoryForStorage(driver string, dataSource string) (AgentRegistryRepository, error) {
 	storageDriver, err := repositoryStorageDriver(driver)
 	if err != nil {

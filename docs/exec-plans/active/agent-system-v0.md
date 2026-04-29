@@ -141,6 +141,20 @@ Integration tests requiring MinIO must skip unless explicit MinIO environment va
 - Modify: migration
 - Add: repository interfaces and tests
 
+**Branch note (`feature/agent-audit-log`):**
+
+- Added append-only audit foundation for `agent_runs`, `agent_tool_calls`, `agent_file_reads`, and `agent_python_execs`.
+- Audit repository/logic supports create/get/list-by-run-id; update/delete are intentionally absent.
+- PostgreSQL migration adds append-only triggers that reject direct update/delete.
+- Summary fields are recursively redacted; Python code is stored only as `sha256` and `size_bytes`.
+- This task does not implement LLM execution, tool execution, or Python execution.
+
+**Verification target:**
+
+```bash
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal/domain/agentaudit ./internal/repository ./internal/logic -run 'AgentAudit|Redact|PythonCode' -count=1
+```
+
 ### Task 8: Add Python executor seam without shell
 
 **Objective:** Add `python.execute` as a tool interface with timeout/resource policy and no shell support.
