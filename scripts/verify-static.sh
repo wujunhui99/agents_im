@@ -100,6 +100,12 @@ required_files=(
   "internal/presence/redis_integration_test.go"
   "internal/gateway/ws/connection_manager.go"
   "internal/gateway/ws/server.go"
+  "internal/messaging/event.go"
+  "internal/messaging/producer.go"
+  "internal/messaging/kafka.go"
+  "internal/messaging/event_test.go"
+  "internal/messaging/producer_test.go"
+  "internal/messaging/kafka_integration_test.go"
   "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
@@ -127,6 +133,7 @@ required_files=(
   "docs/design-docs/postgres-persistence.md"
   "docs/design-docs/gateway-message-contract.md"
   "docs/design-docs/redis-presence.md"
+  "docs/design-docs/kafka-message-events.md"
   "docs/design-docs/websocket-gateway.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
@@ -146,6 +153,7 @@ required_files=(
   "docs/exec-plans/active/remove-handwritten-compat.md"
   "docs/exec-plans/active/jwt-auth-middleware.md"
   "docs/exec-plans/active/websocket-gateway.md"
+  "docs/exec-plans/active/kafka-redpanda-compose.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -537,6 +545,20 @@ for pattern in "${redis_compose_patterns[@]}"; do
   rg -q "$pattern" docker-compose.yml
 done
 
+redpanda_compose_patterns=(
+  "^  redpanda:"
+  "docker.redpanda.com/redpandadata/redpanda"
+  "agents-im-redpanda"
+  "kafka-addr"
+  "advertise-kafka-addr"
+  "REDPANDA_KAFKA_PORT"
+  "agents_im_redpanda_data"
+)
+
+for pattern in "${redpanda_compose_patterns[@]}"; do
+  rg -q "$pattern" docker-compose.yml
+done
+
 redis_env_patterns=(
   "REDIS_ADDR"
   "REDIS_PASSWORD"
@@ -550,6 +572,18 @@ for pattern in "${redis_env_patterns[@]}"; do
   rg -q "$pattern" .env.example
 done
 
+kafka_env_patterns=(
+  "KAFKA_BROKERS"
+  "KAFKA_MESSAGE_EVENTS_TOPIC"
+  "KAFKA_CONSUMER_GROUP"
+  "REDPANDA_KAFKA_PORT"
+  "REDPANDA_ADMIN_PORT"
+)
+
+for pattern in "${kafka_env_patterns[@]}"; do
+  rg -q "$pattern" .env.example
+done
+
 presence_config_patterns=(
   "type RedisConfig"
   "type PresenceConfig"
@@ -560,6 +594,19 @@ presence_config_patterns=(
 
 for pattern in "${presence_config_patterns[@]}"; do
   rg -q "$pattern" internal/config/config.go
+done
+
+kafka_config_patterns=(
+  "type KafkaConfig"
+  "DefaultKafkaConfig"
+  "ResolveKafkaConfig"
+  "KAFKA_BROKERS"
+  "KAFKA_MESSAGE_EVENTS_TOPIC"
+  "KAFKA_CONSUMER_GROUP"
+)
+
+for pattern in "${kafka_config_patterns[@]}"; do
+  rg -q "$pattern" internal/config/config.go internal/config/config_test.go
 done
 
 presence_code_patterns=(
@@ -594,6 +641,58 @@ done
 
 rg -q "redis-presence.md" ARCHITECTURE.md docs/design-docs/index.md
 rg -q "REDIS_ADDR is required.*skip|t\\.Skip" internal/presence/redis_integration_test.go
+
+message_event_schema_patterns=(
+  "type MessageEvent struct"
+  "event_id"
+  "event_type"
+  "conversation_id"
+  "server_msg_id"
+  "sender_id"
+  "chat_type"
+  "created_at"
+  "payload"
+  "message.accepted"
+  "message.read"
+)
+
+for pattern in "${message_event_schema_patterns[@]}"; do
+  rg -q "$pattern" internal/messaging/event.go internal/messaging/event_test.go docs/design-docs/kafka-message-events.md
+done
+
+producer_contract_patterns=(
+  "type Producer interface"
+  "NewNoopProducer"
+  "NewInMemoryProducer"
+  "NewKafkaProducer"
+  "ParseBrokerList"
+  "segmentio/kafka-go"
+  "KAFKA_REDPANDA_INTEGRATION"
+  "t\\.Skip"
+)
+
+for pattern in "${producer_contract_patterns[@]}"; do
+  rg -q "$pattern" internal/messaging go.mod
+done
+
+kafka_doc_patterns=(
+  "message.events.v1"
+  "conversation_id"
+  "at-least-once"
+  "outbox"
+  "Message Transfer"
+  "Gateway"
+  "Push"
+  "KAFKA_BROKERS"
+  "Redpanda"
+)
+
+for pattern in "${kafka_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/kafka-message-events.md docs/exec-plans/active/kafka-redpanda-compose.md
+done
+
+rg -q "kafka-message-events.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-chain-contract.md
+rg -q "kafka-redpanda-compose" docs/exec-plans/active/kafka-redpanda-compose.md
 read_receipt_patterns=(
   "has_read_seq"
   "unread_count"

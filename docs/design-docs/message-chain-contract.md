@@ -471,6 +471,8 @@ Response:
 
 Even if phase 1 does not implement Kafka/gateway, the contract should define event shapes.
 
+Kafka-compatible topic, schema, producer abstraction, and delivery semantics are versioned in [`kafka-message-events.md`](./kafka-message-events.md). The examples below remain the phase-1 conceptual shape; the canonical transport schema is `MessageEvent`.
+
 ### message.accepted
 
 Emitted after message is persisted.
