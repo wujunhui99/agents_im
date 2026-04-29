@@ -5,6 +5,7 @@ Owner: IM backend
 Related product spec: [`../product-specs/message-storage.md`](../product-specs/message-storage.md)
 Related contract: [`./message-chain-contract.md`](./message-chain-contract.md)
 Related implementation: [`./postgres-persistence.md`](./postgres-persistence.md)
+Related outbox: [`./message-outbox.md`](./message-outbox.md)
 
 ## Background
 
@@ -22,6 +23,7 @@ The storage layer must preserve these invariants:
 ## Goals
 
 - Define PostgreSQL tables for `messages`, `conversation_threads`, `user_conversation_states`, and idempotency records.
+- Define the transactional outbox boundary used as the reliable event source after message acceptance.
 - Define unique constraints required for idempotency, message identity, and per-conversation ordering.
 - Define sequence allocation and transaction boundaries for send, pull, and mark-as-read.
 - Define Redis keys that can be introduced later without changing repository behavior.
@@ -30,6 +32,7 @@ The storage layer must preserve these invariants:
 ## Non-goals
 
 - Implement HTTP handlers, RPC handlers, gateway delivery, Kafka transfer, push notification, or WebSocket ACK.
+- Implement Kafka producer/consumer, Message Transfer worker, Gateway push fanout, or delivery ACK.
 - Decide distributed sharding or cross-region replication.
 - Implement message recall/delete, edits, reactions, per-device sync state, or media storage.
 - Make Redis authoritative for durable history.
@@ -210,6 +213,12 @@ Phase 1 can write only `accepted` rows in the same transaction as `messages`. If
 - same `payload_hash`: return the existing `server_msg_id`, `conversation_id`, and `seq` with `deduplicated = true`;
 - different `payload_hash`: return idempotency conflict and do not allocate a new seq.
 
+### message_outbox
+
+Stores reliable asynchronous event rows for accepted messages. Detailed schema and repository behavior are defined in [`message-outbox.md`](./message-outbox.md).
+
+The send transaction writes one `message.created` event after the message row, idempotency row, visible conversation states, sender read state, and conversation thread summary are updated. The outbox row is committed atomically with the message and can later be polled by Kafka/Message Transfer/Push workers.
+
 ## Sequence Allocation
 
 The repository must allocate seq inside the same PostgreSQL transaction that inserts the message.
@@ -264,7 +273,8 @@ Steps:
 10. Upsert `user_conversation_states` for every `visible_user_id` with `last_visible_seq = greatest(existing.last_visible_seq, next_seq)`.
 11. Upsert `user_conversation_states` for the sender with `has_read_seq = greatest(existing.has_read_seq, next_seq)` and `last_visible_seq = greatest(existing.last_visible_seq, next_seq)`.
 12. Update `conversation_threads.max_seq`, `last_message_id`, and `last_message_at`.
-13. Commit.
+13. Insert `message_outbox` with `event_type = message.created`.
+14. Commit.
 
 If a unique constraint is hit because of a concurrent retry, the repository should re-read the existing idempotency result and return deduplicated or conflict according to `payload_hash`.
 

@@ -10,6 +10,7 @@ type ServiceContext struct {
 	Config       config.Config
 	MessageLogic *business.MessageLogic
 	MessageRepo  repository.MessageRepository
+	OutboxRepo   repository.OutboxRepository
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -18,5 +19,11 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Config:       c,
 		MessageLogic: business.NewMessageLogic(messageRepo),
 		MessageRepo:  messageRepo,
+		OutboxRepo:   outboxRepositoryFromMessageRepo(messageRepo),
 	}
+}
+
+func outboxRepositoryFromMessageRepo(repo repository.MessageRepository) repository.OutboxRepository {
+	outboxRepo, _ := repo.(repository.OutboxRepository)
+	return outboxRepo
 }

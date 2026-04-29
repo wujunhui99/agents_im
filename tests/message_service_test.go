@@ -2,9 +2,11 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
@@ -225,6 +227,69 @@ func TestMessageConversationSeqQueryUnreadCount(t *testing.T) {
 	}
 }
 
+func TestMessageSendCreatesOutboxEvent(t *testing.T) {
+	repo := repository.NewMemoryMessageRepository()
+	messageLogic := logic.NewMessageLogic(repo)
+	ctx := context.Background()
+
+	sent, err := messageLogic.SendMessage(ctx, testSendRequest("usr_a", "usr_b", "client-outbox-1", "hello outbox"))
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	events, err := repo.PollPending(ctx, "memory-worker-1", 10, time.Minute)
+	if err != nil {
+		t.Fatalf("poll outbox: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("got %d outbox events, want 1: %+v", len(events), events)
+	}
+	event := events[0]
+	if event.EventType != repository.OutboxEventTypeMessageCreated ||
+		event.AggregateType != repository.OutboxAggregateTypeMessage ||
+		event.AggregateID != sent.Message.ServerMsgID ||
+		event.ServerMsgID != sent.Message.ServerMsgID ||
+		event.ConversationID != sent.Message.ConversationID ||
+		event.Seq != sent.Message.Seq {
+		t.Fatalf("unexpected outbox metadata: %+v", event)
+	}
+
+	var payload repository.MessageCreatedOutboxPayload
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		t.Fatalf("decode outbox payload: %v", err)
+	}
+	if payload.Message.ServerMsgID != sent.Message.ServerMsgID || payload.Message.Content != sent.Message.Content {
+		t.Fatalf("payload message mismatch: %+v", payload.Message)
+	}
+	if !containsString(payload.VisibleUserIDs, "usr_a") || !containsString(payload.VisibleUserIDs, "usr_b") {
+		t.Fatalf("payload visible users missing sender/receiver: %+v", payload.VisibleUserIDs)
+	}
+
+	if err := repo.MarkFailed(ctx, event.EventID, "memory-worker-1", repository.OutboxFailure{
+		NextAttemptAt: time.Now().Add(-time.Second),
+		LastError:     "temporary failure",
+	}); err != nil {
+		t.Fatalf("mark failed: %v", err)
+	}
+	retried, err := repo.PollPending(ctx, "memory-worker-2", 10, time.Minute)
+	if err != nil {
+		t.Fatalf("poll retried outbox: %v", err)
+	}
+	if len(retried) != 1 || retried[0].AttemptCount != 1 || retried[0].LockedBy != "memory-worker-2" {
+		t.Fatalf("retry poll mismatch: %+v", retried)
+	}
+	if err := repo.MarkPublished(ctx, retried[0].EventID, "memory-worker-2"); err != nil {
+		t.Fatalf("mark published: %v", err)
+	}
+	remaining, err := repo.PollPending(ctx, "memory-worker-3", 10, time.Minute)
+	if err != nil {
+		t.Fatalf("poll after publish: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Fatalf("published event should not be pending: %+v", remaining)
+	}
+}
+
 func TestMessageHTTPHandlersUseJWTUser(t *testing.T) {
 	serviceContext := svc.NewMessageServiceContextWithAuth(repository.NewMemoryMessageRepository(), nil, nil, testJWTAuthConfig())
 	mux := newMessageGoZeroRouter(t, serviceContext)
@@ -333,4 +398,13 @@ func mustMessageState(t *testing.T, messageLogic *logic.MessageLogic, userID str
 		t.Fatalf("got %d states, want 1", len(result.States))
 	}
 	return result.States[0]
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

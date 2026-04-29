@@ -1,6 +1,7 @@
 create sequence if not exists agents_im_users_id_seq;
 create sequence if not exists agents_im_groups_id_seq;
 create sequence if not exists agents_im_messages_id_seq;
+create sequence if not exists agents_im_outbox_events_id_seq;
 
 create table if not exists users (
   user_id text primary key default ('usr_' || lpad(nextval('agents_im_users_id_seq')::text, 6, '0')),
@@ -176,3 +177,55 @@ create table if not exists message_idempotency_keys (
 
 create index if not exists message_idempotency_conversation_seq_idx
   on message_idempotency_keys (conversation_id, seq);
+
+create table if not exists message_outbox (
+  event_id text primary key default ('outbox_' || lpad(nextval('agents_im_outbox_events_id_seq')::text, 6, '0')),
+  event_type text not null,
+  aggregate_type text not null,
+  aggregate_id text not null,
+  conversation_id text not null,
+  server_msg_id text not null references messages(server_msg_id) on delete restrict,
+  seq bigint not null,
+  payload jsonb not null,
+  status text not null default 'pending',
+  attempt_count integer not null default 0,
+  next_attempt_at timestamptz not null default now(),
+  locked_by text not null default '',
+  locked_until timestamptz,
+  last_error text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  published_at timestamptz,
+  constraint message_outbox_event_type_not_blank check (event_type <> ''),
+  constraint message_outbox_aggregate_type_not_blank check (aggregate_type <> ''),
+  constraint message_outbox_aggregate_id_not_blank check (aggregate_id <> ''),
+  constraint message_outbox_conversation_id_not_blank check (conversation_id <> ''),
+  constraint message_outbox_seq_positive_check check (seq > 0),
+  constraint message_outbox_status_check check (status in ('pending', 'published', 'failed')),
+  constraint message_outbox_attempt_count_check check (attempt_count >= 0),
+  constraint message_outbox_lock_shape_check check (
+    (locked_by = '' and locked_until is null)
+    or
+    (locked_by <> '' and locked_until is not null)
+  ),
+  constraint message_outbox_published_shape_check check (
+    (status = 'published' and published_at is not null)
+    or
+    (status <> 'published')
+  ),
+  constraint message_outbox_event_aggregate_uniq unique (event_type, aggregate_type, aggregate_id)
+);
+
+create index if not exists message_outbox_pending_idx
+  on message_outbox (next_attempt_at, created_at, event_id)
+  where status = 'pending';
+
+create index if not exists message_outbox_locked_idx
+  on message_outbox (locked_until)
+  where status = 'pending' and locked_until is not null;
+
+create index if not exists message_outbox_conversation_seq_idx
+  on message_outbox (conversation_id, seq);
+
+create index if not exists message_outbox_server_msg_idx
+  on message_outbox (server_msg_id);

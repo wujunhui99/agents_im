@@ -22,7 +22,7 @@ message-api / message-rpc
   -> assign conversation seq
   -> store message
   -> update conversation state and read state
-  -> expose events/contracts for future gateway/push
+  -> write transactional outbox event for future gateway/push
 ```
 
 ## OpenIM design summary
@@ -64,7 +64,7 @@ Responsibilities:
 - maintain conversation `max_seq` and last message summary;
 - maintain user read state;
 - expose pull/sync/read APIs;
-- emit in-process or repository events for future gateway/push integration.
+- write `message.created` events into PostgreSQL outbox for future Kafka/Message Transfer/Push integration.
 
 #### User Service
 
