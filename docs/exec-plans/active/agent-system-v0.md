@@ -155,6 +155,25 @@ Integration tests requiring MinIO must skip unless explicit MinIO environment va
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal/domain/agentaudit ./internal/repository ./internal/logic -run 'AgentAudit|Redact|PythonCode' -count=1
 ```
 
+### Task 7A: Add Eino runtime core contract
+
+**Objective:** Freeze the local Agent runtime boundary before adding any Eino/DeepSeek adapter.
+
+**Branch note (`feature/eino-runtime-core`):**
+
+- Added `internal/agentruntime.Runtime` with `Run(ctx, RunRequest) (RunResult, error)`.
+- Added plain domain structs for `AgentConfig`, prompt snapshots, model config, tool refs, skill refs, runtime policy, conversation context, usage, model metadata, and tool-call result metadata.
+- `RunRequest` carries fields needed from `internal/agentim.AgentTrigger`, including request/event/trace ids, trigger type, target Agent user id, requesting user, conversation id/type, trigger message id/seq, prompt text, recursion/source fields, and target Agent user ids.
+- Added fail-first `NormalizeRunRequest` / `NormalizeRunResult` validation with `apperror.InvalidArgument` for missing agent ids, prompt id/content, prompt text, model provider/model, invalid tool metadata shapes, negative counters, and empty successful final text.
+- This branch intentionally does not import Eino packages, call DeepSeek, execute tools/Python, orchestrate IM write-back, or write message repositories directly.
+- Design boundary documented in [`../../design-docs/agent-runtime-eino.md`](../../design-docs/agent-runtime-eino.md).
+
+**Verification target:**
+
+```bash
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal/agentruntime
+```
+
 ### Task 8: Add Python executor seam without shell
 
 **Objective:** Add `python.execute` as a tool interface with timeout/resource policy and no shell support.

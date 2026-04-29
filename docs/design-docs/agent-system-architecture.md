@@ -189,6 +189,8 @@ skills/{skill_id}/versions/{version}/{file_path}
 
 ### Agent Runtime
 
+当前 `feature/eino-runtime-core` 冻结了纯 Go 运行时接口边界，位于 `internal/agentruntime`，设计见 [`agent-runtime-eino.md`](./agent-runtime-eino.md)。该边界只定义 `Runtime.Run(ctx, RunRequest) (RunResult, error)`、请求/结果归一化、Agent 配置快照、prompt/tool/skill refs 和模型 usage 元数据；不导入 Eino、不调用 LLM、不执行工具、不写回 IM。
+
 Runtime 每次 run 组装：
 
 ```text
