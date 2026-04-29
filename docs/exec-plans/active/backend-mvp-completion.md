@@ -44,17 +44,67 @@ Owns WebSocket reconnect/sync command polish, stable error envelope, missed-mess
 
 Must not implement delivery persistence or social/group rules.
 
+Implementation note for this branch:
+
+- Adds frontend reconnect sync product contract and WebSocket reconnect sync design doc.
+- Updates WebSocket command ACKs to emit frontend fields `requestId`, `command`, `payload`, and nested `error` while keeping legacy `request_id`, `type`, and `data` aliases.
+- Maps WebSocket command errors to MVP frontend codes: `UNAUTHORIZED`, `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`, and `INTERNAL`.
+- Adds WebSocket tests for reconnect sync, duplicate-safe pull, missing seq pull, and invalid command error envelope.
+- Extends static verification to require the new docs and reconnect sync test/code patterns.
+
+Verification record for `feature/mvp-reconnect-sync` on 2026-04-29:
+
+- `goctl --version`: passed, `goctl version 1.10.1 linux/amd64`.
+- `for f in api/*.api; do goctl api validate -api "$f"; done`: passed, five `api format ok` results.
+- `gofmt -w $(find . -name '*.go' -print)`: passed.
+- `go test ./...`: passed.
+- `bash scripts/verify-static.sh`: passed, `static verification passed`.
+- `docker compose config`: passed.
+- `npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./.ai-context/*" -not -path "./docs/references/*" -print)`: passed.
+
 ### mvp-social-group-rules
 
 Owns friends/group MVP behavior and message group membership enforcement.
 
 Must not implement delivery pipeline or observability.
 
+Implementation note for this branch:
+
+- Friends MVP semantics: immediate accepted friendship, duplicate add idempotency, self-add rejection, missing-user rejection, delete/list/status behavior.
+- Groups MVP semantics: creator owner/member, open join, active-member list, owner-only leave rejection.
+- Group message membership enforcement: non-members and left members fail, active members succeed.
+
+Verification record for `feature/mvp-social-group-rules` on 2026-04-29:
+
+- `goctl --version` -> `goctl version 1.10.1 linux/amd64`.
+- `for f in api/*.api; do goctl api validate -api "$f"; done` -> five `api format ok` lines.
+- `gofmt -w $(find . -name '*.go' -print)` -> passed with no output.
+- `go test ./...` -> passed; final rerun package test output ended with `ok github.com/wujunhui99/agents_im/tests (cached)`.
+- `bash scripts/verify-static.sh` -> `static verification passed`.
+- `docker compose config` -> passed and rendered postgres, redis, and redpanda services.
+- Markdown link check excluding `.ai-context` and `docs/references` -> passed.
+
 ### mvp-observability-health
 
 Owns health/readiness/metrics/request-trace-id docs and implementation.
 
 Must not change core business semantics.
+
+Implementation note for this branch:
+
+- Adds health/readiness endpoints and observability configuration for API, gateway, and transfer worker processes.
+- Adds Prometheus-style MVP metrics, including message send counters.
+- Adds trace ID propagation in HTTP and WebSocket envelopes, including heartbeat ACK trace IDs.
+- Extends static verification to ensure observability helpers do not inspect request URI, raw query, authorization headers, passwords, tokens, or request bodies.
+
+Verification record for `feature/mvp-observability-health` on 2026-04-29:
+
+- `goctl --version`: passed, `goctl version 1.10.1 linux/amd64`.
+- `for f in api/*.api; do goctl api validate -api "$f"; done`: passed, five `api format ok` results.
+- `go test ./...`: passed.
+- `bash scripts/verify-static.sh`: passed, `static verification passed`.
+- `docker compose config`: passed.
+- Markdown link check excluding `docs/references`: passed.
 
 ### mvp-frontend-contracts
 
@@ -90,26 +140,6 @@ docker compose config
 ```
 
 If docs changed, run markdown link check excluding `docs/references`.
-
-## Branch Result: feature/mvp-reconnect-sync
-
-Scope completed:
-
-- Added frontend reconnect sync product contract and WebSocket reconnect sync design doc.
-- Updated WebSocket command ACKs to emit frontend fields `requestId`, `command`, `payload`, and nested `error` while keeping legacy `request_id`, `type`, and `data` aliases.
-- Mapped WebSocket command errors to MVP frontend codes: `UNAUTHORIZED`, `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`, and `INTERNAL`.
-- Added WebSocket tests for reconnect sync, duplicate-safe pull, missing seq pull, and invalid command error envelope.
-- Extended static verification to require the new docs and reconnect sync test/code patterns.
-
-Verification on 2026-04-29:
-
-- `goctl --version`: passed, `goctl version 1.10.1 linux/amd64`.
-- `for f in api/*.api; do goctl api validate -api "$f"; done`: passed, five `api format ok` results.
-- `gofmt -w $(find . -name '*.go' -print)`: passed.
-- `go test ./...`: passed.
-- `bash scripts/verify-static.sh`: passed, `static verification passed`.
-- `docker compose config`: passed.
-- `npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./.ai-context/*" -not -path "./docs/references/*" -print)`: passed.
 
 ## Merge Order
 

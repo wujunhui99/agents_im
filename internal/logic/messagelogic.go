@@ -280,7 +280,7 @@ func (l *MessageLogic) resolveGroupParticipants(ctx context.Context, groupID str
 		return nil, err
 	}
 	if l.groups == nil {
-		return []string{senderID}, nil
+		return nil, apperror.Internal("group membership validator is not configured")
 	}
 
 	members, err := l.groups.ListMembers(ctx, ListMembersRequest{GroupID: groupID})
@@ -305,7 +305,7 @@ func (l *MessageLogic) resolveGroupParticipants(ctx context.Context, groupID str
 		}
 	}
 	if !senderIsMember {
-		return nil, apperror.InvalidArgument("sender is not a group member")
+		return nil, apperror.Forbidden("sender is not a group member")
 	}
 	return participantIDs, nil
 }

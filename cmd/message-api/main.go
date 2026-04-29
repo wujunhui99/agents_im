@@ -6,6 +6,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/handler"
+	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
 	"github.com/wujunhui99/agents_im/internal/svc"
@@ -22,7 +23,13 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	serviceContext := svc.NewMessageServiceContextWithAuth(repository.MustMessageRepositoryForStorage(cfg.StorageDriver, cfg.DataSource), nil, nil, cfg.Auth)
+	groupsLogic := logic.NewGroupsLogic(repository.MustGroupsRepositoryForStorage(cfg.StorageDriver, cfg.DataSource), nil)
+	serviceContext := svc.NewMessageServiceContextWithAuth(
+		repository.MustMessageRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
+		nil,
+		groupsLogic,
+		cfg.Auth,
+	)
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
 	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()

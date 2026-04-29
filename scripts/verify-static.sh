@@ -1147,6 +1147,59 @@ rg -q "Salt" internal/auth/model/credential.go
 rg -q "user-rpc" docs/design-docs/groups-service-go-zero.md docs/product-specs/groups-service.md
 rg -q "client_msg_id" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md "$message_plan_file"
 rg -q "has_read_seq" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md "$message_plan_file"
+
+social_mvp_account_patterns=(
+  "AddFriend"
+  "重复添加同一有效好友"
+  "添加自己为好友"
+  "目标用户不存在"
+  "MVP 群默认允许公开加入"
+  "非成员或已退出成员发送群消息必须失败"
+)
+
+for pattern in "${social_mvp_account_patterns[@]}"; do
+  rg -q "$pattern" docs/product-specs/account-social-core.md
+done
+
+social_mvp_boundary_patterns=(
+  "MVP 业务规则"
+  "GetFriendship"
+  "FORBIDDEN"
+  "不能写入消息、推进 seq 或创建 outbox"
+  "creator 是 owner/member"
+)
+
+for pattern in "${social_mvp_boundary_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/user-auth-friends-groups-boundaries.md
+done
+
+social_mvp_code_patterns=(
+  "CodeForbidden"
+  "PermissionDenied"
+  "sender is not a group member"
+  "group membership validator is not configured"
+  "group owner cannot leave as the only active member"
+)
+
+for pattern in "${social_mvp_code_patterns[@]}"; do
+  rg -q "$pattern" internal
+done
+
+social_mvp_test_patterns=(
+  "TestFriendsLogicNeverAddedStatusIsNone"
+  "TestGroupsLogicOwnerCannotLeaveWhenOnlyActiveMember"
+  "TestMessageGroupSendRequiresActiveMembership"
+  "client-group-outsider"
+  "client-group-left"
+)
+
+for pattern in "${social_mvp_test_patterns[@]}"; do
+  rg -q "$pattern" tests
+done
+
+rg -q "NewGroupsLogic\\(repository.MustGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go
+rg -q "NewMessageLogicWithValidators" internal/rpcgen/message/internal/svc/service_context.go
+rg -q "MustGroupsRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
 pg_persistence_patterns=(
   "users"
   "auth_credentials"
@@ -1266,9 +1319,10 @@ if rg -ni "message service (owns|stores|manages|persists).*(password|password_ha
   exit 1
 fi
 
-echo "static verification passed"
 rg -q "Backend MVP" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "message_received" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "get_conversation_seqs" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "healthz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 rg -q "readyz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
+
+echo "static verification passed"

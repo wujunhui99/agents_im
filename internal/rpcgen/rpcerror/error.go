@@ -17,6 +17,8 @@ func ToStatus(err error) error {
 		return status.Error(codes.InvalidArgument, appErr.Message)
 	case apperror.CodeUnauthenticated:
 		return status.Error(codes.Unauthenticated, appErr.Message)
+	case apperror.CodeForbidden:
+		return status.Error(codes.PermissionDenied, appErr.Message)
 	case apperror.CodeNotFound:
 		return status.Error(codes.NotFound, appErr.Message)
 	case apperror.CodeAlreadyExists:
