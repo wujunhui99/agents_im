@@ -157,6 +157,7 @@ required_files=(
   "docs/design-docs/kafka-transfer-consumer.md"
   "docs/design-docs/gateway-push-delivery.md"
   "docs/design-docs/transfer-gateway-dispatcher.md"
+  "docs/design-docs/gateway-presence-routing.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -181,6 +182,7 @@ required_files=(
   "docs/exec-plans/active/kafka-transfer-consumer.md"
   "docs/exec-plans/active/gateway-push-delivery.md"
   "docs/exec-plans/active/transfer-gateway-dispatcher.md"
+  "docs/exec-plans/active/gateway-presence-routing.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -744,6 +746,41 @@ for pattern in "${transfer_gateway_dispatcher_doc_patterns[@]}"; do
 done
 
 rg -q "transfer-gateway-dispatcher.md" ARCHITECTURE.md docs/design-docs/index.md
+
+gateway_presence_routing_code_patterns=(
+  "WithPresenceStore"
+  "WithPresenceTTL"
+  "WithInstanceID"
+  "RegisterConnection"
+  "Heartbeat"
+  "UnregisterConnection"
+  "ListUserConnections"
+  "InstanceID"
+  "StatusRouted"
+  "type Route struct"
+)
+
+for pattern in "${gateway_presence_routing_code_patterns[@]}"; do
+  rg -q "$pattern" internal/gateway/ws internal/gateway/delivery internal/presence tests/websocket_gateway_test.go
+done
+
+gateway_presence_routing_doc_patterns=(
+  "PresenceStore"
+  "connection_id"
+  "instance_id"
+  "heartbeat"
+  "offline"
+  "routed"
+  "in-process"
+  "cross-instance"
+)
+
+for pattern in "${gateway_presence_routing_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/gateway-presence-routing.md docs/exec-plans/active/gateway-presence-routing.md
+done
+
+rg -q "gateway-presence-routing.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/websocket-gateway.md docs/design-docs/gateway-push-delivery.md
+rg -q "Presence:" etc/gateway-ws.yaml
 
 gateway_product_patterns=(
   "command ACK"

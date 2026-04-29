@@ -7,6 +7,7 @@ Related docs:
 - [`message-chain-contract.md`](./message-chain-contract.md)
 - [`jwt-auth-middleware.md`](./jwt-auth-middleware.md)
 - [`websocket-reliability.md`](./websocket-reliability.md)
+- [`gateway-presence-routing.md`](./gateway-presence-routing.md)
 
 ## Background
 
@@ -25,7 +26,7 @@ Gateway is the long-connection entry point for IM clients. The previous Gateway 
 ## Non-goals
 
 - No Kafka fanout, Push worker, offline push, retry queue, or delivery ACK worker.
-- No Redis Presence integration in this branch.
+- Redis Presence integration is handled by the follow-up Gateway presence routing seam; this phase does not implement cross-instance RPC.
 - No docker-compose Redis or CI workflow changes.
 - No changes to user/auth/friends/groups/message business ownership.
 - No replacement of goctl REST/RPC service structure.
@@ -117,7 +118,7 @@ Error response:
 
 | Command | Gateway behavior |
 | --- | --- |
-| `heartbeat` | Return `connection_id`, `user_id`, and server time. |
+| `heartbeat` | Return `connection_id`, `user_id`, optional `instance_id`, and server time; refresh presence TTL when presence is configured. |
 | `send_message` | Inject connection `user_id` as sender and call `MessageLogic.SendMessage`. |
 | `pull_messages` | Inject connection `user_id` and call `MessageLogic.PullMessages`. |
 | `get_conversation_seqs` | Inject connection `user_id` and call `MessageLogic.GetConversationSeqs`. |
@@ -132,7 +133,7 @@ Gateway does not allocate `server_msg_id`, does not assign conversation `seq`, d
 - `connection_id -> connection`
 - `user_id -> connection_id -> connection`
 
-It supports multiple connections per user for multi-device clients. It also exposes a `PresenceReporter` interface with `Connected` and `Disconnected` hooks. Phase 1 does not wire Redis; the interface is the future integration point for the Redis Presence branch during develop integration or a follow-up branch.
+It supports multiple connections per user for multi-device clients. It also exposes a `PresenceReporter` interface with `Connected` and `Disconnected` hooks. Gateway presence routing now writes the same lifecycle to `PresenceStore`, using the memory store by default and Redis only when configured.
 
 ## Reliability Notes
 

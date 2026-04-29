@@ -7,16 +7,27 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
+	"github.com/wujunhui99/agents_im/internal/presence"
 )
 
 var errNilConnectionManager = errors.New("connection manager is not configured")
 
 type InMemoryDeliveryDispatcher struct {
 	connections *ConnectionManager
+	presence    presence.PresenceStore
+	instanceID  string
 }
 
 func NewInMemoryDeliveryDispatcher(manager *ConnectionManager) *InMemoryDeliveryDispatcher {
 	return &InMemoryDeliveryDispatcher{connections: manager}
+}
+
+func NewPresenceAwareDeliveryDispatcher(manager *ConnectionManager, store presence.PresenceStore, instanceID string) *InMemoryDeliveryDispatcher {
+	return &InMemoryDeliveryDispatcher{
+		connections: manager,
+		presence:    store,
+		instanceID:  strings.TrimSpace(instanceID),
+	}
 }
 
 func (d *InMemoryDeliveryDispatcher) DeliverToUser(ctx context.Context, userID string, event delivery.Event) (delivery.Result, error) {
@@ -82,8 +93,30 @@ func (d *InMemoryDeliveryDispatcher) deliverToUser(ctx context.Context, userID s
 		}, err
 	}
 
+	routes, err := d.lookupRoutes(ctx, userID)
+	if err != nil {
+		return delivery.RecipientResult{
+			UserID: userID,
+			Status: delivery.StatusFailed,
+			Error:  err.Error(),
+		}, err
+	}
+	if d.presence != nil && len(routes) == 0 {
+		return delivery.RecipientResult{
+			UserID: userID,
+			Status: delivery.StatusOffline,
+		}, nil
+	}
+
 	connections := d.connections.UserConnections(userID)
 	if len(connections) == 0 {
+		if len(routes) > 0 {
+			return delivery.RecipientResult{
+				UserID: userID,
+				Status: delivery.StatusRouted,
+				Routes: routes,
+			}, nil
+		}
 		return delivery.RecipientResult{
 			UserID: userID,
 			Status: delivery.StatusOffline,
@@ -93,6 +126,7 @@ func (d *InMemoryDeliveryDispatcher) deliverToUser(ctx context.Context, userID s
 	recipient := delivery.RecipientResult{
 		UserID: userID,
 		Status: delivery.StatusFailed,
+		Routes: routes,
 	}
 	for _, conn := range connections {
 		if err := ctx.Err(); err != nil {
@@ -117,4 +151,35 @@ func (d *InMemoryDeliveryDispatcher) deliverToUser(ctx context.Context, userID s
 		recipient.Error = ""
 	}
 	return recipient, nil
+}
+
+func (d *InMemoryDeliveryDispatcher) lookupRoutes(ctx context.Context, userID string) ([]delivery.Route, error) {
+	if d.presence == nil {
+		return nil, nil
+	}
+	connections, err := d.presence.ListUserConnections(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	routes := make([]delivery.Route, 0, len(connections))
+	for _, metadata := range connections {
+		routes = append(routes, delivery.Route{
+			UserID:       metadata.UserID,
+			ConnectionID: metadata.ConnectionID,
+			InstanceID:   metadata.InstanceID,
+			GatewayID:    metadata.GatewayID,
+			DeviceID:     metadata.DeviceID,
+			Platform:     metadata.Platform,
+			Local:        sameInstance(metadata.InstanceID, metadata.GatewayID, d.instanceID),
+		})
+	}
+	return routes, nil
+}
+
+func sameInstance(instanceID string, gatewayID string, localInstanceID string) bool {
+	localInstanceID = strings.TrimSpace(localInstanceID)
+	if localInstanceID == "" {
+		return false
+	}
+	return strings.TrimSpace(instanceID) == localInstanceID || strings.TrimSpace(gatewayID) == localInstanceID
 }

@@ -6,3 +6,7 @@ Auth:
   AccessExpire: 86400
 StorageDriver: memory
 DataSource: ${DATABASE_URL}
+Presence:
+  Driver: memory
+  HeartbeatTTLSeconds: 60
+  KeyPrefix: agents_im:presence

@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +15,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
+	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/svc"
 )
@@ -103,6 +105,110 @@ func TestWebSocketGatewayHeartbeatReturnsOK(t *testing.T) {
 	if data.ConnectionID == "" || data.UserID != "usr_ws_heartbeat" || data.ServerTime == 0 {
 		t.Fatalf("unexpected heartbeat data: %+v", data)
 	}
+}
+
+func TestWebSocketGatewayRegistersPresenceOnConnect(t *testing.T) {
+	store := presence.NewMemoryStore()
+	_, server, cleanup := newGatewayWSAppTestServerWithPresence(t, store)
+	defer cleanup()
+
+	conn := dialGatewayWS(t, server.URL, "usr_ws_presence_connect")
+	defer conn.Close()
+
+	waitFor(t, func() bool {
+		connections, err := store.ListUserConnections(context.Background(), "usr_ws_presence_connect")
+		return err == nil &&
+			len(connections) == 1 &&
+			connections[0].ConnectionID != "" &&
+			connections[0].InstanceID == "gateway-test" &&
+			connections[0].GatewayID == "gateway-test"
+	}, "presence registration after websocket connect")
+}
+
+func TestWebSocketGatewayHeartbeatRefreshesPresenceTTL(t *testing.T) {
+	store := presence.NewMemoryStore()
+	_, server, cleanup := newGatewayWSAppTestServerWithPresence(t, store)
+	defer cleanup()
+
+	conn := dialGatewayWS(t, server.URL, "usr_ws_presence_heartbeat")
+	defer conn.Close()
+
+	var before time.Time
+	waitFor(t, func() bool {
+		connections, err := store.ListUserConnections(context.Background(), "usr_ws_presence_heartbeat")
+		if err != nil || len(connections) != 1 {
+			return false
+		}
+		before = connections[0].LastHeartbeatAt
+		return !before.IsZero()
+	}, "initial presence heartbeat timestamp")
+
+	time.Sleep(time.Millisecond)
+	writeCommand(t, conn, map[string]interface{}{
+		"request_id": "req-presence-heartbeat",
+		"type":       gatewayws.CommandHeartbeat,
+		"payload":    map[string]interface{}{},
+	})
+	resp := readWSResponse(t, conn)
+	if resp.Status != gateway.AckStatusOK {
+		t.Fatalf("heartbeat status = %q", resp.Status)
+	}
+
+	waitFor(t, func() bool {
+		connections, err := store.ListUserConnections(context.Background(), "usr_ws_presence_heartbeat")
+		return err == nil && len(connections) == 1 && connections[0].LastHeartbeatAt.After(before)
+	}, "presence heartbeat refresh")
+}
+
+func TestWebSocketGatewayUnregistersPresenceOnDisconnect(t *testing.T) {
+	store := presence.NewMemoryStore()
+	_, server, cleanup := newGatewayWSAppTestServerWithPresence(t, store)
+	defer cleanup()
+
+	conn := dialGatewayWS(t, server.URL, "usr_ws_presence_disconnect")
+	waitFor(t, func() bool {
+		online, err := store.IsUserOnline(context.Background(), "usr_ws_presence_disconnect")
+		return err == nil && online
+	}, "presence online after connect")
+
+	_ = conn.Close()
+	waitFor(t, func() bool {
+		online, err := store.IsUserOnline(context.Background(), "usr_ws_presence_disconnect")
+		return err == nil && !online
+	}, "presence unregister after websocket disconnect")
+}
+
+func TestWebSocketGatewayPresenceTracksMultipleConnections(t *testing.T) {
+	store := presence.NewMemoryStore()
+	app, server, cleanup := newGatewayWSAppTestServerWithPresence(t, store)
+	defer cleanup()
+
+	connA := dialGatewayWS(t, server.URL, "usr_ws_presence_multi")
+	defer connA.Close()
+	connB := dialGatewayWS(t, server.URL, "usr_ws_presence_multi")
+	defer connB.Close()
+
+	waitFor(t, func() bool {
+		connections, err := store.ListUserConnections(context.Background(), "usr_ws_presence_multi")
+		return err == nil && len(connections) == 2 && app.Connections().UserCount("usr_ws_presence_multi") == 2
+	}, "two websocket presence records")
+
+	result, err := app.PushToUser(context.Background(), "usr_ws_presence_multi", delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
+		ServerMsgID:    "msg_presence_multi_1",
+		ConversationID: "single:sender:usr_ws_presence_multi",
+		Seq:            1,
+		SenderID:       "sender",
+		ReceiverID:     "usr_ws_presence_multi",
+		ContentType:    "text",
+	}))
+	if err != nil {
+		t.Fatalf("push with multiple presence connections: %v", err)
+	}
+	if result.DeliveredConnections != 2 || len(result.Recipients) != 1 || len(result.Recipients[0].Routes) != 2 {
+		t.Fatalf("unexpected multiple connection routing result: %+v", result)
+	}
+	_ = readWSPushEvent(t, connA)
+	_ = readWSPushEvent(t, connB)
 }
 
 func TestWebSocketGatewaySendAndPullMessages(t *testing.T) {
@@ -233,12 +339,75 @@ func TestWebSocketGatewayPushOfflineUserReturnsOfflineStatus(t *testing.T) {
 	}
 }
 
+func TestWebSocketGatewayPushReturnsRoutedForRemotePresence(t *testing.T) {
+	store := presence.NewMemoryStore()
+	app := newGatewayWSAppWithPresence(t, store)
+	err := store.RegisterConnection(context.Background(), presence.ConnectionMetadata{
+		UserID:       "usr_ws_remote_route",
+		ConnectionID: "conn_remote_1",
+		InstanceID:   "gateway-remote",
+		GatewayID:    "gateway-remote",
+		Platform:     "web",
+	}, time.Minute)
+	if err != nil {
+		t.Fatalf("register remote presence route: %v", err)
+	}
+
+	result, err := app.PushToUser(context.Background(), "usr_ws_remote_route", delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
+		ServerMsgID:    "msg_remote_route_1",
+		ConversationID: "single:sender:usr_ws_remote_route",
+		Seq:            1,
+		SenderID:       "sender",
+		ReceiverID:     "usr_ws_remote_route",
+		ContentType:    "text",
+	}))
+	if err != nil {
+		t.Fatalf("remote routed result should not be an error: %v", err)
+	}
+	if result.RoutedRecipients != 1 || len(result.Recipients) != 1 || result.Recipients[0].Status != delivery.StatusRouted {
+		t.Fatalf("unexpected routed result: %+v", result)
+	}
+	if len(result.Recipients[0].Routes) != 1 || result.Recipients[0].Routes[0].Local {
+		t.Fatalf("unexpected route metadata: %+v", result.Recipients[0].Routes)
+	}
+}
+
+func TestWebSocketGatewayPushReportsPresenceLookupFailure(t *testing.T) {
+	store := failingPresenceStore{err: errors.New("presence unavailable")}
+	app, server, cleanup := newGatewayWSAppTestServerWithPresence(t, store)
+	defer cleanup()
+
+	conn := dialGatewayWS(t, server.URL, "usr_ws_presence_failure")
+	defer conn.Close()
+	waitFor(t, func() bool {
+		return app.Connections().UserCount("usr_ws_presence_failure") == 1
+	}, "local websocket connection despite presence lookup failure")
+
+	result, err := app.PushToUser(context.Background(), "usr_ws_presence_failure", delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
+		ServerMsgID:    "msg_presence_failure_1",
+		ConversationID: "single:sender:usr_ws_presence_failure",
+		Seq:            1,
+		SenderID:       "sender",
+		ReceiverID:     "usr_ws_presence_failure",
+		ContentType:    "text",
+	}))
+	if err == nil {
+		t.Fatal("expected presence lookup failure")
+	}
+	if result.FailedRecipients != 1 || len(result.Recipients) != 1 || result.Recipients[0].Status != delivery.StatusFailed {
+		t.Fatalf("unexpected presence failure result: %+v", result)
+	}
+}
+
 func TestWebSocketGatewayPushDoesNotBreakCommandResponses(t *testing.T) {
 	app, server, cleanup := newGatewayWSAppTestServer(t)
 	defer cleanup()
 
 	conn := dialGatewayWS(t, server.URL, "usr_ws_push_command")
 	defer conn.Close()
+	waitFor(t, func() bool {
+		return app.Connections().UserCount("usr_ws_push_command") == 1
+	}, "websocket connection registered before push command test")
 
 	_, err := app.PushToUser(context.Background(), "usr_ws_push_command", delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
 		ServerMsgID:    "msg_push_command_1",
@@ -298,7 +467,21 @@ func newGatewayWSAppTestServer(t *testing.T) (*gatewayws.Server, *httptest.Serve
 	return app, server, server.Close
 }
 
+func newGatewayWSAppTestServerWithPresence(t *testing.T, store presence.PresenceStore) (*gatewayws.Server, *httptest.Server, func()) {
+	t.Helper()
+
+	app := newGatewayWSAppWithPresence(t, store)
+	server := httptest.NewServer(app)
+	return app, server, server.Close
+}
+
 func newGatewayWSApp(t *testing.T) *gatewayws.Server {
+	t.Helper()
+
+	return newGatewayWSAppWithPresence(t, presence.NewMemoryStore())
+}
+
+func newGatewayWSAppWithPresence(t *testing.T, store presence.PresenceStore) *gatewayws.Server {
 	t.Helper()
 
 	serviceContext := svc.NewMessageServiceContextWithAuth(
@@ -307,7 +490,12 @@ func newGatewayWSApp(t *testing.T) *gatewayws.Server {
 		nil,
 		testJWTAuthConfig(),
 	)
-	return gatewayws.NewServer(serviceContext)
+	return gatewayws.NewServer(
+		serviceContext,
+		gatewayws.WithPresenceStore(store),
+		gatewayws.WithPresenceTTL(time.Minute),
+		gatewayws.WithInstanceID("gateway-test"),
+	)
 }
 
 func dialGatewayWS(t *testing.T, serverURL string, userID string) *websocket.Conn {
@@ -404,4 +592,28 @@ func responseStatus(resp *http.Response) int {
 		return 0
 	}
 	return resp.StatusCode
+}
+
+type failingPresenceStore struct {
+	err error
+}
+
+func (s failingPresenceStore) RegisterConnection(context.Context, presence.ConnectionMetadata, time.Duration) error {
+	return nil
+}
+
+func (s failingPresenceStore) Heartbeat(context.Context, string, string, time.Duration) error {
+	return nil
+}
+
+func (s failingPresenceStore) UnregisterConnection(context.Context, string, string) error {
+	return nil
+}
+
+func (s failingPresenceStore) ListUserConnections(context.Context, string) ([]presence.ConnectionMetadata, error) {
+	return nil, s.err
+}
+
+func (s failingPresenceStore) IsUserOnline(context.Context, string) (bool, error) {
+	return false, s.err
 }
