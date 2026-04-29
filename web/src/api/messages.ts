@@ -42,9 +42,12 @@ export type ConversationSeqState = {
   maxSeq: number;
   hasReadSeq?: number;
   unreadCount?: number;
+  maxSeqTime?: number;
+  lastMessage?: ServerMessage;
 };
 
 export type ConversationSeqsResponse = {
+  states?: ConversationSeqState[];
   conversations?: ConversationSeqState[];
   seqs?: ConversationSeqState[];
 };
