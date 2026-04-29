@@ -1,22 +1,12 @@
 import { ChevronLeft, Search, SendHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import type { MessageApi, ServerMessage } from '../../api/messages';
+import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
 import { createMessageApi } from '../../api/messages';
 import type { ChatMessage, Conversation, MessageStatus } from '../../models/messages';
-import { cloneMockConversations, currentUserId as mockCurrentUserId } from './mockConversations';
-
-type SendMessageHandler = (message: ChatMessage) => Promise<ChatMessage>;
-
-type ConversationSeed = Pick<Conversation, 'id' | 'title' | 'chatType'> &
-  Partial<Pick<Conversation, 'avatar' | 'color' | 'receiverId' | 'groupId'>>;
 
 type MessagesPageProps = {
-  mode?: 'mock' | 'real';
-  currentUserId?: string;
-  conversations?: ConversationSeed[];
-  initialConversations?: Conversation[];
+  currentUserId: string;
   messageApi?: MessageApi;
-  sendMessage?: SendMessageHandler;
 };
 
 const statusLabels: Record<MessageStatus, string> = {
@@ -25,38 +15,28 @@ const statusLabels: Record<MessageStatus, string> = {
   failed: '发送失败',
 };
 
-export function MessagesPage({
-  mode = 'mock',
-  currentUserId = mockCurrentUserId,
-  conversations,
-  initialConversations,
-  messageApi = createMessageApi(),
-  sendMessage,
-}: MessagesPageProps) {
-  const [items, setItems] = useState(() =>
-    mode === 'real'
-      ? conversationSeedsToViews(conversations ?? [], currentUserId)
-      : cloneConversations(initialConversations ?? cloneMockConversations()),
-  );
+export function MessagesPage({ currentUserId, messageApi = createMessageApi() }: MessagesPageProps) {
+  const [items, setItems] = useState<Conversation[]>([]);
+  const [status, setStatus] = useState('正在加载会话');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const selectedConversation = items.find((conversation) => conversation.id === selectedConversationId) ?? null;
 
   useEffect(() => {
-    if (mode !== 'real' || !conversations?.length) {
-      return;
-    }
-
-    const conversationSeeds = conversations;
     let cancelled = false;
     async function loadConversations() {
-      const nextItems = await Promise.all(
-        conversationSeeds.map(async (conversation) => {
-          const pulled = await messageApi.pullMessages(conversation.id, { fromSeq: 1, limit: 50, order: 'asc' });
-          return conversationSeedToView(conversation, currentUserId, pulled.messages);
-        }),
-      );
-      if (!cancelled) {
-        setItems(nextItems);
+      setStatus('正在加载会话');
+      try {
+        const response = await messageApi.getConversationSeqs([]);
+        const states = response.states ?? response.conversations ?? response.seqs ?? [];
+        const conversations = await Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi)));
+        if (!cancelled) {
+          setItems(conversations);
+          setStatus(conversations.length > 0 ? `已加载 ${conversations.length} 个会话` : '暂无会话');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStatus(error instanceof Error ? error.message : '加载会话失败');
+        }
       }
     }
 
@@ -64,7 +44,7 @@ export function MessagesPage({
     return () => {
       cancelled = true;
     };
-  }, [mode, conversations, currentUserId, messageApi]);
+  }, [currentUserId, messageApi]);
 
   function handleSend(content: string) {
     if (!selectedConversation) {
@@ -74,16 +54,12 @@ export function MessagesPage({
     const pendingMessage = createPendingMessage(selectedConversation, content, currentUserId);
     setItems((current) => appendMessage(current, selectedConversation.id, pendingMessage));
 
-    const sender =
-      mode === 'real'
-        ? sendMessageWithApi(messageApi, pendingMessage)
-        : (sendMessage ?? sendMessageWithMockAck)(pendingMessage);
-
-    void sender
+    void sendMessageWithApi(messageApi, pendingMessage)
       .then((sentMessage) => {
         setItems((current) => updateMessage(current, selectedConversation.id, pendingMessage.id, sentMessage));
       })
-      .catch(() => {
+      .catch((error) => {
+        setStatus(error instanceof Error ? error.message : '发送消息失败');
         setItems((current) =>
           updateMessage(current, selectedConversation.id, pendingMessage.id, {
             ...pendingMessage,
@@ -99,23 +75,30 @@ export function MessagesPage({
         conversation={selectedConversation}
         onBack={() => setSelectedConversationId(null)}
         onSend={handleSend}
+        status={status}
       />
     );
   }
 
-  return <ConversationList conversations={items} onSelect={(conversationId) => setSelectedConversationId(conversationId)} />;
+  return <ConversationList conversations={items} status={status} onSelect={(conversationId) => setSelectedConversationId(conversationId)} />;
 }
 
 function ConversationList({
   conversations,
+  status,
   onSelect,
 }: {
   conversations: Conversation[];
+  status: string;
   onSelect: (conversationId: string) => void;
 }) {
   return (
     <div className="page-stack">
       <SearchBox placeholder="搜索" />
+      <p className="inline-status" role="status">
+        {status}
+      </p>
+      {conversations.length === 0 ? <p className="empty-state">暂无会话</p> : null}
       <section className="list-card conversation-list" role="list" aria-label="消息列表">
         {conversations.map((item) => (
           <div className="conversation-list-item" role="listitem" key={item.id}>
@@ -141,10 +124,12 @@ function ChatWindow({
   conversation,
   onBack,
   onSend,
+  status,
 }: {
   conversation: Conversation;
   onBack: () => void;
   onSend: (content: string) => void;
+  status: string;
 }) {
   const sortedMessages = useMemo(
     () => [...conversation.messages].sort((left, right) => left.sendTime - right.sendTime),
@@ -159,7 +144,9 @@ function ChatWindow({
         </button>
         <h2>{conversation.title}</h2>
       </header>
-
+      <p className="inline-status" role="status">
+        {status}
+      </p>
       <div className="message-thread" role="log" aria-label="聊天消息">
         {sortedMessages.map((message) => (
           <article className={`message-row message-${message.direction}`} key={message.id}>
@@ -212,11 +199,28 @@ function SearchBox({ placeholder }: { placeholder: string }) {
   );
 }
 
-function cloneConversations(conversations: Conversation[]) {
-  return conversations.map((conversation) => ({
-    ...conversation,
-    messages: conversation.messages.map((message) => ({ ...message })),
-  }));
+async function loadConversation(state: ConversationSeqState, currentUserId: string, messageApi: MessageApi): Promise<Conversation> {
+  const pulled = await messageApi.pullMessages(state.conversationId, { fromSeq: 1, limit: 50, order: 'asc' });
+  return conversationStateToView(state, currentUserId, pulled.messages);
+}
+
+function conversationStateToView(state: ConversationSeqState, currentUserId: string, messages: ServerMessage[]): Conversation {
+  const chatMessages = messages.map((message) => serverMessageToChatMessage(message, currentUserId));
+  const lastMessage = chatMessages[chatMessages.length - 1] ?? serverLastMessage(state.lastMessage, currentUserId);
+  const peerId = inferPeerId(state.conversationId, currentUserId, lastMessage);
+  return {
+    id: state.conversationId,
+    title: peerId || state.conversationId,
+    avatar: avatarText(peerId || state.conversationId),
+    preview: lastMessage?.content ?? '暂无消息',
+    time: state.maxSeqTime ? '刚刚' : '',
+    unread: state.unreadCount ?? 0,
+    color: state.conversationId.startsWith('group:') ? 'green' : 'blue',
+    chatType: state.conversationId.startsWith('group:') ? 'group' : 'single',
+    receiverId: state.conversationId.startsWith('group:') ? undefined : peerId,
+    groupId: state.conversationId.startsWith('group:') ? state.conversationId.replace(/^group:/, '') : undefined,
+    messages: chatMessages,
+  };
 }
 
 function appendMessage(conversations: Conversation[], conversationId: string, message: ChatMessage) {
@@ -291,44 +295,8 @@ function sendMessageWithApi(messageApi: MessageApi, message: ChatMessage): Promi
   return messageApi.sendMessage(request).then((response) => serverMessageToChatMessage(response.message, message.senderId));
 }
 
-function sendMessageWithMockAck(message: ChatMessage): Promise<ChatMessage> {
-  return new Promise((resolve, reject) => {
-    window.setTimeout(() => {
-      if (message.content.includes('/fail')) {
-        reject(new Error('mock send failed'));
-        return;
-      }
-
-      resolve({
-        ...message,
-        serverMsgId: `mock-${message.clientMsgId}`,
-        createdAt: Date.now(),
-        status: 'sent',
-      });
-    }, 20);
-  });
-}
-
-function conversationSeedsToViews(seeds: ConversationSeed[], currentUserId: string) {
-  return seeds.map((seed) => conversationSeedToView(seed, currentUserId, []));
-}
-
-function conversationSeedToView(seed: ConversationSeed, currentUserId: string, messages: ServerMessage[]): Conversation {
-  const chatMessages = messages.map((message) => serverMessageToChatMessage(message, currentUserId));
-  const lastMessage = chatMessages[chatMessages.length - 1];
-  return {
-    id: seed.id,
-    title: seed.title,
-    avatar: seed.avatar ?? seed.title.slice(0, 2).toUpperCase(),
-    preview: lastMessage?.content ?? '暂无消息',
-    time: lastMessage ? '刚刚' : '',
-    unread: 0,
-    color: seed.color ?? 'blue',
-    chatType: seed.chatType,
-    receiverId: seed.receiverId,
-    groupId: seed.groupId,
-    messages: chatMessages,
-  };
+function serverLastMessage(message: ServerMessage | undefined, currentUserId: string) {
+  return message ? serverMessageToChatMessage(message, currentUserId) : undefined;
 }
 
 function serverMessageToChatMessage(message: ServerMessage, currentUserId: string): ChatMessage {
@@ -351,9 +319,31 @@ function serverMessageToChatMessage(message: ServerMessage, currentUserId: strin
   };
 }
 
+function inferPeerId(conversationId: string, currentUserId: string, lastMessage?: ChatMessage) {
+  if (lastMessage) {
+    if (lastMessage.senderId && lastMessage.senderId !== currentUserId) {
+      return lastMessage.senderId;
+    }
+    if (lastMessage.receiverId && lastMessage.receiverId !== currentUserId) {
+      return lastMessage.receiverId;
+    }
+  }
+  if (conversationId.startsWith('single:')) {
+    return conversationId
+      .replace(/^single:/, '')
+      .split(':')
+      .find((part) => part && part !== currentUserId);
+  }
+  return undefined;
+}
+
 function requiredField(value: string | undefined, fieldName: string) {
   if (!value) {
     throw new Error(`${fieldName} is required`);
   }
   return value;
+}
+
+function avatarText(value: string) {
+  return value.trim().slice(0, 2).toUpperCase() || 'C';
 }

@@ -3,11 +3,12 @@ import { Compass, Contact, MessageCircle, ShieldCheck, UserRound } from 'lucide-
 import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
 import { createApiClient } from './api/client';
+import { createContactsApi, type ContactsApi } from './api/contacts';
+import { createMessageApi, type MessageApi } from './api/messages';
 import { createUserApi, type UserApi, type UserProfile, type UserProfilePatch } from './api/user';
 import ContactsPage from './components/ContactsPage';
 import { TabBar, type TabDefinition } from './components/ui/TabBar';
 import { TopBar } from './components/ui/TopBar';
-import { mockCurrentUser } from './data/mockData';
 import { MessagesPage } from './features/messages/MessagesPage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { MePage } from './pages/MePage';
@@ -63,6 +64,15 @@ function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppPr
       ),
     [session?.token, userApi],
   );
+  const authedApiClient = useMemo(
+    () =>
+      createApiClient({
+        getToken: () => session?.token,
+      }),
+    [session?.token],
+  );
+  const messageApi = useMemo(() => createMessageApi(authedApiClient), [authedApiClient]);
+  const contactsApi = useMemo(() => createContactsApi(authedApiClient), [authedApiClient]);
 
   async function updateProfile(patch: UserProfilePatch) {
     const updatedUser = await effectiveUserApi.patchCurrentUser(patch);
@@ -74,7 +84,9 @@ function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppPr
       <section className="phone-frame">
         <TopBar title={activeLabel} />
 
-        <section className="content-area">{renderPage(activeTab, currentUser, updateProfile, logout)}</section>
+        <section className="content-area">
+          {renderPage(activeTab, currentUser, updateProfile, logout, effectiveUserApi, contactsApi, messageApi)}
+        </section>
 
         <TabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
       </section>
@@ -200,13 +212,16 @@ function renderPage(
   currentUser: UserProfile,
   onUpdateProfile: (patch: UserProfilePatch) => Promise<void>,
   onLogout: () => void,
+  userApi: UserApi,
+  contactsApi: ContactsApi,
+  messageApi: MessageApi,
 ) {
   if (tab === 'messages') {
-    return <MessagesPage />;
+    return <MessagesPage currentUserId={currentUser.user_id} messageApi={messageApi} />;
   }
 
   if (tab === 'contacts') {
-    return <ContactsPage />;
+    return <ContactsPage userApi={userApi} contactsApi={contactsApi} />;
   }
 
   if (tab === 'discover') {
@@ -229,11 +244,9 @@ function userProfileFromAuth(user: AuthUser): UserProfile {
     identifier: user.identifier,
     display_name: user.displayName,
     name: user.displayName,
-    gender: user.gender ?? mockCurrentUser.gender,
-    age: user.age ?? mockCurrentUser.age,
-    region: user.region ?? mockCurrentUser.region,
-    created_at: mockCurrentUser.created_at,
-    updated_at: mockCurrentUser.updated_at,
+    gender: user.gender ?? '',
+    age: user.age ?? 0,
+    region: user.region ?? '',
   };
 }
 

@@ -1,20 +1,11 @@
 import { useMemo, useState, type ComponentType, type FormEvent } from 'react';
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Hash,
-  Megaphone,
-  Plus,
-  Search,
-  Tag,
-  UserPlus,
-  UserRound,
-  UsersRound,
-} from 'lucide-react';
+import { ChevronRight, Megaphone, Search, Tag, UserPlus, UsersRound } from 'lucide-react';
+import type { ContactsApi, Friendship } from '../api/contacts';
+import { createContactsApi } from '../api/contacts';
+import type { UserApi, UserProfile } from '../api/user';
+import { createUserApi } from '../api/user';
 
 type Friend = {
-  id: string;
   userId: string;
   name: string;
   identifier: string;
@@ -30,111 +21,105 @@ type ContactEntry = {
   icon: ComponentType<{ size?: number }>;
 };
 
-type GroupMemberView = {
-  userId: string;
-  name: string;
-  identifier: string;
+type ContactsPageProps = {
+  userApi?: UserApi;
+  contactsApi?: ContactsApi;
 };
-
-type GroupView = {
-  id: string;
-  name: string;
-  description: string;
-  members: GroupMemberView[];
-};
-
-const currentUser: GroupMemberView = {
-  userId: 'usr_000001',
-  name: 'Alice Chen',
-  identifier: 'alice_001',
-};
-
-const friends: Friend[] = [
-  { id: 'alice', userId: 'usr_000001', name: 'Alice Chen', identifier: 'alice_001', initial: 'A', avatar: 'A' },
-  { id: 'agent', userId: 'usr_agent', name: 'Agent 助手', identifier: 'agent_helper', initial: 'A', avatar: 'AI' },
-  { id: 'bob', userId: 'usr_000002', name: 'Bob Lin', identifier: 'bob_002', initial: 'B', avatar: 'B' },
-];
-
-const searchableUsers: Friend[] = [
-  ...friends,
-  { id: 'carol', userId: 'usr_000003', name: 'Carol Wu', identifier: 'carol_003', initial: 'C', avatar: 'C' },
-];
 
 const contactEntries: ContactEntry[] = [
-  { id: 'new', label: '新的朋友', helper: '好友申请与推荐', accent: 'orange', icon: UserPlus },
-  { id: 'groups', label: '群聊', helper: 'Frontend Demo、Agent 群', accent: 'green', icon: UsersRound },
-  { id: 'tags', label: '标签', helper: '按角色整理联系人', accent: 'blue', icon: Tag },
-  { id: 'official', label: '公众号', helper: '系统通知与服务号', accent: 'gray', icon: Megaphone },
+  { id: 'new', label: '新的朋友', helper: '通过账号搜索并添加好友', accent: 'orange', icon: UserPlus },
+  { id: 'groups', label: '群聊', helper: '群聊能力走 groups API，后续在群聊页展开', accent: 'green', icon: UsersRound },
+  { id: 'tags', label: '标签', helper: '标签功能暂未实现', accent: 'blue', icon: Tag },
+  { id: 'official', label: '公众号', helper: '系统通知与服务号暂未实现', accent: 'gray', icon: Megaphone },
 ];
 
-const initialGroups: GroupView[] = [
-  {
-    id: 'grp_000001',
-    name: 'Frontend Demo',
-    description: 'MVP smoke room',
-    members: [
-      currentUser,
-      { userId: 'usr_000002', name: 'Bob Lin', identifier: 'bob_002' },
-    ],
-  },
-  {
-    id: 'grp_agent',
-    name: 'Agent 群',
-    description: 'Agent 生命周期与群聊演示',
-    members: [
-      currentUser,
-      { userId: 'usr_agent', name: 'Agent 助手', identifier: 'agent_helper' },
-    ],
-  },
-];
+function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsApi() }: ContactsPageProps) {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [friendStatus, setFriendStatus] = useState('点击刷新好友列表');
 
-function ContactsPage() {
-  const [showGroups, setShowGroups] = useState(false);
+  async function refreshFriends() {
+    setFriendStatus('正在加载好友列表');
+    const response = await contactsApi.listFriends();
+    setFriends(response.friends.map(friendshipToFriend));
+    setFriendStatus(response.friends.length > 0 ? `已加载 ${response.friends.length} 位好友` : '暂无好友');
+  }
+
+  async function addFriend(profile: UserProfile) {
+    await contactsApi.addFriend(profile.user_id);
+    setFriends((current) => upsertFriend(current, userProfileToFriend(profile)));
+    setFriendStatus(`已添加好友：${profile.identifier}`);
+  }
 
   return (
     <div className="page-stack contacts-page">
-      <IdentifierSearch />
+      <IdentifierSearch userApi={userApi} onAddFriend={addFriend} />
       <section className="list-card" aria-label="联系人快捷入口">
         {contactEntries.map((entry) => (
-          <ContactEntryButton key={entry.id} entry={entry} onClick={() => entry.id === 'groups' && setShowGroups(true)} />
+          <ContactEntryButton key={entry.id} entry={entry} />
         ))}
       </section>
-
-      {showGroups ? <GroupsPanel onBack={() => setShowGroups(false)} /> : <FriendDirectory friends={friends} />}
+      <section aria-label="好友列表">
+        <div className="panel-heading">
+          <h2>好友</h2>
+          <button className="text-command" type="button" onClick={refreshFriends}>
+            刷新好友
+          </button>
+        </div>
+        <p className="inline-status" role="status">
+          {friendStatus}
+        </p>
+        <FriendDirectory friends={friends} />
+      </section>
     </div>
   );
 }
 
-function IdentifierSearch() {
+function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFriend: (profile: UserProfile) => Promise<void> }) {
   const [identifier, setIdentifier] = useState('');
-  const [result, setResult] = useState<Friend | null>(null);
+  const [result, setResult] = useState<UserProfile | null>(null);
   const [status, setStatus] = useState('按唯一 identifier 搜索用户');
-  const [addedIdentifier, setAddedIdentifier] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [adding, setAdding] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const query = identifier.trim().toLowerCase();
+    const query = identifier.trim();
 
     if (!query) {
       setResult(null);
-      setAddedIdentifier(null);
       setStatus('请输入 identifier');
       return;
     }
 
-    const found = searchableUsers.find((user) => user.identifier.toLowerCase() === query) ?? null;
-    setResult(found);
-    setAddedIdentifier(null);
-    setStatus(found ? `找到 ${found.name}` : `未找到 ${identifier.trim()}`);
+    setSubmitting(true);
+    setStatus('正在搜索用户');
+    try {
+      const profile = await userApi.getPublicProfileByIdentifier(query);
+      setResult(profile);
+      setStatus(`找到 ${profile.display_name || profile.name || profile.identifier}`);
+    } catch (error) {
+      setResult(null);
+      setStatus(error instanceof Error ? error.message : `未找到 ${query}`);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  function handleAddFriend() {
+  async function handleAddFriend() {
     if (!result) {
       return;
     }
 
-    setAddedIdentifier(result.identifier);
-    setStatus(`已发送添加请求：${result.identifier}`);
+    setAdding(true);
+    setStatus('正在添加好友');
+    try {
+      await onAddFriend(result);
+      setStatus(`已添加好友：${result.identifier}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '添加好友失败');
+    } finally {
+      setAdding(false);
+    }
   }
 
   return (
@@ -149,7 +134,7 @@ function IdentifierSearch() {
             onChange={(event) => setIdentifier(event.target.value)}
           />
         </label>
-        <button className="compact-command" type="submit" aria-label="搜索用户">
+        <button className="compact-command" type="submit" aria-label="搜索用户" disabled={submitting}>
           <Search size={17} />
           <span>搜索</span>
         </button>
@@ -159,19 +144,19 @@ function IdentifierSearch() {
       </p>
       {result ? (
         <article className="search-result">
-          <div className="avatar avatar-blue">{result.avatar}</div>
+          <div className="avatar avatar-blue">{avatarText(result.display_name || result.name || result.identifier)}</div>
           <div className="row-main">
-            <strong>{result.name}</strong>
+            <strong>{result.display_name || result.name || result.identifier}</strong>
             <p>{result.identifier}</p>
           </div>
           <button
             className="text-command"
             type="button"
             aria-label={`添加好友 ${result.identifier}`}
-            disabled={addedIdentifier === result.identifier}
+            disabled={adding}
             onClick={handleAddFriend}
           >
-            {addedIdentifier === result.identifier ? '已添加' : '添加好友'}
+            {adding ? '添加中' : '添加好友'}
           </button>
         </article>
       ) : null}
@@ -179,11 +164,11 @@ function IdentifierSearch() {
   );
 }
 
-function ContactEntryButton({ entry, onClick }: { entry: ContactEntry; onClick: () => void }) {
+function ContactEntryButton({ entry }: { entry: ContactEntry }) {
   const Icon = entry.icon;
 
   return (
-    <button className="action-row row-button" type="button" aria-label={entry.label} onClick={onClick}>
+    <div className="action-row" aria-label={entry.label}>
       <div className={`action-icon action-${entry.accent}`}>
         <Icon size={19} />
       </div>
@@ -192,15 +177,19 @@ function ContactEntryButton({ entry, onClick }: { entry: ContactEntry; onClick: 
         <p>{entry.helper}</p>
       </div>
       <ChevronRight size={18} />
-    </button>
+    </div>
   );
 }
 
-function FriendDirectory({ friends: directoryFriends }: { friends: Friend[] }) {
-  const groups = useMemo(() => groupFriends(directoryFriends), [directoryFriends]);
+function FriendDirectory({ friends }: { friends: Friend[] }) {
+  const groups = useMemo(() => groupFriends(friends), [friends]);
+
+  if (friends.length === 0) {
+    return <p className="empty-state">暂无好友</p>;
+  }
 
   return (
-    <section aria-label="好友列表">
+    <>
       {groups.map(([initial, groupedFriends]) => (
         <section className="friend-group" aria-labelledby={`friend-group-${initial}`} key={initial}>
           <h2 className="section-label" id={`friend-group-${initial}`}>
@@ -208,173 +197,19 @@ function FriendDirectory({ friends: directoryFriends }: { friends: Friend[] }) {
           </h2>
           <div className="list-card">
             {groupedFriends.map((friend) => (
-              <article className="friend-row" key={friend.id}>
+              <article className="friend-row" key={friend.userId}>
                 <div className="avatar avatar-blue">{friend.avatar}</div>
                 <div>
                   <strong>{friend.name}</strong>
                   <p>{friend.identifier}</p>
+                  <p>{friend.userId}</p>
                 </div>
               </article>
             ))}
           </div>
         </section>
       ))}
-    </section>
-  );
-}
-
-function GroupsPanel({ onBack }: { onBack: () => void }) {
-  const [groups, setGroups] = useState<GroupView[]>(initialGroups);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [groupName, setGroupName] = useState('');
-  const [joinGroupId, setJoinGroupId] = useState('');
-  const [notice, setNotice] = useState('可创建群或输入群 ID 加入群聊');
-  const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
-
-  function handleCreateGroup(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const name = groupName.trim();
-
-    if (!name) {
-      setNotice('请输入群名称');
-      return;
-    }
-
-    const group: GroupView = {
-      id: `grp_mock_${groups.length + 1}`,
-      name,
-      description: '本地 mock 群聊',
-      members: [currentUser],
-    };
-    setGroups((items) => [group, ...items]);
-    setGroupName('');
-    setSelectedGroupId(group.id);
-    setNotice(`已创建 ${group.name}`);
-  }
-
-  function handleJoinGroup(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const groupId = joinGroupId.trim();
-
-    if (!groupId) {
-      setNotice('请输入群 ID');
-      return;
-    }
-
-    const existingGroup = groups.find((group) => group.id === groupId);
-    if (existingGroup) {
-      setGroups((items) =>
-        items.map((group) =>
-          group.id === groupId && !group.members.some((member) => member.userId === currentUser.userId)
-            ? { ...group, members: [currentUser, ...group.members] }
-            : group,
-        ),
-      );
-      setSelectedGroupId(existingGroup.id);
-      setNotice(`已加入 ${existingGroup.name}`);
-      setJoinGroupId('');
-      return;
-    }
-
-    const joinedGroup: GroupView = {
-      id: groupId,
-      name: groupId,
-      description: '通过群 ID 加入的本地 mock 群聊',
-      members: [currentUser],
-    };
-    setGroups((items) => [joinedGroup, ...items]);
-    setSelectedGroupId(joinedGroup.id);
-    setJoinGroupId('');
-    setNotice(`已加入 ${joinedGroup.name}`);
-  }
-
-  return (
-    <section className="group-workspace" aria-label="群聊工作区">
-      <div className="panel-heading">
-        <button className="icon-command" type="button" aria-label="返回联系人列表" onClick={onBack}>
-          <ChevronLeft size={19} />
-        </button>
-        <h2>群聊</h2>
-      </div>
-
-      <div className="group-actions">
-        <form className="mini-form" aria-label="创建群" onSubmit={handleCreateGroup}>
-          <label>
-            <span>群名称</span>
-            <input value={groupName} onChange={(event) => setGroupName(event.target.value)} />
-          </label>
-          <button className="compact-command" type="submit" aria-label="创建群">
-            <Plus size={17} />
-            <span>创建</span>
-          </button>
-        </form>
-        <form className="mini-form" aria-label="加入群" onSubmit={handleJoinGroup}>
-          <label>
-            <span>群 ID</span>
-            <input value={joinGroupId} onChange={(event) => setJoinGroupId(event.target.value)} />
-          </label>
-          <button className="compact-command" type="submit" aria-label="加入群">
-            <Check size={17} />
-            <span>加入</span>
-          </button>
-        </form>
-        <p className="helper-line">{notice}</p>
-      </div>
-
-      <section className="list-card" aria-label="群聊列表">
-        {groups.map((group) => (
-          <button
-            className="group-row row-button"
-            type="button"
-            key={group.id}
-            aria-label={`查看 ${group.name}`}
-            onClick={() => setSelectedGroupId(group.id)}
-          >
-            <div className="avatar avatar-green">
-              <UsersRound size={19} />
-            </div>
-            <div className="row-main">
-              <strong>{group.name}</strong>
-              <p>
-                {group.id} · {group.members.length} 位成员
-              </p>
-            </div>
-            <ChevronRight size={18} />
-          </button>
-        ))}
-      </section>
-
-      {selectedGroup ? <GroupDetail group={selectedGroup} /> : null}
-    </section>
-  );
-}
-
-function GroupDetail({ group }: { group: GroupView }) {
-  return (
-    <section className="group-detail" aria-label="群详情">
-      <div className="group-detail-head">
-        <div className="avatar avatar-green avatar-large">
-          <Hash size={25} />
-        </div>
-        <div className="row-main">
-          <h2>{group.name}</h2>
-          <p>{group.description}</p>
-        </div>
-      </div>
-      <ul className="member-list" aria-label="群成员列表">
-        {group.members.map((member) => (
-          <li className="member-row" key={member.userId}>
-            <div className="avatar avatar-blue">
-              <UserRound size={18} />
-            </div>
-            <div>
-              <strong>{member.name}</strong>
-              <p>{member.identifier}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
+    </>
   );
 }
 
@@ -387,6 +222,39 @@ function groupFriends(directoryFriends: Friend[]) {
   }, new Map<string, Friend[]>());
 
   return [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right));
+}
+
+function userProfileToFriend(profile: UserProfile): Friend {
+  const name = profile.display_name || profile.name || profile.identifier;
+  return {
+    userId: profile.user_id,
+    name,
+    identifier: profile.identifier,
+    initial: avatarText(name).slice(0, 1),
+    avatar: avatarText(name),
+  };
+}
+
+function friendshipToFriend(friendship: Friendship): Friend {
+  const name = friendship.friend_id;
+  return {
+    userId: friendship.friend_id,
+    name,
+    identifier: friendship.friend_id,
+    initial: avatarText(name).slice(0, 1),
+    avatar: avatarText(name),
+  };
+}
+
+function upsertFriend(friends: Friend[], friend: Friend) {
+  if (friends.some((item) => item.userId === friend.userId)) {
+    return friends.map((item) => (item.userId === friend.userId ? friend : item));
+  }
+  return [...friends, friend];
+}
+
+function avatarText(value: string) {
+  return value.trim().slice(0, 2).toUpperCase() || 'U';
 }
 
 export default ContactsPage;
