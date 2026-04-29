@@ -10,6 +10,13 @@
 - 复杂任务必须产出可版本化的计划、决策记录和验证结果。
 - 变更前先理解现有结构，变更后必须自测并记录验证方式。
 
+## 严格执行规则
+
+1. **禁止假实现**：不得用 mock、stub、硬编码、空实现、假成功返回、跳过错误、仅改测试等方式冒充真实能力。mock 只能用于明确标注的测试 fixture、demo/mock mode 或视觉占位；凡是业务/API/持久化/消息链路能力，都必须接真实实现或在计划中明确标为未完成。
+2. **失败优先**：遇到错误、异常、测试失败、接口不通、依赖缺失时，必须优先暴露并定位失败，不能用兜底逻辑吞掉错误、不能静默降级成 mock、不能为了让流程继续而返回成功。可恢复错误也必须记录原因、边界和验证方式。
+3. **根因优先**：修复失败前先复现、读完整错误、追踪数据流并形成根因假设；禁止未理解原因就堆叠补丁。
+4. **验证优先**：任何声称完成的实现都必须有可重复验证命令。没有启动真实依赖/服务并实际请求时，不得声称端到端成功，只能说明为 contract/proxy/unit verification。
+
 ## 快速导航
 
 - 项目架构总览：[`ARCHITECTURE.md`](./ARCHITECTURE.md)
@@ -77,13 +84,13 @@ feature/* -> develop -> main
 ## 工作要求
 
 - 新增或修改重要行为时，同步更新相关文档。
+- 发现假实现、静默兜底、吞错、只为通过测试而绕过真实逻辑时，必须立即改为失败优先并补充验证。
 - 涉及架构变更时，更新 `ARCHITECTURE.md` 或 `docs/design-docs/`。
 - 涉及产品行为时，更新 `docs/product-specs/`。
 - 涉及复杂任务时，在 `docs/exec-plans/active/` 下创建执行计划。
 - 完成任务后，将执行计划移到 `docs/exec-plans/completed/`，并补充结果与验证记录。
 - PR/MR 描述必须包含测试结果与风险说明。
 - 前端联调相关变更必须同步检查 [`docs/product-specs/frontend-backend-contract.md`](./docs/product-specs/frontend-backend-contract.md)、[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)、`scripts/dev-up.sh`、`scripts/dev-demo-data.sh` 和 `tests/mvp_backend_test.go`。
-
 
 ## Frontend AI Knowledge
 
@@ -96,7 +103,7 @@ This repository now includes a React/Vite frontend. Before any frontend task, Co
 
 Follow the WeChat-style four-tab product direction: `消息`, `联系人`, `发现`, `我的`. Use TDD with Vitest + Testing Library and verify with `npm run frontend:test`, `npm run frontend:build`, `npm run frontend:lint`, backend tests, and `scripts/verify-static.sh`.
 
-Frontend API integration work must not replace real backend behavior with silent mocks. Mock data is allowed only for visual scaffolding, test fixtures, or explicit demo/mock modes. Codex agents must use the unified `createApiClient`, keep bearer token injection consistent, verify Vite proxy/API contract paths, and clearly report whether validation was real E2E or frontend contract/proxy verification.
+Frontend API integration work must not replace real backend behavior with silent mocks or fake-success fallbacks. Mock data is allowed only for visual scaffolding, test fixtures, or explicit demo/mock modes. Codex agents must use the unified `createApiClient`, keep bearer token injection consistent, verify Vite proxy/API contract paths, and clearly report whether validation was real E2E or frontend contract/proxy verification. If a real API call fails, surface the failure and fix the cause instead of silently switching to demo data.
 
 ## go-zero / goctl AI Knowledge
 
