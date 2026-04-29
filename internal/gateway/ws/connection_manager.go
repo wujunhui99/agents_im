@@ -95,6 +95,18 @@ func (m *ConnectionManager) UserConnectionIDs(userID string) []string {
 	return ids
 }
 
+func (m *ConnectionManager) UserConnections(userID string) []*Connection {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	userConnections := m.byUserID[userID]
+	connections := make([]*Connection, 0, len(userConnections))
+	for _, conn := range userConnections {
+		connections = append(connections, conn)
+	}
+	return connections
+}
+
 func (m *ConnectionManager) Count() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

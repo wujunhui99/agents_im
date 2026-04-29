@@ -16,6 +16,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
+	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/svc"
 )
@@ -166,6 +167,18 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Connections() *ConnectionManager {
 	return s.connections
+}
+
+func (s *Server) DeliveryDispatcher() delivery.Dispatcher {
+	return NewInMemoryDeliveryDispatcher(s.connections)
+}
+
+func (s *Server) PushToUser(ctx context.Context, userID string, event delivery.Event) (delivery.Result, error) {
+	return s.DeliveryDispatcher().DeliverToUser(ctx, userID, event)
+}
+
+func (s *Server) PushToConversation(ctx context.Context, conversationID string, recipientUserIDs []string, event delivery.Event) (delivery.Result, error) {
+	return s.DeliveryDispatcher().DeliverToConversation(ctx, conversationID, recipientUserIDs, event)
 }
 
 func (s *Server) authenticate(r *http.Request) (token.Claims, error) {

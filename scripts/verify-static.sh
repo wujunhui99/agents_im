@@ -116,6 +116,8 @@ required_files=(
   "internal/messaging/event_test.go"
   "internal/messaging/producer_test.go"
   "internal/messaging/kafka_integration_test.go"
+  "internal/gateway/delivery/delivery.go"
+  "internal/gateway/ws/delivery.go"
   "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
@@ -147,6 +149,7 @@ required_files=(
   "docs/design-docs/kafka-message-events.md"
   "docs/design-docs/websocket-gateway.md"
   "docs/design-docs/message-transfer-worker.md"
+  "docs/design-docs/gateway-push-delivery.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -168,6 +171,7 @@ required_files=(
   "docs/exec-plans/active/websocket-gateway.md"
   "docs/exec-plans/active/kafka-redpanda-compose.md"
   "docs/exec-plans/active/message-transfer-worker.md"
+  "docs/exec-plans/active/gateway-push-delivery.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -586,6 +590,40 @@ rg -q "message-transfer-worker.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "ConsumerGroup|Consumer\\.Group" etc/message-transfer.yaml internal/config/config.go
 rg -q "Topic|Consumer\\.Topic" etc/message-transfer.yaml internal/config/config.go
 rg -q "WorkerID|Worker\\.ID" etc/message-transfer.yaml internal/config/config.go
+
+gateway_delivery_code_patterns=(
+  "type Dispatcher interface"
+  "DeliverToUser"
+  "DeliverToConversation"
+  "EventMessageReceived"
+  "EventMessageDelivered"
+  "StatusOffline"
+  "NewInMemoryDeliveryDispatcher"
+  "PushToUser"
+  "PushToConversation"
+  "UserConnections"
+)
+
+for pattern in "${gateway_delivery_code_patterns[@]}"; do
+  rg -q "$pattern" internal/gateway/delivery internal/gateway/ws tests/websocket_gateway_test.go
+done
+
+gateway_delivery_doc_patterns=(
+  "Message Transfer worker"
+  "Redis Presence"
+  "message_received"
+  "message_delivered"
+  "server_msg_id"
+  "conversation_id"
+  "offline"
+  "in-memory"
+)
+
+for pattern in "${gateway_delivery_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/gateway-push-delivery.md docs/exec-plans/active/gateway-push-delivery.md
+done
+
+rg -q "gateway-push-delivery.md" ARCHITECTURE.md docs/design-docs/index.md
 
 gateway_product_patterns=(
   "command ACK"
