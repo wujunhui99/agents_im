@@ -14,7 +14,7 @@ Phase 1 previously used in-memory repositories for user, auth, friends, groups, 
 ## Goals
 
 - Provide local PostgreSQL through `docker-compose.yml`.
-- Store phase-1 user, auth credential, friendship, group, message, conversation, read-state, and idempotency data in PostgreSQL.
+- Store phase-1 user, auth credential, friendship, group, message, conversation, read-state, idempotency, outbox, and delivery-attempt data in PostgreSQL.
 - Keep normal `go test ./...` independent from Docker/PostgreSQL.
 - Preserve existing domain repository interfaces.
 - Keep auth secrets owned by auth storage, not user/message storage.
@@ -42,6 +42,7 @@ Phase-1 tables:
 - `user_conversation_states`: per-user visibility and read progress.
 - `message_idempotency_keys`: explicit sender/client idempotency record.
 - `message_outbox`: transactional outbox rows for accepted message events.
+- `delivery_attempts`: per-recipient delivery state for accepted/published/delivered/offline/failed outcomes.
 
 ## Service Boundary Constraints
 
@@ -52,6 +53,7 @@ Strong foreign keys are only used inside a service-owned aggregate:
 - `user_conversation_states.conversation_id -> conversation_threads.conversation_id`
 - `message_idempotency_keys.server_msg_id -> messages.server_msg_id`
 - `message_outbox.server_msg_id -> messages.server_msg_id`
+- `delivery_attempts.server_msg_id -> messages.server_msg_id`
 
 Cross-service references are logical constraints:
 
@@ -120,7 +122,8 @@ Message writes use one PostgreSQL transaction:
 6. Upsert visible `user_conversation_states`.
 7. Advance sender `has_read_seq`.
 8. Update conversation max seq and last-message fields.
-9. Insert one `message_outbox` row for the `message.created` event.
+9. Insert accepted `delivery_attempts` rows for message recipients, excluding the sender.
+10. Insert one `message_outbox` row for the `message.created` event.
 
 The locked conversation row is the serialization point, preserving contiguous per-conversation seq values.
 
@@ -136,7 +139,7 @@ Follow-up command after local PG is running and migrated:
 export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
 goctl model pg datasource \
   -url "$DATABASE_URL" \
-  -table "users,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys,message_outbox" \
+  -table "users,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys,message_outbox,delivery_attempts" \
   -dir ./internal/model/pg \
   --style go_zero
 ```

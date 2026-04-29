@@ -12,14 +12,15 @@ import (
 )
 
 type MemoryMessageRepository struct {
-	mu            sync.RWMutex
-	nextMessageID uint64
-	nextOutboxID  uint64
-	conversations map[string]*memoryConversation
-	idempotency   map[string]messageIdempotencyRecord
-	readStates    map[string]int64
-	outbox        []OutboxEvent
-	now           func() time.Time
+	mu               sync.RWMutex
+	nextMessageID    uint64
+	nextOutboxID     uint64
+	conversations    map[string]*memoryConversation
+	idempotency      map[string]messageIdempotencyRecord
+	readStates       map[string]int64
+	outbox           []OutboxEvent
+	deliveryAttempts map[string]DeliveryAttempt
+	now              func() time.Time
 }
 
 type memoryConversation struct {
@@ -52,10 +53,11 @@ type messageIdempotencyPayload struct {
 
 func NewMemoryMessageRepository() *MemoryMessageRepository {
 	return &MemoryMessageRepository{
-		conversations: make(map[string]*memoryConversation),
-		idempotency:   make(map[string]messageIdempotencyRecord),
-		readStates:    make(map[string]int64),
-		now:           time.Now,
+		conversations:    make(map[string]*memoryConversation),
+		idempotency:      make(map[string]messageIdempotencyRecord),
+		readStates:       make(map[string]int64),
+		deliveryAttempts: make(map[string]DeliveryAttempt),
+		now:              time.Now,
 	}
 }
 
@@ -92,7 +94,8 @@ func (r *MemoryMessageRepository) CreateMessageIdempotent(_ context.Context, inp
 
 	conversation := r.ensureConversationLocked(conversationID, input)
 	conversation.maxSeq++
-	nowMillis := r.now().UTC().UnixMilli()
+	now := r.now().UTC()
+	nowMillis := now.UnixMilli()
 
 	r.nextMessageID++
 	message := Message{
@@ -121,6 +124,9 @@ func (r *MemoryMessageRepository) CreateMessageIdempotent(_ context.Context, inp
 	}
 	r.setReadSeqLocked(input.SenderID, conversationID, message.Seq)
 	if err := r.appendMessageCreatedOutboxLocked(message, input, nowMillis); err != nil {
+		return Message{}, false, err
+	}
+	if err := r.createDeliveryAttemptsAcceptedLocked(deliveryAttemptsForMessage(message, input), now); err != nil {
 		return Message{}, false, err
 	}
 
@@ -189,6 +195,7 @@ func (r *MemoryMessageRepository) MarkPublished(_ context.Context, eventID strin
 	event.LockedUntil = time.Time{}
 	event.PublishedAt = now
 	event.UpdatedAt = now
+	r.markDeliveryAttemptsPublishedLocked(event.ServerMsgID, nil, now)
 	return nil
 }
 

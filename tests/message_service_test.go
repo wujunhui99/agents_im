@@ -236,6 +236,15 @@ func TestMessageSendCreatesOutboxEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("send: %v", err)
 	}
+	deliveryAttempts, err := repo.ListDeliveryAttemptsByMessage(ctx, sent.Message.ServerMsgID)
+	if err != nil {
+		t.Fatalf("list delivery attempts: %v", err)
+	}
+	if len(deliveryAttempts) != 1 ||
+		deliveryAttempts[0].RecipientUserID != "usr_b" ||
+		deliveryAttempts[0].Status != repository.DeliveryStatusAccepted {
+		t.Fatalf("accepted delivery attempt mismatch: %+v", deliveryAttempts)
+	}
 
 	events, err := repo.PollPending(ctx, "memory-worker-1", 10, time.Minute)
 	if err != nil {
@@ -280,6 +289,13 @@ func TestMessageSendCreatesOutboxEvent(t *testing.T) {
 	}
 	if err := repo.MarkPublished(ctx, retried[0].EventID, "memory-worker-2"); err != nil {
 		t.Fatalf("mark published: %v", err)
+	}
+	deliveryAttempts, err = repo.ListDeliveryAttemptsByMessage(ctx, sent.Message.ServerMsgID)
+	if err != nil {
+		t.Fatalf("list published delivery attempts: %v", err)
+	}
+	if len(deliveryAttempts) != 1 || deliveryAttempts[0].Status != repository.DeliveryStatusPublished {
+		t.Fatalf("published delivery attempt mismatch: %+v", deliveryAttempts)
 	}
 	remaining, err := repo.PollPending(ctx, "memory-worker-3", 10, time.Minute)
 	if err != nil {

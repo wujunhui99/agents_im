@@ -8,6 +8,7 @@ Related docs:
 - [`postgres-persistence.md`](./postgres-persistence.md)
 - [`websocket-gateway.md`](./websocket-gateway.md)
 - [`outbox-kafka-publisher.md`](./outbox-kafka-publisher.md)
+- [`message-delivery-reliability.md`](./message-delivery-reliability.md)
 
 ## Background
 
@@ -126,6 +127,8 @@ The payload is for downstream Kafka/Transfer/Push workers. It does not mean the 
 10. Commit.
 
 If the outbox insert fails, the whole send transaction rolls back. Idempotent retries return the original message and do not create another outbox row.
+
+The same transaction also creates accepted `delivery_attempts` rows for message recipients. When a worker successfully marks the outbox row `published`, the repository advances those attempts from `accepted` to `published` without downgrading later delivery outcomes.
 
 ## Repository Contract
 

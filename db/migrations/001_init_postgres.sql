@@ -229,3 +229,33 @@ create index if not exists message_outbox_conversation_seq_idx
 
 create index if not exists message_outbox_server_msg_idx
   on message_outbox (server_msg_id);
+
+create table if not exists delivery_attempts (
+  server_msg_id text not null references messages(server_msg_id) on delete cascade,
+  conversation_id text not null,
+  recipient_user_id text not null,
+  status text not null,
+  attempt_count integer not null default 0,
+  last_error text not null default '',
+  next_retry_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (server_msg_id, recipient_user_id),
+  constraint delivery_attempts_server_msg_id_not_blank check (server_msg_id <> ''),
+  constraint delivery_attempts_conversation_id_not_blank check (conversation_id <> ''),
+  constraint delivery_attempts_recipient_user_id_not_blank check (recipient_user_id <> ''),
+  constraint delivery_attempts_status_check check (status in ('accepted', 'published', 'delivered', 'offline', 'failed')),
+  constraint delivery_attempts_attempt_count_check check (attempt_count >= 0),
+  constraint delivery_attempts_retry_shape_check check (
+    (status = 'failed')
+    or
+    (next_retry_at is null)
+  )
+);
+
+create index if not exists delivery_attempts_conversation_recipient_idx
+  on delivery_attempts (conversation_id, recipient_user_id, updated_at desc);
+
+create index if not exists delivery_attempts_retry_idx
+  on delivery_attempts (next_retry_at, updated_at)
+  where status = 'failed' and next_retry_at is not null;

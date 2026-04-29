@@ -66,13 +66,24 @@ func (d *Dispatcher) dispatchMessageAccepted(ctx context.Context, envelope trans
 	event := messageReceivedEvent(envelope, recipients)
 	result, err := d.gateway.DeliverToConversation(ctx, envelope.Event.ConversationID, recipients, event)
 	if err != nil {
-		return d.retryable(err)
+		dispatch := d.retryable(err)
+		dispatch.RecipientResults = failedRecipientResults(recipients, err.Error())
+		return dispatch
 	}
 	if result.FailedRecipients > 0 {
-		return d.retryable(failedDeliveryError(result))
+		dispatch := d.retryable(failedDeliveryError(result))
+		dispatch.RecipientResults = recipientDeliveryResults(result)
+		return dispatch
+	}
+	if result.RoutedRecipients > 0 {
+		dispatch := d.retryable(routedDeliveryError(result))
+		dispatch.RecipientResults = recipientDeliveryResults(result)
+		return dispatch
 	}
 
-	return transfer.DispatchSucceeded(deliveredUserIDs(result)...)
+	dispatch := transfer.DispatchSucceeded(deliveredUserIDs(result)...)
+	dispatch.RecipientResults = recipientDeliveryResults(result)
+	return dispatch
 }
 
 func (d *Dispatcher) retryable(err error) transfer.DispatchResult {
@@ -158,6 +169,58 @@ func deliveredUserIDs(result gatewaydelivery.Result) []string {
 	return delivered
 }
 
+func recipientDeliveryResults(result gatewaydelivery.Result) []transfer.RecipientDeliveryResult {
+	recipients := make([]transfer.RecipientDeliveryResult, 0, len(result.Recipients))
+	for _, recipient := range result.Recipients {
+		recipients = append(recipients, transfer.RecipientDeliveryResult{
+			UserID: recipient.UserID,
+			Status: transferRecipientStatus(recipient.Status),
+			Error:  transferRecipientError(recipient),
+		})
+	}
+	return recipients
+}
+
+func transferRecipientStatus(status string) transfer.RecipientDeliveryStatus {
+	switch status {
+	case gatewaydelivery.StatusDelivered:
+		return transfer.RecipientDeliveryDelivered
+	case gatewaydelivery.StatusOffline:
+		return transfer.RecipientDeliveryOffline
+	default:
+		return transfer.RecipientDeliveryFailed
+	}
+}
+
+func transferRecipientError(recipient gatewaydelivery.RecipientResult) string {
+	if strings.TrimSpace(recipient.Error) != "" {
+		return recipient.Error
+	}
+	if recipient.Status == gatewaydelivery.StatusRouted {
+		return "recipient routed to remote gateway; remote delivery is not implemented"
+	}
+	if recipient.Status == gatewaydelivery.StatusFailed {
+		return "gateway delivery failed"
+	}
+	return ""
+}
+
+func failedRecipientResults(userIDs []string, message string) []transfer.RecipientDeliveryResult {
+	results := make([]transfer.RecipientDeliveryResult, 0, len(userIDs))
+	for _, userID := range userIDs {
+		userID = strings.TrimSpace(userID)
+		if userID == "" {
+			continue
+		}
+		results = append(results, transfer.RecipientDeliveryResult{
+			UserID: userID,
+			Status: transfer.RecipientDeliveryFailed,
+			Error:  strings.TrimSpace(message),
+		})
+	}
+	return results
+}
+
 func failedDeliveryError(result gatewaydelivery.Result) error {
 	failures := make([]string, 0, result.FailedRecipients)
 	for _, recipient := range result.Recipients {
@@ -174,4 +237,17 @@ func failedDeliveryError(result gatewaydelivery.Result) error {
 		return ErrGatewayDeliveryFailed
 	}
 	return fmt.Errorf("%w: %s", ErrGatewayDeliveryFailed, strings.Join(failures, ", "))
+}
+
+func routedDeliveryError(result gatewaydelivery.Result) error {
+	routed := make([]string, 0, result.RoutedRecipients)
+	for _, recipient := range result.Recipients {
+		if recipient.Status == gatewaydelivery.StatusRouted {
+			routed = append(routed, recipient.UserID)
+		}
+	}
+	if len(routed) == 0 {
+		return ErrGatewayDeliveryFailed
+	}
+	return fmt.Errorf("%w: routed recipients require remote gateway delivery: %s", ErrGatewayDeliveryFailed, strings.Join(routed, ", "))
 }

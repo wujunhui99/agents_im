@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/transfer"
 )
 
@@ -33,27 +34,34 @@ func main() {
 		}()
 	}
 	dispatcher := buildDispatcher(cfg)
-	worker := transfer.NewWorker(
-		consumer,
-		dispatcher,
+	recorder, err := buildDeliveryAttemptRecorder(cfg)
+	if err != nil {
+		log.Fatalf("build delivery attempt recorder: %v", err)
+	}
+	workerOptions := []transfer.WorkerOption{
 		transfer.WithWorkerID(cfg.WorkerID),
 		transfer.WithIdempotencyStore(transfer.NewMemoryIdempotencyStore()),
-		transfer.WithPollInterval(time.Duration(cfg.Worker.PollIntervalMillis)*time.Millisecond),
-		transfer.WithRetryBackoff(time.Duration(cfg.Worker.RetryBackoffMillis)*time.Millisecond),
+		transfer.WithPollInterval(time.Duration(cfg.Worker.PollIntervalMillis) * time.Millisecond),
+		transfer.WithRetryBackoff(time.Duration(cfg.Worker.RetryBackoffMillis) * time.Millisecond),
 		transfer.WithMaxAttempts(cfg.Worker.MaxAttempts),
-	)
+	}
+	if recorder != nil {
+		workerOptions = append(workerOptions, transfer.WithDeliveryAttemptRecorder(recorder))
+	}
+	worker := transfer.NewWorker(consumer, dispatcher, workerOptions...)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	log.Printf(
-		"%s starting worker_id=%s topic=%s group=%s consumer=%s dispatcher=%s dry_run=%t",
+		"%s starting worker_id=%s topic=%s group=%s consumer=%s dispatcher=%s storage=%s dry_run=%t",
 		cfg.Name,
 		cfg.WorkerID,
 		cfg.Consumer.Topic,
 		cfg.Consumer.Group,
 		cfg.Consumer.Driver,
 		cfg.Dispatcher.Driver,
+		cfg.StorageDriver,
 		cfg.DryRun,
 	)
 	if err := worker.Run(ctx); err != nil {
@@ -79,5 +87,18 @@ func buildDispatcher(cfg config.MessageTransferConfig) transfer.DeliveryDispatch
 	switch cfg.Dispatcher.Driver {
 	default:
 		return transfer.NoopDispatcher{}
+	}
+}
+
+func buildDeliveryAttemptRecorder(cfg config.MessageTransferConfig) (transfer.DeliveryAttemptRecorder, error) {
+	switch cfg.StorageDriver {
+	case config.StorageDriverPostgres:
+		repo, err := repository.NewPostgresMessageRepository(cfg.DataSource)
+		if err != nil {
+			return nil, err
+		}
+		return transfer.NewRepositoryDeliveryAttemptRecorder(repo), nil
+	default:
+		return transfer.NewRepositoryDeliveryAttemptRecorder(repository.NewMemoryMessageRepository()), nil
 	}
 }

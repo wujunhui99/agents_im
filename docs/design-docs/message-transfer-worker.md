@@ -8,6 +8,7 @@ Related docs:
 - [`websocket-gateway.md`](./websocket-gateway.md)
 - [`redis-presence.md`](./redis-presence.md)
 - [`kafka-transfer-consumer.md`](./kafka-transfer-consumer.md)
+- [`message-delivery-reliability.md`](./message-delivery-reliability.md)
 
 ## Background
 
@@ -117,6 +118,8 @@ Future mappings:
 
 `IdempotencyStore` is the worker hook that prevents duplicate dispatch for the same accepted-message event. Phase 1 provides noop and in-memory stores; integration should replace this with Redis or durable idempotency when events can be redelivered across worker restarts.
 
+`DeliveryAttemptRecorder` is the worker hook for durable delivery outcomes. The repository-backed implementation records Gateway per-recipient results as `delivered`, `offline`, or `failed` after retry policy has been applied. It does not record read state; read progress remains `has_read_seq`.
+
 ## Processing Semantics
 
 `Worker.RunOnce` processes at most one event:
@@ -124,9 +127,10 @@ Future mappings:
 1. Receive one envelope from the consumer.
 2. Check the idempotency key.
 3. Dispatch if the key has not already been processed.
-4. On success, mark the key processed and call `MarkSuccessful`.
-5. On retryable failure, call `MarkRetry` with attempt, max attempts, backoff, and next attempt time.
-6. When max attempts is reached, call `MarkFailed`.
+4. Record per-recipient delivery attempts when the dispatcher returns delivery results.
+5. On success, mark the key processed and call `MarkSuccessful`.
+6. On retryable failure, call `MarkRetry` with attempt, max attempts, backoff, and next attempt time.
+7. When max attempts is reached, call `MarkFailed`.
 
 `Worker.Run` repeats `RunOnce` until context cancellation. `Worker.Start` starts the loop in a goroutine and `Worker.Stop` cancels and waits for shutdown.
 

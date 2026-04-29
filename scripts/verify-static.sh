@@ -76,8 +76,12 @@ required_files=(
   "internal/repository/message_memory.go"
   "internal/repository/message_repository.go"
   "internal/repository/message_outbox_repository.go"
+  "internal/repository/delivery_attempt_repository.go"
+  "internal/repository/delivery_attempt_memory.go"
   "internal/repository/postgres_message.go"
   "internal/repository/postgres_outbox.go"
+  "internal/repository/postgres_delivery_attempt.go"
+  "internal/repository/delivery_attempt_repository_test.go"
   "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
   "internal/types/types.go"
@@ -100,6 +104,7 @@ required_files=(
   "internal/transfer/event.go"
   "internal/transfer/interfaces.go"
   "internal/transfer/idempotency.go"
+  "internal/transfer/delivery_attempt_recorder.go"
   "internal/transfer/memory.go"
   "internal/transfer/worker.go"
   "internal/transfer/worker_test.go"
@@ -157,6 +162,7 @@ required_files=(
   "docs/design-docs/kafka-transfer-consumer.md"
   "docs/design-docs/gateway-push-delivery.md"
   "docs/design-docs/transfer-gateway-dispatcher.md"
+  "docs/design-docs/message-delivery-reliability.md"
   "docs/design-docs/gateway-presence-routing.md"
   "docs/exec-plans/active/backend-mvp-completion.md"
   "docs/design-docs/backend-mvp-contract.md"
@@ -750,6 +756,58 @@ done
 
 rg -q "transfer-gateway-dispatcher.md" ARCHITECTURE.md docs/design-docs/index.md
 
+delivery_reliability_code_patterns=(
+  "DeliveryStatusAccepted"
+  "DeliveryStatusPublished"
+  "DeliveryStatusDelivered"
+  "DeliveryStatusOffline"
+  "DeliveryStatusFailed"
+  "type DeliveryAttemptRepository interface"
+  "CreateDeliveryAttemptsAccepted"
+  "MarkDeliveryAttemptsPublished"
+  "RecordDeliveryAttemptResult"
+  "ListDeliveryAttemptsByMessage"
+  "type DeliveryAttemptRecorder interface"
+  "NewRepositoryDeliveryAttemptRecorder"
+  "RecipientDeliveryResult"
+  "delivery_attempts"
+)
+
+for pattern in "${delivery_reliability_code_patterns[@]}"; do
+  rg -q "$pattern" internal/repository internal/transfer db/migrations/001_init_postgres.sql
+done
+
+delivery_reliability_test_patterns=(
+  "TestMemoryMessageRepositoryCreatesAcceptedDeliveryAttempt"
+  "TestMemoryMessageRepositoryMarksDeliveryAttemptPublishedWithOutbox"
+  "TestMemoryMessageRepositoryRecordsDeliveryAttemptResults"
+  "TestWorkerRecordsDeliveredDeliveryAttempt"
+  "TestWorkerRecordsOfflineDeliveryAttempt"
+  "TestWorkerRecordsRetryableFailedDeliveryAttempt"
+  "TestWorkerRecordsTerminalFailedDeliveryAttemptAtMaxAttempts"
+)
+
+for pattern in "${delivery_reliability_test_patterns[@]}"; do
+  rg -q "$pattern" internal/repository/delivery_attempt_repository_test.go internal/transfer/gateway/dispatcher_test.go
+done
+
+delivery_reliability_doc_patterns=(
+  "accepted"
+  "published"
+  "delivered"
+  "offline"
+  "failed"
+  "next_retry_at"
+  "has_read_seq"
+  "not a read receipt"
+)
+
+for pattern in "${delivery_reliability_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/message-delivery-reliability.md
+done
+
+rg -q "message-delivery-reliability.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-transfer-worker.md docs/design-docs/transfer-gateway-dispatcher.md docs/exec-plans/active/backend-mvp-completion.md
+
 gateway_presence_routing_code_patterns=(
   "WithPresenceStore"
   "WithPresenceTTL"
@@ -1062,6 +1120,7 @@ pg_persistence_patterns=(
   "user_conversation_states"
   "message_idempotency_keys"
   "message_outbox"
+  "delivery_attempts"
 )
 
 for pattern in "${pg_persistence_patterns[@]}"; do

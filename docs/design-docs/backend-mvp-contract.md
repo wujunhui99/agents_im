@@ -253,11 +253,15 @@ WebSocket delivery may be duplicated. Client must deduplicate by `serverMsgId` o
 Backend should expose or at least persist delivery attempt status for debugging and retry:
 
 - server message id
+- conversation id
 - recipient user id
-- status
+- status: `accepted`, `published`, `delivered`, `offline`, or `failed`
 - attempt count
 - last error
+- next retry time
 - timestamps
+
+`delivered` means Gateway pushed the message to at least one online connection for that recipient. It is not a read receipt; read state remains `has_read_seq`.
 
 ## Health Contract
 
