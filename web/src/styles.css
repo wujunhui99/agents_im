@@ -36,9 +36,7 @@ button {
   display: grid;
   place-items: center;
   padding: 28px;
-  background:
-    radial-gradient(circle at top left, rgba(7, 193, 96, 0.18), transparent 28rem),
-    linear-gradient(135deg, #eef2f5 0%, #cfd6df 100%);
+  background: #d8dde5;
 }
 
 .phone-frame {
@@ -197,6 +195,25 @@ button {
   flex: 1;
 }
 
+.row-trailing {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a0a4ab;
+}
+
+.row-badge {
+  max-width: 72px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #64748b;
+  background: #f1f5f9;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .row-title-line {
   display: flex;
   align-items: baseline;
@@ -253,6 +270,133 @@ time {
 
 .profile-main strong {
   font-size: 21px;
+}
+
+.profile-edit-button {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: #57606f;
+  background: #f4f5f7;
+  cursor: pointer;
+}
+
+.profile-edit-button:hover {
+  background: #ebecef;
+}
+
+.profile-detail-card,
+.profile-edit-card {
+  padding: 0 16px;
+}
+
+.profile-detail-list {
+  margin: 0;
+}
+
+.profile-detail-list div {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(112px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.profile-detail-list div:first-child {
+  border-top: 0;
+}
+
+.profile-detail-list dt,
+.profile-detail-list dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.profile-detail-list dt {
+  color: #6b7280;
+}
+
+.profile-detail-list dd {
+  color: #111827;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.profile-edit-form {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+  gap: 10px;
+}
+
+.profile-field {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+}
+
+.profile-field span {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.profile-field input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: 0;
+  color: #111827;
+  background: #f9fafb;
+}
+
+.profile-field input:focus {
+  border-color: var(--wechat-green);
+  background: #ffffff;
+}
+
+.profile-form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.primary-button {
+  color: white;
+  background: var(--wechat-green);
+}
+
+.primary-button:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.secondary-button {
+  color: #374151;
+  background: #eef0f3;
+}
+
+.form-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 13px;
 }
 
 .discover-page,

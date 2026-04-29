@@ -183,7 +183,20 @@ required_files=(
   "web/index.html"
   "web/src/App.tsx"
   "web/src/App.test.tsx"
+  "web/src/api/user.test.ts"
+  "web/src/api/user.ts"
+  "web/src/components/ui/ActionRow.tsx"
+  "web/src/components/ui/Avatar.tsx"
+  "web/src/components/ui/ListCard.tsx"
+  "web/src/components/ui/SearchBox.tsx"
+  "web/src/components/ui/TabBar.tsx"
+  "web/src/components/ui/TopBar.tsx"
+  "web/src/data/mockData.ts"
   "web/src/main.tsx"
+  "web/src/pages/ContactsPage.tsx"
+  "web/src/pages/DiscoverPage.tsx"
+  "web/src/pages/MePage.tsx"
+  "web/src/pages/MessagesPage.tsx"
   "web/src/styles.css"
   "web/src/vite-env.d.ts"
   "docs/design-docs/read-receipts.md"
@@ -1485,8 +1498,15 @@ frontend_patterns=(
   "wechat-green"
 )
 
+frontend_files=(
+  "web/src/App.tsx"
+  "web/src/components/ui/TabBar.tsx"
+  "web/src/data/mockData.ts"
+  "web/src/styles.css"
+)
+
 for pattern in "${frontend_patterns[@]}"; do
-  rg -qF "$pattern" web/src/App.tsx web/src/styles.css
+  rg -qF "$pattern" "${frontend_files[@]}"
 done
 
 echo "static verification passed"
