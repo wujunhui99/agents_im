@@ -189,9 +189,19 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal/domain/agentaudit ./inter
 - Modify: IM-Agent contract implementation area
 - Test: single Agent receives message and writes response through Message Service
 
+**Current feature branch note (`feature/agent-im-integration-contract`):**
+
+- Added `internal/agentim` contract types for `message.created` triggers, group mentions, admin manual runs, Agent response metadata, and Message Service response writing.
+- This branch intentionally does not implement LLM runtime execution or an event consumer. It freezes the trigger/writeback contract used by later runtime wiring.
+
 ### Task 10: Add loop prevention
 
 **Objective:** Prevent Agent messages from recursively triggering Agent runs unless explicitly enabled.
+
+**Current feature branch note (`feature/agent-im-integration-contract`):**
+
+- Loop prevention is encoded in `AgentMessageMetadata`: Agent responses suppress recursive triggers unless both runtime policy and message metadata explicitly allow recursion.
+- Unit tests cover default suppression and explicit opt-in behavior.
 
 **Verification:**
 

@@ -190,11 +190,14 @@
 - Agent response writer interface：只允许调用 Message Service 发送消息。
 - 预留 outbox/worker trigger，不实现 LLM。
 - 文档说明 Agent 不能绕过 Message Service 直接写 messages 表。
+- 当前实现入口为 `internal/agentim`，其中 `MessageServiceResponseWriter` 只接收兼容 `MessageLogic.SendMessage` 的 `MessageSender`，不导入 message repository。
+- Loop prevention 使用 Agent message metadata，默认抑制 Agent 消息递归触发，只有全局策略和消息元数据都显式 opt-in 时允许递归。
 
 验收：
 
 - 单元测试确保 response writer 调用 MessageLogic/Message Service，而不是 repository 直写。
 - 无 LLM provider 也能编译和测试。
+- 单元测试确保空 Message Service 成功返回会被拒绝，避免 fake success。
 
 ## 共享质量规则
 

@@ -396,7 +396,9 @@ POST /internal/agent/messages
   },
   "metadata": {
     "tool_calls": [],
-    "agent_run_id": "run_123"
+    "agent_run_id": "run_123",
+    "trigger_message_id": "msg_456",
+    "allow_recursive_trigger": false
   }
 }
 ```
@@ -417,6 +419,8 @@ POST /internal/agent/messages
 - `agent_id` 必须是该会话成员，或具备向该会话发消息的权限。
 - 写回消息必须进入 IM 标准消息链路。
 - IM 后端负责持久化、分发、ACK 和离线补偿。
+- Go v0 契约中，Agent 写回由 `internal/agentim.MessageServiceResponseWriter` 适配到现有 `MessageLogic.SendMessage` / Message Service；禁止 Agent 代码直接调用 message repository、直接写 `messages` 表或直接推 WebSocket。
+- Message Service 返回错误必须暴露；返回空 `message_id` / `server_msg_id`、空会话或非法 seq 视为失败，不能把空返回当成功。
 
 ## API 2：写回 Agent 处理状态
 
@@ -557,15 +561,25 @@ GET /internal/agent/conversations/{conversation_id}/agents
 
 | trigger | 场景 |
 | --- | --- |
-| `direct_chat` | 用户与 Agent 单聊 |
-| `mention` | 群聊中 @Agent |
-| `auto` | 群配置允许 Agent 自动响应，第一阶段可暂缓 |
+| `user_private_message` | 用户与 Agent 单聊，接收方是目标 Agent 账号 |
+| `group_mention` | 群聊中 @Agent，目标 Agent 必须出现在 `at_user_ids` |
+| `admin_manual_run` | 管理员在指定会话中手动触发 Agent run，不伪造用户消息 |
 
 默认策略：
 
 - 单聊 Agent 必须响应。
 - 群聊只有 @Agent 时响应。
 - 多 Agent 同时被 @ 时，分别触发对应 Agent，但需要共享同一个 `trace_id`。
+- Agent 消息默认不触发新的 Agent run；只有运行策略允许递归，且 Agent 消息元数据 `allow_recursive_trigger=true` 时，才允许再次触发。
+
+### Agent 触发 Go 契约
+
+`internal/agentim` 定义当前实现契约：
+
+- `MessageCreatedEvent`：IM `message.created` 事件的 Agent 视图，包含 `event_id`、`operation_id`、`trace_id`、会话、消息 envelope 和目标 Agent 列表。
+- `BuildMessageCreatedTriggers`：从用户私聊或群聊 @ 事件构造 `AgentTrigger`；不会执行 LLM，不会写消息。
+- `AdminManualRunRequest` / `NewAdminManualRunTrigger`：管理员手动 run 入口。
+- `AgentMessageMetadata`：Agent 消息循环控制元数据，字段为 `agent_run_id`、`trigger_message_id`、`allow_recursive_trigger`。
 
 ## 幂等规则
 

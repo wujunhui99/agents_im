@@ -367,6 +367,8 @@ Response
 
 ## IM 集成数据流
 
+第一阶段 Go 契约落在 `internal/agentim`，只定义触发、写回接口和循环预防规则，不接入任何 LLM provider/framework。
+
 ### 用户消息触发 Agent
 
 ```text
@@ -381,12 +383,42 @@ Client -> Gateway/Message API
 
 原则：Agent 不直接写 messages 表，不直接推 WebSocket，不绕过 Message Service。
 
+触发类型：
+
+| 类型 | 来源 | 必需条件 |
+| --- | --- | --- |
+| `user_private_message` | 用户私聊 Agent | `conversation_type=single`，消息接收方是目标 Agent 用户，发送方不是默认抑制的 Agent 消息。 |
+| `group_mention` | 群聊 @Agent | `conversation_type=group`，目标 Agent 在 `at_user_ids` 中。 |
+| `admin_manual_run` | 管理员手动触发 | 管理员传入 `request_id`、`admin_user_id`、`agent_user_id`、会话和 prompt 文本；不伪造用户消息。 |
+
+`message.created` 事件必须保留 `event_id`、`operation_id`、`trace_id`、`conversation_id`、`server_msg_id`、`seq`、`sender_id`、`sender_type`、`content_type` 和目标 Agent 列表。构造出的 Agent trigger 使用 `event_id + agent_user_id` 作为幂等请求基础。
+
+### Agent 响应写回
+
+Agent 响应写回使用 `MessageServiceResponseWriter`：
+
+```text
+Agent Runtime
+-> agentim.ResponseWriter
+-> MessageSender interface
+-> existing MessageLogic.SendMessage / Message Service
+-> Message Service storage/outbox path
+```
+
+强制约束：
+
+- `internal/agentim` 不依赖 message repository，也不拥有 `messages` 表写入能力。
+- 生产实现必须注入兼容 `MessageLogic.SendMessage(ctx, logic.SendMessageRequest)` 的 Message Service seam。
+- Writer 只生成 `sender_id=agent_user_id` 的标准 `SendMessageRequest`，并复用 Message Service 的幂等、seq、outbox、投递链路。
+- Message Service 返回错误必须原样暴露；返回空 `server_msg_id`、空 `conversation_id` 或非法 `seq` 必须视为内部错误，禁止把空返回当成功。
+
 ### 循环控制
 
 - Agent 消息默认不再触发 Agent。
 - 群聊默认只在 @Agent 时触发。
 - 每个 run 有最大工具调用次数、最大执行时长、最大递归深度。
 - 幂等键应包含 `event_id` 或 `trigger_message_id + agent_id`。
+- Agent 响应元数据包含 `agent_run_id`、`trigger_message_id` 和 `allow_recursive_trigger`；只有全局/会话策略 `AllowAgentMessageRecursion=true` 且消息元数据 `allow_recursive_trigger=true` 时，Agent 发送的消息才能再次构造 Agent trigger。
 
 ## 权限模型
 
