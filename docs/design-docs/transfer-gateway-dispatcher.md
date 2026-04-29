@@ -62,7 +62,10 @@ The adapter calls `DeliverToConversation(ctx, conversation_id, recipient_user_id
 - A `message.accepted` event with no direct recipients produces terminal `transfer.StatusFailed` and does not call Gateway.
 - Gateway dispatcher errors produce `transfer.StatusRetryable`.
 - Gateway `failed` recipient statuses produce `transfer.StatusRetryable`, even if `DeliverToConversation` returned no Go error.
+- Gateway `routed` recipient statuses produce `transfer.StatusRetryable` for MVP because remote Gateway delivery transport is not implemented in this branch.
 - Unsupported transfer event types produce terminal `transfer.StatusFailed`.
+
+The adapter also copies Gateway per-recipient outcomes into `DispatchResult.RecipientResults` so the worker can persist delivery attempts as `delivered`, `offline`, or `failed` through [`message-delivery-reliability.md`](./message-delivery-reliability.md).
 
 The worker remains responsible for idempotency. When the same accepted event is received again, `MemoryIdempotencyStore` or a future durable idempotency store skips a second Gateway call and still marks the envelope successful.
 

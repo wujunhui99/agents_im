@@ -56,13 +56,15 @@ type KafkaConfig struct {
 }
 
 type MessageTransferConfig struct {
-	Name       string
-	WorkerID   string
-	DryRun     bool
-	Kafka      KafkaConfig
-	Consumer   TransferConsumerConfig
-	Dispatcher TransferDispatcherConfig
-	Worker     TransferWorkerConfig
+	Name          string
+	WorkerID      string
+	DryRun        bool
+	StorageDriver string
+	DataSource    string
+	Kafka         KafkaConfig
+	Consumer      TransferConsumerConfig
+	Dispatcher    TransferDispatcherConfig
+	Worker        TransferWorkerConfig
 }
 
 type TransferConsumerConfig struct {
@@ -162,10 +164,11 @@ func DefaultKafkaConfig() KafkaConfig {
 
 func DefaultMessageTransferConfig() MessageTransferConfig {
 	return MessageTransferConfig{
-		Name:     "message-transfer",
-		WorkerID: defaultWorkerID(),
-		DryRun:   true,
-		Kafka:    DefaultKafkaConfig(),
+		Name:          "message-transfer",
+		WorkerID:      defaultWorkerID(),
+		DryRun:        true,
+		StorageDriver: StorageDriverMemory,
+		Kafka:         DefaultKafkaConfig(),
 		Consumer: TransferConsumerConfig{
 			Driver: TransferConsumerMemory,
 			Topic:  defaultTransferTopic,
@@ -284,6 +287,12 @@ func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
 		cfg.Name = value
 	}
 	cfg.WorkerID = firstNonEmpty(values["Worker.ID"], values["WorkerID"], os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), cfg.WorkerID)
+	if value := firstNonEmpty(values["StorageDriver"], values["Repository"]); value != "" {
+		cfg.StorageDriver = ResolveStorageDriver(value)
+	} else {
+		cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
+	}
+	cfg.DataSource = ResolveDataSource(values["DataSource"])
 	cfg.Kafka = kafkaConfigFromValues(values)
 	if value := firstNonEmpty(values["Consumer.Driver"], values["ConsumerDriver"]); value != "" {
 		cfg.Consumer.Driver = ResolveTransferConsumerDriver(value)
@@ -398,6 +407,8 @@ func ResolveTransferDispatcherDriver(value string) string {
 func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConfig {
 	cfg.Name = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "message-transfer")
 	cfg.WorkerID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.WorkerID)), os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), defaultWorkerID())
+	cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
+	cfg.DataSource = ResolveDataSource(cfg.DataSource)
 	cfg.Kafka = ResolveKafkaConfig(cfg.Kafka)
 	cfg.Consumer.Driver = ResolveTransferConsumerDriver(cfg.Consumer.Driver)
 	cfg.Consumer.Topic = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Topic)), os.Getenv("MESSAGE_TRANSFER_TOPIC"), cfg.Kafka.MessageEventsTopic, defaultTransferTopic)

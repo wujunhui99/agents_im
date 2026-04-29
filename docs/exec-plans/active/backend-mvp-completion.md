@@ -22,6 +22,22 @@ Owns delivery attempt persistence, status transitions, retry/failed policy, and 
 
 Must not implement social/group rules or frontend docs beyond delivery examples.
 
+Implementation note for this branch:
+
+- Adds [`message-delivery-reliability.md`](../../design-docs/message-delivery-reliability.md).
+- Models `delivery_attempts` with `accepted`, `published`, `delivered`, `offline`, and `failed` states.
+- Records Transfer/Gateway dispatcher outcomes without changing reconnect sync, friends/groups policy, frontend handoff scope, or native push.
+
+Verification record for `feature/mvp-delivery-reliability` on 2026-04-29:
+
+- `goctl --version`: `goctl version 1.10.1 linux/amd64`.
+- `for f in api/*.api; do goctl api validate -api "$f"; done`: five `api format ok` results.
+- `gofmt -w $(find . -name '*.go' -print)`: completed with exit code 0.
+- `go test ./...`: completed with exit code 0.
+- `bash scripts/verify-static.sh`: `static verification passed`.
+- `docker compose config`: completed with exit code 0 and rendered `postgres`, `redis`, and `redpanda` services.
+- `npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name '*.md' -not -path './.git/*' -not -path './.ai-context/*' -not -path './docs/references/*' -print)`: completed with exit code 0.
+
 ### mvp-reconnect-sync
 
 Owns WebSocket reconnect/sync command polish, stable error envelope, missed-message sync docs/tests.

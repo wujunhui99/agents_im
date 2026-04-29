@@ -90,7 +90,8 @@ func (r *PostgresMessageRepository) MarkPublished(ctx context.Context, eventID s
 		return apperror.InvalidArgument("worker_id is required")
 	}
 
-	result, err := r.conn.ExecCtx(ctx, `
+	return r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+		result, err := session.ExecCtx(ctx, `
 update message_outbox
 set status = $3,
     locked_by = '',
@@ -102,10 +103,14 @@ where event_id = $1
   and status = $4
   and locked_until > now()
 `, eventID, workerID, OutboxStatusPublished, OutboxStatusPending)
-	if err != nil {
-		return err
-	}
-	return requireOutboxRowAffected(result)
+		if err != nil {
+			return err
+		}
+		if err := requireOutboxRowAffected(result); err != nil {
+			return err
+		}
+		return markDeliveryAttemptsPublishedForOutboxEvent(ctx, session, eventID)
+	})
 }
 
 func (r *PostgresMessageRepository) MarkFailed(ctx context.Context, eventID string, workerID string, failure OutboxFailure) error {
