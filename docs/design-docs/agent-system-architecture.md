@@ -240,7 +240,7 @@ agent_runs
 - 缺少 `DEEPSEEK_API_KEY` 时构造 ChatModel 必须返回明确错误，不能降级为 mock/fake response。
 - 默认 `go test ./...` 不请求 DeepSeek；live smoke test 只能在 `RUN_LIVE_DEEPSEEK_TESTS=1` 且存在 API key 时运行。
 
-该基线不实现 Agent runtime orchestration、工具/MCP 调用、上下文装配或 IM 写回 worker。
+该基线不实现完整 Agent runtime orchestration、工具/MCP 调用或上下文装配；当前 Agent-IM runner seam 使用 `internal/agentruntime.Runtime`，但生产 wiring 仍必须显式组装 registry-derived `RunRequest`。
 
 工具调用审计：
 
@@ -419,7 +419,10 @@ Client -> Gateway/Message API
 Agent 响应写回使用 `MessageServiceResponseWriter`：
 
 ```text
-Agent Runtime
+AgentTrigger
+-> AgentRunOrchestrator
+-> RuntimeRequestBuilder loads Agent config/context
+-> agentruntime.Runtime
 -> agentim.ResponseWriter
 -> MessageSender interface
 -> existing MessageLogic.SendMessage / Message Service
@@ -429,6 +432,8 @@ Agent Runtime
 强制约束：
 
 - `internal/agentim` 不依赖 message repository，也不拥有 `messages` 表写入能力。
+- `AgentRunOrchestrator` 只依赖统一的 `internal/agentruntime.Runtime`，不得重新定义 provider-specific 或 Eino-specific runtime interface。
+- `RuntimeRequestBuilder` 必须从真实 Agent 配置、prompt/tool/skill 绑定和会话上下文构造 `agentruntime.RunRequest`；缺失配置、请求不匹配或 runtime result 无 `run_id` / `final_text` 必须记录失败 audit 并返回明确错误。
 - 生产实现必须注入兼容 `MessageLogic.SendMessage(ctx, logic.SendMessageRequest)` 的 Message Service seam。
 - Writer 只生成 `sender_id=agent_user_id` 的标准 `SendMessageRequest`，并复用 Message Service 的幂等、seq、outbox、投递链路。
 - Message Service 返回错误必须原样暴露；返回空 `server_msg_id`、空 `conversation_id` 或非法 `seq` 必须视为内部错误，禁止把空返回当成功。

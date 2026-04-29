@@ -6,7 +6,7 @@ Status: Accepted
 
 The Agent System V0 branches are adding Agent profile, prompt, tool, skill, audit, Python executor, and Agent-IM contracts in parallel. The runtime branch needs a stable Go boundary that later Eino and DeepSeek adapters can implement without leaking Eino concrete types into business logic.
 
-The current branch is a pure core contract. It does not import CloudWeGo Eino packages, does not call an LLM provider, does not execute tools or Python, and does not write IM messages.
+The core runtime package is a pure contract. It does not import CloudWeGo Eino packages, does not call an LLM provider, does not execute tools or Python, and does not write IM messages.
 
 ## Goals
 
@@ -21,7 +21,7 @@ The current branch is a pure core contract. It does not import CloudWeGo Eino pa
 - No Eino adapter implementation in this branch.
 - No real DeepSeek/OpenAI-compatible client.
 - No tool execution, Python execution, shell execution, or OS process startup.
-- No Agent response write-back orchestration and no direct message repository/table writes.
+- No Agent response write-back inside `internal/agentruntime` and no direct message repository/table writes.
 - No audit repository implementation changes.
 
 ## Package Boundary
@@ -109,7 +109,9 @@ Agent-IM trigger
 -> Agent response writer sends final text through Message Service
 ```
 
-The runtime does not own IM persistence. A successful `RunResult` is not an IM write-back success. End-to-end success requires the later orchestration layer to write through `agentim.ResponseWriter` / Message Service and validate that Message Service returns a real message id, conversation id, and seq.
+The Agent-IM runner seam is `internal/agentim.AgentRunOrchestrator`. It depends on `agentruntime.Runtime` plus an explicit `RuntimeRequestBuilder`; it must not introduce a separate Eino/provider-specific runtime interface. The builder owns loading registry-derived Agent config and conversation context. Missing config, mismatched trigger fields, runtime failures, empty final text, and audit/write-back failures are visible errors.
+
+The runtime does not own IM persistence. A successful `RunResult` is not an IM write-back success. End-to-end success requires the orchestration layer to write through `agentim.ResponseWriter` / Message Service and validate that Message Service returns a real message id, conversation id, and seq.
 
 ## Eino Adapter Rules
 

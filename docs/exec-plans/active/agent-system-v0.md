@@ -213,12 +213,12 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal/agentruntime
 - Added `internal/agentim` contract types for `message.created` triggers, group mentions, admin manual runs, Agent response metadata, and Message Service response writing.
 - This branch intentionally does not implement LLM runtime execution or an event consumer. It freezes the trigger/writeback contract used by later runtime wiring.
 
-**Current feature branch note (`feature/eino-im-runner`):**
+**Current feature branch note (`feature/eino-im-runner`, reconciled on develop):**
 
-- Added `internal/agentim.AgentRunOrchestrator` as the first runner seam from `AgentTrigger` to a local `AgentRuntime` interface, append-only run audit, and `ResponseWriter`.
-- Runner order is fail-first: validate trigger, call runtime, create a final `agent_runs` audit record, then write non-empty final text through `AgentResponseRequest` / Message Service response writer. Audit failures stop response write-back; runtime failures and empty final text create failed audit records and return explicit errors.
+- Added `internal/agentim.AgentRunOrchestrator` as the first runner seam from `AgentTrigger` to the shared `internal/agentruntime.Runtime` interface, append-only run audit, and `ResponseWriter`.
+- Runner order is fail-first: validate trigger, build and validate an `agentruntime.RunRequest` through an explicit `RuntimeRequestBuilder`, call runtime, create a final `agent_runs` audit record, then write non-empty final text through `AgentResponseRequest` / Message Service response writer. Request builder failures, runtime failures, invalid runtime results, and empty final text create failed audit records and return explicit errors; audit failures stop response write-back.
 - The runner does not include a concrete Eino/DeepSeek adapter, tool registry resolution, direct message repository writes, shell execution, Python execution, or live provider calls.
-- Unit coverage includes success, runtime failure, audit failure, empty final text rejection, and response-writer failure propagation.
+- Unit coverage includes success, request-builder failure, runtime failure, audit failure, empty final text rejection, recursion policy gating, and response-writer failure propagation.
 
 ### Task 10: Add loop prevention
 
