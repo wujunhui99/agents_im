@@ -70,11 +70,14 @@ type commandFrame struct {
 }
 
 type responseFrame struct {
-	RequestID string         `json:"request_id"`
-	Type      string         `json:"type"`
-	Status    string         `json:"status"`
-	Error     *responseError `json:"error,omitempty"`
-	Data      interface{}    `json:"data,omitempty"`
+	RequestID      string         `json:"request_id,omitempty"`
+	RequestIDCamel string         `json:"requestId,omitempty"`
+	Type           string         `json:"type,omitempty"`
+	Command        string         `json:"command,omitempty"`
+	Status         string         `json:"status"`
+	Error          *responseError `json:"error,omitempty"`
+	Data           interface{}    `json:"data,omitempty"`
+	Payload        interface{}    `json:"payload,omitempty"`
 }
 
 type responseError struct {
@@ -316,10 +319,13 @@ func (s *Server) handleCommand(ctx context.Context, conn *Connection, raw []byte
 		return errorResponse(requestID, commandType, err)
 	}
 	return responseFrame{
-		RequestID: requestID,
-		Type:      commandType,
-		Status:    gateway.AckStatusOK,
-		Data:      data,
+		RequestID:      requestID,
+		RequestIDCamel: requestID,
+		Type:           commandType,
+		Command:        commandType,
+		Status:         gateway.AckStatusOK,
+		Data:           data,
+		Payload:        data,
 	}
 }
 
@@ -495,18 +501,34 @@ func (f commandFrame) commandType() string {
 
 func errorResponse(requestID string, commandType string, err error) responseFrame {
 	appErr := apperror.From(err)
-	code := string(appErr.Code)
-	if appErr.Code == apperror.CodeAlreadyExists && strings.Contains(strings.ToLower(appErr.Message), "idempotency") {
-		code = "IDEMPOTENCY_CONFLICT"
-	}
 	return responseFrame{
-		RequestID: requestID,
-		Type:      commandType,
-		Status:    gateway.AckStatusError,
+		RequestID:      requestID,
+		RequestIDCamel: requestID,
+		Type:           commandType,
+		Command:        commandType,
+		Status:         gateway.AckStatusError,
 		Error: &responseError{
-			Code:    code,
+			Code:    frontendErrorCode(appErr),
 			Message: appErr.Message,
 		},
+	}
+}
+
+func frontendErrorCode(appErr *apperror.Error) string {
+	if appErr == nil {
+		return "INTERNAL"
+	}
+	switch appErr.Code {
+	case apperror.CodeUnauthenticated:
+		return "UNAUTHORIZED"
+	case apperror.CodeInvalidArgument:
+		return "VALIDATION_ERROR"
+	case apperror.CodeNotFound:
+		return "NOT_FOUND"
+	case apperror.CodeAlreadyExists:
+		return "CONFLICT"
+	default:
+		return "INTERNAL"
 	}
 }
 

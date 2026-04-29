@@ -69,9 +69,21 @@ Gateway replies with one ACK per command:
   "requestId": "client-request-id",
   "command": "send_message",
   "status": "ok",
-  "code": "OK",
-  "message": "",
   "payload": {}
+}
+```
+
+Error ACKs use a nested `error` object:
+
+```json
+{
+  "requestId": "client-request-id",
+  "command": "send_message",
+  "status": "error",
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "invalid payload"
+  }
 }
 ```
 
@@ -271,16 +283,15 @@ Gateway does not store `has_read_seq`; it forwards the monotonic update to Messa
 
 ## Error mapping
 
-Gateway should preserve Message Service error categories in the command ACK `code`. Recommended phase 1 codes:
+Gateway maps internal service errors to the frontend-visible ACK `error.code`. MVP codes align with [`backend-mvp-contract.md`](./backend-mvp-contract.md):
 
 | Code | Meaning |
 | --- | --- |
-| `OK` | Command succeeded |
-| `UNAUTHENTICATED` | Connection has no authenticated user |
-| `INVALID_ARGUMENT` | Command payload is malformed or has invalid fields |
+| `UNAUTHORIZED` | Connection has no authenticated user |
+| `VALIDATION_ERROR` | Command payload is malformed or has invalid fields |
 | `FORBIDDEN` | User is not allowed to access the conversation |
 | `NOT_FOUND` | Target user, group, or conversation was not found |
-| `IDEMPOTENCY_CONFLICT` | `clientMsgId` was reused with different send payload |
+| `CONFLICT` | `clientMsgId` was reused with different send payload |
 | `INTERNAL` | Unexpected Gateway or Message Service failure |
 
 Gateway may validate envelope shape before RPC. Business validation remains in Message Service.

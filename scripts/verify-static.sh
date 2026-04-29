@@ -139,6 +139,7 @@ required_files=(
   "docs/product-specs/message-chain.md"
   "docs/product-specs/message-storage.md"
   "docs/product-specs/gateway-message-contract.md"
+  "docs/product-specs/frontend-sync-contract.md"
   "docs/product-specs/read-receipts.md"
   "docs/design-docs/user-service-go-zero.md"
   "docs/design-docs/auth-service-go-zero.md"
@@ -153,6 +154,7 @@ required_files=(
   "docs/design-docs/redis-presence.md"
   "docs/design-docs/kafka-message-events.md"
   "docs/design-docs/websocket-gateway.md"
+  "docs/design-docs/websocket-reconnect-sync.md"
   "docs/design-docs/message-transfer-worker.md"
   "docs/design-docs/kafka-transfer-consumer.md"
   "docs/design-docs/gateway-push-delivery.md"
@@ -552,6 +554,42 @@ done
 rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
 rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "websocket-gateway" docs/exec-plans/active/websocket-gateway.md
+
+websocket_reconnect_sync_patterns=(
+  "requestId"
+  "status"
+  "error.code"
+  "error.message"
+  "get_conversation_seqs"
+  "pull_messages"
+  "mark_conversation_read"
+  "serverMsgId"
+  "conversationId"
+  "hasReadSeq"
+  "unreadCount"
+)
+
+for pattern in "${websocket_reconnect_sync_patterns[@]}"; do
+  rg -q "$pattern" docs/product-specs/frontend-sync-contract.md docs/design-docs/websocket-reconnect-sync.md
+done
+
+websocket_reconnect_sync_code_patterns=(
+  "RequestIDCamel"
+  "Payload"
+  "frontendErrorCode"
+  "VALIDATION_ERROR"
+  "TestWebSocketGatewayReconnectSyncFlow"
+  "TestWebSocketGatewayPullMessagesIsDuplicateSafe"
+  "TestWebSocketGatewayPullMessagesFromMissingSeq"
+  "TestWebSocketGatewayInvalidCommandReturnsFrontendErrorEnvelope"
+)
+
+for pattern in "${websocket_reconnect_sync_code_patterns[@]}"; do
+  rg -q "$pattern" internal/gateway/ws/server.go tests/websocket_gateway_test.go
+done
+
+rg -q "frontend-sync-contract.md" docs/product-specs/index.md ARCHITECTURE.md docs/design-docs/backend-mvp-contract.md
+rg -q "websocket-reconnect-sync.md" docs/design-docs/index.md ARCHITECTURE.md docs/design-docs/backend-mvp-contract.md docs/design-docs/websocket-gateway.md
 
 message_transfer_code_patterns=(
   "type MessageEvent struct"
