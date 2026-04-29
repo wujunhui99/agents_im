@@ -12,6 +12,7 @@ import {
   UserRound,
   UsersRound,
 } from 'lucide-react';
+import ContactsPage from './components/ContactsPage';
 
 type TabKey = 'messages' | 'contacts' | 'discover' | 'me';
 
@@ -56,19 +57,6 @@ const conversations = [
     unread: 0,
     color: 'purple',
   },
-];
-
-const contacts = [
-  { id: 'new', label: '新的朋友', helper: '好友申请与推荐', accent: 'orange' },
-  { id: 'groups', label: '群聊', helper: '产品讨论群、Agent 群', accent: 'green' },
-  { id: 'tags', label: '标签', helper: '按角色整理联系人', accent: 'blue' },
-  { id: 'official', label: '公众号', helper: '系统通知与服务号', accent: 'gray' },
-];
-
-const friends = [
-  { id: 'alice', name: 'Alice Chen', identifier: 'alice_001', initial: 'A' },
-  { id: 'bob', name: 'Bob Lin', identifier: 'bob_002', initial: 'B' },
-  { id: 'agent', name: 'Agent 助手', identifier: 'agent_helper', initial: 'AI' },
 ];
 
 function App() {
@@ -146,31 +134,6 @@ function MessagesPage() {
               <p>{item.preview}</p>
             </div>
             {item.unread > 0 ? <span className="unread-badge">{item.unread}</span> : null}
-          </article>
-        ))}
-      </section>
-    </div>
-  );
-}
-
-function ContactsPage() {
-  return (
-    <div className="page-stack">
-      <SearchBox placeholder="搜索联系人、账号或群聊" />
-      <section className="list-card" aria-label="联系人快捷入口">
-        {contacts.map((item) => (
-          <ActionRow key={item.id} label={item.label} helper={item.helper} accent={item.accent} />
-        ))}
-      </section>
-      <p className="section-label">A</p>
-      <section className="list-card" aria-label="好友列表">
-        {friends.map((friend) => (
-          <article className="friend-row" key={friend.id}>
-            <div className="avatar avatar-blue">{friend.initial}</div>
-            <div>
-              <strong>{friend.name}</strong>
-              <p>{friend.identifier}</p>
-            </div>
           </article>
         ))}
       </section>
