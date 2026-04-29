@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package user.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/proto/userpb";
+
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (UserResponse);
+  rpc GetUserByIdentifier(GetUserByIdentifierRequest) returns (UserResponse);
+  rpc ExistsByIdentifier(ExistsByIdentifierRequest) returns (ExistsByIdentifierResponse);
+  rpc GetUserByID(GetUserByIDRequest) returns (UserResponse);
+  rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UserResponse);
+}
+
+message User {
+  string user_id = 1;
+  string identifier = 2;
+  string display_name = 3;
+  string name = 4;
+  string gender = 5;
+  int32 age = 6;
+  string region = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message CreateUserRequest {
+  string identifier = 1;
+  string display_name = 2;
+  string name = 3;
+  string gender = 4;
+  int32 age = 5;
+  string region = 6;
+}
+
+message GetUserByIdentifierRequest {
+  string identifier = 1;
+}
+
+message ExistsByIdentifierRequest {
+  string identifier = 1;
+}
+
+message ExistsByIdentifierResponse {
+  string identifier = 1;
+  bool exists = 2;
+}
+
+message GetUserByIDRequest {
+  string user_id = 1;
+}
+
+message UpdateUserProfileRequest {
+  string user_id = 1;
+  optional string display_name = 2;
+  optional string name = 3;
+  optional string gender = 4;
+  optional int32 age = 5;
+  optional string region = 6;
+}
+
+message UserResponse {
+  User user = 1;
+}
+
