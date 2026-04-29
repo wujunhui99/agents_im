@@ -73,7 +73,9 @@ required_files=(
   "internal/repository/postgres_groups.go"
   "internal/repository/message_memory.go"
   "internal/repository/message_repository.go"
+  "internal/repository/message_outbox_repository.go"
   "internal/repository/postgres_message.go"
+  "internal/repository/postgres_outbox.go"
   "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
   "internal/types/types.go"
@@ -125,6 +127,7 @@ required_files=(
   "docs/design-docs/message-storage.md"
   "docs/design-docs/jwt-auth-middleware.md"
   "docs/design-docs/postgres-persistence.md"
+  "docs/design-docs/message-outbox.md"
   "docs/design-docs/gateway-message-contract.md"
   "docs/design-docs/redis-presence.md"
   "docs/design-docs/websocket-gateway.md"
@@ -134,6 +137,7 @@ required_files=(
   "docs/exec-plans/active/friends-service-go-zero.md"
   "docs/exec-plans/active/groups-service-go-zero.md"
   "docs/exec-plans/active/message-storage.md"
+  "docs/exec-plans/active/message-outbox.md"
   "internal/repository/message_storage_contract.go"
   "docker-compose.yml"
   ".env.example"
@@ -698,6 +702,7 @@ pg_persistence_patterns=(
   "conversation_threads"
   "user_conversation_states"
   "message_idempotency_keys"
+  "message_outbox"
 )
 
 for pattern in "${pg_persistence_patterns[@]}"; do
@@ -709,6 +714,43 @@ rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go inter
 rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
 rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
 rg -q "docker compose" scripts/migrate-postgres.sh docs/design-docs/postgres-persistence.md
+
+outbox_schema_patterns=(
+  "event_id"
+  "event_type"
+  "aggregate_type"
+  "aggregate_id"
+  "conversation_id"
+  "server_msg_id"
+  "payload jsonb"
+  "attempt_count"
+  "next_attempt_at"
+  "locked_by"
+  "locked_until"
+  "published_at"
+)
+
+for pattern in "${outbox_schema_patterns[@]}"; do
+  rg -q "$pattern" db/migrations/001_init_postgres.sql docs/design-docs/message-outbox.md
+done
+
+outbox_code_patterns=(
+  "type OutboxRepository interface"
+  "OutboxEventTypeMessageCreated"
+  "PollPending"
+  "MarkPublished"
+  "MarkFailed"
+  "messageCreatedOutboxPayload"
+  "insertMessageOutboxEvent"
+  "SKIP LOCKED"
+)
+
+for pattern in "${outbox_code_patterns[@]}"; do
+  rg -q "$pattern" internal/repository/message_outbox_repository.go internal/repository/postgres_outbox.go internal/repository/postgres_message.go internal/repository/message_memory.go tests/message_service_test.go tests/postgres_persistence_integration_test.go
+done
+
+rg -q "message-outbox.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/postgres-persistence.md
+rg -q "message-outbox" docs/exec-plans/active/message-outbox.md
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \

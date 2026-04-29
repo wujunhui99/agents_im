@@ -15,6 +15,7 @@ type ServiceContext struct {
 	Repo         repository.Repository
 	GroupsRepo   repository.GroupsRepository
 	MessageRepo  repository.MessageRepository
+	OutboxRepo   repository.OutboxRepository
 }
 
 func NewServiceContext(repo repository.Repository) *ServiceContext {
@@ -31,6 +32,7 @@ func NewServiceContextWithAuth(repo repository.Repository, auth config.JWTAuthCo
 		MessageLogic: logic.NewMessageLogicWithValidators(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil),
 		Repo:         repo,
 		MessageRepo:  messageRepo,
+		OutboxRepo:   outboxRepositoryFromMessageRepo(messageRepo),
 	}
 }
 
@@ -55,6 +57,7 @@ func NewMessageServiceContextWithAuth(repo repository.MessageRepository, userExi
 		Auth:         normalizeAuthConfig(auth),
 		MessageLogic: logic.NewMessageLogicWithValidators(repo, userExists, groups),
 		MessageRepo:  repo,
+		OutboxRepo:   outboxRepositoryFromMessageRepo(repo),
 	}
 }
 
@@ -67,4 +70,9 @@ func normalizeAuthConfig(auth config.JWTAuthConfig) config.JWTAuthConfig {
 		auth.AccessExpire = defaults.AccessExpire
 	}
 	return auth
+}
+
+func outboxRepositoryFromMessageRepo(repo repository.MessageRepository) repository.OutboxRepository {
+	outboxRepo, _ := repo.(repository.OutboxRepository)
+	return outboxRepo
 }
