@@ -53,7 +53,9 @@ required_files=(
   "cmd/message-api/main.go"
   "cmd/message-rpc/main.go"
   "cmd/gateway-ws/main.go"
+  "cmd/message-transfer/main.go"
   "etc/gateway-ws.yaml"
+  "etc/message-transfer.yaml"
   "etc/message-rpc.yaml"
   "internal/logic/userlogic.go"
   "internal/logic/friendslogic.go"
@@ -95,6 +97,12 @@ required_files=(
   "internal/rpcgen/message/entry/entry.go"
   "internal/rpcgen/rpcerror/error.go"
   "internal/gateway/contract.go"
+  "internal/transfer/event.go"
+  "internal/transfer/interfaces.go"
+  "internal/transfer/idempotency.go"
+  "internal/transfer/memory.go"
+  "internal/transfer/worker.go"
+  "internal/transfer/worker_test.go"
   "internal/presence/store.go"
   "internal/presence/memory.go"
   "internal/presence/redis.go"
@@ -138,6 +146,7 @@ required_files=(
   "docs/design-docs/redis-presence.md"
   "docs/design-docs/kafka-message-events.md"
   "docs/design-docs/websocket-gateway.md"
+  "docs/design-docs/message-transfer-worker.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -158,6 +167,7 @@ required_files=(
   "docs/exec-plans/active/jwt-auth-middleware.md"
   "docs/exec-plans/active/websocket-gateway.md"
   "docs/exec-plans/active/kafka-redpanda-compose.md"
+  "docs/exec-plans/active/message-transfer-worker.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -524,6 +534,58 @@ done
 rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
 rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "websocket-gateway" docs/exec-plans/active/websocket-gateway.md
+
+message_transfer_code_patterns=(
+  "type MessageEvent struct"
+  "type Envelope struct"
+  "type EventConsumer interface"
+  "type DeliveryDispatcher interface"
+  "type IdempotencyStore interface"
+  "type RetryDecision struct"
+  "type Worker struct"
+  "func NewWorker"
+  "func \\(w \\*Worker\\) Start"
+  "func \\(w \\*Worker\\) RunOnce"
+  "func \\(w \\*Worker\\) Stop"
+  "NewInMemoryConsumer"
+  "type NoopDispatcher struct"
+)
+
+for pattern in "${message_transfer_code_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer
+done
+
+message_transfer_test_patterns=(
+  "TestWorkerConsumesEventAndMarksSuccessful"
+  "TestWorkerIdempotencySkipsDuplicateDispatch"
+  "TestWorkerRetryableFailureDoesNotMarkSuccessful"
+  "TestWorkerContextCancellationStopsLoop"
+)
+
+for pattern in "${message_transfer_test_patterns[@]}"; do
+  rg -q "$pattern" internal/transfer/worker_test.go
+done
+
+message_transfer_doc_patterns=(
+  "message.accepted"
+  "EventConsumer"
+  "DeliveryDispatcher"
+  "IdempotencyStore"
+  "RetryDecision"
+  "memory consumer"
+  "noop dispatcher"
+)
+
+for pattern in "${message_transfer_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/message-transfer-worker.md docs/exec-plans/active/message-transfer-worker.md
+done
+
+rg -q "LoadMessageTransferConfig" internal/config/config.go
+rg -q "message-transfer" cmd/message-transfer/main.go etc/message-transfer.yaml ARCHITECTURE.md
+rg -q "message-transfer-worker.md" docs/design-docs/index.md ARCHITECTURE.md
+rg -q "ConsumerGroup|Consumer\\.Group" etc/message-transfer.yaml internal/config/config.go
+rg -q "Topic|Consumer\\.Topic" etc/message-transfer.yaml internal/config/config.go
+rg -q "WorkerID|Worker\\.ID" etc/message-transfer.yaml internal/config/config.go
 
 gateway_product_patterns=(
   "command ACK"

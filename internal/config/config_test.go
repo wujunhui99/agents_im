@@ -96,3 +96,42 @@ func TestResolveRedisAndPresenceConfigFromEnv(t *testing.T) {
 		t.Fatalf("kafka env config mismatch: %+v", kafkaConfig)
 	}
 }
+
+func TestLoadMessageTransferConfig(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "message-transfer.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: message-transfer-test
+WorkerID: worker-a
+DryRun: true
+Consumer:
+  Driver: memory
+  Topic: message.accepted.test
+  Group: transfer-test
+Dispatcher:
+  Driver: noop
+Worker:
+  PollIntervalMillis: 25
+  RetryBackoffMillis: 250
+  MaxAttempts: 3
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadMessageTransferConfig(configPath)
+	if err != nil {
+		t.Fatalf("load message transfer config: %v", err)
+	}
+	if cfg.Name != "message-transfer-test" || cfg.WorkerID != "worker-a" || !cfg.DryRun {
+		t.Fatalf("basic transfer config mismatch: %+v", cfg)
+	}
+	if cfg.Consumer.Driver != TransferConsumerMemory || cfg.Consumer.Topic != "message.accepted.test" || cfg.Consumer.Group != "transfer-test" {
+		t.Fatalf("consumer config mismatch: %+v", cfg.Consumer)
+	}
+	if cfg.Dispatcher.Driver != TransferDispatcherNoop {
+		t.Fatalf("dispatcher config mismatch: %+v", cfg.Dispatcher)
+	}
+	if cfg.Worker.PollIntervalMillis != 25 || cfg.Worker.RetryBackoffMillis != 250 || cfg.Worker.MaxAttempts != 3 {
+		t.Fatalf("worker config mismatch: %+v", cfg.Worker)
+	}
+}
