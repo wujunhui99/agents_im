@@ -25,9 +25,8 @@ type GroupMember {
 }
 
 type CreateGroupReq {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	Name          string `json:"name"`
-	Description   string `json:"description,optional"`
+	Name        string `json:"name"`
+	Description string `json:"description,optional"`
 }
 
 type GetGroupReq {
@@ -35,14 +34,12 @@ type GetGroupReq {
 }
 
 type AddMemberReq {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	GroupID       string `path:"group_id"`
-	UserID        string `json:"user_id,optional"`
+	GroupID string `path:"group_id"`
+	UserID  string `json:"user_id,optional"`
 }
 
 type LeaveGroupReq {
-	CurrentUserID string `header:"X-User-Id,optional"`
-	GroupID       string `path:"group_id"`
+	GroupID string `path:"group_id"`
 }
 
 type ListMembersReq {
@@ -78,22 +75,27 @@ type ListMembersResp {
 }
 
 @server (
+	jwt:   Auth
 	group: groups
 )
 service groups-api {
 	@handler createGroup
 	post /groups (CreateGroupReq) returns (GroupResp)
 
-	@handler getGroup
-	get /groups/:group_id (GetGroupReq) returns (GroupResp)
-
 	@handler addMember
 	post /groups/:group_id/members (AddMemberReq) returns (MemberResp)
 
 	@handler leaveGroup
 	delete /groups/:group_id/members/me (LeaveGroupReq) returns (MemberResp)
+}
+
+@server (
+	group: groups
+)
+service groups-api {
+	@handler getGroup
+	get /groups/:group_id (GetGroupReq) returns (GroupResp)
 
 	@handler listMembers
 	get /groups/:group_id/members (ListMembersReq) returns (ListMembersResp)
 }
-

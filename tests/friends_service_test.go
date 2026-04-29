@@ -112,16 +112,26 @@ func TestFriendsLogicUserNotExists(t *testing.T) {
 }
 
 func TestFriendsHTTPHandlers(t *testing.T) {
-	serviceContext := svc.NewServiceContext(repository.NewMemoryRepository())
+	serviceContext := svc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
 	mux := newFriendsGoZeroRouter(t, serviceContext)
 	ctx := context.Background()
 
 	alice := createFriendTestUser(t, ctx, serviceContext.UserLogic, "alice_http")
 	bob := createFriendTestUser(t, ctx, serviceContext.UserLogic, "bob_http")
+	aliceBearer := bearerTokenForUser(t, alice.UserID)
+
+	bypassResp := httptest.NewRecorder()
+	bypassReq := newJSONRequest(http.MethodPost, "/friends", fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID))
+	bypassReq.Header.Set("X-User-Id", alice.UserID)
+	mux.ServeHTTP(bypassResp, bypassReq)
+	if bypassResp.Code != http.StatusUnauthorized {
+		t.Fatalf("X-User-Id bypass status = %d", bypassResp.Code)
+	}
 
 	addResp := httptest.NewRecorder()
 	addReq := newJSONRequest(http.MethodPost, "/friends", fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID))
-	addReq.Header.Set("X-User-Id", alice.UserID)
+	addReq.Header.Set("Authorization", aliceBearer)
+	addReq.Header.Set("X-User-Id", bob.UserID)
 	mux.ServeHTTP(addResp, addReq)
 	if addResp.Code != http.StatusOK {
 		t.Fatalf("add status = %d, body = %s", addResp.Code, addResp.Body.String())
@@ -131,10 +141,13 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 	if !added.Data.Created || added.Data.Friendship.FriendID != bob.UserID {
 		t.Fatalf("unexpected add response: %+v", added.Data)
 	}
+	if added.Data.Friendship.UserID != alice.UserID {
+		t.Fatalf("friendship did not use token user: %+v", added.Data.Friendship)
+	}
 
 	duplicateResp := httptest.NewRecorder()
 	duplicateReq := newJSONRequest(http.MethodPost, "/friends", fmt.Sprintf(`{"user_id":"%s"}`, bob.UserID))
-	duplicateReq.Header.Set("X-User-Id", alice.UserID)
+	duplicateReq.Header.Set("Authorization", aliceBearer)
 	mux.ServeHTTP(duplicateResp, duplicateReq)
 	if duplicateResp.Code != http.StatusOK {
 		t.Fatalf("duplicate status = %d, body = %s", duplicateResp.Code, duplicateResp.Body.String())
@@ -147,7 +160,7 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 
 	listResp := httptest.NewRecorder()
 	listReq := httptest.NewRequest(http.MethodGet, "/friends", nil)
-	listReq.Header.Set("X-User-Id", alice.UserID)
+	listReq.Header.Set("Authorization", aliceBearer)
 	mux.ServeHTTP(listResp, listReq)
 	if listResp.Code != http.StatusOK {
 		t.Fatalf("list status = %d, body = %s", listResp.Code, listResp.Body.String())
@@ -160,7 +173,7 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 
 	getResp := httptest.NewRecorder()
 	getReq := httptest.NewRequest(http.MethodGet, "/friends/"+bob.UserID, nil)
-	getReq.Header.Set("X-User-Id", alice.UserID)
+	getReq.Header.Set("Authorization", aliceBearer)
 	mux.ServeHTTP(getResp, getReq)
 	if getResp.Code != http.StatusOK {
 		t.Fatalf("get status = %d, body = %s", getResp.Code, getResp.Body.String())
@@ -173,7 +186,7 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 
 	deleteResp := httptest.NewRecorder()
 	deleteReq := httptest.NewRequest(http.MethodDelete, "/friends/"+bob.UserID, nil)
-	deleteReq.Header.Set("X-User-Id", alice.UserID)
+	deleteReq.Header.Set("Authorization", aliceBearer)
 	mux.ServeHTTP(deleteResp, deleteReq)
 	if deleteResp.Code != http.StatusOK {
 		t.Fatalf("delete status = %d, body = %s", deleteResp.Code, deleteResp.Body.String())
@@ -181,7 +194,7 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 
 	afterDeleteResp := httptest.NewRecorder()
 	afterDeleteReq := httptest.NewRequest(http.MethodGet, "/friends", nil)
-	afterDeleteReq.Header.Set("X-User-Id", alice.UserID)
+	afterDeleteReq.Header.Set("Authorization", aliceBearer)
 	mux.ServeHTTP(afterDeleteResp, afterDeleteReq)
 	if afterDeleteResp.Code != http.StatusOK {
 		t.Fatalf("list after delete status = %d, body = %s", afterDeleteResp.Code, afterDeleteResp.Body.String())

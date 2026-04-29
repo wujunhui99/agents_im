@@ -38,7 +38,7 @@ HTTP 接口：
 - `POST /auth/login`
 - `POST /auth/validate`
 
-选择 `POST /auth/validate` 是为了避免与 `user-api` 的 `/me` 冲突；后续 gateway 可在边缘层解析 token 并向 user 服务透传 `X-User-Id`。
+选择 `POST /auth/validate` 是为了避免与 `user-api` 的 `/me` 冲突；受保护 HTTP API 通过 go-zero JWT middleware 在本服务签发的 access token 中读取 `user_id`。
 
 ## 目录结构
 
@@ -108,7 +108,7 @@ tests/auth_service_test.go
 
 ## Token
 
-第一阶段 token 是 HMAC/JWT-like 三段结构：
+第一阶段 access token 是 HS256 JWT 三段结构：
 
 ```text
 base64url(header).base64url(payload).base64url(signature)
@@ -129,7 +129,8 @@ payload 包含：
 
 配置：
 
-- 第一阶段从环境变量 `AUTH_TOKEN_SECRET` 和 `AUTH_TOKEN_TTL` 读取；未设置时使用开发默认值和 24 小时 TTL。
+- `Auth.AccessSecret` 配置 JWT HMAC secret，本地 YAML 只使用开发 placeholder。
+- `Auth.AccessExpire` 配置 access token 过期秒数，当前本地开发值为 86400。
 - 后续应切换为配置中心或密钥管理系统，并支持密钥轮换。
 
 ## 错误处理
@@ -153,6 +154,8 @@ payload 包含：
 - 登录成功。
 - 密码错误。
 - token 校验。
+- Bearer token 可访问受保护 `/me`。
+- 旧 `X-User-Id` header 不能绕过受保护路由。
 
 验证命令：
 

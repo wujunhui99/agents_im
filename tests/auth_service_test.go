@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
 	userrepo "github.com/wujunhui99/agents_im/internal/repository"
+	rootsvc "github.com/wujunhui99/agents_im/internal/svc"
 )
 
 func TestAuthLogicRegisterLoginAndValidateToken(t *testing.T) {
@@ -35,8 +37,9 @@ func TestAuthLogicRegisterLoginAndValidateToken(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 	if registered.UserID == "" || registered.Identifier != "alice_001" || registered.Token == "" || registered.ExpiresAt == "" {
-		t.Fatalf("unexpected register response: %+v", registered)
+		t.Fatalf("register response missing required auth fields")
 	}
+	assertLooksLikeJWT(t, registered.Token)
 
 	if _, err := time.Parse(time.RFC3339, registered.ExpiresAt); err != nil {
 		t.Fatalf("expires_at is not RFC3339: %v", err)
@@ -68,8 +71,9 @@ func TestAuthLogicRegisterLoginAndValidateToken(t *testing.T) {
 		t.Fatalf("login: %v", err)
 	}
 	if loggedIn.UserID != registered.UserID || loggedIn.Identifier != registered.Identifier || loggedIn.Token == "" {
-		t.Fatalf("unexpected login response: %+v", loggedIn)
+		t.Fatalf("login response missing required auth fields")
 	}
+	assertLooksLikeJWT(t, loggedIn.Token)
 
 	_, err = authLogic.Login(ctx, authlogic.LoginRequest{
 		Identifier: "alice_001",
@@ -129,8 +133,9 @@ func TestAuthHTTPHandlers(t *testing.T) {
 	var registered envelope[authlogic.AuthResponse]
 	decodeEnvelope(t, registerResp.Body.Bytes(), &registered)
 	if registered.Data.UserID == "" || registered.Data.Token == "" {
-		t.Fatalf("unexpected register response: %+v", registered.Data)
+		t.Fatalf("register response missing required auth fields")
 	}
+	assertLooksLikeJWT(t, registered.Data.Token)
 
 	duplicateResp := httptest.NewRecorder()
 	duplicateReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"BOB_001","password":"another-password"}`)
@@ -149,6 +154,7 @@ func TestAuthHTTPHandlers(t *testing.T) {
 
 	var loggedIn envelope[authlogic.AuthResponse]
 	decodeEnvelope(t, loginResp.Body.Bytes(), &loggedIn)
+	assertLooksLikeJWT(t, loggedIn.Data.Token)
 
 	wrongPasswordResp := httptest.NewRecorder()
 	wrongPasswordReq := newJSONRequest(http.MethodPost, "/auth/login", `{"identifier":"bob_001","password":"wrong-password"}`)
@@ -171,6 +177,44 @@ func TestAuthHTTPHandlers(t *testing.T) {
 	}
 }
 
+func TestAuthIssuedBearerTokenAccessesMe(t *testing.T) {
+	authConfig := testJWTAuthConfig()
+	repo := userrepo.NewMemoryRepository()
+	userLogic := userlogic.NewUserLogic(repo)
+	authServiceContext := authsvc.NewServiceContext(
+		authrepo.NewMemoryRepository(),
+		useradapter.NewLogicClient(userLogic),
+		token.NewHMACTokenManager(authConfig.AccessSecret, time.Duration(authConfig.AccessExpire)*time.Second),
+	)
+	authMux := newAuthGoZeroRouter(t, authServiceContext)
+	userMux := newUserGoZeroRouter(t, rootsvc.NewServiceContextWithAuth(repo, authConfig))
+
+	registerResp := httptest.NewRecorder()
+	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"bearer_me","password":"correct-password","display_name":"Bearer User"}`)
+	authMux.ServeHTTP(registerResp, registerReq)
+	if registerResp.Code != http.StatusOK {
+		t.Fatalf("register status = %d", registerResp.Code)
+	}
+
+	var registered envelope[authlogic.AuthResponse]
+	decodeEnvelope(t, registerResp.Body.Bytes(), &registered)
+	assertLooksLikeJWT(t, registered.Data.Token)
+
+	meResp := httptest.NewRecorder()
+	meReq := httptest.NewRequest(http.MethodGet, "/me", nil)
+	meReq.Header.Set("Authorization", "Bearer "+registered.Data.Token)
+	userMux.ServeHTTP(meResp, meReq)
+	if meResp.Code != http.StatusOK {
+		t.Fatalf("me status = %d, body = %s", meResp.Code, meResp.Body.String())
+	}
+
+	var me envelope[userlogic.UserProfile]
+	decodeEnvelope(t, meResp.Body.Bytes(), &me)
+	if me.Data.UserID != registered.Data.UserID || me.Data.Identifier != "bearer_me" {
+		t.Fatalf("unexpected /me user: %+v", me.Data)
+	}
+}
+
 func newAuthLogic(userLogic *userlogic.UserLogic) *authlogic.AuthLogic {
 	return authlogic.NewAuthLogic(
 		authrepo.NewMemoryRepository(),
@@ -178,4 +222,17 @@ func newAuthLogic(userLogic *userlogic.UserLogic) *authlogic.AuthLogic {
 		authlogic.NewPasswordHasher(),
 		token.NewHMACTokenManager("test-secret", time.Hour),
 	)
+}
+
+func assertLooksLikeJWT(t *testing.T, raw string) {
+	t.Helper()
+	parts := strings.Split(raw, ".")
+	if len(parts) != 3 {
+		t.Fatalf("token is not a JWT compact serialization")
+	}
+	for _, part := range parts {
+		if part == "" {
+			t.Fatalf("token has an empty JWT segment")
+		}
+	}
 }

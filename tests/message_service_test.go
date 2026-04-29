@@ -2,11 +2,14 @@ package tests
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/internal/svc"
 )
 
 func TestMessageSingleChatSeqStartsAtOne(t *testing.T) {
@@ -219,6 +222,84 @@ func TestMessageConversationSeqQueryUnreadCount(t *testing.T) {
 	state = mustMessageState(t, messageLogic, "usr_b", first.Message.ConversationID)
 	if state.MaxSeq != 2 || state.HasReadSeq != 1 || state.UnreadCount != 1 {
 		t.Fatalf("unexpected unread state after read: %+v", state)
+	}
+}
+
+func TestMessageHTTPHandlersUseJWTUser(t *testing.T) {
+	serviceContext := svc.NewMessageServiceContextWithAuth(repository.NewMemoryMessageRepository(), nil, nil, testJWTAuthConfig())
+	mux := newMessageGoZeroRouter(t, serviceContext)
+
+	headerOnlyResp := httptest.NewRecorder()
+	headerOnlyReq := newJSONRequest(http.MethodPost, "/messages", `{"receiverId":"usr_receiver","chatType":"single","clientMsgId":"client-http-bypass","contentType":"text","content":"hello"}`)
+	headerOnlyReq.Header.Set("X-User-Id", "usr_sender")
+	mux.ServeHTTP(headerOnlyResp, headerOnlyReq)
+	if headerOnlyResp.Code != http.StatusUnauthorized {
+		t.Fatalf("X-User-Id bypass status = %d", headerOnlyResp.Code)
+	}
+
+	invalidTokenResp := httptest.NewRecorder()
+	invalidTokenReq := httptest.NewRequest(http.MethodGet, "/conversations/seqs", nil)
+	invalidTokenReq.Header.Set("Authorization", "Bearer [REDACTED]")
+	mux.ServeHTTP(invalidTokenResp, invalidTokenReq)
+	if invalidTokenResp.Code != http.StatusUnauthorized {
+		t.Fatalf("invalid token status = %d", invalidTokenResp.Code)
+	}
+
+	mismatchResp := httptest.NewRecorder()
+	mismatchReq := newJSONRequest(http.MethodPost, "/messages", `{"senderId":"usr_other","receiverId":"usr_receiver","chatType":"single","clientMsgId":"client-http-mismatch","contentType":"text","content":"hello"}`)
+	mismatchReq.Header.Set("Authorization", bearerTokenForUser(t, "usr_sender"))
+	mux.ServeHTTP(mismatchResp, mismatchReq)
+	if mismatchResp.Code != http.StatusBadRequest {
+		t.Fatalf("sender mismatch status = %d, body = %s", mismatchResp.Code, mismatchResp.Body.String())
+	}
+
+	sendResp := httptest.NewRecorder()
+	sendReq := newJSONRequest(http.MethodPost, "/messages", `{"receiverId":"usr_receiver","chatType":"single","clientMsgId":"client-http-send","contentType":"text","content":"hello"}`)
+	sendReq.Header.Set("Authorization", bearerTokenForUser(t, "usr_sender"))
+	sendReq.Header.Set("X-User-Id", "usr_receiver")
+	mux.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusOK {
+		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
+	}
+
+	var sent envelope[logic.SendMessageResponse]
+	decodeEnvelope(t, sendResp.Body.Bytes(), &sent)
+	if sent.Data.Message.SenderID != "usr_sender" {
+		t.Fatalf("message sender did not use token user: %+v", sent.Data.Message)
+	}
+
+	seqsResp := httptest.NewRecorder()
+	seqsReq := httptest.NewRequest(http.MethodGet, "/conversations/seqs?conversationIds="+sent.Data.Message.ConversationID, nil)
+	seqsReq.Header.Set("Authorization", bearerTokenForUser(t, "usr_receiver"))
+	mux.ServeHTTP(seqsResp, seqsReq)
+	if seqsResp.Code != http.StatusOK {
+		t.Fatalf("seqs status = %d, body = %s", seqsResp.Code, seqsResp.Body.String())
+	}
+
+	pullResp := httptest.NewRecorder()
+	pullReq := httptest.NewRequest(http.MethodGet, "/conversations/"+sent.Data.Message.ConversationID+"/messages?fromSeq=1&limit=10", nil)
+	pullReq.Header.Set("Authorization", bearerTokenForUser(t, "usr_receiver"))
+	mux.ServeHTTP(pullResp, pullReq)
+	if pullResp.Code != http.StatusOK {
+		t.Fatalf("pull status = %d, body = %s", pullResp.Code, pullResp.Body.String())
+	}
+	var pulled envelope[logic.PullMessagesResponse]
+	decodeEnvelope(t, pullResp.Body.Bytes(), &pulled)
+	if len(pulled.Data.Messages) != 1 || pulled.Data.Messages[0].SenderID != "usr_sender" {
+		t.Fatalf("unexpected pull response: %+v", pulled.Data.Messages)
+	}
+
+	readResp := httptest.NewRecorder()
+	readReq := newJSONRequest(http.MethodPost, "/conversations/"+sent.Data.Message.ConversationID+"/read", `{"hasReadSeq":1}`)
+	readReq.Header.Set("Authorization", bearerTokenForUser(t, "usr_receiver"))
+	mux.ServeHTTP(readResp, readReq)
+	if readResp.Code != http.StatusOK {
+		t.Fatalf("mark read status = %d, body = %s", readResp.Code, readResp.Body.String())
+	}
+	var read envelope[logic.MarkConversationAsReadResponse]
+	decodeEnvelope(t, readResp.Body.Bytes(), &read)
+	if read.Data.UnreadCount != 0 || read.Data.HasReadSeq != 1 {
+		t.Fatalf("unexpected read response: %+v", read.Data)
 	}
 }
 

@@ -144,15 +144,27 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
 	creator := mustCreateUser(t, userLogic, "creator_003")
 	member := mustCreateUser(t, userLogic, "member_003")
-	serviceContext := svc.NewGroupsServiceContext(
+	serviceContext := svc.NewGroupsServiceContextWithAuth(
 		repository.NewMemoryGroupsRepository(),
 		logic.NewUserLogicExistenceChecker(userLogic),
+		testJWTAuthConfig(),
 	)
 	mux := newGroupsGoZeroRouter(t, serviceContext)
+	creatorBearer := bearerTokenForUser(t, creator.UserID)
+	memberBearer := bearerTokenForUser(t, member.UserID)
+
+	bypassResp := httptest.NewRecorder()
+	bypassReq := newJSONRequest(http.MethodPost, "/groups", `{"name":"Header Only"}`)
+	bypassReq.Header.Set("X-User-Id", creator.UserID)
+	mux.ServeHTTP(bypassResp, bypassReq)
+	if bypassResp.Code != http.StatusUnauthorized {
+		t.Fatalf("X-User-Id bypass status = %d", bypassResp.Code)
+	}
 
 	createResp := httptest.NewRecorder()
 	createReq := newJSONRequest(http.MethodPost, "/groups", `{"name":"Team Chat","description":"team room"}`)
-	createReq.Header.Set("X-User-Id", creator.UserID)
+	createReq.Header.Set("Authorization", creatorBearer)
+	createReq.Header.Set("X-User-Id", member.UserID)
 	mux.ServeHTTP(createResp, createReq)
 	if createResp.Code != http.StatusOK {
 		t.Fatalf("create group status = %d, body = %s", createResp.Code, createResp.Body.String())
@@ -174,7 +186,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 
 	addResp := httptest.NewRecorder()
 	addReq := newJSONRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", `{"user_id":"`+member.UserID+`"}`)
-	addReq.Header.Set("X-User-Id", creator.UserID)
+	addReq.Header.Set("Authorization", creatorBearer)
 	mux.ServeHTTP(addResp, addReq)
 	if addResp.Code != http.StatusOK {
 		t.Fatalf("add member status = %d, body = %s", addResp.Code, addResp.Body.String())
@@ -187,7 +199,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 
 	repeatResp := httptest.NewRecorder()
 	repeatReq := newJSONRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", `{"user_id":"`+member.UserID+`"}`)
-	repeatReq.Header.Set("X-User-Id", creator.UserID)
+	repeatReq.Header.Set("Authorization", creatorBearer)
 	mux.ServeHTTP(repeatResp, repeatReq)
 	if repeatResp.Code != http.StatusOK {
 		t.Fatalf("repeat add status = %d, body = %s", repeatResp.Code, repeatResp.Body.String())
@@ -212,7 +224,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 
 	leaveResp := httptest.NewRecorder()
 	leaveReq := httptest.NewRequest(http.MethodDelete, "/groups/"+created.Data.GroupID+"/members/me", nil)
-	leaveReq.Header.Set("X-User-Id", member.UserID)
+	leaveReq.Header.Set("Authorization", memberBearer)
 	mux.ServeHTTP(leaveResp, leaveReq)
 	if leaveResp.Code != http.StatusOK {
 		t.Fatalf("leave status = %d, body = %s", leaveResp.Code, leaveResp.Body.String())
@@ -229,7 +241,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 
 	missingUserResp := httptest.NewRecorder()
 	missingUserReq := newJSONRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", `{"user_id":"usr_missing"}`)
-	missingUserReq.Header.Set("X-User-Id", creator.UserID)
+	missingUserReq.Header.Set("Authorization", creatorBearer)
 	mux.ServeHTTP(missingUserResp, missingUserReq)
 	if missingUserResp.Code != http.StatusNotFound {
 		t.Fatalf("missing user status = %d, body = %s", missingUserResp.Code, missingUserResp.Body.String())

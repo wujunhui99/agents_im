@@ -7,6 +7,7 @@
 - [agent-chat.md](./agent-chat.md)：Agent 单聊与群聊
 - [agent-lifecycle.md](./agent-lifecycle.md)：Agent 创建、销毁与持久化
 - [account-social-core.md](./account-social-core.md)：账号资料、认证、好友与群聊基础能力
+- [auth-service.md](./auth-service.md)：Auth Service 第一阶段产品规格
 - [user-service.md](./user-service.md)：User Service 第一阶段产品规格
 - [message-chain.md](./message-chain.md)：消息发送、存储、拉取与已读链路产品规格
 - [message-storage.md](./message-storage.md)：消息存储的幂等、顺序、拉取与已读保证

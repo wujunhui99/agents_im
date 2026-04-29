@@ -2,9 +2,9 @@ package groups
 
 import (
 	"context"
-	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/svc"
 	"github.com/wujunhui99/agents_im/internal/types"
@@ -26,7 +26,7 @@ func NewAddMemberLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddMemb
 }
 
 func (l *AddMemberLogic) AddMember(req *types.AddMemberReq) (*types.MemberResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func NewCreateGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Creat
 }
 
 func (l *CreateGroupLogic) CreateGroup(req *types.CreateGroupReq) (*types.GroupResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func NewLeaveGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LeaveG
 }
 
 func (l *LeaveGroupLogic) LeaveGroup(req *types.LeaveGroupReq) (*types.MemberResp, error) {
-	userID, err := currentUserID(req.CurrentUserID)
+	userID, err := ctxuser.UserID(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -157,14 +157,6 @@ func (l *ListMembersLogic) ListMembers(req *types.ListMembersReq) (*types.ListMe
 			Members: members,
 		},
 	}, nil
-}
-
-func currentUserID(value string) (string, error) {
-	userID := strings.TrimSpace(value)
-	if userID == "" {
-		return "", apperror.Unauthenticated("X-User-Id header is required")
-	}
-	return userID, nil
 }
 
 func groupResp(group business.GroupInfo) *types.GroupResp {

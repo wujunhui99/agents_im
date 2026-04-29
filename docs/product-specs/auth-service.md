@@ -12,7 +12,7 @@
 - 支持账号密码登录。
 - 注册前按唯一标识符检查账号是否已存在。
 - 注册成功时创建 user 资料，并在 auth 内部保存密码哈希与 salt。
-- 登录成功后签发带过期时间的 token。
+- 登录成功后签发带过期时间的 JWT access token。
 - 提供 token 校验接口，便于后续 gateway 或其他服务验证登录态。
 - 为手机号验证码、微信扫码登录等后续方式保留扩展点，但第一阶段不实现。
 
@@ -65,7 +65,7 @@
 
 - token 必须有过期时间。
 - 过期、签名非法或格式错误的 token 返回未认证错误。
-- 第一阶段 token 使用本地 HMAC/JWT-like 实现；后续可替换为标准 JWT 库或集中鉴权服务。
+- 第一阶段 token 使用 HS256 JWT compact serialization；受保护 API 使用 Bearer token 鉴权。
 
 ## 第一阶段接口
 
@@ -148,7 +148,7 @@
 
 - 手机号验证码：后续新增验证码发送、校验、手机号绑定和手机号登录 adapter。
 - 微信扫码：后续新增扫码会话、二维码状态轮询、微信身份绑定和登录 adapter。
-- token：后续支持刷新 token、登出吊销、密钥轮换和 gateway 统一鉴权。
+- token：当前签发 JWT access token，payload 至少包含 `user_id`、`identifier`、`iat`、`exp`；后续支持刷新 token、登出吊销、密钥轮换和 gateway 统一鉴权。
 - 密码哈希：第一阶段使用标准库实现的 salted iterative SHA-256；生产化前应切换为 Argon2id、bcrypt 或 scrypt。
 
 ## 风险与待决
