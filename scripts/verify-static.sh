@@ -40,12 +40,14 @@ required_files=(
   "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
   "internal/gateway/contract.go"
+  "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
   "tests/friends_service_test.go"
   "tests/groups_service_test.go"
   "tests/message_service_test.go"
   "tests/gateway_contract_test.go"
+  "tests/read_receipts_test.go"
   "docs/product-specs/user-service.md"
   "docs/product-specs/auth-service.md"
   "docs/product-specs/friends-service.md"
@@ -53,6 +55,7 @@ required_files=(
   "docs/product-specs/message-chain.md"
   "docs/product-specs/message-storage.md"
   "docs/product-specs/gateway-message-contract.md"
+  "docs/product-specs/read-receipts.md"
   "docs/design-docs/user-service-go-zero.md"
   "docs/design-docs/auth-service-go-zero.md"
   "docs/design-docs/friends-service-go-zero.md"
@@ -60,6 +63,7 @@ required_files=(
   "docs/design-docs/message-chain-contract.md"
   "docs/design-docs/message-storage.md"
   "docs/design-docs/gateway-message-contract.md"
+  "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
   "docs/exec-plans/active/friends-service-go-zero.md"
@@ -67,6 +71,7 @@ required_files=(
   "docs/exec-plans/active/message-storage.md"
   "internal/repository/message_storage_contract.go"
   "docs/exec-plans/active/gateway-message-contract.md"
+  "docs/exec-plans/active/read-receipts.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -234,6 +239,29 @@ for pattern in "${gateway_product_patterns[@]}"; do
 done
 
 rg -q "gateway-message-contract.md" docs/design-docs/index.md docs/product-specs/index.md
+read_receipt_patterns=(
+  "has_read_seq"
+  "unread_count"
+  "message.read"
+  "requested_has_read_seq > max_seq"
+)
+
+for pattern in "${read_receipt_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/read-receipts.md docs/product-specs/read-receipts.md
+done
+
+read_receipt_code_patterns=(
+  "NormalizeMarkRead"
+  "CanAdvanceReadSeq"
+  "UnreadCount"
+  "ErrReadSeqExceedsMax"
+)
+
+for pattern in "${read_receipt_code_patterns[@]}"; do
+  rg -q "$pattern" internal/domain/readreceipt/read_receipt.go tests/read_receipts_test.go
+done
+
+rg -q "read-receipts.md" docs/design-docs/index.md docs/product-specs/index.md
 rg -q "X-User-Id" internal/handler docs
 rg -q "ExistsByIdentifier" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
 rg -q "CreateUser" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
