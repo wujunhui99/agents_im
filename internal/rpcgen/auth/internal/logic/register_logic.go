@@ -3,7 +3,9 @@ package logic
 import (
 	"context"
 
+	business "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/auth/internal/svc"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/proto/authpb"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -24,7 +26,17 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 }
 
 func (l *RegisterLogic) Register(in *authpb.RegisterRequest) (*authpb.AuthResponse, error) {
-	// todo: add your logic here and delete this line
-
-	return &authpb.AuthResponse{}, nil
+	result, err := l.svcCtx.AuthLogic.Register(l.ctx, business.RegisterRequest{
+		Identifier:  in.GetIdentifier(),
+		Password:    in.GetPassword(),
+		DisplayName: in.GetDisplayName(),
+		Name:        in.GetName(),
+		Gender:      in.GetGender(),
+		Age:         in.GetAge(),
+		Region:      in.GetRegion(),
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return toAuthResponse(result), nil
 }

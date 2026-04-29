@@ -4,7 +4,7 @@
 
 ## 背景
 
-`groups` 服务负责群聊基础信息和群成员关系。当前仓库已有手写 go-zero 风格的 `user` 服务骨架，`goctl` 在当前环境不可用，因此第一阶段沿用相同方式：保留 `api/groups.api` 和 `proto/groups.proto` 契约文件，手写目录结构、业务逻辑、HTTP handler、RPC contract wrapper 和单元测试。后续工具可用后再用 `goctl` 生成或校准骨架。
+`groups` 服务负责群聊基础信息和群成员关系。当前 REST 与 RPC transport 已按 goctl/go-zero 生成结构校准，旧手写 HTTP mux handler 和 RPC contract wrapper 已移除；业务 logic、repository 和单元测试继续保留。
 
 ## 服务组成
 
@@ -50,12 +50,12 @@ cmd/groups-api/main.go
 cmd/groups-rpc/main.go
 etc/groups-api.yaml
 etc/groups-rpc.yaml
-internal/handler/groups_handler.go
+internal/handler/groups
 internal/logic/groupslogic.go
 internal/model/group.go
 internal/repository/groups_repository.go
 internal/repository/groups_memory.go
-internal/rpc/groups_server.go
+internal/rpcgen/groups
 internal/svc/service_context.go
 proto/groups.proto
 tests/groups_service_test.go

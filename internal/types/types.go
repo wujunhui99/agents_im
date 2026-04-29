@@ -9,7 +9,7 @@ type AddFriendData struct {
 }
 
 type AddFriendReq struct {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	UserID        string `json:"user_id"`
 }
 
@@ -20,7 +20,7 @@ type AddFriendResp struct {
 }
 
 type AddMemberReq struct {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	GroupID       string `path:"group_id"`
 	UserID        string `json:"user_id,optional"`
 }
@@ -52,7 +52,7 @@ type ConversationSeqsData struct {
 }
 
 type ConversationSeqsReq struct {
-	CurrentUserID   string `header:"X-User-Id"`
+	CurrentUserID   string `header:"X-User-Id,optional"`
 	ConversationIDs string `form:"conversationIds,optional"`
 }
 
@@ -63,7 +63,7 @@ type ConversationSeqsResp struct {
 }
 
 type CreateGroupReq struct {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	Name          string `json:"name"`
 	Description   string `json:"description,optional"`
 }
@@ -104,7 +104,7 @@ type ExistsResp struct {
 }
 
 type FriendPathReq struct {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	UserID        string `path:"user_id"`
 }
 
@@ -132,7 +132,7 @@ type GetGroupReq struct {
 }
 
 type GetMeReq struct {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 }
 
 type GetUserByIdentifierReq struct {
@@ -163,7 +163,7 @@ type GroupResp struct {
 }
 
 type LeaveGroupReq struct {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	GroupID       string `path:"group_id"`
 }
 
@@ -172,7 +172,7 @@ type ListFriendsData struct {
 }
 
 type ListFriendsReq struct {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 }
 
 type ListFriendsResp struct {
@@ -210,7 +210,7 @@ type MarkConversationAsReadData struct {
 }
 
 type MarkConversationAsReadReq struct {
-	CurrentUserID  string `header:"X-User-Id"`
+	CurrentUserID  string `header:"X-User-Id,optional"`
 	ConversationID string `path:"conversation_id"`
 	HasReadSeq     int64  `json:"hasReadSeq"`
 }
@@ -254,7 +254,7 @@ type PullMessagesData struct {
 }
 
 type PullMessagesReq struct {
-	CurrentUserID  string `header:"X-User-Id"`
+	CurrentUserID  string `header:"X-User-Id,optional"`
 	ConversationID string `path:"conversation_id"`
 	FromSeq        int64  `form:"fromSeq,optional"`
 	ToSeq          int64  `form:"toSeq,optional"`
@@ -284,7 +284,7 @@ type SendMessageData struct {
 }
 
 type SendMessageReq struct {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	ReceiverID    string `json:"receiverId,optional"`
 	GroupID       string `json:"groupId,optional"`
 	ChatType      string `json:"chatType"`
@@ -300,7 +300,9 @@ type SendMessageResp struct {
 }
 
 type UpdateMeReq struct {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
+	UserID        string `json:"user_id,optional"`
+	Identifier    string `json:"identifier,optional"`
 	DisplayName   string `json:"display_name,optional"`
 	Name          string `json:"name,optional"`
 	Gender        string `json:"gender,optional"`

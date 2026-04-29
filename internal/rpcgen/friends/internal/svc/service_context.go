@@ -1,13 +1,25 @@
 package svc
 
-import "github.com/wujunhui99/agents_im/internal/rpcgen/friends/internal/config"
+import (
+	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/friends/internal/config"
+)
 
 type ServiceContext struct {
-	Config config.Config
+	Config       config.Config
+	FriendsLogic *business.FriendsLogic
+	UserLogic    *business.UserLogic
+	Repo         repository.Repository
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
+	repo := repository.NewMemoryRepository()
+	userLogic := business.NewUserLogic(repo)
 	return &ServiceContext{
-		Config: c,
+		Config:       c,
+		FriendsLogic: business.NewFriendsLogic(repo, userLogic),
+		UserLogic:    userLogic,
+		Repo:         repo,
 	}
 }

@@ -3,7 +3,9 @@ package logic
 import (
 	"context"
 
+	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/groups/internal/svc"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/proto/groupspb"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -24,7 +26,11 @@ func NewGetGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetGroup
 }
 
 func (l *GetGroupLogic) GetGroup(in *groupspb.GetGroupRequest) (*groupspb.GroupResponse, error) {
-	// todo: add your logic here and delete this line
-
-	return &groupspb.GroupResponse{}, nil
+	result, err := l.svcCtx.GroupsLogic.GetGroup(l.ctx, business.GetGroupRequest{
+		GroupID: in.GetGroupId(),
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return &groupspb.GroupResponse{Group: toGroup(result)}, nil
 }

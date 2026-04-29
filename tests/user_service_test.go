@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/handler"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/svc"
@@ -67,12 +66,11 @@ func TestUserLogicCreateDuplicateExistsAndUpdate(t *testing.T) {
 
 func TestUserHTTPHandlers(t *testing.T) {
 	serviceContext := svc.NewServiceContext(repository.NewMemoryRepository())
-	mux := http.NewServeMux()
-	handler.RegisterHandlers(mux, serviceContext)
+	mux := newUserGoZeroRouter(t, serviceContext)
 
 	createBody := `{"identifier":"bob_001","display_name":"Bob","gender":"male","age":28,"region":"Beijing"}`
 	createResp := httptest.NewRecorder()
-	createReq := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(createBody))
+	createReq := newJSONRequest(http.MethodPost, "/users", createBody)
 	mux.ServeHTTP(createResp, createReq)
 	if createResp.Code != http.StatusOK {
 		t.Fatalf("create status = %d, body = %s", createResp.Code, createResp.Body.String())
@@ -86,7 +84,7 @@ func TestUserHTTPHandlers(t *testing.T) {
 	}
 
 	duplicateResp := httptest.NewRecorder()
-	duplicateReq := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(`{"identifier":"BOB_001"}`))
+	duplicateReq := newJSONRequest(http.MethodPost, "/users", `{"identifier":"BOB_001"}`)
 	mux.ServeHTTP(duplicateResp, duplicateReq)
 	if duplicateResp.Code != http.StatusConflict {
 		t.Fatalf("duplicate status = %d, body = %s", duplicateResp.Code, duplicateResp.Body.String())
@@ -121,7 +119,7 @@ func TestUserHTTPHandlers(t *testing.T) {
 	assertNoSecretFields(t, meResp.Body.String())
 
 	patchResp := httptest.NewRecorder()
-	patchReq := httptest.NewRequest(http.MethodPatch, "/me", strings.NewReader(`{"name":"Bobby","region":"Hangzhou"}`))
+	patchReq := newJSONRequest(http.MethodPatch, "/me", `{"name":"Bobby","region":"Hangzhou"}`)
 	patchReq.Header.Set("X-User-Id", created.Data.UserID)
 	mux.ServeHTTP(patchResp, patchReq)
 	if patchResp.Code != http.StatusOK {
@@ -144,17 +142,16 @@ func TestUserHTTPHandlers(t *testing.T) {
 
 func TestPatchRejectsImmutableFields(t *testing.T) {
 	serviceContext := svc.NewServiceContext(repository.NewMemoryRepository())
-	mux := http.NewServeMux()
-	handler.RegisterHandlers(mux, serviceContext)
+	mux := newUserGoZeroRouter(t, serviceContext)
 
 	createResp := httptest.NewRecorder()
-	createReq := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(`{"identifier":"carol_001"}`))
+	createReq := newJSONRequest(http.MethodPost, "/users", `{"identifier":"carol_001"}`)
 	mux.ServeHTTP(createResp, createReq)
 	var created envelope[logic.UserProfile]
 	decodeEnvelope(t, createResp.Body.Bytes(), &created)
 
 	patchResp := httptest.NewRecorder()
-	identifierReq := httptest.NewRequest(http.MethodPatch, "/me", strings.NewReader(`{"identifier":"changed"}`))
+	identifierReq := newJSONRequest(http.MethodPatch, "/me", `{"identifier":"changed"}`)
 	identifierReq.Header.Set("X-User-Id", created.Data.UserID)
 	mux.ServeHTTP(patchResp, identifierReq)
 	if patchResp.Code != http.StatusBadRequest {
@@ -162,7 +159,7 @@ func TestPatchRejectsImmutableFields(t *testing.T) {
 	}
 
 	userIDResp := httptest.NewRecorder()
-	userIDReq := httptest.NewRequest(http.MethodPatch, "/me", strings.NewReader(`{"user_id":"usr_999999"}`))
+	userIDReq := newJSONRequest(http.MethodPatch, "/me", `{"user_id":"usr_999999"}`)
 	userIDReq.Header.Set("X-User-Id", created.Data.UserID)
 	mux.ServeHTTP(userIDResp, userIDReq)
 	if userIDResp.Code != http.StatusBadRequest {

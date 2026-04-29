@@ -3,7 +3,9 @@ package logic
 import (
 	"context"
 
+	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/friends/internal/svc"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/proto/friendspb"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -24,7 +26,14 @@ func NewGetFriendshipLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Get
 }
 
 func (l *GetFriendshipLogic) GetFriendship(in *friendspb.GetFriendshipRequest) (*friendspb.GetFriendshipResponse, error) {
-	// todo: add your logic here and delete this line
-
-	return &friendspb.GetFriendshipResponse{}, nil
+	result, err := l.svcCtx.FriendsLogic.GetFriendship(l.ctx, business.GetFriendshipRequest{
+		UserID:   in.GetUserId(),
+		FriendID: in.GetFriendId(),
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return &friendspb.GetFriendshipResponse{
+		Friendship: toFriendship(result.Friendship),
+	}, nil
 }

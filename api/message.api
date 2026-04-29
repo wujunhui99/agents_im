@@ -23,7 +23,7 @@ type Message {
 }
 
 type SendMessageReq {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	ReceiverID    string `json:"receiverId,optional"`
 	GroupID       string `json:"groupId,optional"`
 	ChatType      string `json:"chatType"`
@@ -44,7 +44,7 @@ type SendMessageResp {
 }
 
 type PullMessagesReq {
-	CurrentUserID  string `header:"X-User-Id"`
+	CurrentUserID  string `header:"X-User-Id,optional"`
 	ConversationID string `path:"conversation_id"`
 	FromSeq        int64  `form:"fromSeq,optional"`
 	ToSeq          int64  `form:"toSeq,optional"`
@@ -65,7 +65,7 @@ type PullMessagesResp {
 }
 
 type ConversationSeqsReq {
-	CurrentUserID   string `header:"X-User-Id"`
+	CurrentUserID   string `header:"X-User-Id,optional"`
 	ConversationIDs string `form:"conversationIds,optional"`
 }
 
@@ -89,7 +89,7 @@ type ConversationSeqsResp {
 }
 
 type MarkConversationAsReadReq {
-	CurrentUserID  string `header:"X-User-Id"`
+	CurrentUserID  string `header:"X-User-Id,optional"`
 	ConversationID string `path:"conversation_id"`
 	HasReadSeq     int64  `json:"hasReadSeq"`
 }
@@ -124,3 +124,4 @@ service message-api {
 	@handler markConversationAsRead
 	post /conversations/:conversation_id/read (MarkConversationAsReadReq) returns (MarkConversationAsReadResp)
 }
+

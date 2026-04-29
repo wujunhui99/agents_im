@@ -25,7 +25,7 @@ type GroupMember {
 }
 
 type CreateGroupReq {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	Name          string `json:"name"`
 	Description   string `json:"description,optional"`
 }
@@ -35,13 +35,13 @@ type GetGroupReq {
 }
 
 type AddMemberReq {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	GroupID       string `path:"group_id"`
 	UserID        string `json:"user_id,optional"`
 }
 
 type LeaveGroupReq {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	GroupID       string `path:"group_id"`
 }
 
@@ -96,3 +96,4 @@ service groups-api {
 	@handler listMembers
 	get /groups/:group_id/members (ListMembersReq) returns (ListMembersResp)
 }
+

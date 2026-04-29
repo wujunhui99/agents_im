@@ -4,11 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/handler"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
@@ -150,11 +148,10 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 		repository.NewMemoryGroupsRepository(),
 		logic.NewUserLogicExistenceChecker(userLogic),
 	)
-	mux := http.NewServeMux()
-	handler.RegisterGroupsHandlers(mux, serviceContext)
+	mux := newGroupsGoZeroRouter(t, serviceContext)
 
 	createResp := httptest.NewRecorder()
-	createReq := httptest.NewRequest(http.MethodPost, "/groups", strings.NewReader(`{"name":"Team Chat","description":"team room"}`))
+	createReq := newJSONRequest(http.MethodPost, "/groups", `{"name":"Team Chat","description":"team room"}`)
 	createReq.Header.Set("X-User-Id", creator.UserID)
 	mux.ServeHTTP(createResp, createReq)
 	if createResp.Code != http.StatusOK {
@@ -176,7 +173,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	}
 
 	addResp := httptest.NewRecorder()
-	addReq := httptest.NewRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", strings.NewReader(`{"user_id":"`+member.UserID+`"}`))
+	addReq := newJSONRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", `{"user_id":"`+member.UserID+`"}`)
 	addReq.Header.Set("X-User-Id", creator.UserID)
 	mux.ServeHTTP(addResp, addReq)
 	if addResp.Code != http.StatusOK {
@@ -189,7 +186,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	}
 
 	repeatResp := httptest.NewRecorder()
-	repeatReq := httptest.NewRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", strings.NewReader(`{"user_id":"`+member.UserID+`"}`))
+	repeatReq := newJSONRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", `{"user_id":"`+member.UserID+`"}`)
 	repeatReq.Header.Set("X-User-Id", creator.UserID)
 	mux.ServeHTTP(repeatResp, repeatReq)
 	if repeatResp.Code != http.StatusOK {
@@ -231,7 +228,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	}
 
 	missingUserResp := httptest.NewRecorder()
-	missingUserReq := httptest.NewRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", strings.NewReader(`{"user_id":"usr_missing"}`))
+	missingUserReq := newJSONRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", `{"user_id":"usr_missing"}`)
 	missingUserReq.Header.Set("X-User-Id", creator.UserID)
 	mux.ServeHTTP(missingUserResp, missingUserReq)
 	if missingUserResp.Code != http.StatusNotFound {

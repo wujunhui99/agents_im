@@ -17,16 +17,16 @@ type Friendship {
 }
 
 type AddFriendReq {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	UserID        string `json:"user_id"`
 }
 
 type ListFriendsReq {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 }
 
 type FriendPathReq {
-	CurrentUserID string `header:"X-User-Id"`
+	CurrentUserID string `header:"X-User-Id,optional"`
 	UserID        string `path:"user_id"`
 }
 
@@ -88,3 +88,4 @@ service friends-api {
 	@handler getFriendship
 	get /friends/:user_id (FriendPathReq) returns (FriendshipResp)
 }
+
