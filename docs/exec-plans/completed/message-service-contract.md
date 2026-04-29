@@ -1,5 +1,8 @@
 # Message Service Contract Implementation Plan
 
+Status: Completed  
+Completed: 2026-04-29
+
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
 **Goal:** Create the first message-service interface contract so message storage, gateway mapping, and read receipts can be developed in parallel.
@@ -221,3 +224,39 @@ git push -u origin feature/message-service-contract
 - Branch is clean after commit.
 - Branch is pushed to origin.
 - Final response includes commit SHA and verification output.
+
+## Result Record
+
+### Planner
+
+- Read required context: `AGENTS.md`, `ARCHITECTURE.md`, `docs/product-specs/message-chain.md`, `docs/design-docs/message-chain-contract.md`, and this execution plan.
+- Confirmed phase 1 scope: synchronous message service skeleton, deterministic conversation IDs, per-conversation seq, send idempotency, pull-by-seq, conversation read state, and future-compatible API/RPC contracts.
+- Confirmed `goctl` is unavailable in this worktree runtime, so files were handwritten using the existing user/auth/friends/groups skeleton style.
+
+### Generator
+
+- Added `proto/message.proto` with `MessageService` RPCs and shared `Message` / `ConversationSeqState` schemas.
+- Added `api/message.api` for `POST /messages`, `GET /conversations/:conversation_id/messages`, `GET /conversations/seqs`, and `POST /conversations/:conversation_id/read`.
+- Added message logic and in-memory repository with deterministic `single:{lower_user_id}:{higher_user_id}` / `group:{group_id}` conversation IDs, idempotent send, seq allocation, sender read advancement, pull, seq query, and monotonic mark-read behavior.
+- Added message HTTP handler skeleton and mounted `MessageLogic` / `MessageRepository` in `internal/svc/service_context.go` without changing user/auth/friends/groups contracts.
+- Added `tests/message_service_test.go` covering single-chat seq, idempotent retry, idempotency conflict, seq pull, sender read advancement, mark-read rejection above max, monotonic mark-read, and unread seq query.
+- Updated `scripts/verify-static.sh` to require message API/proto/docs/test/source checks and guard message contract sources/docs from auth-secret ownership.
+
+### Evaluator
+
+Verification run:
+
+```bash
+PATH=/tmp/go/bin:$PATH gofmt -w $(find . -name "*.go" -print)
+PATH=/tmp/go/bin:$PATH go test ./...
+bash scripts/verify-static.sh
+```
+
+Results:
+
+- `go test ./...`: passed.
+- `bash scripts/verify-static.sh`: `static verification passed`.
+
+Residual risk:
+
+- Group-chat validation is adapter-ready through `GroupMemberLister`, but the default message context does not wire a groups service instance. Full group membership enforcement should be completed when service composition is finalized.
