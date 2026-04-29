@@ -17,6 +17,7 @@ func RegisterHandlers(mux *http.ServeMux, ctx *svc.ServiceContext) {
 	registerHealthHandler(mux)
 	registerUserHandlers(mux, ctx)
 	registerFriendsHandlers(mux, ctx)
+	registerMessageHandlers(mux, ctx)
 }
 
 func RegisterUserHandlers(mux *http.ServeMux, ctx *svc.ServiceContext) {
