@@ -66,7 +66,7 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 - 在线状态维护
 - 消息下发与重试
 
-在线状态和连接元数据通过 Redis presence 层保存为短期运行状态，设计见 [`docs/design-docs/redis-presence.md`](./docs/design-docs/redis-presence.md)。第一阶段已提供独立入口 `cmd/gateway-ws`，通过 `GET /ws` 建立 WebSocket 连接；Handshake 使用与 HTTP API 一致的 JWT 配置，支持 `Authorization: Bearer ...` 和 `token` query param；连接通过内存 connection manager 按 `user_id` 注册多端 `connection_id`。Gateway command router 支持 `heartbeat`、`send_message`、`pull_messages`、`get_conversation_seqs`、`mark_conversation_read`，并调用现有 Message Service 业务逻辑/仓储契约完成消息写入、拉取、seq 查询和已读推进。Gateway 不拥有消息历史、会话 seq 或已读状态；这些数据仍由 Message Service 和 PostgreSQL 权威维护。Redis Presence 集成、Kafka fanout、Push worker 和 delivery ACK 留给后续链路补齐。设计见 [`docs/design-docs/websocket-gateway.md`](./docs/design-docs/websocket-gateway.md)。
+在线状态和连接元数据通过 Redis presence 层保存为短期运行状态，设计见 [`docs/design-docs/redis-presence.md`](./docs/design-docs/redis-presence.md)。第一阶段已提供独立入口 `cmd/gateway-ws`，通过 `GET /ws` 建立 WebSocket 连接；Handshake 使用与 HTTP API 一致的 JWT 配置，支持 `Authorization: Bearer ...` 和 `token` query param；连接通过内存 connection manager 按 `user_id` 注册多端 `connection_id`。Gateway command router 支持 `heartbeat`、`send_message`、`pull_messages`、`get_conversation_seqs`、`mark_conversation_read`，并调用现有 Message Service 业务逻辑/仓储契约完成消息写入、拉取、seq 查询和已读推进。Gateway push delivery 第一阶段提供 `internal/gateway/delivery.Dispatcher` 契约和本进程内 WebSocket fanout，可向在线连接主动下发 `message_received` / `message_delivered` event；offline recipient 返回明确状态。Gateway 不拥有消息历史、会话 seq 或已读状态；这些数据仍由 Message Service 和 PostgreSQL 权威维护。后续 Message Transfer worker 将消费 outbox/Kafka 事件并调用 dispatcher，Redis Presence 用于跨实例路由，delivery ACK 留给后续链路补齐。设计见 [`docs/design-docs/websocket-gateway.md`](./docs/design-docs/websocket-gateway.md) 和 [`docs/design-docs/gateway-push-delivery.md`](./docs/design-docs/gateway-push-delivery.md)。
 
 ### Agent Service
 
@@ -105,7 +105,7 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 2. Gateway 校验连接 JWT 身份，并把 token `user_id` 注入消息发送请求。
 3. Message Service 写入消息，生成 `server_msg_id` 和会话内递增 `seq`。
 4. Gateway 返回 command ACK。第一阶段 ACK 只表示消息业务命令完成，不表示收件端在线送达。
-5. Kafka fanout、Push worker、Redis Presence 和 delivery ACK 由后续链路补齐。
+5. Gateway 当前可通过 in-memory dispatcher 向本实例在线连接主动下发 server push event；Kafka fanout、Transfer worker、Redis Presence 跨实例路由和 delivery ACK 由后续链路补齐。
 
 ### Agent 响应消息
 

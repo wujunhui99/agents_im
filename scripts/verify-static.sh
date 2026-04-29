@@ -100,6 +100,8 @@ required_files=(
   "internal/presence/redis_integration_test.go"
   "internal/gateway/ws/connection_manager.go"
   "internal/gateway/ws/server.go"
+  "internal/gateway/delivery/delivery.go"
+  "internal/gateway/ws/delivery.go"
   "internal/domain/readreceipt/read_receipt.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
@@ -128,6 +130,7 @@ required_files=(
   "docs/design-docs/gateway-message-contract.md"
   "docs/design-docs/redis-presence.md"
   "docs/design-docs/websocket-gateway.md"
+  "docs/design-docs/gateway-push-delivery.md"
   "docs/design-docs/read-receipts.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
@@ -146,6 +149,7 @@ required_files=(
   "docs/exec-plans/active/remove-handwritten-compat.md"
   "docs/exec-plans/active/jwt-auth-middleware.md"
   "docs/exec-plans/active/websocket-gateway.md"
+  "docs/exec-plans/active/gateway-push-delivery.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -512,6 +516,40 @@ done
 rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
 rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "websocket-gateway" docs/exec-plans/active/websocket-gateway.md
+
+gateway_delivery_code_patterns=(
+  "type Dispatcher interface"
+  "DeliverToUser"
+  "DeliverToConversation"
+  "EventMessageReceived"
+  "EventMessageDelivered"
+  "StatusOffline"
+  "NewInMemoryDeliveryDispatcher"
+  "PushToUser"
+  "PushToConversation"
+  "UserConnections"
+)
+
+for pattern in "${gateway_delivery_code_patterns[@]}"; do
+  rg -q "$pattern" internal/gateway/delivery internal/gateway/ws tests/websocket_gateway_test.go
+done
+
+gateway_delivery_doc_patterns=(
+  "Message Transfer worker"
+  "Redis Presence"
+  "message_received"
+  "message_delivered"
+  "server_msg_id"
+  "conversation_id"
+  "offline"
+  "in-memory"
+)
+
+for pattern in "${gateway_delivery_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/gateway-push-delivery.md docs/exec-plans/active/gateway-push-delivery.md
+done
+
+rg -q "gateway-push-delivery.md" ARCHITECTURE.md docs/design-docs/index.md
 
 gateway_product_patterns=(
   "command ACK"
