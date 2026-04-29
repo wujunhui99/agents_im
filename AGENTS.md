@@ -96,6 +96,8 @@ This repository now includes a React/Vite frontend. Before any frontend task, Co
 
 Follow the WeChat-style four-tab product direction: `消息`, `联系人`, `发现`, `我的`. Use TDD with Vitest + Testing Library and verify with `npm run frontend:test`, `npm run frontend:build`, `npm run frontend:lint`, backend tests, and `scripts/verify-static.sh`.
 
+Frontend API integration work must not replace real backend behavior with silent mocks. Mock data is allowed only for visual scaffolding, test fixtures, or explicit demo/mock modes. Codex agents must use the unified `createApiClient`, keep bearer token injection consistent, verify Vite proxy/API contract paths, and clearly report whether validation was real E2E or frontend contract/proxy verification.
+
 ## go-zero / goctl AI Knowledge
 
 This repository uses go-zero. Before any go-zero refactor or code generation task, Codex agents must read:

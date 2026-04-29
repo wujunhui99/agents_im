@@ -2,7 +2,8 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Compass, Contact, MessageCircle, ShieldCheck, UserRound } from 'lucide-react';
 import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
-import { defaultUserApi, type UserApi, type UserProfile, type UserProfilePatch } from './api/user';
+import { createApiClient } from './api/client';
+import { createUserApi, type UserApi, type UserProfile, type UserProfilePatch } from './api/user';
 import ContactsPage from './components/ContactsPage';
 import { TabBar, type TabDefinition } from './components/ui/TabBar';
 import { TopBar } from './components/ui/TopBar';
@@ -47,14 +48,24 @@ type AuthenticatedAppProps = AppProps & {
   authUser: AuthUser;
 };
 
-function AuthenticatedApp({ authUser, initialUser, userApi = defaultUserApi }: AuthenticatedAppProps) {
+function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
   const activeLabel = useMemo(() => tabs.find((tab) => tab.key === activeTab)?.label ?? '消息', [activeTab]);
-  const { logout } = useAuth();
+  const { session, logout } = useAuth();
+  const effectiveUserApi = useMemo(
+    () =>
+      userApi ??
+      createUserApi(
+        createApiClient({
+          getToken: () => session?.token,
+        }),
+      ),
+    [session?.token, userApi],
+  );
 
   async function updateProfile(patch: UserProfilePatch) {
-    const updatedUser = await userApi.patchCurrentUser(patch);
+    const updatedUser = await effectiveUserApi.patchCurrentUser(patch);
     setCurrentUser(updatedUser);
   }
 

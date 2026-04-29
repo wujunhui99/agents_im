@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createApiClient } from './client';
 import { createContactsApi } from './contacts';
 import { createGroupsApi } from './groups';
 
@@ -26,7 +27,8 @@ function headersFor(call: RecordedFetchCall) {
 describe('contacts API adapter', () => {
   it('uses the friends contract paths and bearer token', async () => {
     const { calls, fetcher } = createFetchRecorder({ friends: [] });
-    const api = createContactsApi({ baseUrl: 'http://api.test', token: '***', fetcher });
+    const client = createApiClient({ baseUrl: 'http://api.test', getToken: () => '***', fetchImpl: fetcher });
+    const api = createContactsApi(client);
 
     await api.listFriends();
     await api.addFriend('usr_000002');
@@ -45,7 +47,8 @@ describe('contacts API adapter', () => {
 describe('groups API adapter', () => {
   it('uses the groups contract paths and typed member operations', async () => {
     const { calls, fetcher } = createFetchRecorder({ members: [] });
-    const api = createGroupsApi({ baseUrl: 'http://api.test/', token: '***', fetcher });
+    const client = createApiClient({ baseUrl: 'http://api.test/', getToken: () => '***', fetchImpl: fetcher });
+    const api = createGroupsApi(client);
 
     await api.getGroup('grp_000001');
     await api.createGroup({ name: 'Frontend Demo', description: 'MVP smoke room' });

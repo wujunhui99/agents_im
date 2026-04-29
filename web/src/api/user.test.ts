@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createApiClient } from './client';
 import { createUserApi, type UserProfile } from './user';
 
 const profile: UserProfile = {
@@ -21,11 +22,8 @@ describe('user API adapter', () => {
         headers: { 'Content-Type': 'application/json' },
       });
     });
-    const api = createUserApi({
-      baseUrl: 'http://api.test',
-      token: '***',
-      fetcher,
-    });
+    const client = createApiClient({ baseUrl: 'http://api.test', getToken: () => '***', fetchImpl: fetcher });
+    const api = createUserApi(client);
 
     await api.patchCurrentUser({
       user_id: 'usr_changed',

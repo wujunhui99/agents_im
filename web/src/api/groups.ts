@@ -1,4 +1,4 @@
-import { type ApiClientOptions, requestEnvelope } from './shared';
+import { createApiClient, type ApiClient } from './client';
 
 export type Group = {
   group_id: string;
@@ -40,32 +40,22 @@ export type GroupsApi = {
   listMembers: (groupId: string) => Promise<ListMembersData>;
 };
 
-export function createGroupsApi(options: ApiClientOptions = {}): GroupsApi {
+export function createGroupsApi(api: ApiClient = createApiClient()): GroupsApi {
   return {
     getGroup(groupId: string) {
-      return requestEnvelope<Group>(options, `/groups/${encodeURIComponent(groupId)}`, { method: 'GET' });
+      return api.get<Group>(`/groups/${encodeURIComponent(groupId)}`);
     },
     createGroup(request: CreateGroupRequest) {
-      return requestEnvelope<Group>(options, '/groups', {
-        method: 'POST',
-        body: JSON.stringify(request),
-      });
+      return api.post<Group>('/groups', request);
     },
     joinGroup(groupId: string, userId?: string) {
-      return requestEnvelope<MemberData>(options, `/groups/${encodeURIComponent(groupId)}/members`, {
-        method: 'POST',
-        body: JSON.stringify(userId ? { user_id: userId } : {}),
-      });
+      return api.post<MemberData>(`/groups/${encodeURIComponent(groupId)}/members`, userId ? { user_id: userId } : {});
     },
     leaveGroup(groupId: string) {
-      return requestEnvelope<MemberData>(options, `/groups/${encodeURIComponent(groupId)}/members/me`, {
-        method: 'DELETE',
-      });
+      return api.delete<MemberData>(`/groups/${encodeURIComponent(groupId)}/members/me`);
     },
     listMembers(groupId: string) {
-      return requestEnvelope<ListMembersData>(options, `/groups/${encodeURIComponent(groupId)}/members`, {
-        method: 'GET',
-      });
+      return api.get<ListMembersData>(`/groups/${encodeURIComponent(groupId)}/members`);
     },
   };
 }

@@ -1,3 +1,5 @@
+import { createApiClient, type ApiClient } from './client';
+
 export type UserProfile = {
   user_id: string;
   identifier: string;
@@ -12,20 +14,16 @@ export type UserProfile = {
 
 export type UserProfilePatch = Partial<Pick<UserProfile, 'display_name' | 'name' | 'gender' | 'age' | 'region'>>;
 
+export type IdentifierExistsResponse = {
+  exists: boolean;
+  identifier: string;
+};
+
 export type UserApi = {
+  getCurrentUser: () => Promise<UserProfile>;
   patchCurrentUser: (patch: UserProfilePatch) => Promise<UserProfile>;
-};
-
-type UserApiOptions = {
-  baseUrl?: string;
-  token?: string | (() => string | null | undefined) | null;
-  fetcher?: typeof fetch;
-};
-
-type ApiEnvelope<T> = {
-  code: string;
-  message: string;
-  data: T | null;
+  identifierExists: (identifier: string) => Promise<IdentifierExistsResponse>;
+  getPublicProfileByIdentifier: (identifier: string) => Promise<UserProfile>;
 };
 
 const mutableProfileKeys = ['display_name', 'name', 'gender', 'age', 'region'] as const;
@@ -42,58 +40,22 @@ export function toUserProfilePatch(input: Record<string, unknown>): UserProfileP
   return patch as UserProfilePatch;
 }
 
-export function createUserApi({ baseUrl = '', token = readStoredAccessToken, fetcher = globalThis.fetch.bind(globalThis) }: UserApiOptions = {}): UserApi {
+export function createUserApi(api: ApiClient = createApiClient()): UserApi {
   return {
-    async patchCurrentUser(input) {
-      const payload = toUserProfilePatch(input as Record<string, unknown>);
-      const response = await fetcher(`${baseUrl}/me`, {
-        method: 'PATCH',
-        headers: createJsonHeaders(resolveToken(token)),
-        body: JSON.stringify(payload),
-      });
-
-      let envelope: ApiEnvelope<UserProfile>;
-      try {
-        envelope = (await response.json()) as ApiEnvelope<UserProfile>;
-      } catch {
-        throw new Error('Invalid /me response');
-      }
-
-      if (!response.ok || envelope.code !== 'OK' || !envelope.data) {
-        throw new Error(envelope.message || 'Failed to update profile');
-      }
-
-      return envelope.data;
+    getCurrentUser() {
+      return api.get<UserProfile>('/me');
+    },
+    patchCurrentUser(input) {
+      return api.patch<UserProfile>('/me', toUserProfilePatch(input as Record<string, unknown>));
+    },
+    identifierExists(identifier) {
+      const params = new URLSearchParams({ identifier });
+      return api.get<IdentifierExistsResponse>(`/users/exists?${params.toString()}`, { auth: false });
+    },
+    getPublicProfileByIdentifier(identifier) {
+      return api.get<UserProfile>(`/users/${encodeURIComponent(identifier)}`, { auth: false });
     },
   };
 }
 
 export const defaultUserApi = createUserApi();
-
-function createJsonHeaders(token?: string) {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  return headers;
-}
-
-function resolveToken(token: UserApiOptions['token']) {
-  if (typeof token === 'function') {
-    return token() ?? undefined;
-  }
-
-  return token ?? undefined;
-}
-
-function readStoredAccessToken() {
-  if (typeof window === 'undefined') {
-    return undefined;
-  }
-
-  return window.localStorage.getItem('agents_im_access_token') ?? undefined;
-}

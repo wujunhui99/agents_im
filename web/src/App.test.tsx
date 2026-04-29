@@ -215,8 +215,14 @@ describe('WeChat-inspired app shell', () => {
       ...payload,
       updated_at: '2026-04-29T12:30:00Z',
     }));
+    const userApi = {
+      getCurrentUser: vi.fn(async () => initialProfile),
+      identifierExists: vi.fn(async () => ({ identifier: initialProfile.identifier, exists: true })),
+      getPublicProfileByIdentifier: vi.fn(async () => initialProfile),
+      patchCurrentUser,
+    };
 
-    render(<App initialUser={initialProfile} userApi={{ patchCurrentUser }} />);
+    render(<App initialUser={initialProfile} userApi={userApi} />);
 
     await user.click(screen.getByRole('tab', { name: /我的/i }));
 

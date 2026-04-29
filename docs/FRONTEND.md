@@ -1,6 +1,6 @@
 # FRONTEND.md
 
-本文档记录 `agents_im` Web 前端约定。当前阶段已搭建微信风格主框架，并接入认证入口、typed REST API client 基础、联系人/群聊 UI、消息页/WebSocket client 基础、共享 UI 组件与个人资料编辑；后续继续逐步接入真实远端数据、重连补消息和完整已读状态。
+本文档记录 `agents_im` Web 前端约定。当前阶段已搭建微信风格主框架，并接入认证入口、typed REST API client 基础、联系人/群聊 UI、消息页/WebSocket client 基础、共享 UI 组件与个人资料编辑；第一波技术债治理已统一 REST adapters 与 Vite 多服务 dev proxy，后续继续逐步接入完整联系人/群聊远端状态、重连补消息和完整已读状态。
 
 ## 技术栈
 
@@ -19,15 +19,15 @@
 3. **发现**：朋友圈、扫一扫、小程序等发现入口占位，全部标记为 `MVP 占位`；扫一扫当前不启动真实扫码能力。
 4. **我的**：个人资料卡、用户详情、服务、收藏、朋友圈、设置入口；支持编辑 `display_name`、`gender`、`age`、`region` 等可变资料字段，并支持退出登录。
 
-当前会话、联系人、群聊和发现页仍使用本地 mock 数据搭信息架构和视觉骨架；认证页按 [`docs/product-specs/frontend-backend-contract.md`](./product-specs/frontend-backend-contract.md) 调用 `/auth/login` 与 `/auth/register`。我的页通过 typed user API adapter 调用 `PATCH /me` 更新资料。联系人/群聊与消息 typed API adapters 已按同一契约封装 REST 路径，但页面暂未接真实远端数据。WebSocket client wrapper 已提供 connect/send/close 与 ACK 解析基础；重连补消息、去重缓存和完整已读状态后续继续按同一契约接入。
+当前 `web/src/api/{user,contacts,groups,messages}.ts` 均基于统一 `createApiClient` 封装 REST contract，共享 envelope 解析、错误处理和 bearer token 注入。认证页调用真实 `/auth/login` 与 `/auth/register`；我的页通过 typed user API adapter 调用 `PATCH /me` 更新资料。消息页支持显式 `mode="real"`：真实模式通过 `pullMessages` 拉取会话消息，并通过 `sendMessage -> POST /messages` 发送；mock ACK 只保留在 `mode="mock"`/测试/demo 数据中。联系人/群聊页面的完整远端状态机仍是后续工作，但 API adapters 已对齐真实后端路径。WebSocket client wrapper 已提供 connect/send/close 与 ACK 解析基础；重连补消息、去重缓存和完整已读状态后续继续按同一契约接入。
 
 ## 消息页边界
 
-- `web/src/features/messages/` 持有消息页组件和 mock 会话数据，当前不直接请求真实后端。
+- `web/src/features/messages/` 持有消息页组件和 demo 会话种子，默认 `mode="mock"` 只用于前端骨架/测试演示；真实联调必须显式使用 `mode="real"` 并注入/创建 `MessageApi`。
 - `web/src/models/messages.ts` 定义前端会话与消息模型，发送状态仅用于本地 UI 呈现。
-- `web/src/api/messages.ts` 是消息 REST 薄 adapter，函数签名覆盖 `sendMessage`、`pullMessages`、`getConversationSeqs`、`markRead`，字段名保持与前后端合约一致。
+- `web/src/api/messages.ts` 是消息 REST 薄 adapter，函数签名覆盖 `sendMessage`、`pullMessages`、`getConversationSeqs`、`markRead`，字段名保持与前后端合约一致，并基于统一 `createApiClient`。
 - `web/src/api/websocketClient.ts` 是 WebSocket client wrapper，提供 `connect`、`send`、`close`，浏览器侧使用 `/ws?token=***` query fallback，并将后端 snake_case ACK 解析为 typed frontend ACK。
-- 当前 mock sender 会先追加 `sending` 消息，再模拟 ACK 更新为 `sent`；输入 `/fail` 可进入 `failed` 状态用于本地验收。
+- mock sender 会先追加 `sending` 消息，再模拟 ACK 更新为 `sent`；输入 `/fail` 可进入 `failed` 状态用于本地验收。该路径不能作为真实 API 验收证据。
 
 ## 目录
 
@@ -71,7 +71,7 @@ web/
 
 - REST client 入口为 `web/src/api/client.ts`，默认同源请求；需要跨域联调时使用 Vite env `VITE_API_BASE_URL` 覆盖，例如 `VITE_API_BASE_URL=http://127.0.0.1:8081`。
 - 后端响应必须使用统一 envelope：`{ "code": "OK", "message": "ok", "data": {} }`。`code !== "OK"` 或 HTTP 非 2xx 时抛出 typed `ApiError`。
-- 受保护接口由 client 注入 `Authorization: Bearer ***`。前端文档、测试和示例不得记录真实 token。
+- 受保护接口由 client 注入 `Authorization: Bearer ***`。前...记录真实 token。
 - MVP 认证状态使用 React Context 和 localStorage，key 为示例/占位值。保存内容限于 access token 与当前用户展示信息；遇到损坏 session 会清理并回到登录页。
 - 未登录时显示登录/注册页；登录或注册成功后进入 `消息 / 联系人 / 发现 / 我的` 四 Tab。`我的` 页展示当前用户昵称、账号、地区和用户 ID，并提供退出登录。
 
