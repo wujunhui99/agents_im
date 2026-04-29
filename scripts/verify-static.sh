@@ -49,15 +49,19 @@ required_files=(
   "docs/product-specs/friends-service.md"
   "docs/product-specs/groups-service.md"
   "docs/product-specs/message-chain.md"
+  "docs/product-specs/message-storage.md"
   "docs/design-docs/user-service-go-zero.md"
   "docs/design-docs/auth-service-go-zero.md"
   "docs/design-docs/friends-service-go-zero.md"
   "docs/design-docs/groups-service-go-zero.md"
   "docs/design-docs/message-chain-contract.md"
+  "docs/design-docs/message-storage.md"
   "docs/exec-plans/active/user-service-go-zero.md"
   "docs/exec-plans/active/auth-service-go-zero.md"
   "docs/exec-plans/active/friends-service-go-zero.md"
   "docs/exec-plans/active/groups-service-go-zero.md"
+  "docs/exec-plans/active/message-storage.md"
+  "internal/repository/message_storage_contract.go"
 )
 
 for file in "${required_files[@]}"; do
