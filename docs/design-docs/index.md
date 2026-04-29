@@ -11,6 +11,7 @@
 - [jwt-auth-middleware.md](./jwt-auth-middleware.md)：统一 JWT 鉴权中间件与 context user 规则
 - [user-service-go-zero.md](./user-service-go-zero.md)：User Service go-zero 实现设计
 - [message-chain-contract.md](./message-chain-contract.md)：消息链路接口契约与 OpenIM 借鉴设计
+- [kafka-message-events.md](./kafka-message-events.md)：Kafka-compatible Redpanda 消息事件 topic、schema、producer abstraction 与投递语义
 - [message-storage.md](./message-storage.md)：消息存储 PostgreSQL/Redis 契约设计
 - [postgres-persistence.md](./postgres-persistence.md)：第一阶段 PostgreSQL 持久化 schema、配置和 repository 设计
 - [gateway-message-contract.md](./gateway-message-contract.md)：Gateway WebSocket command 到 Message Service RPC 的第一阶段映射契约

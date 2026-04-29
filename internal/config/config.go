@@ -18,6 +18,7 @@ type APIConfig struct {
 	DataSource    string
 	Redis         RedisConfig
 	Presence      PresenceConfig
+	Kafka         KafkaConfig
 }
 
 type RPCConfig struct {
@@ -28,6 +29,7 @@ type RPCConfig struct {
 	DataSource    string
 	Redis         RedisConfig
 	Presence      PresenceConfig
+	Kafka         KafkaConfig
 }
 
 type JWTAuthConfig struct {
@@ -47,6 +49,12 @@ type PresenceConfig struct {
 	KeyPrefix           string
 }
 
+type KafkaConfig struct {
+	Brokers            []string
+	MessageEventsTopic string
+	ConsumerGroup      string
+}
+
 const (
 	StorageDriverMemory   = "memory"
 	StorageDriverPostgres = "postgres"
@@ -58,6 +66,9 @@ const (
 	defaultRedisAddr                   = "localhost:6379"
 	defaultPresenceHeartbeatTTLSeconds = 60
 	defaultPresenceRedisKeyPrefix      = "agents_im:presence"
+	defaultKafkaBroker                 = "localhost:19092"
+	defaultKafkaMessageEventsTopic     = "message.events.v1"
+	defaultKafkaConsumerGroup          = "message-transfer-worker"
 )
 
 func DefaultAPIConfig() APIConfig {
@@ -69,6 +80,7 @@ func DefaultAPIConfig() APIConfig {
 		StorageDriver: StorageDriverMemory,
 		Redis:         DefaultRedisConfig(),
 		Presence:      DefaultPresenceConfig(),
+		Kafka:         DefaultKafkaConfig(),
 	}
 }
 
@@ -80,6 +92,7 @@ func DefaultRPCConfig() RPCConfig {
 		StorageDriver: StorageDriverMemory,
 		Redis:         DefaultRedisConfig(),
 		Presence:      DefaultPresenceConfig(),
+		Kafka:         DefaultKafkaConfig(),
 	}
 }
 
@@ -102,6 +115,14 @@ func DefaultPresenceConfig() PresenceConfig {
 		Driver:              PresenceDriverMemory,
 		HeartbeatTTLSeconds: defaultPresenceHeartbeatTTLSeconds,
 		KeyPrefix:           defaultPresenceRedisKeyPrefix,
+	}
+}
+
+func DefaultKafkaConfig() KafkaConfig {
+	return KafkaConfig{
+		Brokers:            []string{defaultKafkaBroker},
+		MessageEventsTopic: defaultKafkaMessageEventsTopic,
+		ConsumerGroup:      defaultKafkaConsumerGroup,
 	}
 }
 
@@ -149,6 +170,7 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+	cfg.Kafka = kafkaConfigFromValues(values)
 
 	return cfg, nil
 }
@@ -190,6 +212,7 @@ func LoadRPCConfig(path string) (RPCConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+	cfg.Kafka = kafkaConfigFromValues(values)
 
 	return cfg, nil
 }
@@ -268,6 +291,22 @@ func ResolvePresenceConfig(cfg PresenceConfig) (PresenceConfig, error) {
 	return cfg, nil
 }
 
+func ResolveKafkaConfig(cfg KafkaConfig) KafkaConfig {
+	brokers := brokerListFromValue(strings.Join(cfg.Brokers, ","))
+	if len(brokers) == 0 {
+		brokers = brokerListFromValue(firstNonEmpty(os.Getenv("KAFKA_BROKERS"), os.Getenv("AGENTS_IM_KAFKA_BROKERS")))
+	}
+	if len(brokers) == 0 {
+		brokers = []string{defaultKafkaBroker}
+	}
+
+	return KafkaConfig{
+		Brokers:            brokers,
+		MessageEventsTopic: firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.MessageEventsTopic)), os.Getenv("KAFKA_MESSAGE_EVENTS_TOPIC"), os.Getenv("AGENTS_IM_KAFKA_MESSAGE_EVENTS_TOPIC"), defaultKafkaMessageEventsTopic),
+		ConsumerGroup:      firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.ConsumerGroup)), os.Getenv("KAFKA_CONSUMER_GROUP"), os.Getenv("AGENTS_IM_KAFKA_CONSUMER_GROUP"), defaultKafkaConsumerGroup),
+	}
+}
+
 func redisConfigFromValues(values map[string]string) (RedisConfig, error) {
 	cfg := RedisConfig{
 		Addr:     firstNonEmpty(values["Redis.Addr"], values["RedisAddr"]),
@@ -298,6 +337,31 @@ func presenceConfigFromValues(values map[string]string) (PresenceConfig, error) 
 		cfg.HeartbeatTTLSeconds = ttl
 	}
 	return ResolvePresenceConfig(cfg)
+}
+
+func kafkaConfigFromValues(values map[string]string) KafkaConfig {
+	cfg := KafkaConfig{
+		Brokers:            brokerListFromValue(firstNonEmpty(values["Kafka.Brokers"], values["KafkaBrokers"])),
+		MessageEventsTopic: firstNonEmpty(values["Kafka.MessageEventsTopic"], values["KafkaMessageEventsTopic"]),
+		ConsumerGroup:      firstNonEmpty(values["Kafka.ConsumerGroup"], values["KafkaConsumerGroup"]),
+	}
+	return ResolveKafkaConfig(cfg)
+}
+
+func brokerListFromValue(value string) []string {
+	value = strings.TrimSpace(os.ExpandEnv(value))
+	if value == "" {
+		return nil
+	}
+	rawBrokers := strings.Split(value, ",")
+	brokers := make([]string, 0, len(rawBrokers))
+	for _, broker := range rawBrokers {
+		broker = strings.TrimSpace(broker)
+		if broker != "" {
+			brokers = append(brokers, broker)
+		}
+	}
+	return brokers
 }
 
 func resolveInt(current int, envValues ...string) (int, error) {

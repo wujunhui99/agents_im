@@ -83,7 +83,7 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 
 ### Message Pipeline
 
-基于 Kafka 实现消息异步解耦与削峰，支撑高吞吐消息处理链路。
+基于 Kafka-compatible Redpanda 本地开发环境和 `message.events.v1` 事件契约实现消息异步解耦与削峰，支撑后续 outbox、Message Transfer worker、Gateway fanout 和 Push 链路。当前 Message Service 仍同步写 PostgreSQL；事件 topic、schema、producer abstraction 与投递语义见 [`docs/design-docs/kafka-message-events.md`](./docs/design-docs/kafka-message-events.md)。
 
 ### Storage Layer
 
@@ -128,6 +128,6 @@ IM 与 Agent 第一阶段最小 API/Event Contract 见 [`docs/design-docs/im-age
 
 - Agent 框架最终选择：LangChain 系列或 Google ADK。
 - 服务拆分粒度与代码仓库结构。
-- Kafka topic 设计与消息 schema。
+- Kafka topic 设计与消息 schema 第一版见 [`docs/design-docs/kafka-message-events.md`](./docs/design-docs/kafka-message-events.md)，后续需随 outbox/transfer/push 实现继续细化。
 - PostgreSQL 表结构和迁移方案。
 - Agent 工具权限模型。
