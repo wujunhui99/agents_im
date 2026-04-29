@@ -56,13 +56,14 @@ type KafkaConfig struct {
 }
 
 type MessageTransferConfig struct {
-	Name       string
-	WorkerID   string
-	DryRun     bool
-	Kafka      KafkaConfig
-	Consumer   TransferConsumerConfig
-	Dispatcher TransferDispatcherConfig
-	Worker     TransferWorkerConfig
+	Name          string
+	WorkerID      string
+	DryRun        bool
+	Kafka         KafkaConfig
+	Consumer      TransferConsumerConfig
+	Dispatcher    TransferDispatcherConfig
+	Worker        TransferWorkerConfig
+	Observability ObservabilityHTTPConfig
 }
 
 type TransferConsumerConfig struct {
@@ -79,6 +80,12 @@ type TransferWorkerConfig struct {
 	PollIntervalMillis int64
 	RetryBackoffMillis int64
 	MaxAttempts        int
+}
+
+type ObservabilityHTTPConfig struct {
+	Enabled bool
+	Host    string
+	Port    int
 }
 
 const (
@@ -103,6 +110,8 @@ const (
 	defaultTransferPollIntervalMillis  = 100
 	defaultTransferRetryBackoffMillis  = 1000
 	defaultTransferMaxAttempts         = 5
+	defaultTransferObservabilityHost   = "0.0.0.0"
+	defaultTransferObservabilityPort   = 8085
 )
 
 func DefaultAPIConfig() APIConfig {
@@ -178,6 +187,11 @@ func DefaultMessageTransferConfig() MessageTransferConfig {
 			PollIntervalMillis: defaultTransferPollIntervalMillis,
 			RetryBackoffMillis: defaultTransferRetryBackoffMillis,
 			MaxAttempts:        defaultTransferMaxAttempts,
+		},
+		Observability: ObservabilityHTTPConfig{
+			Enabled: true,
+			Host:    defaultTransferObservabilityHost,
+			Port:    defaultTransferObservabilityPort,
 		},
 	}
 }
@@ -333,6 +347,10 @@ func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
 		}
 		cfg.DryRun = dryRun
 	}
+	cfg.Observability, err = observabilityHTTPConfigFromValues(values, cfg.Observability)
+	if err != nil {
+		return cfg, err
+	}
 	cfg = ResolveMessageTransferConfig(cfg)
 	return cfg, nil
 }
@@ -412,7 +430,31 @@ func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConf
 	if cfg.Worker.MaxAttempts <= 0 {
 		cfg.Worker.MaxAttempts = defaultTransferMaxAttempts
 	}
+	resolvedObservability, err := ResolveObservabilityHTTPConfig(cfg.Observability)
+	if err == nil {
+		cfg.Observability = resolvedObservability
+	}
 	return cfg
+}
+
+func ResolveObservabilityHTTPConfig(cfg ObservabilityHTTPConfig) (ObservabilityHTTPConfig, error) {
+	if value := firstNonEmpty(os.Getenv("MESSAGE_TRANSFER_OBSERVABILITY_ENABLED"), os.Getenv("AGENTS_IM_OBSERVABILITY_ENABLED")); value != "" {
+		enabled, err := strconv.ParseBool(strings.TrimSpace(value))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Enabled = enabled
+	}
+	cfg.Host = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Host)), os.Getenv("MESSAGE_TRANSFER_OBSERVABILITY_HOST"), defaultTransferObservabilityHost)
+	port, err := resolveInt(cfg.Port, os.Getenv("MESSAGE_TRANSFER_OBSERVABILITY_PORT"))
+	if err != nil {
+		return cfg, err
+	}
+	if port <= 0 {
+		port = defaultTransferObservabilityPort
+	}
+	cfg.Port = port
+	return cfg, nil
 }
 
 func ResolveDataSource(value string) string {
@@ -510,6 +552,28 @@ func kafkaConfigFromValues(values map[string]string) KafkaConfig {
 		ConsumerGroup:      firstNonEmpty(values["Kafka.ConsumerGroup"], values["KafkaConsumerGroup"]),
 	}
 	return ResolveKafkaConfig(cfg)
+}
+
+func observabilityHTTPConfigFromValues(values map[string]string, current ObservabilityHTTPConfig) (ObservabilityHTTPConfig, error) {
+	cfg := current
+	if value := firstNonEmpty(values["Observability.Enabled"], values["ObservabilityHTTP.Enabled"]); strings.TrimSpace(value) != "" {
+		enabled, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Enabled = enabled
+	}
+	if value := firstNonEmpty(values["Observability.Host"], values["ObservabilityHTTP.Host"]); strings.TrimSpace(value) != "" {
+		cfg.Host = strings.TrimSpace(os.ExpandEnv(value))
+	}
+	if value := firstNonEmpty(values["Observability.Port"], values["ObservabilityHTTP.Port"]); strings.TrimSpace(value) != "" {
+		port, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Port = port
+	}
+	return ResolveObservabilityHTTPConfig(cfg)
 }
 
 func brokerListFromValue(value string) []string {

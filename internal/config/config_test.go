@@ -113,6 +113,10 @@ Worker:
   PollIntervalMillis: 25
   RetryBackoffMillis: 250
   MaxAttempts: 3
+Observability:
+  Enabled: true
+  Host: 127.0.0.1
+  Port: 18085
 `), 0o600)
 	if err != nil {
 		t.Fatal(err)
@@ -133,6 +137,9 @@ Worker:
 	}
 	if cfg.Worker.PollIntervalMillis != 25 || cfg.Worker.RetryBackoffMillis != 250 || cfg.Worker.MaxAttempts != 3 {
 		t.Fatalf("worker config mismatch: %+v", cfg.Worker)
+	}
+	if !cfg.Observability.Enabled || cfg.Observability.Host != "127.0.0.1" || cfg.Observability.Port != 18085 {
+		t.Fatalf("observability config mismatch: %+v", cfg.Observability)
 	}
 }
 

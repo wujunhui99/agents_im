@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
@@ -91,18 +92,31 @@ type MarkConversationAsReadResponse struct {
 }
 
 func (l *MessageLogic) SendMessage(ctx context.Context, req SendMessageRequest) (SendMessageResponse, error) {
+	metricsStatus := "accepted"
+	metricsChatType := strings.ToLower(strings.TrimSpace(req.ChatType))
+	defer func() {
+		observability.RecordMessageSend(metricsStatus, metricsChatType)
+	}()
+
 	if l.repo == nil {
+		metricsStatus = "failed"
 		return SendMessageResponse{}, apperror.Internal("message repository is not configured")
 	}
 
 	input, err := l.normalizeSendMessage(ctx, req)
 	if err != nil {
+		metricsStatus = "failed"
 		return SendMessageResponse{}, err
 	}
+	metricsChatType = input.ChatType
 
 	message, deduplicated, err := l.repo.CreateMessageIdempotent(ctx, input)
 	if err != nil {
+		metricsStatus = "failed"
 		return SendMessageResponse{}, err
+	}
+	if deduplicated {
+		metricsStatus = "deduplicated"
 	}
 
 	return SendMessageResponse{Message: message, Deduplicated: deduplicated}, nil

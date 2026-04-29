@@ -25,6 +25,7 @@
 - [transfer-gateway-dispatcher.md](./transfer-gateway-dispatcher.md)：Transfer worker 到 Gateway delivery dispatcher 的本进程适配器契约
 - [gateway-presence-routing.md](./gateway-presence-routing.md)：Gateway 连接生命周期接入 PresenceStore，并为未来跨实例投递提供路由 metadata
 - [read-receipts.md](./read-receipts.md)：已读回执状态模型、单调推进和扩展设计
+- [observability-mvp.md](./observability-mvp.md)：Backend MVP health、readiness、metrics 和 trace/request ID 基础
 - [im-agent-decoupling.md](./im-agent-decoupling.md)：IM 与 Agent 解耦设计
 - [websocket-reliability.md](./websocket-reliability.md)：WebSocket 可靠性设计
 - [agent-tooling.md](./agent-tooling.md)：Agent 工具调用体系设计
