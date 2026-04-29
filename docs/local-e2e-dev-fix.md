@@ -85,3 +85,20 @@ ws_server_msg_id=msg_000002
 ## Remaining Environment Note
 
 In this specific machine state, default ports `8080-8085` are still held by root-owned processes under `/home/ws/project/agents_im/.dev/bin`. Without elevated permissions, the current user cannot stop or replace those processes. Use alternate ports with `AGENTS_IM_DEV_STATE_DIR` or clean the root-owned processes externally before using default ports.
+
+## Git Commit
+
+This fix was committed to git after verification.
+
+Commit:
+
+```text
+a1a0b93 Add single-machine e2e fallback
+```
+
+Related earlier commits in the same E2E/debug batch:
+
+```text
+ae6922d Wire websocket send to live delivery
+e92e484 Fix dev demo cleanup trap
+```
