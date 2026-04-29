@@ -10,6 +10,7 @@ PID_DIR="${STATE_DIR}/pids"
 
 WITH_SERVICES=1
 RUN_MIGRATIONS=1
+WITH_MIDDLEWARE=1
 ACTION="start"
 
 usage() {
@@ -22,6 +23,9 @@ backend services with PostgreSQL-backed local config.
 Options:
   --middleware-only  Start Docker middleware and migrations, but skip Go services.
   --with-services   Start Go services after middleware. This is the default.
+  --services-only   Restart only host Go services; skip Docker middleware and migrations.
+                   Service ports can be overridden with USER_API_PORT, AUTH_API_PORT,
+                   FRIENDS_API_PORT, MESSAGE_API_PORT, GATEWAY_WS_PORT, GROUPS_API_PORT.
   --no-migrate      Skip PostgreSQL migrations.
   --stop            Stop host Go services started by this script.
   -h, --help        Show this help.
@@ -35,6 +39,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     --with-services)
       WITH_SERVICES=1
+      ;;
+    --services-only)
+      WITH_SERVICES=1
+      WITH_MIDDLEWARE=0
+      RUN_MIGRATIONS=0
       ;;
     --no-migrate)
       RUN_MIGRATIONS=0
@@ -139,15 +148,15 @@ YAML
 
 write_configs() {
   mkdir -p "${CONFIG_DIR}"
-  write_api_config "user-api" "8080"
-  write_api_config "auth-api" "8081"
-  write_api_config "friends-api" "8082"
-  write_api_config "message-api" "8083"
-  write_api_config "gateway-ws" "8084" "Presence:
+  write_api_config "user-api" "${USER_API_PORT:-8080}"
+  write_api_config "auth-api" "${AUTH_API_PORT:-8081}"
+  write_api_config "friends-api" "${FRIENDS_API_PORT:-8082}"
+  write_api_config "message-api" "${MESSAGE_API_PORT:-8083}"
+  write_api_config "gateway-ws" "${GATEWAY_WS_PORT:-8084}" "Presence:
   Driver: ${PRESENCE_DRIVER}
   HeartbeatTTLSeconds: ${PRESENCE_TTL_SECONDS:-60}
   KeyPrefix: ${PRESENCE_KEY_PREFIX:-agents_im:presence}"
-  write_api_config "groups-api" "8085"
+  write_api_config "groups-api" "${GROUPS_API_PORT:-8085}"
 }
 
 build_service() {
@@ -204,8 +213,10 @@ main() {
     return 0
   fi
 
-  docker compose up -d postgres redis redpanda
-  wait_for_postgres
+  if [[ "${WITH_MIDDLEWARE}" -eq 1 ]]; then
+    docker compose up -d postgres redis redpanda
+    wait_for_postgres
+  fi
 
   if [[ "${RUN_MIGRATIONS}" -eq 1 ]]; then
     bash scripts/migrate-postgres.sh
@@ -228,12 +239,12 @@ main() {
   start_service "gateway-ws"
   start_service "groups-api"
 
-  wait_http "user-api" "http://127.0.0.1:8080/healthz"
-  wait_http "auth-api" "http://127.0.0.1:8081/healthz"
-  wait_http "friends-api" "http://127.0.0.1:8082/healthz"
-  wait_http "message-api" "http://127.0.0.1:8083/healthz"
-  wait_http "gateway-ws" "http://127.0.0.1:8084/healthz"
-  wait_http "groups-api" "http://127.0.0.1:8085/healthz"
+  wait_http "user-api" "http://127.0.0.1:${USER_API_PORT:-8080}/healthz"
+  wait_http "auth-api" "http://127.0.0.1:${AUTH_API_PORT:-8081}/healthz"
+  wait_http "friends-api" "http://127.0.0.1:${FRIENDS_API_PORT:-8082}/healthz"
+  wait_http "message-api" "http://127.0.0.1:${MESSAGE_API_PORT:-8083}/healthz"
+  wait_http "gateway-ws" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
+  wait_http "groups-api" "http://127.0.0.1:${GROUPS_API_PORT:-8085}/healthz"
 
   echo "local backend is ready"
 }
