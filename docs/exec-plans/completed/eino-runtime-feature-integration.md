@@ -52,7 +52,9 @@ go test ./...
 bash scripts/verify-static.sh
 docker compose config
 git diff --check
-git grep -n '[REDACTED]\|DEEPSEEK_API_KEY: sk-' -- . ':!.env' && exit 1 || true
+git grep -n '<provider>_API_KEY: <real-secret>' -- . ':!.env' && exit 1 || true
+# Also scan for any accidentally committed real provider key value using your local secret scanner.
+# Do not write real API keys or near-key examples into docs.
 ```
 
 ## 风险与回滚
