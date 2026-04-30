@@ -23,6 +23,17 @@ func TestNewChatModelFailsWhenAPIKeyMissing(t *testing.T) {
 	}
 }
 
+func TestNewChatModelFailsWhenAPIKeyIsPlaceholder(t *testing.T) {
+	t.Setenv("DEEPSEEK_API_KEY", "replace-with-local-deepseek-api-key")
+	t.Setenv("DEEPSEEK_BASE_URL", "")
+	t.Setenv("DEEPSEEK_MODEL", "")
+
+	_, err := NewChatModel(context.Background(), appconfig.DeepSeekConfig{})
+	if !errors.Is(err, appconfig.ErrDeepSeekAPIKeyPlaceholder) {
+		t.Fatalf("NewChatModel error = %v, want %v", err, appconfig.ErrDeepSeekAPIKeyPlaceholder)
+	}
+}
+
 func TestNewChatModelConstructsWithExplicitConfig(t *testing.T) {
 	t.Setenv("DEEPSEEK_API_KEY", "")
 	t.Setenv("DEEPSEEK_BASE_URL", "")

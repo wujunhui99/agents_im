@@ -208,7 +208,6 @@ wait_http() {
 main() {
   cd "${ROOT_DIR}"
   load_env
-  require_command docker
 
   if [[ "${ACTION}" == "stop" ]]; then
     stop_services
@@ -216,6 +215,7 @@ main() {
   fi
 
   if [[ "${WITH_MIDDLEWARE}" -eq 1 ]]; then
+    require_command docker
     docker compose up -d postgres redis redpanda
     wait_for_postgres
   fi

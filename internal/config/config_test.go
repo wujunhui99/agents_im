@@ -123,6 +123,18 @@ func TestValidateDeepSeekConfigRequiresAPIKey(t *testing.T) {
 	}
 }
 
+func TestValidateDeepSeekConfigRejectsPlaceholderAPIKey(t *testing.T) {
+	t.Setenv("DEEPSEEK_API_KEY", "replace-with-local-deepseek-api-key")
+	t.Setenv("DEEPSEEK_BASE_URL", "")
+	t.Setenv("DEEPSEEK_MODEL", "")
+
+	cfg := ResolveDeepSeekConfig(DeepSeekConfig{})
+	err := ValidateDeepSeekConfig(cfg)
+	if !errors.Is(err, ErrDeepSeekAPIKeyPlaceholder) {
+		t.Fatalf("validate deepseek config error = %v, want %v", err, ErrDeepSeekAPIKeyPlaceholder)
+	}
+}
+
 func TestResolveRedisAndPresenceConfigFromEnv(t *testing.T) {
 	t.Setenv("REDIS_ADDR", "127.0.0.1:6390")
 	t.Setenv("REDIS_PASSWORD", "env-dev-only")
