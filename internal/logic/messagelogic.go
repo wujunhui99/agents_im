@@ -49,8 +49,9 @@ type SendMessageRequest struct {
 }
 
 type SendMessageResponse struct {
-	Message      Message `json:"message"`
-	Deduplicated bool    `json:"deduplicated"`
+	Message          Message  `json:"message"`
+	Deduplicated     bool     `json:"deduplicated"`
+	RecipientUserIDs []string `json:"-"`
 }
 
 type PullMessagesRequest struct {
@@ -119,7 +120,11 @@ func (l *MessageLogic) SendMessage(ctx context.Context, req SendMessageRequest) 
 		metricsStatus = "deduplicated"
 	}
 
-	return SendMessageResponse{Message: message, Deduplicated: deduplicated}, nil
+	return SendMessageResponse{
+		Message:          message,
+		Deduplicated:     deduplicated,
+		RecipientUserIDs: repository.DeliveryRecipientUserIDs(input),
+	}, nil
 }
 
 func (l *MessageLogic) PullMessages(ctx context.Context, req PullMessagesRequest) (PullMessagesResponse, error) {
@@ -144,8 +149,10 @@ func (l *MessageLogic) PullMessages(ctx context.Context, req PullMessagesRequest
 	if err != nil {
 		return PullMessagesResponse{}, err
 	}
-	if toSeq == 0 && len(states) == 1 {
-		toSeq = states[0].MaxSeq
+	if len(states) == 1 {
+		if toSeq == 0 || toSeq > states[0].MaxSeq {
+			toSeq = states[0].MaxSeq
+		}
 	}
 
 	messages, isEnd, nextSeq, err := l.repo.GetMessages(ctx, conversationID, fromSeq, toSeq, limit, order)
@@ -306,15 +313,19 @@ func (l *MessageLogic) resolveGroupParticipants(ctx context.Context, groupID str
 	senderIsMember := false
 	seen := make(map[string]struct{}, len(members.Members))
 	for _, member := range members.Members {
-		if member.UserID == "" {
+		if member.State != "" && member.State != "active" {
 			continue
 		}
-		if _, ok := seen[member.UserID]; ok {
+		userID := strings.TrimSpace(member.UserID)
+		if userID == "" {
 			continue
 		}
-		seen[member.UserID] = struct{}{}
-		participantIDs = append(participantIDs, member.UserID)
-		if member.UserID == senderID {
+		if _, ok := seen[userID]; ok {
+			continue
+		}
+		seen[userID] = struct{}{}
+		participantIDs = append(participantIDs, userID)
+		if userID == senderID {
 			senderIsMember = true
 		}
 	}

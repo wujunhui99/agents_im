@@ -38,6 +38,7 @@ type Server struct {
 	tokenManager token.Manager
 	messageLogic *logic.MessageLogic
 	connections  *ConnectionManager
+	dispatcher   delivery.Dispatcher
 	presence     presence.PresenceStore
 	presenceTTL  time.Duration
 	instanceID   string
@@ -159,6 +160,12 @@ func WithPresenceStore(store presence.PresenceStore) ServerOption {
 	}
 }
 
+func WithDeliveryDispatcher(dispatcher delivery.Dispatcher) ServerOption {
+	return func(s *Server) {
+		s.dispatcher = dispatcher
+	}
+}
+
 func WithPresenceTTL(ttl time.Duration) ServerOption {
 	return func(s *Server) {
 		if ttl > 0 {
@@ -238,6 +245,9 @@ func (s *Server) Connections() *ConnectionManager {
 }
 
 func (s *Server) DeliveryDispatcher() delivery.Dispatcher {
+	if s.dispatcher != nil {
+		return s.dispatcher
+	}
 	return NewPresenceAwareDeliveryDispatcher(s.connections, s.presence, s.instanceID)
 }
 
@@ -401,7 +411,7 @@ func (s *Server) dispatch(ctx context.Context, conn *Connection, commandType str
 			return nil, err
 		}
 		if !result.Deduplicated {
-			s.pushNewMessage(ctx, conn.UserID, result.Message)
+			s.pushNewMessage(ctx, conn.UserID, result.Message, result.RecipientUserIDs)
 		}
 		return gateway.MapSendMessageResponse(gateway.SendMessageRPCResponse{
 			Message:      toGatewayMessage(result.Message),
@@ -477,8 +487,8 @@ func (s *Server) dispatch(ctx context.Context, conn *Connection, commandType str
 	}
 }
 
-func (s *Server) pushNewMessage(ctx context.Context, senderID string, message logic.Message) {
-	recipients := pushRecipients(senderID, message)
+func (s *Server) pushNewMessage(ctx context.Context, senderID string, message logic.Message, recipientUserIDs []string) {
+	recipients := pushRecipients(senderID, message, recipientUserIDs)
 	if len(recipients) == 0 {
 		return
 	}
@@ -489,10 +499,10 @@ func (s *Server) pushNewMessage(ctx context.Context, senderID string, message lo
 	}
 }
 
-func pushRecipients(senderID string, message logic.Message) []string {
+func pushRecipients(senderID string, message logic.Message, recipientUserIDs []string) []string {
 	senderID = strings.TrimSpace(senderID)
 	seen := map[string]struct{}{}
-	recipients := make([]string, 0, 1)
+	recipients := make([]string, 0, len(recipientUserIDs))
 	add := func(userID string) {
 		userID = strings.TrimSpace(userID)
 		if userID == "" || userID == senderID {
@@ -503,6 +513,13 @@ func pushRecipients(senderID string, message logic.Message) []string {
 		}
 		seen[userID] = struct{}{}
 		recipients = append(recipients, userID)
+	}
+
+	for _, userID := range recipientUserIDs {
+		add(userID)
+	}
+	if len(recipientUserIDs) > 0 {
+		return recipients
 	}
 
 	switch strings.ToLower(strings.TrimSpace(message.ChatType)) {
