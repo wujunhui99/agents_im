@@ -3,6 +3,8 @@ package config
 import (
 	"bufio"
 	"errors"
+	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -21,6 +23,7 @@ type APIConfig struct {
 	Presence      PresenceConfig
 	Kafka         KafkaConfig
 	DeepSeek      DeepSeekConfig
+	GatewayWS     GatewayWSConfig
 }
 
 type RPCConfig struct {
@@ -49,6 +52,15 @@ type PresenceConfig struct {
 	Driver              string
 	HeartbeatTTLSeconds int64
 	KeyPrefix           string
+}
+
+type GatewayWSConfig struct {
+	AllowedOrigins            []string
+	AllowQueryToken           bool
+	PingIntervalSeconds       int64
+	HeartbeatTimeoutSeconds   int64
+	CommandRateLimitPerSecond int
+	CommandRateLimitBurst     int
 }
 
 type KafkaConfig struct {
@@ -112,6 +124,10 @@ const (
 	defaultRedisAddr                   = "localhost:6379"
 	defaultPresenceHeartbeatTTLSeconds = 60
 	defaultPresenceRedisKeyPrefix      = "agents_im:presence"
+	defaultGatewayWSPingSeconds        = 30
+	defaultGatewayWSHeartbeatSeconds   = 75
+	defaultGatewayWSCommandRate        = 20
+	defaultGatewayWSCommandBurst       = 40
 	defaultKafkaBroker                 = "localhost:19092"
 	defaultKafkaMessageEventsTopic     = "message.events.v1"
 	defaultKafkaConsumerGroup          = "message-transfer-worker"
@@ -140,6 +156,7 @@ func DefaultAPIConfig() APIConfig {
 		Presence:      DefaultPresenceConfig(),
 		Kafka:         DefaultKafkaConfig(),
 		DeepSeek:      DefaultDeepSeekConfig(),
+		GatewayWS:     DefaultGatewayWSConfig(),
 	}
 }
 
@@ -174,6 +191,17 @@ func DefaultPresenceConfig() PresenceConfig {
 		Driver:              PresenceDriverMemory,
 		HeartbeatTTLSeconds: defaultPresenceHeartbeatTTLSeconds,
 		KeyPrefix:           defaultPresenceRedisKeyPrefix,
+	}
+}
+
+func DefaultGatewayWSConfig() GatewayWSConfig {
+	return GatewayWSConfig{
+		AllowedOrigins:            nil,
+		AllowQueryToken:           false,
+		PingIntervalSeconds:       defaultGatewayWSPingSeconds,
+		HeartbeatTimeoutSeconds:   defaultGatewayWSHeartbeatSeconds,
+		CommandRateLimitPerSecond: defaultGatewayWSCommandRate,
+		CommandRateLimitBurst:     defaultGatewayWSCommandBurst,
 	}
 }
 
@@ -261,6 +289,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		return cfg, err
 	}
 	cfg.Presence, err = presenceConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.GatewayWS, err = gatewayWSConfigFromValues(values)
 	if err != nil {
 		return cfg, err
 	}
@@ -532,6 +564,76 @@ func ResolvePresenceConfig(cfg PresenceConfig) (PresenceConfig, error) {
 	return cfg, nil
 }
 
+func ResolveGatewayWSConfig(cfg GatewayWSConfig) (GatewayWSConfig, error) {
+	origins := cfg.AllowedOrigins
+	if len(origins) == 0 {
+		origins = originListFromValue(firstNonEmpty(os.Getenv("GATEWAY_WS_ALLOWED_ORIGINS"), os.Getenv("AGENTS_IM_GATEWAY_WS_ALLOWED_ORIGINS")))
+	}
+	normalizedOrigins := make([]string, 0, len(origins))
+	seenOrigins := make(map[string]struct{}, len(origins))
+	for _, origin := range origins {
+		normalized, err := normalizeOrigin(origin)
+		if err != nil {
+			return cfg, err
+		}
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seenOrigins[normalized]; ok {
+			continue
+		}
+		seenOrigins[normalized] = struct{}{}
+		normalizedOrigins = append(normalizedOrigins, normalized)
+	}
+	cfg.AllowedOrigins = normalizedOrigins
+
+	allowQueryToken, err := resolveBool(cfg.AllowQueryToken, os.Getenv("GATEWAY_WS_ALLOW_QUERY_TOKEN"), os.Getenv("AGENTS_IM_GATEWAY_WS_ALLOW_QUERY_TOKEN"))
+	if err != nil {
+		return cfg, err
+	}
+	cfg.AllowQueryToken = allowQueryToken
+
+	pingInterval, err := resolveInt64(cfg.PingIntervalSeconds, os.Getenv("GATEWAY_WS_PING_INTERVAL_SECONDS"), os.Getenv("AGENTS_IM_GATEWAY_WS_PING_INTERVAL_SECONDS"))
+	if err != nil {
+		return cfg, err
+	}
+	if pingInterval <= 0 {
+		pingInterval = defaultGatewayWSPingSeconds
+	}
+	cfg.PingIntervalSeconds = pingInterval
+
+	heartbeatTimeout, err := resolveInt64(cfg.HeartbeatTimeoutSeconds, os.Getenv("GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS"), os.Getenv("AGENTS_IM_GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS"))
+	if err != nil {
+		return cfg, err
+	}
+	if heartbeatTimeout <= 0 {
+		heartbeatTimeout = defaultGatewayWSHeartbeatSeconds
+	}
+	cfg.HeartbeatTimeoutSeconds = heartbeatTimeout
+	if cfg.PingIntervalSeconds >= cfg.HeartbeatTimeoutSeconds {
+		cfg.PingIntervalSeconds = maxInt64(1, cfg.HeartbeatTimeoutSeconds/2)
+	}
+
+	commandRate, err := resolveInt(cfg.CommandRateLimitPerSecond, os.Getenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND"), os.Getenv("AGENTS_IM_GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND"))
+	if err != nil {
+		return cfg, err
+	}
+	if commandRate <= 0 {
+		commandRate = defaultGatewayWSCommandRate
+	}
+	cfg.CommandRateLimitPerSecond = commandRate
+
+	commandBurst, err := resolveInt(cfg.CommandRateLimitBurst, os.Getenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST"), os.Getenv("AGENTS_IM_GATEWAY_WS_COMMAND_RATE_LIMIT_BURST"))
+	if err != nil {
+		return cfg, err
+	}
+	if commandBurst <= 0 {
+		commandBurst = maxInt(defaultGatewayWSCommandBurst, commandRate)
+	}
+	cfg.CommandRateLimitBurst = commandBurst
+	return cfg, nil
+}
+
 func ResolveKafkaConfig(cfg KafkaConfig) KafkaConfig {
 	brokers := brokerListFromValue(strings.Join(cfg.Brokers, ","))
 	if len(brokers) == 0 {
@@ -614,6 +716,48 @@ func presenceConfigFromValues(values map[string]string) (PresenceConfig, error) 
 	return ResolvePresenceConfig(cfg)
 }
 
+func gatewayWSConfigFromValues(values map[string]string) (GatewayWSConfig, error) {
+	cfg := GatewayWSConfig{
+		AllowedOrigins: originListFromValue(firstNonEmpty(values["GatewayWS.AllowedOrigins"], values["GatewayWSAllowedOrigins"])),
+	}
+	if value := firstNonEmpty(values["GatewayWS.AllowQueryToken"], values["GatewayWSAllowQueryToken"]); strings.TrimSpace(value) != "" {
+		allowQueryToken, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.AllowQueryToken = allowQueryToken
+	}
+	if value := firstNonEmpty(values["GatewayWS.PingIntervalSeconds"], values["GatewayWSPingIntervalSeconds"]); strings.TrimSpace(value) != "" {
+		seconds, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.PingIntervalSeconds = seconds
+	}
+	if value := firstNonEmpty(values["GatewayWS.HeartbeatTimeoutSeconds"], values["GatewayWSHeartbeatTimeoutSeconds"]); strings.TrimSpace(value) != "" {
+		seconds, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.HeartbeatTimeoutSeconds = seconds
+	}
+	if value := firstNonEmpty(values["GatewayWS.CommandRateLimitPerSecond"], values["GatewayWSCommandRateLimitPerSecond"]); strings.TrimSpace(value) != "" {
+		limit, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.CommandRateLimitPerSecond = limit
+	}
+	if value := firstNonEmpty(values["GatewayWS.CommandRateLimitBurst"], values["GatewayWSCommandRateLimitBurst"]); strings.TrimSpace(value) != "" {
+		burst, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.CommandRateLimitBurst = burst
+	}
+	return ResolveGatewayWSConfig(cfg)
+}
+
 func kafkaConfigFromValues(values map[string]string) KafkaConfig {
 	cfg := KafkaConfig{
 		Brokers:            brokerListFromValue(firstNonEmpty(values["Kafka.Brokers"], values["KafkaBrokers"])),
@@ -670,6 +814,43 @@ func brokerListFromValue(value string) []string {
 	return brokers
 }
 
+func originListFromValue(value string) []string {
+	value = strings.TrimSpace(os.ExpandEnv(value))
+	if value == "" {
+		return nil
+	}
+	rawOrigins := strings.Split(value, ",")
+	origins := make([]string, 0, len(rawOrigins))
+	for _, origin := range rawOrigins {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			origins = append(origins, origin)
+		}
+	}
+	return origins
+}
+
+func normalizeOrigin(origin string) (string, error) {
+	origin = strings.TrimSpace(os.ExpandEnv(origin))
+	if origin == "" {
+		return "", nil
+	}
+	if origin == "*" {
+		return "", fmt.Errorf("gateway websocket allowed origin %q is invalid: wildcard origins are not allowed", origin)
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return "", fmt.Errorf("gateway websocket allowed origin %q is invalid: %w", origin, err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf("gateway websocket allowed origin %q is invalid: scheme must be http or https", origin)
+	}
+	if strings.TrimSpace(parsed.Host) == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
+		return "", fmt.Errorf("gateway websocket allowed origin %q is invalid: expected exact scheme://host[:port]", origin)
+	}
+	return strings.ToLower(parsed.Scheme) + "://" + strings.ToLower(parsed.Host), nil
+}
+
 func resolveInt(current int, envValues ...string) (int, error) {
 	if current != 0 {
 		return current, nil
@@ -684,6 +865,17 @@ func resolveInt(current int, envValues ...string) (int, error) {
 	return 0, nil
 }
 
+func resolveBool(current bool, envValues ...string) (bool, error) {
+	for _, value := range envValues {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		return strconv.ParseBool(value)
+	}
+	return current, nil
+}
+
 func resolveInt64(current int64, envValues ...string) (int64, error) {
 	if current != 0 {
 		return current, nil
@@ -696,6 +888,20 @@ func resolveInt64(current int64, envValues ...string) (int64, error) {
 		return strconv.ParseInt(value, 10, 64)
 	}
 	return 0, nil
+}
+
+func maxInt(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func maxInt64(a int64, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func readFlatYAML(path string) (map[string]string, error) {
