@@ -378,7 +378,7 @@ Fallback for clients that cannot set headers:
 ws://127.0.0.1:8084/ws?token=<access_token>
 ```
 
-The gateway authenticates the same JWT used by REST. Missing or invalid tokens fail the handshake with HTTP 401.
+The gateway authenticates the same JWT used by REST. Missing or invalid tokens fail the handshake with HTTP 401. Query-token auth is disabled by default and only works when `GatewayWS.AllowQueryToken=true`; browser cross-origin access must match `GatewayWS.AllowedOrigins` exactly, while empty allowed origins only permit same-origin browser requests.
 
 ### Command Envelope
 
@@ -422,7 +422,7 @@ Command error ACK:
 }
 ```
 
-WebSocket error codes include the REST application codes plus `IDEMPOTENCY_CONFLICT` for conflicting `clientMsgId` retries.
+WebSocket error codes include the REST application codes plus `IDEMPOTENCY_CONFLICT` for conflicting `clientMsgId` retries and `RATE_LIMITED` for per-connection command throttling.
 
 ### send_message
 

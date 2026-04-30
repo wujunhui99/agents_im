@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"time"
@@ -114,10 +115,9 @@ func dial(serverURL string, token string) *websocket.Conn {
 	must("parse server url", err)
 	u.Scheme = "ws"
 	u.Path = "/ws"
-	q := u.Query()
-	q.Set("token", token)
-	u.RawQuery = q.Encode()
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	header := http.Header{}
+	header.Set("Authorization", "Bearer "+token)
+	conn, _, err := websocket.DefaultDialer.Dial(u.String(), header)
 	must("dial websocket", err)
 	return conn
 }
