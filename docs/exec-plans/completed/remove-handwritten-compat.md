@@ -1,6 +1,7 @@
 # remove-handwritten-compat
 
-状态：Active
+状态：Completed
+Completed: 2026-05-01
 
 ## 背景
 
@@ -32,7 +33,7 @@
 - [x] Generator：删除旧 REST mux 文件和旧 RPC wrapper 目录。
 - [x] Generator：更新 `scripts/verify-static.sh` 和相关设计/执行文档。
 - [x] Evaluator：执行强制验证并记录结果。
-- [ ] 收尾：提交并推送 `feature/remove-handwritten-compat`。
+- [x] 收尾：历史 cleanup 分支实现已集成到 `main`；本归档分支不 push。
 
 ## 决策日志
 
@@ -97,4 +98,10 @@ rm -rf .tmp-goctl-check
 - `gofmt -w $(find . -name "*.go" -print)`：完成
 - `go test ./...`：通过，包含 `tests` 包
 - `bash scripts/verify-static.sh`：`static verification passed`
-- `git status --short --branch`：位于 `feature/remove-handwritten-compat`，变更待提交
+- `git status --short --branch`：历史记录为位于 `feature/remove-handwritten-compat`，变更待提交；2026-05-01 核对时当前 `main` 已包含对应实现
+
+2026-05-01 归档记录：
+
+- 当前 `main`/`HEAD` 为 `e1fdba70ede044879775c13fa31c1025f4a1b371`，`cmd/{user,auth,friends,groups,message}-rpc` 均导入 `internal/rpcgen/<service>/entry`，旧 `internal/rpc` 与 `internal/auth/rpc` wrapper 不存在。
+- `scripts/verify-static.sh` 已包含旧兼容层删除检查、RPC command import 检查、generated RPC logic 空壳检查和 REST 测试旧注册函数检查。
+- 原计划只剩历史“提交并推送 feature 分支”事项，主干已包含对应实现，因此移至 `completed`。本归档任务不执行 push。
