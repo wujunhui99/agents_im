@@ -1,5 +1,5 @@
 Name: groups-rpc
-ListenOn: 0.0.0.0:9093
+ListenOn: 0.0.0.0:9103
 
 JWTAuth:
   AccessSecret: ${JWT_ACCESS_SECRET}
