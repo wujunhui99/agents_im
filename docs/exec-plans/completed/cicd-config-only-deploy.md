@@ -51,7 +51,9 @@ panic: listen tcp 0.0.0.0:9093: bind: address already in use
 
 这会导致一个问题：即使只是修改 `deploy/k8s/**` 这类 Kubernetes 配置，也会重新构建所有业务镜像，并强制全服务 rollout。
 
-本次实际只需要修改 k8s 配置中的 `groups-rpc` 端口，不应该重新构建镜像，因为业务代码没有变。
+本次第一阶段实际只需要修改 k8s 配置中的 `groups-rpc` 端口，不应该重新构建镜像，因为业务代码没有变。
+
+随后 config-only deploy 暴露出第二个问题：RPC 服务镜像中的 go-zero 配置 tag 无法正确接受线上配置 `StorageDriver: postgres`，导致多个 RPC Pod 在新配置应用后启动失败。因此第二阶段又补充了一次业务镜像相关修复，并触发完整构建部署。
 
 ## 目标
 
@@ -59,6 +61,7 @@ panic: listen tcp 0.0.0.0:9093: bind: address already in use
 - 让纯 k8s 配置变更走 config-only deploy，不重新构建镜像。
 - config-only deploy 时不执行数据库迁移、不重启 middleware、不重设所有 deployment 镜像。
 - config-only deploy 时只重启并等待受影响服务，本次为 `groups-rpc`。
+- 修复 RPC 服务配置 tag 对 `StorageDriver: postgres` 的解析问题，保证完整镜像部署后 RPC 服务可正常启动。
 
 ## 非目标
 
@@ -168,6 +171,53 @@ RESTART_ROLLOUT="${RESTART_ROLLOUT:-false}"
 
 注意：ConfigMap 变更不会可靠触发 Pod 重建，所以 config-only 模式需要主动 rollout restart 目标 deployment。
 
+
+### 6. 修复 RPC StorageDriver 配置校验
+
+config-only deploy 后，`groups-rpc` 端口冲突已解除，但新的 Pod 继续启动失败。日志显示：
+
+```text
+groups-rpc:
+error: config file /config/groups-rpc.yaml, error: value "postgres" is not defined in options "[memory|postgres]"
+
+friends-rpc:
+error: config file /config/friends-rpc.yaml, error: value "postgres" is not defined in options "[memory|postgres]"
+
+user-rpc:
+error: config file /config/user-rpc.yaml, error: value "postgres" is not defined in options "[memory|postgres]"
+
+message-rpc:
+error: config file /config/message-rpc.yaml, error: value "postgres" is not defined in options "[memory|postgres]"
+```
+
+另有 `auth-rpc` 在当时输出：
+
+```text
+error: config file /config/auth-rpc.yaml, conflict key auth, pay attention to anonymous fields
+```
+
+本次代码修复点集中在 RPC 配置结构体的 `StorageDriver` tag。原 tag：
+
+```go
+StorageDriver string `json:",default=memory,options=memory|postgres"`
+```
+
+在当前 go-zero 配置解析行为下，`postgres` 未被正确识别为合法枚举值。修复后：
+
+```go
+StorageDriver string `json:",default=memory,options=memory|postgres|postgresql"`
+```
+
+涉及文件：
+
+- `internal/rpcgen/auth/internal/config/config.go`
+- `internal/rpcgen/friends/internal/config/config.go`
+- `internal/rpcgen/groups/internal/config/config.go`
+- `internal/rpcgen/message/internal/config/config.go`
+- `internal/rpcgen/user/internal/config/config.go`
+
+这属于代码变更，按 `detect-changes` 规则会触发完整镜像构建和部署。
+
 ## 发布记录
 
 提交：
@@ -196,6 +246,25 @@ Deploy on server: in_progress
 ```
 
 说明本次配置变更未重新构建业务镜像。
+
+该 run 后续失败，失败原因不是镜像构建，而是 RPC 配置校验问题，见上文“修复 RPC StorageDriver 配置校验”。
+
+补充修复提交：
+
+```text
+a1dd194 fix: allow postgres storage driver in rpc configs
+```
+
+该提交触发完整构建部署：
+
+- <https://github.com/wujunhui99/agents_im/actions/runs/25193929362>
+
+最终状态：
+
+```text
+Deploy to k3s: success
+CI: success
+```
 
 ## 验证
 
@@ -241,12 +310,24 @@ gh run view 25193698668 --repo wujunhui99/agents_im --json status,conclusion,job
 - `Build web image` 跳过；
 - `Deploy on server` 开始执行。
 
+补充代码修复后的最终验证：
+
+```bash
+gh run list --repo wujunhui99/agents_im --limit 4 --json databaseId,headSha,status,conclusion,name,createdAt,url
+```
+
+结果显示：
+
+- `Deploy to k3s` / `a1dd194`：`completed` + `success`；
+- `CI` / `a1dd194`：`completed` + `success`。
+
 ## 风险与注意事项
 
 - 当前 config-only 判断将 `.github/workflows/deploy.yml` 视为部署配置变更，会触发部署但不构建镜像；这适合本次场景，但如果后续 workflow 变更影响镜像构建逻辑，可能需要手动 `workflow_dispatch` 做完整发布。
 - 当前 config-only 模式固定 `ROLLOUT_SERVICES=groups-rpc`，适合本次修复。后续如果修改其他服务的 ConfigMap 或 manifest，需要扩展变更检测逻辑，按变更文件推导受影响服务。
 - `hostNetwork: true` 会让所有服务直接占用宿主机端口。后续应统一梳理端口规划，避免再次与系统服务或其他 Pod 冲突。
 - 如果只是改 Service 端口但应用实际监听端口不同，会导致 readiness/liveness 或服务访问异常；因此 `ListenOn`、`containerPort`、Service `port/targetPort` 要保持一致。
+- config-only deploy 只能验证当前镜像是否能读取新配置；如果新配置触发了镜像内代码或配置解析 bug，需要继续做代码修复并走完整镜像发布。
 
 ## 回滚方案
 
@@ -269,6 +350,16 @@ git revert 6ddadcb
 ```
 
 但这会同时回退 `groups-rpc` 端口修复和 CI/CD 优化。如只想回退 workflow，需要单独 revert `.github/workflows/deploy.yml` 与 `scripts/deploy-k3s.sh` 的相关变更。
+
+### 回滚 RPC StorageDriver 修复
+
+回退提交：
+
+```bash
+git revert a1dd194
+```
+
+不建议在当前线上配置仍使用 `StorageDriver: postgres` 时回滚该提交，否则 RPC 服务可能重新出现配置校验失败。
 
 ## 后续建议
 
