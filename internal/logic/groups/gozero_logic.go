@@ -88,7 +88,15 @@ func NewGetGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetGroup
 }
 
 func (l *GetGroupLogic) GetGroup(req *types.GetGroupReq) (*types.GroupResp, error) {
-	group, err := l.svcCtx.GroupsLogic.GetGroup(l.ctx, business.GetGroupRequest{GroupID: req.GroupID})
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := l.svcCtx.GroupsLogic.GetGroup(l.ctx, business.GetGroupRequest{
+		GroupID:         req.GroupID,
+		RequesterUserID: userID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +148,15 @@ func NewListMembersLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListM
 }
 
 func (l *ListMembersLogic) ListMembers(req *types.ListMembersReq) (*types.ListMembersResp, error) {
-	result, err := l.svcCtx.GroupsLogic.ListMembers(l.ctx, business.ListMembersRequest{GroupID: req.GroupID})
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := l.svcCtx.GroupsLogic.ListMembers(l.ctx, business.ListMembersRequest{
+		GroupID:         req.GroupID,
+		RequesterUserID: userID,
+	})
 	if err != nil {
 		return nil, err
 	}
