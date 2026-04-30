@@ -55,14 +55,6 @@ func NewRepositoryForStorage(driver string, dataSource string) (CredentialReposi
 	}
 }
 
-func MustRepositoryForStorage(driver string, dataSource string) CredentialRepository {
-	repo, err := NewRepositoryForStorage(driver, dataSource)
-	if err != nil {
-		panic(err)
-	}
-	return repo
-}
-
 func (r *PostgresRepository) Create(ctx context.Context, credential model.Credential) (model.Credential, error) {
 	var row postgresCredentialRow
 	err := r.conn.QueryRowCtx(ctx, &row, `

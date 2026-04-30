@@ -1319,9 +1319,9 @@ for pattern in "${social_mvp_test_patterns[@]}"; do
   rg -q "$pattern" tests
 done
 
-rg -q "NewGroupsLogic\\(repository.MustGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go
+rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go internal/rpcgen/message/internal/svc/service_context.go
 rg -q "NewMessageLogicWithValidators" internal/rpcgen/message/internal/svc/service_context.go
-rg -q "MustGroupsRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
+rg -q "NewMessageRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
 pg_persistence_patterns=(
   "users"
   "auth_credentials"

@@ -1,6 +1,8 @@
 package svc
 
 import (
+	"log"
+
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/message/internal/config"
@@ -14,8 +16,15 @@ type ServiceContext struct {
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	messageRepo := repository.MustMessageRepositoryForStorage(c.StorageDriver, c.DataSource)
-	groupsLogic := business.NewGroupsLogic(repository.MustGroupsRepositoryForStorage(c.StorageDriver, c.DataSource), nil)
+	messageRepo, err := repository.NewMessageRepositoryForStorage(c.StorageDriver, c.DataSource)
+	if err != nil {
+		log.Fatalf("build message repository: %v", err)
+	}
+	groupsRepo, err := repository.NewGroupsRepositoryForStorage(c.StorageDriver, c.DataSource)
+	if err != nil {
+		log.Fatalf("build groups repository: %v", err)
+	}
+	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
 	return &ServiceContext{
 		Config:       c,
 		MessageLogic: business.NewMessageLogicWithValidators(messageRepo, nil, groupsLogic),

@@ -31,14 +31,25 @@ func main() {
 		log.Fatalf("load gateway config: %v", err)
 	}
 
-	groupsLogic := logic.NewGroupsLogic(repository.MustGroupsRepositoryForStorage(cfg.StorageDriver, cfg.DataSource), nil)
+	groupsRepo, err := repository.NewGroupsRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build groups repository: %v", err)
+	}
+	messageRepo, err := repository.NewMessageRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build message repository: %v", err)
+	}
+	presenceStore, err := presence.NewStore(cfg.Presence, cfg.Redis)
+	if err != nil {
+		log.Fatalf("build presence store: %v", err)
+	}
+	groupsLogic := logic.NewGroupsLogic(groupsRepo, nil)
 	serviceContext := svc.NewMessageServiceContextWithAuth(
-		repository.MustMessageRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
+		messageRepo,
 		nil,
 		groupsLogic,
 		cfg.Auth,
 	)
-	presenceStore := presence.MustStore(cfg.Presence, cfg.Redis)
 	defer closePresenceStore(presenceStore)
 
 	wsServer := gatewayws.NewServer(

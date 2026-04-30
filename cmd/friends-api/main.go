@@ -23,7 +23,11 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	serviceContext := svc.NewServiceContextWithAuth(repository.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource), cfg.Auth)
+	repo, err := repository.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build friends repository: %v", err)
+	}
+	serviceContext := svc.NewServiceContextWithAuth(repo, cfg.Auth)
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
 	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()

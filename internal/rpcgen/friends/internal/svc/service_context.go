@@ -1,6 +1,8 @@
 package svc
 
 import (
+	"log"
+
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/friends/internal/config"
@@ -14,7 +16,10 @@ type ServiceContext struct {
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	repo := repository.MustRepositoryForStorage(c.StorageDriver, c.DataSource)
+	repo, err := repository.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
+	if err != nil {
+		log.Fatalf("build friends repository: %v", err)
+	}
 	userLogic := business.NewUserLogic(repo)
 	return &ServiceContext{
 		Config:       c,

@@ -28,9 +28,17 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	userLogic := userlogic.NewUserLogic(userrepo.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource))
+	userRepo, err := userrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build user repository: %v", err)
+	}
+	credentialRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build auth repository: %v", err)
+	}
+	userLogic := userlogic.NewUserLogic(userRepo)
 	serviceContext := svc.NewServiceContext(
-		authrepo.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
+		credentialRepo,
 		useradapter.NewLogicClient(userLogic),
 		token.NewHMACTokenManager(cfg.Auth.AccessSecret, time.Duration(cfg.Auth.AccessExpire)*time.Second),
 	)
