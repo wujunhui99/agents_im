@@ -2,6 +2,8 @@
 
 状态：Completed
 
+归档日期：2026-05-01
+
 ## 背景
 
 Gateway contract 已定义 WebSocket command 到 Message Service 能力的第一阶段映射，但仓库还缺少可启动的 WebSocket 长连接入口。当前优先级任务 C 需要在不阻塞 CI、Redis Presence、Kafka/Push 并行分支的前提下实现真实 Gateway 第一阶段。
@@ -35,7 +37,7 @@ Gateway contract 已定义 WebSocket command 到 Message Service 能力的第一
 - [x] 新增 WebSocket Gateway 测试。
 - [x] 更新 `docs/design-docs/websocket-gateway.md`、`ARCHITECTURE.md`、设计文档索引和静态验证脚本。
 - [x] 执行强制验证并记录结果。
-- [ ] 提交并推送 `feature/websocket-gateway`。
+- [x] 历史 `feature/websocket-gateway` 已提交并推送，提交 `1311c8c` 已合入当前 `main`；本次状态对齐不 push。
 
 ## 决策日志
 
@@ -66,6 +68,13 @@ Gateway contract 已定义 WebSocket command 到 Message Service 能力的第一
   回滚/缓解：正式前增加配置化 allowed origins。
 
 ## 结果记录
+
+2026-05-01 状态对齐：
+
+- 当前 `main` 已包含 WebSocket Gateway 第一阶段入口、JWT handshake、connection manager、command router、command ACK、heartbeat、reconnect sync 和同实例单聊 `message_received` live push。
+- 该计划原本只剩历史 feature 分支提交/推送事项；当前已由 main 集成覆盖，因此从 active 归档到 completed。
+- 未由本计划关闭的生产问题仍包括跨实例 Gateway transport、offline push、delivery ACK worker、完整 message-transfer 生产 wiring，以及 read receipt push ACK。这些不属于本计划第一阶段目标，应由更具体计划或后续新计划跟踪。
+- 本次只做文档状态对齐，未启动真实依赖，也未声称端到端验证。
 
 已实现 Gateway 第一阶段代码、测试与文档。
 

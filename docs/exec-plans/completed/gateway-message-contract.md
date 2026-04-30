@@ -1,10 +1,14 @@
 # Gateway Message Contract
 
-状态：Active
+状态：Completed
+
+归档日期：2026-05-01
 
 ## 背景
 
-`feature/gateway-contract` 需要在 `message-service-contract` 并行开发时先稳定 Gateway 与 Message Service 的接口边界。当前阶段只落文档和纯 Go 契约映射，不实现真实 WebSocket server，不保存消息，不维护 seq/read state。
+`feature/gateway-contract` 需要在 `message-service-contract` 并行开发时先稳定 Gateway 与 Message Service 的接口边界。该计划只落文档和纯 Go 契约映射，不实现真实 WebSocket server，不保存消息，不维护 seq/read state。
+
+2026-05-01 状态对齐：该早期契约计划已被后续 `websocket-gateway`、`gateway-push-delivery`、`gateway-presence-routing` 和 `transfer-gateway-dispatcher` 计划覆盖，且这些提交已包含在当前 `main`。本文件从 active 归档到 completed；剩余 Gateway 生产问题不再由本早期契约计划跟踪，而由更具体的执行计划或后续新计划承接。
 
 ## 目标
 
@@ -38,20 +42,23 @@
 - [x] Task 9：运行 `PATH=/tmp/go/bin:$PATH go test ./...`。
 - [x] Task 10：运行 `bash scripts/verify-static.sh`。
 - [x] Task 11：Evaluator 检查文档、代码、测试和边界一致性。
-- [ ] Task 12：提交并推送 `origin/feature/gateway-contract`。
+- [x] Task 12：`feature/gateway-contract` 历史分支已存在于远端并已合入当前 `main`；本次状态对齐不 push。
 
-## 后续 gateway skeleton 实现任务
+## 后续 gateway skeleton 实现任务状态对齐
 
-- [ ] 定义 WebSocket command envelope decoder/encoder，并保持 `requestId` 透传。
-- [ ] 接入连接鉴权，将连接用户注入 `sender_id` 或 `user_id`，禁止客户端伪造。
-- [ ] 定义 Message Service RPC client interface，依赖 `SendMessage`、`PullMessages`、`GetConversationSeqs`、`MarkConversationAsRead`。
-- [ ] 实现 Gateway command router，将四个 command 分发到 RPC client。
-- [ ] 实现 command ACK writer，区分 command ACK 与未来 delivery ACK。
-- [ ] 接入心跳检测和连接生命周期管理。
-- [ ] 定义连接 registry，支持后续按用户/设备投递。
-- [ ] 接入 message accepted/read event 的在线投递入口，但不在 Gateway 内保存消息。
-- [ ] 增加 reconnect sync 集成测试：`get_conversation_seqs` 后按 seq `pull_messages`。
-- [ ] 增加错误映射测试，覆盖 unauthenticated、invalid argument、forbidden、not found、idempotency conflict。
+| 原后续任务 | 当前承接状态 |
+| --- | --- |
+| WebSocket command envelope decoder/encoder，保持 `requestId` 透传 | 已由 `websocket-gateway` 实现，支持 canonical `request_id/type/payload` 和 frontend `requestId/command/payload` alias。 |
+| 连接鉴权，注入连接用户，禁止客户端伪造 | 已由 `websocket-gateway` 实现；Gateway 使用 JWT claim 注入 `sender_id` / `user_id`。 |
+| Message Service 调用边界 | 已由当前 Message API/RPC contract 和 `websocket-gateway` 承接；Gateway 在本仓库阶段直接调用 `MessageLogic`，不在该早期计划继续追踪独立 RPC client。 |
+| Gateway command router | 已由 `websocket-gateway` 实现 `heartbeat`、`send_message`、`pull_messages`、`get_conversation_seqs`、`mark_conversation_read`。 |
+| command ACK writer，区分 command ACK 与 delivery ACK | 已由 `websocket-gateway` 和 `gateway-push-delivery` 文档/测试覆盖；command ACK 不代表收件端收到或已读。 |
+| 心跳检测和连接生命周期 | 已由 `websocket-gateway` 实现，后续由 `gateway-presence-routing` 接入 Presence TTL refresh。 |
+| 连接 registry，支持按用户/设备投递 | 已由 `websocket-gateway` 的 `ConnectionManager` 和 `gateway-push-delivery` 的 in-process fanout 覆盖。 |
+| `message.accepted` 在线投递入口 | 已由 `gateway-push-delivery` 和 `transfer-gateway-dispatcher` 覆盖为 `message_received` push；跨实例远程 Gateway 调用仍不是这些已归档计划的实现范围。 |
+| `message.read` 在线通知和 read receipt push ACK | 未闭环，不在本早期 Gateway contract 中假关闭；继续由 active 的 `read-receipts.md` 跟踪。 |
+| reconnect sync 集成测试 | 已由 `websocket-gateway` 的 reconnect sync flow 测试覆盖。 |
+| 错误映射测试 | Gateway handshake、invalid command 和 frontend error envelope 已有测试覆盖；更完整业务错误映射随 Message/Gateway 后续专项继续补强。 |
 
 ## 决策日志
 
@@ -87,6 +94,13 @@ bash scripts/verify-static.sh
 - 回滚：移除 gateway-message 文档、`internal/gateway`、gateway 测试，并撤销 `scripts/verify-static.sh` 的 gateway 检查。
 
 ## 结果记录
+
+## 2026-05-01 状态对齐结果
+
+- 当前 `main` 已包含 `feature/gateway-contract`、`feature/websocket-gateway`、`feature/gateway-push-delivery`、`feature/gateway-presence-routing` 和 `feature/transfer-gateway-dispatcher` 的相关提交。
+- 该计划的早期契约产物仍有效：`docs/design-docs/gateway-message-contract.md`、`docs/product-specs/gateway-message-contract.md`、`internal/gateway/contract.go` 和 `tests/gateway_contract_test.go`。
+- 原“后续 gateway skeleton 实现任务”大多已被更具体计划覆盖；仍未完整闭环的 Gateway 生产问题包括跨实例远程 Gateway transport、offline push、delivery ACK worker，以及 read receipt 的 `message.read` 通知和 push ACK。前几项由更具体 Gateway/Transfer/Delivery 计划或后续新计划跟踪，read receipt 剩余事项由 active 的 `read-receipts.md` 跟踪。
+- 本次只做文档状态对齐，未启动真实依赖，也未声称端到端验证。
 
 ## Generator 结果
 

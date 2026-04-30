@@ -1,6 +1,6 @@
 # Read Receipts Product Spec
 
-Status: Draft
+Status: Partially implemented
 Owner: IM backend
 Related design: [`../design-docs/read-receipts.md`](../design-docs/read-receipts.md)
 Related message spec: [`message-chain.md`](./message-chain.md)
@@ -19,12 +19,17 @@ user_id + conversation_id -> has_read_seq
 
 The client marks a conversation as read up to a sequence number. The service returns the resulting read cursor, conversation `max_seq`, and derived unread count.
 
+Implementation status as of 2026-05-01:
+
+- Current `main` supports repository/logic mutation, HTTP `POST /conversations/:conversation_id/read`, RPC `MarkConversationAsRead`, and Gateway `mark_conversation_read` command ACK.
+- Current `main` does not complete `message.read` notification plumbing, server-pushed read receipt events, or client push ACKs.
+
 ## Non-goals
 
-Phase 1 does not require:
+Remaining phase 1 gaps:
 
-- WebSocket implementation;
-- Gateway ACK implementation;
+- `message.read` event emission only when the read cursor actually advances;
+- Gateway read receipt server push and client push ACK;
 - offline push notification;
 - per-device read cursors;
 - exact group read member lists;
@@ -202,4 +207,5 @@ Phase 1 clients may use this only for the current user's unread count. Future cl
 - Duplicate mark-as-read requests are successful and idempotent.
 - Lower mark-as-read requests do not reduce read state.
 - Requests greater than `max_seq` are rejected.
-- The contract does not require Gateway, message handler, or storage implementation in this branch.
+- HTTP/RPC and Gateway command ACK return the authoritative read state when the mark-read command succeeds.
+- Read receipt server push and push ACK remain unfinished until `message.read` notification plumbing is connected.
