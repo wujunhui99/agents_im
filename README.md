@@ -23,6 +23,7 @@
 - 消息：Kafka-compatible Redpanda
 - Agent：CloudWeGo Eino、DeepSeek ChatModel adapter
 - 可观测性：Prometheus text metrics、trace/request id 基础
+- CI/CD：GitHub Actions、GHCR、k3s、Docker Compose
 
 ## 仓库结构
 
@@ -37,6 +38,7 @@ scripts/             本地启动、迁移、demo data、静态验证脚本
 tests/               跨服务契约和 MVP smoke 测试
 web/                 React/Vite 前端
 docs/                架构、产品规格、设计文档、执行计划和开发文档
+deploy/              k3s 应用部署清单、生产中间件 Compose、部署说明
 ```
 
 ## 快速开始
@@ -197,6 +199,17 @@ npm run frontend:lint
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./cmd/single-machine-e2e
 ```
 
+## CI/CD 与部署
+
+仓库包含两个长期 GitHub Actions 工作流：
+
+- `.github/workflows/ci.yml`：PR/MR 合入前的 backend verification，包括 go-zero API validate、Go 格式、`go test ./...`、静态约束、Compose 配置和 Markdown link check，并用独立 PostgreSQL service 跑 integration job。
+- `.github/workflows/deploy.yml`：`main` 分支 push 或手动触发后先由 `detect-changes` 判断变更类型；业务/镜像相关变更会按服务矩阵构建后端镜像和 web 镜像，推送到 GHCR，再通过 SSH 把部署文件同步到服务器并运行 `scripts/deploy-k3s.sh`。纯 `deploy/k8s/**`、`scripts/deploy-k3s.sh` 或 deploy workflow 配置变更走 config-only deploy：跳过镜像构建、middleware 启动、数据库迁移和 `kubectl set image`，仅应用 manifests 并重启/等待受影响服务。
+
+当前生产部署采用混合单机模型：k3s 承载 Go API/RPC/worker 和 web UI，Docker Compose 承载 PostgreSQL、Redis、Redpanda。首次部署服务器需先执行 `scripts/bootstrap-server.sh` 创建 `/opt/agents-im/middleware/.env`、启动中间件并创建 k3s `agents-im-secrets`；真实 secret 只保存在服务器/k3s，不提交到仓库，也不放进 GitHub Actions workflow 日志。
+
+部署入口与必需 GitHub Secrets 见 [`deploy/README.md`](./deploy/README.md)。
+
 ## Agent / DeepSeek 配置
 
 Agent runtime provider 基线使用 Eino + DeepSeek ChatModel adapter。真实本地运行需要在未跟踪的 `.env` 中配置：
@@ -238,3 +251,4 @@ RUN_LIVE_DEEPSEEK_TESTS=1 PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal
 - 设计文档索引：[`docs/design-docs/index.md`](./docs/design-docs/index.md)
 - 技术债追踪：[`docs/exec-plans/tech-debt-tracker.md`](./docs/exec-plans/tech-debt-tracker.md)
 - Git 工作流：[`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md)
+- 部署说明：[`deploy/README.md`](./deploy/README.md)

@@ -31,6 +31,7 @@
 - 消息链路接口契约：[`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)
 - User Service go-zero 实现设计：[`docs/design-docs/user-service-go-zero.md`](./docs/design-docs/user-service-go-zero.md)
 - 本地开发启动说明：[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)
+- 部署说明：[`deploy/README.md`](./deploy/README.md)
 - 执行计划规范：[`docs/PLANS.md`](./docs/PLANS.md)
 - 活跃执行计划：[`docs/exec-plans/active/`](./docs/exec-plans/active/)
 - 已完成执行计划：[`docs/exec-plans/completed/`](./docs/exec-plans/completed/)
@@ -55,7 +56,9 @@
 - Agent 框架：CloudWeGo Eino（当前提供 DeepSeek ChatModel adapter/config；runtime orchestration 待实现）
 - Python API：FastAPI
 - 可观测性：Prometheus / Grafana / Jaeger
-- CI/CD：GitHub Actions
+- CI/CD：GitHub Actions；`main` 分支触发部署 workflow，也支持手动 `workflow_dispatch`；deploy workflow 包含 `detect-changes`，可区分完整构建部署、config-only deploy 和文档-only 不部署。
+- `deploy-k3s.sh` 支持 config-only 开关：`SKIP_SET_IMAGE`、`SKIP_MIDDLEWARE`、`SKIP_MIGRATIONS`、`ROLLOUT_SERVICES`、`RESTART_ROLLOUT`。
+- 部署：k3s 承载应用工作负载，Docker Compose 承载 PostgreSQL / Redis / Redpanda 中间件
 - 镜像仓库：GHCR
 
 ## Agent 执行流程
