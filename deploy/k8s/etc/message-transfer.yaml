@@ -1,0 +1,28 @@
+Name: message-transfer
+WorkerID: ${HOSTNAME}
+DryRun: true
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
+
+Consumer:
+  Driver: kafka
+  Topic: ${KAFKA_MESSAGE_EVENTS_TOPIC}
+  Group: ${KAFKA_CONSUMER_GROUP}
+
+Kafka:
+  Brokers: ${KAFKA_BROKERS}
+  MessageEventsTopic: ${KAFKA_MESSAGE_EVENTS_TOPIC}
+  ConsumerGroup: ${KAFKA_CONSUMER_GROUP}
+
+Dispatcher:
+  Driver: noop
+
+Worker:
+  PollIntervalMillis: 100
+  RetryBackoffMillis: 1000
+  MaxAttempts: 5
+
+Observability:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: ${MESSAGE_TRANSFER_OBSERVABILITY_PORT}

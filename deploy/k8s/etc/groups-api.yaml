@@ -1,8 +1,9 @@
 Name: groups-api
 Host: 0.0.0.0
 Port: 8085
+
 Auth:
-  AccessSecret: dev-jwt-secret-change-me
+  AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
-StorageDriver: memory
+StorageDriver: postgres
 DataSource: ${DATABASE_URL}

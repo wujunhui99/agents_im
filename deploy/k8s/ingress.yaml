@@ -1,0 +1,73 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agents-im
+  namespace: agents-im
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-api
+                port:
+                  number: 8081
+          - path: /me
+            pathType: Prefix
+            backend:
+              service:
+                name: user-api
+                port:
+                  number: 8080
+          - path: /users
+            pathType: Prefix
+            backend:
+              service:
+                name: user-api
+                port:
+                  number: 8080
+          - path: /friends
+            pathType: Prefix
+            backend:
+              service:
+                name: friends-api
+                port:
+                  number: 8082
+          - path: /messages
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
+          - path: /conversations
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
+          - path: /groups
+            pathType: Prefix
+            backend:
+              service:
+                name: groups-api
+                port:
+                  number: 8085
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-ws
+                port:
+                  number: 8084
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

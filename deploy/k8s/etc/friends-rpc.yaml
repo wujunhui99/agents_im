@@ -1,0 +1,8 @@
+Name: friends-rpc
+ListenOn: 0.0.0.0:9092
+
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: 86400
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
