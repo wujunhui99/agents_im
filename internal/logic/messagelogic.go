@@ -297,7 +297,10 @@ func (l *MessageLogic) resolveGroupParticipants(ctx context.Context, groupID str
 		return nil, apperror.Internal("group membership validator is not configured")
 	}
 
-	members, err := l.groups.ListMembers(ctx, ListMembersRequest{GroupID: groupID})
+	members, err := l.groups.ListMembers(ctx, ListMembersRequest{
+		GroupID:         groupID,
+		RequesterUserID: senderID,
+	})
 	if err != nil {
 		return nil, err
 	}

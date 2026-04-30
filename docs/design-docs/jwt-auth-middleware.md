@@ -45,8 +45,6 @@ Public endpoints:
 - `POST /users`
 - `GET /users/exists`
 - `GET /users/:identifier`
-- `GET /groups/:group_id`
-- `GET /groups/:group_id/members`
 - `GET /healthz`
 
 Protected endpoints:
@@ -60,6 +58,8 @@ Protected endpoints:
 - `POST /groups`
 - `POST /groups/:group_id/members`
 - `DELETE /groups/:group_id/members/me`
+- `GET /groups/:group_id`
+- `GET /groups/:group_id/members`
 - `POST /messages`
 - `GET /conversations/:conversation_id/messages`
 - `GET /conversations/seqs`

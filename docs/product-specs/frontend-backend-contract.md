@@ -217,6 +217,7 @@ Authorization: Bearer <access_token>
 ## Groups
 
 The group creator is automatically an active member. Groups are open join in MVP.
+Group detail and member-list reads require a bearer token and only active members can read them. Adding a different user requires the group creator/owner.
 
 ### Create Group
 
@@ -237,6 +238,7 @@ Content-Type: application/json
 
 ```http
 GET /groups/grp_000001
+Authorization: Bearer <access_token>
 ```
 
 ### Join Or Add Member
@@ -254,6 +256,7 @@ Content-Type: application/json
 ```
 
 If `user_id` is omitted, the authenticated user joins the group.
+If `user_id` names another user, the authenticated user must be the group creator/owner.
 
 ### Leave Group
 
@@ -266,6 +269,7 @@ Authorization: Bearer <access_token>
 
 ```http
 GET /groups/grp_000001/members
+Authorization: Bearer <access_token>
 ```
 
 ### Current Gap
