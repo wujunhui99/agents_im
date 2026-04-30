@@ -1,6 +1,7 @@
 # User Service Go-Zero
 
-状态：Active
+状态：Completed
+Completed: 2026-05-01
 
 ## 背景
 
@@ -34,7 +35,7 @@
 - [x] Task 7：补充单元测试或验证脚本。
 - [x] Task 8：运行所有可运行验证命令，记录工具缺失 BLOCKER。
 - [x] Task 9：Evaluator 检查代码、测试、文档一致性，修复问题。
-- [ ] Task 10：提交当前 feature 分支。
+- [x] Task 10：历史 feature 分支实现已集成到 `main`；本计划归档。
 
 ## 决策日志
 
@@ -120,7 +121,12 @@ ok  	github.com/wujunhui99/agents_im/tests	0.002s
 - `PATCH /me` 通过 go-zero request type 和 route-level logic 拒绝 `identifier`、`user_id` 等不可变字段。
 - 文档中已记录 goctl 不可用和外层文档写入受限。
 
-## BLOCKER
+## 归档记录
 
-- `goctl version` 当前返回 `/bin/bash: line 1: goctl: command not found`。
-- Codex 沙箱拒绝写入外层 `/home/ws/project/docs/...`，因此 Codex 先提交 worktree 内 `docs/...` 副本；控制会话可在完成后同步到外层文档。
+- 2026-05-01：当前 `main`/`HEAD` 为 `e1fdba70ede044879775c13fa31c1025f4a1b371`，已包含 `api/user.api`、`proto/user.proto`、`cmd/user-*`、`internal/rpcgen/user`、user logic/repository/handler、产品规格、设计文档和 `tests/user_service_test.go`。原计划只剩历史“提交 feature 分支”事项，主干已包含对应实现，因此移至 `completed`。
+- 本次归档不改业务代码，后续验证以 `bash scripts/verify-static.sh` 和 `git diff --check` 为准。
+
+## 历史 BLOCKER
+
+- 历史执行时 `goctl version` 返回 `/bin/bash: line 1: goctl: command not found`。
+- 历史执行时 Codex 沙箱拒绝写入外层 `/home/ws/project/docs/...`，因此先提交 worktree 内 `docs/...` 副本。当前主干已包含这些文档，本项不再阻塞归档。

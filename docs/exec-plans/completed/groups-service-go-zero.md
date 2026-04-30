@@ -1,6 +1,7 @@
 # Groups Service Go-Zero
 
-状态：Active
+状态：Completed
+Completed: 2026-05-01
 
 ## 背景
 
@@ -39,7 +40,7 @@
 - [x] Task 9：补充单元测试覆盖创建群、加群、重复加群、退群、成员列表、群不存在、用户不存在。
 - [x] Task 10：运行 `gofmt`、`go test ./...`、`scripts/verify-static.sh`，记录验证结果和 BLOCKER。
 - [x] Task 11：Evaluator 检查代码、测试、文档一致性，修复问题。
-- [ ] Task 12：提交当前 feature 分支。当前 Codex 沙箱无法写入 worktree git 元数据目录，见 BLOCKER。
+- [x] Task 12：历史 feature 分支实现已集成到 `main`；本计划归档。
 
 ## 决策日志
 
@@ -55,7 +56,7 @@
 - 已阅读当前 worktree `AGENTS.md`。
 - 已阅读 `docs/product-specs/user-service.md`。
 - 已阅读 `docs/design-docs/user-service-go-zero.md`。
-- 已阅读 `docs/exec-plans/active/user-service-go-zero.md`。
+- 已阅读 `docs/exec-plans/completed/user-service-go-zero.md`。
 - 已阅读外层 `/home/ws/project/AGENTS.md`。
 - 已阅读 `/home/ws/project/ARCHITECTURE.md`。
 - 已阅读 `/home/ws/project/docs/PLANS.md`。
@@ -142,8 +143,13 @@ static verification passed
 - user 既有测试与新增 groups 测试均已通过。
 - 初次运行 `PATH=/tmp/go/bin:$PATH go test ./...` 因默认 Go build cache 指向只读目录失败；设置 `GOCACHE=/tmp/go-build-cache` 后通过。
 
-## BLOCKER
+## 归档记录
 
-- `goctl version` 当前返回 `/bin/bash: line 1: goctl: command not found`，因此本次按要求手写 go-zero 风格结构。
-- 默认 PATH 中没有 `go`，本次使用 `/tmp/go/bin/go` 和 `/tmp/go/bin/gofmt` 完成验证。
-- `git add` 当前返回 `fatal: Unable to create '/home/ws/project/agents_im/.git/worktrees/groups/index.lock': Read-only file system`。当前沙箱可写根不包含主仓库 git 元数据目录，因此无法在本会话内完成提交。
+- 2026-05-01：当前 `main`/`HEAD` 为 `e1fdba70ede044879775c13fa31c1025f4a1b371`，已包含 `api/groups.api`、`proto/groups.proto`、`cmd/groups-*`、groups logic/repository/handler、`internal/rpcgen/groups`、产品规格、设计文档和 `tests/groups_service_test.go`。原计划只剩历史“提交 feature 分支”事项，主干已包含对应实现，因此移至 `completed`。
+- 本次归档不改业务代码，后续验证以 `bash scripts/verify-static.sh` 和 `git diff --check` 为准。
+
+## 历史 BLOCKER
+
+- 历史执行时 `goctl version` 返回 `/bin/bash: line 1: goctl: command not found`，因此该阶段按要求手写 go-zero 风格结构。
+- 历史执行时默认 PATH 中没有 `go`，使用 `/tmp/go/bin/go` 和 `/tmp/go/bin/gofmt` 完成验证。
+- 历史执行时 `git add` 返回 `fatal: Unable to create '/home/ws/project/agents_im/.git/worktrees/groups/index.lock': Read-only file system`。当前主干已包含对应实现，本项不再阻塞归档。
