@@ -1,6 +1,6 @@
 # Read Receipts Design
 
-Status: Draft
+Status: Partially implemented
 Owner: IM backend
 Related product spec: [`../product-specs/read-receipts.md`](../product-specs/read-receipts.md)
 Related message contract: [`message-chain-contract.md`](./message-chain-contract.md)
@@ -16,6 +16,8 @@ user_id + conversation_id -> has_read_seq
 ```
 
 `has_read_seq` means the highest contiguous conversation `seq` the user has marked as read.
+
+2026-05-01 implementation status: repository/logic mutation, HTTP/RPC `MarkConversationAsRead`, and Gateway `mark_conversation_read` command ACK are present in current `main`. The `message.read` notification path, read receipt server push, and client push ACK are still future work and must not be treated as completed.
 
 ## Goals
 

@@ -2,6 +2,8 @@
 
 状态：Completed
 
+归档日期：2026-05-01
+
 ## 背景
 
 WebSocket Gateway 已实现 JWT handshake、connection manager 和 send/pull/read command router。第二优先级并行任务 D 需要新增 Gateway push delivery 第一阶段接口和本进程内 fanout，让未来 Message Transfer worker 可以把消息事件主动下发到在线 WebSocket 连接。Outbox、Kafka/Redpanda、Transfer worker、跨进程路由和 Redis Presence 订阅由其他分支处理。
@@ -67,6 +69,13 @@ WebSocket Gateway 已实现 JWT handshake、connection manager 和 send/pull/rea
 - 回滚：移除 `internal/gateway/delivery`、`internal/gateway/ws/delivery.go`、Server push 方法和对应测试/文档，恢复静态验证脚本条目。
 
 ## 结果记录
+
+2026-05-01 状态对齐：
+
+- 当前 `main` 已包含 Gateway delivery dispatcher 契约、同实例 WebSocket fanout、`message_received` / `message_delivered` push event envelope 和 offline/failed result 分类。
+- 该计划已无 active 剩余任务，因此从 active 归档到 completed。
+- 本计划没有实现真实 Kafka/Redpanda consumer、durable outbox reader、跨实例 Gateway RPC、offline push、delivery ACK worker 或 read receipt push ACK；这些仍不得被解释为已完成。
+- 本次只做文档状态对齐，未启动真实依赖，也未声称端到端验证。
 
 已完成 Gateway push delivery 第一阶段接口、in-memory fanout、server push 方法、测试、文档和静态验证脚本更新。
 

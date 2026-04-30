@@ -1,6 +1,8 @@
 # transfer-gateway-dispatcher
 
-状态：Active
+状态：Completed
+
+归档日期：2026-05-01
 
 ## 背景
 
@@ -32,7 +34,7 @@ Message Transfer worker 已有 `DeliveryDispatcher`、幂等和重试接口，Ga
 - [x] 新增 `docs/design-docs/transfer-gateway-dispatcher.md`。
 - [x] 更新 `ARCHITECTURE.md`、`docs/design-docs/index.md` 和 `scripts/verify-static.sh`。
 - [x] 完成完整验证命令并记录结果。
-- [ ] 提交并推送 `feature/transfer-gateway-dispatcher`。
+- [x] 历史 `feature/transfer-gateway-dispatcher` 已提交并推送，提交 `e152d30` 已合入当前 `main`；本次状态对齐不 push。
 
 ## 决策日志
 
@@ -61,6 +63,13 @@ Message Transfer worker 已有 `DeliveryDispatcher`、幂等和重试接口，Ga
 - 回滚：移除 `internal/transfer/gateway`、对应测试、transfer event 可选字段、文档和静态验证条目。
 
 ## 结果记录
+
+2026-05-01 状态对齐：
+
+- 当前 `main` 已包含 `internal/transfer/gateway` adapter、accepted-message 到 Gateway `message_received` event 的转换、recipient result 映射、worker idempotency/retry decision 单元测试和设计文档。
+- 该计划原本只剩历史 feature 分支提交/推送事项；当前已由 main 集成覆盖，因此从 active 归档到 completed。
+- 本计划没有实现真实 Kafka consumer、outbox publisher/polling、Redis 跨实例路由、远程 Gateway 网络调用、offline push、delivery ACK persistence 或 read receipt `message.read` fanout。
+- 本次只做文档状态对齐，未启动真实依赖，也未声称端到端验证。
 
 已完成 Transfer Gateway Dispatcher adapter、单元测试、设计文档和静态验证条目。
 
