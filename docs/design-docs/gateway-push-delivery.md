@@ -46,6 +46,8 @@ type Dispatcher interface {
 
 `DeliverToConversation` deliberately receives resolved recipient user IDs. Gateway does not own conversation membership. The future Message Transfer worker or its upstream message pipeline should resolve recipients from Message Service or IM Core ownership and then call the dispatcher.
 
+For the synchronous WebSocket `send_message` path, MessageLogic returns the same post-acceptance recipient list used to create `delivery_attempts` and outbox/Kafka `receiver_ids`: single-chat receiver, or active group participants excluding the sender. Gateway immediate push uses that resolved list and skips fanout on idempotent duplicate sends, keeping command response schema unchanged.
+
 Delivery results are per-recipient and include:
 
 - `delivered` when at least one local WebSocket connection received the event;

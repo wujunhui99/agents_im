@@ -121,7 +121,7 @@ func trimDeliveryLastError(value string) string {
 	return value[:maxDeliveryAttemptLastErrorLength]
 }
 
-func deliveryAttemptRecipientUserIDs(input CreateMessageInput) []string {
+func DeliveryRecipientUserIDs(input CreateMessageInput) []string {
 	seen := make(map[string]struct{})
 	add := func(userID string) {
 		userID = strings.TrimSpace(userID)
@@ -146,4 +146,8 @@ func deliveryAttemptRecipientUserIDs(input CreateMessageInput) []string {
 	}
 	sort.Strings(recipients)
 	return recipients
+}
+
+func deliveryAttemptRecipientUserIDs(input CreateMessageInput) []string {
+	return DeliveryRecipientUserIDs(input)
 }
