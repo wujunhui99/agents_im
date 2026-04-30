@@ -212,7 +212,7 @@ func (l *MessageLogic) MarkConversationAsRead(ctx context.Context, req MarkConve
 }
 
 func (l *MessageLogic) normalizeSendMessage(ctx context.Context, req SendMessageRequest) (repository.CreateMessageInput, error) {
-	senderID, err := normalizeMessageRequiredID(req.SenderID, "sender_id")
+	senderID, err := normalizeMessageConversationComponentID(req.SenderID, "sender_id")
 	if err != nil {
 		return repository.CreateMessageInput{}, err
 	}
@@ -243,7 +243,7 @@ func (l *MessageLogic) normalizeSendMessage(ctx context.Context, req SendMessage
 
 	switch chatType {
 	case MessageChatTypeSingle:
-		receiverID, err := normalizeMessageRequiredID(req.ReceiverID, "receiver_id")
+		receiverID, err := normalizeMessageConversationComponentID(req.ReceiverID, "receiver_id")
 		if err != nil {
 			return repository.CreateMessageInput{}, err
 		}
@@ -262,7 +262,7 @@ func (l *MessageLogic) normalizeSendMessage(ctx context.Context, req SendMessage
 		input.ReceiverID = receiverID
 		input.ParticipantUserIDs = []string{senderID, receiverID}
 	case MessageChatTypeGroup:
-		groupID, err := normalizeMessageRequiredID(req.GroupID, "group_id")
+		groupID, err := normalizeMessageConversationComponentID(req.GroupID, "group_id")
 		if err != nil {
 			return repository.CreateMessageInput{}, err
 		}
@@ -332,6 +332,20 @@ func normalizeMessageRequiredID(value string, field string) (string, error) {
 	if len([]rune(value)) > 128 {
 		return "", apperror.InvalidArgument(field + " must be 128 characters or fewer")
 	}
+	if strings.Contains(value, "\x00") {
+		return "", apperror.InvalidArgument(field + " cannot contain NUL")
+	}
+	return value, nil
+}
+
+func normalizeMessageConversationComponentID(value string, field string) (string, error) {
+	value, err := normalizeMessageRequiredID(value, field)
+	if err != nil {
+		return "", err
+	}
+	if strings.Contains(value, ":") {
+		return "", apperror.InvalidArgument(field + " cannot contain ':'")
+	}
 	return value, nil
 }
 
@@ -342,6 +356,9 @@ func normalizeConversationID(value string) (string, error) {
 	}
 	if len([]rune(value)) > 256 {
 		return "", apperror.InvalidArgument("conversation_id must be 256 characters or fewer")
+	}
+	if strings.Contains(value, "\x00") {
+		return "", apperror.InvalidArgument("conversation_id cannot contain NUL")
 	}
 	return value, nil
 }

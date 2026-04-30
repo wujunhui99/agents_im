@@ -69,7 +69,7 @@ func NewPostgresMessageRepositoryFromConn(conn sqlx.SqlConn) *PostgresMessageRep
 }
 
 func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context, input CreateMessageInput) (Message, bool, error) {
-	conversationID, err := inputConversationID(input)
+	conversationID, err := validateCreateMessageInput(input)
 	if err != nil {
 		return Message{}, false, err
 	}
@@ -150,6 +150,12 @@ func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context,
 }
 
 func (r *PostgresMessageRepository) GetMessages(ctx context.Context, conversationID string, fromSeq, toSeq int64, limit int, order string) ([]Message, bool, int64, error) {
+	var err error
+	fromSeq, toSeq, limit, order, err = normalizeMessagePullRange(fromSeq, toSeq, limit, order)
+	if err != nil {
+		return nil, false, 0, err
+	}
+
 	var maxSeq int64
 	if err := r.conn.QueryRowCtx(ctx, &maxSeq, `
 select max_seq from conversation_threads where conversation_id = $1
@@ -160,25 +166,11 @@ select max_seq from conversation_threads where conversation_id = $1
 		return nil, false, 0, err
 	}
 
-	if fromSeq <= 0 {
-		fromSeq = 1
-	}
 	if toSeq <= 0 || toSeq > maxSeq {
 		toSeq = maxSeq
 	}
-	if limit <= 0 {
-		limit = 50
-	}
 	if fromSeq > toSeq || maxSeq == 0 {
 		return []Message{}, true, fromSeq, nil
-	}
-
-	order = strings.ToLower(strings.TrimSpace(order))
-	if order == "" {
-		order = MessageStorageOrderAsc
-	}
-	if order != MessageStorageOrderAsc && order != MessageStorageOrderDesc {
-		return nil, false, 0, apperror.InvalidArgument("order must be asc or desc")
 	}
 
 	query := `

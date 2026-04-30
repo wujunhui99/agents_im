@@ -62,7 +62,7 @@ func NewMemoryMessageRepository() *MemoryMessageRepository {
 }
 
 func (r *MemoryMessageRepository) CreateMessageIdempotent(_ context.Context, input CreateMessageInput) (Message, bool, error) {
-	conversationID, err := inputConversationID(input)
+	conversationID, err := validateCreateMessageInput(input)
 	if err != nil {
 		return Message{}, false, err
 	}
@@ -229,6 +229,12 @@ func (r *MemoryMessageRepository) MarkFailed(_ context.Context, eventID string, 
 }
 
 func (r *MemoryMessageRepository) GetMessages(_ context.Context, conversationID string, fromSeq, toSeq int64, limit int, order string) ([]Message, bool, int64, error) {
+	var err error
+	fromSeq, toSeq, limit, order, err = normalizeMessagePullRange(fromSeq, toSeq, limit, order)
+	if err != nil {
+		return nil, false, 0, err
+	}
+
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -236,14 +242,8 @@ func (r *MemoryMessageRepository) GetMessages(_ context.Context, conversationID 
 	if !exists {
 		return nil, false, 0, apperror.NotFound("conversation not found")
 	}
-	if fromSeq <= 0 {
-		fromSeq = 1
-	}
 	if toSeq <= 0 || toSeq > conversation.maxSeq {
 		toSeq = conversation.maxSeq
-	}
-	if limit <= 0 {
-		limit = 50
 	}
 	if fromSeq > toSeq || conversation.maxSeq == 0 {
 		return []Message{}, true, fromSeq, nil
@@ -446,9 +446,35 @@ func (r *MemoryMessageRepository) lockedOutboxEventLocked(eventID string, worker
 func inputConversationID(input CreateMessageInput) (string, error) {
 	switch input.ChatType {
 	case ChatTypeSingle:
-		return SingleConversationID(input.SenderID, input.ReceiverID), nil
+		if err := validateMessageConversationComponentID(input.SenderID, "sender_id"); err != nil {
+			return "", err
+		}
+		if err := validateMessageConversationComponentID(input.ReceiverID, "receiver_id"); err != nil {
+			return "", err
+		}
+		if input.SenderID == input.ReceiverID {
+			return "", apperror.InvalidArgument("sender_id and receiver_id must be different")
+		}
+		if strings.TrimSpace(input.GroupID) != "" {
+			return "", apperror.InvalidArgument("group_id must be empty for single chat")
+		}
+		conversationID := SingleConversationID(input.SenderID, input.ReceiverID)
+		if err := validateMessageConversationID(conversationID); err != nil {
+			return "", err
+		}
+		return conversationID, nil
 	case ChatTypeGroup:
-		return GroupConversationID(input.GroupID), nil
+		if err := validateMessageConversationComponentID(input.GroupID, "group_id"); err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(input.ReceiverID) != "" {
+			return "", apperror.InvalidArgument("receiver_id must be empty for group chat")
+		}
+		conversationID := GroupConversationID(input.GroupID)
+		if err := validateMessageConversationID(conversationID); err != nil {
+			return "", err
+		}
+		return conversationID, nil
 	default:
 		return "", apperror.InvalidArgument("chat_type must be single or group")
 	}

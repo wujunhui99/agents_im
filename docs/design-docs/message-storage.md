@@ -142,6 +142,15 @@ group:{group_id}
 
 The storage layer should expose a single helper for this derivation so handlers, logic, and repository code do not duplicate string formatting.
 
+Conversation ID components are validated before storage:
+
+- `sender_id`, `receiver_id`, and `group_id` must be non-empty canonical service IDs, 128 characters or fewer.
+- Components must not contain `:` because it is the `conversation_id` delimiter.
+- Components and `client_msg_id` must not contain NUL because memory idempotency/read-state keys and PostgreSQL text storage must not accept hidden delimiters.
+- The derived `conversation_id` must be 256 characters or fewer so a successfully sent message can later be pulled through the public conversation APIs.
+
+Current User and Group services generate `usr_...` and `grp_...` IDs, and user-facing `identifier` values are not used as conversation ID components.
+
 ### user_conversation_states
 
 Stores per-user read state and conversation visibility.
@@ -290,6 +299,14 @@ Pull is a read-only operation:
 
 The repository should not advance `has_read_seq` during pull. Read state changes only through send-side sender advancement or explicit mark-as-read.
 
+Pagination validation is shared by memory and PostgreSQL implementations:
+
+- `from_seq`, `to_seq`, and `limit` must not be negative.
+- `from_seq = 0` defaults to 1.
+- `to_seq = 0` or beyond current max seq is clipped to current max seq.
+- `limit = 0` defaults to 50; values above 500 are clipped to 500 and fetched with `limit + 1` to compute `is_end`.
+- `order` must normalize to `asc` or `desc` before any SQL is built; invalid or malicious order strings return `INVALID_ARGUMENT`.
+
 ### GetConversationSeqStates
 
 This can be a read-only query joining `conversation_threads`, `user_conversation_states`, and optionally the last message:
@@ -397,6 +414,22 @@ Storage implementation is acceptable when these checks pass:
 - mark-as-read rejects seq greater than `max_seq`;
 - mark-as-read with a lower seq does not reduce `has_read_seq`;
 - static verification confirms storage docs are present.
+
+Repository contract tests live in `internal/repository` and run against memory by default:
+
+```bash
+go test ./internal/repository
+```
+
+PostgreSQL contract tests are opt-in so ordinary local tests do not require middleware. Use a disposable development database with migrations allowed:
+
+```bash
+AGENTS_IM_TEST_POSTGRES_CONTRACT=1 \
+DATABASE_URL=postgres://agents_im:agents_im_dev_password@localhost:5432/agents_im?sslmode=disable \
+go test ./internal/repository
+```
+
+`AGENTS_IM_POSTGRES_DSN` may be used instead of `DATABASE_URL`. The opt-in test applies `db/migrations/*.sql` and uses unique message IDs rather than truncating existing data.
 
 ## Risks and Tradeoffs
 
