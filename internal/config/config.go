@@ -127,6 +127,7 @@ const (
 )
 
 var ErrDeepSeekAPIKeyMissing = errors.New("deepseek API key is required: set DEEPSEEK_API_KEY")
+var ErrDeepSeekAPIKeyPlaceholder = errors.New("deepseek API key is a placeholder: set a real DEEPSEEK_API_KEY")
 
 func DefaultAPIConfig() APIConfig {
 	return APIConfig{
@@ -556,10 +557,29 @@ func ResolveDeepSeekConfig(cfg DeepSeekConfig) DeepSeekConfig {
 
 func ValidateDeepSeekConfig(cfg DeepSeekConfig) error {
 	cfg = ResolveDeepSeekConfig(cfg)
-	if strings.TrimSpace(cfg.APIKey) == "" {
+	apiKey := strings.TrimSpace(cfg.APIKey)
+	if apiKey == "" {
 		return ErrDeepSeekAPIKeyMissing
 	}
+	if isPlaceholderDeepSeekAPIKey(apiKey) {
+		return ErrDeepSeekAPIKeyPlaceholder
+	}
 	return nil
+}
+
+func isPlaceholderDeepSeekAPIKey(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch normalized {
+	case "replace-with-local-deepseek-api-key",
+		"replace-with-your-deepseek-api-key",
+		"your-deepseek-api-key",
+		"your_deepseek_api_key",
+		"deepseek-api-key",
+		"test-deepseek-api-key":
+		return true
+	default:
+		return strings.Contains(normalized, "placeholder") || strings.HasPrefix(normalized, "replace-with-")
+	}
 }
 
 func redisConfigFromValues(values map[string]string) (RedisConfig, error) {
