@@ -204,11 +204,11 @@ required_files=(
   "web/src/styles.css"
   "web/src/vite-env.d.ts"
   "docs/design-docs/read-receipts.md"
-  "docs/exec-plans/active/user-service-go-zero.md"
-  "docs/exec-plans/active/auth-service-go-zero.md"
-  "docs/exec-plans/active/friends-service-go-zero.md"
-  "docs/exec-plans/active/groups-service-go-zero.md"
-  "docs/exec-plans/active/message-storage.md"
+  "docs/exec-plans/completed/user-service-go-zero.md"
+  "docs/exec-plans/completed/auth-service-go-zero.md"
+  "docs/exec-plans/completed/friends-service-go-zero.md"
+  "docs/exec-plans/completed/groups-service-go-zero.md"
+  "docs/exec-plans/completed/message-storage.md"
   "docs/exec-plans/active/message-outbox.md"
   "internal/repository/message_storage_contract.go"
   "docker-compose.yml"
@@ -219,18 +219,18 @@ required_files=(
   "scripts/dev-demo-data.sh"
   "tests/postgres_persistence_integration_test.go"
   "tests/mvp_backend_test.go"
-  "docs/exec-plans/active/gateway-message-contract.md"
+  "docs/exec-plans/completed/gateway-message-contract.md"
   "docs/exec-plans/active/redis-presence.md"
   "docs/exec-plans/active/read-receipts.md"
-  "docs/exec-plans/active/remove-handwritten-compat.md"
+  "docs/exec-plans/completed/remove-handwritten-compat.md"
   "docs/exec-plans/active/jwt-auth-middleware.md"
-  "docs/exec-plans/active/websocket-gateway.md"
+  "docs/exec-plans/completed/websocket-gateway.md"
   "docs/exec-plans/active/kafka-redpanda-compose.md"
   "docs/exec-plans/active/message-transfer-worker.md"
   "docs/exec-plans/active/kafka-transfer-consumer.md"
-  "docs/exec-plans/active/gateway-push-delivery.md"
-  "docs/exec-plans/active/transfer-gateway-dispatcher.md"
-  "docs/exec-plans/active/gateway-presence-routing.md"
+  "docs/exec-plans/completed/gateway-push-delivery.md"
+  "docs/exec-plans/completed/transfer-gateway-dispatcher.md"
+  "docs/exec-plans/completed/gateway-presence-routing.md"
   "docs/exec-plans/active/agent-system-v0.md"
   "docs/exec-plans/active/agent-infrastructure-parallel-baseline.md"
 )
@@ -661,7 +661,7 @@ websocket_gateway_patterns=(
 )
 
 for pattern in "${websocket_gateway_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/websocket-gateway.md docs/exec-plans/active/websocket-gateway.md
+  rg -q "$pattern" docs/design-docs/websocket-gateway.md docs/exec-plans/completed/websocket-gateway.md
 done
 
 websocket_gateway_code_patterns=(
@@ -681,7 +681,7 @@ done
 
 rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
 rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
-rg -q "websocket-gateway" docs/exec-plans/active/websocket-gateway.md
+rg -q "websocket-gateway" docs/exec-plans/completed/websocket-gateway.md
 
 websocket_reconnect_sync_patterns=(
   "requestId"
@@ -868,7 +868,7 @@ gateway_delivery_doc_patterns=(
 )
 
 for pattern in "${gateway_delivery_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/gateway-push-delivery.md docs/exec-plans/active/gateway-push-delivery.md
+  rg -q "$pattern" docs/design-docs/gateway-push-delivery.md docs/exec-plans/completed/gateway-push-delivery.md
 done
 
 rg -q "gateway-push-delivery.md" ARCHITECTURE.md docs/design-docs/index.md
@@ -911,7 +911,7 @@ transfer_gateway_dispatcher_doc_patterns=(
 )
 
 for pattern in "${transfer_gateway_dispatcher_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/transfer-gateway-dispatcher.md docs/exec-plans/active/transfer-gateway-dispatcher.md
+  rg -q "$pattern" docs/design-docs/transfer-gateway-dispatcher.md docs/exec-plans/completed/transfer-gateway-dispatcher.md
 done
 
 rg -q "transfer-gateway-dispatcher.md" ARCHITECTURE.md docs/design-docs/index.md
@@ -997,7 +997,7 @@ gateway_presence_routing_doc_patterns=(
 )
 
 for pattern in "${gateway_presence_routing_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/gateway-presence-routing.md docs/exec-plans/active/gateway-presence-routing.md
+  rg -q "$pattern" docs/design-docs/gateway-presence-routing.md docs/exec-plans/completed/gateway-presence-routing.md
 done
 
 rg -q "gateway-presence-routing.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/websocket-gateway.md docs/design-docs/gateway-push-delivery.md
