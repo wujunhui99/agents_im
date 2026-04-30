@@ -2,6 +2,8 @@
 
 状态：Completed
 
+归档日期：2026-05-01
+
 ## 背景
 
 WebSocket Gateway 已具备 JWT handshake、连接管理、同步 message command router 和本进程内 push fanout。Redis Presence 已提供 `PresenceStore` 契约、memory 实现和 Redis 实现。当前分支负责把 Gateway 连接生命周期接入 Presence，并为后续跨 Gateway 实例投递补齐路由元数据。
@@ -67,6 +69,13 @@ git status --short --branch
 - 回滚：移除 Gateway `PresenceStore` option/wiring、route metadata、presence-aware dispatcher 分支和对应测试/文档/静态验证条目。
 
 ## 结果记录
+
+2026-05-01 状态对齐：
+
+- 当前 `main` 已包含 Gateway 连接生命周期写入 `PresenceStore`、heartbeat/pong TTL refresh、disconnect unregister、presence-aware delivery routing seam 和 `routed` result。
+- 该计划已无 active 剩余任务，因此从 active 归档到 completed。
+- 本计划没有实现跨 Gateway 进程 RPC、生产 Message Transfer wiring、offline push、delivery ACK worker 或 read receipt push ACK；`routed` 仍只是未来跨实例 transport 的 seam。
+- 本次只做文档状态对齐，未启动真实依赖，也未声称端到端验证。
 
 已完成 Gateway 连接生命周期到 `PresenceStore` 的接入、heartbeat TTL refresh、disconnect unregister、presence-aware delivery routing seam、route metadata、memory-only 默认测试路径、设计文档和静态验证脚本更新。
 
