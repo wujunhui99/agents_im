@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	zrpc.RpcServerConf
-	JWTAuth      commonconfig.JWTAuthConfig
+	JWTAuth       commonconfig.JWTAuthConfig
 	StorageDriver string `json:",default=memory,options=[memory|postgres]"`
 	DataSource    string `json:",optional"`
 }
