@@ -1,6 +1,7 @@
 # Auth Service Go-Zero
 
-状态：Active
+状态：Completed
+Completed: 2026-05-01
 
 ## 背景
 
@@ -41,7 +42,7 @@
 - [x] Task 9：补充单元测试覆盖注册成功、重复账号、登录成功、密码错误、token 校验。
 - [x] Task 10：运行 gofmt、`go test ./...`、`scripts/verify-static.sh` 并记录结果。
 - [x] Task 11：Evaluator 检查代码、测试、文档一致性，修复问题。
-- [ ] Task 12：提交当前 feature 分支（Blocked：当前沙箱无法写入 worktree 的 git metadata）。
+- [x] Task 12：历史 feature 分支实现已集成到 `main`；本计划归档。
 
 ## 决策日志
 
@@ -57,7 +58,7 @@
 - 已阅读当前 worktree `AGENTS.md`。
 - 已阅读 `docs/product-specs/user-service.md`。
 - 已阅读 `docs/design-docs/user-service-go-zero.md`。
-- 已阅读 `docs/exec-plans/active/user-service-go-zero.md`。
+- 已阅读 `docs/exec-plans/completed/user-service-go-zero.md`。
 - 已阅读外层 `/home/ws/project/AGENTS.md`。
 - 已阅读 `/home/ws/project/ARCHITECTURE.md`。
 - 已阅读 `/home/ws/project/docs/PLANS.md`。
@@ -151,7 +152,12 @@ goctl version:
 - `POST /auth/validate` 避免与 user 的 `/me` 冲突。
 - auth HTTP 响应和测试断言均不泄露明文密码、password hash 或 salt。
 
-## BLOCKER
+## 归档记录
 
-- `goctl version` 当前返回 `/bin/bash: line 1: goctl: command not found`，因此本阶段手写 go-zero 风格结构，后续工具可用后再用 goctl 校准。
-- `git add` 当前返回 `fatal: Unable to create '/home/ws/project/agents_im/.git/worktrees/auth/index.lock': Read-only file system`。代码与文档已完成并验证，但当前沙箱不能写入该 worktree 的 git metadata，因此无法在本会话内完成提交。
+- 2026-05-01：当前 `main`/`HEAD` 为 `e1fdba70ede044879775c13fa31c1025f4a1b371`，已包含 `api/auth.api`、`proto/auth.proto`、`cmd/auth-*`、`internal/auth`、`internal/rpcgen/auth`、auth 产品规格、设计文档和 `tests/auth_service_test.go`。原计划只剩历史“提交 feature 分支”事项，主干已包含对应实现，因此移至 `completed`。
+- 本次归档不改业务代码，后续验证以 `bash scripts/verify-static.sh` 和 `git diff --check` 为准。
+
+## 历史 BLOCKER
+
+- 历史执行时 `goctl version` 返回 `/bin/bash: line 1: goctl: command not found`，因此该阶段手写 go-zero 风格结构，后续工具可用后再用 goctl 校准。
+- 历史执行时 `git add` 返回 `fatal: Unable to create '/home/ws/project/agents_im/.git/worktrees/auth/index.lock': Read-only file system`。当前主干已包含对应实现，本项不再阻塞归档。
