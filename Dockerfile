@@ -1,13 +1,15 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.7
 FROM golang:1.25-alpine AS backend-builder
 WORKDIR /src
 RUN apk add --no-cache git
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 ARG SERVICE
 RUN test -n "$SERVICE"
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o /out/${SERVICE} ./cmd/${SERVICE}
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o /out/${SERVICE} ./cmd/${SERVICE}
 
 FROM alpine:3.22 AS backend
 RUN apk add --no-cache ca-certificates tzdata
@@ -21,7 +23,7 @@ ENTRYPOINT ["/app/service"]
 FROM node:22-alpine AS web-builder
 WORKDIR /src/web
 COPY web/package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 COPY web ./
 ARG VITE_API_BASE_URL=/
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
