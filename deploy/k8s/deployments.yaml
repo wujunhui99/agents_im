@@ -1,0 +1,687 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-api
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-api
+  template:
+    metadata:
+      labels:
+        app: user-api
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: user-api
+          image: ghcr.io/wujunhui99/agents_im/user-api:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/user-api.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-api
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-api
+  template:
+    metadata:
+      labels:
+        app: auth-api
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: auth-api
+          image: ghcr.io/wujunhui99/agents_im/auth-api:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/auth-api.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: friends-api
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: friends-api
+  template:
+    metadata:
+      labels:
+        app: friends-api
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: friends-api
+          image: ghcr.io/wujunhui99/agents_im/friends-api:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/friends-api.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8082
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: message-api
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: message-api
+  template:
+    metadata:
+      labels:
+        app: message-api
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: message-api
+          image: ghcr.io/wujunhui99/agents_im/message-api:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/message-api.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8083
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-ws
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway-ws
+  template:
+    metadata:
+      labels:
+        app: gateway-ws
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: gateway-ws
+          image: ghcr.io/wujunhui99/agents_im/gateway-ws:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/gateway-ws.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8084
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: groups-api
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: groups-api
+  template:
+    metadata:
+      labels:
+        app: groups-api
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: groups-api
+          image: ghcr.io/wujunhui99/agents_im/groups-api:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/groups-api.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8085
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-api
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent-api
+  template:
+    metadata:
+      labels:
+        app: agent-api
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: agent-api
+          image: ghcr.io/wujunhui99/agents_im/agent-api:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/agent-api.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8086
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: message-transfer
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: message-transfer
+  template:
+    metadata:
+      labels:
+        app: message-transfer
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: message-transfer
+          image: ghcr.io/wujunhui99/agents_im/message-transfer:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/message-transfer.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8087
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-rpc
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-rpc
+  template:
+    metadata:
+      labels:
+        app: user-rpc
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: user-rpc
+          image: ghcr.io/wujunhui99/agents_im/user-rpc:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/user-rpc.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: grpc
+              containerPort: 9090
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-rpc
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-rpc
+  template:
+    metadata:
+      labels:
+        app: auth-rpc
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: auth-rpc
+          image: ghcr.io/wujunhui99/agents_im/auth-rpc:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/auth-rpc.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: grpc
+              containerPort: 9091
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: friends-rpc
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: friends-rpc
+  template:
+    metadata:
+      labels:
+        app: friends-rpc
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: friends-rpc
+          image: ghcr.io/wujunhui99/agents_im/friends-rpc:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/friends-rpc.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: grpc
+              containerPort: 9092
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: groups-rpc
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: groups-rpc
+  template:
+    metadata:
+      labels:
+        app: groups-rpc
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: groups-rpc
+          image: ghcr.io/wujunhui99/agents_im/groups-rpc:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/groups-rpc.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: grpc
+              containerPort: 9093
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: message-rpc
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: message-rpc
+  template:
+    metadata:
+      labels:
+        app: message-rpc
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: message-rpc
+          image: ghcr.io/wujunhui99/agents_im/message-rpc:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/message-rpc.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: grpc
+              containerPort: 9094
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/wujunhui99/agents_im/web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10

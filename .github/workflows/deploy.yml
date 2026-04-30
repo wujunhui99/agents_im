@@ -1,0 +1,107 @@
+name: Deploy to k3s
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ghcr.io/${{ github.repository }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-deploy:
+    name: Build images and deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend images
+        shell: bash
+        run: |
+          set -euo pipefail
+          services=(
+            user-api
+            auth-api
+            friends-api
+            message-api
+            gateway-ws
+            groups-api
+            agent-api
+            message-transfer
+            user-rpc
+            auth-rpc
+            friends-rpc
+            groups-rpc
+            message-rpc
+          )
+          for service in "${services[@]}"; do
+            docker buildx build \
+              --target backend \
+              --build-arg SERVICE="${service}" \
+              --tag "${IMAGE_NAMESPACE}/${service}:${GITHUB_SHA}" \
+              --tag "${IMAGE_NAMESPACE}/${service}:latest" \
+              --push \
+              .
+          done
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: web
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAMESPACE }}/web:${{ github.sha }}
+            ${{ env.IMAGE_NAMESPACE }}/web:latest
+
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: Deploy on server
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          IMAGE_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
+          IMAGE_TAG: ${{ github.sha }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          port="${SERVER_PORT:-22}"
+          : "${SERVER_HOST:?SERVER_HOST secret is required}"
+          : "${SERVER_USER:?SERVER_USER secret is required}"
+          remote="${SERVER_USER}@${SERVER_HOST}"
+          ssh_opts=(-o StrictHostKeyChecking=accept-new -p "${port}")
+
+          ssh "${ssh_opts[@]}" "${remote}" 'mkdir -p /opt/agents-im/repo'
+          tar \
+            --exclude='.git' \
+            --exclude='.dev' \
+            --exclude='web/node_modules' \
+            --exclude='web/dist' \
+            -czf - . | ssh "${ssh_opts[@]}" "${remote}" 'tar -xzf - -C /opt/agents-im/repo'
+
+          ssh "${ssh_opts[@]}" "${remote}" \
+            "cd /opt/agents-im/repo && IMAGE_REGISTRY='${IMAGE_NAMESPACE}' IMAGE_TAG='${IMAGE_TAG}' GHCR_USERNAME='${GHCR_USERNAME}' GHCR_TOKEN='${GHCR_TOKEN}' MIDDLEWARE_DIR=/opt/agents-im/middleware ./scripts/deploy-k3s.sh"

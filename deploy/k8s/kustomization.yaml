@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - services.yaml
+  - deployments.yaml
+  - ingress.yaml
+configMapGenerator:
+  - name: agents-im-etc
+    namespace: agents-im
+    files:
+      - etc/user-api.yaml
+      - etc/auth-api.yaml
+      - etc/friends-api.yaml
+      - etc/message-api.yaml
+      - etc/gateway-ws.yaml
+      - etc/groups-api.yaml
+      - etc/agent-api.yaml
+      - etc/message-transfer.yaml
+      - etc/user-rpc.yaml
+      - etc/auth-rpc.yaml
+      - etc/friends-rpc.yaml
+      - etc/groups-rpc.yaml
+      - etc/message-rpc.yaml
+generatorOptions:
+  disableNameSuffixHash: true

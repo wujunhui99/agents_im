@@ -1,0 +1,17 @@
+Name: gateway-ws
+Host: 0.0.0.0
+Port: 8084
+
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: 86400
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
+Presence:
+  Driver: redis
+  HeartbeatTTLSeconds: 60
+  KeyPrefix: agents_im:presence
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}

@@ -1,0 +1,9 @@
+Name: friends-api
+Host: 0.0.0.0
+Port: 8082
+
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: 86400
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
