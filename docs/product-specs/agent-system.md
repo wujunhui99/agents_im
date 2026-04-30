@@ -97,11 +97,9 @@ Agent 是由 profile、系统提示词、工具、skills、模型配置和运行
 - Agent 可以被加入单聊或群聊。
 - Agent 接收到 IM 事件后，根据策略决定是否响应。
 
-#### 当前管理基础接口
+#### 当前管理和运行基础接口
 
-当前 Agent profile 管理基础不实现 LLM run、prompt/tool/skill 执行或 Python runtime。
-
-当前 REST 契约见 [`../../api/agent.api`](../../api/agent.api)，覆盖：
+当前 Agent profile 管理 REST 契约见 [`../../api/agent.api`](../../api/agent.api)，覆盖：
 
 - `POST /agents`：创建 Agent profile，绑定已有 IM 用户；
 - `GET /agents`：按 `status`、`created_by` 可选过滤列表；
@@ -118,11 +116,11 @@ Agent 是由 profile、系统提示词、工具、skills、模型配置和运行
 
 ### Model Provider Config
 
-当前 Agent runtime provider 基线使用 CloudWeGo Eino 和 DeepSeek ChatModel adapter。它只负责构造真实 ChatModel，不执行 Agent 编排、不写回 IM、不执行工具。
+当前 Agent runtime provider 基线使用 CloudWeGo Eino 和 DeepSeek ChatModel adapter。DeepSeek adapter 负责构造真实 ChatModel；IM runner 负责把规范化 runtime result 通过 Message Service 写回 IM；工具执行仍保持 fail-closed adapter seam，缺少显式安全 adapter 时不得执行。
 
 配置来源：
 
-- `DEEPSEEK_API_KEY`：必填；缺失时生产 adapter 必须失败。
+- `DEEPSEEK_API_KEY`：必填；缺失或仍为 `.env.example` 占位值时生产 adapter 必须失败。
 - `DEEPSEEK_BASE_URL`：可选，默认 `https://api.deepseek.com`。
 - `DEEPSEEK_MODEL`：可选，默认 `deepseek-v4-pro`。
 

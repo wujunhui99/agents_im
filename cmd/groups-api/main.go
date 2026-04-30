@@ -24,9 +24,17 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	userLogic := logic.NewUserLogic(repository.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource))
+	userRepo, err := repository.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build user repository: %v", err)
+	}
+	groupsRepo, err := repository.NewGroupsRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build groups repository: %v", err)
+	}
+	userLogic := logic.NewUserLogic(userRepo)
 	serviceContext := svc.NewGroupsServiceContextWithAuth(
-		repository.MustGroupsRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
+		groupsRepo,
 		logic.NewUserLogicExistenceChecker(userLogic),
 		cfg.Auth,
 	)

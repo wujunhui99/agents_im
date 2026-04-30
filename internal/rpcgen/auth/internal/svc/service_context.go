@@ -1,6 +1,7 @@
 package svc
 
 import (
+	"log"
 	"time"
 
 	business "github.com/wujunhui99/agents_im/internal/auth/logic"
@@ -20,8 +21,15 @@ type ServiceContext struct {
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	userLogic := userlogic.NewUserLogic(userrepo.MustRepositoryForStorage(c.StorageDriver, c.DataSource))
-	authRepo := authrepo.MustRepositoryForStorage(c.StorageDriver, c.DataSource)
+	userRepo, err := userrepo.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
+	if err != nil {
+		log.Fatalf("build user repository: %v", err)
+	}
+	authRepo, err := authrepo.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
+	if err != nil {
+		log.Fatalf("build auth repository: %v", err)
+	}
+	userLogic := userlogic.NewUserLogic(userRepo)
 	return &ServiceContext{
 		Config:    c,
 		AuthLogic: business.NewAuthLogic(authRepo, useradapter.NewLogicClient(userLogic), business.NewPasswordHasher(), token.NewHMACTokenManager(c.Auth.AccessSecret, time.Duration(c.Auth.AccessExpire)*time.Second)),

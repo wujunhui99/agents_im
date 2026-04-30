@@ -50,14 +50,6 @@ func NewStore(presenceConfig config.PresenceConfig, redisConfig config.RedisConf
 	}
 }
 
-func MustStore(presenceConfig config.PresenceConfig, redisConfig config.RedisConfig) PresenceStore {
-	store, err := NewStore(presenceConfig, redisConfig)
-	if err != nil {
-		panic(err)
-	}
-	return store
-}
-
 func HeartbeatTTL(presenceConfig config.PresenceConfig) time.Duration {
 	if presenceConfig.HeartbeatTTLSeconds <= 0 {
 		presenceConfig = config.DefaultPresenceConfig()

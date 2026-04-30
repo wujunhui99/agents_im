@@ -24,10 +24,17 @@ func main() {
 		log.Fatalf("load api config: %v", err)
 	}
 
-	userRepo := repository.MustRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	userRepo, err := repository.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build user repository: %v", err)
+	}
+	agentRepo, err := repository.NewAgentRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent repository: %v", err)
+	}
 	userLogic := logic.NewUserLogic(userRepo)
 	serviceContext := svc.NewAgentServiceContextWithAuth(
-		repository.MustAgentRepositoryForStorage(cfg.StorageDriver, cfg.DataSource),
+		agentRepo,
 		logic.NewUserLogicAccountTypeChecker(userLogic),
 		cfg.Auth,
 	)

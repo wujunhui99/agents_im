@@ -37,14 +37,6 @@ func NewRepositoryForStorage(driver string, dataSource string) (Repository, erro
 	return NewPostgresRepository(appconfig.ResolveDataSource(dataSource))
 }
 
-func MustRepositoryForStorage(driver string, dataSource string) Repository {
-	repo, err := NewRepositoryForStorage(driver, dataSource)
-	if err != nil {
-		panic(err)
-	}
-	return repo
-}
-
 func NewGroupsRepositoryForStorage(driver string, dataSource string) (GroupsRepository, error) {
 	storageDriver, err := repositoryStorageDriver(driver)
 	if err != nil {
@@ -54,14 +46,6 @@ func NewGroupsRepositoryForStorage(driver string, dataSource string) (GroupsRepo
 		return NewMemoryGroupsRepository(), nil
 	}
 	return NewPostgresGroupsRepository(appconfig.ResolveDataSource(dataSource))
-}
-
-func MustGroupsRepositoryForStorage(driver string, dataSource string) GroupsRepository {
-	repo, err := NewGroupsRepositoryForStorage(driver, dataSource)
-	if err != nil {
-		panic(err)
-	}
-	return repo
 }
 
 func NewMessageRepositoryForStorage(driver string, dataSource string) (MessageRepository, error) {
@@ -75,14 +59,6 @@ func NewMessageRepositoryForStorage(driver string, dataSource string) (MessageRe
 	return NewPostgresMessageRepository(appconfig.ResolveDataSource(dataSource))
 }
 
-func MustMessageRepositoryForStorage(driver string, dataSource string) MessageRepository {
-	repo, err := NewMessageRepositoryForStorage(driver, dataSource)
-	if err != nil {
-		panic(err)
-	}
-	return repo
-}
-
 func NewOutboxRepositoryForStorage(driver string, dataSource string) (OutboxRepository, error) {
 	storageDriver, err := repositoryStorageDriver(driver)
 	if err != nil {
@@ -92,14 +68,6 @@ func NewOutboxRepositoryForStorage(driver string, dataSource string) (OutboxRepo
 		return NewMemoryMessageRepository(), nil
 	}
 	return NewPostgresMessageRepository(appconfig.ResolveDataSource(dataSource))
-}
-
-func MustOutboxRepositoryForStorage(driver string, dataSource string) OutboxRepository {
-	repo, err := NewOutboxRepositoryForStorage(driver, dataSource)
-	if err != nil {
-		panic(err)
-	}
-	return repo
 }
 
 func NewAgentRepositoryForStorage(driver string, dataSource string) (AgentRepository, error) {
@@ -113,14 +81,6 @@ func NewAgentRepositoryForStorage(driver string, dataSource string) (AgentReposi
 	return NewPostgresRepository(appconfig.ResolveDataSource(dataSource))
 }
 
-func MustAgentRepositoryForStorage(driver string, dataSource string) AgentRepository {
-	repo, err := NewAgentRepositoryForStorage(driver, dataSource)
-	if err != nil {
-		panic(err)
-	}
-	return repo
-}
-
 func NewAgentAuditRepositoryForStorage(driver string, dataSource string) (AgentAuditRepository, error) {
 	storageDriver, err := repositoryStorageDriver(driver)
 	if err != nil {
@@ -132,14 +92,6 @@ func NewAgentAuditRepositoryForStorage(driver string, dataSource string) (AgentA
 	return NewPostgresAgentAuditRepository(appconfig.ResolveDataSource(dataSource))
 }
 
-func MustAgentAuditRepositoryForStorage(driver string, dataSource string) AgentAuditRepository {
-	repo, err := NewAgentAuditRepositoryForStorage(driver, dataSource)
-	if err != nil {
-		panic(err)
-	}
-	return repo
-}
-
 func NewAgentRegistryRepositoryForStorage(driver string, dataSource string) (AgentRegistryRepository, error) {
 	storageDriver, err := repositoryStorageDriver(driver)
 	if err != nil {
@@ -149,14 +101,6 @@ func NewAgentRegistryRepositoryForStorage(driver string, dataSource string) (Age
 		return NewMemoryAgentRegistryRepository(), nil
 	}
 	return NewPostgresAgentRegistryRepository(appconfig.ResolveDataSource(dataSource))
-}
-
-func MustAgentRegistryRepositoryForStorage(driver string, dataSource string) AgentRegistryRepository {
-	repo, err := NewAgentRegistryRepositoryForStorage(driver, dataSource)
-	if err != nil {
-		panic(err)
-	}
-	return repo
 }
 
 func repositoryStorageDriver(driver string) (string, error) {
