@@ -72,6 +72,7 @@ Frontend-visible WebSocket error codes for this MVP are:
 - `NOT_FOUND`
 - `CONFLICT`
 - `FORBIDDEN`
+- `RATE_LIMITED`
 - `INTERNAL`
 
 ## Reconnect Flow

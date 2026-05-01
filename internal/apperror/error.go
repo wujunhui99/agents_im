@@ -14,6 +14,7 @@ const (
 	CodeForbidden       Code = "FORBIDDEN"
 	CodeNotFound        Code = "NOT_FOUND"
 	CodeAlreadyExists   Code = "ALREADY_EXISTS"
+	CodeRateLimited     Code = "RATE_LIMITED"
 	CodeInternal        Code = "INTERNAL"
 )
 
@@ -50,6 +51,10 @@ func AlreadyExists(message string) *Error {
 	return New(CodeAlreadyExists, message)
 }
 
+func RateLimited(message string) *Error {
+	return New(CodeRateLimited, message)
+}
+
 func Internal(message string) *Error {
 	return New(CodeInternal, message)
 }
@@ -84,6 +89,8 @@ func HTTPStatus(err error) int {
 		return http.StatusNotFound
 	case CodeAlreadyExists:
 		return http.StatusConflict
+	case CodeRateLimited:
+		return http.StatusTooManyRequests
 	default:
 		return http.StatusInternalServerError
 	}
