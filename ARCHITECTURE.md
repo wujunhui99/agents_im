@@ -52,7 +52,11 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 ### Message Service
 
-负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为后续 Kafka、Message Transfer、Push 服务提供可靠事件源。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md) 和 [`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
+负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为后续 Kafka、Message Transfer、Push 服务提供可靠事件源。当前文本、图片、文件消息均通过同一消息链路写入；图片/文件消息必须引用已就绪、归发送者所有的 `media_objects` 记录。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md) 和 [`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
+
+### Media Service Surface
+
+第一阶段不新增独立 `media-api` 进程；媒体上传意图、上传完成校验、下载 URL 和头像绑定作为受保护 REST 路由挂在 `user-api` 上。`user-api` 负责创建私有对象存储 bucket、生成后端控制的 object key、签发上传/下载 URL，并把媒体元数据写入 PostgreSQL `media_objects`。Message API/RPC/Gateway 只验证媒体元数据的 owner、purpose、status、content type 和 size，不直接访问对象存储。
 
 ### Message Transfer Worker
 
@@ -106,6 +110,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 - PostgreSQL：持久化用户、会话、消息、Agent 配置、工具调用记录等核心数据。
 - Redis：缓存会话状态、在线状态、幂等键、热点数据和短期运行状态。Presence 场景中 Redis 只保存连接 hash、用户连接集合和短期 online marker；丢失后由 Gateway 连接重建，不作为持久业务数据权威。
+- MinIO/S3-compatible object storage：保存用户头像、图片消息和文件消息的二进制对象。PostgreSQL 的 `media_objects` 保存 owner、purpose、status、content type、size、sha256 和 object key；对象 key 由后端生成，客户端只能使用短时预签名 URL 上传/下载。
 
 ### Observability Stack
 
@@ -124,7 +129,7 @@ Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trac
 - deploy workflow 先执行 `detect-changes`：业务/镜像相关变更输出受影响后端服务列表和 `web_required`；纯 `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh` 或 deploy workflow 配置变更进入 config-only deploy；文档/Markdown-only 变更不部署。手动 `workflow_dispatch` 在 `main` 上保持完整构建部署语义。
 - 后端每个 Go API/RPC/worker 按动态服务矩阵构建独立镜像，web UI 仅在 web-owned 路径变更时构建独立镜像；镜像推送到 GHCR，并同时打 commit SHA 与 `latest` tag。
 - k3s 运行应用工作负载，包括所有 Go API、RPC、Message Transfer worker、Gateway WebSocket 和 web UI。
-- Docker Compose 运行服务器中间件 PostgreSQL、Redis、Redpanda；中间件配置位于 `/opt/agents-im/middleware/.env`，不进入 Git。
+- Docker Compose 运行服务器中间件 PostgreSQL、Redis、Redpanda、MinIO；中间件配置位于 `/opt/agents-im/middleware/.env`，不进入 Git。
 - `scripts/bootstrap-server.sh` 负责首次服务器初始化：写中间件 `.env`、启动 middleware、创建 k3s `agents-im-secrets`，并可创建 `ghcr-pull-secret`。
 - `scripts/deploy-k3s.sh` 负责常规发布：启动/确认中间件、从 k3s secret 读取 `DATABASE_URL` 执行 PostgreSQL migration、刷新 GHCR pull secret、应用 `deploy/k8s` manifests 并等待 rollout。选择性镜像发布通过 `IMAGE_SERVICES` 只更新已构建服务的镜像 tag；config-only deploy 会跳过镜像更新、middleware 和 migration，只对受影响 deployment 执行 `rollout restart` / `rollout status`。
 

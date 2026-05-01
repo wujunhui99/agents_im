@@ -328,9 +328,7 @@ for update
 }
 
 func insertMessage(ctx context.Context, session sqlx.Session, input CreateMessageInput, conversationID string, seq int64, payloadHash string, sendTime time.Time) (postgresMessageRow, error) {
-	contentJSON, err := json.Marshal(struct {
-		Text string `json:"text"`
-	}{Text: input.Content})
+	contentJSON, err := messageContentJSON(input)
 	if err != nil {
 		return postgresMessageRow{}, err
 	}
@@ -347,6 +345,19 @@ returning server_msg_id, client_msg_id, sender_id, conversation_id, seq, chat_ty
 `, input.ClientMsgID, input.SenderID, conversationID, seq, input.ChatType, input.ReceiverID, input.GroupID,
 		input.ContentType, string(contentJSON), payloadHash, sendTime)
 	return row, err
+}
+
+func messageContentJSON(input CreateMessageInput) ([]byte, error) {
+	if input.ContentType == ContentTypeText {
+		return json.Marshal(struct {
+			Text string `json:"text"`
+		}{Text: input.Content})
+	}
+	var raw json.RawMessage
+	if err := json.Unmarshal([]byte(input.Content), &raw); err != nil {
+		return nil, err
+	}
+	return raw, nil
 }
 
 func insertMessageIdempotency(ctx context.Context, session sqlx.Session, input CreateMessageInput, message postgresMessageRow) error {

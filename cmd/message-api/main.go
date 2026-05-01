@@ -32,9 +32,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("build message repository: %v", err)
 	}
+	mediaRepo, err := repository.NewMediaRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build media repository: %v", err)
+	}
 	groupsLogic := logic.NewGroupsLogic(groupsRepo, nil)
-	serviceContext := svc.NewMessageServiceContextWithAuth(
+	serviceContext := svc.NewMessageServiceContextWithMedia(
 		messageRepo,
+		mediaRepo,
 		nil,
 		groupsLogic,
 		cfg.Auth,

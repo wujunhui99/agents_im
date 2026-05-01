@@ -3,7 +3,7 @@
 This project uses a hybrid single-server deployment:
 
 - k3s manages application workloads: all Go APIs/RPCs/workers and the web UI.
-- Docker Compose manages middleware: PostgreSQL, Redis, and Redpanda.
+- Docker Compose manages middleware: PostgreSQL, Redis, Redpanda, and MinIO.
 - GitHub Actions builds images, pushes them to GHCR, copies deployment files to the server, and runs `scripts/deploy-k3s.sh` remotely.
 
 ## Server bootstrap
@@ -44,7 +44,7 @@ Backend images are built for:
 - Worker: `message-transfer`
 - RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`
 
-`deploy-k3s.sh` starts middleware Compose, runs PostgreSQL migrations from the server-side k3s secret `DATABASE_URL`, applies `deploy/k8s`, sets selected deployment images to the current commit SHA tag, and waits for rollout status. When `SKIP_SET_IMAGE=false` and `IMAGE_SERVICES` is empty, the script keeps the legacy full-deploy behavior and sets every service image. Selective deploys pass a space-separated `IMAGE_SERVICES` list so unchanged services are not pointed at a SHA tag that was not built.
+`deploy-k3s.sh` starts middleware Compose, runs PostgreSQL migrations from the server-side k3s secret `DATABASE_URL`, applies `deploy/k8s`, sets selected deployment images to the current commit SHA tag, and waits for rollout status. Middleware Compose includes MinIO for private S3-compatible object storage; `user-api` reads `OBJECT_STORAGE_*` secret values and creates the configured bucket on startup. When `SKIP_SET_IMAGE=false` and `IMAGE_SERVICES` is empty, the script keeps the legacy full-deploy behavior and sets every service image. Selective deploys pass a space-separated `IMAGE_SERVICES` list so unchanged services are not pointed at a SHA tag that was not built.
 
 ### Selective image builds
 
@@ -101,6 +101,30 @@ RPC ports currently include:
 - `friends-rpc`: `9092`
 - `groups-rpc`: `9103` (`9093` is avoided because it is occupied by server SSH/systemd socket)
 - `message-rpc`: `9094`
+
+## Object storage
+
+MinIO is bound to localhost by the middleware Compose file:
+
+- API: `127.0.0.1:9000`
+- Console: `127.0.0.1:9001`
+
+Required middleware/server secret values:
+
+- `MINIO_ROOT_USER`
+- `MINIO_ROOT_PASSWORD`
+- `MINIO_API_PORT`
+- `MINIO_CONSOLE_PORT`
+- `OBJECT_STORAGE_DRIVER=minio`
+- `OBJECT_STORAGE_ENDPOINT`
+- `OBJECT_STORAGE_EXTERNAL_ENDPOINT`
+- `OBJECT_STORAGE_BUCKET`
+- `OBJECT_STORAGE_REGION`
+- `OBJECT_STORAGE_USE_SSL`
+- `OBJECT_STORAGE_ACCESS_KEY_ID`
+- `OBJECT_STORAGE_SECRET_ACCESS_KEY`
+
+Do not commit real MinIO credentials. The example files contain placeholders only.
 
 ## Public entry
 

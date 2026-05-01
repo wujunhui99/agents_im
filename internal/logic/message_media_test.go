@@ -1,0 +1,125 @@
+package logic
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/model"
+	"github.com/wujunhui99/agents_im/internal/repository"
+)
+
+func TestMessageMediaValidation(t *testing.T) {
+	ctx := context.Background()
+	messageRepo := repository.NewMemoryMessageRepository()
+	mediaRepo := repository.NewMemoryMediaRepository()
+	mediaLogic := NewMediaLogic(mediaRepo, nil, "agents-im-media")
+	messageLogic := NewMessageLogicWithMediaValidator(messageRepo, nil, nil, mediaLogic)
+
+	image := createMediaForTest(t, mediaRepo, model.MediaObject{
+		MediaID:     "med_image_ready",
+		OwnerUserID: "usr_sender",
+		Bucket:      "agents-im-media",
+		ObjectKey:   "users/usr_sender/media/med_image_ready/cat.jpg",
+		ContentType: "image/jpeg",
+		SizeBytes:   1024,
+		Purpose:     model.MediaPurposeMessageImage,
+		Status:      model.MediaStatusReady,
+	})
+	file := createMediaForTest(t, mediaRepo, model.MediaObject{
+		MediaID:          "med_file_ready",
+		OwnerUserID:      "usr_sender",
+		Bucket:           "agents-im-media",
+		ObjectKey:        "users/usr_sender/media/med_file_ready/report.pdf",
+		ContentType:      "application/pdf",
+		SizeBytes:        2048,
+		OriginalFilename: "report.pdf",
+		Purpose:          model.MediaPurposeMessageFile,
+		Status:           model.MediaStatusReady,
+	})
+	pending := createMediaForTest(t, mediaRepo, model.MediaObject{
+		MediaID:     "med_image_pending",
+		OwnerUserID: "usr_sender",
+		Bucket:      "agents-im-media",
+		ObjectKey:   "users/usr_sender/media/med_image_pending/cat.jpg",
+		ContentType: "image/jpeg",
+		SizeBytes:   1024,
+		Purpose:     model.MediaPurposeMessageImage,
+		Status:      model.MediaStatusPending,
+	})
+	notOwned := createMediaForTest(t, mediaRepo, model.MediaObject{
+		MediaID:     "med_image_other",
+		OwnerUserID: "usr_other",
+		Bucket:      "agents-im-media",
+		ObjectKey:   "users/usr_other/media/med_image_other/cat.jpg",
+		ContentType: "image/jpeg",
+		SizeBytes:   1024,
+		Purpose:     model.MediaPurposeMessageImage,
+		Status:      model.MediaStatusReady,
+	})
+
+	if _, err := messageLogic.SendMessage(ctx, SendMessageRequest{
+		SenderID:    "usr_sender",
+		ReceiverID:  "usr_receiver",
+		ChatType:    MessageChatTypeSingle,
+		ClientMsgID: "client-image-ready",
+		ContentType: MessageContentTypeImage,
+		Content:     fmt.Sprintf(`{"mediaId":%q,"width":100,"height":100}`, image.MediaID),
+	}); err != nil {
+		t.Fatalf("send ready image message: %v", err)
+	}
+
+	if _, err := messageLogic.SendMessage(ctx, SendMessageRequest{
+		SenderID:    "usr_sender",
+		ReceiverID:  "usr_receiver",
+		ChatType:    MessageChatTypeSingle,
+		ClientMsgID: "client-file-ready",
+		ContentType: MessageContentTypeFile,
+		Content:     fmt.Sprintf(`{"mediaId":%q,"filename":"report.pdf","sizeBytes":2048,"contentType":"application/pdf"}`, file.MediaID),
+	}); err != nil {
+		t.Fatalf("send ready file message: %v", err)
+	}
+
+	cases := []struct {
+		name        string
+		contentType string
+		content     string
+		want        apperror.Code
+	}{
+		{name: "missing media id", contentType: MessageContentTypeImage, content: `{}`, want: apperror.CodeInvalidArgument},
+		{name: "not ready", contentType: MessageContentTypeImage, content: fmt.Sprintf(`{"mediaId":%q}`, pending.MediaID), want: apperror.CodeInvalidArgument},
+		{name: "not owned", contentType: MessageContentTypeImage, content: fmt.Sprintf(`{"mediaId":%q}`, notOwned.MediaID), want: apperror.CodeForbidden},
+		{name: "file metadata mismatch", contentType: MessageContentTypeFile, content: fmt.Sprintf(`{"mediaId":%q,"filename":"report.pdf","sizeBytes":1,"contentType":"application/pdf"}`, file.MediaID), want: apperror.CodeInvalidArgument},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := messageLogic.SendMessage(ctx, SendMessageRequest{
+				SenderID:    "usr_sender",
+				ReceiverID:  "usr_receiver",
+				ChatType:    MessageChatTypeSingle,
+				ClientMsgID: "client-" + tc.name,
+				ContentType: tc.contentType,
+				Content:     tc.content,
+			})
+			assertLogicAppCode(t, err, tc.want)
+		})
+	}
+}
+
+func TestTextMessagesContinueWithoutMediaValidator(t *testing.T) {
+	messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
+	if _, err := messageLogic.SendMessage(context.Background(), logicTestSendRequest("usr_text_a", "usr_text_b", "client-text-no-media", "hello")); err != nil {
+		t.Fatalf("text message without media validator: %v", err)
+	}
+
+	_, err := messageLogic.SendMessage(context.Background(), SendMessageRequest{
+		SenderID:    "usr_text_a",
+		ReceiverID:  "usr_text_b",
+		ChatType:    MessageChatTypeSingle,
+		ClientMsgID: "client-image-no-media",
+		ContentType: MessageContentTypeImage,
+		Content:     `{"mediaId":"med_missing"}`,
+	})
+	assertLogicAppCode(t, err, apperror.CodeInternal)
+}

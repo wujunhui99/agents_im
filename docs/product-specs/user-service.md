@@ -35,6 +35,7 @@
 - `age`：年龄，允许未设置。
 - `region`：地区，允许未设置。
 - `account_type`：账号类型，支持 `normal`、`agent`、`admin`；公开 HTTP 注册/创建路径默认并固定为 `normal`，内部 User RPC 可显式创建 `agent` 或 `admin`。
+- `avatar_media_id`：当前头像绑定的 media id，允许为空。头像文件本身由 Media API 上传到 MinIO/S3-compatible object storage，用户资料只保存 ready media 的引用。
 - `created_at` / `updated_at`：资料创建和更新时间。
 
 ## 接口能力
@@ -97,6 +98,28 @@
 - 不允许更新 `user_id`、`identifier`、创建时间、认证字段。
 - 参数非法时返回明确参数错误。
 - 成功后 `/me` 返回最新资料。
+
+### 更新自己的头像
+
+`PATCH /me/avatar`
+
+请求：
+
+```json
+{
+  "mediaId": "med_000001"
+}
+```
+
+通过 token `user_id` 确认当前用户。服务必须验证 media 对象归当前用户所有、`purpose=avatar`、`status=ready`、MIME 类型为允许的图片类型且大小不超过 5 MiB，然后把 `avatar_media_id` 写入用户资料。
+
+验收标准：
+
+- 缺少、过期或非法 token 时返回未认证错误。
+- media 不存在时返回明确不存在错误。
+- media 不属于当前用户时返回禁止访问错误。
+- media 不是 avatar purpose 或尚未 ready 时返回明确参数错误。
+- 成功后 `/me` 返回新的 `avatar_media_id`。
 
 ## 依赖关系
 

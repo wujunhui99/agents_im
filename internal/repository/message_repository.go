@@ -9,7 +9,9 @@ const (
 	ChatTypeSingle = "single"
 	ChatTypeGroup  = "group"
 
-	ContentTypeText = "text"
+	ContentTypeText  = "text"
+	ContentTypeImage = "image"
+	ContentTypeFile  = "file"
 )
 
 type Message struct {

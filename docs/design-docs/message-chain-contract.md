@@ -103,9 +103,11 @@ Phase 1:
 
 ```text
 text
+image
+file
 ```
 
-Future-compatible values can be added later, e.g. `image`, `file`, `custom`, `agent_result`.
+Future-compatible values can be added later, e.g. `custom`, `agent_result`.
 
 ### Message
 
@@ -205,7 +207,7 @@ message SendMessageRequest {
   string group_id = 3;
   string chat_type = 4;       // single | group
   string client_msg_id = 5;
-  string content_type = 6;    // text for phase 1
+  string content_type = 6;    // text | image | file
   string content = 7;
 }
 ```
@@ -225,6 +227,9 @@ Behavior:
 - For single chat, `receiver_id` is required and `group_id` must be empty.
 - For group chat, `group_id` is required and `receiver_id` must be empty.
 - `client_msg_id` is required.
+- `text` content is plain text, non-empty after trim, <= 4096 characters.
+- `image` content is JSON with at least `mediaId`; the media record must be owned by the sender, `purpose=message_image`, `status=ready`, `content_type=image/*` from the allowlist, and under the image size limit.
+- `file` content is JSON with `mediaId`, `filename`, `sizeBytes`, and `contentType`; the media record must be owned by the sender, `purpose=message_file`, `status=ready`, and the message metadata must match the media record.
 - Same `sender_id + client_msg_id` returns the prior message if payload matches.
 - Different payload for same idempotency key returns idempotency conflict.
 
@@ -377,6 +382,30 @@ Request:
 }
 ```
 
+Image message:
+
+```json
+{
+  "chatType": "single",
+  "receiverId": "user_b",
+  "clientMsgId": "client-generated-image-id",
+  "contentType": "image",
+  "content": "{\"mediaId\":\"med_000001\",\"width\":1080,\"height\":720}"
+}
+```
+
+File message:
+
+```json
+{
+  "chatType": "single",
+  "receiverId": "user_b",
+  "clientMsgId": "client-generated-file-id",
+  "contentType": "file",
+  "content": "{\"mediaId\":\"med_000002\",\"filename\":\"report.pdf\",\"sizeBytes\":123456,\"contentType\":\"application/pdf\"}"
+}
+```
+
 Response:
 
 ```json
@@ -512,6 +541,12 @@ Emitted after `has_read_seq` advances.
 - Storage worker, when introduced, owns asynchronous durable storage.
 - Message service must not depend on gateway internals.
 
+## Media dependency
+
+Media metadata is stored in PostgreSQL `media_objects`; object bytes live in MinIO/S3-compatible storage. Message send does not trust client-provided object keys or URLs. For image/file messages it validates only a `mediaId` reference and requires the media record to be ready and owned by the sender before persisting the message.
+
+Phase 1 download URL authorization for `/media/:media_id/download-url` is owner-only. When frontend media messaging is wired end to end, message attachment reads must add conversation-participant authorization before participants can fetch media they did not upload.
+
 ## Storage contract
 
 Phase 1 can use an in-memory repository, but repository interfaces should match persistent storage behavior.
@@ -553,6 +588,7 @@ Message service needs:
 - `groups` check group exists;
 - `groups` check sender is group member;
 - `groups` list group member IDs for future delivery fanout.
+- `media` check for image/file message owner, purpose, ready status, content type, and size.
 
 ### Pull/read
 
