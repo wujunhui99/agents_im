@@ -1,7 +1,7 @@
 Name: user-rpc
 ListenOn: 0.0.0.0:9090
 
-Auth:
+JWTAuth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
 StorageDriver: postgres

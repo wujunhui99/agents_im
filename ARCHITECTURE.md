@@ -116,6 +116,20 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trace/request ID 传播设计见 [`docs/design-docs/observability-mvp.md`](./docs/design-docs/observability-mvp.md)。当前实现不要求本地启动 Prometheus、Grafana 或 Jaeger。
 
+### Deployment / CI-CD
+
+生产发布采用 GitHub Actions + GHCR + k3s + Docker Compose 的混合单机模型：
+
+- GitHub Actions `.github/workflows/deploy.yml` 只从 `main` 分支 push 或手动 `workflow_dispatch` 发布；feature 分支先通过 `.github/workflows/ci.yml` 合入 `develop`，再由经过验证的 `develop` 合入 `main`。
+- deploy workflow 先执行 `detect-changes`：业务/镜像相关变更进入完整构建部署；纯 `deploy/k8s/**`、`scripts/deploy-k3s.sh` 或 deploy workflow 配置变更进入 config-only deploy；文档/Markdown-only 变更不部署。手动 `workflow_dispatch` 始终保持完整构建部署语义。
+- 后端每个 Go API/RPC/worker 按服务矩阵构建独立镜像，web UI 构建独立镜像；镜像推送到 GHCR，并同时打 commit SHA 与 `latest` tag。
+- k3s 运行应用工作负载，包括所有 Go API、RPC、Message Transfer worker、Gateway WebSocket 和 web UI。
+- Docker Compose 运行服务器中间件 PostgreSQL、Redis、Redpanda；中间件配置位于 `/opt/agents-im/middleware/.env`，不进入 Git。
+- `scripts/bootstrap-server.sh` 负责首次服务器初始化：写中间件 `.env`、启动 middleware、创建 k3s `agents-im-secrets`，并可创建 `ghcr-pull-secret`。
+- `scripts/deploy-k3s.sh` 负责常规发布：启动/确认中间件、从 k3s secret 读取 `DATABASE_URL` 执行 PostgreSQL migration、刷新 GHCR pull secret、应用 `deploy/k8s` manifests 并等待 rollout。config-only deploy 会跳过镜像更新、middleware 和 migration，只对受影响 deployment 执行 `rollout restart` / `rollout status`。
+
+部署操作手册见 [`deploy/README.md`](./deploy/README.md)。
+
 ## 关键链路
 
 ### 用户发送消息

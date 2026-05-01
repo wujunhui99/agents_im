@@ -75,7 +75,7 @@ git push -u origin develop
 
 ## CI Checks
 
-GitHub Actions workflow 位于 `.github/workflows/ci.yml`，PR/MR 合入 `develop` 前必须通过默认 backend verification。当前 CI checks 包括：
+CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从 `main` 发布。GitHub Actions workflow 位于 `.github/workflows/ci.yml`，PR/MR 合入 `develop` 前必须通过默认 backend verification。当前 CI checks 包括：
 
 - `actions/checkout` 拉取仓库代码。
 - `actions/setup-go` 按 `go.mod` 配置 Go。
@@ -109,10 +109,32 @@ npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $
 如需本地复现 PostgreSQL integration job，先启动或准备 PostgreSQL，再运行：
 
 ```bash
-export DATABASE_URL=postgres://agents_im:agents_im_dev_password@localhost:5432/agents_im?sslmode=disable
+export DATABASE_URL=postgres://agents_im:***@localhost:5432/agents_im?sslmode=disable
 bash scripts/migrate-postgres.sh --host-psql
 go test -tags=integration ./tests
 ```
+
+## CD / Deployment
+
+生产发布由 `.github/workflows/deploy.yml` 负责。该 workflow 在 `main` 分支 push 后自动触发，也可通过 GitHub Actions `workflow_dispatch` 手动触发。发布链路为：
+
+1. `detect-changes` job 先判断本次变更类型，并输出 `build_required`、`deploy_required`、`config_only`：
+   - `workflow_dispatch`：完整构建和部署，保持手动发布语义。
+   - `deploy/k8s/**`、`scripts/deploy-k3s.sh`、`.github/workflows/deploy.yml`：config-only deploy，不构建镜像。
+   - `docs/**`、`README.md`、其他 Markdown：不部署。
+   - 其他文件：视为业务/镜像相关变更，完整构建和部署。
+2. `build-backend` job 在 `build_required=true` 时按服务矩阵构建并推送后端镜像到 GHCR，服务包括 `user-api`、`auth-api`、`friends-api`、`message-api`、`gateway-ws`、`groups-api`、`agent-api`、`message-transfer` 以及各 RPC 服务。
+3. `build-web` job 在 `build_required=true` 时构建并推送 web 镜像到 GHCR。
+4. `deploy` job 使用 `SERVER_*` secrets 通过 SSH 连接服务器，将仓库部署文件同步到 `/opt/agents-im/repo`，并以当前 commit SHA 作为 `IMAGE_TAG` 执行 `scripts/deploy-k3s.sh`。
+
+生产拓扑采用混合单机部署：
+
+- k3s 管理应用工作负载：Go API、RPC、worker 和 web UI。
+- Docker Compose 管理中间件：PostgreSQL、Redis、Redpanda。
+- `scripts/deploy-k3s.sh` 会启动服务器上的中间件 Compose、从 k3s `agents-im-secrets` 读取 `DATABASE_URL` 执行迁移、刷新 `ghcr-pull-secret`，再 `kubectl apply -k deploy/k8s` 并等待 deployment rollout。config-only deploy 会向脚本传入 `SKIP_SET_IMAGE=true`、`SKIP_MIDDLEWARE=true`、`SKIP_MIGRATIONS=true`、`RESTART_ROLLOUT=true` 和 `ROLLOUT_SERVICES=<service>`，用于跳过镜像更新/中间件/迁移，只重启并等待受影响 deployment。
+- 首次服务器初始化使用 `scripts/bootstrap-server.sh`，它会写入 `/opt/agents-im/middleware/.env`，启动中间件，并创建 k3s `agents-im-secrets`。真实 secret 只应保存在服务器/k3s，不提交到 Git，也不打印到 Actions 日志。
+
+发布 workflow 需要的 GitHub repository secrets 见 [`../deploy/README.md`](../deploy/README.md)。
 
 ## develop 集成流程
 
