@@ -14,13 +14,19 @@ type ProfilePatch struct {
 	Region      *string
 }
 
-type UserRepository interface {
-	Create(ctx context.Context, user model.User) (model.User, error)
-	GetByIdentifier(ctx context.Context, identifier string) (model.User, error)
+type AccountProfilePatch = ProfilePatch
+
+type AccountRepository interface {
+	Create(ctx context.Context, account model.Account) (model.Account, error)
+	GetByIdentifier(ctx context.Context, identifier string) (model.Account, error)
 	ExistsByIdentifier(ctx context.Context, identifier string) (bool, error)
-	GetByID(ctx context.Context, userID string) (model.User, error)
-	UpdateProfile(ctx context.Context, userID string, patch ProfilePatch) (model.User, error)
+	GetByID(ctx context.Context, accountID string) (model.Account, error)
+	UpdateProfile(ctx context.Context, accountID string, patch AccountProfilePatch) (model.Account, error)
 }
+
+// UserRepository is the V0 transport/storage compatibility name. It points at
+// account profile storage; callers should prefer AccountRepository for new code.
+type UserRepository = AccountRepository
 
 type FriendshipRepository interface {
 	AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
@@ -30,6 +36,6 @@ type FriendshipRepository interface {
 }
 
 type Repository interface {
-	UserRepository
+	AccountRepository
 	FriendshipRepository
 }

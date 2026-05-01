@@ -8,6 +8,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/svc"
 )
@@ -17,8 +18,8 @@ func TestAgentLogicCreateRequiresAgentAccountType(t *testing.T) {
 	agentRepo := repository.NewMemoryAgentRepository()
 	agentLogic := logic.NewAgentLogic(agentRepo, testAccountTypeChecker{
 		accountTypes: map[string]string{
-			"usr_agent":  logic.AccountTypeAgent,
-			"usr_normal": "normal",
+			"usr_agent": logic.AccountTypeAgent,
+			"usr_user":  string(model.AccountTypeUser),
 		},
 	})
 
@@ -45,12 +46,12 @@ func TestAgentLogicCreateRequiresAgentAccountType(t *testing.T) {
 	}
 
 	_, err = agentLogic.CreateAgent(ctx, logic.CreateAgentRequest{
-		IMUserID:  "usr_normal",
+		IMUserID:  "usr_user",
 		Name:      "Wrong Type Bot",
 		CreatedBy: "usr_admin",
 	})
 	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
-		t.Fatalf("normal user binding error = %v, want FORBIDDEN", err)
+		t.Fatalf("user-type account binding error = %v, want FORBIDDEN", err)
 	}
 
 	_, err = agentLogic.CreateAgent(ctx, logic.CreateAgentRequest{
@@ -98,12 +99,12 @@ func TestAgentLogicUsesUserLogicAccountTypeChecker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create agent user: %v", err)
 	}
-	normalUser, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
-		Identifier:  "normaluser",
-		DisplayName: "Normal User",
+	userTypeAccount, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
+		Identifier:  "humantypeuser",
+		DisplayName: "Human Type User",
 	})
 	if err != nil {
-		t.Fatalf("create normal user: %v", err)
+		t.Fatalf("create user-type account: %v", err)
 	}
 
 	agentLogic := logic.NewAgentLogic(
@@ -118,11 +119,11 @@ func TestAgentLogicUsesUserLogicAccountTypeChecker(t *testing.T) {
 		t.Fatalf("create agent with real account type checker: %v", err)
 	}
 	if _, err := agentLogic.CreateAgent(ctx, logic.CreateAgentRequest{
-		IMUserID:  normalUser.UserID,
+		IMUserID:  userTypeAccount.UserID,
 		Name:      "Wrong Type Bot",
 		CreatedBy: "usr_admin",
 	}); err == nil || apperror.From(err).Code != apperror.CodeForbidden {
-		t.Fatalf("normal user binding error = %v, want FORBIDDEN", err)
+		t.Fatalf("user-type account binding error = %v, want FORBIDDEN", err)
 	}
 }
 
@@ -191,8 +192,8 @@ func TestAgentHTTPHandlers(t *testing.T) {
 	serviceContext := svc.NewAgentServiceContextWithAuth(
 		repository.NewMemoryAgentRepository(),
 		testAccountTypeChecker{accountTypes: map[string]string{
-			"usr_agent":  logic.AccountTypeAgent,
-			"usr_normal": "normal",
+			"usr_agent": logic.AccountTypeAgent,
+			"usr_user":  string(model.AccountTypeUser),
 		}},
 		testJWTAuthConfig(),
 	)
@@ -264,11 +265,11 @@ func TestAgentHTTPHandlers(t *testing.T) {
 	}
 
 	forbiddenResp := httptest.NewRecorder()
-	forbiddenReq := newJSONRequest(http.MethodPost, "/agents", `{"im_user_id":"usr_normal","name":"Wrong Type Bot"}`)
+	forbiddenReq := newJSONRequest(http.MethodPost, "/agents", `{"im_user_id":"usr_user","name":"Wrong Type Bot"}`)
 	forbiddenReq.Header.Set("Authorization", adminBearer)
 	mux.ServeHTTP(forbiddenResp, forbiddenReq)
 	if forbiddenResp.Code != http.StatusForbidden {
-		t.Fatalf("normal user binding status = %d, body = %s", forbiddenResp.Code, forbiddenResp.Body.String())
+		t.Fatalf("user-type account binding status = %d, body = %s", forbiddenResp.Code, forbiddenResp.Body.String())
 	}
 
 	deleteResp := httptest.NewRecorder()

@@ -130,7 +130,7 @@ Environment note from the debug session: on one local machine, default ports `80
 
 | Service | URL |
 | --- | --- |
-| User API | `http://127.0.0.1:8080` |
+| Account API (V0 `user-api`) | `http://127.0.0.1:8080` |
 | Auth API | `http://127.0.0.1:8081` |
 | Friends API | `http://127.0.0.1:8082` |
 | Message API | `http://127.0.0.1:8083` |
@@ -141,11 +141,11 @@ Environment note from the debug session: on one local machine, default ports `80
 | Redis | `localhost:6379` |
 | Redpanda Kafka | `localhost:19092` |
 
-`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share users, credentials, friendships, groups, Agent profiles, and message history. Agent creation still fails closed until the account-type checker is wired to a user service that can verify `account_type=agent`.
+`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, and message history. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
 
 ## Demo Data
 
-After `scripts/dev-up.sh` succeeds, seed two users, one friendship, one group, and one single-chat message:
+After `scripts/dev-up.sh` succeeds, seed two user-type accounts, one friendship, one group, and one single-chat message:
 
 ```bash
 scripts/dev-demo-data.sh

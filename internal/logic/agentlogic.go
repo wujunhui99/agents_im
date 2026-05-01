@@ -22,11 +22,13 @@ type UserAccountTypeChecker interface {
 	EnsureUserAccountType(ctx context.Context, userID string, accountType string) error
 }
 
+type AccountTypeChecker = UserAccountTypeChecker
+
 type UserAccountTypeCheckerFunc func(ctx context.Context, userID string, accountType string) error
 
 func (f UserAccountTypeCheckerFunc) EnsureUserAccountType(ctx context.Context, userID string, accountType string) error {
 	if f == nil {
-		return apperror.Internal("user account_type checker is not configured")
+		return apperror.Internal("account_type checker is not configured")
 	}
 	return f(ctx, userID, accountType)
 }
@@ -38,7 +40,7 @@ func NewFailClosedUserAccountTypeChecker() FailClosedUserAccountTypeChecker {
 }
 
 func (FailClosedUserAccountTypeChecker) EnsureUserAccountType(context.Context, string, string) error {
-	return apperror.Internal("user account_type checker is not configured")
+	return apperror.Internal("account_type checker is not configured")
 }
 
 type UserLogicAccountTypeChecker struct {
@@ -51,14 +53,14 @@ func NewUserLogicAccountTypeChecker(userLogic *UserLogic) UserLogicAccountTypeCh
 
 func (c UserLogicAccountTypeChecker) EnsureUserAccountType(ctx context.Context, userID string, accountType string) error {
 	if c.userLogic == nil {
-		return apperror.Internal("user account_type checker is not configured")
+		return apperror.Internal("account_type checker is not configured")
 	}
 	profile, err := c.userLogic.GetUserByID(ctx, GetUserByIDRequest{UserID: userID})
 	if err != nil {
 		return err
 	}
 	if profile.AccountType != accountType {
-		return apperror.Forbidden("user account_type must be " + accountType)
+		return apperror.Forbidden("account_type must be " + accountType)
 	}
 	return nil
 }
@@ -286,7 +288,7 @@ func (l *AgentLogic) ensureAgentRepository() error {
 
 func (l *AgentLogic) ensureAgentAccountType(ctx context.Context, imUserID string) error {
 	if l.accountTypeChecker == nil {
-		return apperror.Internal("user account_type checker is not configured")
+		return apperror.Internal("account_type checker is not configured")
 	}
 	return l.accountTypeChecker.EnsureUserAccountType(ctx, imUserID, AccountTypeAgent)
 }

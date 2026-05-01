@@ -17,16 +17,27 @@ import (
 	"github.com/wujunhui99/agents_im/proto/userpb"
 )
 
-func TestUserAccountTypeDefaultsAndExplicitInternalCreate(t *testing.T) {
+func TestAccountTypeDefaultsAndExplicitInternalCreate(t *testing.T) {
 	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
 	ctx := context.Background()
 
-	normal, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{Identifier: "normal_001"})
+	userAccount, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{Identifier: "user_001"})
 	if err != nil {
 		t.Fatalf("create default user: %v", err)
 	}
-	if normal.AccountType != string(model.AccountTypeNormal) {
-		t.Fatalf("default account_type = %q, want %q", normal.AccountType, model.AccountTypeNormal)
+	if userAccount.AccountType != string(model.AccountTypeUser) {
+		t.Fatalf("default account_type = %q, want %q", userAccount.AccountType, model.AccountTypeUser)
+	}
+
+	legacyNormal, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
+		Identifier:  "legacy_normal_001",
+		AccountType: "normal",
+	})
+	if err != nil {
+		t.Fatalf("create legacy normal account_type: %v", err)
+	}
+	if legacyNormal.AccountType != string(model.AccountTypeUser) {
+		t.Fatalf("legacy normal account_type = %q, want %q", legacyNormal.AccountType, model.AccountTypeUser)
 	}
 
 	agent, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
@@ -69,16 +80,16 @@ func TestMemoryRepositoryAccountTypeSemantics(t *testing.T) {
 	ctx := context.Background()
 
 	defaultUser, err := repo.Create(ctx, model.User{
-		Identifier:  "repo_normal",
-		DisplayName: "Repo Normal",
-		Name:        "Repo Normal",
+		Identifier:  "repo_user",
+		DisplayName: "Repo User",
+		Name:        "Repo User",
 		Gender:      "unknown",
 	})
 	if err != nil {
 		t.Fatalf("create default repository user: %v", err)
 	}
-	if defaultUser.AccountType != model.AccountTypeNormal {
-		t.Fatalf("repository default account_type = %q, want %q", defaultUser.AccountType, model.AccountTypeNormal)
+	if defaultUser.AccountType != model.AccountTypeUser {
+		t.Fatalf("repository default account_type = %q, want %q", defaultUser.AccountType, model.AccountTypeUser)
 	}
 
 	explicitAgent, err := repo.Create(ctx, model.User{
@@ -107,7 +118,7 @@ func TestMemoryRepositoryAccountTypeSemantics(t *testing.T) {
 	}
 }
 
-func TestPublicUserCreateIgnoresAccountTypeAndDefaultsNormal(t *testing.T) {
+func TestPublicAccountCreateIgnoresAccountTypeAndDefaultsUser(t *testing.T) {
 	serviceContext := newTestUserServiceContext()
 	mux := newUserGoZeroRouter(t, serviceContext)
 
@@ -118,12 +129,12 @@ func TestPublicUserCreateIgnoresAccountTypeAndDefaultsNormal(t *testing.T) {
 
 	var created envelope[logic.UserProfile]
 	decodeEnvelope(t, createResp.Body.Bytes(), &created)
-	if created.Data.AccountType != string(model.AccountTypeNormal) {
-		t.Fatalf("public create account_type = %q, want default %q", created.Data.AccountType, model.AccountTypeNormal)
+	if created.Data.AccountType != string(model.AccountTypeUser) {
+		t.Fatalf("public create account_type = %q, want default %q", created.Data.AccountType, model.AccountTypeUser)
 	}
 }
 
-func TestAuthRegisterCreatesNormalAccountTypeByDefault(t *testing.T) {
+func TestAuthRegisterCreatesUserAccountTypeByDefault(t *testing.T) {
 	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
 	serviceContext := authsvc.NewServiceContext(
 		authrepo.NewMemoryRepository(),
@@ -144,8 +155,8 @@ func TestAuthRegisterCreatesNormalAccountTypeByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load registered user: %v", err)
 	}
-	if profile.AccountType != string(model.AccountTypeNormal) {
-		t.Fatalf("auth register account_type = %q, want %q", profile.AccountType, model.AccountTypeNormal)
+	if profile.AccountType != string(model.AccountTypeUser) {
+		t.Fatalf("auth register account_type = %q, want %q", profile.AccountType, model.AccountTypeUser)
 	}
 }
 

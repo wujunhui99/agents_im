@@ -48,8 +48,8 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if alice.AccountType != model.AccountTypeNormal {
-		t.Fatalf("default postgres account_type = %q, want %q", alice.AccountType, model.AccountTypeNormal)
+	if alice.AccountType != model.AccountTypeUser {
+		t.Fatalf("default postgres account_type = %q, want %q", alice.AccountType, model.AccountTypeUser)
 	}
 	bob, err := users.Create(ctx, model.User{
 		Identifier:  "pg_bob",

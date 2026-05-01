@@ -10,8 +10,8 @@
 
 必须覆盖：
 
-1. 扩展账号系统 `account_type`: `normal` / `agent` / `admin`。
-2. Agent 账号作为 IM 用户参与聊天；Agent 配置另建 `agents` 表，不塞入 `users` 表。
+1. 扩展账号系统 `account_type`: `user` / `agent` / `admin`。
+2. Agent 账号作为 IM Account 参与聊天；Agent 配置另建 `agents` 表，不塞入 Account Service 资料表。
 3. 系统提示词、工具、skills 独立管理并持久化。
 4. Skill 文件使用 MinIO/OSS 对象存储；PG 只保存元数据、object key、sha256。
 5. 第一版禁止 shell/命令行能力。
@@ -36,9 +36,9 @@
 
 范围：
 
-- `users.account_type` migration，默认 `normal`。
+- `users.account_type` migration，默认 `user`；`users` 表名为 V0 storage compatibility。
 - Go domain/model/repository/API/RPC 类型增加 account_type。
-- 创建普通用户默认 `normal`。
+- 创建 human user 账号默认 `user`。
 - 支持创建 Agent 用户时 account_type=`agent` 的内部能力。
 - admin 能力只保留类型和校验，不做完整 RBAC。
 
@@ -46,14 +46,14 @@
 
 验收：
 
-- TDD 测试覆盖默认 normal、agent/admin 合法值、非法值拒绝。
+- TDD 测试覆盖默认 user、agent/admin 合法值、非法值拒绝。
 - PG 和 memory repository 语义一致。
 - 现有注册/登录/E2E 不破坏。
 
 当前分支落地说明：
 
-- `normal`、`agent`、`admin` 作为 user domain 合法枚举写入 Go model、REST response、User RPC contract 和 PostgreSQL migration。
-- 内存与 PostgreSQL repository 均把空 `account_type` 归一化为 `normal`，非法值返回明确参数错误。
+- `user`、`agent`、`admin` 作为 Account domain 合法枚举写入 Go model、REST response、User RPC compatibility contract 和 PostgreSQL migration。
+- 内存与 PostgreSQL repository 均把空 `account_type` 归一化为 `user`，非法值返回明确参数错误。
 - HTTP 公开创建与 auth 注册路径不传递请求体中的 `account_type`，避免公开注册为 `admin` 或 `agent`。
 
 ### 2. `feature/agent-core-management`
