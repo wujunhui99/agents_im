@@ -397,6 +397,55 @@ for pattern in "${message_api_patterns[@]}"; do
   rg -q "$pattern" api/message.api
 done
 
+message_ordering_schema_patterns=(
+  "messages_conversation_seq_uniq"
+  "messages_sender_client_msg_uniq"
+  "message_idempotency_keys"
+  "conversation_threads"
+)
+
+for pattern in "${message_ordering_schema_patterns[@]}"; do
+  rg -q "$pattern" db/migrations/001_init_postgres.sql
+done
+
+message_ordering_code_patterns=(
+  "for update"
+  "existingMessageForIdempotency"
+  "orderedChatMessages"
+  "conversationHasInFlightSend"
+)
+
+for pattern in "${message_ordering_code_patterns[@]}"; do
+  rg -q "$pattern" internal/repository/postgres_message.go web/src/features/messages/MessagesPage.tsx
+done
+
+if rg -n "sort\\([^\\n]*sendTime|sendTime - .*sendTime|sendTime.* - .*sendTime" web/src/features/messages/MessagesPage.tsx; then
+  echo "message UI must not sort confirmed messages by sendTime" >&2
+  exit 1
+fi
+
+message_ordering_test_patterns=(
+  "concurrent same conversation sends allocate contiguous seqs"
+  "last message state follows max seq"
+  "renders shuffled server messages by authoritative seq"
+  "one in-flight send per conversation"
+)
+
+for pattern in "${message_ordering_test_patterns[@]}"; do
+  rg -q "$pattern" internal/repository/message_repository_contract_test.go web/src/features/messages/MessagesPage.test.tsx
+done
+
+message_ordering_doc_patterns=(
+  "conversation_id + seq"
+  "network arrival order"
+  "clientMsgId"
+  "gap"
+)
+
+for pattern in "${message_ordering_doc_patterns[@]}"; do
+  rg -qF "$pattern" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md docs/product-specs/frontend-backend-contract.md docs/RELIABILITY.md
+done
+
 frontend_contract_patterns=(
   "/auth/register"
   "/auth/login"
