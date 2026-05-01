@@ -250,34 +250,26 @@ func (r *PostgresMessageRepository) SetUserHasReadSeqMax(ctx context.Context, us
 	var state ConversationSeqState
 	updated := false
 	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
-		var maxSeq int64
-		if err := session.QueryRowCtx(ctx, &maxSeq, `
-select max_seq
-from conversation_threads
-where conversation_id = $1
-for update
-`, conversationID); err != nil {
-			return err
+		var stateRow struct {
+			HasReadSeq     int64 `db:"has_read_seq"`
+			LastVisibleSeq int64 `db:"last_visible_seq"`
 		}
-		if seq > maxSeq {
-			return apperror.InvalidArgument("has_read_seq cannot exceed max_seq")
-		}
-
-		var current int64
-		if err := session.QueryRowCtx(ctx, &current, `
-select has_read_seq
+		if err := session.QueryRowCtx(ctx, &stateRow, `
+select has_read_seq, last_visible_seq
 from user_conversation_states
 where user_id = $1 and conversation_id = $2
 for update
 `, userID, conversationID); err != nil {
 			return err
 		}
+		if seq > stateRow.LastVisibleSeq {
+			return apperror.InvalidArgument("has_read_seq cannot exceed max_seq")
+		}
 
-		updated = seq > current
+		updated = seq > stateRow.HasReadSeq
 		if _, err := session.ExecCtx(ctx, `
 update user_conversation_states
 set has_read_seq = greatest(has_read_seq, $3),
-    last_visible_seq = greatest(last_visible_seq, $3),
     updated_at = now()
 where user_id = $1 and conversation_id = $2
 `, userID, conversationID, seq); err != nil {
@@ -418,13 +410,14 @@ func queryConversationSeqState(ctx context.Context, session sqlx.Session, userID
 	var row postgresConversationStateRow
 	if err := session.QueryRowCtx(ctx, &row, `
 select t.conversation_id,
-       t.max_seq,
+       s.last_visible_seq as max_seq,
        s.has_read_seq,
-       t.last_message_at as max_seq_time,
-       t.last_message_id,
+       m.send_time as max_seq_time,
+       coalesce(m.server_msg_id, '') as last_message_id,
        s.updated_at
 from conversation_threads t
 join user_conversation_states s on s.conversation_id = t.conversation_id
+left join messages m on m.conversation_id = t.conversation_id and m.seq = s.last_visible_seq
 where s.user_id = $1 and t.conversation_id = $2
 `, userID, conversationID); err != nil {
 		return ConversationSeqState{}, err
