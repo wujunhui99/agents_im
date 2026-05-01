@@ -175,7 +175,7 @@ create index user_conversation_states_user_updated_idx
 `unread_count` is derived, not authoritative:
 
 ```text
-max(0, conversation_threads.max_seq - user_conversation_states.has_read_seq)
+max(0, user_conversation_states.last_visible_seq - user_conversation_states.has_read_seq)
 ```
 
 For a user with no row, the repository should treat `has_read_seq` as `0` only after membership/visibility is confirmed by message service or conversation membership data. The send path should create or update rows for users that should see the conversation. For single chat this is sender and receiver; for group chat this is the active group-member set supplied by the message service or a later fanout worker.
@@ -295,10 +295,10 @@ The repository should not advance `has_read_seq` during pull. Read state changes
 This can be a read-only query joining `conversation_threads`, `user_conversation_states`, and optionally the last message:
 
 ```text
-max_seq = conversation_threads.max_seq
+max_seq = user_conversation_states.last_visible_seq
 has_read_seq = coalesce(user_conversation_states.has_read_seq, 0)
-unread_count = max(0, max_seq - has_read_seq)
-last_message = messages where server_msg_id = last_message_id
+unread_count = max(0, last_visible_seq - has_read_seq)
+last_message = messages where conversation_id + seq = last_visible_seq
 ```
 
 When `conversation_ids` is empty, the query should return conversations visible to `user_id` via `user_conversation_states` or future membership tables.
@@ -308,8 +308,8 @@ When `conversation_ids` is empty, the query should return conversations visible 
 One transaction validates the requested read seq and advances state monotonically:
 
 1. Begin transaction.
-2. Lock or read `conversation_threads` for `conversation_id`.
-3. Reject when `requested_seq > max_seq`.
+2. Lock `user_conversation_states` for `user_id + conversation_id`.
+3. Reject when `requested_seq > last_visible_seq`.
 4. Upsert `user_conversation_states`:
 
 ```sql
