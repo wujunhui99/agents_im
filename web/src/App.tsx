@@ -52,6 +52,7 @@ type AuthenticatedAppProps = AppProps & {
 function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
+  const [startChatSignal, setStartChatSignal] = useState(0);
   const activeLabel = useMemo(() => tabs.find((tab) => tab.key === activeTab)?.label ?? '消息', [activeTab]);
   const { session, logout } = useAuth();
   const effectiveUserApi = useMemo(
@@ -82,10 +83,13 @@ function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppPr
   return (
     <main className="app-shell" aria-label="Agents IM 微信风格主框架">
       <section className="phone-frame">
-        <TopBar title={activeLabel} />
+        <TopBar
+          title={activeLabel}
+          onAdd={activeTab === 'messages' ? () => setStartChatSignal((current) => current + 1) : undefined}
+        />
 
         <section className="content-area">
-          {renderPage(activeTab, currentUser, updateProfile, logout, effectiveUserApi, contactsApi, messageApi)}
+          {renderPage(activeTab, currentUser, updateProfile, logout, effectiveUserApi, contactsApi, messageApi, startChatSignal)}
         </section>
 
         <TabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
@@ -215,9 +219,17 @@ function renderPage(
   userApi: UserApi,
   contactsApi: ContactsApi,
   messageApi: MessageApi,
+  startChatSignal: number,
 ) {
   if (tab === 'messages') {
-    return <MessagesPage currentUserId={currentUser.user_id} messageApi={messageApi} />;
+    return (
+      <MessagesPage
+        currentUserId={currentUser.user_id}
+        userApi={userApi}
+        messageApi={messageApi}
+        startChatSignal={startChatSignal}
+      />
+    );
   }
 
   if (tab === 'contacts') {

@@ -19,6 +19,7 @@ type ContactEntry = {
   helper: string;
   accent: string;
   icon: ComponentType<{ size?: number }>;
+  available: boolean;
 };
 
 type ContactsPageProps = {
@@ -27,10 +28,10 @@ type ContactsPageProps = {
 };
 
 const contactEntries: ContactEntry[] = [
-  { id: 'new', label: '新的朋友', helper: '通过账号搜索并添加好友', accent: 'orange', icon: UserPlus },
-  { id: 'groups', label: '群聊', helper: '群聊能力走 groups API，后续在群聊页展开', accent: 'green', icon: UsersRound },
-  { id: 'tags', label: '标签', helper: '标签功能暂未实现', accent: 'blue', icon: Tag },
-  { id: 'official', label: '公众号', helper: '系统通知与服务号暂未实现', accent: 'gray', icon: Megaphone },
+  { id: 'new', label: '新的朋友', helper: '通过账号搜索并添加好友', accent: 'orange', icon: UserPlus, available: true },
+  { id: 'groups', label: '群聊', helper: '群聊入口暂未开放', accent: 'green', icon: UsersRound, available: false },
+  { id: 'tags', label: '标签', helper: '标签功能暂未开放', accent: 'blue', icon: Tag, available: false },
+  { id: 'official', label: '公众号', helper: '系统通知与服务号暂未开放', accent: 'gray', icon: Megaphone, available: false },
 ];
 
 function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsApi() }: ContactsPageProps) {
@@ -80,6 +81,8 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
   const [status, setStatus] = useState('按唯一 identifier 搜索用户');
   const [submitting, setSubmitting] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [addedUserIds, setAddedUserIds] = useState<Set<string>>(() => new Set());
+  const isAdded = result ? addedUserIds.has(result.user_id) : false;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,6 +117,7 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
     setStatus('正在添加好友');
     try {
       await onAddFriend(result);
+      setAddedUserIds((current) => new Set(current).add(result.user_id));
       setStatus(`已添加好友：${result.identifier}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '添加好友失败');
@@ -152,11 +156,11 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
           <button
             className="text-command"
             type="button"
-            aria-label={`添加好友 ${result.identifier}`}
-            disabled={adding}
+            aria-label={isAdded ? '已添加' : `添加好友 ${result.identifier}`}
+            disabled={adding || isAdded}
             onClick={handleAddFriend}
           >
-            {adding ? '添加中' : '添加好友'}
+            {isAdded ? '已添加' : adding ? '添加中' : '添加好友'}
           </button>
         </article>
       ) : null}
@@ -166,9 +170,14 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
 
 function ContactEntryButton({ entry }: { entry: ContactEntry }) {
   const Icon = entry.icon;
+  const disabled = !entry.available;
 
   return (
-    <div className="action-row" aria-label={entry.label}>
+    <div
+      className={`action-row${disabled ? ' action-row-disabled' : ''}`}
+      aria-label={disabled ? `${entry.label} 暂未开放` : entry.label}
+      aria-disabled={disabled || undefined}
+    >
       <div className={`action-icon action-${entry.accent}`}>
         <Icon size={19} />
       </div>
@@ -176,7 +185,13 @@ function ContactEntryButton({ entry }: { entry: ContactEntry }) {
         <strong>{entry.label}</strong>
         <p>{entry.helper}</p>
       </div>
-      <ChevronRight size={18} />
+      {disabled ? (
+        <div className="row-trailing">
+          <span className="row-badge">暂未开放</span>
+        </div>
+      ) : (
+        <ChevronRight size={18} />
+      )}
     </div>
   );
 }

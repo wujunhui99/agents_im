@@ -155,6 +155,10 @@ GET /users/alice_001
 
 This is the current MVP user search path.
 
+### Current Gap
+
+A frontend-visible `GET /users/id/:user_id` public-profile endpoint is not present in this worktree. Message conversation IDs use canonical `usr_...` IDs, so clients can only show a friendly conversation title when they already have profile data from `/users/:identifier` or another real source; otherwise they must fall back to the internal user ID instead of inventing a lookup path.
+
 ## Friends
 
 Friendship is immediately accepted in MVP. Duplicate add is idempotent, self-add returns `INVALID_ARGUMENT`, and non-existent users return `NOT_FOUND`.

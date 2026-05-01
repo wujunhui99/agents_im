@@ -1,12 +1,16 @@
-import { ChevronLeft, Search, SendHorizontal } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, MessageCircle, Search, SendHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
 import { createMessageApi } from '../../api/messages';
+import type { UserApi, UserProfile } from '../../api/user';
+import { createUserApi } from '../../api/user';
 import type { ChatMessage, Conversation, MessageStatus } from '../../models/messages';
 
 type MessagesPageProps = {
   currentUserId: string;
   messageApi?: MessageApi;
+  userApi?: UserApi;
+  startChatSignal?: number;
 };
 
 const statusLabels: Record<MessageStatus, string> = {
@@ -15,10 +19,16 @@ const statusLabels: Record<MessageStatus, string> = {
   failed: '发送失败',
 };
 
-export function MessagesPage({ currentUserId, messageApi = createMessageApi() }: MessagesPageProps) {
+export function MessagesPage({
+  currentUserId,
+  messageApi = createMessageApi(),
+  userApi = createUserApi(),
+  startChatSignal = 0,
+}: MessagesPageProps) {
   const [items, setItems] = useState<Conversation[]>([]);
   const [status, setStatus] = useState('正在加载会话');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [showStartChat, setShowStartChat] = useState(false);
   const selectedConversation = items.find((conversation) => conversation.id === selectedConversationId) ?? null;
 
   useEffect(() => {
@@ -46,6 +56,26 @@ export function MessagesPage({ currentUserId, messageApi = createMessageApi() }:
     };
   }, [currentUserId, messageApi]);
 
+  useEffect(() => {
+    if (startChatSignal > 0) {
+      setShowStartChat(true);
+      setSelectedConversationId(null);
+    }
+  }, [startChatSignal]);
+
+  function handleStartChat(profile: UserProfile) {
+    const draftConversation = userProfileToDraftConversation(profile);
+    const existingConversation = items.find(
+      (conversation) => conversation.chatType === 'single' && conversation.receiverId === profile.user_id,
+    );
+    const selectedId = existingConversation?.id ?? draftConversation.id;
+
+    setItems((current) => upsertStartedConversation(current, existingConversation?.id, draftConversation));
+    setSelectedConversationId(selectedId);
+    setShowStartChat(false);
+    setStatus(`已打开 ${draftConversation.title} 的聊天`);
+  }
+
   function handleSend(content: string) {
     if (!selectedConversation) {
       return;
@@ -54,9 +84,11 @@ export function MessagesPage({ currentUserId, messageApi = createMessageApi() }:
     const pendingMessage = createPendingMessage(selectedConversation, content, currentUserId);
     setItems((current) => appendMessage(current, selectedConversation.id, pendingMessage));
 
-    void sendMessageWithApi(messageApi, pendingMessage)
+    void Promise.resolve()
+      .then(() => sendMessageWithApi(messageApi, pendingMessage))
       .then((sentMessage) => {
-        setItems((current) => updateMessage(current, selectedConversation.id, pendingMessage.id, sentMessage));
+        setItems((current) => confirmSentMessage(current, selectedConversation.id, pendingMessage.id, sentMessage));
+        setSelectedConversationId(sentMessage.conversationId);
       })
       .catch((error) => {
         setStatus(error instanceof Error ? error.message : '发送消息失败');
@@ -80,25 +112,55 @@ export function MessagesPage({ currentUserId, messageApi = createMessageApi() }:
     );
   }
 
-  return <ConversationList conversations={items} status={status} onSelect={(conversationId) => setSelectedConversationId(conversationId)} />;
+  return (
+    <ConversationList
+      conversations={items}
+      status={status}
+      userApi={userApi}
+      showStartChat={showStartChat}
+      onOpenStartChat={() => setShowStartChat(true)}
+      onCloseStartChat={() => setShowStartChat(false)}
+      onStartChat={handleStartChat}
+      onSelect={(conversationId) => setSelectedConversationId(conversationId)}
+    />
+  );
 }
 
 function ConversationList({
   conversations,
   status,
+  userApi,
+  showStartChat,
+  onOpenStartChat,
+  onCloseStartChat,
+  onStartChat,
   onSelect,
 }: {
   conversations: Conversation[];
   status: string;
+  userApi: UserApi;
+  showStartChat: boolean;
+  onOpenStartChat: () => void;
+  onCloseStartChat: () => void;
+  onStartChat: (profile: UserProfile) => void;
   onSelect: (conversationId: string) => void;
 }) {
   return (
     <div className="page-stack">
       <SearchBox placeholder="搜索" />
+      {showStartChat ? <StartChatPanel userApi={userApi} onStartChat={onStartChat} onClose={onCloseStartChat} /> : null}
       <p className="inline-status" role="status">
         {status}
       </p>
-      {conversations.length === 0 ? <p className="empty-state">暂无会话</p> : null}
+      {conversations.length === 0 ? (
+        <div className="empty-state empty-state-action">
+          <p>暂无会话</p>
+          <button type="button" className="compact-command" onClick={onOpenStartChat}>
+            <MessageCircle size={17} />
+            <span>发起聊天</span>
+          </button>
+        </div>
+      ) : null}
       <section className="list-card conversation-list" role="list" aria-label="消息列表">
         {conversations.map((item) => (
           <div className="conversation-list-item" role="listitem" key={item.id}>
@@ -117,6 +179,92 @@ function ConversationList({
         ))}
       </section>
     </div>
+  );
+}
+
+function StartChatPanel({
+  userApi,
+  onStartChat,
+  onClose,
+}: {
+  userApi: UserApi;
+  onStartChat: (profile: UserProfile) => void;
+  onClose: () => void;
+}) {
+  const [identifier, setIdentifier] = useState('');
+  const [result, setResult] = useState<UserProfile | null>(null);
+  const [status, setStatus] = useState('输入 identifier 搜索用户');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = identifier.trim();
+
+    if (!query) {
+      setResult(null);
+      setStatus('请输入 identifier');
+      return;
+    }
+
+    setSubmitting(true);
+    setStatus('正在搜索用户');
+    try {
+      const profile = await userApi.getPublicProfileByIdentifier(query);
+      setResult(profile);
+      setStatus(`找到 ${profileDisplayName(profile)}`);
+    } catch (error) {
+      setResult(null);
+      setStatus(error instanceof Error ? error.message : `未找到 ${query}`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="start-chat-card" aria-label="发起聊天">
+      <div className="start-chat-heading">
+        <h2>发起聊天</h2>
+        <button type="button" className="text-command" onClick={onClose}>
+          关闭
+        </button>
+      </div>
+      <form className="identifier-search-form" onSubmit={handleSubmit}>
+        <label className="search-box identifier-field">
+          <Search size={17} />
+          <input
+            placeholder="输入唯一 identifier"
+            aria-label="按 identifier 搜索聊天对象"
+            value={identifier}
+            onChange={(event) => setIdentifier(event.target.value)}
+          />
+        </label>
+        <button className="compact-command" type="submit" aria-label="搜索聊天对象" disabled={submitting}>
+          <Search size={17} />
+          <span>搜索</span>
+        </button>
+      </form>
+      <p className="inline-status" role="status">
+        {status}
+      </p>
+      {result ? (
+        <article className="search-result">
+          <div className="avatar avatar-blue">{avatarText(profileDisplayName(result))}</div>
+          <div className="row-main">
+            <strong>{profileDisplayName(result)}</strong>
+            <p>{result.identifier}</p>
+            <p>{result.user_id}</p>
+          </div>
+          <button
+            className="text-command"
+            type="button"
+            aria-label={`发起聊天 ${profileDisplayName(result)}`}
+            onClick={() => onStartChat(result)}
+          >
+            发起聊天
+          </button>
+        </article>
+      ) : null}
+    </section>
   );
 }
 
@@ -204,6 +352,46 @@ async function loadConversation(state: ConversationSeqState, currentUserId: stri
   return conversationStateToView(state, currentUserId, pulled.messages);
 }
 
+function userProfileToDraftConversation(profile: UserProfile): Conversation {
+  const title = profileDisplayName(profile);
+
+  return {
+    id: draftConversationId(profile.user_id),
+    title,
+    avatar: avatarText(title),
+    preview: '暂无消息',
+    time: '',
+    unread: 0,
+    color: 'blue',
+    chatType: 'single',
+    receiverId: profile.user_id,
+    messages: [],
+  };
+}
+
+function upsertStartedConversation(conversations: Conversation[], existingConversationId: string | undefined, draftConversation: Conversation) {
+  if (existingConversationId) {
+    return conversations.map((conversation) =>
+      conversation.id === existingConversationId
+        ? {
+            ...conversation,
+            title: draftConversation.title,
+            avatar: draftConversation.avatar,
+            receiverId: draftConversation.receiverId,
+          }
+        : conversation,
+    );
+  }
+
+  if (conversations.some((conversation) => conversation.id === draftConversation.id)) {
+    return conversations.map((conversation) =>
+      conversation.id === draftConversation.id ? { ...conversation, ...draftConversation, messages: conversation.messages } : conversation,
+    );
+  }
+
+  return [draftConversation, ...conversations];
+}
+
 function conversationStateToView(state: ConversationSeqState, currentUserId: string, messages: ServerMessage[]): Conversation {
   const chatMessages = messages.map((message) => serverMessageToChatMessage(message, currentUserId));
   const lastMessage = chatMessages[chatMessages.length - 1] ?? serverLastMessage(state.lastMessage, currentUserId);
@@ -249,6 +437,25 @@ function updateMessage(conversations: Conversation[], conversationId: string, me
       ...conversation,
       preview: nextMessage.content,
       time: '刚刚',
+      messages: conversation.messages.map((message) => (message.id === messageId ? nextMessage : message)),
+    };
+  });
+}
+
+function confirmSentMessage(conversations: Conversation[], conversationId: string, messageId: string, nextMessage: ChatMessage) {
+  return conversations.map((conversation) => {
+    if (conversation.id !== conversationId) {
+      return conversation;
+    }
+
+    return {
+      ...conversation,
+      id: nextMessage.conversationId,
+      preview: nextMessage.content,
+      time: '刚刚',
+      unread: 0,
+      receiverId: nextMessage.receiverId ?? conversation.receiverId,
+      groupId: nextMessage.groupId ?? conversation.groupId,
       messages: conversation.messages.map((message) => (message.id === messageId ? nextMessage : message)),
     };
   });
@@ -342,6 +549,14 @@ function requiredField(value: string | undefined, fieldName: string) {
     throw new Error(`${fieldName} is required`);
   }
   return value;
+}
+
+function draftConversationId(userId: string) {
+  return `draft-single:${userId}`;
+}
+
+function profileDisplayName(profile: UserProfile) {
+  return profile.display_name || profile.name || profile.identifier || profile.user_id;
 }
 
 function avatarText(value: string) {
