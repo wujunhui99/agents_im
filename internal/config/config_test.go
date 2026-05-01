@@ -13,6 +13,12 @@ func TestLoadAPIConfigResolvesRedisAndPresenceFromFile(t *testing.T) {
 	t.Setenv("PRESENCE_DRIVER", "")
 	t.Setenv("PRESENCE_TTL_SECONDS", "")
 	t.Setenv("PRESENCE_KEY_PREFIX", "")
+	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "")
+	t.Setenv("GATEWAY_WS_ALLOW_QUERY_TOKEN", "")
+	t.Setenv("GATEWAY_WS_PING_INTERVAL_SECONDS", "")
+	t.Setenv("GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS", "")
+	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND", "")
+	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST", "")
 	t.Setenv("KAFKA_BROKERS", "")
 	t.Setenv("KAFKA_MESSAGE_EVENTS_TOPIC", "")
 	t.Setenv("KAFKA_CONSUMER_GROUP", "")
@@ -32,6 +38,13 @@ Presence:
   Driver: redis
   HeartbeatTTLSeconds: 45
   KeyPrefix: agents_im:test_presence
+GatewayWS:
+  AllowedOrigins: https://chat.example.com, http://localhost:5173
+  AllowQueryToken: true
+  PingIntervalSeconds: 10
+  HeartbeatTimeoutSeconds: 40
+  CommandRateLimitPerSecond: 7
+  CommandRateLimitBurst: 9
 Kafka:
   Brokers: redpanda:9092,localhost:19092
   MessageEventsTopic: message.events.test
@@ -53,6 +66,15 @@ Kafka:
 	}
 	if cfg.StorageDriver != StorageDriverPostgres {
 		t.Fatalf("storage driver should remain postgres, got %q", cfg.StorageDriver)
+	}
+	if len(cfg.GatewayWS.AllowedOrigins) != 2 || cfg.GatewayWS.AllowedOrigins[0] != "https://chat.example.com" || cfg.GatewayWS.AllowedOrigins[1] != "http://localhost:5173" {
+		t.Fatalf("gateway websocket allowed origins mismatch: %+v", cfg.GatewayWS.AllowedOrigins)
+	}
+	if !cfg.GatewayWS.AllowQueryToken || cfg.GatewayWS.PingIntervalSeconds != 10 || cfg.GatewayWS.HeartbeatTimeoutSeconds != 40 {
+		t.Fatalf("gateway websocket heartbeat/auth config mismatch: %+v", cfg.GatewayWS)
+	}
+	if cfg.GatewayWS.CommandRateLimitPerSecond != 7 || cfg.GatewayWS.CommandRateLimitBurst != 9 {
+		t.Fatalf("gateway websocket rate limit config mismatch: %+v", cfg.GatewayWS)
 	}
 	if len(cfg.Kafka.Brokers) != 2 || cfg.Kafka.Brokers[0] != "redpanda:9092" || cfg.Kafka.Brokers[1] != "localhost:19092" {
 		t.Fatalf("kafka brokers mismatch: %+v", cfg.Kafka.Brokers)
@@ -91,6 +113,64 @@ DeepSeek:
 	}
 	if cfg.DeepSeek.Model != "deepseek-local-model" {
 		t.Fatalf("deepseek model = %q", cfg.DeepSeek.Model)
+	}
+}
+
+func TestResolveGatewayWSConfigDefaultsAreProductionSafe(t *testing.T) {
+	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "")
+	t.Setenv("GATEWAY_WS_ALLOW_QUERY_TOKEN", "")
+	t.Setenv("GATEWAY_WS_PING_INTERVAL_SECONDS", "")
+	t.Setenv("GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS", "")
+	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND", "")
+	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST", "")
+
+	cfg, err := ResolveGatewayWSConfig(GatewayWSConfig{})
+	if err != nil {
+		t.Fatalf("resolve gateway ws config: %v", err)
+	}
+	if len(cfg.AllowedOrigins) != 0 {
+		t.Fatalf("allowed origins should default empty same-origin policy, got %+v", cfg.AllowedOrigins)
+	}
+	if cfg.AllowQueryToken {
+		t.Fatal("query-token auth should be disabled by default")
+	}
+	if cfg.PingIntervalSeconds != 30 || cfg.HeartbeatTimeoutSeconds != 75 {
+		t.Fatalf("gateway ws heartbeat defaults mismatch: %+v", cfg)
+	}
+	if cfg.CommandRateLimitPerSecond != 20 || cfg.CommandRateLimitBurst != 40 {
+		t.Fatalf("gateway ws rate limit defaults mismatch: %+v", cfg)
+	}
+}
+
+func TestResolveGatewayWSConfigFromEnv(t *testing.T) {
+	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "https://app.example.com, http://127.0.0.1:5173/")
+	t.Setenv("GATEWAY_WS_ALLOW_QUERY_TOKEN", "true")
+	t.Setenv("GATEWAY_WS_PING_INTERVAL_SECONDS", "15")
+	t.Setenv("GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS", "45")
+	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND", "11")
+	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST", "13")
+
+	cfg, err := ResolveGatewayWSConfig(GatewayWSConfig{})
+	if err != nil {
+		t.Fatalf("resolve gateway ws env config: %v", err)
+	}
+	if len(cfg.AllowedOrigins) != 2 || cfg.AllowedOrigins[0] != "https://app.example.com" || cfg.AllowedOrigins[1] != "http://127.0.0.1:5173" {
+		t.Fatalf("env allowed origins mismatch: %+v", cfg.AllowedOrigins)
+	}
+	if !cfg.AllowQueryToken || cfg.PingIntervalSeconds != 15 || cfg.HeartbeatTimeoutSeconds != 45 {
+		t.Fatalf("env heartbeat/auth mismatch: %+v", cfg)
+	}
+	if cfg.CommandRateLimitPerSecond != 11 || cfg.CommandRateLimitBurst != 13 {
+		t.Fatalf("env rate limit mismatch: %+v", cfg)
+	}
+}
+
+func TestResolveGatewayWSConfigRejectsWildcardOrigin(t *testing.T) {
+	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "")
+
+	_, err := ResolveGatewayWSConfig(GatewayWSConfig{AllowedOrigins: []string{"*"}})
+	if err == nil {
+		t.Fatal("expected wildcard allowed origin to be rejected")
 	}
 }
 

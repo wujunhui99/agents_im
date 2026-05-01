@@ -11,6 +11,13 @@ Presence:
   Driver: redis
   HeartbeatTTLSeconds: 60
   KeyPrefix: agents_im:presence
+GatewayWS:
+  AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}
+  AllowQueryToken: false
+  PingIntervalSeconds: 30
+  HeartbeatTimeoutSeconds: 75
+  CommandRateLimitPerSecond: 20
+  CommandRateLimitBurst: 40
 Redis:
   Addr: ${REDIS_ADDR}
   Password: ${REDIS_PASSWORD}

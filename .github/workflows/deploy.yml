@@ -22,6 +22,12 @@ jobs:
       build_required: ${{ steps.detect.outputs.build_required }}
       deploy_required: ${{ steps.detect.outputs.deploy_required }}
       config_only: ${{ steps.detect.outputs.config_only }}
+      backend_services: ${{ steps.detect.outputs.backend_services }}
+      web_required: ${{ steps.detect.outputs.web_required }}
+      image_services: ${{ steps.detect.outputs.image_services }}
+      image_services_space: ${{ steps.detect.outputs.image_services_space }}
+      rollout_services: ${{ steps.detect.outputs.rollout_services }}
+      restart_services: ${{ steps.detect.outputs.restart_services }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,74 +37,45 @@ jobs:
       - name: Detect changes
         id: detect
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "build_required=true" >> "$GITHUB_OUTPUT"
-            echo "deploy_required=true" >> "$GITHUB_OUTPUT"
-            echo "config_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          changed=()
+          if [[ "${EVENT_NAME}" != "workflow_dispatch" ]]; then
+            before="${BEFORE_SHA:-}"
+            if [[ -z "${before}" || "${before}" =~ ^0+$ ]]; then
+              if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+                before="HEAD^"
+              else
+                mapfile -t changed < <(git ls-files)
+              fi
+            fi
+            if [[ ${#changed[@]} -eq 0 ]]; then
+              mapfile -t changed < <(git diff --name-only "${before}" HEAD)
+            fi
           fi
 
-          before="${{ github.event.before }}"
-          if [[ -z "${before}" || "${before}" =~ ^0+$ ]]; then
-            before="HEAD^"
-          fi
-
-          mapfile -t changed < <(git diff --name-only "${before}" HEAD)
-          build_required=false
-          deploy_required=false
-
-          for file in "${changed[@]}"; do
-            case "${file}" in
-              deploy/k8s/*|deploy/k8s/**|scripts/deploy-k3s.sh)
-                deploy_required=true
-                ;;
-              .github/workflows/deploy.yml)
-                deploy_required=true
-                ;;
-              docs/*|docs/**|README.md|*.md)
-                ;;
-              *)
-                build_required=true
-                deploy_required=true
-                ;;
-            esac
-          done
-
-          if [[ "${build_required}" == "true" ]]; then
-            config_only=false
-          else
-            config_only="${deploy_required}"
-          fi
-
-          echo "build_required=${build_required}" >> "$GITHUB_OUTPUT"
-          echo "deploy_required=${deploy_required}" >> "$GITHUB_OUTPUT"
-          echo "config_only=${config_only}" >> "$GITHUB_OUTPUT"
+          outputs_file="$(mktemp)"
+          python3 scripts/detect-deploy-changes.py \
+            --event-name "${EVENT_NAME}" \
+            --ref "${GITHUB_REF}" \
+            "${changed[@]}" | tee "${outputs_file}"
+          cat "${outputs_file}" >> "$GITHUB_OUTPUT"
 
   build-backend:
     name: Build backend image (${{ matrix.service }})
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.build_required == 'true'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs.backend_services != '[]'
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - user-api
-          - auth-api
-          - friends-api
-          - message-api
-          - gateway-ws
-          - groups-api
-          - agent-api
-          - message-transfer
-          - user-rpc
-          - auth-rpc
-          - friends-rpc
-          - groups-rpc
-          - message-rpc
+        service: ${{ fromJSON(needs.detect-changes.outputs.backend_services) }}
 
     steps:
       - name: Checkout
@@ -132,7 +109,9 @@ jobs:
     name: Build web image
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.build_required == 'true'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs.web_required == 'true'
 
     steps:
       - name: Checkout
@@ -169,11 +148,11 @@ jobs:
       - build-web
     if: >-
       always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.result == 'success' &&
       needs.detect-changes.outputs.deploy_required == 'true' &&
-      (
-        needs.detect-changes.outputs.build_required == 'false' ||
-        (needs.build-backend.result == 'success' && needs.build-web.result == 'success')
-      )
+      (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') &&
+      (needs.build-web.result == 'success' || needs.build-web.result == 'skipped')
 
     steps:
       - name: Checkout
@@ -196,8 +175,10 @@ jobs:
           SKIP_SET_IMAGE: ${{ needs.detect-changes.outputs.build_required == 'false' }}
           SKIP_MIDDLEWARE: ${{ needs.detect-changes.outputs.config_only }}
           SKIP_MIGRATIONS: ${{ needs.detect-changes.outputs.config_only }}
-          ROLLOUT_SERVICES: ${{ needs.detect-changes.outputs.config_only == 'true' && 'groups-rpc' || '' }}
-          RESTART_ROLLOUT: ${{ needs.detect-changes.outputs.config_only }}
+          IMAGE_SERVICES: ${{ needs.detect-changes.outputs.image_services_space }}
+          ROLLOUT_SERVICES: ${{ needs.detect-changes.outputs.rollout_services }}
+          RESTART_SERVICES: ${{ needs.detect-changes.outputs.restart_services }}
+          RESTART_ROLLOUT: ${{ needs.detect-changes.outputs.restart_services != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -216,4 +197,4 @@ jobs:
             -czf - . | ssh "${ssh_opts[@]}" "${remote}" 'tar -xzf - -C /opt/agents-im/repo'
 
           ssh "${ssh_opts[@]}" "${remote}" \
-            "cd /opt/agents-im/repo && IMAGE_REGISTRY='${IMAGE_NAMESPACE}' IMAGE_TAG='${IMAGE_TAG}' GHCR_USERNAME='${GHCR_USERNAME}' GHCR_TOKEN='${GHCR_TOKEN}' SKIP_SET_IMAGE='${SKIP_SET_IMAGE}' SKIP_MIDDLEWARE='${SKIP_MIDDLEWARE}' SKIP_MIGRATIONS='${SKIP_MIGRATIONS}' ROLLOUT_SERVICES='${ROLLOUT_SERVICES}' RESTART_ROLLOUT='${RESTART_ROLLOUT}' MIDDLEWARE_DIR=/opt/agents-im/middleware ./scripts/deploy-k3s.sh"
+            "cd /opt/agents-im/repo && IMAGE_REGISTRY='${IMAGE_NAMESPACE}' IMAGE_TAG='${IMAGE_TAG}' GHCR_USERNAME='${GHCR_USERNAME}' GHCR_TOKEN='${GHCR_TOKEN}' SKIP_SET_IMAGE='${SKIP_SET_IMAGE}' SKIP_MIDDLEWARE='${SKIP_MIDDLEWARE}' SKIP_MIGRATIONS='${SKIP_MIGRATIONS}' IMAGE_SERVICES='${IMAGE_SERVICES}' ROLLOUT_SERVICES='${ROLLOUT_SERVICES}' RESTART_SERVICES='${RESTART_SERVICES}' RESTART_ROLLOUT='${RESTART_ROLLOUT}' MIDDLEWARE_DIR=/opt/agents-im/middleware ./scripts/deploy-k3s.sh"

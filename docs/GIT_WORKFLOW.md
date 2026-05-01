@@ -116,22 +116,26 @@ go test -tags=integration ./tests
 
 ## CD / Deployment
 
-生产发布由 `.github/workflows/deploy.yml` 负责。该 workflow 在 `main` 分支 push 后自动触发，也可通过 GitHub Actions `workflow_dispatch` 手动触发。发布链路为：
+生产发布由 `.github/workflows/deploy.yml` 负责。该 workflow 在 `main` 分支 push 后自动触发，也可通过 GitHub Actions `workflow_dispatch` 手动触发。所有 build/deploy job 都带有 `github.ref == 'refs/heads/main'` 防线；如果手动触发选择了非 `main` ref，workflow 只会 no-op，不会 SSH 到服务器。发布链路为：
 
-1. `detect-changes` job 先判断本次变更类型，并输出 `build_required`、`deploy_required`、`config_only`：
-   - `workflow_dispatch`：完整构建和部署，保持手动发布语义。
-   - `deploy/k8s/**`、`scripts/deploy-k3s.sh`、`.github/workflows/deploy.yml`：config-only deploy，不构建镜像。
+1. `detect-changes` job 先判断本次变更类型，并输出 `build_required`、`deploy_required`、`config_only`、`backend_services`、`web_required`、`image_services` 和 `rollout_services`：
+   - `workflow_dispatch` on `main`：完整构建和部署，保持手动发布语义。
+   - `workflow_dispatch` on non-`main`：no-op，禁止部署。
+   - `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh`、`.github/workflows/deploy.yml`：config-only deploy，不构建镜像。
    - `docs/**`、`README.md`、其他 Markdown：不部署。
-   - 其他文件：视为业务/镜像相关变更，完整构建和部署。
-2. `build-backend` job 在 `build_required=true` 时按服务矩阵构建并推送后端镜像到 GHCR，服务包括 `user-api`、`auth-api`、`friends-api`、`message-api`、`gateway-ws`、`groups-api`、`agent-api`、`message-transfer` 以及各 RPC 服务。
-3. `build-web` job 在 `build_required=true` 时构建并推送 web 镜像到 GHCR。
-4. `deploy` job 使用 `SERVER_*` secrets 通过 SSH 连接服务器，将仓库部署文件同步到 `/opt/agents-im/repo`，并以当前 commit SHA 作为 `IMAGE_TAG` 执行 `scripts/deploy-k3s.sh`。
+   - `web/**`：只构建和部署 `web`。
+   - `cmd/<service>/**`、`api/<domain>.api`：只构建和部署对应服务。
+   - `proto/**`、`go.mod`、`go.sum`、`Dockerfile`、`.dockerignore`、`internal/**`、`db/**`、`scripts/migrate-postgres.sh`：构建并部署全部后端服务；只有同时修改 web-owned 路径时才构建 `web`。
+   - 其他非文档文件：fail-safe 为全部后端服务，避免漏构建。
+2. `build-backend` job 在 `backend_services` 非空时按动态服务矩阵构建并推送后端镜像到 GHCR，服务包括 `user-api`、`auth-api`、`friends-api`、`message-api`、`gateway-ws`、`groups-api`、`agent-api`、`message-transfer` 以及各 RPC 服务。
+3. `build-web` job 仅在 `web_required=true` 时构建并推送 web 镜像到 GHCR。
+4. `deploy` job 使用 `SERVER_*` secrets 通过 SSH 连接服务器，将仓库部署文件同步到 `/opt/agents-im/repo`，并以当前 commit SHA 作为 `IMAGE_TAG` 执行 `scripts/deploy-k3s.sh`。选择性发布会传入 `IMAGE_SERVICES`，只对已构建服务执行 `kubectl set image`，并只等待受影响服务 rollout。
 
 生产拓扑采用混合单机部署：
 
 - k3s 管理应用工作负载：Go API、RPC、worker 和 web UI。
 - Docker Compose 管理中间件：PostgreSQL、Redis、Redpanda。
-- `scripts/deploy-k3s.sh` 会启动服务器上的中间件 Compose、从 k3s `agents-im-secrets` 读取 `DATABASE_URL` 执行迁移、刷新 `ghcr-pull-secret`，再 `kubectl apply -k deploy/k8s` 并等待 deployment rollout。config-only deploy 会向脚本传入 `SKIP_SET_IMAGE=true`、`SKIP_MIDDLEWARE=true`、`SKIP_MIGRATIONS=true`、`RESTART_ROLLOUT=true` 和 `ROLLOUT_SERVICES=<service>`，用于跳过镜像更新/中间件/迁移，只重启并等待受影响 deployment。
+- `scripts/deploy-k3s.sh` 会启动服务器上的中间件 Compose、从 k3s `agents-im-secrets` 读取 `DATABASE_URL` 执行迁移、刷新 `ghcr-pull-secret`，再 `kubectl apply -k deploy/k8s` 并等待 deployment rollout。选择性镜像发布会向脚本传入 `IMAGE_SERVICES=<services>`，避免未构建服务被设置到不存在的 `${GITHUB_SHA}` tag。config-only deploy 会向脚本传入 `SKIP_SET_IMAGE=true`、`SKIP_MIDDLEWARE=true`、`SKIP_MIGRATIONS=true`、`RESTART_ROLLOUT=true`、`ROLLOUT_SERVICES=<services>` 和 `RESTART_SERVICES=<services>`，用于跳过镜像更新/中间件/迁移，只重启并等待受影响 deployment。
 - 首次服务器初始化使用 `scripts/bootstrap-server.sh`，它会写入 `/opt/agents-im/middleware/.env`，启动中间件，并创建 k3s `agents-im-secrets`。真实 secret 只应保存在服务器/k3s，不提交到 Git，也不打印到 Actions 日志。
 
 发布 workflow 需要的 GitHub repository secrets 见 [`../deploy/README.md`](../deploy/README.md)。

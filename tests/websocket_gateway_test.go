@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
@@ -84,7 +85,7 @@ func TestWebSocketGatewayRejectsMissingAndInvalidToken(t *testing.T) {
 	}
 }
 
-func TestWebSocketGatewayAcceptsValidTokenFromHeaderAndQuery(t *testing.T) {
+func TestWebSocketGatewayAcceptsValidTokenFromHeaderAndConfiguredQuery(t *testing.T) {
 	server, cleanup := newGatewayWSTestServer(t)
 	defer cleanup()
 
@@ -96,8 +97,15 @@ func TestWebSocketGatewayAcceptsValidTokenFromHeaderAndQuery(t *testing.T) {
 	}
 	_ = headerConn.Close()
 
+	queryServer, queryCleanup := newGatewayWSTestServer(t, gatewayws.WithGatewayWSConfig(config.GatewayWSConfig{
+		AllowQueryToken:           true,
+		CommandRateLimitPerSecond: 100,
+		CommandRateLimitBurst:     100,
+	}))
+	defer queryCleanup()
+
 	rawToken := strings.TrimPrefix(bearerTokenForUser(t, "usr_ws_query"), "Bearer ")
-	queryConn, _, err := websocket.DefaultDialer.Dial(wsURL(server.URL, rawToken), nil)
+	queryConn, _, err := websocket.DefaultDialer.Dial(wsURL(queryServer.URL, rawToken), nil)
 	if err != nil {
 		t.Fatalf("dial with token query param: %v", err)
 	}
@@ -675,17 +683,17 @@ func TestWebSocketGatewayConnectionCloseCleansManager(t *testing.T) {
 	}, "websocket connection unregistered after close")
 }
 
-func newGatewayWSTestServer(t *testing.T) (*httptest.Server, func()) {
+func newGatewayWSTestServer(t *testing.T, opts ...gatewayws.ServerOption) (*httptest.Server, func()) {
 	t.Helper()
 
-	_, server, cleanup := newGatewayWSAppTestServer(t)
+	_, server, cleanup := newGatewayWSAppTestServer(t, opts...)
 	return server, cleanup
 }
 
-func newGatewayWSAppTestServer(t *testing.T) (*gatewayws.Server, *httptest.Server, func()) {
+func newGatewayWSAppTestServer(t *testing.T, opts ...gatewayws.ServerOption) (*gatewayws.Server, *httptest.Server, func()) {
 	t.Helper()
 
-	app := newGatewayWSApp(t)
+	app := newGatewayWSApp(t, opts...)
 	server := httptest.NewServer(app)
 	return app, server, server.Close
 }
@@ -698,13 +706,13 @@ func newGatewayWSAppTestServerWithPresence(t *testing.T, store presence.Presence
 	return app, server, server.Close
 }
 
-func newGatewayWSApp(t *testing.T) *gatewayws.Server {
+func newGatewayWSApp(t *testing.T, opts ...gatewayws.ServerOption) *gatewayws.Server {
 	t.Helper()
 
-	return newGatewayWSAppWithPresence(t, presence.NewMemoryStore())
+	return newGatewayWSAppWithPresence(t, presence.NewMemoryStore(), opts...)
 }
 
-func newGatewayWSAppWithPresence(t *testing.T, store presence.PresenceStore) *gatewayws.Server {
+func newGatewayWSAppWithPresence(t *testing.T, store presence.PresenceStore, opts ...gatewayws.ServerOption) *gatewayws.Server {
 	t.Helper()
 
 	serviceContext := svc.NewMessageServiceContextWithAuth(
@@ -713,12 +721,13 @@ func newGatewayWSAppWithPresence(t *testing.T, store presence.PresenceStore) *ga
 		nil,
 		testJWTAuthConfig(),
 	)
-	return gatewayws.NewServer(
-		serviceContext,
+	serverOpts := []gatewayws.ServerOption{
 		gatewayws.WithPresenceStore(store),
 		gatewayws.WithPresenceTTL(time.Minute),
 		gatewayws.WithInstanceID("gateway-test"),
-	)
+	}
+	serverOpts = append(serverOpts, opts...)
+	return gatewayws.NewServer(serviceContext, serverOpts...)
 }
 
 func dialGatewayWS(t *testing.T, serverURL string, userID string) *websocket.Conn {
