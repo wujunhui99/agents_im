@@ -17,7 +17,8 @@ Gateway is the long-connection entry point for IM clients. The previous Gateway 
 
 - Expose `GET /ws` as a WebSocket upgrade endpoint through `cmd/gateway-ws`.
 - Authenticate the WebSocket handshake with the existing HS256 JWT token format.
-- Accept token from `Authorization: Bearer <token>` or `?token=<token>`.
+- Accept token from `Authorization: Bearer <token>`; `?token=<token>` is available only when explicitly enabled in Gateway config.
+- Enforce an explicit browser `Origin` policy instead of relying on `gorilla/websocket` defaults.
 - Maintain an in-memory connection manager keyed by `user_id`, supporting multiple `connection_id` values per user.
 - Route client commands: `send_message`, `pull_messages`, `mark_conversation_read`, `get_conversation_seqs`, and `heartbeat`.
 - Call existing `MessageLogic` and repository contracts for message commands.
@@ -57,19 +58,40 @@ Auth:
   AccessExpire: 86400
 StorageDriver: memory
 DataSource: ${DATABASE_URL}
+GatewayWS:
+  AllowedOrigins: http://localhost:5173,http://127.0.0.1:5173
+  AllowQueryToken: true
+  PingIntervalSeconds: 30
+  HeartbeatTimeoutSeconds: 75
+  CommandRateLimitPerSecond: 20
+  CommandRateLimitBurst: 40
 ```
 
 `StorageDriver: memory` is the default first-phase mode. `StorageDriver: postgres` can use the existing message repository implementation after database migrations are applied, but normal tests remain memory-only.
+
+`GatewayWS` keys:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `AllowedOrigins` | empty | Comma-separated exact `http(s)://host[:port]` origins. Empty means no browser cross-origin access; same-origin requests are accepted. Wildcards are rejected. |
+| `AllowQueryToken` | `false` | Enables `?token=` only for controlled local/dev or constrained clients. Production should prefer the `Authorization` header. |
+| `PingIntervalSeconds` | `30` | Server WebSocket ping interval. |
+| `HeartbeatTimeoutSeconds` | `75` | Read deadline extended by pong frames; dead or non-responsive peers are closed after this timeout. |
+| `CommandRateLimitPerSecond` | `20` | Per-connection command token refill rate. |
+| `CommandRateLimitBurst` | `40` | Per-connection command burst capacity. |
+
+Equivalent environment overrides use `GATEWAY_WS_*` names: `GATEWAY_WS_ALLOWED_ORIGINS`, `GATEWAY_WS_ALLOW_QUERY_TOKEN`, `GATEWAY_WS_PING_INTERVAL_SECONDS`, `GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS`, `GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND`, and `GATEWAY_WS_COMMAND_RATE_LIMIT_BURST`. `AGENTS_IM_GATEWAY_WS_*` aliases are also accepted by the config resolver.
 
 ## Handshake
 
 Gateway validates the token before upgrading:
 
 1. Read `Authorization: Bearer <token>`.
-2. If absent, read `token` query param.
-3. Validate with `internal/auth/token.HMACTokenManager` using `Auth.AccessSecret` and `Auth.AccessExpire`.
-4. Reject missing, malformed, invalid, or expired tokens with HTTP 401.
-5. Register the upgraded connection under the token `user_id`.
+2. If absent and `GatewayWS.AllowQueryToken=true`, read `token` query param.
+3. Validate the browser `Origin` during upgrade. If `GatewayWS.AllowedOrigins` is non-empty, the origin must exactly match one configured origin. If it is empty, only same-origin browser requests are accepted. Requests without an `Origin` header are treated as non-browser clients and are allowed to proceed to JWT auth.
+4. Validate with `internal/auth/token.HMACTokenManager` using `Auth.AccessSecret` and `Auth.AccessExpire`.
+5. Reject missing, malformed, invalid, or expired tokens with HTTP 401.
+6. Register the upgraded connection under the token `user_id`.
 
 The Gateway never accepts a client-provided user id as identity.
 
@@ -140,7 +162,9 @@ It supports multiple connections per user for multi-device clients. It also expo
 ## Reliability Notes
 
 - App-level `heartbeat` is implemented in phase 1.
-- WebSocket pong updates connection last-seen time.
+- The server sends WebSocket ping frames every `GatewayWS.PingIntervalSeconds`.
+- WebSocket pong updates connection last-seen time and extends the read deadline by `GatewayWS.HeartbeatTimeoutSeconds`.
+- Each connection has a token-bucket command limiter. Exceeding it returns the normal command ACK envelope with `status=error` and `error.code=RATE_LIMITED`.
 - Reconnect compensation remains client-driven through `get_conversation_seqs` and `pull_messages`; the stable frontend contract is [`websocket-reconnect-sync.md`](./websocket-reconnect-sync.md).
 - Delivery ACK and server-pushed message fanout are future work tied to Kafka/Push/Presence integration.
 
@@ -155,7 +179,7 @@ Required validation:
 - `bash scripts/verify-static.sh`
 - `docker compose config`
 
-Tests cover missing/invalid token rejection, valid token from header/query, heartbeat, `send_message`, and `pull_messages` with memory storage.
+Tests cover missing/invalid token rejection, valid token from header/configured query-token auth, origin policy, ping loop, rate limiting, heartbeat, `send_message`, and `pull_messages` with memory storage.
 
 
 ## Local Live Delivery On WebSocket Send

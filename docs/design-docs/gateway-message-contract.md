@@ -292,6 +292,7 @@ Gateway maps internal service errors to the frontend-visible ACK `error.code`. M
 | `FORBIDDEN` | User is not allowed to access the conversation |
 | `NOT_FOUND` | Target user, group, or conversation was not found |
 | `CONFLICT` | `clientMsgId` was reused with different send payload |
+| `RATE_LIMITED` | Connection exceeded configured Gateway command rate |
 | `INTERNAL` | Unexpected Gateway or Message Service failure |
 
 Gateway may validate envelope shape before RPC. Business validation remains in Message Service.

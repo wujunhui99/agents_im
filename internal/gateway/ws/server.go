@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -28,9 +29,8 @@ import (
 const CommandHeartbeat = gateway.CommandHeartbeat
 
 const (
-	defaultReadLimit        = 64 * 1024
-	defaultWriteWait        = 10 * time.Second
-	defaultHeartbeatTimeout = 75 * time.Second
+	defaultReadLimit = 64 * 1024
+	defaultWriteWait = 10 * time.Second
 )
 
 type Server struct {
@@ -41,6 +41,9 @@ type Server struct {
 	presence     presence.PresenceStore
 	presenceTTL  time.Duration
 	instanceID   string
+	wsConfig     config.GatewayWSConfig
+	configErr    error
+	origins      map[string]struct{}
 	upgrader     websocket.Upgrader
 	now          func() time.Time
 }
@@ -63,6 +66,7 @@ type Connection struct {
 	writeMu   sync.Mutex
 	lastSeen  time.Time
 	lastSeenM sync.RWMutex
+	limiter   *commandRateLimiter
 }
 
 type commandFrame struct {
@@ -108,6 +112,7 @@ func NewServer(serviceContext *svc.ServiceContext, opts ...ServerOption) *Server
 		messageLogic = serviceContext.MessageLogic
 	}
 	auth = normalizeAuth(auth)
+	wsConfig, wsConfigErr := config.ResolveGatewayWSConfig(config.GatewayWSConfig{})
 
 	server := &Server{
 		auth:         auth,
@@ -117,6 +122,8 @@ func NewServer(serviceContext *svc.ServiceContext, opts ...ServerOption) *Server
 		presence:     presence.NewMemoryStore(),
 		presenceTTL:  presence.HeartbeatTTL(config.DefaultPresenceConfig()),
 		instanceID:   defaultGatewayInstanceID(),
+		wsConfig:     wsConfig,
+		configErr:    wsConfigErr,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -126,6 +133,7 @@ func NewServer(serviceContext *svc.ServiceContext, opts ...ServerOption) *Server
 	for _, opt := range opts {
 		opt(server)
 	}
+	server.configureWebSocket()
 	return server
 }
 
@@ -175,6 +183,26 @@ func WithInstanceID(instanceID string) ServerOption {
 	}
 }
 
+func WithGatewayWSConfig(wsConfig config.GatewayWSConfig) ServerOption {
+	return func(s *Server) {
+		s.wsConfig = wsConfig
+		s.configErr = nil
+	}
+}
+
+func (s *Server) configureWebSocket() {
+	resolved, err := config.ResolveGatewayWSConfig(s.wsConfig)
+	if err != nil {
+		s.configErr = err
+		s.origins = nil
+	} else {
+		s.wsConfig = resolved
+		s.configErr = nil
+		s.origins = originSet(resolved.AllowedOrigins)
+	}
+	s.upgrader.CheckOrigin = s.checkOrigin
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.HandleWebSocket(w, r)
 }
@@ -184,6 +212,11 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	r = tracedRequest
 	observability.InjectTraceHeaders(w, traceContext)
 
+	if s.configErr != nil {
+		log.Printf("websocket_handshake_failed trace_id=%s request_id=%s status=config_error error=%v", traceContext.TraceID, traceContext.RequestID, s.configErr)
+		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		return
+	}
 	claims, err := s.authenticate(r)
 	if err != nil {
 		log.Printf("websocket_handshake_failed trace_id=%s request_id=%s status=unauthorized remote_addr=%s", traceContext.TraceID, traceContext.RequestID, r.RemoteAddr)
@@ -215,6 +248,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		RequestID:   traceContext.RequestID,
 		ws:          socket,
 		lastSeen:    now,
+		limiter:     newCommandRateLimiter(s.wsConfig, s.now),
 	}
 	_ = s.registerPresence(r.Context(), conn)
 	s.connections.Register(conn)
@@ -230,7 +264,10 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("websocket_disconnected trace_id=%s request_id=%s connection_id=%s user_id=%s instance_id=%s", conn.TraceID, conn.RequestID, conn.ID, conn.UserID, conn.InstanceID)
 	}()
 
-	s.readLoop(r.Context(), conn)
+	connCtx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	go s.pingLoop(connCtx, conn)
+	s.readLoop(connCtx, conn)
 }
 
 func (s *Server) Connections() *ConnectionManager {
@@ -280,7 +317,7 @@ func (s *Server) unregisterPresence(conn *Connection) error {
 
 func (s *Server) authenticate(r *http.Request) (token.Claims, error) {
 	rawToken := bearerToken(r.Header.Get("Authorization"))
-	if rawToken == "" {
+	if rawToken == "" && s.wsConfig.AllowQueryToken {
 		rawToken = strings.TrimSpace(r.URL.Query().Get("token"))
 	}
 	if rawToken == "" {
@@ -298,11 +335,11 @@ func (s *Server) authenticate(r *http.Request) (token.Claims, error) {
 
 func (s *Server) readLoop(ctx context.Context, conn *Connection) {
 	conn.ws.SetReadLimit(defaultReadLimit)
-	_ = conn.ws.SetReadDeadline(s.now().Add(defaultHeartbeatTimeout))
+	_ = conn.ws.SetReadDeadline(s.now().Add(s.heartbeatTimeout()))
 	conn.ws.SetPongHandler(func(string) error {
 		conn.touch(s.now())
 		_ = s.refreshPresence(ctx, conn)
-		return conn.ws.SetReadDeadline(s.now().Add(defaultHeartbeatTimeout))
+		return conn.ws.SetReadDeadline(s.now().Add(s.heartbeatTimeout()))
 	})
 
 	for {
@@ -322,6 +359,30 @@ func (s *Server) readLoop(ctx context.Context, conn *Connection) {
 	}
 }
 
+func (s *Server) pingLoop(ctx context.Context, conn *Connection) {
+	interval := s.pingInterval()
+	if interval <= 0 || conn == nil || conn.ws == nil {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			deadline := time.Now().Add(defaultWriteWait)
+			conn.writeMu.Lock()
+			err := conn.ws.WriteControl(websocket.PingMessage, nil, deadline)
+			conn.writeMu.Unlock()
+			if err != nil {
+				_ = conn.ws.Close()
+				return
+			}
+		}
+	}
+}
+
 func (s *Server) handleCommand(ctx context.Context, conn *Connection, raw []byte) responseFrame {
 	traceContext := conn.traceContext()
 	frame, err := decodeCommandFrame(raw)
@@ -337,6 +398,12 @@ func (s *Server) handleCommand(ctx context.Context, conn *Connection, raw []byte
 		traceContext = observability.NewTraceContext(frameTraceID, traceContext.RequestID)
 	}
 	ctx = observability.ContextWithTrace(ctx, traceContext)
+	if conn != nil && conn.limiter != nil && !conn.limiter.Allow() {
+		resp := errorResponse(requestID, commandType, apperror.RateLimited("command rate limit exceeded"))
+		resp.TraceID = traceContext.TraceID
+		logWebSocketCommand(conn, traceContext, resp)
+		return resp
+	}
 	if strings.TrimSpace(requestID) == "" {
 		resp := errorResponse("", commandType, apperror.InvalidArgument("request_id is required"))
 		resp.TraceID = traceContext.TraceID
@@ -615,9 +682,148 @@ func frontendErrorCode(appErr *apperror.Error) string {
 		return "NOT_FOUND"
 	case apperror.CodeAlreadyExists:
 		return "CONFLICT"
+	case apperror.CodeRateLimited:
+		return "RATE_LIMITED"
 	default:
 		return "INTERNAL"
 	}
+}
+
+func (s *Server) checkOrigin(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return true
+	}
+	normalized, ok := normalizeRequestOrigin(origin)
+	if !ok {
+		return false
+	}
+	if len(s.origins) > 0 {
+		_, allowed := s.origins[normalized]
+		return allowed
+	}
+	return normalized == sameRequestOrigin(r)
+}
+
+func originSet(origins []string) map[string]struct{} {
+	if len(origins) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(origins))
+	for _, origin := range origins {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			set[origin] = struct{}{}
+		}
+	}
+	return set
+}
+
+func normalizeRequestOrigin(origin string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(origin))
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || strings.TrimSpace(parsed.Host) == "" {
+		return "", false
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
+		return "", false
+	}
+	return strings.ToLower(parsed.Scheme) + "://" + strings.ToLower(parsed.Host), true
+}
+
+func sameRequestOrigin(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwarded != "" {
+		if idx := strings.Index(forwarded, ","); idx >= 0 {
+			forwarded = forwarded[:idx]
+		}
+		forwarded = strings.ToLower(strings.TrimSpace(forwarded))
+		if forwarded == "http" || forwarded == "https" {
+			scheme = forwarded
+		}
+	}
+	host := strings.ToLower(strings.TrimSpace(r.Host))
+	if host == "" {
+		host = strings.ToLower(strings.TrimSpace(r.Header.Get("Host")))
+	}
+	if host == "" {
+		return ""
+	}
+	return scheme + "://" + host
+}
+
+func (s *Server) pingInterval() time.Duration {
+	if s.wsConfig.PingIntervalSeconds <= 0 {
+		return time.Duration(config.DefaultGatewayWSConfig().PingIntervalSeconds) * time.Second
+	}
+	return time.Duration(s.wsConfig.PingIntervalSeconds) * time.Second
+}
+
+func (s *Server) heartbeatTimeout() time.Duration {
+	if s.wsConfig.HeartbeatTimeoutSeconds <= 0 {
+		return time.Duration(config.DefaultGatewayWSConfig().HeartbeatTimeoutSeconds) * time.Second
+	}
+	return time.Duration(s.wsConfig.HeartbeatTimeoutSeconds) * time.Second
+}
+
+type commandRateLimiter struct {
+	mu     sync.Mutex
+	rate   float64
+	burst  float64
+	tokens float64
+	last   time.Time
+	now    func() time.Time
+}
+
+func newCommandRateLimiter(wsConfig config.GatewayWSConfig, now func() time.Time) *commandRateLimiter {
+	if wsConfig.CommandRateLimitPerSecond <= 0 {
+		return nil
+	}
+	burst := wsConfig.CommandRateLimitBurst
+	if burst <= 0 {
+		burst = wsConfig.CommandRateLimitPerSecond
+	}
+	if now == nil {
+		now = time.Now
+	}
+	return &commandRateLimiter{
+		rate:   float64(wsConfig.CommandRateLimitPerSecond),
+		burst:  float64(burst),
+		tokens: float64(burst),
+		last:   now().UTC(),
+		now:    now,
+	}
+}
+
+func (l *commandRateLimiter) Allow() bool {
+	if l == nil {
+		return true
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	now := l.now().UTC()
+	if l.last.IsZero() {
+		l.last = now
+	}
+	elapsed := now.Sub(l.last).Seconds()
+	if elapsed > 0 {
+		l.tokens += elapsed * l.rate
+		if l.tokens > l.burst {
+			l.tokens = l.burst
+		}
+		l.last = now
+	}
+	if l.tokens < 1 {
+		return false
+	}
+	l.tokens--
+	return true
 }
 
 func unmarshalPayload(payload json.RawMessage, dst interface{}) error {
@@ -771,6 +977,9 @@ func normalizeAuth(auth config.JWTAuthConfig) config.JWTAuthConfig {
 var errNilMessageLogic = errors.New("message logic is not configured")
 
 func (s *Server) Ready() error {
+	if s.configErr != nil {
+		return s.configErr
+	}
 	if s.messageLogic == nil {
 		return errNilMessageLogic
 	}

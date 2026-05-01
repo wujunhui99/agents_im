@@ -89,6 +89,12 @@ load_env() {
   export JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-dev-jwt-secret-change-me}"
   export JWT_ACCESS_EXPIRE="${JWT_ACCESS_EXPIRE:-86400}"
   export PRESENCE_DRIVER="${PRESENCE_DRIVER:-memory}"
+  export GATEWAY_WS_ALLOWED_ORIGINS="${GATEWAY_WS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
+  export GATEWAY_WS_ALLOW_QUERY_TOKEN="${GATEWAY_WS_ALLOW_QUERY_TOKEN:-true}"
+  export GATEWAY_WS_PING_INTERVAL_SECONDS="${GATEWAY_WS_PING_INTERVAL_SECONDS:-30}"
+  export GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS="${GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS:-75}"
+  export GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND="${GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND:-20}"
+  export GATEWAY_WS_COMMAND_RATE_LIMIT_BURST="${GATEWAY_WS_COMMAND_RATE_LIMIT_BURST:-40}"
 }
 
 require_command() {
@@ -156,7 +162,14 @@ write_configs() {
   write_api_config "gateway-ws" "${GATEWAY_WS_PORT:-8084}" "Presence:
   Driver: ${PRESENCE_DRIVER}
   HeartbeatTTLSeconds: ${PRESENCE_TTL_SECONDS:-60}
-  KeyPrefix: ${PRESENCE_KEY_PREFIX:-agents_im:presence}"
+  KeyPrefix: ${PRESENCE_KEY_PREFIX:-agents_im:presence}
+GatewayWS:
+  AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}
+  AllowQueryToken: ${GATEWAY_WS_ALLOW_QUERY_TOKEN}
+  PingIntervalSeconds: ${GATEWAY_WS_PING_INTERVAL_SECONDS}
+  HeartbeatTimeoutSeconds: ${GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS}
+  CommandRateLimitPerSecond: ${GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND}
+  CommandRateLimitBurst: ${GATEWAY_WS_COMMAND_RATE_LIMIT_BURST}"
   write_api_config "groups-api" "${GROUPS_API_PORT:-8085}"
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
 }

@@ -57,6 +57,7 @@ func main() {
 		gatewayws.WithPresenceStore(presenceStore),
 		gatewayws.WithPresenceTTL(presence.HeartbeatTTL(cfg.Presence)),
 		gatewayws.WithInstanceID(gatewayInstanceID()),
+		gatewayws.WithGatewayWSConfig(cfg.GatewayWS),
 	)
 
 	mux := http.NewServeMux()
