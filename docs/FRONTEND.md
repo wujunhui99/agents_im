@@ -8,7 +8,7 @@
 - Vite
 - Vitest + Testing Library
 - lucide-react 图标
-- 原生 CSS，先不引入 UI 组件库，避免过早绑定设计系统
+- 原生 CSS + 轻量自研 Material 3-inspired UI layer，不引入官方 Material Web 或 MUI 等重型组件库
 
 ## 当前阶段范围
 
@@ -20,6 +20,16 @@
 4. **我的**：个人资料卡、用户详情、服务、收藏、朋友圈、设置入口；支持编辑 `display_name`、`gender`、`age`、`region` 等可变资料字段，并支持退出登录。
 
 当前 `web/src/api/{user,contacts,groups,messages}.ts` 均基于统一 `createApiClient` 封装 REST contract，共享 envelope 解析、错误处理和 bearer token 注入。认证页调用真实 `/auth/login` 与 `/auth/register`；我的页通过 typed user API adapter 调用 `PATCH /me` 更新资料。
+
+## Material 3-inspired 轻量设计系统
+
+当前前端保留微信式四 Tab 产品方向：`消息 / 联系人 / 发现 / 我的`，视觉层重构为轻量自研的 Google Material Design 3-inspired 系统。该系统只使用原生 CSS variables 和本仓库 React 组件，不依赖 `@material/web`、`@mui/*` 或其他重型 UI 框架。
+
+- `web/src/styles/tokens.css` 定义 design tokens：颜色、surface / tonal roles、shape、spacing、typography、state layer、shadow/elevation。
+- `web/src/styles.css` 引入 tokens 并按 app shell、components、pages 组织样式，兼容既有页面 class。
+- `web/src/components/ui/` 提供轻量组件：`Button`、`Card`、`TextField`、`TopAppBar`、`NavigationBar`、`ListItem`、`Avatar`、`Badge`、`MessageBubble`，以及兼容入口 `TopBar`、`TabBar`、`ListCard`、`SearchBox`、`ActionRow`。
+- 未实现入口继续显示明确 helper 或 `MVP 占位`，不能用视觉完成态暗示真实业务已实现。
+- 前端 API 错误必须继续显式展示；生产代码不得为了 UI 演示切换到 mock/default demo fallback。
 
 ## 消息页边界
 
@@ -50,12 +60,14 @@ web/
       session.ts         # localStorage session 工具
     components/
       ContactsPage.tsx   # 联系人、identifier 搜索和加好友真实 API UI
-      ui/                # TabBar、TopBar、ListCard、Avatar、SearchBox、ActionRow 等共享 UI
+      ui/                # Material 3-inspired Button、Card、TextField、TopAppBar、NavigationBar、ListItem、Avatar、Badge、MessageBubble 等共享 UI
     features/
       messages/          # 消息页和聊天窗口真实 API UI
     models/
       messages.ts        # frontend message/conversation models
     pages/               # DiscoverPage、MePage
+    styles/
+      tokens.css         # design tokens：颜色、surface、shape、spacing、typography、state layer、elevation
     App.tsx              # 认证入口、四 Tab shell 和页面路由
     App.test.tsx         # 认证、主导航、联系人/加好友、消息页、发现占位和我的页编辑行为测试
     main.tsx
@@ -93,11 +105,13 @@ make status
 
 - 主导航固定底部，使用四个 tab：`消息 / 联系人 / 发现 / 我的`。
 - 移动端优先；桌面环境使用 phone frame 预览，方便后续做响应式适配。
-- 视觉上参考微信：浅灰页面背景、白色列表卡片、绿色激活态、紧凑列表行。
+- 视觉上采用 Material 3-inspired surface 层级、tonal container、state feedback、elevation 和圆角节奏，同时保留微信式四 Tab 信息架构。
+- 列表、卡片、按钮、输入框、导航、消息气泡等基础 UI 必须优先复用 `web/src/components/ui/` 的轻量组件和 `web/src/styles/tokens.css` tokens。
 - 联系人页入口固定为：`新的朋友 / 群聊 / 标签 / 公众号`。
 - 好友列表来自 `GET /friends`；identifier 搜索来自 `GET /users/:identifier`；加好友来自 `POST /friends`。
 - 不在前端生产代码中写入 mock 用户、mock 会话、真实 token、密码或后端 secret。
 - 前端用户资料更新必须走 `web/src/api/user.ts`，只向 `PATCH /me` 发送可变字段，不发送 `user_id` 或 `identifier`。
+- 默认禁止新增 `@material/web`、`@mui/*` 等重依赖；如未来必须引入，需要先在执行计划和本文档中记录原因、替代方案与验证结果。
 
 ## REST Adapter 约定
 

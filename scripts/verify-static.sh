@@ -192,15 +192,24 @@ required_files=(
   "web/src/api/user.ts"
   "web/src/components/ui/ActionRow.tsx"
   "web/src/components/ui/Avatar.tsx"
+  "web/src/components/ui/Badge.tsx"
+  "web/src/components/ui/Button.tsx"
+  "web/src/components/ui/Card.tsx"
   "web/src/components/ui/ListCard.tsx"
+  "web/src/components/ui/ListItem.tsx"
+  "web/src/components/ui/MessageBubble.tsx"
+  "web/src/components/ui/NavigationBar.tsx"
   "web/src/components/ui/SearchBox.tsx"
   "web/src/components/ui/TabBar.tsx"
+  "web/src/components/ui/TextField.tsx"
   "web/src/components/ui/TopBar.tsx"
+  "web/src/components/ui/TopAppBar.tsx"
   "web/src/main.tsx"
   "web/src/components/ContactsPage.tsx"
   "web/src/pages/DiscoverPage.tsx"
   "web/src/pages/MePage.tsx"
   "web/src/features/messages/MessagesPage.tsx"
+  "web/src/styles/tokens.css"
   "web/src/styles.css"
   "web/src/vite-env.d.ts"
   "docs/design-docs/read-receipts.md"
@@ -252,6 +261,46 @@ shell_scripts=(
 for script in "${shell_scripts[@]}"; do
   bash -n "$script"
 done
+
+frontend_material_doc_patterns=(
+  "Material 3-inspired 轻量设计系统"
+  "web/src/styles/tokens.css"
+  "Button"
+  "Card"
+  "TextField"
+  "TopAppBar"
+  "NavigationBar"
+  "ListItem"
+  "MessageBubble"
+  "消息 / 联系人 / 发现 / 我的"
+  '不依赖 `@material/web`、`@mui/*`'
+)
+
+for pattern in "${frontend_material_doc_patterns[@]}"; do
+  rg -qF "$pattern" docs/FRONTEND.md
+done
+
+frontend_material_token_patterns=(
+  "--md-sys-color-primary"
+  "--md-sys-color-surface-container"
+  "--md-shape-corner-small"
+  "--md-space-4"
+  "--md-elevation-level1"
+  "--md-state-hover-opacity"
+)
+
+for pattern in "${frontend_material_token_patterns[@]}"; do
+  rg -qF -- "$pattern" web/src/styles/tokens.css
+done
+
+rg -qF '@import "./styles/tokens.css";' web/src/styles.css
+rg -qF "createApiClient" web/src/App.tsx web/src/api/client.ts
+rg -qF "POST /messages" docs/FRONTEND.md docs/product-specs/frontend-backend-contract.md
+
+if rg -n "(@material/web|@mui/)" web/package.json web/package-lock.json web/src; then
+  echo "frontend must not introduce Material Web or MUI heavy dependencies" >&2
+  exit 1
+fi
 
 ci_workflow_patterns=(
   "actions/checkout"
@@ -1511,6 +1560,7 @@ frontend_patterns=(
 
 frontend_files=(
   "web/src/App.tsx"
+  "web/src/components/ui/NavigationBar.tsx"
   "web/src/components/ui/TabBar.tsx"
   "web/src/components/ContactsPage.tsx"
   "web/src/features/messages/MessagesPage.tsx"

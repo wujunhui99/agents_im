@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { NavigationBar } from './NavigationBar';
 
 export type TabDefinition<T extends string> = {
   key: T;
@@ -13,26 +14,5 @@ type TabBarProps<T extends string> = {
 };
 
 export function TabBar<T extends string>({ tabs, activeTab, onChange }: TabBarProps<T>) {
-  return (
-    <nav className="tab-bar" role="tablist" aria-label="主导航">
-      {tabs.map((tab) => {
-        const Icon = tab.icon;
-        const selected = activeTab === tab.key;
-
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            className={selected ? 'tab-item active' : 'tab-item'}
-            onClick={() => onChange(tab.key)}
-          >
-            <Icon size={24} strokeWidth={selected ? 2.6 : 2.1} />
-            <span>{tab.label}</span>
-          </button>
-        );
-      })}
-    </nav>
-  );
+  return <NavigationBar tabs={tabs} activeTab={activeTab} onChange={onChange} />;
 }

@@ -1,7 +1,15 @@
-import { ChevronLeft, Search, SendHorizontal } from 'lucide-react';
+import { ChevronLeft, SendHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
 import { createMessageApi } from '../../api/messages';
+import { Avatar } from '../../components/ui/Avatar';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
+import { ListItem } from '../../components/ui/ListItem';
+import { MessageBubble } from '../../components/ui/MessageBubble';
+import { SearchBox } from '../../components/ui/SearchBox';
+import { TextField } from '../../components/ui/TextField';
 import type { ChatMessage, Conversation, MessageStatus } from '../../models/messages';
 
 type MessagesPageProps = {
@@ -99,23 +107,31 @@ function ConversationList({
         {status}
       </p>
       {conversations.length === 0 ? <p className="empty-state">暂无会话</p> : null}
-      <section className="list-card conversation-list" role="list" aria-label="消息列表">
+      <Card className="list-card conversation-list" role="list" aria-label="消息列表">
         {conversations.map((item) => (
           <div className="conversation-list-item" role="listitem" key={item.id}>
-            <button type="button" className="conversation-row conversation-button" onClick={() => onSelect(item.id)}>
-              <div className={`avatar avatar-${item.color}`}>{item.avatar}</div>
-              <div className="row-main">
-                <div className="row-title-line">
-                  <strong>{item.title}</strong>
+            <ListItem
+              className="conversation-row conversation-button"
+              onClick={() => onSelect(item.id)}
+              leading={<Avatar label={item.avatar} color={item.color} />}
+              headline={
+                <span className="row-title-line">
+                  <span>{item.title}</span>
                   <time>{item.time}</time>
-                </div>
-                <p>{item.preview}</p>
-              </div>
-              {item.unread > 0 ? <span className="unread-badge">{item.unread}</span> : null}
-            </button>
+                </span>
+              }
+              supportingText={item.preview}
+              trailing={
+                item.unread > 0 ? (
+                  <Badge tone="error" className="unread-badge">
+                    {item.unread}
+                  </Badge>
+                ) : null
+              }
+            />
           </div>
         ))}
-      </section>
+      </Card>
     </div>
   );
 }
@@ -139,9 +155,9 @@ function ChatWindow({
   return (
     <section className="chat-window" aria-label={`${conversation.title} 聊天窗口`}>
       <header className="chat-header">
-        <button type="button" className="chat-back-button" aria-label="返回消息列表" onClick={onBack}>
+        <Button variant="icon" className="chat-back-button" aria-label="返回消息列表" onClick={onBack}>
           <ChevronLeft size={24} />
-        </button>
+        </Button>
         <h2>{conversation.title}</h2>
       </header>
       <p className="inline-status" role="status">
@@ -151,10 +167,16 @@ function ChatWindow({
         {sortedMessages.map((message) => (
           <article className={`message-row message-${message.direction}`} key={message.id}>
             <div className="message-body">
-              <p className="message-bubble">{message.content}</p>
-              {message.direction === 'outgoing' ? (
-                <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>
-              ) : null}
+              <MessageBubble
+                direction={message.direction}
+                status={
+                  message.direction === 'outgoing' ? (
+                    <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>
+                  ) : null
+                }
+              >
+                {message.content}
+              </MessageBubble>
             </div>
           </article>
         ))}
@@ -181,21 +203,19 @@ function SendMessageComposer({ onSend }: { onSend: (content: string) => void }) 
 
   return (
     <form className="message-composer" aria-label="发送消息" onSubmit={handleSubmit}>
-      <input aria-label="输入消息" value={draft} placeholder="输入消息" onChange={(event) => setDraft(event.target.value)} />
-      <button type="submit" disabled={!trimmedDraft}>
+      <TextField
+        label="输入消息"
+        hideLabel
+        value={draft}
+        placeholder="输入消息"
+        onChange={(event) => setDraft(event.target.value)}
+        fieldClassName="message-composer-field"
+      />
+      <Button className="message-send-button" type="submit" disabled={!trimmedDraft}>
         <SendHorizontal size={17} />
         <span>发送</span>
-      </button>
+      </Button>
     </form>
-  );
-}
-
-function SearchBox({ placeholder }: { placeholder: string }) {
-  return (
-    <label className="search-box">
-      <Search size={17} />
-      <input placeholder={placeholder} aria-label={placeholder} />
-    </label>
   );
 }
 
