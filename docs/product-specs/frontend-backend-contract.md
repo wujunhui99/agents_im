@@ -217,6 +217,7 @@ Authorization: Bearer <access_token>
 ## Groups
 
 The group creator is automatically an active member. Groups are open join in MVP.
+Group detail and member-list reads require a bearer token and only active members can read them. Adding a different user requires the group creator/owner.
 
 ### Create Group
 
@@ -237,6 +238,7 @@ Content-Type: application/json
 
 ```http
 GET /groups/grp_000001
+Authorization: Bearer <access_token>
 ```
 
 ### Join Or Add Member
@@ -254,6 +256,7 @@ Content-Type: application/json
 ```
 
 If `user_id` is omitted, the authenticated user joins the group.
+If `user_id` names another user, the authenticated user must be the group creator/owner.
 
 ### Leave Group
 
@@ -266,6 +269,7 @@ Authorization: Bearer <access_token>
 
 ```http
 GET /groups/grp_000001/members
+Authorization: Bearer <access_token>
 ```
 
 ### Current Gap
@@ -378,7 +382,7 @@ Fallback for clients that cannot set headers:
 ws://127.0.0.1:8084/ws?token=<access_token>
 ```
 
-The gateway authenticates the same JWT used by REST. Missing or invalid tokens fail the handshake with HTTP 401.
+The gateway authenticates the same JWT used by REST. Missing or invalid tokens fail the handshake with HTTP 401. Query-token auth is disabled by default and only works when `GatewayWS.AllowQueryToken=true`; browser cross-origin access must match `GatewayWS.AllowedOrigins` exactly, while empty allowed origins only permit same-origin browser requests.
 
 ### Command Envelope
 
@@ -422,7 +426,7 @@ Command error ACK:
 }
 ```
 
-WebSocket error codes include the REST application codes plus `IDEMPOTENCY_CONFLICT` for conflicting `clientMsgId` retries.
+WebSocket error codes include the REST application codes plus `IDEMPOTENCY_CONFLICT` for conflicting `clientMsgId` retries and `RATE_LIMITED` for per-connection command throttling.
 
 ### send_message
 

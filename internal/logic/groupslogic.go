@@ -64,7 +64,8 @@ type CreateGroupRequest struct {
 }
 
 type GetGroupRequest struct {
-	GroupID string `json:"group_id"`
+	GroupID         string `json:"group_id"`
+	RequesterUserID string `json:"requester_user_id,omitempty"`
 }
 
 type AddMemberRequest struct {
@@ -84,7 +85,8 @@ type LeaveGroupRequest struct {
 }
 
 type ListMembersRequest struct {
-	GroupID string `json:"group_id"`
+	GroupID         string `json:"group_id"`
+	RequesterUserID string `json:"requester_user_id,omitempty"`
 }
 
 type MemberResponse struct {
@@ -132,10 +134,19 @@ func (l *GroupsLogic) GetGroup(ctx context.Context, req GetGroupRequest) (GroupI
 	if err != nil {
 		return GroupInfo{}, err
 	}
+	requesterUserID, err := normalizeOptionalID(req.RequesterUserID, "requester_user_id")
+	if err != nil {
+		return GroupInfo{}, err
+	}
 
 	group, err := l.repo.GetGroup(ctx, groupID)
 	if err != nil {
 		return GroupInfo{}, err
+	}
+	if requesterUserID != "" {
+		if err := l.ensureActiveMember(ctx, groupID, requesterUserID); err != nil {
+			return GroupInfo{}, err
+		}
 	}
 
 	return toGroupInfo(group), nil
@@ -159,13 +170,17 @@ func (l *GroupsLogic) AddMember(ctx context.Context, req AddMemberRequest) (Memb
 		return MemberResponse{}, err
 	}
 
-	if _, err := l.repo.GetGroup(ctx, groupID); err != nil {
+	group, err := l.repo.GetGroup(ctx, groupID)
+	if err != nil {
 		return MemberResponse{}, err
 	}
 	if err := l.ensureUserExists(ctx, operatorUserID); err != nil {
 		return MemberResponse{}, err
 	}
 	if userID != operatorUserID {
+		if group.CreatorUserID != operatorUserID {
+			return MemberResponse{}, apperror.Forbidden("only group owner can add another member")
+		}
 		if err := l.ensureUserExists(ctx, userID); err != nil {
 			return MemberResponse{}, err
 		}
@@ -248,10 +263,17 @@ func (l *GroupsLogic) ListMembers(ctx context.Context, req ListMembersRequest) (
 	if err != nil {
 		return ListMembersResponse{}, err
 	}
+	requesterUserID, err := normalizeOptionalID(req.RequesterUserID, "requester_user_id")
+	if err != nil {
+		return ListMembersResponse{}, err
+	}
 
 	members, err := l.repo.ListActiveMembers(ctx, groupID)
 	if err != nil {
 		return ListMembersResponse{}, err
+	}
+	if requesterUserID != "" && !containsActiveMember(members, requesterUserID) {
+		return ListMembersResponse{}, apperror.Forbidden("requester is not a group member")
 	}
 
 	result := ListMembersResponse{
@@ -272,6 +294,26 @@ func (l *GroupsLogic) ensureUserExists(ctx context.Context, userID string) error
 	return l.userExists.EnsureUserExists(ctx, userID)
 }
 
+func (l *GroupsLogic) ensureActiveMember(ctx context.Context, groupID string, userID string) error {
+	members, err := l.repo.ListActiveMembers(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	if !containsActiveMember(members, userID) {
+		return apperror.Forbidden("requester is not a group member")
+	}
+	return nil
+}
+
+func containsActiveMember(members []model.GroupMember, userID string) bool {
+	for _, member := range members {
+		if member.UserID == userID && member.State == model.MemberStateActive {
+			return true
+		}
+	}
+	return false
+}
+
 func normalizeRequiredID(value string, field string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -281,6 +323,14 @@ func normalizeRequiredID(value string, field string) (string, error) {
 		return "", apperror.InvalidArgument(field + " must be 64 characters or fewer")
 	}
 	return value, nil
+}
+
+func normalizeOptionalID(value string, field string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	return normalizeRequiredID(value, field)
 }
 
 func normalizeGroupName(value string) (string, error) {

@@ -18,6 +18,7 @@ type MemoryMessageRepository struct {
 	conversations    map[string]*memoryConversation
 	idempotency      map[string]messageIdempotencyRecord
 	readStates       map[string]int64
+	visibleStates    map[string]int64
 	outbox           []OutboxEvent
 	deliveryAttempts map[string]DeliveryAttempt
 	now              func() time.Time
@@ -56,13 +57,14 @@ func NewMemoryMessageRepository() *MemoryMessageRepository {
 		conversations:    make(map[string]*memoryConversation),
 		idempotency:      make(map[string]messageIdempotencyRecord),
 		readStates:       make(map[string]int64),
+		visibleStates:    make(map[string]int64),
 		deliveryAttempts: make(map[string]DeliveryAttempt),
 		now:              time.Now,
 	}
 }
 
 func (r *MemoryMessageRepository) CreateMessageIdempotent(_ context.Context, input CreateMessageInput) (Message, bool, error) {
-	conversationID, err := inputConversationID(input)
+	conversationID, err := validateCreateMessageInput(input)
 	if err != nil {
 		return Message{}, false, err
 	}
@@ -121,6 +123,9 @@ func (r *MemoryMessageRepository) CreateMessageIdempotent(_ context.Context, inp
 		payload:        payload,
 		conversationID: conversationID,
 		seq:            message.Seq,
+	}
+	for _, userID := range visibleUserIDs(input) {
+		r.setVisibleSeqLocked(userID, conversationID, message.Seq)
 	}
 	r.setReadSeqLocked(input.SenderID, conversationID, message.Seq)
 	if err := r.appendMessageCreatedOutboxLocked(message, input, nowMillis); err != nil {
@@ -229,6 +234,12 @@ func (r *MemoryMessageRepository) MarkFailed(_ context.Context, eventID string, 
 }
 
 func (r *MemoryMessageRepository) GetMessages(_ context.Context, conversationID string, fromSeq, toSeq int64, limit int, order string) ([]Message, bool, int64, error) {
+	var err error
+	fromSeq, toSeq, limit, order, err = normalizeMessagePullRange(fromSeq, toSeq, limit, order)
+	if err != nil {
+		return nil, false, 0, err
+	}
+
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -236,14 +247,8 @@ func (r *MemoryMessageRepository) GetMessages(_ context.Context, conversationID 
 	if !exists {
 		return nil, false, 0, apperror.NotFound("conversation not found")
 	}
-	if fromSeq <= 0 {
-		fromSeq = 1
-	}
 	if toSeq <= 0 || toSeq > conversation.maxSeq {
 		toSeq = conversation.maxSeq
-	}
-	if limit <= 0 {
-		limit = 50
 	}
 	if fromSeq > toSeq || conversation.maxSeq == 0 {
 		return []Message{}, true, fromSeq, nil
@@ -285,9 +290,10 @@ func (r *MemoryMessageRepository) GetConversationSeqStates(_ context.Context, us
 	ids := conversationIDs
 	if len(ids) == 0 {
 		ids = make([]string, 0, len(r.conversations))
-		for conversationID, conversation := range r.conversations {
-			if _, ok := conversation.participants[userID]; ok {
-				ids = append(ids, conversationID)
+		prefix := userID + "\x00"
+		for key := range r.visibleStates {
+			if strings.HasPrefix(key, prefix) {
+				ids = append(ids, strings.TrimPrefix(key, prefix))
 			}
 		}
 		sort.Strings(ids)
@@ -299,10 +305,11 @@ func (r *MemoryMessageRepository) GetConversationSeqStates(_ context.Context, us
 		if !exists {
 			return nil, apperror.NotFound("conversation not found")
 		}
-		if _, ok := conversation.participants[userID]; !ok {
+		visibleSeq, ok := r.visibleSeqLocked(userID, conversationID)
+		if !ok {
 			return nil, apperror.NotFound("conversation not found")
 		}
-		states = append(states, r.conversationSeqStateLocked(userID, conversation).Clone())
+		states = append(states, r.conversationSeqStateLocked(userID, conversation, visibleSeq).Clone())
 	}
 
 	return states, nil
@@ -320,10 +327,11 @@ func (r *MemoryMessageRepository) SetUserHasReadSeqMax(_ context.Context, userID
 	if !exists {
 		return ConversationSeqState{}, false, apperror.NotFound("conversation not found")
 	}
-	if _, ok := conversation.participants[userID]; !ok {
+	visibleSeq, ok := r.visibleSeqLocked(userID, conversationID)
+	if !ok {
 		return ConversationSeqState{}, false, apperror.NotFound("conversation not found")
 	}
-	if seq > conversation.maxSeq {
+	if seq > visibleSeq {
 		return ConversationSeqState{}, false, apperror.InvalidArgument("has_read_seq cannot exceed max_seq")
 	}
 
@@ -334,7 +342,7 @@ func (r *MemoryMessageRepository) SetUserHasReadSeqMax(_ context.Context, userID
 		updated = true
 	}
 
-	return r.conversationSeqStateLocked(userID, conversation).Clone(), updated, nil
+	return r.conversationSeqStateLocked(userID, conversation, visibleSeq).Clone(), updated, nil
 }
 
 func (r *MemoryMessageRepository) ensureConversationLocked(conversationID string, input CreateMessageInput) *memoryConversation {
@@ -362,22 +370,22 @@ func (r *MemoryMessageRepository) ensureConversationLocked(conversationID string
 	return conversation
 }
 
-func (r *MemoryMessageRepository) conversationSeqStateLocked(userID string, conversation *memoryConversation) ConversationSeqState {
+func (r *MemoryMessageRepository) conversationSeqStateLocked(userID string, conversation *memoryConversation, visibleSeq int64) ConversationSeqState {
 	hasReadSeq := r.readStates[userConversationStateKey(userID, conversation.conversationID)]
-	unreadCount := conversation.maxSeq - hasReadSeq
+	unreadCount := visibleSeq - hasReadSeq
 	if unreadCount < 0 {
 		unreadCount = 0
 	}
 
 	state := ConversationSeqState{
 		ConversationID: conversation.conversationID,
-		MaxSeq:         conversation.maxSeq,
+		MaxSeq:         visibleSeq,
 		HasReadSeq:     hasReadSeq,
 		UnreadCount:    unreadCount,
-		MaxSeqTime:     conversation.maxSeqTime,
 	}
-	if conversation.lastMessage != nil {
-		lastMessage := conversation.lastMessage.Clone()
+	if visibleSeq > 0 && visibleSeq <= int64(len(conversation.messages)) {
+		lastMessage := conversation.messages[visibleSeq-1].Clone()
+		state.MaxSeqTime = lastMessage.SendTime
 		state.LastMessage = &lastMessage
 	}
 	return state
@@ -399,6 +407,18 @@ func (r *MemoryMessageRepository) setReadSeqLocked(userID, conversationID string
 	if seq > r.readStates[key] {
 		r.readStates[key] = seq
 	}
+}
+
+func (r *MemoryMessageRepository) setVisibleSeqLocked(userID, conversationID string, seq int64) {
+	key := userConversationStateKey(userID, conversationID)
+	if seq > r.visibleStates[key] {
+		r.visibleStates[key] = seq
+	}
+}
+
+func (r *MemoryMessageRepository) visibleSeqLocked(userID, conversationID string) (int64, bool) {
+	seq, ok := r.visibleStates[userConversationStateKey(userID, conversationID)]
+	return seq, ok
 }
 
 func (r *MemoryMessageRepository) appendMessageCreatedOutboxLocked(message Message, input CreateMessageInput, nowMillis int64) error {
@@ -446,9 +466,35 @@ func (r *MemoryMessageRepository) lockedOutboxEventLocked(eventID string, worker
 func inputConversationID(input CreateMessageInput) (string, error) {
 	switch input.ChatType {
 	case ChatTypeSingle:
-		return SingleConversationID(input.SenderID, input.ReceiverID), nil
+		if err := validateMessageConversationComponentID(input.SenderID, "sender_id"); err != nil {
+			return "", err
+		}
+		if err := validateMessageConversationComponentID(input.ReceiverID, "receiver_id"); err != nil {
+			return "", err
+		}
+		if input.SenderID == input.ReceiverID {
+			return "", apperror.InvalidArgument("sender_id and receiver_id must be different")
+		}
+		if strings.TrimSpace(input.GroupID) != "" {
+			return "", apperror.InvalidArgument("group_id must be empty for single chat")
+		}
+		conversationID := SingleConversationID(input.SenderID, input.ReceiverID)
+		if err := validateMessageConversationID(conversationID); err != nil {
+			return "", err
+		}
+		return conversationID, nil
 	case ChatTypeGroup:
-		return GroupConversationID(input.GroupID), nil
+		if err := validateMessageConversationComponentID(input.GroupID, "group_id"); err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(input.ReceiverID) != "" {
+			return "", apperror.InvalidArgument("receiver_id must be empty for group chat")
+		}
+		conversationID := GroupConversationID(input.GroupID)
+		if err := validateMessageConversationID(conversationID); err != nil {
+			return "", err
+		}
+		return conversationID, nil
 	default:
 		return "", apperror.InvalidArgument("chat_type must be single or group")
 	}

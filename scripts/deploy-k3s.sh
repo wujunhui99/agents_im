@@ -12,7 +12,9 @@ GHCR_TOKEN="${GHCR_TOKEN:-}"
 SKIP_SET_IMAGE="${SKIP_SET_IMAGE:-false}"
 SKIP_MIDDLEWARE="${SKIP_MIDDLEWARE:-false}"
 SKIP_MIGRATIONS="${SKIP_MIGRATIONS:-false}"
+IMAGE_SERVICES="${IMAGE_SERVICES:-}"
 ROLLOUT_SERVICES="${ROLLOUT_SERVICES:-}"
+RESTART_SERVICES="${RESTART_SERVICES:-}"
 RESTART_ROLLOUT="${RESTART_ROLLOUT:-false}"
 
 SERVICES=(
@@ -43,12 +45,46 @@ bool_true() {
   [[ "$1" == "true" || "$1" == "1" || "$1" == "yes" ]]
 }
 
-rollout_services() {
-  if [[ -n "${ROLLOUT_SERVICES}" ]]; then
-    # shellcheck disable=SC2206
-    echo "${ROLLOUT_SERVICES}"
+known_service() {
+  local service="$1"
+  local known
+  for known in "${SERVICES[@]}"; do
+    if [[ "${known}" == "${service}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+selected_services() {
+  local service_list="$1"
+  local service
+  if [[ -n "${service_list}" ]]; then
+    for service in ${service_list}; do
+      if ! known_service "${service}"; then
+        echo "unknown deployment service: ${service}" >&2
+        exit 1
+      fi
+      printf '%s\n' "${service}"
+    done
   else
     printf '%s\n' "${SERVICES[@]}"
+  fi
+}
+
+image_services() {
+  selected_services "${IMAGE_SERVICES}"
+}
+
+rollout_services() {
+  selected_services "${ROLLOUT_SERVICES}"
+}
+
+restart_services() {
+  if [[ -n "${RESTART_SERVICES}" ]]; then
+    selected_services "${RESTART_SERVICES}"
+  elif bool_true "${RESTART_ROLLOUT}"; then
+    rollout_services
   fi
 }
 
@@ -105,16 +141,17 @@ apply_manifests() {
   if bool_true "${SKIP_SET_IMAGE}"; then
     echo "Skipping image updates; keeping currently deployed image tags."
   else
-    for service in "${SERVICES[@]}"; do
+    while IFS= read -r service; do
+      [[ -z "${service}" ]] && continue
       ${KUBECTL} -n "${NAMESPACE}" set image "deployment/${service}" "${service}=${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}" --record=false
-    done
+    done < <(image_services)
   fi
 
-  if bool_true "${RESTART_ROLLOUT}"; then
+  if [[ -n "${RESTART_SERVICES}" ]] || bool_true "${RESTART_ROLLOUT}"; then
     while IFS= read -r service; do
       [[ -z "${service}" ]] && continue
       ${KUBECTL} -n "${NAMESPACE}" rollout restart "deployment/${service}"
-    done < <(rollout_services)
+    done < <(restart_services)
   fi
 
   while IFS= read -r service; do

@@ -49,8 +49,9 @@ type SendMessageRequest struct {
 }
 
 type SendMessageResponse struct {
-	Message      Message `json:"message"`
-	Deduplicated bool    `json:"deduplicated"`
+	Message          Message  `json:"message"`
+	Deduplicated     bool     `json:"deduplicated"`
+	RecipientUserIDs []string `json:"-"`
 }
 
 type PullMessagesRequest struct {
@@ -119,7 +120,11 @@ func (l *MessageLogic) SendMessage(ctx context.Context, req SendMessageRequest) 
 		metricsStatus = "deduplicated"
 	}
 
-	return SendMessageResponse{Message: message, Deduplicated: deduplicated}, nil
+	return SendMessageResponse{
+		Message:          message,
+		Deduplicated:     deduplicated,
+		RecipientUserIDs: repository.DeliveryRecipientUserIDs(input),
+	}, nil
 }
 
 func (l *MessageLogic) PullMessages(ctx context.Context, req PullMessagesRequest) (PullMessagesResponse, error) {
@@ -144,8 +149,10 @@ func (l *MessageLogic) PullMessages(ctx context.Context, req PullMessagesRequest
 	if err != nil {
 		return PullMessagesResponse{}, err
 	}
-	if toSeq == 0 && len(states) == 1 {
-		toSeq = states[0].MaxSeq
+	if len(states) == 1 {
+		if toSeq == 0 || toSeq > states[0].MaxSeq {
+			toSeq = states[0].MaxSeq
+		}
 	}
 
 	messages, isEnd, nextSeq, err := l.repo.GetMessages(ctx, conversationID, fromSeq, toSeq, limit, order)
@@ -212,7 +219,7 @@ func (l *MessageLogic) MarkConversationAsRead(ctx context.Context, req MarkConve
 }
 
 func (l *MessageLogic) normalizeSendMessage(ctx context.Context, req SendMessageRequest) (repository.CreateMessageInput, error) {
-	senderID, err := normalizeMessageRequiredID(req.SenderID, "sender_id")
+	senderID, err := normalizeMessageConversationComponentID(req.SenderID, "sender_id")
 	if err != nil {
 		return repository.CreateMessageInput{}, err
 	}
@@ -243,7 +250,7 @@ func (l *MessageLogic) normalizeSendMessage(ctx context.Context, req SendMessage
 
 	switch chatType {
 	case MessageChatTypeSingle:
-		receiverID, err := normalizeMessageRequiredID(req.ReceiverID, "receiver_id")
+		receiverID, err := normalizeMessageConversationComponentID(req.ReceiverID, "receiver_id")
 		if err != nil {
 			return repository.CreateMessageInput{}, err
 		}
@@ -262,7 +269,7 @@ func (l *MessageLogic) normalizeSendMessage(ctx context.Context, req SendMessage
 		input.ReceiverID = receiverID
 		input.ParticipantUserIDs = []string{senderID, receiverID}
 	case MessageChatTypeGroup:
-		groupID, err := normalizeMessageRequiredID(req.GroupID, "group_id")
+		groupID, err := normalizeMessageConversationComponentID(req.GroupID, "group_id")
 		if err != nil {
 			return repository.CreateMessageInput{}, err
 		}
@@ -297,7 +304,10 @@ func (l *MessageLogic) resolveGroupParticipants(ctx context.Context, groupID str
 		return nil, apperror.Internal("group membership validator is not configured")
 	}
 
-	members, err := l.groups.ListMembers(ctx, ListMembersRequest{GroupID: groupID})
+	members, err := l.groups.ListMembers(ctx, ListMembersRequest{
+		GroupID:         groupID,
+		RequesterUserID: senderID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -306,15 +316,19 @@ func (l *MessageLogic) resolveGroupParticipants(ctx context.Context, groupID str
 	senderIsMember := false
 	seen := make(map[string]struct{}, len(members.Members))
 	for _, member := range members.Members {
-		if member.UserID == "" {
+		if member.State != "" && member.State != "active" {
 			continue
 		}
-		if _, ok := seen[member.UserID]; ok {
+		userID := strings.TrimSpace(member.UserID)
+		if userID == "" {
 			continue
 		}
-		seen[member.UserID] = struct{}{}
-		participantIDs = append(participantIDs, member.UserID)
-		if member.UserID == senderID {
+		if _, ok := seen[userID]; ok {
+			continue
+		}
+		seen[userID] = struct{}{}
+		participantIDs = append(participantIDs, userID)
+		if userID == senderID {
 			senderIsMember = true
 		}
 	}
@@ -332,6 +346,20 @@ func normalizeMessageRequiredID(value string, field string) (string, error) {
 	if len([]rune(value)) > 128 {
 		return "", apperror.InvalidArgument(field + " must be 128 characters or fewer")
 	}
+	if strings.Contains(value, "\x00") {
+		return "", apperror.InvalidArgument(field + " cannot contain NUL")
+	}
+	return value, nil
+}
+
+func normalizeMessageConversationComponentID(value string, field string) (string, error) {
+	value, err := normalizeMessageRequiredID(value, field)
+	if err != nil {
+		return "", err
+	}
+	if strings.Contains(value, ":") {
+		return "", apperror.InvalidArgument(field + " cannot contain ':'")
+	}
 	return value, nil
 }
 
@@ -342,6 +370,9 @@ func normalizeConversationID(value string) (string, error) {
 	}
 	if len([]rune(value)) > 256 {
 		return "", apperror.InvalidArgument("conversation_id must be 256 characters or fewer")
+	}
+	if strings.Contains(value, "\x00") {
+		return "", apperror.InvalidArgument("conversation_id cannot contain NUL")
 	}
 	return value, nil
 }

@@ -29,14 +29,14 @@ The workflow uses the built-in `GITHUB_TOKEN` to push images to GHCR and to refr
 
 ## Deployment workflow
 
-`.github/workflows/deploy.yml` runs on pushes to `main` and supports manual `workflow_dispatch`.
+`.github/workflows/deploy.yml` runs on pushes to `main` and supports manual `workflow_dispatch`. Deployment jobs are guarded with `github.ref == 'refs/heads/main'`; if a manual dispatch is started from another branch, change detection emits a no-op result and no SSH/deploy step runs.
 
 The workflow has four jobs:
 
-1. `detect-changes`: classifies the push as full build/deploy, config-only deploy, or no deploy.
-2. `build-backend`: builds one backend image per service using the Dockerfile `backend` target and `SERVICE=<name>` build arg. It publishes each image to GHCR with both `${GITHUB_SHA}` and `latest` tags.
-3. `build-web`: builds the web UI image using the Dockerfile `web` target and publishes `${GITHUB_SHA}` and `latest` tags.
-4. `deploy`: connects to the server over SSH using the `SERVER_*` secrets, syncs the repository files to `/opt/agents-im/repo`, then runs `scripts/deploy-k3s.sh` with `IMAGE_REGISTRY`, `IMAGE_TAG`, GHCR credentials, and `MIDDLEWARE_DIR=/opt/agents-im/middleware`.
+1. `detect-changes`: classifies changed files and emits `build_required`, `deploy_required`, `config_only`, `backend_services`, `web_required`, `image_services`, `rollout_services`, and restart service outputs.
+2. `build-backend`: builds only backend services listed in `backend_services` using the Dockerfile `backend` target and `SERVICE=<name>` build arg. It publishes each selected image to GHCR with both `${GITHUB_SHA}` and `latest` tags.
+3. `build-web`: builds the web UI image only when `web_required=true` and publishes `${GITHUB_SHA}` and `latest` tags.
+4. `deploy`: connects to the server over SSH using the `SERVER_*` secrets, syncs the repository files to `/opt/agents-im/repo`, then runs `scripts/deploy-k3s.sh` with `IMAGE_REGISTRY`, `IMAGE_TAG`, GHCR credentials, `IMAGE_SERVICES`, `ROLLOUT_SERVICES`, optional `RESTART_SERVICES`, and `MIDDLEWARE_DIR=/opt/agents-im/middleware`.
 
 Backend images are built for:
 
@@ -44,7 +44,27 @@ Backend images are built for:
 - Worker: `message-transfer`
 - RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`
 
-`deploy-k3s.sh` starts middleware Compose, runs PostgreSQL migrations from the server-side k3s secret `DATABASE_URL`, applies `deploy/k8s`, sets each deployment image to the current commit SHA tag, and waits for rollout status.
+`deploy-k3s.sh` starts middleware Compose, runs PostgreSQL migrations from the server-side k3s secret `DATABASE_URL`, applies `deploy/k8s`, sets selected deployment images to the current commit SHA tag, and waits for rollout status. When `SKIP_SET_IMAGE=false` and `IMAGE_SERVICES` is empty, the script keeps the legacy full-deploy behavior and sets every service image. Selective deploys pass a space-separated `IMAGE_SERVICES` list so unchanged services are not pointed at a SHA tag that was not built.
+
+### Selective image builds
+
+`detect-changes` uses these first-version ownership rules:
+
+- Docs-only changes (`docs/**`, `README.md`, other Markdown) do not deploy.
+- `web/**`, including web package files and nginx config, builds and deploys only `web`.
+- `cmd/<service>/**` builds and deploys only that backend service.
+- `api/<domain>.api` builds the matching API service, for example `api/user.api` -> `user-api`.
+- `etc/<service>.yaml` and `deploy/k8s/etc/<service>.yaml` are config-only service rollouts and do not build images.
+- `deploy/k8s/**` shared manifest changes deploy config and restart affected services; broad manifest files use all services because ownership is not safely inferable.
+- `proto/**` changes build all backend services. Generated RPC contracts can affect callers across service boundaries, so the first selective version intentionally fails safe here.
+- Shared backend/build inputs such as `go.mod`, `go.sum`, `Dockerfile`, `.dockerignore`, `internal/**`, `db/**`, and `scripts/migrate-postgres.sh` build all backend services. They do not build `web` unless a web-owned path also changed.
+- Unknown non-doc paths fail safe by building all backend services.
+
+The backend image list is stable and ordered:
+
+- API services: `user-api`, `auth-api`, `friends-api`, `message-api`, `gateway-ws`, `groups-api`, `agent-api`
+- Worker: `message-transfer`
+- RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`
 
 ### Config-only deploy
 
@@ -53,8 +73,9 @@ For pushes that only change deployment configuration, `detect-changes` sets `con
 - `deploy/k8s/**`
 - `scripts/deploy-k3s.sh`
 - `.github/workflows/deploy.yml`
+- `etc/<service>.yaml`
 
-Markdown/doc-only changes do not deploy. Manual `workflow_dispatch` always performs a full build and deploy.
+Markdown/doc-only changes do not deploy. Manual `workflow_dispatch` on `main` performs a full build and deploy; manual dispatch on a non-`main` ref no-ops before any deployment step.
 
 In config-only mode, backend/web image build jobs are skipped and the deploy job runs `scripts/deploy-k3s.sh` with:
 
@@ -62,13 +83,12 @@ In config-only mode, backend/web image build jobs are skipped and the deploy job
 SKIP_SET_IMAGE=true
 SKIP_MIDDLEWARE=true
 SKIP_MIGRATIONS=true
-ROLLOUT_SERVICES=groups-rpc
+ROLLOUT_SERVICES='<affected services>'
+RESTART_SERVICES='<affected services>'
 RESTART_ROLLOUT=true
 ```
 
 This keeps existing image tags, skips Docker Compose middleware startup and database migrations, applies the k3s manifests, then restarts and waits only for the selected deployment. ConfigMap changes do not reliably recreate Pods by themselves, so config-only deploy must use `RESTART_ROLLOUT=true` for affected services.
-
-Current limitation: `ROLLOUT_SERVICES` is fixed to `groups-rpc` for the first config-only repair. If future config-only changes touch other service ConfigMaps or manifests, extend change detection to infer the affected service instead of reusing this fixed value.
 
 ## Ports and host networking
 

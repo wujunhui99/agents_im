@@ -85,6 +85,7 @@ Gateway maps internal app errors to frontend codes:
 | `INVALID_ARGUMENT` | `VALIDATION_ERROR` |
 | `NOT_FOUND` | `NOT_FOUND` |
 | `ALREADY_EXISTS` | `CONFLICT` |
+| `RATE_LIMITED` | `RATE_LIMITED` |
 | other errors | `INTERNAL` |
 
 `FORBIDDEN` is reserved for future authorization checks when those errors are introduced.
