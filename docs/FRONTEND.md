@@ -28,6 +28,7 @@
 - 发送消息先追加本地 `sending` UI 状态，但最终状态必须来自 `messageApi.sendMessage -> POST /messages` 的真实返回；失败会显示错误，不静默兜底为成功。
 - `web/src/models/messages.ts` 定义前端会话与消息模型，发送状态仅用于本地 UI 呈现。
 - `web/src/api/messages.ts` 是消息 REST 薄 adapter，函数签名覆盖 `sendMessage`、`pullMessages`、`getConversationSeqs`、`markRead`，字段名保持与前后端合约一致，并基于统一 `createApiClient`。
+- 消息模型包含 `messageOrigin: human | ai | system` 和 AI metadata；`MessagesPage` 必须用 `AI/Agent` 标签明显标注 `ai` 消息，系统消息使用系统标签。
 - `web/src/api/websocketClient.ts` 是 WebSocket client wrapper，提供 `connect`、`send`、`close`，浏览器侧使用 `/ws?token=***` query fallback，并将后端 snake_case ACK 解析为 typed frontend ACK。
 
 ## 目录

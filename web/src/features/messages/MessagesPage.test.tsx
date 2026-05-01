@@ -39,6 +39,10 @@ const messageApi: MessageApi = {
         chatType: 'single',
         contentType: 'text',
         content: '真实后端会话消息',
+        messageOrigin: 'ai',
+        agentAccountId: 'usr_000002',
+        triggerServerMsgId: 'msg_user_1',
+        agentRunId: 'run_1',
         sendTime: 1777464000000,
         createdAt: 1777464000000,
       },
@@ -61,6 +65,7 @@ describe('MessagesPage real API mode', () => {
     );
 
     expect(await screen.findByText('真实后端会话消息')).toBeInTheDocument();
+    expect(await screen.findByText('AI/Agent')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /usr_000002/ }));
     await user.type(screen.getByRole('textbox', { name: '输入消息' }), '你好 Bob');
     await user.click(screen.getByRole('button', { name: '发送' }));

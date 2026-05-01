@@ -124,9 +124,16 @@ group_id        string  // group chat only
 chat_type       string  // single | group
 content_type    string
 content         string or JSON payload
+message_origin  string  // human | ai | system
+agent_account_id        string // ai only
+trigger_server_msg_id   string // ai only
+agent_run_id            string // ai only
+allow_recursive_trigger bool   // ai only, default false
 send_time       int64   // server timestamp in milliseconds
 created_at      int64
 ```
+
+`message_origin` is authoritative metadata owned by Message Service. Public REST sends default to `human`; service-to-service Agent writeback can send `ai` with Agent metadata. System status messages use `system`. AI messages remain ordinary stored messages and must still pass idempotency, conversation seq, outbox, pull, and read-state rules.
 
 ### ConversationThread
 
@@ -209,6 +216,11 @@ message SendMessageRequest {
   string client_msg_id = 5;
   string content_type = 6;    // text for phase 1
   string content = 7;
+  string message_origin = 8;  // service-to-service only; public REST defaults human
+  string agent_account_id = 9;
+  string trigger_server_msg_id = 10;
+  string agent_run_id = 11;
+  bool allow_recursive_trigger = 12;
 }
 ```
 
@@ -340,8 +352,13 @@ message Message {
   string chat_type = 8;
   string content_type = 9;
   string content = 10;
-  int64 send_time = 11;
-  int64 created_at = 12;
+  string message_origin = 11;
+  string agent_account_id = 12;
+  string trigger_server_msg_id = 13;
+  string agent_run_id = 14;
+  bool allow_recursive_trigger = 15;
+  int64 send_time = 16;
+  int64 created_at = 17;
 }
 ```
 
@@ -394,6 +411,7 @@ Response:
     "chatType": "single",
     "contentType": "text",
     "content": "hello",
+    "messageOrigin": "human",
     "sendTime": 1710000000000
   },
   "deduplicated": false

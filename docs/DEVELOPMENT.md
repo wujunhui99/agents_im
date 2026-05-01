@@ -143,6 +143,8 @@ Environment note from the debug session: on one local machine, default ports `80
 
 `scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, and message history. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
 
+Message API responses include `messageOrigin=human|ai|system` and Agent metadata when present. Local dev does not enable a production LLM by default; Agent conversation hosting must be wired with an explicit runtime/provider config and otherwise fail closed instead of returning fake AI replies.
+
 ## Demo Data
 
 After `scripts/dev-up.sh` succeeds, seed two user-type accounts, one friendship, one group, and one single-chat message:

@@ -159,6 +159,9 @@ func TestMVPBackendFriendGroupMessageSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("send single message: %v", err)
 	}
+	if sentSingle.Message.MessageOrigin != logic.MessageOriginHuman {
+		t.Fatalf("single message origin = %q, want human", sentSingle.Message.MessageOrigin)
+	}
 	bobSingleState := mustMessageState(t, messageLogic, bob.UserID, sentSingle.Message.ConversationID)
 	if bobSingleState.MaxSeq != 1 || bobSingleState.UnreadCount != 1 {
 		t.Fatalf("unexpected bob single state: %+v", bobSingleState)
@@ -234,7 +237,10 @@ func TestMVPBackendWebSocketSendPullMarkReadSmoke(t *testing.T) {
 	}
 	var sent gateway.SendMessageCommandResponse
 	decodeRaw(t, sendResp.Data, &sent)
-	if sent.Message.ServerMsgID == "" || sent.Message.SenderID != "usr_mvp_ws_sender" || sent.Message.ReceiverID != "usr_mvp_ws_receiver" {
+	if sent.Message.ServerMsgID == "" ||
+		sent.Message.SenderID != "usr_mvp_ws_sender" ||
+		sent.Message.ReceiverID != "usr_mvp_ws_receiver" ||
+		sent.Message.MessageOrigin != logic.MessageOriginHuman {
 		t.Fatalf("unexpected sent websocket message: %+v", sent.Message)
 	}
 
@@ -277,7 +283,9 @@ func TestMVPBackendWebSocketSendPullMarkReadSmoke(t *testing.T) {
 	}
 	var pulled gateway.PullMessagesCommandResponse
 	decodeRaw(t, pullResp.Data, &pulled)
-	if len(pulled.Messages) != 1 || pulled.Messages[0].ServerMsgID != sent.Message.ServerMsgID {
+	if len(pulled.Messages) != 1 ||
+		pulled.Messages[0].ServerMsgID != sent.Message.ServerMsgID ||
+		pulled.Messages[0].MessageOrigin != logic.MessageOriginHuman {
 		t.Fatalf("unexpected pulled websocket messages: %+v", pulled.Messages)
 	}
 
