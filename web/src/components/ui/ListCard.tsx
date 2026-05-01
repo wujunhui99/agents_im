@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Card } from './Card';
 
 type ListCardProps = {
   children: ReactNode;
@@ -10,8 +11,8 @@ export function ListCard({ children, ariaLabel, className = '' }: ListCardProps)
   const classes = ['list-card', className].filter(Boolean).join(' ');
 
   return (
-    <section className={classes} aria-label={ariaLabel}>
+    <Card className={classes} ariaLabel={ariaLabel} variant="surface">
       {children}
-    </section>
+    </Card>
   );
 }

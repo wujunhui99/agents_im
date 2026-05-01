@@ -1,0 +1,95 @@
+:root {
+  color-scheme: light;
+
+  --md-ref-palette-primary: #0b6b4f;
+  --md-ref-palette-primary-high: #084d39;
+  --md-ref-palette-secondary: #47645b;
+  --md-ref-palette-tertiary: #395d85;
+  --md-ref-palette-error: #ba1a1a;
+  --md-ref-palette-success: #146c2e;
+  --md-ref-palette-warning: #8a4b00;
+  --md-ref-palette-neutral: #5d6561;
+  --md-ref-palette-neutral-variant: #58635f;
+
+  --md-sys-color-primary: var(--md-ref-palette-primary);
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #b6f1d9;
+  --md-sys-color-on-primary-container: #062016;
+  --md-sys-color-secondary: var(--md-ref-palette-secondary);
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #cce9de;
+  --md-sys-color-on-secondary-container: #042019;
+  --md-sys-color-tertiary: var(--md-ref-palette-tertiary);
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #d2e4ff;
+  --md-sys-color-on-tertiary-container: #071d34;
+  --md-sys-color-error: var(--md-ref-palette-error);
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
+  --md-sys-color-background: #f7fbf7;
+  --md-sys-color-on-background: #181d1a;
+  --md-sys-color-surface: #fbfefb;
+  --md-sys-color-surface-dim: #dbe5de;
+  --md-sys-color-surface-bright: #fbfefb;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f4f8f3;
+  --md-sys-color-surface-container: #eef2ed;
+  --md-sys-color-surface-container-high: #e8ede7;
+  --md-sys-color-surface-container-highest: #e2e7e1;
+  --md-sys-color-on-surface: #181d1a;
+  --md-sys-color-on-surface-variant: #414944;
+  --md-sys-color-outline: #717a75;
+  --md-sys-color-outline-variant: #c1cac4;
+  --md-sys-color-inverse-surface: #2d322f;
+  --md-sys-color-inverse-on-surface: #eff5ee;
+  --md-sys-color-scrim: rgba(0, 0, 0, 0.32);
+
+  --md-state-hover-opacity: 0.08;
+  --md-state-focus-opacity: 0.12;
+  --md-state-pressed-opacity: 0.12;
+  --md-state-dragged-opacity: 0.16;
+  --md-state-disabled-opacity: 0.38;
+  --md-state-disabled-container-opacity: 0.12;
+
+  --md-shape-corner-extra-small: 4px;
+  --md-shape-corner-small: 8px;
+  --md-shape-corner-medium: 12px;
+  --md-shape-corner-large: 16px;
+  --md-shape-corner-extra-large: 28px;
+  --md-shape-corner-full: 999px;
+
+  --md-space-1: 4px;
+  --md-space-2: 8px;
+  --md-space-3: 12px;
+  --md-space-4: 16px;
+  --md-space-5: 20px;
+  --md-space-6: 24px;
+  --md-space-8: 32px;
+  --md-space-10: 40px;
+  --md-space-12: 48px;
+
+  --md-type-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+  --md-type-display-small: 2.25rem;
+  --md-type-headline-small: 1.5rem;
+  --md-type-title-large: 1.375rem;
+  --md-type-title-medium: 1rem;
+  --md-type-body-large: 1rem;
+  --md-type-body-medium: 0.875rem;
+  --md-type-body-small: 0.75rem;
+  --md-type-label-large: 0.875rem;
+  --md-type-label-medium: 0.75rem;
+  --md-line-height-tight: 1.2;
+  --md-line-height-normal: 1.45;
+
+  --md-elevation-level0: none;
+  --md-elevation-level1: 0 1px 2px rgba(24, 29, 26, 0.12), 0 1px 3px 1px rgba(24, 29, 26, 0.08);
+  --md-elevation-level2: 0 1px 2px rgba(24, 29, 26, 0.16), 0 2px 6px 2px rgba(24, 29, 26, 0.08);
+  --md-elevation-level3: 0 4px 8px 3px rgba(24, 29, 26, 0.12), 0 1px 3px rgba(24, 29, 26, 0.12);
+  --md-elevation-frame: 0 24px 80px rgba(39, 49, 44, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+
+  --app-accent-green: #0b6b4f;
+  --app-accent-blue: #246b9f;
+  --app-accent-purple: #6b4aa0;
+  --app-accent-orange: #9a5b00;
+  --app-accent-gray: #5c6670;
+}
