@@ -56,7 +56,21 @@ services:
       timeout: 5s
       retries: 24
 
+  minio:
+    image: minio/minio:latest
+    container_name: agents-im-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-agents_im_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-agents_im_minio_dev_password}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - agents_im_minio_data:/data
+
 volumes:
   agents_im_pg_data:
   agents_im_redis_data:
   agents_im_redpanda_data:
+  agents_im_minio_data:

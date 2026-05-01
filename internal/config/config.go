@@ -24,6 +24,7 @@ type APIConfig struct {
 	Kafka         KafkaConfig
 	DeepSeek      DeepSeekConfig
 	GatewayWS     GatewayWSConfig
+	ObjectStorage ObjectStorageConfig
 }
 
 type RPCConfig struct {
@@ -75,6 +76,17 @@ type DeepSeekConfig struct {
 	Model   string
 }
 
+type ObjectStorageConfig struct {
+	Driver           string
+	Endpoint         string
+	ExternalEndpoint string
+	Bucket           string
+	Region           string
+	UseSSL           bool
+	AccessKeyID      string
+	SecretAccessKey  string
+}
+
 type MessageTransferConfig struct {
 	Name          string
 	WorkerID      string
@@ -111,13 +123,15 @@ type ObservabilityHTTPConfig struct {
 }
 
 const (
-	StorageDriverMemory    = "memory"
-	StorageDriverPostgres  = "postgres"
-	PresenceDriverMemory   = "memory"
-	PresenceDriverRedis    = "redis"
-	TransferConsumerMemory = "memory"
-	TransferConsumerKafka  = "kafka"
-	TransferDispatcherNoop = "noop"
+	StorageDriverMemory       = "memory"
+	StorageDriverPostgres     = "postgres"
+	ObjectStorageDriverMemory = "memory"
+	ObjectStorageDriverMinIO  = "minio"
+	PresenceDriverMemory      = "memory"
+	PresenceDriverRedis       = "redis"
+	TransferConsumerMemory    = "memory"
+	TransferConsumerKafka     = "kafka"
+	TransferDispatcherNoop    = "noop"
 )
 
 const (
@@ -131,6 +145,8 @@ const (
 	defaultKafkaBroker                 = "localhost:19092"
 	defaultKafkaMessageEventsTopic     = "message.events.v1"
 	defaultKafkaConsumerGroup          = "message-transfer-worker"
+	defaultObjectStorageBucket         = "agents-im-media"
+	defaultObjectStorageRegion         = "us-east-1"
 	defaultTransferTopic               = defaultKafkaMessageEventsTopic
 	defaultTransferGroup               = defaultKafkaConsumerGroup
 	defaultTransferPollIntervalMillis  = 100
@@ -157,6 +173,7 @@ func DefaultAPIConfig() APIConfig {
 		Kafka:         DefaultKafkaConfig(),
 		DeepSeek:      DefaultDeepSeekConfig(),
 		GatewayWS:     DefaultGatewayWSConfig(),
+		ObjectStorage: DefaultObjectStorageConfig(),
 	}
 }
 
@@ -217,6 +234,14 @@ func DefaultDeepSeekConfig() DeepSeekConfig {
 	return DeepSeekConfig{
 		BaseURL: DefaultDeepSeekBaseURL,
 		Model:   DefaultDeepSeekModel,
+	}
+}
+
+func DefaultObjectStorageConfig() ObjectStorageConfig {
+	return ObjectStorageConfig{
+		Driver: ObjectStorageDriverMemory,
+		Bucket: defaultObjectStorageBucket,
+		Region: defaultObjectStorageRegion,
 	}
 }
 
@@ -298,6 +323,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 	}
 	cfg.Kafka = kafkaConfigFromValues(values)
 	cfg.DeepSeek = deepSeekConfigFromValues(values)
+	cfg.ObjectStorage, err = objectStorageConfigFromValues(values, cfg.StorageDriver)
+	if err != nil {
+		return cfg, err
+	}
 
 	return cfg, nil
 }
@@ -657,6 +686,40 @@ func ResolveDeepSeekConfig(cfg DeepSeekConfig) DeepSeekConfig {
 	return cfg
 }
 
+func ResolveObjectStorageConfig(cfg ObjectStorageConfig, storageDriver string) (ObjectStorageConfig, error) {
+	driver := strings.ToLower(strings.TrimSpace(os.ExpandEnv(cfg.Driver)))
+	if driver == "" {
+		driver = strings.ToLower(strings.TrimSpace(firstNonEmpty(os.Getenv("OBJECT_STORAGE_DRIVER"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_DRIVER"))))
+	}
+	if driver == "" {
+		if ResolveStorageDriver(storageDriver) == StorageDriverMemory {
+			driver = ObjectStorageDriverMemory
+		} else {
+			driver = ObjectStorageDriverMinIO
+		}
+	}
+	switch driver {
+	case ObjectStorageDriverMemory, ObjectStorageDriverMinIO:
+		cfg.Driver = driver
+	default:
+		return cfg, fmt.Errorf("unsupported object storage driver %q; use %q for explicit dev/test memory mode or %q for MinIO/S3-compatible storage", driver, ObjectStorageDriverMemory, ObjectStorageDriverMinIO)
+	}
+
+	cfg.Endpoint = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Endpoint)), os.Getenv("OBJECT_STORAGE_ENDPOINT"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_ENDPOINT"))
+	cfg.ExternalEndpoint = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.ExternalEndpoint)), os.Getenv("OBJECT_STORAGE_EXTERNAL_ENDPOINT"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_EXTERNAL_ENDPOINT"))
+	cfg.Bucket = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Bucket)), os.Getenv("OBJECT_STORAGE_BUCKET"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_BUCKET"), defaultObjectStorageBucket)
+	cfg.Region = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Region)), os.Getenv("OBJECT_STORAGE_REGION"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_REGION"), defaultObjectStorageRegion)
+	cfg.AccessKeyID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.AccessKeyID)), os.Getenv("OBJECT_STORAGE_ACCESS_KEY_ID"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_ACCESS_KEY_ID"), os.Getenv("MINIO_ROOT_USER"))
+	cfg.SecretAccessKey = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.SecretAccessKey)), os.Getenv("OBJECT_STORAGE_SECRET_ACCESS_KEY"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_SECRET_ACCESS_KEY"), os.Getenv("MINIO_ROOT_PASSWORD"))
+
+	useSSL, err := resolveBool(cfg.UseSSL, os.Getenv("OBJECT_STORAGE_USE_SSL"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_USE_SSL"))
+	if err != nil {
+		return cfg, err
+	}
+	cfg.UseSSL = useSSL
+	return cfg, nil
+}
+
 func ValidateDeepSeekConfig(cfg DeepSeekConfig) error {
 	cfg = ResolveDeepSeekConfig(cfg)
 	apiKey := strings.TrimSpace(cfg.APIKey)
@@ -774,6 +837,26 @@ func deepSeekConfigFromValues(values map[string]string) DeepSeekConfig {
 		Model:   firstNonEmpty(values["DeepSeek.Model"], values["DeepSeekModel"]),
 	}
 	return ResolveDeepSeekConfig(cfg)
+}
+
+func objectStorageConfigFromValues(values map[string]string, storageDriver string) (ObjectStorageConfig, error) {
+	cfg := ObjectStorageConfig{
+		Driver:           firstNonEmpty(values["ObjectStorage.Driver"], values["ObjectStorageDriver"]),
+		Endpoint:         firstNonEmpty(values["ObjectStorage.Endpoint"], values["ObjectStorageEndpoint"]),
+		ExternalEndpoint: firstNonEmpty(values["ObjectStorage.ExternalEndpoint"], values["ObjectStorageExternalEndpoint"]),
+		Bucket:           firstNonEmpty(values["ObjectStorage.Bucket"], values["ObjectStorageBucket"]),
+		Region:           firstNonEmpty(values["ObjectStorage.Region"], values["ObjectStorageRegion"]),
+		AccessKeyID:      firstNonEmpty(values["ObjectStorage.AccessKeyID"], values["ObjectStorageAccessKeyID"]),
+		SecretAccessKey:  firstNonEmpty(values["ObjectStorage.SecretAccessKey"], values["ObjectStorageSecretAccessKey"]),
+	}
+	if value := firstNonEmpty(values["ObjectStorage.UseSSL"], values["ObjectStorageUseSSL"]); strings.TrimSpace(value) != "" {
+		useSSL, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.UseSSL = useSSL
+	}
+	return ResolveObjectStorageConfig(cfg, storageDriver)
 }
 
 func observabilityHTTPConfigFromValues(values map[string]string, current ObservabilityHTTPConfig) (ObservabilityHTTPConfig, error) {

@@ -1,0 +1,93 @@
+syntax = "v1"
+
+info (
+	title:   "Media API"
+	desc:    "Media object upload and download URL HTTP API"
+	author:  "Codex"
+	version: "v0.1.0"
+)
+
+type MediaObject {
+	MediaID          string `json:"mediaId"`
+	OwnerUserID      string `json:"ownerUserId"`
+	Bucket           string `json:"bucket"`
+	ObjectKey        string `json:"objectKey"`
+	SHA256           string `json:"sha256"`
+	ContentType      string `json:"contentType"`
+	SizeBytes        int64  `json:"sizeBytes"`
+	Width            int32  `json:"width,omitempty"`
+	Height           int32  `json:"height,omitempty"`
+	OriginalFilename string `json:"originalFilename"`
+	Purpose          string `json:"purpose"`
+	Status           string `json:"status"`
+	CreatedAt        string `json:"createdAt"`
+	UpdatedAt        string `json:"updatedAt"`
+}
+
+type CreateMediaUploadReq {
+	Purpose     string `json:"purpose"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"contentType"`
+	SizeBytes   int64  `json:"sizeBytes"`
+	SHA256      string `json:"sha256,optional"`
+	Width       int32  `json:"width,optional"`
+	Height      int32  `json:"height,optional"`
+}
+
+type CreateMediaUploadData {
+	MediaID   string `json:"mediaId"`
+	ObjectKey string `json:"objectKey"`
+	UploadURL string `json:"uploadUrl"`
+	ExpiresAt int64  `json:"expiresAt"`
+}
+
+type CreateMediaUploadResp {
+	Code    string                `json:"code"`
+	Message string                `json:"message"`
+	Data    CreateMediaUploadData `json:"data"`
+}
+
+type CompleteMediaUploadReq {
+	MediaID string `path:"media_id"`
+}
+
+type CompleteMediaUploadData {
+	Media MediaObject `json:"media"`
+}
+
+type CompleteMediaUploadResp {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    CompleteMediaUploadData `json:"data"`
+}
+
+type GetMediaDownloadURLReq {
+	MediaID string `path:"media_id"`
+}
+
+type GetMediaDownloadURLData {
+	MediaID     string `json:"mediaId"`
+	DownloadURL string `json:"downloadUrl"`
+	ExpiresAt   int64  `json:"expiresAt"`
+}
+
+type GetMediaDownloadURLResp {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    GetMediaDownloadURLData `json:"data"`
+}
+
+@server (
+	jwt:   Auth
+	group: media
+)
+service media-api {
+	@handler createUploadIntent
+	post /media/uploads (CreateMediaUploadReq) returns (CreateMediaUploadResp)
+
+	@handler completeUpload
+	post /media/uploads/:media_id/complete (CompleteMediaUploadReq) returns (CompleteMediaUploadResp)
+
+	@handler getDownloadURL
+	get /media/:media_id/download-url (GetMediaDownloadURLReq) returns (GetMediaDownloadURLResp)
+}
