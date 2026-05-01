@@ -104,7 +104,7 @@ metadata:
   namespace: agents-im
 spec:
   selector: { app: groups-rpc }
-  ports: [{ name: grpc, port: 9093, targetPort: 9093 }]
+  ports: [{ name: grpc, port: 9103, targetPort: 9103 }]
 ---
 apiVersion: v1
 kind: Service

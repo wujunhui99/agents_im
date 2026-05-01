@@ -188,9 +188,6 @@ func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/groups/:group_id/members/me",
 			Handler: groupshandler.LeaveGroupHandler(serverCtx),
 		},
-	}, jwtOption(serverCtx))
-
-	server.AddRoutes([]rest.Route{
 		{
 			Method:  http.MethodGet,
 			Path:    "/groups/:group_id",
@@ -201,7 +198,7 @@ func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/groups/:group_id/members",
 			Handler: groupshandler.ListMembersHandler(serverCtx),
 		},
-	})
+	}, jwtOption(serverCtx))
 }
 
 func addMessageRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {

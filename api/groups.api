@@ -87,12 +87,7 @@ service groups-api {
 
 	@handler leaveGroup
 	delete /groups/:group_id/members/me (LeaveGroupReq) returns (MemberResp)
-}
 
-@server (
-	group: groups
-)
-service groups-api {
 	@handler getGroup
 	get /groups/:group_id (GetGroupReq) returns (GroupResp)
 

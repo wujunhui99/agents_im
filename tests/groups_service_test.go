@@ -178,6 +178,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
 	creator := mustCreateUser(t, userLogic, "creator_003")
 	member := mustCreateUser(t, userLogic, "member_003")
+	outsider := mustCreateUser(t, userLogic, "outsider_003")
 	serviceContext := svc.NewGroupsServiceContextWithAuth(
 		repository.NewMemoryGroupsRepository(),
 		logic.NewUserLogicExistenceChecker(userLogic),
@@ -186,6 +187,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	mux := newGroupsGoZeroRouter(t, serviceContext)
 	creatorBearer := bearerTokenForUser(t, creator.UserID)
 	memberBearer := bearerTokenForUser(t, member.UserID)
+	outsiderBearer := bearerTokenForUser(t, outsider.UserID)
 
 	t.Run("rejects legacy X-User-Id header without bearer token", func(t *testing.T) {
 		bypassResp := httptest.NewRecorder()
@@ -214,9 +216,25 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 
 	getResp := httptest.NewRecorder()
 	getReq := httptest.NewRequest(http.MethodGet, "/groups/"+created.Data.GroupID, nil)
+	getReq.Header.Set("Authorization", creatorBearer)
 	mux.ServeHTTP(getResp, getReq)
 	if getResp.Code != http.StatusOK {
 		t.Fatalf("get group status = %d, body = %s", getResp.Code, getResp.Body.String())
+	}
+
+	unauthGetResp := httptest.NewRecorder()
+	unauthGetReq := httptest.NewRequest(http.MethodGet, "/groups/"+created.Data.GroupID, nil)
+	mux.ServeHTTP(unauthGetResp, unauthGetReq)
+	if unauthGetResp.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated get group status = %d, body = %s", unauthGetResp.Code, unauthGetResp.Body.String())
+	}
+
+	outsiderGetResp := httptest.NewRecorder()
+	outsiderGetReq := httptest.NewRequest(http.MethodGet, "/groups/"+created.Data.GroupID, nil)
+	outsiderGetReq.Header.Set("Authorization", outsiderBearer)
+	mux.ServeHTTP(outsiderGetResp, outsiderGetReq)
+	if outsiderGetResp.Code != http.StatusForbidden {
+		t.Fatalf("outsider get group status = %d, body = %s", outsiderGetResp.Code, outsiderGetResp.Body.String())
 	}
 
 	addResp := httptest.NewRecorder()
@@ -245,8 +263,17 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 		t.Fatalf("repeat add should report already_member: %+v", repeated.Data)
 	}
 
+	forbiddenAddResp := httptest.NewRecorder()
+	forbiddenAddReq := newJSONRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", `{"user_id":"`+outsider.UserID+`"}`)
+	forbiddenAddReq.Header.Set("Authorization", memberBearer)
+	mux.ServeHTTP(forbiddenAddResp, forbiddenAddReq)
+	if forbiddenAddResp.Code != http.StatusForbidden {
+		t.Fatalf("non-owner add status = %d, body = %s", forbiddenAddResp.Code, forbiddenAddResp.Body.String())
+	}
+
 	listResp := httptest.NewRecorder()
 	listReq := httptest.NewRequest(http.MethodGet, "/groups/"+created.Data.GroupID+"/members", nil)
+	listReq.Header.Set("Authorization", creatorBearer)
 	mux.ServeHTTP(listResp, listReq)
 	if listResp.Code != http.StatusOK {
 		t.Fatalf("list status = %d, body = %s", listResp.Code, listResp.Body.String())
@@ -255,6 +282,14 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	decodeEnvelope(t, listResp.Body.Bytes(), &listed)
 	if len(listed.Data.Members) != 2 {
 		t.Fatalf("unexpected member list: %+v", listed.Data.Members)
+	}
+
+	outsiderListResp := httptest.NewRecorder()
+	outsiderListReq := httptest.NewRequest(http.MethodGet, "/groups/"+created.Data.GroupID+"/members", nil)
+	outsiderListReq.Header.Set("Authorization", outsiderBearer)
+	mux.ServeHTTP(outsiderListResp, outsiderListReq)
+	if outsiderListResp.Code != http.StatusForbidden {
+		t.Fatalf("outsider list status = %d, body = %s", outsiderListResp.Code, outsiderListResp.Body.String())
 	}
 
 	leaveResp := httptest.NewRecorder()
@@ -267,6 +302,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 
 	listAfterLeaveResp := httptest.NewRecorder()
 	listAfterLeaveReq := httptest.NewRequest(http.MethodGet, "/groups/"+created.Data.GroupID+"/members", nil)
+	listAfterLeaveReq.Header.Set("Authorization", creatorBearer)
 	mux.ServeHTTP(listAfterLeaveResp, listAfterLeaveReq)
 	var listedAfterLeave envelope[logic.ListMembersResponse]
 	decodeEnvelope(t, listAfterLeaveResp.Body.Bytes(), &listedAfterLeave)
@@ -284,6 +320,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 
 	missingGroupResp := httptest.NewRecorder()
 	missingGroupReq := httptest.NewRequest(http.MethodGet, "/groups/grp_missing", nil)
+	missingGroupReq.Header.Set("Authorization", creatorBearer)
 	mux.ServeHTTP(missingGroupResp, missingGroupReq)
 	if missingGroupResp.Code != http.StatusNotFound {
 		t.Fatalf("missing group status = %d, body = %s", missingGroupResp.Code, missingGroupResp.Body.String())

@@ -1,7 +1,7 @@
 Name: message-rpc
 ListenOn: 0.0.0.0:9094
 
-Auth:
+JWTAuth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
 StorageDriver: postgres

@@ -66,8 +66,12 @@
 
 `GET /groups/{group_id}`
 
+请求必须携带 `Authorization: Bearer <access_token>`，且 token 用户必须是该群 active 成员。
+
 验收标准：
 
+- 缺少、过期或非法 token 时返回未认证错误。
+- 当前用户不是 active 群成员时返回禁止错误。
 - 群存在时返回群基础信息。
 - 群不存在时返回明确不存在错误。
 - 返回内容不包含用户资料权威字段、密码或认证秘密。
@@ -76,12 +80,13 @@
 
 `POST /groups/{group_id}/members`
 
-请求必须携带 `Authorization: Bearer <access_token>`。请求体可选 `user_id`：为空时表示当前 token 用户加入群；不为空时表示添加指定用户。第一阶段不做管理员权限模型，因此添加指定用户只做存在性和群存在性校验，权限控制留给后续扩展。
+请求必须携带 `Authorization: Bearer <access_token>`。请求体可选 `user_id`：为空或等于当前 token 用户时表示当前用户加入群；不为空且不同于当前 token 用户时表示添加指定用户。第一阶段尚未实现完整管理员权限模型，添加其他用户暂时仅允许群创建者/owner 操作。
 
 验收标准：
 
 - 缺少、过期或非法 token 时返回未认证错误。
 - 群不存在时返回明确不存在错误。
+- 非 owner 添加其他用户时返回禁止错误。
 - 目标用户不存在时返回明确不存在错误。
 - 首次加入成功后成员状态为 `active`。
 - 重复加入保持幂等，返回 `already_member=true`，不创建重复有效成员关系。
@@ -104,8 +109,12 @@
 
 `GET /groups/{group_id}/members`
 
+请求必须携带 `Authorization: Bearer <access_token>`，且 token 用户必须是该群 active 成员。
+
 验收标准：
 
+- 缺少、过期或非法 token 时返回未认证错误。
+- 当前用户不是 active 群成员时返回禁止错误。
 - 群不存在时返回明确不存在错误。
 - 返回当前 `active` 成员列表。
 - 已退出成员不出现在列表中。
@@ -120,6 +129,6 @@
 ## 风险与待决
 
 - 所有需要当前用户身份的接口必须使用 JWT Bearer token；`X-User-Id` 只允许作为明确标记的测试绕过断言或历史兼容说明。
-- 第一阶段未实现群管理员或审批，`POST /groups/{group_id}/members` 的添加指定成员能力后续需要补权限模型。
+- 第一阶段未实现群管理员或审批，`POST /groups/{group_id}/members` 的添加指定成员能力当前只允许 creator/owner，后续需要补角色和邀请审批模型。
 - 第一阶段使用内存 repository 支撑本地开发和测试；生产化需要替换 PostgreSQL，并补充唯一约束和成员状态索引。
 - 重复加群第一阶段按幂等处理并显式返回 `already_member`，如客户端需要冲突语义，可在后续版本调整。

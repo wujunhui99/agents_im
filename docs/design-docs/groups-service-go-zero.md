@@ -145,8 +145,10 @@ HTTP 响应沿用统一 envelope：
 `groups-api` 通过 go-zero JWT middleware 获取当前用户身份：
 
 - `POST /groups` 必须携带 `Authorization: Bearer <access_token>`，token 用户作为创建者。
-- `POST /groups/:group_id/members` 必须携带 `Authorization: Bearer <access_token>`，请求体不传 `user_id` 时添加 token 用户。
+- `POST /groups/:group_id/members` 必须携带 `Authorization: Bearer <access_token>`，请求体不传 `user_id` 时添加 token 用户；添加其他用户时 token 用户必须是群 creator/owner。
 - `DELETE /groups/:group_id/members/me` 必须携带 `Authorization: Bearer <access_token>`，表示 token 用户退出。
+- `GET /groups/:group_id` 必须携带 `Authorization: Bearer <access_token>`，且 token 用户必须是 active 群成员。
+- `GET /groups/:group_id/members` 必须携带 `Authorization: Bearer <access_token>`，且 token 用户必须是 active 群成员。
 
 JWT middleware 校验 token 后将 `user_id` claim 注入 context；logic adapter 使用该 user id 调用 groups 业务逻辑。`X-User-Id` 不作为生产鉴权路径。
 
@@ -168,6 +170,8 @@ scripts/verify-static.sh
 - 加群成功。
 - 重复加群返回 `already_member=true` 且成员列表不重复。
 - 退群后成员列表不包含该成员。
+- 非成员查询群详情或成员列表返回 `FORBIDDEN`。
+- 非 owner 添加其他用户返回 `FORBIDDEN`。
 - 查询群不存在返回 `NOT_FOUND`。
 - 添加不存在用户返回 `NOT_FOUND`。
 - user 既有测试继续通过。

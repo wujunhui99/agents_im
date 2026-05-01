@@ -1,7 +1,7 @@
 Name: groups-rpc
-ListenOn: 0.0.0.0:9093
+ListenOn: 0.0.0.0:9103
 
-Auth:
+JWTAuth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
 StorageDriver: postgres

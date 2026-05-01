@@ -32,7 +32,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	userLogic := userlogic.NewUserLogic(userRepo)
 	return &ServiceContext{
 		Config:    c,
-		AuthLogic: business.NewAuthLogic(authRepo, useradapter.NewLogicClient(userLogic), business.NewPasswordHasher(), token.NewHMACTokenManager(c.Auth.AccessSecret, time.Duration(c.Auth.AccessExpire)*time.Second)),
+		AuthLogic: business.NewAuthLogic(authRepo, useradapter.NewLogicClient(userLogic), business.NewPasswordHasher(), token.NewHMACTokenManager(c.JWTAuth.AccessSecret, time.Duration(c.JWTAuth.AccessExpire)*time.Second)),
 		AuthRepo:  authRepo,
 		UserLogic: userLogic,
 	}

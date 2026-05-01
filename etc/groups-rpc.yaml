@@ -1,6 +1,6 @@
 Name: groups-rpc
 ListenOn: 0.0.0.0:9093
-Auth:
+JWTAuth:
   AccessSecret: dev-jwt-secret-change-me
   AccessExpire: 86400
 StorageDriver: memory

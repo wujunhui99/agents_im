@@ -25,3 +25,15 @@ configMapGenerator:
       - etc/message-rpc.yaml
 generatorOptions:
   disableNameSuffixHash: true
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/strategy
+        value:
+          type: Recreate
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ghcr-pull-secret
