@@ -161,6 +161,13 @@ func (l *SendMessageLogic) SendMessage(req *types.SendMessageReq) (*types.SendMe
 	if senderID := strings.TrimSpace(req.SenderID); senderID != "" && senderID != userID {
 		return nil, apperror.InvalidArgument("sender_id must match authenticated user")
 	}
+	if strings.TrimSpace(req.MessageOrigin) != "" ||
+		strings.TrimSpace(req.AgentAccountID) != "" ||
+		strings.TrimSpace(req.TriggerServerMsgID) != "" ||
+		strings.TrimSpace(req.AgentRunID) != "" ||
+		req.AllowRecursiveTrigger {
+		return nil, apperror.InvalidArgument("message origin and agent metadata are controlled by Message Service")
+	}
 
 	result, err := l.svcCtx.MessageLogic.SendMessage(l.ctx, business.SendMessageRequest{
 		SenderID:    userID,
@@ -218,17 +225,22 @@ func toConversationSeqState(state business.ConversationSeqState) types.Conversat
 
 func toMessage(message business.Message) types.Message {
 	return types.Message{
-		ServerMsgID:    message.ServerMsgID,
-		ClientMsgID:    message.ClientMsgID,
-		ConversationID: message.ConversationID,
-		Seq:            message.Seq,
-		SenderID:       message.SenderID,
-		ReceiverID:     message.ReceiverID,
-		GroupID:        message.GroupID,
-		ChatType:       message.ChatType,
-		ContentType:    message.ContentType,
-		Content:        message.Content,
-		SendTime:       message.SendTime,
-		CreatedAt:      message.CreatedAt,
+		ServerMsgID:           message.ServerMsgID,
+		ClientMsgID:           message.ClientMsgID,
+		ConversationID:        message.ConversationID,
+		Seq:                   message.Seq,
+		SenderID:              message.SenderID,
+		ReceiverID:            message.ReceiverID,
+		GroupID:               message.GroupID,
+		ChatType:              message.ChatType,
+		ContentType:           message.ContentType,
+		Content:               message.Content,
+		MessageOrigin:         message.MessageOrigin,
+		AgentAccountID:        message.AgentAccountID,
+		TriggerServerMsgID:    message.TriggerServerMsgID,
+		AgentRunID:            message.AgentRunID,
+		AllowRecursiveTrigger: message.AllowRecursiveTrigger,
+		SendTime:              message.SendTime,
+		CreatedAt:             message.CreatedAt,
 	}
 }

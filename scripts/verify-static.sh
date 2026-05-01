@@ -235,6 +235,14 @@ required_files=(
   "docs/exec-plans/completed/account-service-terminology.md"
   "docs/exec-plans/active/agent-system-v0.md"
   "docs/exec-plans/active/agent-infrastructure-parallel-baseline.md"
+  "docs/design-docs/agent-conversation-hosting.md"
+  "docs/exec-plans/completed/agent-conversation-hosting.md"
+  "db/migrations/003_agent_conversation_hosting.sql"
+  "internal/agentim/hosting.go"
+  "internal/agentim/hosting_test.go"
+  "internal/repository/agent_hosting_repository.go"
+  "internal/repository/agent_hosting_memory.go"
+  "internal/repository/postgres_agent_hosting.go"
 )
 
 for file in "${required_files[@]}"; do
@@ -530,6 +538,79 @@ message_proto_patterns=(
 for pattern in "${message_proto_patterns[@]}"; do
   rg -q "$pattern" proto/message.proto
 done
+
+agent_conversation_hosting_contract_patterns=(
+  "message_origin"
+  "agent_account_id"
+  "trigger_server_msg_id"
+  "agent_run_id"
+  "allow_recursive_trigger"
+)
+
+for pattern in "${agent_conversation_hosting_contract_patterns[@]}"; do
+  rg -q "$pattern" proto/message.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go internal/messaging/event.go docs/design-docs/agent-conversation-hosting.md docs/design-docs/message-chain-contract.md docs/product-specs/message-chain.md
+done
+
+agent_conversation_hosting_camel_patterns=(
+  "messageOrigin"
+  "agentAccountId"
+  "triggerServerMsgId"
+  "agentRunId"
+  "allowRecursiveTrigger"
+)
+
+for pattern in "${agent_conversation_hosting_camel_patterns[@]}"; do
+  rg -q "$pattern" api/message.api internal/types/types.go web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx docs/product-specs/frontend-backend-contract.md
+done
+
+agent_conversation_hosting_code_patterns=(
+  "MessageCreatedHook"
+  "SetMessageCreatedHook"
+  "message.created:"
+  "NewConversationHostingService"
+  "OnMessageCreated"
+  "TryStartAgentTrigger"
+  "FinishAgentTrigger"
+  "agent_conversation_hosting"
+  "agent_trigger_idempotency"
+  "MessageServiceResponseWriter"
+  "SendMessage\\(ctx"
+)
+
+for pattern in "${agent_conversation_hosting_code_patterns[@]}"; do
+  rg -q "$pattern" internal/logic/messagelogic.go internal/agentim internal/repository db/migrations/003_agent_conversation_hosting.sql docs/design-docs/agent-conversation-hosting.md
+done
+
+agent_conversation_hosting_test_patterns=(
+  "TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates"
+  "SetMessageCreatedHook"
+  "AI/Agent"
+  "messageOrigin: 'ai'"
+  "deterministic-test"
+)
+
+for pattern in "${agent_conversation_hosting_test_patterns[@]}"; do
+  rg -q "$pattern" internal/agentim/hosting_test.go web/src/features/messages/MessagesPage.test.tsx
+done
+
+agent_conversation_hosting_doc_patterns=(
+  "message_origin=human|ai|system"
+  "MessageLogic.SendMessage"
+  "MessageCreatedHook"
+  "idempotency"
+  "allow_recursive_trigger"
+  "AI/Agent"
+  "fail closed"
+)
+
+for pattern in "${agent_conversation_hosting_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/agent-conversation-hosting.md docs/product-specs/agent-system.md docs/product-specs/agent-chat.md docs/product-specs/frontend-backend-contract.md docs/FRONTEND.md ARCHITECTURE.md docs/exec-plans/completed/agent-conversation-hosting.md
+done
+
+if rg -n "CreateMessageIdempotent|insert into messages|insertMessage" internal/agentim --glob '*.go'; then
+  echo "agentim must write responses through MessageLogic/Message Service, not message repository or direct DB insert" >&2
+  exit 1
+fi
 
 rpc_generated_dirs=(
   "internal/rpcgen/user"
@@ -1357,7 +1438,7 @@ account_code_patterns=(
   "type UserRepository = AccountRepository"
   "type AccountProfile = UserProfile"
   "func NewAccountLogic"
-  "AccountLogic    *logic.AccountLogic"
+  "AccountLogic"
   "Path:    \"/accounts\""
   "Path:    \"/accounts/exists\""
   "Path:    \"/accounts/:identifier\""

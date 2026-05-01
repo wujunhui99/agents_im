@@ -795,6 +795,31 @@ time {
   gap: 4px;
 }
 
+.message-origin-badge,
+.conversation-origin-badge {
+  width: max-content;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: #0f766e;
+  background: #dff7ef;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.conversation-origin-badge {
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.message-origin-system,
+.conversation-origin-system {
+  color: #475569;
+  background: #e5e7eb;
+}
+
 .message-bubble {
   margin: 0;
   padding: 9px 11px;
@@ -808,6 +833,10 @@ time {
 
 .message-outgoing .message-bubble {
   background: #95ec69;
+}
+
+.message-origin-ai .message-bubble {
+  border: 1px solid rgba(15, 118, 110, 0.22);
 }
 
 .message-status {

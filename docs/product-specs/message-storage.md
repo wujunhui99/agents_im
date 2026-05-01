@@ -18,6 +18,7 @@ Message storage must guarantee:
 - stable message ordering inside each conversation;
 - pullable message history by sequence range;
 - monotonic conversation-level read state.
+- persisted `message_origin=human|ai|system` plus AI trigger metadata for Agent replies.
 
 ## Non-goals
 

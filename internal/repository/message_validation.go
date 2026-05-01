@@ -40,7 +40,55 @@ func validateCreateMessageInput(input CreateMessageInput) (string, error) {
 			return "", err
 		}
 	}
+	if _, err := normalizeMessageOriginInput(&input); err != nil {
+		return "", err
+	}
 	return inputConversationID(input)
+}
+
+func normalizeMessageOriginInput(input *CreateMessageInput) (string, error) {
+	origin := strings.ToLower(strings.TrimSpace(input.MessageOrigin))
+	if origin == "" {
+		origin = MessageOriginHuman
+	}
+	switch origin {
+	case MessageOriginHuman, MessageOriginAI, MessageOriginSystem:
+	default:
+		return "", apperror.InvalidArgument("message_origin must be human, ai, or system")
+	}
+	input.MessageOrigin = origin
+	input.AgentAccountID = strings.TrimSpace(input.AgentAccountID)
+	input.TriggerServerMsgID = strings.TrimSpace(input.TriggerServerMsgID)
+	input.AgentRunID = strings.TrimSpace(input.AgentRunID)
+	if input.AgentAccountID != "" {
+		if err := validateMessageConversationComponentID(input.AgentAccountID, "agent_account_id"); err != nil {
+			return "", err
+		}
+	}
+	if input.TriggerServerMsgID != "" {
+		if err := validateMessageRequiredID(input.TriggerServerMsgID, "trigger_server_msg_id"); err != nil {
+			return "", err
+		}
+	}
+	if input.AgentRunID != "" {
+		if err := validateMessageRequiredID(input.AgentRunID, "agent_run_id"); err != nil {
+			return "", err
+		}
+	}
+	switch origin {
+	case MessageOriginAI:
+		if input.AgentAccountID == "" {
+			input.AgentAccountID = input.SenderID
+		}
+		if input.AgentAccountID != input.SenderID {
+			return "", apperror.InvalidArgument("agent_account_id must match sender_id for ai messages")
+		}
+	case MessageOriginHuman, MessageOriginSystem:
+		if input.AgentAccountID != "" || input.TriggerServerMsgID != "" || input.AgentRunID != "" || input.AllowRecursiveTrigger {
+			return "", apperror.InvalidArgument("agent metadata is only allowed for ai messages")
+		}
+	}
+	return origin, nil
 }
 
 func normalizeMessagePullRange(fromSeq, toSeq int64, limit int, order string) (int64, int64, int, string, error) {

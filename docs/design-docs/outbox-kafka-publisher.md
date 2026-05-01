@@ -43,6 +43,7 @@ This module bridges the already-implemented transactional outbox and the Kafka-c
    - `event_type` becomes `message.accepted`;
    - `conversation_id`, `server_msg_id`, `seq`, `sender_id`, `chat_type`, and `created_at` come from the stored message with outbox metadata as fallback;
    - text content is encoded as JSON `{"text":"..."}`;
+   - `message_origin`, `agent_account_id`, `trigger_server_msg_id`, `agent_run_id`, and `allow_recursive_trigger` are copied from the stored message;
    - `receiver_ids` excludes the sender and is derived from single-chat receiver or visible user IDs.
 4. Calls `Producer.Publish(ctx, event)`.
 5. Calls `MarkPublished` after successful publish.

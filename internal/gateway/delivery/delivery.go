@@ -25,20 +25,25 @@ type Event struct {
 }
 
 type Message struct {
-	ServerMsgID     string                 `json:"server_msg_id"`
-	ClientMsgID     string                 `json:"client_msg_id,omitempty"`
-	ConversationID  string                 `json:"conversation_id"`
-	Seq             int64                  `json:"seq"`
-	SenderID        string                 `json:"sender_id"`
-	ReceiverID      string                 `json:"receiver_id,omitempty"`
-	GroupID         string                 `json:"group_id,omitempty"`
-	ChatType        string                 `json:"chat_type,omitempty"`
-	ContentType     string                 `json:"content_type"`
-	Content         string                 `json:"content,omitempty"`
-	ContentMetadata map[string]interface{} `json:"content_metadata,omitempty"`
-	SendTime        int64                  `json:"send_time,omitempty"`
-	CreatedAt       int64                  `json:"created_at,omitempty"`
-	TraceID         string                 `json:"trace_id,omitempty"`
+	ServerMsgID           string                 `json:"server_msg_id"`
+	ClientMsgID           string                 `json:"client_msg_id,omitempty"`
+	ConversationID        string                 `json:"conversation_id"`
+	Seq                   int64                  `json:"seq"`
+	SenderID              string                 `json:"sender_id"`
+	ReceiverID            string                 `json:"receiver_id,omitempty"`
+	GroupID               string                 `json:"group_id,omitempty"`
+	ChatType              string                 `json:"chat_type,omitempty"`
+	ContentType           string                 `json:"content_type"`
+	Content               string                 `json:"content,omitempty"`
+	ContentMetadata       map[string]interface{} `json:"content_metadata,omitempty"`
+	MessageOrigin         string                 `json:"message_origin,omitempty"`
+	AgentAccountID        string                 `json:"agent_account_id,omitempty"`
+	TriggerServerMsgID    string                 `json:"trigger_server_msg_id,omitempty"`
+	AgentRunID            string                 `json:"agent_run_id,omitempty"`
+	AllowRecursiveTrigger bool                   `json:"allow_recursive_trigger,omitempty"`
+	SendTime              int64                  `json:"send_time,omitempty"`
+	CreatedAt             int64                  `json:"created_at,omitempty"`
+	TraceID               string                 `json:"trace_id,omitempty"`
 }
 
 type Result struct {

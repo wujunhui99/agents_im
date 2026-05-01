@@ -7,21 +7,22 @@ import (
 )
 
 type ServiceContext struct {
-	Auth            config.JWTAuthConfig
-	AccountLogic    *logic.AccountLogic
-	UserLogic       *logic.UserLogic
-	FriendsLogic    *logic.FriendsLogic
-	GroupsLogic     *logic.GroupsLogic
-	MessageLogic    *logic.MessageLogic
-	AgentLogic      *logic.AgentLogic
-	AgentAuditLogic *logic.AgentAuditLogic
-	Repo            repository.Repository
-	GroupsRepo      repository.GroupsRepository
-	MessageRepo     repository.MessageRepository
-	AgentRepo       repository.AgentRepository
-	OutboxRepo      repository.OutboxRepository
-	DeliveryRepo    repository.DeliveryAttemptRepository
-	AgentAuditRepo  repository.AgentAuditRepository
+	Auth             config.JWTAuthConfig
+	AccountLogic     *logic.AccountLogic
+	UserLogic        *logic.UserLogic
+	FriendsLogic     *logic.FriendsLogic
+	GroupsLogic      *logic.GroupsLogic
+	MessageLogic     *logic.MessageLogic
+	AgentLogic       *logic.AgentLogic
+	AgentAuditLogic  *logic.AgentAuditLogic
+	Repo             repository.Repository
+	GroupsRepo       repository.GroupsRepository
+	MessageRepo      repository.MessageRepository
+	AgentRepo        repository.AgentRepository
+	AgentHostingRepo repository.AgentConversationHostingRepository
+	OutboxRepo       repository.OutboxRepository
+	DeliveryRepo     repository.DeliveryAttemptRepository
+	AgentAuditRepo   repository.AgentAuditRepository
 }
 
 func NewServiceContext(repo repository.Repository) *ServiceContext {
@@ -89,6 +90,12 @@ func NewAgentAuditServiceContext(repo repository.AgentAuditRepository) *ServiceC
 	return &ServiceContext{
 		AgentAuditLogic: logic.NewAgentAuditLogic(repo),
 		AgentAuditRepo:  repo,
+	}
+}
+
+func NewAgentConversationHostingServiceContext(repo repository.AgentConversationHostingRepository) *ServiceContext {
+	return &ServiceContext{
+		AgentHostingRepo: repo,
 	}
 }
 

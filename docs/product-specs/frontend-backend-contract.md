@@ -295,6 +295,8 @@ A dedicated `GET /groups` or `ListGroups` endpoint is not present in this worktr
 
 Message history is authoritative in the message service. WebSocket delivery is best-effort and may be duplicated, so clients should deduplicate by `serverMsgId` or by `conversationId + seq`.
 
+Message snapshots include `messageOrigin`, one of `human`, `ai`, or `system`. Frontend UI must visibly label `ai` messages as AI/Agent messages. AI messages also expose `agentAccountId`, `triggerServerMsgId`, `agentRunId`, and `allowRecursiveTrigger`; clients display these as metadata only and must not use them as authorization facts.
+
 ### Send Message
 
 ```http
@@ -344,6 +346,11 @@ Success:
       "chatType": "single",
       "contentType": "text",
       "content": "hello",
+      "messageOrigin": "human",
+      "agentAccountId": "",
+      "triggerServerMsgId": "",
+      "agentRunId": "",
+      "allowRecursiveTrigger": false,
       "sendTime": 1777464000000,
       "createdAt": 1777464000000
     },
@@ -529,6 +536,11 @@ Push event envelope:
     "chat_type": "single",
     "content_type": "text",
     "content": "hello",
+    "message_origin": "human",
+    "agent_account_id": "",
+    "trigger_server_msg_id": "",
+    "agent_run_id": "",
+    "allow_recursive_trigger": false,
     "send_time": 1777464000000,
     "created_at": 1777464000000
   }
@@ -547,7 +559,8 @@ Delivery status push event:
     "sender_id": "usr_000001",
     "receiver_id": "usr_000002",
     "chat_type": "single",
-    "content_type": "text"
+    "content_type": "text",
+    "message_origin": "human"
   }
 }
 ```

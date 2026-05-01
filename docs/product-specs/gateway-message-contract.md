@@ -69,7 +69,7 @@ Successful behavior:
 
 - Gateway forwards the request with the connection user as sender.
 - Message Service validates the target, stores the message, assigns `serverMsgId`, resolves `conversationId`, and assigns `seq`.
-- The ACK payload returns the stored message snapshot and `deduplicated`.
+- The ACK payload returns the stored message snapshot and `deduplicated`; snapshots include `messageOrigin=human|ai|system` and AI metadata when present.
 
 Retry behavior:
 
