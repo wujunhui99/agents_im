@@ -4,21 +4,21 @@
 
 ## 背景
 
-`friends` 是好友关系的权威服务，依赖 `user` 的用户存在性能力，但不保存用户资料权威数据，不管理登录认证，也不维护群成员关系。第一阶段目标是在 `user` 基础接口稳定后，提供直接添加好友、删除好友、查询好友列表和查询好友关系能力，为后续 IM 会话和社交展示提供关系基础。
+`friends` 是好友关系的权威服务，依赖 Account Service 的账号存在性能力，但不保存账号资料权威数据，不管理登录认证，也不维护群成员关系。第一阶段目标是在 Account Service 基础接口稳定后，提供直接添加好友、删除好友、查询好友列表和查询好友关系能力，为后续 IM 会话和社交展示提供关系基础。V0 `user_id` / `friend_id` 字段是 account id alias。
 
 ## 目标
 
 - 提供添加好友能力。
 - 提供删除好友能力。
-- 提供当前用户好友列表查询能力。
-- 提供当前用户与指定用户的好友关系查询能力。
-- 添加好友前校验发起方和目标用户都存在。
+- 提供当前账号好友列表查询能力。
+- 提供当前账号与指定账号的好友关系查询能力。
+- 添加好友前校验发起方和目标账号都存在。
 - 第一阶段直接双向建立好友关系，不引入好友申请审批流。
 - 通过 JWT Bearer token 解析当前用户身份。
 
 ## 非目标
 
-- 不保存 `display_name`、`identifier`、头像等用户资料权威字段。
+- 不保存 `display_name`、`identifier`、头像等账号资料权威字段。
 - 不保存密码、验证码、OAuth token 等认证秘密。
 - 不验证登录密码、不签发 token、不实现登录注册。
 - 不维护群成员关系。
@@ -29,8 +29,8 @@
 
 第一阶段好友关系包含：
 
-- `user_id`：当前用户 ID。
-- `friend_id`：好友用户 ID。
+- `user_id`：当前 account id alias。
+- `friend_id`：好友 account id alias。
 - `status`：关系状态，第一阶段支持 `active`、`deleted`、`none`。
 - `is_friend`：是否为有效好友关系。
 - `created_at` / `updated_at`：关系创建和更新时间。
@@ -47,7 +47,7 @@
 
 `POST /friends`
 
-请求必须携带 `Authorization: Bearer <access_token>`，请求体包含目标用户：
+请求必须携带 `Authorization: Bearer <access_token>`，请求体包含目标账号的 V0 account id alias：
 
 ```json
 {

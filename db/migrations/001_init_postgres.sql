@@ -15,7 +15,7 @@ create table if not exists users (
   gender text not null default 'unknown',
   age integer not null default 0,
   region text not null default '',
-  account_type text not null default 'normal',
+  account_type text not null default 'user',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint users_identifier_uniq unique (identifier),
@@ -24,17 +24,24 @@ create table if not exists users (
   constraint users_name_not_blank check (name <> ''),
   constraint users_gender_check check (gender in ('unknown', 'male', 'female', 'other')),
   constraint users_age_check check (age >= 0 and age <= 150),
-  constraint users_account_type_check check (account_type in ('normal', 'agent', 'admin'))
+  constraint users_account_type_check check (account_type in ('user', 'agent', 'admin'))
 );
 
 alter table users
-  add column if not exists account_type text not null default 'normal';
+  add column if not exists account_type text not null default 'user';
 
 alter table users
   drop constraint if exists users_account_type_check;
 
+update users
+set account_type = 'user'
+where account_type = 'normal';
+
 alter table users
-  add constraint users_account_type_check check (account_type in ('normal', 'agent', 'admin'));
+  alter column account_type set default 'user';
+
+alter table users
+  add constraint users_account_type_check check (account_type in ('user', 'agent', 'admin'));
 
 create table if not exists auth_credentials (
   identifier text primary key,

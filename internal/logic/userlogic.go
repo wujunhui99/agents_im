@@ -25,6 +25,12 @@ func NewUserLogic(repo repository.UserRepository) *UserLogic {
 	return &UserLogic{repo: repo}
 }
 
+type AccountLogic = UserLogic
+
+func NewAccountLogic(repo repository.AccountRepository) *AccountLogic {
+	return NewUserLogic(repo)
+}
+
 type UserProfile struct {
 	UserID      string `json:"user_id"`
 	Identifier  string `json:"identifier"`
@@ -38,6 +44,8 @@ type UserProfile struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
+type AccountProfile = UserProfile
+
 type CreateUserRequest struct {
 	Identifier  string `json:"identifier"`
 	DisplayName string `json:"display_name"`
@@ -48,9 +56,13 @@ type CreateUserRequest struct {
 	AccountType string `json:"account_type"`
 }
 
+type CreateAccountRequest = CreateUserRequest
+
 type GetUserByIdentifierRequest struct {
 	Identifier string `json:"identifier"`
 }
+
+type GetAccountByIdentifierRequest = GetUserByIdentifierRequest
 
 type ExistsByIdentifierRequest struct {
 	Identifier string `json:"identifier"`
@@ -61,9 +73,13 @@ type ExistsByIdentifierResponse struct {
 	Exists     bool   `json:"exists"`
 }
 
+type AccountExistsByIdentifierResponse = ExistsByIdentifierResponse
+
 type GetUserByIDRequest struct {
 	UserID string `json:"user_id"`
 }
+
+type GetAccountByIDRequest = GetUserByIDRequest
 
 type UpdateUserProfileRequest struct {
 	UserID      string  `json:"user_id"`
@@ -73,6 +89,8 @@ type UpdateUserProfileRequest struct {
 	Age         *int32  `json:"age,omitempty"`
 	Region      *string `json:"region,omitempty"`
 }
+
+type UpdateAccountProfileRequest = UpdateUserProfileRequest
 
 func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (UserProfile, error) {
 	identifier, err := NormalizeIdentifier(req.Identifier)
@@ -101,7 +119,7 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 
 	accountType, ok := model.NormalizeAccountType(req.AccountType)
 	if !ok {
-		return UserProfile{}, apperror.InvalidArgument("account_type must be normal, agent, or admin")
+		return UserProfile{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
 	}
 
 	user, err := l.repo.Create(ctx, model.User{
@@ -120,6 +138,10 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 	return toProfile(user), nil
 }
 
+func (l *UserLogic) CreateAccount(ctx context.Context, req CreateAccountRequest) (AccountProfile, error) {
+	return l.CreateUser(ctx, req)
+}
+
 func (l *UserLogic) GetUserByIdentifier(ctx context.Context, req GetUserByIdentifierRequest) (UserProfile, error) {
 	identifier, err := NormalizeIdentifier(req.Identifier)
 	if err != nil {
@@ -132,6 +154,10 @@ func (l *UserLogic) GetUserByIdentifier(ctx context.Context, req GetUserByIdenti
 	}
 
 	return toProfile(user), nil
+}
+
+func (l *UserLogic) GetAccountByIdentifier(ctx context.Context, req GetAccountByIdentifierRequest) (AccountProfile, error) {
+	return l.GetUserByIdentifier(ctx, req)
 }
 
 func (l *UserLogic) ExistsByIdentifier(ctx context.Context, req ExistsByIdentifierRequest) (ExistsByIdentifierResponse, error) {
@@ -160,6 +186,10 @@ func (l *UserLogic) GetUserByID(ctx context.Context, req GetUserByIDRequest) (Us
 	}
 
 	return toProfile(user), nil
+}
+
+func (l *UserLogic) GetAccountByID(ctx context.Context, req GetAccountByIDRequest) (AccountProfile, error) {
+	return l.GetUserByID(ctx, req)
 }
 
 func (l *UserLogic) UpdateUserProfile(ctx context.Context, req UpdateUserProfileRequest) (UserProfile, error) {
@@ -216,6 +246,10 @@ func (l *UserLogic) UpdateUserProfile(ctx context.Context, req UpdateUserProfile
 	}
 
 	return toProfile(user), nil
+}
+
+func (l *UserLogic) UpdateAccountProfile(ctx context.Context, req UpdateAccountProfileRequest) (AccountProfile, error) {
+	return l.UpdateUserProfile(ctx, req)
 }
 
 func NormalizeIdentifier(identifier string) (string, error) {

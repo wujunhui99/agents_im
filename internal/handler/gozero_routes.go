@@ -18,6 +18,7 @@ func RegisterGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) 
 	registerGoZeroObservabilityHandlers(server, "agents-im-api", func(*http.Request) []health.Check {
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("account_logic", serverCtx != nil && serverCtx.AccountLogic != nil, "configured"),
 			componentCheck("user_logic", serverCtx != nil && serverCtx.UserLogic != nil, "configured"),
 			componentCheck("friends_logic", serverCtx != nil && serverCtx.FriendsLogic != nil, "configured"),
 			componentCheck("message_logic", serverCtx != nil && serverCtx.MessageLogic != nil, "configured"),
@@ -34,6 +35,7 @@ func RegisterUserGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceConte
 	registerGoZeroObservabilityHandlers(server, "user-api", func(*http.Request) []health.Check {
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("account_logic", serverCtx != nil && serverCtx.AccountLogic != nil, "configured"),
 			componentCheck("user_logic", serverCtx != nil && serverCtx.UserLogic != nil, "configured"),
 			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
 		}
@@ -134,13 +136,28 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Handler: userhandler.CreateUserHandler(serverCtx),
 		},
 		{
+			Method:  http.MethodPost,
+			Path:    "/accounts",
+			Handler: userhandler.CreateUserHandler(serverCtx),
+		},
+		{
 			Method:  http.MethodGet,
 			Path:    "/users/exists",
 			Handler: userhandler.ExistsUserHandler(serverCtx),
 		},
 		{
 			Method:  http.MethodGet,
+			Path:    "/accounts/exists",
+			Handler: userhandler.ExistsUserHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
 			Path:    "/users/:identifier",
+			Handler: userhandler.GetUserByIdentifierHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/accounts/:identifier",
 			Handler: userhandler.GetUserByIdentifierHandler(serverCtx),
 		},
 	})

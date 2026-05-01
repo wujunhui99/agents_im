@@ -6,7 +6,7 @@
 
 构建一个高性能、分布式、实时聊天系统，同时提供 Agent 服务能力。系统需要支持：
 
-- 用户单聊与群聊
+- Account 单聊与群聊，其中 Account 可代表 human user、agent、admin，未来可扩展 service/official accounts
 - Agent 创建、销毁、持久化和运行时管理
 - 用户与 Agent 单聊
 - 多用户与多 Agent 群聊
@@ -34,25 +34,25 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 ## 顶层模块
 
-### User Service
+### Account Service
 
-负责用户账号资料的权威数据，不管理密码或认证秘密。核心能力包括唯一标识符（类似微信号）、名称、性别、年龄、地区等资料维护，`/me` 查询，公开资料查询，以及供 `auth` 注册流程使用的账号存在性检查。
+负责账号资料的权威数据，不管理密码或认证秘密。Account 是身份与资料主体，可代表 human user、agent、admin，未来可扩展 service/official accounts。核心能力包括唯一标识符（类似微信号）、名称、性别、年龄、地区、`account_type=user|agent|admin` 等资料维护，`/me` 查询，公开资料查询，以及供 `auth` 注册流程使用的账号存在性检查。V0 public/API/storage compatibility 继续保留 `/users`、`user-api`、`user-rpc`、`users` 表和 `user_id` 字段；这些 `user_id` 均是 account id alias。术语边界见 [`docs/design-docs/account-service-terminology.md`](./docs/design-docs/account-service-terminology.md)。
 
 ### Auth Service
 
-负责认证和登录注册。第一阶段支持账号密码注册/登录，密码和认证秘密只归 `auth` 管理；注册时依赖 `user` 查询账号是否存在，并协作创建用户资料。手机号验证码、微信扫码等能力作为后续扩展，当前不实现。
+负责认证和登录注册。第一阶段支持账号密码注册/登录，密码和认证秘密只归 `auth` 管理；注册时依赖 Account Service 查询账号是否存在，并协作创建账号资料。手机号验证码、微信扫码等能力作为后续扩展，当前不实现。
 
 ### Friends Service
 
-负责好友关系维护，包括添加好友、删除好友、查询好友列表和关系状态。好友关系不写入 `user` 的权威资料模型。
+负责好友关系维护，包括添加好友、删除好友、查询好友列表和关系状态。第一阶段 public JSON 仍使用 `user_id` / `friend_id`，但它们指向 account id。好友关系不写入 Account Service 的权威资料模型。
 
 ### Groups Service
 
-负责群聊和群成员关系维护，包括创建群、加群、退群、查询群成员。群成员关系不写入 `user` 的权威资料模型。
+负责群聊和群成员关系维护，包括创建群、加群、退群、查询群成员。第一阶段 `creator_user_id`、`user_id` 等字段是 account id alias。群成员关系不写入 Account Service 的权威资料模型。
 
 ### Message Service
 
-负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为后续 Kafka、Message Transfer、Push 服务提供可靠事件源。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md) 和 [`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
+负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为后续 Kafka、Message Transfer、Push 服务提供可靠事件源。这里的 `user_id` 是 V0 account id alias。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md) 和 [`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
 
 ### Message Transfer Worker
 
@@ -72,14 +72,14 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - 在线状态维护
 - 消息下发与重试
 
-在线状态和连接元数据通过 Redis presence 层保存为短期运行状态，设计见 [`docs/design-docs/redis-presence.md`](./docs/design-docs/redis-presence.md)。第一阶段已提供独立入口 `cmd/gateway-ws`，通过 `GET /ws` 建立 WebSocket 连接；Handshake 使用与 HTTP API 一致的 JWT 配置，优先支持 `Authorization: Bearer <token>`，`token` query param 仅在 `GatewayWS.AllowQueryToken=true` 时启用；浏览器 `Origin` 由 `GatewayWS.AllowedOrigins` 精确匹配，未配置时只允许 same-origin。连接通过内存 connection manager 按 `user_id` 注册多端 `connection_id`，并同步写入 `PresenceStore`。Gateway command router 支持 `heartbeat`、`send_message`、`pull_messages`、`get_conversation_seqs`、`mark_conversation_read`，并调用现有 Message Service 业务逻辑/仓储契约完成消息写入、拉取、seq 查询和已读推进；heartbeat 和 WebSocket pong 会刷新 presence/last-seen，服务端按配置发送 ping 并按连接执行命令限流。Frontend reconnect sync 使用稳定 WebSocket ACK error envelope，并通过 `get_conversation_seqs`、`pull_messages`、`mark_conversation_read` 补偿缺失消息，产品契约见 [`docs/product-specs/frontend-sync-contract.md`](./docs/product-specs/frontend-sync-contract.md)，设计见 [`docs/design-docs/websocket-reconnect-sync.md`](./docs/design-docs/websocket-reconnect-sync.md)。Gateway push delivery 第一阶段提供 `internal/gateway/delivery.Dispatcher` 契约和本进程内 WebSocket fanout，可向在线连接主动下发 `message_received` / `message_delivered` event；delivery dispatcher 会先查询 presence route metadata，再执行本进程内 fanout，offline/routed/failed recipient 均返回明确状态。Gateway 不拥有消息历史、会话 seq 或已读状态；这些数据仍由 Message Service 和 PostgreSQL 权威维护。后续 Message Transfer worker 将消费 outbox/Kafka 事件并调用 dispatcher，Redis Presence route metadata 用于跨实例路由，delivery ACK 留给后续链路补齐。设计见 [`docs/design-docs/websocket-gateway.md`](./docs/design-docs/websocket-gateway.md)、[`docs/design-docs/gateway-push-delivery.md`](./docs/design-docs/gateway-push-delivery.md) 和 [`docs/design-docs/gateway-presence-routing.md`](./docs/design-docs/gateway-presence-routing.md)。
+在线状态和连接元数据通过 Redis presence 层保存为短期运行状态，设计见 [`docs/design-docs/redis-presence.md`](./docs/design-docs/redis-presence.md)。第一阶段已提供独立入口 `cmd/gateway-ws`，通过 `GET /ws` 建立 WebSocket 连接；Handshake 使用与 HTTP API 一致的 JWT 配置，优先支持 `Authorization: Bearer <token>`，`token` query param 仅在 `GatewayWS.AllowQueryToken=true` 时启用；浏览器 `Origin` 由 `GatewayWS.AllowedOrigins` 精确匹配，未配置时只允许 same-origin。连接通过内存 connection manager 按 `user_id`（account id alias）注册多端 `connection_id`，并同步写入 `PresenceStore`。Gateway command router 支持 `heartbeat`、`send_message`、`pull_messages`、`get_conversation_seqs`、`mark_conversation_read`，并调用现有 Message Service 业务逻辑/仓储契约完成消息写入、拉取、seq 查询和已读推进；heartbeat 和 WebSocket pong 会刷新 presence/last-seen，服务端按配置发送 ping 并按连接执行命令限流。Frontend reconnect sync 使用稳定 WebSocket ACK error envelope，并通过 `get_conversation_seqs`、`pull_messages`、`mark_conversation_read` 补偿缺失消息，产品契约见 [`docs/product-specs/frontend-sync-contract.md`](./docs/product-specs/frontend-sync-contract.md)，设计见 [`docs/design-docs/websocket-reconnect-sync.md`](./docs/design-docs/websocket-reconnect-sync.md)。Gateway push delivery 第一阶段提供 `internal/gateway/delivery.Dispatcher` 契约和本进程内 WebSocket fanout，可向在线连接主动下发 `message_received` / `message_delivered` event；delivery dispatcher 会先查询 presence route metadata，再执行本进程内 fanout，offline/routed/failed recipient 均返回明确状态。Gateway 不拥有消息历史、会话 seq 或已读状态；这些数据仍由 Message Service 和 PostgreSQL 权威维护。后续 Message Transfer worker 将消费 outbox/Kafka 事件并调用 dispatcher，Redis Presence route metadata 用于跨实例路由，delivery ACK 留给后续链路补齐。设计见 [`docs/design-docs/websocket-gateway.md`](./docs/design-docs/websocket-gateway.md)、[`docs/design-docs/gateway-push-delivery.md`](./docs/design-docs/gateway-push-delivery.md) 和 [`docs/design-docs/gateway-presence-routing.md`](./docs/design-docs/gateway-presence-routing.md)。
 
 ### Agent Service
 
 负责 Agent 生命周期、配置组装、运行时能力和工具调用审计。第一版设计见 [`docs/product-specs/agent-system.md`](./docs/product-specs/agent-system.md)、[`docs/design-docs/agent-system-architecture.md`](./docs/design-docs/agent-system-architecture.md) 和 [`docs/exec-plans/active/agent-system-v0.md`](./docs/exec-plans/active/agent-system-v0.md)。核心能力包括：
 
-- 在账号系统中配合 `normal` / `agent` / `admin` 账号类型，让 Agent 账号作为 IM 会话成员参与单聊和群聊。
-- 当前 `feature/agent-core-management` 提供 `cmd/agent-api` 和 `api/agent.api` 的 Agent profile 管理基础，配置单独持久化到 `agents` 表；由于本分支尚未合入 `users.account_type`，创建 Agent 使用 fail-closed 的账号类型检查接口，不能验证 `account_type=agent` 时必须失败。
+- 在账号系统中配合 `user` / `agent` / `admin` 账号类型，让 Agent 账号作为 IM 会话成员参与单聊和群聊。
+- 当前 `cmd/agent-api` 和 `api/agent.api` 提供 Agent profile 管理基础，配置单独持久化到 `agents` 表；创建 Agent 必须通过 Account Service 资料能力验证绑定账号为 `account_type=agent`，验证不可用时必须失败。
 - 管理系统提示词、工具、Agent skills 和 Agent 配置，并将元数据持久化在 PostgreSQL。
 - 使用系统提示词、工具和 skills 组装 Agent runtime。
 - 通过 MinIO/S3-compatible object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。
@@ -104,7 +104,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 ### Storage Layer
 
-- PostgreSQL：持久化用户、会话、消息、Agent 配置、工具调用记录等核心数据。
+- PostgreSQL：持久化账号资料（V0 存储表名仍为 `users`）、会话、消息、Agent 配置、工具调用记录等核心数据。
 - Redis：缓存会话状态、在线状态、幂等键、热点数据和短期运行状态。Presence 场景中 Redis 只保存连接 hash、用户连接集合和短期 online marker；丢失后由 Gateway 连接重建，不作为持久业务数据权威。
 
 ### Observability Stack
@@ -135,7 +135,7 @@ Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trac
 ### 用户发送消息
 
 1. 客户端通过 WebSocket 发送 `send_message` command。
-2. Gateway 校验连接 JWT 身份，并把 token `user_id` 注入消息发送请求。
+2. Gateway 校验连接 JWT 身份，并把 token `user_id`（account id alias）注入消息发送请求。
 3. Message Service 写入消息，生成 `server_msg_id` 和会话内递增 `seq`。
 4. Message Service 在同一 PostgreSQL transaction 内写入 `message_outbox` 的 `message.created` 事件。
 5. Gateway 返回 command ACK。第一阶段 ACK 只表示消息业务命令完成，不表示收件端在线送达。

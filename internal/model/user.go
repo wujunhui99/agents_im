@@ -8,10 +8,16 @@ import (
 type AccountType string
 
 const (
-	AccountTypeNormal AccountType = "normal"
-	AccountTypeAgent  AccountType = "agent"
-	AccountTypeAdmin  AccountType = "admin"
+	AccountTypeUser  AccountType = "user"
+	AccountTypeAgent AccountType = "agent"
+	AccountTypeAdmin AccountType = "admin"
+
+	// AccountTypeNormal is a temporary V0 compatibility alias for older code and
+	// persisted rows that used "normal" before the domain moved to Account.
+	AccountTypeNormal AccountType = AccountTypeUser
 )
+
+type Account = User
 
 type User struct {
 	UserID      string
@@ -31,19 +37,24 @@ func (u User) Clone() User {
 }
 
 func NormalizeAccountType(value string) (AccountType, bool) {
-	normalized := AccountType(strings.ToLower(strings.TrimSpace(value)))
-	if normalized == "" {
-		return AccountTypeNormal, true
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch AccountType(normalized) {
+	case "", AccountTypeUser:
+		return AccountTypeUser, true
+	case "normal":
+		return AccountTypeUser, true
+	case AccountTypeAgent:
+		return AccountTypeAgent, true
+	case AccountTypeAdmin:
+		return AccountTypeAdmin, true
+	default:
+		return "", false
 	}
-	if normalized.IsValid() {
-		return normalized, true
-	}
-	return "", false
 }
 
 func (t AccountType) IsValid() bool {
 	switch t {
-	case AccountTypeNormal, AccountTypeAgent, AccountTypeAdmin:
+	case AccountTypeUser, AccountTypeAgent, AccountTypeAdmin:
 		return true
 	default:
 		return false

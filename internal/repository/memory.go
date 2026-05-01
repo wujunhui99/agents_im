@@ -38,7 +38,7 @@ func (r *MemoryRepository) Create(_ context.Context, user model.User) (model.Use
 	}
 	accountType, ok := model.NormalizeAccountType(string(user.AccountType))
 	if !ok {
-		return model.User{}, apperror.InvalidArgument("account_type must be normal, agent, or admin")
+		return model.User{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
 	}
 	user.AccountType = accountType
 

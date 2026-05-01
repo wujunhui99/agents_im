@@ -28,15 +28,15 @@
 
 | 类型 | 含义 | 是否可普通登录 | 是否可作为消息成员 | 说明 |
 | --- | --- | --- | --- | --- |
-| `normal` | 普通用户账号 | 是 | 是 | 当前注册用户的默认类型。 |
+| `user` | human user 账号 | 是 | 是 | 当前公开注册账号的默认类型；这里的 `user` 是 account type，不是服务名。 |
 | `agent` | Agent 虚拟账号 | 默认否 | 是 | 用于让 Agent 在 IM 中像成员一样参与单聊/群聊。 |
 | `admin` | 管理员账号 | 是 | 是 | 可管理 prompts、tools、skills、agents 和运行策略。 |
 
 产品约束：
 
-- `user` 服务仍只负责账号资料，不管理密码、Agent 配置或工具配置。
+- Account Service 仍只负责账号资料，不管理密码、Agent 配置或工具配置。
 - `auth` 服务继续负责认证秘密；Agent 账号默认不通过账号密码登录，除非后续明确支持内部凭证或 owner 代理操作。
-- Agent 的 IM 展示身份来自 `users`，详细 Agent 配置来自 `agents`。
+- Agent 的 IM 展示身份来自 Account Service（V0 storage 表名仍为 `users`），详细 Agent 配置来自 `agents`。
 - 普通用户是否能搜索、添加或邀请 Agent，需要由 Agent 的发布状态和可见性策略控制。
 
 ## 核心对象
@@ -101,7 +101,7 @@ Agent 是由 profile、系统提示词、工具、skills、模型配置和运行
 
 当前 Agent profile 管理 REST 契约见 [`../../api/agent.api`](../../api/agent.api)，覆盖：
 
-- `POST /agents`：创建 Agent profile，绑定已有 IM 用户；
+- `POST /agents`：创建 Agent profile，绑定已有 IM account；
 - `GET /agents`：按 `status`、`created_by` 可选过滤列表；
 - `GET /agents/:agent_id`：查询 Agent profile；
 - `PATCH /agents/:agent_id`：更新名称和描述；
@@ -111,7 +111,7 @@ Agent 是由 profile、系统提示词、工具、skills、模型配置和运行
 约束：
 
 - Agent 配置只写入 `agents` 表，不写入 `users` 表。
-- 创建 Agent 必须绑定 `account_type=agent` 的现有 IM 用户。
+- 创建 Agent 必须绑定 `account_type=agent` 的现有 IM account。
 - 生产 wiring 必须使用真实 `UserAccountTypeChecker` 验证账号类型；无法验证账号类型时创建必须失败，不能静默创建假用户或假 Agent。
 
 ### Model Provider Config
