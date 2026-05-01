@@ -270,7 +270,6 @@ for update
 		if _, err := session.ExecCtx(ctx, `
 update user_conversation_states
 set has_read_seq = greatest(has_read_seq, $3),
-    last_visible_seq = greatest(last_visible_seq, $3),
     updated_at = now()
 where user_id = $1 and conversation_id = $2
 `, userID, conversationID, seq); err != nil {
