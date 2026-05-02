@@ -11,7 +11,8 @@ Account Service 是账号资料的权威边界。Account 可代表 human user、
 - 领域与服务名使用 Account Service。
 - `account_type` 支持 `user`、`agent`、`admin`；旧 `normal` 仅作为迁移输入兼容并归一化为 `user`。
 - Public JSON/RPC 字段 `user_id` 是 account id alias，第一阶段不批量改名。
-- PostgreSQL `users` 表作为 V0 storage compatibility 保留，逻辑语义是 account profiles。
+- PostgreSQL source-of-truth 表为 `accounts` 与 `profiles`，不再使用 `users` 表保存资料。
+- Account/Agent ID 均由 Snowflake 算法生成，为无前缀数字字符串。
 
 ## 服务组成
 
@@ -78,16 +79,23 @@ tests/user_service_test.go
 
 ## 数据模型
 
-`Account` profile 字段（当前 Go/Proto V0 类型名仍为 `User`）：
+Account identity 字段：
 
-- `UserID string`：V0 字段名，语义是 account id。
+- `AccountID string`：Snowflake account id，无前缀数字字符串。
 - `Identifier string`
+- `AccountType string`
+- `AccountCreatedAt time.Time`
+- `AccountUpdatedAt time.Time`
+
+Profile 字段（当前 Go/Proto V0 类型名仍为 `User`）：
+
+- `UserID string`：V0 字段名，语义是 account id alias。
 - `DisplayName string`
 - `Name string`
 - `Gender string`
 - `Age int32`
 - `Region string`
-- `AccountType string`
+- `AvatarMediaID string`
 - `CreatedAt time.Time`
 - `UpdatedAt time.Time`
 
@@ -98,7 +106,7 @@ tests/user_service_test.go
 - `Age` 为 `0` 表示未设置；设置时范围为 `1..150`。
 - `AccountType` 只允许空值、`user`、`agent`、`admin`；空值在 logic 和 repository 层统一归一化为 `user`。
 - 旧 `normal` 输入只为 V0 迁移兼容保留，写入/返回统一为 `user`。
-- `UserID` 由 repository 生成，内存实现使用递增 ID；字段名是 V0 account id alias。
+- `UserID` / `AccountID` 由 repository 通过 Snowflake 生成；`UserID` 是 V0 account id alias。
 
 禁止字段：
 
@@ -179,6 +187,6 @@ go run ./cmd/user-rpc -f etc/user-rpc.yaml
 ## 后续演进
 
 - 评估新增一等 `account.api` / `account.proto`，或继续使用 V0 user transport 名称。
-- 将 `users` 表迁移到 `accounts` 或 view-backed compatibility 层，增加独立迁移计划和唯一索引校验。
+- 评估是否需要只读 `users` compatibility view；默认新代码直接使用 `accounts` / `profiles`。
 - 为 `auth` 注册流程增加幂等创建、补偿或 outbox 设计。
 - 接入 gateway 长连接鉴权、trace_id 透传和结构化日志。

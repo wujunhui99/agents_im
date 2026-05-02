@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -28,6 +29,7 @@ func TestAccountTypeDefaultsAndExplicitInternalCreate(t *testing.T) {
 	if userAccount.AccountType != string(model.AccountTypeUser) {
 		t.Fatalf("default account_type = %q, want %q", userAccount.AccountType, model.AccountTypeUser)
 	}
+	assertNumericSnowflakeID(t, userAccount.UserID)
 
 	legacyNormal, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
 		Identifier:  "legacy_normal_001",
@@ -50,6 +52,7 @@ func TestAccountTypeDefaultsAndExplicitInternalCreate(t *testing.T) {
 	if agent.AccountType != string(model.AccountTypeAgent) {
 		t.Fatalf("agent account_type = %q, want %q", agent.AccountType, model.AccountTypeAgent)
 	}
+	assertNumericSnowflakeID(t, agent.UserID)
 
 	admin, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
 		Identifier:  "admin_001",
@@ -75,6 +78,21 @@ func TestAccountTypeDefaultsAndExplicitInternalCreate(t *testing.T) {
 	}
 }
 
+func TestAccountLogicCreateAccountUsesNumericSnowflakeID(t *testing.T) {
+	accountLogic := logic.NewAccountLogic(repository.NewMemoryRepository())
+	ctx := context.Background()
+
+	account, err := accountLogic.CreateAccount(ctx, logic.CreateAccountRequest{
+		Identifier:  "account_numeric_001",
+		DisplayName: "Numeric Account",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	assertNumericSnowflakeID(t, account.UserID)
+}
+
 func TestMemoryRepositoryAccountTypeSemantics(t *testing.T) {
 	repo := repository.NewMemoryRepository()
 	ctx := context.Background()
@@ -91,6 +109,7 @@ func TestMemoryRepositoryAccountTypeSemantics(t *testing.T) {
 	if defaultUser.AccountType != model.AccountTypeUser {
 		t.Fatalf("repository default account_type = %q, want %q", defaultUser.AccountType, model.AccountTypeUser)
 	}
+	assertNumericSnowflakeID(t, defaultUser.UserID)
 
 	explicitAgent, err := repo.Create(ctx, model.User{
 		Identifier:  "repo_agent",
@@ -105,6 +124,7 @@ func TestMemoryRepositoryAccountTypeSemantics(t *testing.T) {
 	if explicitAgent.AccountType != model.AccountTypeAgent {
 		t.Fatalf("repository explicit account_type = %q, want %q", explicitAgent.AccountType, model.AccountTypeAgent)
 	}
+	assertNumericSnowflakeID(t, explicitAgent.UserID)
 
 	_, err = repo.Create(ctx, model.User{
 		Identifier:  "repo_invalid",
@@ -169,5 +189,23 @@ func TestUserRPCAccountTypeContract(t *testing.T) {
 	user := &userpb.User{AccountType: string(model.AccountTypeAdmin)}
 	if user.GetAccountType() != string(model.AccountTypeAdmin) {
 		t.Fatalf("rpc user account_type = %q, want %q", user.GetAccountType(), model.AccountTypeAdmin)
+	}
+}
+
+func assertNumericSnowflakeID(t *testing.T, id string) {
+	t.Helper()
+
+	if strings.HasPrefix(id, "usr_") || strings.HasPrefix(id, "agt_") || strings.HasPrefix(id, "grp_") {
+		t.Fatalf("id %q must not use legacy prefixes", id)
+	}
+	if len(id) < 15 || len(id) > 20 {
+		t.Fatalf("id %q length = %d, want Snowflake numeric string length 15..20", id, len(id))
+	}
+	parsed, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		t.Fatalf("id %q is not a numeric Snowflake string: %v", id, err)
+	}
+	if parsed == 0 {
+		t.Fatalf("id %q must be non-zero", id)
 	}
 }

@@ -2,7 +2,7 @@ syntax = "v1"
 
 info (
 	title:   "Account API"
-	desc:    "Account profile service HTTP API; V0 keeps /users compatibility and exposes /accounts aliases."
+	desc:    "Account profile service HTTP API; account IDs are Snowflake numeric strings and V0 keeps /users/user_id aliases."
 	author:  "Codex"
 	version: "v0.1.0"
 )

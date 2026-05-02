@@ -32,6 +32,7 @@ func NewAccountLogic(repo repository.AccountRepository) *AccountLogic {
 }
 
 type UserProfile struct {
+	AccountID     string `json:"account_id"`
 	UserID        string `json:"user_id"`
 	Identifier    string `json:"identifier"`
 	DisplayName   string `json:"display_name"`
@@ -364,7 +365,9 @@ func normalizeRegion(region string) (string, error) {
 }
 
 func toProfile(user model.User) UserProfile {
+	user = user.Clone()
 	return UserProfile{
+		AccountID:     user.AccountID,
 		UserID:        user.UserID,
 		Identifier:    user.Identifier,
 		DisplayName:   user.DisplayName,
