@@ -1,8 +1,8 @@
 syntax = "v1"
 
 info (
-	title:   "User API"
-	desc:    "User profile service HTTP API"
+	title:   "Account API"
+	desc:    "Account profile service HTTP API; V0 keeps /users compatibility and exposes /accounts aliases."
 	author:  "Codex"
 	version: "v0.1.0"
 )
@@ -94,9 +94,18 @@ service user-api {
 	@handler createUser
 	post /users (CreateUserReq) returns (UserResp)
 
+	@handler createAccount
+	post /accounts (CreateUserReq) returns (UserResp)
+
 	@handler existsUser
 	get /users/exists (ExistsReq) returns (ExistsResp)
 
+	@handler existsAccount
+	get /accounts/exists (ExistsReq) returns (ExistsResp)
+
 	@handler getUserByIdentifier
 	get /users/:identifier (GetUserByIdentifierReq) returns (UserResp)
+
+	@handler getAccountByIdentifier
+	get /accounts/:identifier (GetUserByIdentifierReq) returns (UserResp)
 }

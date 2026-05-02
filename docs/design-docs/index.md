@@ -7,9 +7,10 @@
 - [core-beliefs.md](./core-beliefs.md)：Agent-first 工程核心理念
 - [system-boundaries.md](./system-boundaries.md)：IM 后端、Agent 系统、前端系统职责与边界
 - [im-agent-contract.md](./im-agent-contract.md)：IM 与 Agent 第一阶段 API/Event Contract
-- [user-auth-friends-groups-boundaries.md](./user-auth-friends-groups-boundaries.md)：User/Auth/Friends/Groups 微服务边界
+- [account-service-terminology.md](./account-service-terminology.md)：Account Service 术语、account_type 和 V0 compatibility
+- [user-auth-friends-groups-boundaries.md](./user-auth-friends-groups-boundaries.md)：Account/Auth/Friends/Groups 微服务边界
 - [jwt-auth-middleware.md](./jwt-auth-middleware.md)：统一 JWT 鉴权中间件与 context user 规则
-- [user-service-go-zero.md](./user-service-go-zero.md)：User Service go-zero 实现设计
+- [user-service-go-zero.md](./user-service-go-zero.md)：Account Service go-zero 实现设计
 - [message-chain-contract.md](./message-chain-contract.md)：消息链路接口契约与 OpenIM 借鉴设计
 - [kafka-message-events.md](./kafka-message-events.md)：Kafka-compatible Redpanda 消息事件 topic、schema、producer abstraction 与投递语义
 - [kafka-transfer-consumer.md](./kafka-transfer-consumer.md)：Message Transfer worker 的 Kafka/Redpanda consumer、event mapping 和 offset commit 语义

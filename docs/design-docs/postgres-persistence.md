@@ -57,9 +57,9 @@ Strong foreign keys are only used inside a service-owned aggregate:
 
 Cross-service references are logical constraints:
 
-- `auth_credentials.user_id` references a user created through the auth/user registration flow, but has no database FK to `users`.
-- `friendships.user_id` and `friendships.friend_id` are validated by the friends logic through user lookup.
-- `groups.creator_user_id` and `group_members.user_id` are validated by groups logic through user lookup.
+- `auth_credentials.user_id` references an account created through the auth/Account Service registration flow, but has no database FK to V0 `users`.
+- `friendships.user_id` and `friendships.friend_id` are account id aliases validated by the friends logic through Account Service lookup.
+- `groups.creator_user_id` and `group_members.user_id` are account id aliases validated by groups logic through Account Service lookup.
 - Message sender/receiver/member IDs are validated before repository writes when validators are configured.
 
 This keeps the database usable during microservice extraction and avoids coupling service ownership through cross-service FK cascades.

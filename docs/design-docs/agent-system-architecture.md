@@ -12,7 +12,7 @@ Agent 系统应作为独立能力域开发，并通过 IM 后端事件和 Messag
 
 ```text
 IM Backend
-  ├── User/Auth: normal / agent / admin account type
+  ├── Account/Auth: user / agent / admin account type
   ├── Message Service: authoritative message writes
   ├── Outbox/Kafka/Webhook: message.created events
   └── Gateway: WebSocket delivery
@@ -34,10 +34,10 @@ Storage
 
 ## 服务边界
 
-### User/Auth 扩展
+### Account/Auth 扩展
 
-- `users` 增加 `account_type`，支持 `normal`、`agent`、`admin`。
-- `user` 仍只负责账号资料，不保存 Agent prompt、tool 或 skill 配置。
+- Account Service 增加 `account_type`，支持 `user`、`agent`、`admin`。V0 storage 表名仍为 `users`。
+- Account Service 仍只负责账号资料，不保存 Agent prompt、tool 或 skill 配置。
 - `auth` 仍只负责认证秘密。Agent 账号默认不提供普通账号密码登录。
 
 ### Agent Management
@@ -59,7 +59,7 @@ Storage
 - 仓储契约：`internal/repository/agent_repository.go`，默认测试仓储：`internal/repository/agent_memory.go`，PostgreSQL 仓储：`internal/repository/postgres_agent.go`。
 - PostgreSQL schema：`db/migrations/002_agent_management.sql`。
 
-创建 Agent 时，业务逻辑先调用窄接口 `UserAccountTypeChecker` 验证绑定用户为 `account_type=agent`，再写入 `agents` 表。当前账号类型持久化尚未在本分支合入，真实 `agent-api` wiring 使用 fail-closed checker，无法验证时返回明确错误；测试只能通过显式测试 fixture checker 验证成功路径。此设计避免在 `users` 表中塞入 Agent 配置，也避免用假用户或静默 fallback 冒充账号类型能力。
+创建 Agent 时，业务逻辑先调用窄接口 `UserAccountTypeChecker` 验证绑定账号为 `account_type=agent`，再写入 `agents` 表。当前 `agent-api` wiring 使用真实 Account Service profile repository 校验账号类型；无法验证时必须返回明确错误。此设计避免在 `users` 表中塞入 Agent 配置，也避免用假账号或静默 fallback 冒充账号类型能力。
 
 ### Prompt Management
 
@@ -463,7 +463,7 @@ requested tool permission level
 
 第一版默认策略：
 
-- `normal` 用户不能管理全局工具和 MCP server。
+- `user` 类型账号不能管理全局工具和 MCP server。
 - `admin` 可以管理 prompt/tool/skill/agent。
 - Agent 只能调用已绑定工具。
 - Agent 绑定 skill 后可读取 skill 文件。

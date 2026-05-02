@@ -27,7 +27,7 @@ func main() {
 
 	repo, err := repository.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {
-		log.Fatalf("build user repository: %v", err)
+		log.Fatalf("build account repository: %v", err)
 	}
 	mediaRepo, err := repository.NewMediaRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {

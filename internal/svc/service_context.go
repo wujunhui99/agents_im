@@ -9,6 +9,7 @@ import (
 
 type ServiceContext struct {
 	Auth            config.JWTAuthConfig
+	AccountLogic    *logic.AccountLogic
 	UserLogic       *logic.UserLogic
 	FriendsLogic    *logic.FriendsLogic
 	GroupsLogic     *logic.GroupsLogic
@@ -40,6 +41,7 @@ func NewServiceContextWithAuth(repo repository.Repository, auth config.JWTAuthCo
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{
 		Auth:            normalizeAuthConfig(auth),
+		AccountLogic:    userLogic,
 		UserLogic:       userLogic,
 		FriendsLogic:    logic.NewFriendsLogic(repo, userLogic),
 		MessageLogic:    logic.NewMessageLogicWithMediaValidator(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil, mediaLogic),

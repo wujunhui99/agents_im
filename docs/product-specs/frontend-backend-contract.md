@@ -29,6 +29,7 @@ This document is the MVP frontend handoff for the Go backend. It describes the f
 - Common REST error codes are `INVALID_ARGUMENT`, `UNAUTHENTICATED`, `NOT_FOUND`, `ALREADY_EXISTS`, and `INTERNAL`.
 - REST field names are snake_case for account/social services and camelCase for message payloads. Frontend adapters should preserve the field names shown below.
 - Example passwords and tokens are redacted. Do not commit real credentials.
+- Account is the identity/profile domain. V0 public fields named `user_id` are account id aliases and are intentionally preserved for frontend compatibility.
 
 ## Auth
 
@@ -94,7 +95,7 @@ Content-Type: application/json
 }
 ```
 
-## Profile And User Search
+## Profile And Account Search
 
 ### Current User
 
@@ -115,7 +116,7 @@ Authorization: Bearer <access_token>
     "gender": "female",
     "age": 30,
     "region": "Shanghai",
-    "account_type": "normal",
+    "account_type": "user",
     "avatar_media_id": "med_000001",
     "created_at": "2026-04-29T12:00:00Z",
     "updated_at": "2026-04-29T12:00:00Z"
@@ -123,7 +124,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-`account_type` is one of `normal`, `agent`, or `admin`. Public registration and public user creation always create `normal`; clients cannot self-select `agent` or `admin` through the frontend-visible REST API.
+`account_type` is one of `user`, `agent`, or `admin`. Public registration and public account creation always create `user`; clients cannot self-select `agent` or `admin` through the frontend-visible REST API. Legacy server data that still contains `normal` is normalized by the backend to `user`.
 
 ### Update Current User
 
@@ -164,13 +165,25 @@ The media object must belong to the current user, have `purpose=avatar`, `status
 GET /users/exists?identifier=alice_001
 ```
 
+Account alias:
+
+```http
+GET /accounts/exists?identifier=alice_001
+```
+
 ### Public Profile By Identifier
 
 ```http
 GET /users/alice_001
 ```
 
-This is the current MVP user search path.
+This is the current MVP user search path. The account alias is:
+
+```http
+GET /accounts/alice_001
+```
+
+`POST /accounts` is also accepted as an alias of `POST /users` for internal/profile creation flows. Existing frontend code may continue using `/users/*` and `user_id`.
 
 ### Current Gap
 
@@ -179,6 +192,7 @@ A frontend-visible `GET /users/id/:user_id` public-profile endpoint is not prese
 ## Friends
 
 Friendship is immediately accepted in MVP. Duplicate add is idempotent, self-add returns `INVALID_ARGUMENT`, and non-existent users return `NOT_FOUND`.
+`user_id` and `friend_id` are account id aliases.
 
 ### Add Friend
 
@@ -239,6 +253,7 @@ Authorization: Bearer <access_token>
 
 The group creator is automatically an active member. Groups are open join in MVP.
 Group detail and member-list reads require a bearer token and only active members can read them. Adding a different user requires the group creator/owner.
+`creator_user_id`, `operator_user_id`, and member `user_id` are account id aliases.
 
 ### Create Group
 

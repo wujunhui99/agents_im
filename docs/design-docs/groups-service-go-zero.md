@@ -14,7 +14,7 @@
 
 - 管理群聊基础信息与群成员关系。
 - 提供内部服务依赖的 RPC 能力。
-- 调用或依赖 user-rpc 语义做成员存在性校验。
+- 调用或依赖 V0 user-rpc 语义做成员账号存在性校验。
 - 供 IM Core 后续查询群与成员关系。
 
 RPC 方法：
@@ -31,7 +31,7 @@ RPC 方法：
 职责：
 
 - 对外提供 HTTP 接口。
-- 从 JWT context `user_id` 读取当前用户身份。
+- 从 JWT context `user_id` 读取当前 account id。
 - 调用 groups logic 完成群和成员关系读写。
 
 HTTP 接口：
