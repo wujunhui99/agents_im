@@ -4,7 +4,7 @@
 
 ## 背景
 
-IM 系统需要将账号资料、认证、好友关系和群聊关系拆分为独立微服务，避免单个 IM Core Service 承担过多职责。产品语义已经从 `user service` 收敛为 **Account Service**：Account 是身份与资料主体，可代表 human user、agent、admin，未来可扩展 service/official accounts。历史 `user` path、`user_id` 字段和 `users` 表在第一阶段仅作为 V0 compatibility 保留。
+IM 系统需要将账号资料、认证、好友关系和群聊关系拆分为独立微服务，避免单个 IM Core Service 承担过多职责。产品语义已经从 `user service` 收敛为 **Account Service**：Account 是身份与资料主体，可代表 human user、agent、admin，未来可扩展 service/official accounts。历史 `user` path 和 `user_id` 字段在第一阶段仅作为 V0 public compatibility 保留；PostgreSQL 存储使用 `accounts` + `profiles`。
 
 ## 目标
 
@@ -40,7 +40,7 @@ V0 compatibility：
 
 - 当前 public REST 继续保留 `/users/*`，并提供 `/accounts/*` aliases。
 - 当前 JSON/RPC 字段 `user_id` 是 account id alias。
-- 当前 PostgreSQL `users` 表保留为账号资料存储兼容层。
+- 当前 PostgreSQL `accounts` 表保存身份与账号类型，`profiles` 表保存 human user、agent、admin 的资料和头像引用。
 
 边界：
 

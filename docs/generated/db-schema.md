@@ -6,11 +6,12 @@
 
 ## 当前状态
 
-第一阶段 PostgreSQL migration 已覆盖账号资料、认证、好友、群聊、消息、outbox、delivery attempt、Agent profile 管理表、Agent prompt/tool/skill registry 元数据表和 Agent audit 表。`users.account_type` 支持 `user`、`agent`、`admin`，默认 `user`；`users` 表名是 V0 storage compatibility。
+第一阶段 PostgreSQL migration 已覆盖账号资料、认证、好友、群聊、消息、outbox、delivery attempt、Agent profile 管理表、Agent prompt/tool/skill registry 元数据表和 Agent audit 表。`accounts.account_type` 支持 `user`、`agent`、`admin`，默认 `user`；账号资料拆分为 `accounts` + `profiles`。
 
 ## 当前覆盖
 
-- users
+- accounts
+- profiles
 - auth_credentials
 - friendships
 - groups
@@ -54,9 +55,9 @@
 
 约束：
 
-- `im_user_id` 唯一，并引用 `users(user_id)`。
+- `im_user_id` 唯一，并引用 `accounts(account_id)`。
 - `status` 只能为 `draft`、`active`、`disabled`、`archived`。
-- Agent 配置独立于 `users` 表；`users` 只提供 IM 展示身份和账号类型来源。
+- Agent 配置独立于 `profiles` 表；`accounts` + `profiles` 提供 IM 展示身份和账号类型来源。
 
 ## 后续预期覆盖
 

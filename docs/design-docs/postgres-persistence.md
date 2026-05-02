@@ -14,7 +14,7 @@ Phase 1 previously used in-memory repositories for user, auth, friends, groups, 
 ## Goals
 
 - Provide local PostgreSQL through `docker-compose.yml`.
-- Store phase-1 user, auth credential, friendship, group, message, conversation, read-state, idempotency, outbox, and delivery-attempt data in PostgreSQL.
+- Store phase-1 account, profile, auth credential, friendship, group, message, conversation, read-state, idempotency, outbox, and delivery-attempt data in PostgreSQL.
 - Keep normal `go test ./...` independent from Docker/PostgreSQL.
 - Preserve existing domain repository interfaces.
 - Keep auth secrets owned by auth storage, not user/message storage.
@@ -32,7 +32,8 @@ Migration SQL lives under [`../../db/migrations/001_init_postgres.sql`](../../db
 
 Phase-1 tables:
 
-- `users`: user profile authority; contains no password, hash, salt, token, or credential fields.
+- `accounts`: account identity authority; contains `account_id`, `identifier`, and `account_type`, but no password, hash, salt, token, or credential fields.
+- `profiles`: profile authority for human users, agents, and admins; contains display/avatar/profile fields keyed by `account_id`.
 - `auth_credentials`: auth-owned credential row keyed by identifier; stores password hash, salt, and hash version.
 - `friendships`: directional friendship rows; repository writes reciprocal rows in one transaction.
 - `groups`: group metadata.
@@ -48,8 +49,14 @@ Phase-1 tables:
 
 ## Service Boundary Constraints
 
-Strong foreign keys are only used inside a service-owned aggregate:
+Strong foreign keys are used inside service-owned aggregates and on storage-local account profile references:
 
+- `profiles.account_id -> accounts.account_id`
+- `auth_credentials.user_id -> accounts.account_id`
+- `friendships.user_id / friendships.friend_id -> accounts.account_id`
+- `groups.creator_user_id -> accounts.account_id`
+- `group_members.user_id -> accounts.account_id`
+- `media_objects.owner_user_id -> accounts.account_id`
 - `group_members.group_id -> groups.group_id`
 - `messages.conversation_id -> conversation_threads.conversation_id`
 - `user_conversation_states.conversation_id -> conversation_threads.conversation_id`
@@ -57,14 +64,14 @@ Strong foreign keys are only used inside a service-owned aggregate:
 - `message_outbox.server_msg_id -> messages.server_msg_id`
 - `delivery_attempts.server_msg_id -> messages.server_msg_id`
 
-Cross-service references are logical constraints:
+Compatibility `user_id` columns keep account id alias semantics:
 
-- `auth_credentials.user_id` references an account created through the auth/Account Service registration flow, but has no database FK to V0 `users`.
-- `friendships.user_id` and `friendships.friend_id` are account id aliases validated by the friends logic through Account Service lookup.
-- `groups.creator_user_id` and `group_members.user_id` are account id aliases validated by groups logic through Account Service lookup.
+- `auth_credentials.user_id` is a V0 account id alias and references `accounts.account_id`.
+- `friendships.user_id` and `friendships.friend_id` are V0 account id aliases and reference `accounts.account_id`.
+- `groups.creator_user_id` and `group_members.user_id` are V0 account id aliases and reference `accounts.account_id`.
 - Message sender/receiver/member IDs are validated before repository writes when validators are configured.
 
-This keeps the database usable during microservice extraction and avoids coupling service ownership through cross-service FK cascades.
+Message tables still keep account ids as logical references because message repository contract tests create isolated message rows without provisioning account profiles.
 
 ## Configuration
 
@@ -144,7 +151,7 @@ Follow-up command after local PG is running and migrated:
 export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
 goctl model pg datasource \
   -url "$DATABASE_URL" \
-  -table "users,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys,message_outbox,delivery_attempts,agent_conversation_hosting,agent_trigger_idempotency" \
+  -table "accounts,profiles,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys,message_outbox,delivery_attempts,agent_conversation_hosting,agent_trigger_idempotency" \
   -dir ./internal/model/pg \
   --style go_zero
 ```

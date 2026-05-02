@@ -36,7 +36,7 @@
 
 范围：
 
-- `users.account_type` migration，默认 `user`；`users` 表名为 V0 storage compatibility。
+- `accounts.account_type` migration，默认 `user`；PostgreSQL 存储使用 `accounts` + `profiles`。
 - Go domain/model/repository/API/RPC 类型增加 account_type。
 - 创建 human user 账号默认 `user`。
 - 支持创建 Agent 用户时 account_type=`agent` 的内部能力。
@@ -68,7 +68,7 @@
 - `agents` 表：agent_id、im_user_id、name、description、status、created_by、prompt/tool/skill binding 引用字段或关系表。
 - Agent 必须绑定一个 account_type=`agent` 的 IM user。
 - 提供基础 CRUD/list/get/status。
-- 不允许 Agent 配置写入 `users` 表。
+- 不允许 Agent 配置写入 `accounts` / `profiles` 资料字段。
 
 不得做：LLM run、Python executor 实现、shell 执行。
 
@@ -81,7 +81,7 @@
 当前进展（2026-04-30）：
 
 - 已新增 `api/agent.api`、`cmd/agent-api`、`etc/agent-api.yaml`。
-- 已新增 `agents` 表迁移 `db/migrations/002_agent_management.sql`，Agent 配置与 `users` 表分离。
+- 已新增 `agents` 表迁移 `db/migrations/002_agent_management.sql`，Agent 配置与 Account profile 存储分离。
 - 已新增 Agent domain、logic、memory/PostgreSQL repository、go-zero handler/logic adapter。
 - 创建 Agent 通过 `UserAccountTypeChecker` 校验 `account_type=agent`；由于本分支尚未合入账号类型持久化，真实服务默认 fail closed，测试使用显式 test fixture checker。
 - 已覆盖 create/list/get/update/status/archive、非 agent 用户拒绝、缺失 checker 失败优先和 HTTP handler 测试。
