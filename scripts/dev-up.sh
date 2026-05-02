@@ -177,6 +177,18 @@ ${extra}
 YAML
 }
 
+write_auth_rpc_config() {
+  cat > "${CONFIG_DIR}/auth-rpc.yaml" <<YAML
+Name: auth-rpc
+ListenOn: 127.0.0.1:${AUTH_RPC_PORT:-9091}
+TokenAuth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: ${JWT_ACCESS_EXPIRE}
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
+YAML
+}
+
 write_configs() {
   mkdir -p "${CONFIG_DIR}"
   write_api_config "user-api" "${USER_API_PORT:-8080}" "ObjectStorage:
@@ -204,6 +216,7 @@ GatewayWS:
   CommandRateLimitBurst: ${GATEWAY_WS_COMMAND_RATE_LIMIT_BURST}"
   write_api_config "groups-api" "${GROUPS_API_PORT:-8085}"
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
+  write_auth_rpc_config
 }
 
 build_service() {

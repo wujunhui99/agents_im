@@ -1,5 +1,5 @@
 Name: groups-rpc
 ListenOn: 0.0.0.0:9103
 
-StorageDriver: postgresql
+StorageDriver: postgres
 DataSource: ${DATABASE_URL}

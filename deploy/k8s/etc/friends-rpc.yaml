@@ -1,5 +1,5 @@
 Name: friends-rpc
 ListenOn: 0.0.0.0:9092
 
-StorageDriver: postgresql
+StorageDriver: postgres
 DataSource: ${DATABASE_URL}
