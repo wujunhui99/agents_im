@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentType, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react';
 import { ChevronRight, Megaphone, Search, Tag, UserPlus, UsersRound } from 'lucide-react';
 import type { ContactsApi, Friendship } from '../api/contacts';
 import { createContactsApi } from '../api/contacts';
@@ -30,6 +30,7 @@ type ContactEntry = {
 type ContactsPageProps = {
   userApi?: UserApi;
   contactsApi?: ContactsApi;
+  onStartChat?: (profile: UserProfile) => void;
 };
 
 const contactEntries: ContactEntry[] = [
@@ -39,20 +40,59 @@ const contactEntries: ContactEntry[] = [
   { id: 'official', label: '公众号', helper: '系统通知与服务号暂未开放', accent: 'gray', icon: Megaphone, available: false },
 ];
 
-function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsApi() }: ContactsPageProps) {
-  const [friends, setFriends] = useState<Friend[]>([]);
-  const [friendStatus, setFriendStatus] = useState('点击刷新好友列表');
+let cachedFriends: Friend[] = [];
+
+function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsApi(), onStartChat }: ContactsPageProps) {
+  const [friends, setFriends] = useState<Friend[]>(() => cachedFriends);
+  const [friendStatus, setFriendStatus] = useState('正在加载好友列表');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFriends() {
+      setFriendStatus('正在加载好友列表');
+      try {
+        const response = await contactsApi.listFriends();
+        if (cancelled) {
+          return;
+        }
+        const nextFriends = response.friends.map(friendshipToFriend);
+        cachedFriends = nextFriends;
+        setFriends(nextFriends);
+        setFriendStatus(response.friends.length > 0 ? `已加载 ${response.friends.length} 位好友` : '暂无好友');
+      } catch (error) {
+        if (!cancelled) {
+          setFriendStatus(error instanceof Error ? error.message : '加载好友列表失败');
+        }
+      }
+    }
+
+    void loadFriends();
+    return () => {
+      cancelled = true;
+    };
+  }, [contactsApi]);
 
   async function refreshFriends() {
     setFriendStatus('正在加载好友列表');
-    const response = await contactsApi.listFriends();
-    setFriends(response.friends.map(friendshipToFriend));
-    setFriendStatus(response.friends.length > 0 ? `已加载 ${response.friends.length} 位好友` : '暂无好友');
+    try {
+      const response = await contactsApi.listFriends();
+      const nextFriends = response.friends.map(friendshipToFriend);
+      cachedFriends = nextFriends;
+      setFriends(nextFriends);
+      setFriendStatus(response.friends.length > 0 ? `已加载 ${response.friends.length} 位好友` : '暂无好友');
+    } catch (error) {
+      setFriendStatus(error instanceof Error ? error.message : '加载好友列表失败');
+    }
   }
 
   async function addFriend(profile: UserProfile) {
     await contactsApi.addFriend(profile.user_id);
-    setFriends((current) => upsertFriend(current, userProfileToFriend(profile)));
+    setFriends((current) => {
+      const nextFriends = upsertFriend(current, userProfileToFriend(profile));
+      cachedFriends = nextFriends;
+      return nextFriends;
+    });
     setFriendStatus(`已添加好友：${profile.identifier}`);
   }
 
@@ -74,7 +114,7 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
         <p className="inline-status" role="status">
           {friendStatus}
         </p>
-        <FriendDirectory friends={friends} />
+        <FriendDirectory friends={friends} onStartChat={onStartChat} />
       </section>
     </div>
   );
@@ -196,7 +236,7 @@ function ContactEntryButton({ entry }: { entry: ContactEntry }) {
   );
 }
 
-function FriendDirectory({ friends }: { friends: Friend[] }) {
+function FriendDirectory({ friends, onStartChat }: { friends: Friend[]; onStartChat?: (profile: UserProfile) => void }) {
   const groups = useMemo(() => groupFriends(friends), [friends]);
 
   if (friends.length === 0) {
@@ -215,6 +255,8 @@ function FriendDirectory({ friends }: { friends: Friend[] }) {
               <ListItem
                 className="friend-row"
                 key={friend.userId}
+                onClick={onStartChat ? () => onStartChat(friendToUserProfile(friend)) : undefined}
+                ariaLabel={`和 ${friend.identifier} 聊天`}
                 leading={<Avatar label={friend.avatar} color="blue" />}
                 headline={friend.name}
                 supportingText={
@@ -223,6 +265,7 @@ function FriendDirectory({ friends }: { friends: Friend[] }) {
                     <span>{friend.userId}</span>
                   </span>
                 }
+                trailing={<ChevronRight size={18} />}
               />
             ))}
           </Card>
@@ -251,6 +294,18 @@ function userProfileToFriend(profile: UserProfile): Friend {
     identifier: profile.identifier,
     initial: avatarText(name).slice(0, 1),
     avatar: avatarText(name),
+  };
+}
+
+function friendToUserProfile(friend: Friend): UserProfile {
+  return {
+    user_id: friend.userId,
+    identifier: friend.identifier,
+    display_name: friend.name,
+    name: friend.name,
+    gender: '',
+    age: 0,
+    region: '',
   };
 }
 

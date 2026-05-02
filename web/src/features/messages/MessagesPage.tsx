@@ -19,6 +19,8 @@ type MessagesPageProps = {
   messageApi?: MessageApi;
   userApi?: UserApi;
   startChatSignal?: number;
+  pendingChatProfile?: UserProfile | null;
+  onPendingChatConsumed?: () => void;
 };
 
 const statusLabels: Record<MessageStatus, string> = {
@@ -32,6 +34,8 @@ export function MessagesPage({
   messageApi = createMessageApi(),
   userApi = createUserApi(),
   startChatSignal = 0,
+  pendingChatProfile = null,
+  onPendingChatConsumed,
 }: MessagesPageProps) {
   const [items, setItems] = useState<Conversation[]>([]);
   const [status, setStatus] = useState('正在加载会话');
@@ -48,7 +52,7 @@ export function MessagesPage({
         const states = response.states ?? response.conversations ?? response.seqs ?? [];
         const conversations = await Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi)));
         if (!cancelled) {
-          setItems(conversations);
+          setItems((current) => mergeLoadedConversations(current, conversations));
           setStatus(conversations.length > 0 ? `已加载 ${conversations.length} 个会话` : '暂无会话');
         }
       } catch (error) {
@@ -70,6 +74,14 @@ export function MessagesPage({
       setSelectedConversationId(null);
     }
   }, [startChatSignal]);
+
+  useEffect(() => {
+    if (!pendingChatProfile) {
+      return;
+    }
+    handleStartChat(pendingChatProfile);
+    onPendingChatConsumed?.();
+  }, [pendingChatProfile, onPendingChatConsumed]);
 
   function handleStartChat(profile: UserProfile) {
     const draftConversation = userProfileToDraftConversation(profile);
@@ -410,6 +422,16 @@ function userProfileToDraftConversation(profile: UserProfile): Conversation {
     receiverId: profile.user_id,
     messages: [],
   };
+}
+
+function mergeLoadedConversations(current: Conversation[], loaded: Conversation[]) {
+  if (loaded.length === 0) {
+    return current;
+  }
+
+  const loadedIds = new Set(loaded.map((conversation) => conversation.id));
+  const preservedDrafts = current.filter((conversation) => !loadedIds.has(conversation.id) && conversation.id.startsWith('draft-'));
+  return [...loaded, ...preservedDrafts];
 }
 
 function upsertStartedConversation(conversations: Conversation[], existingConversationId: string | undefined, draftConversation: Conversation) {
