@@ -109,7 +109,7 @@ It uses real business logic and a real WebSocket gateway test server in one proc
 7. send `send_message` over WebSocket;
 8. assert Alice receives ACK and Bob receives live `message_received` push.
 
-This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, and Redpanda when the environment is clean.
+This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, Redpanda, and MinIO when the environment is clean.
 
 ### Local E2E Debug Notes
 
@@ -130,7 +130,7 @@ Environment note from the debug session: on one local machine, default ports `80
 
 | Service | URL |
 | --- | --- |
-| User API | `http://127.0.0.1:8080` |
+| Account API (V0 `user-api`) | `http://127.0.0.1:8080` |
 | Auth API | `http://127.0.0.1:8081` |
 | Friends API | `http://127.0.0.1:8082` |
 | Message API | `http://127.0.0.1:8083` |
@@ -140,12 +140,37 @@ Environment note from the debug session: on one local machine, default ports `80
 | PostgreSQL | `localhost:5432` |
 | Redis | `localhost:6379` |
 | Redpanda Kafka | `localhost:19092` |
+| MinIO API | `http://localhost:9000` |
+| MinIO Console | `http://localhost:9001` |
 
-`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share users, credentials, friendships, groups, Agent profiles, and message history. Agent creation still fails closed until the account-type checker is wired to a user service that can verify `account_type=agent`.
+`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and writes `ObjectStorage` config into the generated `user-api` config. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
+
+## Local Object Storage
+
+Local media uploads use MinIO/S3-compatible object storage. Development defaults are in `.env.example` using local-only placeholder credentials; do not reuse them outside development.
+
+```bash
+MINIO_ROOT_USER=agents_im_minio
+MINIO_ROOT_PASSWORD=agents...word
+MINIO_API_PORT=9000
+MINIO_CONSOLE_PORT=9001
+OBJECT_STORAGE_DRIVER=minio
+OBJECT_STORAGE_ENDPOINT=localhost:9000
+OBJECT_STORAGE_EXTERNAL_ENDPOINT=localhost:9000
+OBJECT_STORAGE_BUCKET=agents-im-media
+OBJECT_STORAGE_REGION=us-east-1
+OBJECT_STORAGE_USE_SSL=false
+OBJECT_STORAGE_ACCESS_KEY_ID=agents_im_minio
+OBJECT_STORAGE_SECRET_ACCESS_KEY=agents...word
+```
+
+The MinIO API is available at `http://localhost:9000`; the console is available at `http://localhost:9001`. The bucket is private and is created by `user-api` at startup. Unit tests use the explicit memory object store and do not require live MinIO.
+
+Message API responses include `messageOrigin=human|ai|system` and Agent metadata when present. Local dev does not enable a production LLM by default; Agent conversation hosting must be wired with an explicit runtime/provider config and otherwise fail closed instead of returning fake AI replies.
 
 ## Demo Data
 
-After `scripts/dev-up.sh` succeeds, seed two users, one friendship, one group, and one single-chat message:
+After `scripts/dev-up.sh` succeeds, seed two user-type accounts, one friendship, one group, and one single-chat message:
 
 ```bash
 scripts/dev-demo-data.sh
@@ -158,7 +183,7 @@ The script prints demo IDs and a conversation ID. It does not print tokens or pa
 When you only need database middleware:
 
 ```bash
-docker compose up -d postgres redis redpanda
+docker compose up -d postgres redis redpanda minio
 bash scripts/migrate-postgres.sh
 ```
 

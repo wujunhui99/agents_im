@@ -44,7 +44,7 @@ For `message.accepted`, it builds:
 delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{...})
 ```
 
-The message payload is copied from the transfer event fields: `server_msg_id`, `client_msg_id`, `conversation_id`, `seq`, `sender_id`, direct receiver, `chat_type`, `content_type`, `content`, `send_time`, `created_at`, and `trace_id`. `content_metadata` is shallow-cloned so Gateway callers cannot mutate the transfer event after dispatch.
+The message payload is copied from the transfer event fields: `server_msg_id`, `client_msg_id`, `conversation_id`, `seq`, `sender_id`, direct receiver, `chat_type`, `content_type`, `content`, `message_origin`, `agent_account_id`, `trigger_server_msg_id`, `agent_run_id`, `allow_recursive_trigger`, `send_time`, `created_at`, and `trace_id`. `content_metadata` is shallow-cloned so Gateway callers cannot mutate the transfer event after dispatch.
 
 Recipient resolution is intentionally narrow:
 

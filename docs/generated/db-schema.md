@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-第一阶段 PostgreSQL migration 已覆盖用户、认证、好友、群聊、消息、outbox、delivery attempt、Agent profile 管理表、Agent prompt/tool/skill registry 元数据表和 Agent audit 表。`users.account_type` 支持 `normal`、`agent`、`admin`，默认 `normal`。
+第一阶段 PostgreSQL migration 已覆盖账号资料、认证、好友、群聊、消息、outbox、delivery attempt、Agent profile 管理表、Agent prompt/tool/skill registry 元数据表和 Agent audit 表。`users.account_type` 支持 `user`、`agent`、`admin`，默认 `user`；`users` 表名是 V0 storage compatibility。
 
 ## 当前覆盖
 

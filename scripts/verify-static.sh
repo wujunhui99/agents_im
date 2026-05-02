@@ -7,6 +7,7 @@ required_files=(
   "api/friends.api"
   "api/groups.api"
   "api/message.api"
+  "api/media.api"
   ".github/workflows/ci.yml"
   ".github/markdown-link-check.json"
   ".ai-context/zero-skills/SKILL.md"
@@ -61,12 +62,20 @@ required_files=(
   "internal/logic/friendslogic.go"
   "internal/logic/groupslogic.go"
   "internal/logic/messagelogic.go"
+  "internal/logic/medialogic_test.go"
+  "internal/logic/message_media_test.go"
   "internal/logic/user/gozero_logic.go"
   "internal/logic/friends/gozero_logic.go"
   "internal/logic/groups/gozero_logic.go"
   "internal/logic/message/gozero_logic.go"
+  "internal/logic/media/gozero_logic.go"
+  "internal/logic/medialogic.go"
   "internal/model/friendship.go"
   "internal/model/group.go"
+  "internal/model/media.go"
+  "internal/objectstorage/store.go"
+  "internal/objectstorage/minio.go"
+  "internal/objectstorage/memory.go"
   "internal/repository/memory.go"
   "internal/repository/postgres_common.go"
   "internal/repository/postgres_user_friends.go"
@@ -75,6 +84,9 @@ required_files=(
   "internal/repository/postgres_groups.go"
   "internal/repository/message_memory.go"
   "internal/repository/message_repository.go"
+  "internal/repository/media_repository.go"
+  "internal/repository/media_memory.go"
+  "internal/repository/postgres_media.go"
   "internal/repository/message_outbox_repository.go"
   "internal/repository/delivery_attempt_repository.go"
   "internal/repository/delivery_attempt_memory.go"
@@ -84,6 +96,10 @@ required_files=(
   "internal/repository/delivery_attempt_repository_test.go"
   "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
+  "internal/handler/media/create_upload_intent_handler.go"
+  "internal/handler/media/complete_upload_handler.go"
+  "internal/handler/media/get_download_url_handler.go"
+  "internal/handler/user/update_me_avatar_handler.go"
   "internal/health/health.go"
   "internal/health/health_test.go"
   "internal/observability/metrics.go"
@@ -158,6 +174,7 @@ required_files=(
   "docs/product-specs/frontend-sync-contract.md"
   "docs/product-specs/read-receipts.md"
   "docs/design-docs/user-service-go-zero.md"
+  "docs/design-docs/account-service-terminology.md"
   "docs/design-docs/auth-service-go-zero.md"
   "docs/design-docs/friends-service-go-zero.md"
   "docs/design-docs/groups-service-go-zero.md"
@@ -192,15 +209,24 @@ required_files=(
   "web/src/api/user.ts"
   "web/src/components/ui/ActionRow.tsx"
   "web/src/components/ui/Avatar.tsx"
+  "web/src/components/ui/Badge.tsx"
+  "web/src/components/ui/Button.tsx"
+  "web/src/components/ui/Card.tsx"
   "web/src/components/ui/ListCard.tsx"
+  "web/src/components/ui/ListItem.tsx"
+  "web/src/components/ui/MessageBubble.tsx"
+  "web/src/components/ui/NavigationBar.tsx"
   "web/src/components/ui/SearchBox.tsx"
   "web/src/components/ui/TabBar.tsx"
+  "web/src/components/ui/TextField.tsx"
   "web/src/components/ui/TopBar.tsx"
+  "web/src/components/ui/TopAppBar.tsx"
   "web/src/main.tsx"
   "web/src/components/ContactsPage.tsx"
   "web/src/pages/DiscoverPage.tsx"
   "web/src/pages/MePage.tsx"
   "web/src/features/messages/MessagesPage.tsx"
+  "web/src/styles/tokens.css"
   "web/src/styles.css"
   "web/src/vite-env.d.ts"
   "docs/design-docs/read-receipts.md"
@@ -231,8 +257,17 @@ required_files=(
   "docs/exec-plans/completed/gateway-push-delivery.md"
   "docs/exec-plans/completed/transfer-gateway-dispatcher.md"
   "docs/exec-plans/completed/gateway-presence-routing.md"
+  "docs/exec-plans/completed/account-service-terminology.md"
   "docs/exec-plans/active/agent-system-v0.md"
   "docs/exec-plans/active/agent-infrastructure-parallel-baseline.md"
+  "docs/design-docs/agent-conversation-hosting.md"
+  "docs/exec-plans/completed/agent-conversation-hosting.md"
+  "db/migrations/003_agent_conversation_hosting.sql"
+  "internal/agentim/hosting.go"
+  "internal/agentim/hosting_test.go"
+  "internal/repository/agent_hosting_repository.go"
+  "internal/repository/agent_hosting_memory.go"
+  "internal/repository/postgres_agent_hosting.go"
 )
 
 for file in "${required_files[@]}"; do
@@ -252,6 +287,46 @@ shell_scripts=(
 for script in "${shell_scripts[@]}"; do
   bash -n "$script"
 done
+
+frontend_material_doc_patterns=(
+  "Material 3-inspired 轻量设计系统"
+  "web/src/styles/tokens.css"
+  "Button"
+  "Card"
+  "TextField"
+  "TopAppBar"
+  "NavigationBar"
+  "ListItem"
+  "MessageBubble"
+  "消息 / 联系人 / 发现 / 我的"
+  '不依赖 `@material/web`、`@mui/*`'
+)
+
+for pattern in "${frontend_material_doc_patterns[@]}"; do
+  rg -qF "$pattern" docs/FRONTEND.md
+done
+
+frontend_material_token_patterns=(
+  "--md-sys-color-primary"
+  "--md-sys-color-surface-container"
+  "--md-shape-corner-small"
+  "--md-space-4"
+  "--md-elevation-level1"
+  "--md-state-hover-opacity"
+)
+
+for pattern in "${frontend_material_token_patterns[@]}"; do
+  rg -qF -- "$pattern" web/src/styles/tokens.css
+done
+
+rg -qF '@import "./styles/tokens.css";' web/src/styles.css
+rg -qF "createApiClient" web/src/App.tsx web/src/api/client.ts
+rg -qF "POST /messages" docs/FRONTEND.md docs/product-specs/frontend-backend-contract.md
+
+if rg -n "(@material/web|@mui/)" web/package.json web/package-lock.json web/src; then
+  echo "frontend must not introduce Material Web or MUI heavy dependencies" >&2
+  exit 1
+fi
 
 ci_workflow_patterns=(
   "actions/checkout"
@@ -345,8 +420,11 @@ api_patterns=(
   "get /me"
   "patch /me"
   "post /users"
+  "post /accounts"
   "get /users/exists"
+  "get /accounts/exists"
   "get /users/:identifier"
+  "get /accounts/:identifier"
 )
 
 for pattern in "${api_patterns[@]}"; do
@@ -397,14 +475,66 @@ for pattern in "${message_api_patterns[@]}"; do
   rg -q "$pattern" api/message.api
 done
 
+message_ordering_schema_patterns=(
+  "messages_conversation_seq_uniq"
+  "messages_sender_client_msg_uniq"
+  "message_idempotency_keys"
+  "conversation_threads"
+)
+
+for pattern in "${message_ordering_schema_patterns[@]}"; do
+  rg -q "$pattern" db/migrations/001_init_postgres.sql
+done
+
+message_ordering_code_patterns=(
+  "for update"
+  "existingMessageForIdempotency"
+  "orderedChatMessages"
+  "conversationHasInFlightSend"
+)
+
+for pattern in "${message_ordering_code_patterns[@]}"; do
+  rg -q "$pattern" internal/repository/postgres_message.go web/src/features/messages/MessagesPage.tsx
+done
+
+if rg -n "sort\\([^\\n]*sendTime|sendTime - .*sendTime|sendTime.* - .*sendTime" web/src/features/messages/MessagesPage.tsx; then
+  echo "message UI must not sort confirmed messages by sendTime" >&2
+  exit 1
+fi
+
+message_ordering_test_patterns=(
+  "concurrent same conversation sends allocate contiguous seqs"
+  "last message state follows max seq"
+  "renders shuffled server messages by authoritative seq"
+  "one in-flight send per conversation"
+)
+
+for pattern in "${message_ordering_test_patterns[@]}"; do
+  rg -q "$pattern" internal/repository/message_repository_contract_test.go web/src/features/messages/MessagesPage.test.tsx
+done
+
+message_ordering_doc_patterns=(
+  "conversation_id + seq"
+  "network arrival order"
+  "clientMsgId"
+  "gap"
+)
+
+for pattern in "${message_ordering_doc_patterns[@]}"; do
+  rg -qF "$pattern" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md docs/product-specs/frontend-backend-contract.md docs/RELIABILITY.md
+done
+
 frontend_contract_patterns=(
   "/auth/register"
   "/auth/login"
   "/me"
   "/users/exists"
+  "/accounts/exists"
   "/friends"
   "/groups"
   "/messages"
+  "/media/uploads"
+  "/me/avatar"
   "/ws"
   "send_message"
   "pull_messages"
@@ -422,7 +552,7 @@ done
 development_doc_patterns=(
   "scripts/dev-up.sh"
   "scripts/dev-demo-data.sh"
-  "docker compose up -d postgres redis redpanda"
+  "docker compose up -d postgres redis redpanda minio"
   "bash scripts/migrate-postgres.sh"
   "go test ./..."
 )
@@ -432,9 +562,10 @@ for pattern in "${development_doc_patterns[@]}"; do
 done
 
 dev_script_patterns=(
-  "docker compose up -d postgres redis redpanda"
+  "docker compose up -d postgres redis redpanda minio"
   "bash scripts/migrate-postgres.sh"
   "StorageDriver: postgres"
+  "ObjectStorage:"
   "gateway-ws"
 )
 
@@ -524,6 +655,79 @@ message_proto_patterns=(
 for pattern in "${message_proto_patterns[@]}"; do
   rg -q "$pattern" proto/message.proto
 done
+
+agent_conversation_hosting_contract_patterns=(
+  "message_origin"
+  "agent_account_id"
+  "trigger_server_msg_id"
+  "agent_run_id"
+  "allow_recursive_trigger"
+)
+
+for pattern in "${agent_conversation_hosting_contract_patterns[@]}"; do
+  rg -q "$pattern" proto/message.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go internal/messaging/event.go docs/design-docs/agent-conversation-hosting.md docs/design-docs/message-chain-contract.md docs/product-specs/message-chain.md
+done
+
+agent_conversation_hosting_camel_patterns=(
+  "messageOrigin"
+  "agentAccountId"
+  "triggerServerMsgId"
+  "agentRunId"
+  "allowRecursiveTrigger"
+)
+
+for pattern in "${agent_conversation_hosting_camel_patterns[@]}"; do
+  rg -q "$pattern" api/message.api internal/types/types.go web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx docs/product-specs/frontend-backend-contract.md
+done
+
+agent_conversation_hosting_code_patterns=(
+  "MessageCreatedHook"
+  "SetMessageCreatedHook"
+  "message.created:"
+  "NewConversationHostingService"
+  "OnMessageCreated"
+  "TryStartAgentTrigger"
+  "FinishAgentTrigger"
+  "agent_conversation_hosting"
+  "agent_trigger_idempotency"
+  "MessageServiceResponseWriter"
+  "SendMessage\\(ctx"
+)
+
+for pattern in "${agent_conversation_hosting_code_patterns[@]}"; do
+  rg -q "$pattern" internal/logic/messagelogic.go internal/agentim internal/repository db/migrations/003_agent_conversation_hosting.sql docs/design-docs/agent-conversation-hosting.md
+done
+
+agent_conversation_hosting_test_patterns=(
+  "TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates"
+  "SetMessageCreatedHook"
+  "AI/Agent"
+  "messageOrigin: 'ai'"
+  "deterministic-test"
+)
+
+for pattern in "${agent_conversation_hosting_test_patterns[@]}"; do
+  rg -q "$pattern" internal/agentim/hosting_test.go web/src/features/messages/MessagesPage.test.tsx
+done
+
+agent_conversation_hosting_doc_patterns=(
+  "message_origin=human|ai|system"
+  "MessageLogic.SendMessage"
+  "MessageCreatedHook"
+  "idempotency"
+  "allow_recursive_trigger"
+  "AI/Agent"
+  "fail closed"
+)
+
+for pattern in "${agent_conversation_hosting_doc_patterns[@]}"; do
+  rg -q "$pattern" docs/design-docs/agent-conversation-hosting.md docs/product-specs/agent-system.md docs/product-specs/agent-chat.md docs/product-specs/frontend-backend-contract.md docs/FRONTEND.md ARCHITECTURE.md docs/exec-plans/completed/agent-conversation-hosting.md
+done
+
+if rg -n "CreateMessageIdempotent|insert into messages|insertMessage" internal/agentim --glob '*.go'; then
+  echo "agentim must write responses through MessageLogic/Message Service, not message repository or direct DB insert" >&2
+  exit 1
+fi
 
 rpc_generated_dirs=(
   "internal/rpcgen/user"
@@ -1041,6 +1245,21 @@ for pattern in "${redpanda_compose_patterns[@]}"; do
   rg -q "$pattern" docker-compose.yml
 done
 
+minio_compose_patterns=(
+  "^  minio:"
+  "minio/minio"
+  "agents-im-minio"
+  "MINIO_ROOT_USER"
+  "MINIO_ROOT_PASSWORD"
+  "MINIO_API_PORT"
+  "MINIO_CONSOLE_PORT"
+  "agents_im_minio_data"
+)
+
+for pattern in "${minio_compose_patterns[@]}"; do
+  rg -q "$pattern" docker-compose.yml deploy/middleware/docker-compose.yml
+done
+
 redis_env_patterns=(
   "REDIS_ADDR"
   "REDIS_PASSWORD"
@@ -1064,6 +1283,25 @@ kafka_env_patterns=(
 
 for pattern in "${kafka_env_patterns[@]}"; do
   rg -q "$pattern" .env.example
+done
+
+object_storage_env_patterns=(
+  "MINIO_ROOT_USER"
+  "MINIO_ROOT_PASSWORD"
+  "MINIO_API_PORT"
+  "MINIO_CONSOLE_PORT"
+  "OBJECT_STORAGE_DRIVER"
+  "OBJECT_STORAGE_ENDPOINT"
+  "OBJECT_STORAGE_EXTERNAL_ENDPOINT"
+  "OBJECT_STORAGE_BUCKET"
+  "OBJECT_STORAGE_REGION"
+  "OBJECT_STORAGE_USE_SSL"
+  "OBJECT_STORAGE_ACCESS_KEY_ID"
+  "OBJECT_STORAGE_SECRET_ACCESS_KEY"
+)
+
+for pattern in "${object_storage_env_patterns[@]}"; do
+  rg -q "$pattern" .env.example deploy/middleware/.env.example deploy/k8s/secrets.example.yaml
 done
 
 presence_config_patterns=(
@@ -1218,6 +1456,7 @@ jwt_api_files=(
   "api/friends.api"
   "api/groups.api"
   "api/message.api"
+  "api/media.api"
 )
 
 for file in "${jwt_api_files[@]}"; do
@@ -1242,7 +1481,7 @@ rg -q "type JWTAuthConfig" internal/config/config.go
 rg -q "AccessSecret" internal/config/config.go internal/rpcgen/auth/internal/config/config.go
 rg -q "AccessExpire" internal/config/config.go internal/rpcgen/auth/internal/config/config.go
 rg -q "user_id" internal/auth/token/token.go internal/ctxuser/user.go
-rg -q "ctxuser\\.UserID" internal/logic/user/gozero_logic.go internal/logic/friends/gozero_logic.go internal/logic/groups/gozero_logic.go internal/logic/message/gozero_logic.go
+rg -q "ctxuser\\.UserID" internal/logic/user/gozero_logic.go internal/logic/friends/gozero_logic.go internal/logic/groups/gozero_logic.go internal/logic/message/gozero_logic.go internal/logic/media/gozero_logic.go
 rg -q "sender_id must match authenticated user" internal/logic/message/gozero_logic.go
 
 jwt_test_patterns=(
@@ -1274,7 +1513,7 @@ social_mvp_account_patterns=(
   "AddFriend"
   "重复添加同一有效好友"
   "添加自己为好友"
-  "目标用户不存在"
+  "目标账号不存在"
   "MVP 群默认允许公开加入"
   "非成员或已退出成员发送群消息必须失败"
 )
@@ -1319,8 +1558,77 @@ for pattern in "${social_mvp_test_patterns[@]}"; do
   rg -q "$pattern" tests
 done
 
+account_terminology_doc_patterns=(
+  "Account Service"
+  "account_type=user|agent|admin"
+  "user_id"
+  "account id alias"
+  "V0 compatibility"
+  "Auth Service"
+  "credential/password/token"
+)
+
+for pattern in "${account_terminology_doc_patterns[@]}"; do
+  rg -qF "$pattern" docs/design-docs/account-service-terminology.md
+done
+
+account_terminology_entry_patterns=(
+  "Account Service"
+  "account id alias"
+  "account_type=user|agent|admin"
+)
+
+for pattern in "${account_terminology_entry_patterns[@]}"; do
+  rg -qF "$pattern" AGENTS.md ARCHITECTURE.md docs/product-specs/account-social-core.md docs/product-specs/frontend-backend-contract.md docs/design-docs/user-auth-friends-groups-boundaries.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
+done
+
+account_code_patterns=(
+  "AccountTypeUser  AccountType = \"user\""
+  "AccountTypeNormal AccountType = AccountTypeUser"
+  "type Account = User"
+  "type AccountRepository interface"
+  "type UserRepository = AccountRepository"
+  "type AccountProfile = UserProfile"
+  "func NewAccountLogic"
+  "AccountLogic"
+  "Path:    \"/accounts\""
+  "Path:    \"/accounts/exists\""
+  "Path:    \"/accounts/:identifier\""
+)
+
+for pattern in "${account_code_patterns[@]}"; do
+  rg -qF "$pattern" internal/model/user.go internal/repository/repository.go internal/logic/userlogic.go internal/svc/service_context.go internal/handler/gozero_routes.go
+done
+
+account_storage_patterns=(
+  "account_type text not null default 'user'"
+  "account_type in ('user', 'agent', 'admin')"
+  "where account_type = 'normal'"
+)
+
+for pattern in "${account_storage_patterns[@]}"; do
+  rg -qF "$pattern" db/migrations/001_init_postgres.sql
+done
+
+rg -qF "account_type?: 'user' | 'agent' | 'admin'" web/src/api/user.ts
+rg -qF "Legacy server data that still contains \`normal\` is normalized by the backend to \`user\`" docs/product-specs/frontend-backend-contract.md
+rg -qF "旧 \`account_type=normal\` 仅作为迁移输入兼容" docs/design-docs/account-service-terminology.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
+rg -qF "Account Service 术语与 V0 compatibility" AGENTS.md docs/design-docs/index.md
+rg -qF "Account Service 第一阶段产品规格" docs/product-specs/index.md docs/product-specs/user-service.md
+rg -qF "Account Service go-zero 实现设计" docs/design-docs/index.md docs/design-docs/user-service-go-zero.md
+
+if rg -n 'account_type.*normal|normal.*account_type|`normal`' \
+  docs/product-specs/agent-system.md \
+  docs/design-docs/agent-system-architecture.md \
+  docs/exec-plans/active/agent-system-v0.md \
+  docs/exec-plans/active/agent-infrastructure-parallel-baseline.md \
+  web/src/api/user.ts; then
+  echo "account_type docs/frontend must use user|agent|admin; normal may appear only in explicit migration compatibility docs" >&2
+  exit 1
+fi
+
 rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go internal/rpcgen/message/internal/svc/service_context.go
-rg -q "NewMessageLogicWithValidators" internal/rpcgen/message/internal/svc/service_context.go
+rg -q "NewMessageLogicWithMediaValidator" internal/rpcgen/message/internal/svc/service_context.go
 rg -q "NewMessageRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
 pg_persistence_patterns=(
   "users"
@@ -1328,6 +1636,7 @@ pg_persistence_patterns=(
   "friendships"
   "groups"
   "group_members"
+  "media_objects"
   "messages"
   "conversation_threads"
   "user_conversation_states"
@@ -1341,6 +1650,14 @@ for pattern in "${pg_persistence_patterns[@]}"; do
 done
 
 rg -q "StorageDriver" internal/config/config.go etc/*.yaml
+rg -q "ObjectStorageConfig" internal/config/config.go
+rg -q "NewStore" internal/objectstorage/factory.go
+rg -q "PresignPut" internal/objectstorage/store.go internal/objectstorage/minio.go
+rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go cmd/user-api/main.go cmd/message-api/main.go cmd/gateway-ws/main.go
+rg -q "ValidateMessageMedia" internal/logic/medialogic.go internal/logic/messagelogic.go
+rg -q "media_objects" db/migrations/001_init_postgres.sql docs/product-specs/message-chain.md docs/product-specs/frontend-backend-contract.md
+rg -q "PATCH /me/avatar" docs/product-specs/frontend-backend-contract.md
+rg -q "POST /media/uploads" docs/product-specs/frontend-backend-contract.md
 rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go internal/auth/repository/postgres.go
 rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
 rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
@@ -1511,6 +1828,7 @@ frontend_patterns=(
 
 frontend_files=(
   "web/src/App.tsx"
+  "web/src/components/ui/NavigationBar.tsx"
   "web/src/components/ui/TabBar.tsx"
   "web/src/components/ContactsPage.tsx"
   "web/src/features/messages/MessagesPage.tsx"

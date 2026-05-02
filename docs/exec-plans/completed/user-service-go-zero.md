@@ -1,17 +1,17 @@
-# User Service Go-Zero
+# Account Service Go-Zero (V0 user transport)
 
 状态：Completed
 Completed: 2026-05-01
 
 ## 背景
 
-`user` 服务需要先于 `auth`、`friends`、`groups` 落地，提供账号资料权威能力。当前 worktree 初始代码为空，环境中没有 `go`/`goctl`，因此本计划要求同时产出产品规格、实现设计、go-zero 风格源码、proto/api 定义和可执行测试设计。
+本计划完成时服务仍以 `user-api` / `user-rpc` 命名；当前领域术语已迁移为 Account Service，这些名称作为 V0 transport compatibility 保留。Account Service 需要先于 `auth`、`friends`、`groups` 落地，提供账号资料权威能力。当前 worktree 初始代码为空，环境中没有 `go`/`goctl`，因此本计划要求同时产出产品规格、实现设计、go-zero 风格源码、proto/api 定义和可执行测试设计。
 
 ## 目标
 
-- 完成 user 第一阶段产品规格。
-- 完成 user-rpc/user-api go-zero 实现设计。
-- 实现 user-rpc 逻辑：创建用户、按唯一标识查询用户、查询账号存在性、按 user_id 查询用户、更新自己的资料字段。
+- 完成 Account Service 第一阶段产品规格。
+- 完成 V0 user-rpc/user-api go-zero 实现设计。
+- 实现 V0 user-rpc 逻辑：创建账号、按唯一标识查询账号、查询账号存在性、按 user_id（account id alias）查询账号、更新自己的资料字段。
 - 实现 user-api HTTP 接口：`GET /me`、`GET /users/:identifier`、`GET /users/exists`、`POST /users`、`PATCH /me`。
 - 不引入密码、验证码、第三方凭据、好友关系或群成员关系字段。
 - 提供单元测试或可运行验证脚本。

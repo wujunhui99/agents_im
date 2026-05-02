@@ -11,16 +11,17 @@ import (
 )
 
 type postgresUserRow struct {
-	UserID      string    `db:"user_id"`
-	Identifier  string    `db:"identifier"`
-	DisplayName string    `db:"display_name"`
-	Name        string    `db:"name"`
-	Gender      string    `db:"gender"`
-	Age         int32     `db:"age"`
-	Region      string    `db:"region"`
-	AccountType string    `db:"account_type"`
-	CreatedAt   time.Time `db:"created_at"`
-	UpdatedAt   time.Time `db:"updated_at"`
+	UserID        string    `db:"user_id"`
+	Identifier    string    `db:"identifier"`
+	DisplayName   string    `db:"display_name"`
+	Name          string    `db:"name"`
+	Gender        string    `db:"gender"`
+	Age           int32     `db:"age"`
+	Region        string    `db:"region"`
+	AccountType   string    `db:"account_type"`
+	AvatarMediaID string    `db:"avatar_media_id"`
+	CreatedAt     time.Time `db:"created_at"`
+	UpdatedAt     time.Time `db:"updated_at"`
 }
 
 type postgresFriendshipRow struct {
@@ -34,7 +35,7 @@ type postgresFriendshipRow struct {
 func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model.User, error) {
 	accountType, ok := model.NormalizeAccountType(string(user.AccountType))
 	if !ok {
-		return model.User{}, apperror.InvalidArgument("account_type must be normal, agent, or admin")
+		return model.User{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
 	}
 
 	var row postgresUserRow
@@ -43,13 +44,13 @@ func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model
 		err = r.conn.QueryRowCtx(ctx, &row, `
 insert into users (identifier, display_name, name, gender, age, region, account_type)
 values ($1, $2, $3, $4, $5, $6, $7)
-returning user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
+returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
 `, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region, accountType)
 	} else {
 		err = r.conn.QueryRowCtx(ctx, &row, `
 insert into users (user_id, identifier, display_name, name, gender, age, region, account_type)
 values ($1, $2, $3, $4, $5, $6, $7, $8)
-returning user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
+returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
 `, user.UserID, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region, accountType)
 	}
 	if err != nil {
@@ -68,7 +69,7 @@ returning user_id, identifier, display_name, name, gender, age, region, account_
 func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier string) (model.User, error) {
 	var row postgresUserRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
+select user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
 from users
 where identifier = $1
 `, identifier)
@@ -92,7 +93,7 @@ select exists(select 1 from users where identifier = $1)
 func (r *PostgresRepository) GetByID(ctx context.Context, userID string) (model.User, error) {
 	var row postgresUserRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
+select user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
 from users
 where user_id = $1
 `, userID)
@@ -137,7 +138,7 @@ func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID string, p
 update users
 set ` + strings.Join(setters, ", ") + `, updated_at = now()
 where user_id = $` + itoa(len(args)) + `
-returning user_id, identifier, display_name, name, gender, age, region, account_type, created_at, updated_at
+returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
 `
 	var row postgresUserRow
 	if err := r.conn.QueryRowCtx(ctx, &row, query, args...); err != nil {
@@ -146,6 +147,22 @@ returning user_id, identifier, display_name, name, gender, age, region, account_
 		}
 		if isPostgresCheckViolation(err) {
 			return model.User{}, apperror.InvalidArgument("invalid user profile")
+		}
+		return model.User{}, err
+	}
+	return row.user(), nil
+}
+
+func (r *PostgresRepository) UpdateAvatar(ctx context.Context, userID string, avatarMediaID string) (model.User, error) {
+	var row postgresUserRow
+	if err := r.conn.QueryRowCtx(ctx, &row, `
+update users
+set avatar_media_id = $2, updated_at = now()
+where user_id = $1
+returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
+`, userID, strings.TrimSpace(avatarMediaID)); err != nil {
+		if isNotFound(err) {
+			return model.User{}, apperror.NotFound("user not found")
 		}
 		return model.User{}, err
 	}
@@ -281,17 +298,22 @@ returning user_id, friend_id, status, created_at, updated_at
 }
 
 func (r postgresUserRow) user() model.User {
+	accountType, ok := model.NormalizeAccountType(r.AccountType)
+	if !ok {
+		accountType = model.AccountType(r.AccountType)
+	}
 	return model.User{
-		UserID:      r.UserID,
-		Identifier:  r.Identifier,
-		DisplayName: r.DisplayName,
-		Name:        r.Name,
-		Gender:      r.Gender,
-		Age:         r.Age,
-		Region:      r.Region,
-		AccountType: model.AccountType(r.AccountType),
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
+		UserID:        r.UserID,
+		Identifier:    r.Identifier,
+		DisplayName:   r.DisplayName,
+		Name:          r.Name,
+		Gender:        r.Gender,
+		Age:           r.Age,
+		Region:        r.Region,
+		AccountType:   accountType,
+		AvatarMediaID: r.AvatarMediaID,
+		CreatedAt:     r.CreatedAt,
+		UpdatedAt:     r.UpdatedAt,
 	}
 }
 

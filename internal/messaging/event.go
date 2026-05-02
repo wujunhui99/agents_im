@@ -34,16 +34,21 @@ type MessageEvent struct {
 }
 
 type MessageEventPayload struct {
-	ClientMsgID string          `json:"client_msg_id,omitempty"`
-	ReceiverID  string          `json:"receiver_id,omitempty"`
-	ReceiverIDs []string        `json:"receiver_ids,omitempty"`
-	GroupID     string          `json:"group_id,omitempty"`
-	ContentType string          `json:"content_type,omitempty"`
-	Content     json.RawMessage `json:"content,omitempty"`
-	UserID      string          `json:"user_id,omitempty"`
-	HasReadSeq  int64           `json:"has_read_seq,omitempty"`
-	ReadAt      int64           `json:"read_at,omitempty"`
-	TraceID     string          `json:"trace_id,omitempty"`
+	ClientMsgID           string          `json:"client_msg_id,omitempty"`
+	ReceiverID            string          `json:"receiver_id,omitempty"`
+	ReceiverIDs           []string        `json:"receiver_ids,omitempty"`
+	GroupID               string          `json:"group_id,omitempty"`
+	ContentType           string          `json:"content_type,omitempty"`
+	Content               json.RawMessage `json:"content,omitempty"`
+	MessageOrigin         string          `json:"message_origin,omitempty"`
+	AgentAccountID        string          `json:"agent_account_id,omitempty"`
+	TriggerServerMsgID    string          `json:"trigger_server_msg_id,omitempty"`
+	AgentRunID            string          `json:"agent_run_id,omitempty"`
+	AllowRecursiveTrigger bool            `json:"allow_recursive_trigger,omitempty"`
+	UserID                string          `json:"user_id,omitempty"`
+	HasReadSeq            int64           `json:"has_read_seq,omitempty"`
+	ReadAt                int64           `json:"read_at,omitempty"`
+	TraceID               string          `json:"trace_id,omitempty"`
 }
 
 func (e MessageEvent) Validate() error {

@@ -85,6 +85,18 @@ load_env() {
   export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-agents_im_dev_password}"
   export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
   export REDIS_PASSWORD="${REDIS_PASSWORD:-agents_im_redis_dev_password}"
+  export MINIO_ROOT_USER="${MINIO_ROOT_USER:-agents_im_minio}"
+  export MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-agents_im_minio_dev_password}"
+  export MINIO_API_PORT="${MINIO_API_PORT:-9000}"
+  export MINIO_CONSOLE_PORT="${MINIO_CONSOLE_PORT:-9001}"
+  export OBJECT_STORAGE_DRIVER="${OBJECT_STORAGE_DRIVER:-minio}"
+  export OBJECT_STORAGE_ENDPOINT="${OBJECT_STORAGE_ENDPOINT:-localhost:${MINIO_API_PORT}}"
+  export OBJECT_STORAGE_EXTERNAL_ENDPOINT="${OBJECT_STORAGE_EXTERNAL_ENDPOINT:-localhost:${MINIO_API_PORT}}"
+  export OBJECT_STORAGE_BUCKET="${OBJECT_STORAGE_BUCKET:-agents-im-media}"
+  export OBJECT_STORAGE_REGION="${OBJECT_STORAGE_REGION:-us-east-1}"
+  export OBJECT_STORAGE_USE_SSL="${OBJECT_STORAGE_USE_SSL:-false}"
+  export OBJECT_STORAGE_ACCESS_KEY_ID="${OBJECT_STORAGE_ACCESS_KEY_ID:-${MINIO_ROOT_USER}}"
+  export OBJECT_STORAGE_SECRET_ACCESS_KEY="${OBJECT_STORAGE_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD}}"
   export DATABASE_URL="${DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable}"
   export JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-dev-jwt-secret-change-me}"
   export JWT_ACCESS_EXPIRE="${JWT_ACCESS_EXPIRE:-86400}"
@@ -135,6 +147,18 @@ wait_for_postgres() {
   exit 1
 }
 
+wait_for_minio() {
+  local attempt
+  for attempt in $(seq 1 60); do
+    if curl --silent --fail "http://${OBJECT_STORAGE_ENDPOINT}/minio/health/live" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "minio did not become ready at ${OBJECT_STORAGE_ENDPOINT}" >&2
+  exit 1
+}
+
 write_api_config() {
   local name="$1"
   local port="$2"
@@ -155,7 +179,15 @@ YAML
 
 write_configs() {
   mkdir -p "${CONFIG_DIR}"
-  write_api_config "user-api" "${USER_API_PORT:-8080}"
+  write_api_config "user-api" "${USER_API_PORT:-8080}" "ObjectStorage:
+  Driver: ${OBJECT_STORAGE_DRIVER}
+  Endpoint: ${OBJECT_STORAGE_ENDPOINT}
+  ExternalEndpoint: ${OBJECT_STORAGE_EXTERNAL_ENDPOINT}
+  Bucket: ${OBJECT_STORAGE_BUCKET}
+  Region: ${OBJECT_STORAGE_REGION}
+  UseSSL: ${OBJECT_STORAGE_USE_SSL}
+  AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
+  SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}"
   write_api_config "auth-api" "${AUTH_API_PORT:-8081}"
   write_api_config "friends-api" "${FRIENDS_API_PORT:-8082}"
   write_api_config "message-api" "${MESSAGE_API_PORT:-8083}"
@@ -229,8 +261,10 @@ main() {
 
   if [[ "${WITH_MIDDLEWARE}" -eq 1 ]]; then
     require_command docker
-    docker compose up -d postgres redis redpanda
+    docker compose up -d postgres redis redpanda minio
     wait_for_postgres
+    require_command curl
+    wait_for_minio
   fi
 
   if [[ "${RUN_MIGRATIONS}" -eq 1 ]]; then

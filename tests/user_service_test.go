@@ -90,6 +90,13 @@ func TestUserHTTPHandlers(t *testing.T) {
 		t.Fatalf("duplicate status = %d, body = %s", duplicateResp.Code, duplicateResp.Body.String())
 	}
 
+	accountCreateResp := httptest.NewRecorder()
+	accountCreateReq := newJSONRequest(http.MethodPost, "/accounts", `{"identifier":"account_alias_001","display_name":"Alias"}`)
+	mux.ServeHTTP(accountCreateResp, accountCreateReq)
+	if accountCreateResp.Code != http.StatusOK {
+		t.Fatalf("account alias create status = %d, body = %s", accountCreateResp.Code, accountCreateResp.Body.String())
+	}
+
 	existsResp := httptest.NewRecorder()
 	existsReq := httptest.NewRequest(http.MethodGet, "/users/exists?identifier=BOB_001", nil)
 	mux.ServeHTTP(existsResp, existsReq)
@@ -100,6 +107,13 @@ func TestUserHTTPHandlers(t *testing.T) {
 	decodeEnvelope(t, existsResp.Body.Bytes(), &exists)
 	if !exists.Data.Exists || exists.Data.Identifier != "bob_001" {
 		t.Fatalf("unexpected exists response: %+v", exists.Data)
+	}
+
+	accountExistsResp := httptest.NewRecorder()
+	accountExistsReq := httptest.NewRequest(http.MethodGet, "/accounts/exists?identifier=BOB_001", nil)
+	mux.ServeHTTP(accountExistsResp, accountExistsReq)
+	if accountExistsResp.Code != http.StatusOK {
+		t.Fatalf("account alias exists status = %d, body = %s", accountExistsResp.Code, accountExistsResp.Body.String())
 	}
 
 	meWithoutTokenResp := httptest.NewRecorder()
@@ -148,6 +162,14 @@ func TestUserHTTPHandlers(t *testing.T) {
 		t.Fatalf("public status = %d, body = %s", publicResp.Code, publicResp.Body.String())
 	}
 	assertNoSecretFields(t, publicResp.Body.String())
+
+	accountPublicResp := httptest.NewRecorder()
+	accountPublicReq := httptest.NewRequest(http.MethodGet, "/accounts/bob_001", nil)
+	mux.ServeHTTP(accountPublicResp, accountPublicReq)
+	if accountPublicResp.Code != http.StatusOK {
+		t.Fatalf("account alias public status = %d, body = %s", accountPublicResp.Code, accountPublicResp.Body.String())
+	}
+	assertNoSecretFields(t, accountPublicResp.Body.String())
 }
 
 func TestPatchRejectsImmutableFields(t *testing.T) {

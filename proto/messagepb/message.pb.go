@@ -22,21 +22,26 @@ const (
 )
 
 type Message struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ServerMsgId    string                 `protobuf:"bytes,1,opt,name=server_msg_id,json=serverMsgId,proto3" json:"server_msg_id,omitempty"`
-	ClientMsgId    string                 `protobuf:"bytes,2,opt,name=client_msg_id,json=clientMsgId,proto3" json:"client_msg_id,omitempty"`
-	ConversationId string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Seq            int64                  `protobuf:"varint,4,opt,name=seq,proto3" json:"seq,omitempty"`
-	SenderId       string                 `protobuf:"bytes,5,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
-	ReceiverId     string                 `protobuf:"bytes,6,opt,name=receiver_id,json=receiverId,proto3" json:"receiver_id,omitempty"`
-	GroupId        string                 `protobuf:"bytes,7,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	ChatType       string                 `protobuf:"bytes,8,opt,name=chat_type,json=chatType,proto3" json:"chat_type,omitempty"`
-	ContentType    string                 `protobuf:"bytes,9,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
-	Content        string                 `protobuf:"bytes,10,opt,name=content,proto3" json:"content,omitempty"`
-	SendTime       int64                  `protobuf:"varint,11,opt,name=send_time,json=sendTime,proto3" json:"send_time,omitempty"`
-	CreatedAt      int64                  `protobuf:"varint,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	ServerMsgId           string                 `protobuf:"bytes,1,opt,name=server_msg_id,json=serverMsgId,proto3" json:"server_msg_id,omitempty"`
+	ClientMsgId           string                 `protobuf:"bytes,2,opt,name=client_msg_id,json=clientMsgId,proto3" json:"client_msg_id,omitempty"`
+	ConversationId        string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Seq                   int64                  `protobuf:"varint,4,opt,name=seq,proto3" json:"seq,omitempty"`
+	SenderId              string                 `protobuf:"bytes,5,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	ReceiverId            string                 `protobuf:"bytes,6,opt,name=receiver_id,json=receiverId,proto3" json:"receiver_id,omitempty"`
+	GroupId               string                 `protobuf:"bytes,7,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	ChatType              string                 `protobuf:"bytes,8,opt,name=chat_type,json=chatType,proto3" json:"chat_type,omitempty"`
+	ContentType           string                 `protobuf:"bytes,9,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Content               string                 `protobuf:"bytes,10,opt,name=content,proto3" json:"content,omitempty"`
+	MessageOrigin         string                 `protobuf:"bytes,11,opt,name=message_origin,json=messageOrigin,proto3" json:"message_origin,omitempty"`
+	AgentAccountId        string                 `protobuf:"bytes,12,opt,name=agent_account_id,json=agentAccountId,proto3" json:"agent_account_id,omitempty"`
+	TriggerServerMsgId    string                 `protobuf:"bytes,13,opt,name=trigger_server_msg_id,json=triggerServerMsgId,proto3" json:"trigger_server_msg_id,omitempty"`
+	AgentRunId            string                 `protobuf:"bytes,14,opt,name=agent_run_id,json=agentRunId,proto3" json:"agent_run_id,omitempty"`
+	AllowRecursiveTrigger bool                   `protobuf:"varint,15,opt,name=allow_recursive_trigger,json=allowRecursiveTrigger,proto3" json:"allow_recursive_trigger,omitempty"`
+	SendTime              int64                  `protobuf:"varint,16,opt,name=send_time,json=sendTime,proto3" json:"send_time,omitempty"`
+	CreatedAt             int64                  `protobuf:"varint,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *Message) Reset() {
@@ -139,6 +144,41 @@ func (x *Message) GetContent() string {
 	return ""
 }
 
+func (x *Message) GetMessageOrigin() string {
+	if x != nil {
+		return x.MessageOrigin
+	}
+	return ""
+}
+
+func (x *Message) GetAgentAccountId() string {
+	if x != nil {
+		return x.AgentAccountId
+	}
+	return ""
+}
+
+func (x *Message) GetTriggerServerMsgId() string {
+	if x != nil {
+		return x.TriggerServerMsgId
+	}
+	return ""
+}
+
+func (x *Message) GetAgentRunId() string {
+	if x != nil {
+		return x.AgentRunId
+	}
+	return ""
+}
+
+func (x *Message) GetAllowRecursiveTrigger() bool {
+	if x != nil {
+		return x.AllowRecursiveTrigger
+	}
+	return false
+}
+
 func (x *Message) GetSendTime() int64 {
 	if x != nil {
 		return x.SendTime
@@ -238,16 +278,21 @@ func (x *ConversationSeqState) GetLastMessage() *Message {
 }
 
 type SendMessageRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SenderId      string                 `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
-	ReceiverId    string                 `protobuf:"bytes,2,opt,name=receiver_id,json=receiverId,proto3" json:"receiver_id,omitempty"`
-	GroupId       string                 `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	ChatType      string                 `protobuf:"bytes,4,opt,name=chat_type,json=chatType,proto3" json:"chat_type,omitempty"`
-	ClientMsgId   string                 `protobuf:"bytes,5,opt,name=client_msg_id,json=clientMsgId,proto3" json:"client_msg_id,omitempty"`
-	ContentType   string                 `protobuf:"bytes,6,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
-	Content       string                 `protobuf:"bytes,7,opt,name=content,proto3" json:"content,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	SenderId              string                 `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	ReceiverId            string                 `protobuf:"bytes,2,opt,name=receiver_id,json=receiverId,proto3" json:"receiver_id,omitempty"`
+	GroupId               string                 `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	ChatType              string                 `protobuf:"bytes,4,opt,name=chat_type,json=chatType,proto3" json:"chat_type,omitempty"`
+	ClientMsgId           string                 `protobuf:"bytes,5,opt,name=client_msg_id,json=clientMsgId,proto3" json:"client_msg_id,omitempty"`
+	ContentType           string                 `protobuf:"bytes,6,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Content               string                 `protobuf:"bytes,7,opt,name=content,proto3" json:"content,omitempty"`
+	MessageOrigin         string                 `protobuf:"bytes,8,opt,name=message_origin,json=messageOrigin,proto3" json:"message_origin,omitempty"`
+	AgentAccountId        string                 `protobuf:"bytes,9,opt,name=agent_account_id,json=agentAccountId,proto3" json:"agent_account_id,omitempty"`
+	TriggerServerMsgId    string                 `protobuf:"bytes,10,opt,name=trigger_server_msg_id,json=triggerServerMsgId,proto3" json:"trigger_server_msg_id,omitempty"`
+	AgentRunId            string                 `protobuf:"bytes,11,opt,name=agent_run_id,json=agentRunId,proto3" json:"agent_run_id,omitempty"`
+	AllowRecursiveTrigger bool                   `protobuf:"varint,12,opt,name=allow_recursive_trigger,json=allowRecursiveTrigger,proto3" json:"allow_recursive_trigger,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *SendMessageRequest) Reset() {
@@ -327,6 +372,41 @@ func (x *SendMessageRequest) GetContent() string {
 		return x.Content
 	}
 	return ""
+}
+
+func (x *SendMessageRequest) GetMessageOrigin() string {
+	if x != nil {
+		return x.MessageOrigin
+	}
+	return ""
+}
+
+func (x *SendMessageRequest) GetAgentAccountId() string {
+	if x != nil {
+		return x.AgentAccountId
+	}
+	return ""
+}
+
+func (x *SendMessageRequest) GetTriggerServerMsgId() string {
+	if x != nil {
+		return x.TriggerServerMsgId
+	}
+	return ""
+}
+
+func (x *SendMessageRequest) GetAgentRunId() string {
+	if x != nil {
+		return x.AgentRunId
+	}
+	return ""
+}
+
+func (x *SendMessageRequest) GetAllowRecursiveTrigger() bool {
+	if x != nil {
+		return x.AllowRecursiveTrigger
+	}
+	return false
 }
 
 type SendMessageResponse struct {
@@ -761,7 +841,7 @@ var File_proto_message_proto protoreflect.FileDescriptor
 
 const file_proto_message_proto_rawDesc = "" +
 	"\n" +
-	"\x13proto/message.proto\x12\amessage\"\xfb\x02\n" +
+	"\x13proto/message.proto\x12\amessage\"\xd9\x04\n" +
 	"\aMessage\x12\"\n" +
 	"\rserver_msg_id\x18\x01 \x01(\tR\vserverMsgId\x12\"\n" +
 	"\rclient_msg_id\x18\x02 \x01(\tR\vclientMsgId\x12'\n" +
@@ -774,10 +854,16 @@ const file_proto_message_proto_rawDesc = "" +
 	"\tchat_type\x18\b \x01(\tR\bchatType\x12!\n" +
 	"\fcontent_type\x18\t \x01(\tR\vcontentType\x12\x18\n" +
 	"\acontent\x18\n" +
-	" \x01(\tR\acontent\x12\x1b\n" +
-	"\tsend_time\x18\v \x01(\x03R\bsendTime\x12\x1d\n" +
+	" \x01(\tR\acontent\x12%\n" +
+	"\x0emessage_origin\x18\v \x01(\tR\rmessageOrigin\x12(\n" +
+	"\x10agent_account_id\x18\f \x01(\tR\x0eagentAccountId\x121\n" +
+	"\x15trigger_server_msg_id\x18\r \x01(\tR\x12triggerServerMsgId\x12 \n" +
+	"\fagent_run_id\x18\x0e \x01(\tR\n" +
+	"agentRunId\x126\n" +
+	"\x17allow_recursive_trigger\x18\x0f \x01(\bR\x15allowRecursiveTrigger\x12\x1b\n" +
+	"\tsend_time\x18\x10 \x01(\x03R\bsendTime\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\f \x01(\x03R\tcreatedAt\"\xf4\x01\n" +
+	"created_at\x18\x11 \x01(\x03R\tcreatedAt\"\xf4\x01\n" +
 	"\x14ConversationSeqState\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x17\n" +
 	"\amax_seq\x18\x02 \x01(\x03R\x06maxSeq\x12 \n" +
@@ -786,7 +872,7 @@ const file_proto_message_proto_rawDesc = "" +
 	"\funread_count\x18\x04 \x01(\x03R\vunreadCount\x12 \n" +
 	"\fmax_seq_time\x18\x05 \x01(\x03R\n" +
 	"maxSeqTime\x123\n" +
-	"\flast_message\x18\x06 \x01(\v2\x10.message.MessageR\vlastMessage\"\xeb\x01\n" +
+	"\flast_message\x18\x06 \x01(\v2\x10.message.MessageR\vlastMessage\"\xc9\x03\n" +
 	"\x12SendMessageRequest\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12\x1f\n" +
 	"\vreceiver_id\x18\x02 \x01(\tR\n" +
@@ -795,7 +881,14 @@ const file_proto_message_proto_rawDesc = "" +
 	"\tchat_type\x18\x04 \x01(\tR\bchatType\x12\"\n" +
 	"\rclient_msg_id\x18\x05 \x01(\tR\vclientMsgId\x12!\n" +
 	"\fcontent_type\x18\x06 \x01(\tR\vcontentType\x12\x18\n" +
-	"\acontent\x18\a \x01(\tR\acontent\"e\n" +
+	"\acontent\x18\a \x01(\tR\acontent\x12%\n" +
+	"\x0emessage_origin\x18\b \x01(\tR\rmessageOrigin\x12(\n" +
+	"\x10agent_account_id\x18\t \x01(\tR\x0eagentAccountId\x121\n" +
+	"\x15trigger_server_msg_id\x18\n" +
+	" \x01(\tR\x12triggerServerMsgId\x12 \n" +
+	"\fagent_run_id\x18\v \x01(\tR\n" +
+	"agentRunId\x126\n" +
+	"\x17allow_recursive_trigger\x18\f \x01(\bR\x15allowRecursiveTrigger\"e\n" +
 	"\x13SendMessageResponse\x12*\n" +
 	"\amessage\x18\x01 \x01(\v2\x10.message.MessageR\amessage\x12\"\n" +
 	"\fdeduplicated\x18\x02 \x01(\bR\fdeduplicated\"\xb5\x01\n" +

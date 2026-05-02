@@ -14,6 +14,9 @@
 - WebSocket 心跳
 - 消息 ACK
 - 幂等写入
+- 会话内 `conversation_id + seq` 权威排序：网络到达顺序、WebSocket push 顺序和本地乐观发送顺序不得作为最终展示顺序
+- 客户端按 `server_msg_id` / `client_msg_id` 去重；发现 seq gap 时按缺失区间 pull 补偿
+- 同一会话本地发送必须串行化、排队或 UI 禁用到上一条发送 accepted/failed，避免本地并发发送造成展示错序
 - 事件重试
 - 死信队列或失败事件表
 - `trace_id` 全链路追踪

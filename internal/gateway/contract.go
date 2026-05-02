@@ -156,18 +156,23 @@ type MarkConversationReadCommandResponse struct {
 }
 
 type MessageSnapshot struct {
-	ServerMsgID    string `json:"serverMsgId"`
-	ClientMsgID    string `json:"clientMsgId"`
-	ConversationID string `json:"conversationId"`
-	Seq            int64  `json:"seq"`
-	SenderID       string `json:"senderId"`
-	ReceiverID     string `json:"receiverId,omitempty"`
-	GroupID        string `json:"groupId,omitempty"`
-	ChatType       string `json:"chatType"`
-	ContentType    string `json:"contentType"`
-	Content        string `json:"content"`
-	SendTime       int64  `json:"sendTime"`
-	CreatedAt      int64  `json:"createdAt"`
+	ServerMsgID           string `json:"serverMsgId"`
+	ClientMsgID           string `json:"clientMsgId"`
+	ConversationID        string `json:"conversationId"`
+	Seq                   int64  `json:"seq"`
+	SenderID              string `json:"senderId"`
+	ReceiverID            string `json:"receiverId,omitempty"`
+	GroupID               string `json:"groupId,omitempty"`
+	ChatType              string `json:"chatType"`
+	ContentType           string `json:"contentType"`
+	Content               string `json:"content"`
+	MessageOrigin         string `json:"messageOrigin"`
+	AgentAccountID        string `json:"agentAccountId,omitempty"`
+	TriggerServerMsgID    string `json:"triggerServerMsgId,omitempty"`
+	AgentRunID            string `json:"agentRunId,omitempty"`
+	AllowRecursiveTrigger bool   `json:"allowRecursiveTrigger,omitempty"`
+	SendTime              int64  `json:"sendTime"`
+	CreatedAt             int64  `json:"createdAt"`
 }
 
 type ConversationSeqState struct {

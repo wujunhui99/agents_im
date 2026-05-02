@@ -12,7 +12,7 @@ Agent 系统应作为独立能力域开发，并通过 IM 后端事件和 Messag
 
 ```text
 IM Backend
-  ├── User/Auth: normal / agent / admin account type
+  ├── Account/Auth: user / agent / admin account type
   ├── Message Service: authoritative message writes
   ├── Outbox/Kafka/Webhook: message.created events
   └── Gateway: WebSocket delivery
@@ -32,12 +32,14 @@ Storage
   └── Redis: short-lived runtime/cache/locks where needed
 ```
 
+Agent 会话托管第一阶段设计见 [`agent-conversation-hosting.md`](./agent-conversation-hosting.md)：Message Service 持久化 `message_origin=human|ai|system`，Agent hosting seam 消费已持久化消息事件，通过 `AgentRunOrchestrator` 调用 runtime，并用 Message Service 写回 `message_origin=ai` 的普通 IM 消息。
+
 ## 服务边界
 
-### User/Auth 扩展
+### Account/Auth 扩展
 
-- `users` 增加 `account_type`，支持 `normal`、`agent`、`admin`。
-- `user` 仍只负责账号资料，不保存 Agent prompt、tool 或 skill 配置。
+- Account Service 增加 `account_type`，支持 `user`、`agent`、`admin`。V0 storage 表名仍为 `users`。
+- Account Service 仍只负责账号资料，不保存 Agent prompt、tool 或 skill 配置。
 - `auth` 仍只负责认证秘密。Agent 账号默认不提供普通账号密码登录。
 
 ### Agent Management
@@ -59,7 +61,7 @@ Storage
 - 仓储契约：`internal/repository/agent_repository.go`，默认测试仓储：`internal/repository/agent_memory.go`，PostgreSQL 仓储：`internal/repository/postgres_agent.go`。
 - PostgreSQL schema：`db/migrations/002_agent_management.sql`。
 
-创建 Agent 时，业务逻辑先调用窄接口 `UserAccountTypeChecker` 验证绑定用户为 `account_type=agent`，再写入 `agents` 表。当前账号类型持久化尚未在本分支合入，真实 `agent-api` wiring 使用 fail-closed checker，无法验证时返回明确错误；测试只能通过显式测试 fixture checker 验证成功路径。此设计避免在 `users` 表中塞入 Agent 配置，也避免用假用户或静默 fallback 冒充账号类型能力。
+创建 Agent 时，业务逻辑先调用窄接口 `UserAccountTypeChecker` 验证绑定账号为 `account_type=agent`，再写入 `agents` 表。当前 `agent-api` wiring 使用真实 Account Service profile repository 校验账号类型；无法验证时必须返回明确错误。此设计避免在 `users` 表中塞入 Agent 配置，也避免用假账号或静默 fallback 冒充账号类型能力。
 
 ### Prompt Management
 
@@ -412,7 +414,7 @@ Client -> Gateway/Message API
 | `group_mention` | 群聊 @Agent | `conversation_type=group`，目标 Agent 在 `at_user_ids` 中。 |
 | `admin_manual_run` | 管理员手动触发 | 管理员传入 `request_id`、`admin_user_id`、`agent_user_id`、会话和 prompt 文本；不伪造用户消息。 |
 
-`message.created` 事件必须保留 `event_id`、`operation_id`、`trace_id`、`conversation_id`、`server_msg_id`、`seq`、`sender_id`、`sender_type`、`content_type` 和目标 Agent 列表。构造出的 Agent trigger 使用 `event_id + agent_user_id` 作为幂等请求基础。
+`message.created` 事件必须保留 `event_id`、`operation_id`、`trace_id`、`conversation_id`、`server_msg_id`、`seq`、`sender_id`、`sender_type`、`content_type` 和目标 Agent 列表。第一阶段由 `MessageLogic.MessageCreatedHook` 在持久化后同步传入 `ConversationHostingService`，event id 使用稳定的 `message.created:<server_msg_id>`；后续异步 consumer 必须保持同一 idempotency 语义。构造出的 Agent trigger 使用 `event_id + agent_user_id` 作为幂等请求基础。
 
 ### Agent 响应写回
 
@@ -446,6 +448,8 @@ AgentTrigger
 - 幂等键应包含 `event_id` 或 `trigger_message_id + agent_id`。
 - Agent 响应元数据包含 `agent_run_id`、`trigger_message_id` 和 `allow_recursive_trigger`；只有全局/会话策略 `AllowAgentMessageRecursion=true` 且消息元数据 `allow_recursive_trigger=true` 时，Agent 发送的消息才能再次构造 Agent trigger。
 
+当前第一阶段实现新增 `agent_conversation_hosting` 与 `agent_trigger_idempotency` 仓储契约。托管配置以 `conversation_id -> agent_account_id` 表示是否 enabled；trigger idempotency key 使用 `event_id/server_msg_id + agent_account_id`，成功后重复事件不再执行，失败会记录为 `failed` 并允许后续显式重试。
+
 ## 权限模型
 
 权限决策至少包含：
@@ -463,7 +467,7 @@ requested tool permission level
 
 第一版默认策略：
 
-- `normal` 用户不能管理全局工具和 MCP server。
+- `user` 类型账号不能管理全局工具和 MCP server。
 - `admin` 可以管理 prompt/tool/skill/agent。
 - Agent 只能调用已绑定工具。
 - Agent 绑定 skill 后可读取 skill 文件。

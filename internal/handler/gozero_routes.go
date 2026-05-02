@@ -6,6 +6,7 @@ import (
 	agenthandler "github.com/wujunhui99/agents_im/internal/handler/agent"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
+	mediahandler "github.com/wujunhui99/agents_im/internal/handler/media"
 	messagehandler "github.com/wujunhui99/agents_im/internal/handler/message"
 	userhandler "github.com/wujunhui99/agents_im/internal/handler/user"
 	"github.com/wujunhui99/agents_im/internal/health"
@@ -18,14 +19,17 @@ func RegisterGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) 
 	registerGoZeroObservabilityHandlers(server, "agents-im-api", func(*http.Request) []health.Check {
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("account_logic", serverCtx != nil && serverCtx.AccountLogic != nil, "configured"),
 			componentCheck("user_logic", serverCtx != nil && serverCtx.UserLogic != nil, "configured"),
 			componentCheck("friends_logic", serverCtx != nil && serverCtx.FriendsLogic != nil, "configured"),
 			componentCheck("message_logic", serverCtx != nil && serverCtx.MessageLogic != nil, "configured"),
 			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
 			componentCheck("message_repository", serverCtx != nil && serverCtx.MessageRepo != nil, "configured"),
+			componentCheck("media_logic", serverCtx != nil && serverCtx.MediaLogic != nil, "configured"),
 		}
 	})
 	addUserRoutes(server, serverCtx)
+	addMediaRoutes(server, serverCtx)
 	addFriendsRoutes(server, serverCtx)
 	addMessageRoutes(server, serverCtx)
 }
@@ -34,11 +38,14 @@ func RegisterUserGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceConte
 	registerGoZeroObservabilityHandlers(server, "user-api", func(*http.Request) []health.Check {
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
+			componentCheck("account_logic", serverCtx != nil && serverCtx.AccountLogic != nil, "configured"),
 			componentCheck("user_logic", serverCtx != nil && serverCtx.UserLogic != nil, "configured"),
 			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
+			componentCheck("media_logic", serverCtx != nil && serverCtx.MediaLogic != nil, "configured"),
 		}
 	})
 	addUserRoutes(server, serverCtx)
+	addMediaRoutes(server, serverCtx)
 }
 
 func RegisterFriendsGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
@@ -125,6 +132,11 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/me",
 			Handler: userhandler.UpdateMeHandler(serverCtx),
 		},
+		{
+			Method:  http.MethodPatch,
+			Path:    "/me/avatar",
+			Handler: userhandler.UpdateMeAvatarHandler(serverCtx),
+		},
 	}, jwtOption(serverCtx))
 
 	server.AddRoutes([]rest.Route{
@@ -134,8 +146,18 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Handler: userhandler.CreateUserHandler(serverCtx),
 		},
 		{
+			Method:  http.MethodPost,
+			Path:    "/accounts",
+			Handler: userhandler.CreateUserHandler(serverCtx),
+		},
+		{
 			Method:  http.MethodGet,
 			Path:    "/users/exists",
+			Handler: userhandler.ExistsUserHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/accounts/exists",
 			Handler: userhandler.ExistsUserHandler(serverCtx),
 		},
 		{
@@ -143,7 +165,32 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/users/:identifier",
 			Handler: userhandler.GetUserByIdentifierHandler(serverCtx),
 		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/accounts/:identifier",
+			Handler: userhandler.GetUserByIdentifierHandler(serverCtx),
+		},
 	})
+}
+
+func addMediaRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodPost,
+			Path:    "/media/uploads",
+			Handler: mediahandler.CreateUploadIntentHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/media/uploads/:media_id/complete",
+			Handler: mediahandler.CompleteUploadHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/media/:media_id/download-url",
+			Handler: mediahandler.GetDownloadURLHandler(serverCtx),
+		},
+	}, jwtOption(serverCtx))
 }
 
 func addFriendsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {

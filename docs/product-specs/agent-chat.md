@@ -18,3 +18,5 @@
 - Agent 能够接收会话消息并回复。
 - 群聊中能够区分用户消息、Agent 消息和工具调用结果。
 - Agent 响应失败时，用户能收到可理解的失败说明或降级回复。
+- Agent 回复必须通过 Message Service 写回并显示为普通 IM 消息，`message_origin=ai`，前端聊天气泡明显显示 `AI/Agent` 标签。
+- 同一 trigger message 不能产生重复 Agent 回复；AI 消息默认不再次触发 AI。

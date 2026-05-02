@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,7 +39,7 @@ func (r *MemoryRepository) Create(_ context.Context, user model.User) (model.Use
 	}
 	accountType, ok := model.NormalizeAccountType(string(user.AccountType))
 	if !ok {
-		return model.User{}, apperror.InvalidArgument("account_type must be normal, agent, or admin")
+		return model.User{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
 	}
 	user.AccountType = accountType
 
@@ -113,6 +114,21 @@ func (r *MemoryRepository) UpdateProfile(_ context.Context, userID string, patch
 	}
 	user.UpdatedAt = r.now().UTC()
 
+	r.byID[user.UserID] = user.Clone()
+	return user.Clone(), nil
+}
+
+func (r *MemoryRepository) UpdateAvatar(_ context.Context, userID string, avatarMediaID string) (model.User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	user, exists := r.byID[userID]
+	if !exists {
+		return model.User{}, apperror.NotFound("user not found")
+	}
+
+	user.AvatarMediaID = strings.TrimSpace(avatarMediaID)
+	user.UpdatedAt = r.now().UTC()
 	r.byID[user.UserID] = user.Clone()
 	return user.Clone(), nil
 }

@@ -140,15 +140,26 @@ func EnvelopeFromKafkaMessage(message kafka.Message) (Envelope, error) {
 	}
 
 	transferEvent := MessageEvent{
-		EventID:        event.EventID,
-		EventType:      EventTypeMessageAccepted,
-		ConversationID: event.ConversationID,
-		Seq:            event.Seq,
-		ServerMsgID:    event.ServerMsgID,
-		SenderID:       event.SenderID,
-		ReceiverIDs:    receiverIDsFromMessagingEvent(event),
-		CreatedAt:      event.CreatedAt,
-		TraceID:        event.Payload.TraceID,
+		EventID:               event.EventID,
+		EventType:             EventTypeMessageAccepted,
+		ConversationID:        event.ConversationID,
+		Seq:                   event.Seq,
+		ServerMsgID:           event.ServerMsgID,
+		SenderID:              event.SenderID,
+		ReceiverIDs:           receiverIDsFromMessagingEvent(event),
+		ReceiverID:            event.Payload.ReceiverID,
+		GroupID:               event.Payload.GroupID,
+		ChatType:              event.ChatType,
+		ClientMsgID:           event.Payload.ClientMsgID,
+		ContentType:           event.Payload.ContentType,
+		Content:               string(event.Payload.Content),
+		MessageOrigin:         event.Payload.MessageOrigin,
+		AgentAccountID:        event.Payload.AgentAccountID,
+		TriggerServerMsgID:    event.Payload.TriggerServerMsgID,
+		AgentRunID:            event.Payload.AgentRunID,
+		AllowRecursiveTrigger: event.Payload.AllowRecursiveTrigger,
+		CreatedAt:             event.CreatedAt,
+		TraceID:               event.Payload.TraceID,
 	}
 
 	return Envelope{

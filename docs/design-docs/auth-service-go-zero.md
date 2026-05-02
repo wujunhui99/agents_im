@@ -4,7 +4,7 @@
 
 ## 背景
 
-`auth` 服务依赖已稳定的 `user` 契约完成注册流程。当前 REST 与 RPC transport 已按 goctl/go-zero 生成结构校准，旧手写 `internal/auth/rpc` wrapper 已移除；业务逻辑仍通过接口隔离真实 RPC client 与本地 user logic adapter。
+`auth` 服务依赖已稳定的 Account Service 契约完成注册流程。当前 REST 与 RPC transport 已按 goctl/go-zero 生成结构校准，旧手写 `internal/auth/rpc` wrapper 已移除；业务逻辑仍通过接口隔离真实 RPC client 与本地 Account/User compatibility logic adapter。
 
 ## 服务组成
 
@@ -15,7 +15,7 @@
 - 管理账号认证记录。
 - 负责密码哈希、salt 和密码校验。
 - 签发和校验 token。
-- 通过 user adapter 调用 `ExistsByIdentifier` 和 `CreateUser`。
+- 通过 Account adapter 调用 `ExistsByIdentifier` 和 `CreateUser`。
 
 RPC 方法：
 
@@ -60,7 +60,7 @@ proto/auth.proto
 tests/auth_service_test.go
 ```
 
-现有 `internal/logic`、`internal/repository`、`internal/handler` 继续归 user 服务使用；auth 新代码放在 `internal/auth/...`，避免污染 user 模型。
+现有 `internal/logic`、`internal/repository`、`internal/handler` 继续归 Account Service compatibility transport 使用；auth 新代码放在 `internal/auth/...`，避免污染账号资料模型。
 
 ## 数据模型
 
@@ -76,23 +76,23 @@ tests/auth_service_test.go
 
 约束：
 
-- `Identifier` 使用 user 契约的规范化结果。
+- `Identifier` 使用 Account Service 契约的规范化结果。
 - `PasswordHash` 和 `Salt` 只存在于 `internal/auth/model` 与 auth repository。
 - HTTP/RPC 响应只返回 `user_id`、`identifier`、`token`、`expires_at` 或 token 校验结果。
 
 ## 注册流程
 
 1. 校验 `identifier` 和 `password`。
-2. 调用 user adapter 的 `ExistsByIdentifier(identifier)`。
+2. 调用 Account adapter 的 `ExistsByIdentifier(identifier)`。
 3. 如果已存在，返回 `ALREADY_EXISTS`。
-4. 调用 user adapter 的 `CreateUser(...)` 创建 user 资料。
+4. 调用 Account adapter 的 `CreateUser(...)` 创建账号资料。
 5. 生成 salt 和 password_hash。
 6. 保存 auth credential。
 7. 签发 token 并返回。
 
 当前 adapter 实现：
 
-- `internal/auth/useradapter.LogicClient` 包装 `internal/logic.UserLogic`。
+- `internal/auth/useradapter.LogicClient` 包装 `internal/logic.UserLogic` / Account compatibility logic。
 - 它调用 `ExistsByIdentifier` 和 `CreateUser`，模拟后续 `user-rpc` client。
 - 后续替换时只需要新增 go-zero RPC client adapter，auth logic 保持不变。
 
@@ -171,6 +171,6 @@ PATH=/tmp/go/bin:$PATH scripts/verify-static.sh
 
 - 使用 `goctl api go` 和 `goctl rpc protoc` 校准生成骨架。
 - 将内存 auth repository 替换为 PostgreSQL repository，并增加唯一索引和迁移脚本。
-- 用真实 `user-rpc` client 替换本地 user logic adapter。
+- 用真实 Account Service RPC client 替换本地 Account/User compatibility logic adapter。
 - 增加账号锁定、密码强度策略、审计日志、刷新 token 和 token 吊销。
 - 增加手机号验证码、微信扫码等认证方式。

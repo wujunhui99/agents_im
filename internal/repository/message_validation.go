@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
@@ -23,14 +24,24 @@ func validateCreateMessageInput(input CreateMessageInput) (string, error) {
 	if err := validateMessageRequiredID(input.ClientMsgID, "client_msg_id"); err != nil {
 		return "", err
 	}
-	if input.ContentType != ContentTypeText {
-		return "", apperror.InvalidArgument("content_type must be text")
-	}
-	if strings.TrimSpace(input.Content) == "" {
-		return "", apperror.InvalidArgument("content is required")
-	}
-	if len([]rune(input.Content)) > maxMessageContentLength {
-		return "", apperror.InvalidArgument("content must be 4096 characters or fewer")
+	switch input.ContentType {
+	case ContentTypeText:
+		if strings.TrimSpace(input.Content) == "" {
+			return "", apperror.InvalidArgument("content is required")
+		}
+		if len([]rune(input.Content)) > maxMessageContentLength {
+			return "", apperror.InvalidArgument("content must be 4096 characters or fewer")
+		}
+	case ContentTypeImage:
+		if err := validateImageMessageContent(input.Content); err != nil {
+			return "", err
+		}
+	case ContentTypeFile:
+		if err := validateFileMessageContent(input.Content); err != nil {
+			return "", err
+		}
+	default:
+		return "", apperror.InvalidArgument("content_type must be text, image, or file")
 	}
 	for _, userID := range input.ParticipantUserIDs {
 		if userID == "" {
@@ -40,7 +51,99 @@ func validateCreateMessageInput(input CreateMessageInput) (string, error) {
 			return "", err
 		}
 	}
+	if _, err := normalizeMessageOriginInput(&input); err != nil {
+		return "", err
+	}
 	return inputConversationID(input)
+}
+
+func validateImageMessageContent(content string) error {
+	if strings.TrimSpace(content) == "" {
+		return apperror.InvalidArgument("content is required")
+	}
+	var body struct {
+		MediaID string `json:"mediaId"`
+	}
+	if err := json.Unmarshal([]byte(content), &body); err != nil {
+		return apperror.InvalidArgument("image content must be a JSON object")
+	}
+	if strings.TrimSpace(body.MediaID) == "" {
+		return apperror.InvalidArgument("image content mediaId is required")
+	}
+	return nil
+}
+
+func validateFileMessageContent(content string) error {
+	if strings.TrimSpace(content) == "" {
+		return apperror.InvalidArgument("content is required")
+	}
+	var body struct {
+		MediaID     string `json:"mediaId"`
+		Filename    string `json:"filename"`
+		SizeBytes   int64  `json:"sizeBytes"`
+		ContentType string `json:"contentType"`
+	}
+	if err := json.Unmarshal([]byte(content), &body); err != nil {
+		return apperror.InvalidArgument("file content must be a JSON object")
+	}
+	if strings.TrimSpace(body.MediaID) == "" {
+		return apperror.InvalidArgument("file content mediaId is required")
+	}
+	if strings.TrimSpace(body.Filename) == "" {
+		return apperror.InvalidArgument("file content filename is required")
+	}
+	if body.SizeBytes <= 0 {
+		return apperror.InvalidArgument("file content sizeBytes must be positive")
+	}
+	if strings.TrimSpace(body.ContentType) == "" {
+		return apperror.InvalidArgument("file content contentType is required")
+	}
+	return nil
+}
+
+func normalizeMessageOriginInput(input *CreateMessageInput) (string, error) {
+	origin := strings.ToLower(strings.TrimSpace(input.MessageOrigin))
+	if origin == "" {
+		origin = MessageOriginHuman
+	}
+	switch origin {
+	case MessageOriginHuman, MessageOriginAI, MessageOriginSystem:
+	default:
+		return "", apperror.InvalidArgument("message_origin must be human, ai, or system")
+	}
+	input.MessageOrigin = origin
+	input.AgentAccountID = strings.TrimSpace(input.AgentAccountID)
+	input.TriggerServerMsgID = strings.TrimSpace(input.TriggerServerMsgID)
+	input.AgentRunID = strings.TrimSpace(input.AgentRunID)
+	if input.AgentAccountID != "" {
+		if err := validateMessageConversationComponentID(input.AgentAccountID, "agent_account_id"); err != nil {
+			return "", err
+		}
+	}
+	if input.TriggerServerMsgID != "" {
+		if err := validateMessageRequiredID(input.TriggerServerMsgID, "trigger_server_msg_id"); err != nil {
+			return "", err
+		}
+	}
+	if input.AgentRunID != "" {
+		if err := validateMessageRequiredID(input.AgentRunID, "agent_run_id"); err != nil {
+			return "", err
+		}
+	}
+	switch origin {
+	case MessageOriginAI:
+		if input.AgentAccountID == "" {
+			input.AgentAccountID = input.SenderID
+		}
+		if input.AgentAccountID != input.SenderID {
+			return "", apperror.InvalidArgument("agent_account_id must match sender_id for ai messages")
+		}
+	case MessageOriginHuman, MessageOriginSystem:
+		if input.AgentAccountID != "" || input.TriggerServerMsgID != "" || input.AgentRunID != "" || input.AllowRecursiveTrigger {
+			return "", apperror.InvalidArgument("agent metadata is only allowed for ai messages")
+		}
+	}
+	return origin, nil
 }
 
 func normalizeMessagePullRange(fromSeq, toSeq int64, limit int, order string) (int64, int64, int, string, error) {

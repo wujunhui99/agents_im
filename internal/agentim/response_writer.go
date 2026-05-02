@@ -101,11 +101,15 @@ func normalizeAgentResponseRequest(req AgentResponseRequest) (logic.SendMessageR
 	expectedConversationID := normalizeOptional(req.ConversationID)
 
 	sendReq := logic.SendMessageRequest{
-		SenderID:    agentUserID,
-		ChatType:    conversationType,
-		ClientMsgID: requestID,
-		ContentType: logic.MessageContentTypeText,
-		Content:     text,
+		SenderID:              agentUserID,
+		ChatType:              conversationType,
+		ClientMsgID:           requestID,
+		ContentType:           logic.MessageContentTypeText,
+		Content:               text,
+		MessageOrigin:         logic.MessageOriginAI,
+		AgentAccountID:        agentUserID,
+		AgentRunID:            agentRunID,
+		AllowRecursiveTrigger: req.AllowRecursiveTrigger,
 	}
 	switch conversationType {
 	case ConversationTypeSingle:
@@ -132,6 +136,7 @@ func normalizeAgentResponseRequest(req AgentResponseRequest) (logic.SendMessageR
 	if triggerMessageID == "" {
 		triggerMessageID = normalizeOptional(req.ReplyToMessageID)
 	}
+	sendReq.TriggerServerMsgID = triggerMessageID
 	return sendReq, AgentMessageMetadata{
 		AgentRunID:            agentRunID,
 		TriggerMessageID:      triggerMessageID,
@@ -158,6 +163,18 @@ func validateMessageServiceResponse(resp logic.SendMessageResponse, req logic.Se
 	}
 	if message.ChatType != req.ChatType {
 		return apperror.Internal("message service returned mismatched chat_type")
+	}
+	if message.MessageOrigin != logic.MessageOriginAI {
+		return apperror.Internal("message service returned non-ai origin for agent response")
+	}
+	if message.AgentAccountID != req.AgentAccountID {
+		return apperror.Internal("message service returned mismatched agent_account_id")
+	}
+	if message.TriggerServerMsgID != req.TriggerServerMsgID {
+		return apperror.Internal("message service returned mismatched trigger_server_msg_id")
+	}
+	if message.AgentRunID != req.AgentRunID {
+		return apperror.Internal("message service returned mismatched agent_run_id")
 	}
 	switch req.ChatType {
 	case ConversationTypeSingle:

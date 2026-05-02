@@ -20,6 +20,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		log.Fatalf("build message repository: %v", err)
 	}
+	mediaRepo, err := repository.NewMediaRepositoryForStorage(c.StorageDriver, c.DataSource)
+	if err != nil {
+		log.Fatalf("build media repository: %v", err)
+	}
 	groupsRepo, err := repository.NewGroupsRepositoryForStorage(c.StorageDriver, c.DataSource)
 	if err != nil {
 		log.Fatalf("build groups repository: %v", err)
@@ -27,7 +31,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
 	return &ServiceContext{
 		Config:       c,
-		MessageLogic: business.NewMessageLogicWithValidators(messageRepo, nil, groupsLogic),
+		MessageLogic: business.NewMessageLogicWithMediaValidator(messageRepo, nil, groupsLogic, business.NewMediaLogic(mediaRepo, nil, "")),
 		MessageRepo:  messageRepo,
 		OutboxRepo:   outboxRepositoryFromMessageRepo(messageRepo),
 	}
