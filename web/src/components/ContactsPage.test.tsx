@@ -70,8 +70,11 @@ describe('ContactsPage', () => {
     expect(screen.getAllByText('Bob Lin').length).toBeGreaterThan(0);
   });
 
-  it('marks roadmap contact entries as unavailable instead of normal working actions', () => {
-    render(<ContactsPage userApi={createUserApi()} contactsApi={createContactsApi()} />);
+  it('marks roadmap contact entries as unavailable instead of normal working actions', async () => {
+    const contactsApi = createContactsApi();
+    render(<ContactsPage userApi={createUserApi()} contactsApi={contactsApi} />);
+
+    await waitFor(() => expect(contactsApi.listFriends).toHaveBeenCalled());
 
     expect(screen.getByLabelText('新的朋友')).not.toHaveAttribute('aria-disabled', 'true');
     for (const label of ['群聊', '标签', '公众号']) {
