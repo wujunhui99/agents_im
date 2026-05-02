@@ -1,41 +1,3 @@
-do $$
-begin
-  if to_regclass('public.users') is not null then
-    drop table if exists
-      agent_trigger_idempotency,
-      agent_conversation_hosting,
-      agents,
-      agent_skill_bindings,
-      agent_tool_bindings,
-      agent_prompt_bindings,
-      agent_skills,
-      agent_tools,
-      mcp_servers,
-      agent_prompts,
-      agent_python_execs,
-      agent_file_reads,
-      agent_tool_calls,
-      agent_runs,
-      delivery_attempts,
-      message_outbox,
-      message_idempotency_keys,
-      user_conversation_states,
-      messages,
-      conversation_threads,
-      group_members,
-      groups,
-      friendships,
-      auth_credentials,
-      media_objects,
-      profiles,
-      accounts,
-      users
-    cascade;
-    drop sequence if exists agents_im_users_id_seq;
-  end if;
-end $$;
-
-create sequence if not exists agents_im_snowflake_seq minvalue 0 maxvalue 4095 cycle;
 create sequence if not exists agents_im_groups_id_seq;
 create sequence if not exists agents_im_messages_id_seq;
 create sequence if not exists agents_im_outbox_events_id_seq;
@@ -45,33 +7,20 @@ create sequence if not exists agents_im_mcp_servers_id_seq;
 create sequence if not exists agents_im_agent_tools_id_seq;
 create sequence if not exists agents_im_agent_skills_id_seq;
 
-create or replace function agents_im_next_snowflake_id()
-returns text
-language sql
-as $$
-  select (
-    (
-      ((floor(extract(epoch from clock_timestamp()) * 1000)::bigint - 1704067200000) << 22)
-      | (1::bigint << 12)
-      | (nextval('agents_im_snowflake_seq')::bigint & 4095)
-    )::text
-  )
-$$;
-
 create table if not exists accounts (
-  account_id text primary key default agents_im_next_snowflake_id(),
+  account_id text primary key,
   identifier text not null,
   account_type text not null default 'user',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  constraint accounts_id_numeric_check check (account_id ~ '^[0-9]+$'),
   constraint accounts_identifier_uniq unique (identifier),
-  constraint accounts_account_id_numeric_check check (account_id ~ '^[0-9]+$'),
   constraint accounts_identifier_not_blank check (identifier <> ''),
   constraint accounts_account_type_check check (account_type in ('user', 'agent', 'admin'))
 );
 
 create table if not exists profiles (
-  account_id text primary key,
+  account_id text primary key references accounts(account_id) on delete cascade,
   display_name text not null,
   name text not null,
   gender text not null default 'unknown',
@@ -80,19 +29,15 @@ create table if not exists profiles (
   avatar_media_id text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint profiles_account_fk foreign key (account_id) references accounts(account_id) on delete cascade,
   constraint profiles_display_name_not_blank check (display_name <> ''),
   constraint profiles_name_not_blank check (name <> ''),
   constraint profiles_gender_check check (gender in ('unknown', 'male', 'female', 'other')),
   constraint profiles_age_check check (age >= 0 and age <= 150)
 );
 
-create index if not exists accounts_type_created_idx
-  on accounts (account_type, created_at desc, account_id);
-
 create table if not exists media_objects (
   media_id text primary key default ('med_' || lpad(nextval('agents_im_media_id_seq')::text, 6, '0')),
-  owner_user_id text not null,
+  owner_user_id text not null references accounts(account_id) on delete restrict,
   bucket text not null,
   object_key text not null,
   sha256 text not null default '',
@@ -105,7 +50,6 @@ create table if not exists media_objects (
   status text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint media_objects_owner_account_fk foreign key (owner_user_id) references accounts(account_id) on delete restrict,
   constraint media_objects_owner_not_blank check (owner_user_id <> ''),
   constraint media_objects_bucket_not_blank check (bucket <> ''),
   constraint media_objects_object_key_not_blank check (object_key <> ''),
@@ -138,7 +82,6 @@ create table if not exists auth_credentials (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint auth_credentials_user_id_uniq unique (user_id),
-  constraint auth_credentials_user_id_account_fk foreign key (user_id) references accounts(account_id) on delete restrict,
   constraint auth_credentials_identifier_not_blank check (identifier <> ''),
   constraint auth_credentials_user_id_not_blank check (user_id <> ''),
   constraint auth_credentials_password_hash_not_blank check (password_hash <> ''),
@@ -152,8 +95,6 @@ create table if not exists friendships (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (user_id, friend_id),
-  constraint friendships_user_id_account_fk foreign key (user_id) references accounts(account_id) on delete restrict,
-  constraint friendships_friend_id_account_fk foreign key (friend_id) references accounts(account_id) on delete restrict,
   constraint friendships_distinct_users_check check (user_id <> friend_id),
   constraint friendships_status_check check (status in ('active', 'deleted'))
 );
@@ -168,7 +109,6 @@ create table if not exists groups (
   creator_user_id text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint groups_creator_user_id_account_fk foreign key (creator_user_id) references accounts(account_id) on delete restrict,
   constraint groups_name_not_blank check (name <> ''),
   constraint groups_creator_not_blank check (creator_user_id <> '')
 );
@@ -180,7 +120,6 @@ create table if not exists group_members (
   joined_at timestamptz not null default now(),
   left_at timestamptz,
   primary key (group_id, user_id),
-  constraint group_members_user_id_account_fk foreign key (user_id) references accounts(account_id) on delete restrict,
   constraint group_members_user_not_blank check (user_id <> ''),
   constraint group_members_state_check check (state in ('active', 'left')),
   constraint group_members_left_at_check check (

@@ -2,88 +2,117 @@ package idgen
 
 import (
 	"fmt"
+	"hash/fnv"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	defaultEpochMillis = int64(1704067200000) // 2024-01-01T00:00:00Z
-	nodeBits           = uint(10)
-	sequenceBits       = uint(12)
-	maxNodeID          = int64(1<<nodeBits - 1)
-	maxSequence        = int64(1<<sequenceBits - 1)
+	snowflakeEpochMs = int64(1704067200000) // 2024-01-01T00:00:00Z
+	nodeBits         = uint(10)
+	sequenceBits     = uint(12)
+	maxNodeID        = int64(-1) ^ (int64(-1) << nodeBits)
+	sequenceMask     = int64(-1) ^ (int64(-1) << sequenceBits)
+	nodeShift        = sequenceBits
+	timestampShift   = sequenceBits + nodeBits
 )
 
-type Generator struct {
-	mu         sync.Mutex
-	nodeID     int64
-	epochMilli int64
-	lastMilli  int64
-	sequence   int64
-	now        func() time.Time
+type Snowflake struct {
+	mu       sync.Mutex
+	nodeID   int64
+	lastMs   int64
+	sequence int64
+	now      func() time.Time
 }
 
-func New(nodeID int64) (*Generator, error) {
+func NewSnowflake(nodeID int64) (*Snowflake, error) {
 	if nodeID < 0 || nodeID > maxNodeID {
-		return nil, fmt.Errorf("node id must be between 0 and %d", maxNodeID)
+		return nil, fmt.Errorf("snowflake node id must be between 0 and %d", maxNodeID)
 	}
-	return &Generator{
-		nodeID:     nodeID,
-		epochMilli: defaultEpochMillis,
-		now:        time.Now,
+	return &Snowflake{
+		nodeID: nodeID,
+		lastMs: -1,
+		now:    time.Now,
 	}, nil
 }
 
-func (g *Generator) NewString() (string, error) {
-	id, err := g.NewInt64()
+func (g *Snowflake) NextString() (string, error) {
+	id, err := g.Next()
 	if err != nil {
 		return "", err
 	}
-	return strconv.FormatInt(id, 10), nil
+	return strconv.FormatUint(id, 10), nil
 }
 
-func (g *Generator) NewInt64() (int64, error) {
+func (g *Snowflake) Next() (uint64, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	currentMilli := g.now().UTC().UnixMilli()
-	if currentMilli < g.lastMilli {
-		return 0, fmt.Errorf("clock moved backwards from %d to %d", g.lastMilli, currentMilli)
+	ms := g.now().UTC().UnixMilli()
+	if ms < g.lastMs {
+		return 0, fmt.Errorf("clock moved backwards while generating snowflake id: last=%d current=%d", g.lastMs, ms)
 	}
-	if currentMilli == g.lastMilli {
-		g.sequence = (g.sequence + 1) & maxSequence
+
+	if ms == g.lastMs {
+		g.sequence = (g.sequence + 1) & sequenceMask
 		if g.sequence == 0 {
-			currentMilli = g.waitNextMilli(currentMilli)
+			ms = g.waitNextMillis(ms)
 		}
 	} else {
 		g.sequence = 0
 	}
 
-	g.lastMilli = currentMilli
-	id := ((currentMilli - g.epochMilli) << (nodeBits + sequenceBits)) |
-		(g.nodeID << sequenceBits) |
-		g.sequence
-	return id, nil
-}
-
-func (g *Generator) waitNextMilli(currentMilli int64) int64 {
-	for currentMilli <= g.lastMilli {
-		currentMilli = g.now().UTC().UnixMilli()
+	elapsed := ms - snowflakeEpochMs
+	if elapsed < 0 {
+		return 0, fmt.Errorf("clock is before snowflake epoch")
 	}
-	return currentMilli
+
+	g.lastMs = ms
+	id := (elapsed << timestampShift) | (g.nodeID << nodeShift) | g.sequence
+	return uint64(id), nil
 }
 
-var defaultGenerator = mustNewDefault()
+func (g *Snowflake) waitNextMillis(currentMs int64) int64 {
+	for {
+		ms := g.now().UTC().UnixMilli()
+		if ms > currentMs {
+			return ms
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+var defaultSnowflake = mustDefaultSnowflake()
 
 func NewString() (string, error) {
-	return defaultGenerator.NewString()
+	return defaultSnowflake.NextString()
 }
 
-func mustNewDefault() *Generator {
-	g, err := New(1)
+func mustDefaultSnowflake() *Snowflake {
+	g, err := NewSnowflake(defaultNodeID())
 	if err != nil {
 		panic(err)
 	}
 	return g
+}
+
+func defaultNodeID() int64 {
+	raw := strings.TrimSpace(os.Getenv("AGENTS_IM_SNOWFLAKE_NODE_ID"))
+	if raw != "" {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err == nil && value >= 0 && value <= maxNodeID {
+			return value
+		}
+	}
+
+	host, err := os.Hostname()
+	if err != nil || strings.TrimSpace(host) == "" {
+		return 0
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(host))
+	return int64(h.Sum32() % uint32(maxNodeID+1))
 }

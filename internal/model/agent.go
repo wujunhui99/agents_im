@@ -11,6 +11,7 @@ const (
 
 type Agent struct {
 	AgentID     string
+	AccountID   string
 	IMUserID    string
 	Name        string
 	Description string
@@ -21,5 +22,11 @@ type Agent struct {
 }
 
 func (a Agent) Clone() Agent {
+	if a.AccountID == "" {
+		a.AccountID = a.IMUserID
+	}
+	if a.IMUserID == "" {
+		a.IMUserID = a.AccountID
+	}
 	return a
 }

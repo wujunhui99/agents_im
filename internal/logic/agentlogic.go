@@ -76,6 +76,7 @@ func NewAgentLogic(repo repository.AgentRepository, accountTypeChecker UserAccou
 
 type AgentInfo struct {
 	AgentID     string `json:"agent_id"`
+	AccountID   string `json:"account_id"`
 	IMUserID    string `json:"im_user_id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -86,6 +87,7 @@ type AgentInfo struct {
 }
 
 type CreateAgentRequest struct {
+	AccountID   string `json:"account_id"`
 	IMUserID    string `json:"im_user_id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -120,7 +122,13 @@ type ListAgentsResponse struct {
 }
 
 func (l *AgentLogic) CreateAgent(ctx context.Context, req CreateAgentRequest) (AgentInfo, error) {
-	imUserID, err := normalizeRequiredID(req.IMUserID, "im_user_id")
+	accountIDInput := req.AccountID
+	accountIDField := "account_id"
+	if strings.TrimSpace(accountIDInput) == "" {
+		accountIDInput = req.IMUserID
+		accountIDField = "im_user_id"
+	}
+	accountID, err := normalizeRequiredID(accountIDInput, accountIDField)
 	if err != nil {
 		return AgentInfo{}, err
 	}
@@ -146,12 +154,13 @@ func (l *AgentLogic) CreateAgent(ctx context.Context, req CreateAgentRequest) (A
 	if err := l.ensureAgentRepository(); err != nil {
 		return AgentInfo{}, err
 	}
-	if err := l.ensureAgentAccountType(ctx, imUserID); err != nil {
+	if err := l.ensureAgentAccountType(ctx, accountID); err != nil {
 		return AgentInfo{}, err
 	}
 
 	agent, err := l.repo.CreateAgent(ctx, model.Agent{
-		IMUserID:    imUserID,
+		AccountID:   accountID,
+		IMUserID:    accountID,
 		Name:        name,
 		Description: description,
 		Status:      status,
@@ -326,8 +335,10 @@ func normalizeAgentStatus(value string, allowEmpty bool) (string, error) {
 }
 
 func toAgentInfo(agent model.Agent) AgentInfo {
+	agent = agent.Clone()
 	return AgentInfo{
 		AgentID:     agent.AgentID,
+		AccountID:   agent.AccountID,
 		IMUserID:    agent.IMUserID,
 		Name:        agent.Name,
 		Description: agent.Description,

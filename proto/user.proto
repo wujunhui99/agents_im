@@ -4,9 +4,10 @@ package user.v1;
 
 option go_package = "github.com/wujunhui99/agents_im/proto/userpb";
 
-// UserService is the V0 transport name for the account profile service.
+// UserService is the V0 transport name for the account/profile service.
 // New domain documentation should refer to Account Service semantics; public
-// user_id fields remain account-id aliases for compatibility.
+// user_id fields remain account_id aliases for compatibility. Account IDs are
+// Snowflake numeric strings without type prefixes.
 service UserService {
   rpc CreateUser(CreateUserRequest) returns (UserResponse);
   rpc GetUserByIdentifier(GetUserByIdentifierRequest) returns (UserResponse);
@@ -15,7 +16,8 @@ service UserService {
   rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UserResponse);
 }
 
-// User is the V0 transport message for an Account profile.
+// User is the V0 transport message for an Account/Profile aggregate. user_id is
+// the compatibility alias for internal account_id.
 message User {
   string user_id = 1;
   string identifier = 2;

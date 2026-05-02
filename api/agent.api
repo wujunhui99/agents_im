@@ -2,7 +2,7 @@ syntax = "v1"
 
 info (
 	title:   "Agent API"
-	desc:    "Agent management foundation HTTP API"
+	desc:    "Agent management foundation HTTP API; im_user_id is a V0 alias for an agent account_id."
 	author:  "Codex"
 	version: "v0.1.0"
 )

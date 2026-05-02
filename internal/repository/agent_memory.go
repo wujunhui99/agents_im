@@ -2,28 +2,27 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/idgen"
 	"github.com/wujunhui99/agents_im/internal/model"
 )
 
 type MemoryAgentRepository struct {
-	mu       sync.RWMutex
-	nextID   uint64
-	agents   map[string]model.Agent
-	imUserID map[string]string
-	now      func() time.Time
+	mu        sync.RWMutex
+	agents    map[string]model.Agent
+	accountID map[string]string
+	now       func() time.Time
 }
 
 func NewMemoryAgentRepository() *MemoryAgentRepository {
 	return &MemoryAgentRepository{
-		agents:   make(map[string]model.Agent),
-		imUserID: make(map[string]string),
-		now:      time.Now,
+		agents:    make(map[string]model.Agent),
+		accountID: make(map[string]string),
+		now:       time.Now,
 	}
 }
 
@@ -31,20 +30,24 @@ func (r *MemoryAgentRepository) CreateAgent(_ context.Context, agent model.Agent
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.imUserID[agent.IMUserID]; exists {
-		return model.Agent{}, apperror.AlreadyExists("agent already exists for im_user_id")
+	agent = agent.Clone()
+	if _, exists := r.accountID[agent.AccountID]; exists {
+		return model.Agent{}, apperror.AlreadyExists("agent already exists for account_id")
 	}
 
-	r.nextID++
 	if agent.AgentID == "" {
-		agent.AgentID = fmt.Sprintf("agt_%06d", r.nextID)
+		agentID, err := idgen.NewString()
+		if err != nil {
+			return model.Agent{}, err
+		}
+		agent.AgentID = agentID
 	}
 	now := r.now().UTC()
 	agent.CreatedAt = now
 	agent.UpdatedAt = now
 
 	r.agents[agent.AgentID] = agent.Clone()
-	r.imUserID[agent.IMUserID] = agent.AgentID
+	r.accountID[agent.AccountID] = agent.AgentID
 	return agent.Clone(), nil
 }
 
@@ -63,7 +66,7 @@ func (r *MemoryAgentRepository) GetAgentByIMUserID(_ context.Context, imUserID s
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	agentID, exists := r.imUserID[imUserID]
+	agentID, exists := r.accountID[imUserID]
 	if !exists {
 		return model.Agent{}, apperror.NotFound("agent not found")
 	}

@@ -14,7 +14,7 @@ Phase 1 previously used in-memory repositories for user, auth, friends, groups, 
 ## Goals
 
 - Provide local PostgreSQL through `docker-compose.yml`.
-- Store phase-1 account, profile, auth credential, friendship, group, message, conversation, read-state, idempotency, outbox, and delivery-attempt data in PostgreSQL.
+- Store phase-1 account/profile, auth credential, friendship, group, message, conversation, read-state, idempotency, outbox, and delivery-attempt data in PostgreSQL.
 - Keep normal `go test ./...` independent from Docker/PostgreSQL.
 - Preserve existing domain repository interfaces.
 - Keep auth secrets owned by auth storage, not user/message storage.
@@ -32,8 +32,8 @@ Migration SQL lives under [`../../db/migrations/001_init_postgres.sql`](../../db
 
 Phase-1 tables:
 
-- `accounts`: account identity authority; contains `account_id`, `identifier`, and `account_type`, but no password, hash, salt, token, or credential fields.
-- `profiles`: profile authority for human users, agents, and admins; contains display/avatar/profile fields keyed by `account_id`.
+- `accounts`: account identity authority; stores Snowflake `account_id`, unique `identifier`, `account_type`, and account timestamps.
+- `profiles`: account profile authority; stores display fields, avatar media reference, and profile timestamps for human users, agents, and admins. It contains no password, hash, salt, token, or credential fields.
 - `auth_credentials`: auth-owned credential row keyed by identifier; stores password hash, salt, and hash version.
 - `friendships`: directional friendship rows; repository writes reciprocal rows in one transaction.
 - `groups`: group metadata.
@@ -49,14 +49,8 @@ Phase-1 tables:
 
 ## Service Boundary Constraints
 
-Strong foreign keys are used inside service-owned aggregates and on storage-local account profile references:
+Strong foreign keys are only used inside a service-owned aggregate:
 
-- `profiles.account_id -> accounts.account_id`
-- `auth_credentials.user_id -> accounts.account_id`
-- `friendships.user_id / friendships.friend_id -> accounts.account_id`
-- `groups.creator_user_id -> accounts.account_id`
-- `group_members.user_id -> accounts.account_id`
-- `media_objects.owner_user_id -> accounts.account_id`
 - `group_members.group_id -> groups.group_id`
 - `messages.conversation_id -> conversation_threads.conversation_id`
 - `user_conversation_states.conversation_id -> conversation_threads.conversation_id`
@@ -64,14 +58,14 @@ Strong foreign keys are used inside service-owned aggregates and on storage-loca
 - `message_outbox.server_msg_id -> messages.server_msg_id`
 - `delivery_attempts.server_msg_id -> messages.server_msg_id`
 
-Compatibility `user_id` columns keep account id alias semantics:
+Cross-service references are logical constraints:
 
-- `auth_credentials.user_id` is a V0 account id alias and references `accounts.account_id`.
-- `friendships.user_id` and `friendships.friend_id` are V0 account id aliases and reference `accounts.account_id`.
-- `groups.creator_user_id` and `group_members.user_id` are V0 account id aliases and reference `accounts.account_id`.
+- `auth_credentials.user_id` references an account created through the auth/Account Service registration flow, but has no database FK to `accounts`.
+- `friendships.user_id` and `friendships.friend_id` are account id aliases validated by the friends logic through Account Service lookup.
+- `groups.creator_user_id` and `group_members.user_id` are account id aliases validated by groups logic through Account Service lookup.
 - Message sender/receiver/member IDs are validated before repository writes when validators are configured.
 
-Message tables still keep account ids as logical references because message repository contract tests create isolated message rows without provisioning account profiles.
+This keeps the database usable during microservice extraction and avoids coupling service ownership through cross-service FK cascades.
 
 ## Configuration
 

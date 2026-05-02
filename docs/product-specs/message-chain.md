@@ -138,7 +138,7 @@ group:{group_id}
 
 The exact string format is a design detail, but it must be stable and documented.
 
-The `sender_id`, `receiver_id`, and `group_id` components used to derive a conversation ID must be canonical service IDs, not user-facing identifiers. Phase 1 accepts non-empty components up to 128 characters, forbids `:` and NUL because `:` is the conversation ID delimiter, and rejects any derived `conversation_id` longer than 256 characters. Account IDs are unprefixed numeric strings; group IDs use the group service ID format.
+The `sender_id`, `receiver_id`, and `group_id` components used to derive a conversation ID must be canonical service IDs, not user-facing identifiers. Phase 1 accepts non-empty components up to 128 characters, forbids `:` and NUL because `:` is the conversation ID delimiter, and rejects any derived `conversation_id` longer than 256 characters. The system-generated `numeric account IDs` and `grp_...` IDs satisfy these constraints.
 
 ## Sequence model
 

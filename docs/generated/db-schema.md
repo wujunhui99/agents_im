@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-第一阶段 PostgreSQL migration 已覆盖账号资料、认证、好友、群聊、消息、outbox、delivery attempt、Agent profile 管理表、Agent prompt/tool/skill registry 元数据表和 Agent audit 表。`accounts.account_type` 支持 `user`、`agent`、`admin`，默认 `user`；账号资料拆分为 `accounts` + `profiles`。
+第一阶段 PostgreSQL migration 已覆盖账号资料、认证、好友、群聊、消息、outbox、delivery attempt、Agent 管理表、Agent prompt/tool/skill registry 元数据表和 Agent audit 表。`accounts.account_type` 支持 `user`、`agent`、`admin`，默认 `user`；账号资料拆分为 `accounts` 与 `profiles`。
 
 ## 当前覆盖
 
@@ -37,15 +37,12 @@
 
 ## Agent Management
 
-`db/migrations/002_agent_management.sql` 新增：
-
-- `agents_im_agents_id_seq`
-- `agents`
+`db/migrations/002_agent_management.sql` 新增 `agents`。
 
 `agents` 字段：
 
 - `agent_id`
-- `im_user_id`
+- `account_id`
 - `name`
 - `description`
 - `status`
@@ -55,9 +52,10 @@
 
 约束：
 
-- `im_user_id` 唯一，并引用 `accounts(account_id)`。
+- `agent_id` 为无前缀 Snowflake 数字字符串。
+- `account_id` 唯一，并引用 `accounts(account_id)`。
 - `status` 只能为 `draft`、`active`、`disabled`、`archived`。
-- Agent 配置独立于 `profiles` 表；`accounts` + `profiles` 提供 IM 展示身份和账号类型来源。
+- Agent 配置独立于 `profiles` 表；Agent 展示资料和头像来自 `profiles`，类型来源为 `accounts.account_type=agent`。
 
 ## 后续预期覆盖
 

@@ -155,7 +155,7 @@ Conversation ID components are validated before storage:
 - Components and `client_msg_id` must not contain NUL because memory idempotency/read-state keys and PostgreSQL text storage must not accept hidden delimiters.
 - The derived `conversation_id` must be 256 characters or fewer so a successfully sent message can later be pulled through the public conversation APIs.
 
-Current Account Service generates unprefixed numeric account IDs. Group IDs still use the group service ID format, and user-facing `identifier` values are not used as conversation ID components.
+Current User and Group services generate `numeric account IDs` and `grp_...` IDs, and user-facing `identifier` values are not used as conversation ID components.
 
 ### user_conversation_states
 
