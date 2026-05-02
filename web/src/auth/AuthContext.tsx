@@ -8,7 +8,7 @@ type AuthResponse = {
   display_name?: string;
   name?: string;
   gender?: string;
-  age?: number;
+  birth_date?: string;
   region?: string;
   token: string;
   expires_at?: string;
@@ -115,7 +115,7 @@ function toSession(response: AuthResponse, displayNameFallback?: string): AuthSe
       identifier: response.identifier,
       displayName: response.display_name || response.name || displayNameFallback || response.identifier,
       gender: response.gender,
-      age: response.age,
+      birth_date: response.birth_date,
       region: response.region,
     },
   };

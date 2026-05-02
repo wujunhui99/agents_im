@@ -1587,7 +1587,6 @@ done
 
 account_code_patterns=(
   "AccountTypeUser  AccountType = \"user\""
-  "AccountTypeNormal AccountType = AccountTypeUser"
   "type Account struct"
   "type Profile struct"
   "AccountID"
@@ -1621,8 +1620,8 @@ for pattern in "${account_storage_patterns[@]}"; do
 done
 
 rg -qF "account_type?: 'user' | 'agent' | 'admin'" web/src/api/user.ts
-rg -qF "Legacy server data that still contains \`normal\` is normalized by the backend to \`user\`" docs/product-specs/frontend-backend-contract.md
-rg -qF "旧 \`account_type=normal\` 仅作为迁移输入兼容" docs/design-docs/account-service-terminology.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
+rg -qF "Legacy server data that still contains \`normal\` is invalid and must be migrated before use" docs/product-specs/frontend-backend-contract.md
+rg -qF "旧 \`account_type=normal\` 不再作为有效输入兼容" docs/design-docs/account-service-terminology.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
 rg -qF "Account Service 术语与 V0 compatibility" AGENTS.md docs/design-docs/index.md
 rg -qF "Account Service 第一阶段产品规格" docs/product-specs/index.md docs/product-specs/user-service.md
 rg -qF "Account Service go-zero 实现设计" docs/design-docs/index.md docs/design-docs/user-service-go-zero.md
@@ -1803,8 +1802,15 @@ fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
-  internal/model internal/logic internal/repository internal/handler internal/rpcgen/user internal/svc; then
+  internal/model internal/logic internal/handler internal/rpcgen/user internal/svc; then
   echo "forbidden auth secret field found in service source" >&2
+  exit 1
+fi
+
+if rg -n "password|password_hash|verification_code|oauth_token|credential" \
+  internal/repository \
+  --glob '!postgres_account_profiles_test.go'; then
+  echo "forbidden auth secret field found in repository source" >&2
   exit 1
 fi
 

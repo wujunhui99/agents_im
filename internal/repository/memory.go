@@ -66,7 +66,7 @@ func (r *MemoryRepository) Create(_ context.Context, user model.User) (model.Use
 		DisplayName:   user.DisplayName,
 		Name:          user.Name,
 		Gender:        user.Gender,
-		Age:           user.Age,
+		BirthDate:     user.BirthDate,
 		Region:        user.Region,
 		AvatarMediaID: user.AvatarMediaID,
 		CreatedAt:     now,
@@ -129,8 +129,8 @@ func (r *MemoryRepository) UpdateProfile(_ context.Context, userID string, patch
 	if patch.Gender != nil {
 		user.Gender = *patch.Gender
 	}
-	if patch.Age != nil {
-		user.Age = *patch.Age
+	if patch.BirthDate != nil {
+		user.BirthDate = *patch.BirthDate
 	}
 	if patch.Region != nil {
 		user.Region = *patch.Region

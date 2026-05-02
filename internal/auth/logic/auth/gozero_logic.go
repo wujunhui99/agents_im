@@ -56,7 +56,7 @@ func (l *RegisterLogic) Register(req *types.RegisterReq) (*types.AuthResp, error
 		DisplayName: req.DisplayName,
 		Name:        req.Name,
 		Gender:      req.Gender,
-		Age:         req.Age,
+		BirthDate:   req.BirthDate,
 		Region:      req.Region,
 	})
 	if err != nil {

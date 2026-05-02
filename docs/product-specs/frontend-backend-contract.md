@@ -46,7 +46,7 @@ Content-Type: application/json
   "password": "[REDACTED]",
   "display_name": "Alice",
   "gender": "female",
-  "age": 30,
+  "birth_date": "1996-05-02",
   "region": "Shanghai"
 }
 ```
@@ -114,7 +114,7 @@ Authorization: Bearer <access_token>
     "display_name": "Alice",
     "name": "Alice",
     "gender": "female",
-    "age": 30,
+    "birth_date": "1996-05-02",
     "region": "Shanghai",
     "account_type": "user",
     "avatar_media_id": "med_000001",
@@ -124,7 +124,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-`account_type` is one of `user`, `agent`, or `admin`. Public registration and public account creation always create `user`; clients cannot self-select `agent` or `admin` through the frontend-visible REST API. Legacy server data that still contains `normal` is normalized by the backend to `user`.
+`account_type` is one of `user`, `agent`, or `admin`. Public registration and public account creation always create `user`; clients cannot self-select `agent` or `admin` through the frontend-visible REST API. Legacy server data that still contains `normal` is invalid and must be migrated before use.
 
 ### Update Current User
 

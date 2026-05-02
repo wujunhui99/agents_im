@@ -97,7 +97,7 @@ type CreateUserReq struct {
 	DisplayName string `json:"display_name,optional"`
 	Name        string `json:"name,optional"`
 	Gender      string `json:"gender,optional"`
-	Age         int32  `json:"age,optional"`
+	BirthDate   string `json:"birth_date,optional"`
 	Region      string `json:"region,optional"`
 }
 
@@ -137,7 +137,7 @@ type FriendProfile struct {
 	DisplayName   string `json:"display_name"`
 	Name          string `json:"name"`
 	Gender        string `json:"gender"`
-	Age           int32  `json:"age"`
+	BirthDate     string `json:"birth_date"`
 	Region        string `json:"region"`
 	AccountType   string `json:"account_type"`
 	AvatarMediaID string `json:"avatar_media_id"`
@@ -397,7 +397,7 @@ type RegisterReq struct {
 	DisplayName string `json:"display_name,optional"`
 	Name        string `json:"name,optional"`
 	Gender      string `json:"gender,optional"`
-	Age         int32  `json:"age,optional"`
+	BirthDate   string `json:"birth_date,optional"`
 	Region      string `json:"region,optional"`
 }
 
@@ -437,7 +437,7 @@ type UpdateMeReq struct {
 	DisplayName string `json:"display_name,optional"`
 	Name        string `json:"name,optional"`
 	Gender      string `json:"gender,optional"`
-	Age         int32  `json:"age,optional"`
+	BirthDate   string `json:"birth_date,optional"`
 	Region      string `json:"region,optional"`
 }
 
@@ -458,7 +458,7 @@ type User struct {
 	DisplayName   string `json:"display_name"`
 	Name          string `json:"name"`
 	Gender        string `json:"gender"`
-	Age           int32  `json:"age"`
+	BirthDate     string `json:"birth_date"`
 	Region        string `json:"region"`
 	AccountType   string `json:"account_type"`
 	AvatarMediaID string `json:"avatar_media_id"`

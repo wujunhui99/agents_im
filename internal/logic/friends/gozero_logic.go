@@ -179,7 +179,7 @@ func toFriendProfile(profile business.UserProfile) types.FriendProfile {
 		DisplayName:   profile.DisplayName,
 		Name:          profile.Name,
 		Gender:        profile.Gender,
-		Age:           profile.Age,
+		BirthDate:     profile.BirthDate,
 		Region:        profile.Region,
 		AccountType:   profile.AccountType,
 		AvatarMediaID: profile.AvatarMediaID,

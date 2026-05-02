@@ -9,7 +9,7 @@ Account Service 是账号资料的权威边界。Account 可代表 human user、
 术语规则：
 
 - 领域与服务名使用 Account Service。
-- `account_type` 支持 `user`、`agent`、`admin`；旧 `normal` 仅作为迁移输入兼容并归一化为 `user`。
+- `account_type` 支持 `user`、`agent`、`admin`；旧 `account_type=normal` 不再作为有效输入兼容。
 - Public JSON/RPC 字段 `user_id` 是 account id alias，第一阶段不批量改名。
 - PostgreSQL source-of-truth 表为 `accounts` 与 `profiles`，不再使用 `users` 表保存资料。
 - Account/Agent ID 均由 Snowflake 算法生成，为无前缀数字字符串。
@@ -93,7 +93,7 @@ Profile 字段（当前 Go/Proto V0 类型名仍为 `User`）：
 - `DisplayName string`
 - `Name string`
 - `Gender string`
-- `Age int32`
+- `BirthDate string`
 - `Region string`
 - `AvatarMediaID string`
 - `CreatedAt time.Time`
@@ -103,9 +103,9 @@ Profile 字段（当前 Go/Proto V0 类型名仍为 `User`）：
 
 - `Identifier` 经 `NormalizeIdentifier` 处理后唯一。
 - `Gender` 只允许空值、`unknown`、`male`、`female`、`other`。
-- `Age` 为 `0` 表示未设置；设置时范围为 `1..150`。
+- `BirthDate` 为生日日期字符串；不存储年龄，年龄如需展示只能动态计算。
 - `AccountType` 只允许空值、`user`、`agent`、`admin`；空值在 logic 和 repository 层统一归一化为 `user`。
-- 旧 `normal` 输入只为 V0 迁移兼容保留，写入/返回统一为 `user`。
+- 旧 `account_type=normal` 不再作为有效输入兼容；非法值必须映射为 `INVALID_ARGUMENT`/gRPC `InvalidArgument`，不能降级为 `user`。
 - `UserID` / `AccountID` 由 repository 通过 Snowflake 生成；`UserID` 是 V0 account id alias。
 
 禁止字段：

@@ -5,7 +5,7 @@ export type AuthUser = {
   identifier: string;
   displayName: string;
   gender?: string;
-  age?: number;
+  birth_date?: string;
   region?: string;
 };
 
@@ -36,7 +36,7 @@ export function readStoredSession(storage: Storage = localStorage): AuthSession 
         identifier: parsed.user.identifier,
         displayName: parsed.user.displayName || parsed.user.identifier,
         gender: parsed.user.gender,
-        age: parsed.user.age,
+        birth_date: parsed.user.birth_date,
         region: parsed.user.region,
       },
     };

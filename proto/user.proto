@@ -24,7 +24,7 @@ message User {
   string display_name = 3;
   string name = 4;
   string gender = 5;
-  int32 age = 6;
+  string birth_date = 6;
   string region = 7;
   string created_at = 8;
   string updated_at = 9;
@@ -37,7 +37,7 @@ message CreateUserRequest {
   string display_name = 2;
   string name = 3;
   string gender = 4;
-  int32 age = 5;
+  string birth_date = 5;
   string region = 6;
   string account_type = 7;
 }
@@ -64,7 +64,7 @@ message UpdateUserProfileRequest {
   optional string display_name = 2;
   optional string name = 3;
   optional string gender = 4;
-  optional int32 age = 5;
+  optional string birth_date = 5;
   optional string region = 6;
 }
 

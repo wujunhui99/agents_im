@@ -28,7 +28,7 @@
 
 ### 账号密码注册
 
-1. 客户端提交 `identifier`、`password`，可选提交 `display_name`、`name`、`gender`、`age`、`region`。
+1. 客户端提交 `identifier`、`password`，可选提交 `display_name`、`name`、`gender`、`birth_date`、`region`。
 2. `auth` 调用或适配 Account Service 的 `ExistsByIdentifier`。
 3. 如果唯一标识符已存在，注册失败。
 4. 如果不存在，`auth` 调用或适配 Account Service 的 `CreateUser` 创建基础资料。
@@ -80,7 +80,7 @@
   "display_name": "Alice",
   "name": "Alice",
   "gender": "female",
-  "age": 30,
+  "birth_date": "1996-05-02",
   "region": "Shanghai"
 }
 ```

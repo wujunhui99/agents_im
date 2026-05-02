@@ -32,7 +32,7 @@ func (l *RegisterLogic) Register(in *authpb.RegisterRequest) (*authpb.AuthRespon
 		DisplayName: in.GetDisplayName(),
 		Name:        in.GetName(),
 		Gender:      in.GetGender(),
-		Age:         in.GetAge(),
+		BirthDate:   in.GetBirthDate(),
 		Region:      in.GetRegion(),
 	})
 	if err != nil {

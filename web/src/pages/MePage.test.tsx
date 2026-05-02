@@ -9,7 +9,7 @@ const profile: UserProfile = {
   display_name: 'Alice Chen',
   name: 'Alice Chen',
   gender: 'female',
-  age: 30,
+  birth_date: '1996-05-02',
   region: 'Shanghai',
   account_type: 'user',
 };

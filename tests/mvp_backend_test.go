@@ -33,7 +33,7 @@ func TestMVPBackendAuthProfileSmoke(t *testing.T) {
 	userMux := newUserGoZeroRouter(t, svc.NewServiceContextWithAuth(userRepo, authConfig))
 
 	registerResp := httptest.NewRecorder()
-	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"mvp_alice","password":"local-demo-password","display_name":"MVP Alice","gender":"female","age":30,"region":"Shanghai"}`)
+	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"mvp_alice","password":"local-demo-password","display_name":"MVP Alice","gender":"female","birth_date":"1996-05-02","region":"Shanghai"}`)
 	authMux.ServeHTTP(registerResp, registerReq)
 	if registerResp.Code != http.StatusOK {
 		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())

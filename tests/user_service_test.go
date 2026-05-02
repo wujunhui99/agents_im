@@ -23,7 +23,7 @@ func TestUserLogicCreateDuplicateExistsAndUpdate(t *testing.T) {
 		Identifier:  "Alice_001",
 		DisplayName: "Alice",
 		Gender:      "female",
-		Age:         30,
+		BirthDate:   "1996-05-02",
 		Region:      "Shanghai",
 	})
 	if err != nil {
@@ -47,16 +47,16 @@ func TestUserLogicCreateDuplicateExistsAndUpdate(t *testing.T) {
 	}
 
 	displayName := "Alice Updated"
-	age := int32(31)
+	birthDate := "1995-05-02"
 	updated, err := userLogic.UpdateUserProfile(ctx, logic.UpdateUserProfileRequest{
 		UserID:      created.UserID,
 		DisplayName: &displayName,
-		Age:         &age,
+		BirthDate:   &birthDate,
 	})
 	if err != nil {
 		t.Fatalf("update profile: %v", err)
 	}
-	if updated.DisplayName != "Alice Updated" || updated.Name != "Alice Updated" || updated.Age != 31 {
+	if updated.DisplayName != "Alice Updated" || updated.Name != "Alice Updated" || updated.BirthDate != birthDate {
 		t.Fatalf("unexpected updated profile: %+v", updated)
 	}
 	if updated.Identifier != created.Identifier || updated.UserID != created.UserID {
@@ -68,7 +68,7 @@ func TestUserHTTPHandlers(t *testing.T) {
 	serviceContext := svc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
 	mux := newUserGoZeroRouter(t, serviceContext)
 
-	createBody := `{"identifier":"bob_001","display_name":"Bob","gender":"male","age":28,"region":"Beijing"}`
+	createBody := `{"identifier":"bob_001","display_name":"Bob","gender":"male","birth_date":"1998-05-02","region":"Beijing"}`
 	createResp := httptest.NewRecorder()
 	createReq := newJSONRequest(http.MethodPost, "/users", createBody)
 	mux.ServeHTTP(createResp, createReq)

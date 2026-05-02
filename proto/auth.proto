@@ -17,7 +17,7 @@ message RegisterRequest {
   string display_name = 3;
   string name = 4;
   string gender = 5;
-  int32 age = 6;
+  string birth_date = 6;
   string region = 7;
 }
 

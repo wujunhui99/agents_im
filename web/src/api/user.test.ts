@@ -8,7 +8,7 @@ const profile: UserProfile = {
   display_name: 'Alice Chen',
   name: 'Alice Chen',
   gender: 'female',
-  age: 30,
+  birth_date: '1996-05-02',
   region: 'Hangzhou',
   created_at: '2026-04-29T12:00:00Z',
   updated_at: '2026-04-29T12:30:00Z',

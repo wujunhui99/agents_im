@@ -30,7 +30,7 @@ type Profile struct {
 	DisplayName   string
 	Name          string
 	Gender        string
-	Age           int32
+	BirthDate     string
 	Region        string
 	AvatarMediaID string
 	CreatedAt     time.Time
@@ -48,7 +48,7 @@ type User struct {
 	DisplayName   string
 	Name          string
 	Gender        string
-	Age           int32
+	BirthDate     string
 	Region        string
 	AccountType   AccountType
 	AvatarMediaID string
@@ -101,7 +101,7 @@ func NewAccountProfile(account Account, profile Profile) User {
 		DisplayName:      profile.DisplayName,
 		Name:             profile.Name,
 		Gender:           profile.Gender,
-		Age:              profile.Age,
+		BirthDate:        profile.BirthDate,
 		Region:           profile.Region,
 		AccountType:      account.AccountType,
 		AvatarMediaID:    profile.AvatarMediaID,
@@ -134,7 +134,7 @@ func (u User) ToProfile() Profile {
 		DisplayName:   u.DisplayName,
 		Name:          u.Name,
 		Gender:        u.Gender,
-		Age:           u.Age,
+		BirthDate:     u.BirthDate,
 		Region:        u.Region,
 		AvatarMediaID: u.AvatarMediaID,
 		CreatedAt:     u.ProfileCreatedAt,

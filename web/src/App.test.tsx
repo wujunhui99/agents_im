@@ -14,7 +14,7 @@ const initialProfile: UserProfile = {
   display_name: 'Alice',
   name: 'Alice',
   gender: 'female',
-  age: 30,
+  birth_date: '1996-05-02',
   region: 'Shanghai',
   account_type: 'user',
   created_at: '2026-04-29T12:00:00Z',
@@ -37,7 +37,7 @@ function storeSession(overrides?: Partial<AuthSession>) {
       identifier: 'alice_001',
       displayName: 'Alice Chen',
       gender: 'female',
-      age: 30,
+      birth_date: '1996-05-02',
       region: 'Shanghai',
     },
     ...overrides,
@@ -265,21 +265,21 @@ describe('WeChat-inspired app shell', () => {
     expect(screen.getByText('alice_001')).toBeInTheDocument();
     expect(screen.getByText('用户')).toBeInTheDocument();
     expect(screen.getByText('female')).toBeInTheDocument();
-    expect(screen.getByText('30')).toBeInTheDocument();
+    expect(screen.getByText('1996-05-02')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '编辑个人资料' }));
     await user.clear(screen.getByLabelText('display_name'));
     await user.type(screen.getByLabelText('display_name'), 'Alice Chen');
     await user.clear(screen.getByLabelText('region'));
     await user.type(screen.getByLabelText('region'), 'Hangzhou');
-    await user.clear(screen.getByLabelText('age'));
-    await user.type(screen.getByLabelText('age'), '31');
+    await user.clear(screen.getByLabelText('生日'));
+    await user.type(screen.getByLabelText('生日'), '1995-05-02');
     await user.click(screen.getByRole('button', { name: '保存' }));
 
     expect(patchCurrentUser).toHaveBeenCalledWith({
       display_name: 'Alice Chen',
       gender: 'female',
-      age: 31,
+      birth_date: '1995-05-02',
       region: 'Hangzhou',
     });
     expect((await screen.findAllByText('Alice Chen')).length).toBeGreaterThan(0);
@@ -308,7 +308,7 @@ describe('WeChat-inspired app shell', () => {
             display_name: 'Bob Lin',
             name: 'Bob Lin',
             gender: '',
-            age: 0,
+            birth_date: '',
             region: '',
           },
         }),
@@ -417,7 +417,7 @@ describe('WeChat-inspired app shell', () => {
                   display_name: 'Bob',
                   name: 'Bob',
                   gender: '',
-                  age: 0,
+                  birth_date: '',
                   region: '',
                 },
                 created_at: '2026-04-29T12:00:00Z',
@@ -531,7 +531,7 @@ describe('WeChat-inspired app shell', () => {
                   display_name: 'Bob',
                   name: 'Bob',
                   gender: '',
-                  age: 0,
+                  birth_date: '',
                   region: '',
                 },
                 created_at: '2026-04-29T12:00:00Z',

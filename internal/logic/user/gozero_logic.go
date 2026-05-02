@@ -32,7 +32,7 @@ func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) (*types.UserResp,
 		DisplayName: req.DisplayName,
 		Name:        req.Name,
 		Gender:      req.Gender,
-		Age:         req.Age,
+		BirthDate:   req.BirthDate,
 		Region:      req.Region,
 	})
 	if err != nil {
@@ -151,7 +151,7 @@ func (l *UpdateMeLogic) UpdateMe(req *types.UpdateMeReq) (*types.UserResp, error
 		DisplayName: optionalString(req.DisplayName),
 		Name:        optionalString(req.Name),
 		Gender:      optionalString(req.Gender),
-		Age:         optionalAge(req.Age),
+		BirthDate:   optionalString(req.BirthDate),
 		Region:      optionalString(req.Region),
 	})
 	if err != nil {
@@ -203,13 +203,6 @@ func optionalString(value string) *string {
 	return &value
 }
 
-func optionalAge(value int32) *int32 {
-	if value == 0 {
-		return nil
-	}
-	return &value
-}
-
 func userResp(profile business.UserProfile) *types.UserResp {
 	return &types.UserResp{
 		Code:    string(apperror.CodeOK),
@@ -220,7 +213,7 @@ func userResp(profile business.UserProfile) *types.UserResp {
 			DisplayName:   profile.DisplayName,
 			Name:          profile.Name,
 			Gender:        profile.Gender,
-			Age:           profile.Age,
+			BirthDate:     profile.BirthDate,
 			Region:        profile.Region,
 			AccountType:   profile.AccountType,
 			AvatarMediaID: profile.AvatarMediaID,
