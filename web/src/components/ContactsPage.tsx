@@ -183,6 +183,7 @@ function ContactEntryButton({ entry }: { entry: ContactEntry }) {
 <ListItem
       className={`action-row${disabled ? ' action-row-disabled' : ''}`}
       ariaLabel={disabled ? `${entry.label} 暂未开放` : entry.label}
+      ariaDisabled={disabled}
       leading={
         <div className={`action-icon action-${entry.accent}`}>
           <Icon size={19} />
