@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { ListCard } from '../components/ui/ListCard';
 import { TextField } from '../components/ui/TextField';
+import { accountTypeLabel, avatarText, firstNonEmpty, profileDisplayName } from '../utils/profileDisplay';
 
 type ProfileDraft = {
   display_name: string;
@@ -61,8 +62,9 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
       <Card className="profile-card" variant="elevated">
         <Avatar label={profileInitial(profile)} color="green" size="large" />
         <div className="profile-main">
-          <strong>{profile.display_name}</strong>
+          <strong>{profileDisplayName(profile)}</strong>
           <p>账号：{profile.identifier}</p>
+          <p>类型：{accountTypeLabel(profile.account_type)}</p>
           <p>地区：{profile.region}</p>
         </div>
         <Button variant="tonal" size="small" className="profile-edit-button" aria-label="编辑个人资料" onClick={() => setIsEditing(true)}>
@@ -73,16 +75,16 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
       <ListCard ariaLabel="个人资料详情" className="profile-detail-card">
         <dl className="profile-detail-list">
           <div>
-            <dt>user_id</dt>
-            <dd>{profile.user_id}</dd>
-          </div>
-          <div>
             <dt>identifier</dt>
             <dd>{profile.identifier}</dd>
           </div>
           <div>
             <dt>display_name</dt>
-            <dd>{profile.display_name}</dd>
+            <dd>{profileDisplayName(profile)}</dd>
+          </div>
+          <div>
+            <dt>account_type</dt>
+            <dd>{accountTypeLabel(profile.account_type)}</dd>
           </div>
           <div>
             <dt>gender</dt>
@@ -163,10 +165,5 @@ function createDraft(profile: UserProfile): ProfileDraft {
 }
 
 function profileInitial(profile: UserProfile) {
-  const displayName = profile.display_name.trim();
-  if (displayName) {
-    return displayName.slice(0, 2).toUpperCase();
-  }
-
-  return profile.identifier.slice(0, 2).toUpperCase();
+  return avatarText(firstNonEmpty(profile.display_name, profile.name, profile.identifier) ?? '');
 }

@@ -9,6 +9,7 @@ export type UserProfile = {
   age: number;
   region: string;
   account_type?: 'user' | 'agent' | 'admin';
+  avatar_media_id?: string;
   created_at?: string;
   updated_at?: string;
 };

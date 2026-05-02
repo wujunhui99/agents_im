@@ -31,16 +31,16 @@ describe('contacts API adapter', () => {
     const api = createContactsApi(client);
 
     await api.listFriends();
-    await api.addFriend('usr_000002');
-    await api.deleteFriend('usr_000002');
+    await api.addFriend('2002');
+    await api.deleteFriend('2002');
 
     expect(calls.map((call) => [String(call.input), call.init?.method ?? 'GET'])).toEqual([
       ['http://api.test/friends', 'GET'],
       ['http://api.test/friends', 'POST'],
-      ['http://api.test/friends/usr_000002', 'DELETE'],
+      ['http://api.test/friends/2002', 'DELETE'],
     ]);
     expect(headersFor(calls[0]).get('Authorization')).toBe('Bearer ***');
-    expect(JSON.parse(String(calls[1].init?.body))).toEqual({ user_id: 'usr_000002' });
+    expect(JSON.parse(String(calls[1].init?.body))).toEqual({ user_id: '2002' });
   });
 });
 
@@ -52,7 +52,7 @@ describe('groups API adapter', () => {
 
     await api.getGroup('grp_000001');
     await api.createGroup({ name: 'Frontend Demo', description: 'MVP smoke room' });
-    await api.joinGroup('grp_000001', 'usr_000002');
+    await api.joinGroup('grp_000001', '2002');
     await api.leaveGroup('grp_000001');
     await api.listMembers('grp_000001');
 
@@ -64,6 +64,6 @@ describe('groups API adapter', () => {
       ['http://api.test/groups/grp_000001/members', 'GET'],
     ]);
     expect(headersFor(calls[2]).get('Authorization')).toBe('Bearer ***');
-    expect(JSON.parse(String(calls[2].init?.body))).toEqual({ user_id: 'usr_000002' });
+    expect(JSON.parse(String(calls[2].init?.body))).toEqual({ user_id: '2002' });
   });
 });
