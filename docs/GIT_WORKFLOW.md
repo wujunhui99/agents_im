@@ -134,7 +134,7 @@ go test -tags=integration ./tests
 生产拓扑采用混合单机部署：
 
 - k3s 管理应用工作负载：Go API、RPC、worker 和 web UI。
-- Docker Compose 管理中间件：PostgreSQL、Redis、Redpanda。
+- Docker Compose 管理中间件：PostgreSQL、Redis、Redpanda、MinIO。
 - `scripts/deploy-k3s.sh` 会启动服务器上的中间件 Compose、从 k3s `agents-im-secrets` 读取 `DATABASE_URL` 执行迁移、刷新 `ghcr-pull-secret`，再 `kubectl apply -k deploy/k8s` 并等待 deployment rollout。选择性镜像发布会向脚本传入 `IMAGE_SERVICES=<services>`，避免未构建服务被设置到不存在的 `${GITHUB_SHA}` tag。config-only deploy 会向脚本传入 `SKIP_SET_IMAGE=true`、`SKIP_MIDDLEWARE=true`、`SKIP_MIGRATIONS=true`、`RESTART_ROLLOUT=true`、`ROLLOUT_SERVICES=<services>` 和 `RESTART_SERVICES=<services>`，用于跳过镜像更新/中间件/迁移，只重启并等待受影响 deployment。
 - 首次服务器初始化使用 `scripts/bootstrap-server.sh`，它会写入 `/opt/agents-im/middleware/.env`，启动中间件，并创建 k3s `agents-im-secrets`。真实 secret 只应保存在服务器/k3s，不提交到 Git，也不打印到 Actions 日志。
 

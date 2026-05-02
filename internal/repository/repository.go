@@ -20,6 +20,7 @@ type UserRepository interface {
 	ExistsByIdentifier(ctx context.Context, identifier string) (bool, error)
 	GetByID(ctx context.Context, userID string) (model.User, error)
 	UpdateProfile(ctx context.Context, userID string, patch ProfilePatch) (model.User, error)
+	UpdateAvatar(ctx context.Context, userID string, avatarMediaID string) (model.User, error)
 }
 
 type FriendshipRepository interface {

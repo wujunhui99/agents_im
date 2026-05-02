@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
@@ -13,7 +14,9 @@ const (
 	MessageChatTypeSingle = repository.ChatTypeSingle
 	MessageChatTypeGroup  = repository.ChatTypeGroup
 
-	MessageContentTypeText = repository.ContentTypeText
+	MessageContentTypeText  = repository.ContentTypeText
+	MessageContentTypeImage = repository.ContentTypeImage
+	MessageContentTypeFile  = repository.ContentTypeFile
 )
 
 type GroupMemberLister interface {
@@ -24,6 +27,11 @@ type MessageLogic struct {
 	repo       repository.MessageRepository
 	userExists UserExistenceChecker
 	groups     GroupMemberLister
+	media      MessageMediaValidator
+}
+
+type MessageMediaValidator interface {
+	ValidateMessageMedia(ctx context.Context, ownerUserID string, contentType string, content string) error
 }
 
 func NewMessageLogic(repo repository.MessageRepository) *MessageLogic {
@@ -32,6 +40,17 @@ func NewMessageLogic(repo repository.MessageRepository) *MessageLogic {
 
 func NewMessageLogicWithValidators(repo repository.MessageRepository, userExists UserExistenceChecker, groups GroupMemberLister) *MessageLogic {
 	return &MessageLogic{repo: repo, userExists: userExists, groups: groups}
+}
+
+func NewMessageLogicWithMediaValidator(repo repository.MessageRepository, userExists UserExistenceChecker, groups GroupMemberLister, media MessageMediaValidator) *MessageLogic {
+	return &MessageLogic{repo: repo, userExists: userExists, groups: groups, media: media}
+}
+
+func (l *MessageLogic) WithMediaValidator(media MessageMediaValidator) *MessageLogic {
+	if l != nil {
+		l.media = media
+	}
+	return l
 }
 
 type Message = repository.Message
@@ -228,16 +247,9 @@ func (l *MessageLogic) normalizeSendMessage(ctx context.Context, req SendMessage
 	if err != nil {
 		return repository.CreateMessageInput{}, err
 	}
-	contentType := strings.ToLower(strings.TrimSpace(req.ContentType))
-	if contentType != MessageContentTypeText {
-		return repository.CreateMessageInput{}, apperror.InvalidArgument("content_type must be text")
-	}
-	content := strings.TrimSpace(req.Content)
-	if content == "" {
-		return repository.CreateMessageInput{}, apperror.InvalidArgument("content is required")
-	}
-	if len([]rune(content)) > 4096 {
-		return repository.CreateMessageInput{}, apperror.InvalidArgument("content must be 4096 characters or fewer")
+	contentType, content, err := l.normalizeMessageContent(ctx, senderID, req.ContentType, req.Content)
+	if err != nil {
+		return repository.CreateMessageInput{}, err
 	}
 
 	input := repository.CreateMessageInput{
@@ -287,6 +299,41 @@ func (l *MessageLogic) normalizeSendMessage(ctx context.Context, req SendMessage
 	}
 
 	return input, nil
+}
+
+func (l *MessageLogic) normalizeMessageContent(ctx context.Context, senderID string, rawContentType string, rawContent string) (string, string, error) {
+	contentType := strings.ToLower(strings.TrimSpace(rawContentType))
+	switch contentType {
+	case MessageContentTypeText:
+		content := strings.TrimSpace(rawContent)
+		if content == "" {
+			return "", "", apperror.InvalidArgument("content is required")
+		}
+		if len([]rune(content)) > 4096 {
+			return "", "", apperror.InvalidArgument("content must be 4096 characters or fewer")
+		}
+		return contentType, content, nil
+	case MessageContentTypeImage, MessageContentTypeFile:
+		content := strings.TrimSpace(rawContent)
+		if content == "" {
+			return "", "", apperror.InvalidArgument("content is required")
+		}
+		if len([]rune(content)) > 8192 {
+			return "", "", apperror.InvalidArgument("content must be 8192 characters or fewer")
+		}
+		if !json.Valid([]byte(content)) {
+			return "", "", apperror.InvalidArgument("content must be valid JSON for image/file messages")
+		}
+		if l.media == nil {
+			return "", "", apperror.Internal("media validator is not configured")
+		}
+		if err := l.media.ValidateMessageMedia(ctx, senderID, contentType, content); err != nil {
+			return "", "", err
+		}
+		return contentType, content, nil
+	default:
+		return "", "", apperror.InvalidArgument("content_type must be text, image, or file")
+	}
 }
 
 func (l *MessageLogic) ensureUserExists(ctx context.Context, userID string) error {

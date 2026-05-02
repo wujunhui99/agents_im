@@ -266,6 +266,76 @@ type MemberResp struct {
 	Data    MemberData `json:"data"`
 }
 
+type MediaObject struct {
+	MediaID          string `json:"mediaId"`
+	OwnerUserID      string `json:"ownerUserId"`
+	Bucket           string `json:"bucket"`
+	ObjectKey        string `json:"objectKey"`
+	SHA256           string `json:"sha256"`
+	ContentType      string `json:"contentType"`
+	SizeBytes        int64  `json:"sizeBytes"`
+	Width            int32  `json:"width,omitempty"`
+	Height           int32  `json:"height,omitempty"`
+	OriginalFilename string `json:"originalFilename"`
+	Purpose          string `json:"purpose"`
+	Status           string `json:"status"`
+	CreatedAt        string `json:"createdAt"`
+	UpdatedAt        string `json:"updatedAt"`
+}
+
+type CreateMediaUploadReq struct {
+	Purpose     string `json:"purpose"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"contentType"`
+	SizeBytes   int64  `json:"sizeBytes"`
+	SHA256      string `json:"sha256,optional"`
+	Width       int32  `json:"width,optional"`
+	Height      int32  `json:"height,optional"`
+}
+
+type CreateMediaUploadData struct {
+	MediaID   string `json:"mediaId"`
+	ObjectKey string `json:"objectKey"`
+	UploadURL string `json:"uploadUrl"`
+	ExpiresAt int64  `json:"expiresAt"`
+}
+
+type CreateMediaUploadResp struct {
+	Code    string                `json:"code"`
+	Message string                `json:"message"`
+	Data    CreateMediaUploadData `json:"data"`
+}
+
+type CompleteMediaUploadReq struct {
+	MediaID string `path:"media_id"`
+}
+
+type CompleteMediaUploadData struct {
+	Media MediaObject `json:"media"`
+}
+
+type CompleteMediaUploadResp struct {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    CompleteMediaUploadData `json:"data"`
+}
+
+type GetMediaDownloadURLReq struct {
+	MediaID string `path:"media_id"`
+}
+
+type GetMediaDownloadURLData struct {
+	MediaID     string `json:"mediaId"`
+	DownloadURL string `json:"downloadUrl"`
+	ExpiresAt   int64  `json:"expiresAt"`
+}
+
+type GetMediaDownloadURLResp struct {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    GetMediaDownloadURLData `json:"data"`
+}
+
 type Message struct {
 	ServerMsgID    string `json:"serverMsgId"`
 	ClientMsgID    string `json:"clientMsgId"`
@@ -332,6 +402,10 @@ type SendMessageResp struct {
 	Data    SendMessageData `json:"data"`
 }
 
+type UpdateMeAvatarReq struct {
+	MediaID string `json:"mediaId"`
+}
+
 type UpdateMeReq struct {
 	UserID      string `json:"user_id,optional"`
 	Identifier  string `json:"identifier,optional"`
@@ -354,16 +428,17 @@ type UpdateAgentStatusReq struct {
 }
 
 type User struct {
-	UserID      string `json:"user_id"`
-	Identifier  string `json:"identifier"`
-	DisplayName string `json:"display_name"`
-	Name        string `json:"name"`
-	Gender      string `json:"gender"`
-	Age         int32  `json:"age"`
-	Region      string `json:"region"`
-	AccountType string `json:"account_type"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	UserID        string `json:"user_id"`
+	Identifier    string `json:"identifier"`
+	DisplayName   string `json:"display_name"`
+	Name          string `json:"name"`
+	Gender        string `json:"gender"`
+	Age           int32  `json:"age"`
+	Region        string `json:"region"`
+	AccountType   string `json:"account_type"`
+	AvatarMediaID string `json:"avatar_media_id"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
 }
 
 type UserResp struct {

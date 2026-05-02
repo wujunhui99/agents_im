@@ -14,16 +14,17 @@ const (
 )
 
 type User struct {
-	UserID      string
-	Identifier  string
-	DisplayName string
-	Name        string
-	Gender      string
-	Age         int32
-	Region      string
-	AccountType AccountType
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	UserID        string
+	Identifier    string
+	DisplayName   string
+	Name          string
+	Gender        string
+	Age           int32
+	Region        string
+	AccountType   AccountType
+	AvatarMediaID string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 func (u User) Clone() User {

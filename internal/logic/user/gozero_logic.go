@@ -160,6 +160,42 @@ func (l *UpdateMeLogic) UpdateMe(req *types.UpdateMeReq) (*types.UserResp, error
 	return userResp(profile), nil
 }
 
+type UpdateMeAvatarLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewUpdateMeAvatarLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateMeAvatarLogic {
+	return &UpdateMeAvatarLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *UpdateMeAvatarLogic) UpdateMeAvatar(req *types.UpdateMeAvatarReq) (*types.UserResp, error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if l.svcCtx.MediaLogic == nil {
+		return nil, apperror.Internal("media logic is not configured")
+	}
+	if _, err := l.svcCtx.MediaLogic.ValidateAvatarMedia(l.ctx, userID, req.MediaID); err != nil {
+		return nil, err
+	}
+
+	profile, err := l.svcCtx.UserLogic.UpdateUserAvatar(l.ctx, business.UpdateUserAvatarRequest{
+		UserID:  userID,
+		MediaID: req.MediaID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return userResp(profile), nil
+}
+
 func optionalString(value string) *string {
 	if value == "" {
 		return nil
@@ -179,16 +215,17 @@ func userResp(profile business.UserProfile) *types.UserResp {
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.User{
-			UserID:      profile.UserID,
-			Identifier:  profile.Identifier,
-			DisplayName: profile.DisplayName,
-			Name:        profile.Name,
-			Gender:      profile.Gender,
-			Age:         profile.Age,
-			Region:      profile.Region,
-			AccountType: profile.AccountType,
-			CreatedAt:   profile.CreatedAt,
-			UpdatedAt:   profile.UpdatedAt,
+			UserID:        profile.UserID,
+			Identifier:    profile.Identifier,
+			DisplayName:   profile.DisplayName,
+			Name:          profile.Name,
+			Gender:        profile.Gender,
+			Age:           profile.Age,
+			Region:        profile.Region,
+			AccountType:   profile.AccountType,
+			AvatarMediaID: profile.AvatarMediaID,
+			CreatedAt:     profile.CreatedAt,
+			UpdatedAt:     profile.UpdatedAt,
 		},
 	}
 }

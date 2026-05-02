@@ -7,6 +7,7 @@ required_files=(
   "api/friends.api"
   "api/groups.api"
   "api/message.api"
+  "api/media.api"
   ".github/workflows/ci.yml"
   ".github/markdown-link-check.json"
   ".ai-context/zero-skills/SKILL.md"
@@ -61,12 +62,20 @@ required_files=(
   "internal/logic/friendslogic.go"
   "internal/logic/groupslogic.go"
   "internal/logic/messagelogic.go"
+  "internal/logic/medialogic_test.go"
+  "internal/logic/message_media_test.go"
   "internal/logic/user/gozero_logic.go"
   "internal/logic/friends/gozero_logic.go"
   "internal/logic/groups/gozero_logic.go"
   "internal/logic/message/gozero_logic.go"
+  "internal/logic/media/gozero_logic.go"
+  "internal/logic/medialogic.go"
   "internal/model/friendship.go"
   "internal/model/group.go"
+  "internal/model/media.go"
+  "internal/objectstorage/store.go"
+  "internal/objectstorage/minio.go"
+  "internal/objectstorage/memory.go"
   "internal/repository/memory.go"
   "internal/repository/postgres_common.go"
   "internal/repository/postgres_user_friends.go"
@@ -75,6 +84,9 @@ required_files=(
   "internal/repository/postgres_groups.go"
   "internal/repository/message_memory.go"
   "internal/repository/message_repository.go"
+  "internal/repository/media_repository.go"
+  "internal/repository/media_memory.go"
+  "internal/repository/postgres_media.go"
   "internal/repository/message_outbox_repository.go"
   "internal/repository/delivery_attempt_repository.go"
   "internal/repository/delivery_attempt_memory.go"
@@ -84,6 +96,10 @@ required_files=(
   "internal/repository/delivery_attempt_repository_test.go"
   "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
+  "internal/handler/media/create_upload_intent_handler.go"
+  "internal/handler/media/complete_upload_handler.go"
+  "internal/handler/media/get_download_url_handler.go"
+  "internal/handler/user/update_me_avatar_handler.go"
   "internal/health/health.go"
   "internal/health/health_test.go"
   "internal/observability/metrics.go"
@@ -454,6 +470,8 @@ frontend_contract_patterns=(
   "/friends"
   "/groups"
   "/messages"
+  "/media/uploads"
+  "/me/avatar"
   "/ws"
   "send_message"
   "pull_messages"
@@ -471,7 +489,7 @@ done
 development_doc_patterns=(
   "scripts/dev-up.sh"
   "scripts/dev-demo-data.sh"
-  "docker compose up -d postgres redis redpanda"
+  "docker compose up -d postgres redis redpanda minio"
   "bash scripts/migrate-postgres.sh"
   "go test ./..."
 )
@@ -481,9 +499,10 @@ for pattern in "${development_doc_patterns[@]}"; do
 done
 
 dev_script_patterns=(
-  "docker compose up -d postgres redis redpanda"
+  "docker compose up -d postgres redis redpanda minio"
   "bash scripts/migrate-postgres.sh"
   "StorageDriver: postgres"
+  "ObjectStorage:"
   "gateway-ws"
 )
 
@@ -1090,6 +1109,21 @@ for pattern in "${redpanda_compose_patterns[@]}"; do
   rg -q "$pattern" docker-compose.yml
 done
 
+minio_compose_patterns=(
+  "^  minio:"
+  "minio/minio"
+  "agents-im-minio"
+  "MINIO_ROOT_USER"
+  "MINIO_ROOT_PASSWORD"
+  "MINIO_API_PORT"
+  "MINIO_CONSOLE_PORT"
+  "agents_im_minio_data"
+)
+
+for pattern in "${minio_compose_patterns[@]}"; do
+  rg -q "$pattern" docker-compose.yml deploy/middleware/docker-compose.yml
+done
+
 redis_env_patterns=(
   "REDIS_ADDR"
   "REDIS_PASSWORD"
@@ -1113,6 +1147,25 @@ kafka_env_patterns=(
 
 for pattern in "${kafka_env_patterns[@]}"; do
   rg -q "$pattern" .env.example
+done
+
+object_storage_env_patterns=(
+  "MINIO_ROOT_USER"
+  "MINIO_ROOT_PASSWORD"
+  "MINIO_API_PORT"
+  "MINIO_CONSOLE_PORT"
+  "OBJECT_STORAGE_DRIVER"
+  "OBJECT_STORAGE_ENDPOINT"
+  "OBJECT_STORAGE_EXTERNAL_ENDPOINT"
+  "OBJECT_STORAGE_BUCKET"
+  "OBJECT_STORAGE_REGION"
+  "OBJECT_STORAGE_USE_SSL"
+  "OBJECT_STORAGE_ACCESS_KEY_ID"
+  "OBJECT_STORAGE_SECRET_ACCESS_KEY"
+)
+
+for pattern in "${object_storage_env_patterns[@]}"; do
+  rg -q "$pattern" .env.example deploy/middleware/.env.example deploy/k8s/secrets.example.yaml
 done
 
 presence_config_patterns=(
@@ -1267,6 +1320,7 @@ jwt_api_files=(
   "api/friends.api"
   "api/groups.api"
   "api/message.api"
+  "api/media.api"
 )
 
 for file in "${jwt_api_files[@]}"; do
@@ -1291,7 +1345,7 @@ rg -q "type JWTAuthConfig" internal/config/config.go
 rg -q "AccessSecret" internal/config/config.go internal/rpcgen/auth/internal/config/config.go
 rg -q "AccessExpire" internal/config/config.go internal/rpcgen/auth/internal/config/config.go
 rg -q "user_id" internal/auth/token/token.go internal/ctxuser/user.go
-rg -q "ctxuser\\.UserID" internal/logic/user/gozero_logic.go internal/logic/friends/gozero_logic.go internal/logic/groups/gozero_logic.go internal/logic/message/gozero_logic.go
+rg -q "ctxuser\\.UserID" internal/logic/user/gozero_logic.go internal/logic/friends/gozero_logic.go internal/logic/groups/gozero_logic.go internal/logic/message/gozero_logic.go internal/logic/media/gozero_logic.go
 rg -q "sender_id must match authenticated user" internal/logic/message/gozero_logic.go
 
 jwt_test_patterns=(
@@ -1369,7 +1423,7 @@ for pattern in "${social_mvp_test_patterns[@]}"; do
 done
 
 rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go internal/rpcgen/message/internal/svc/service_context.go
-rg -q "NewMessageLogicWithValidators" internal/rpcgen/message/internal/svc/service_context.go
+rg -q "NewMessageLogicWithMediaValidator" internal/rpcgen/message/internal/svc/service_context.go
 rg -q "NewMessageRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
 pg_persistence_patterns=(
   "users"
@@ -1377,6 +1431,7 @@ pg_persistence_patterns=(
   "friendships"
   "groups"
   "group_members"
+  "media_objects"
   "messages"
   "conversation_threads"
   "user_conversation_states"
@@ -1390,6 +1445,14 @@ for pattern in "${pg_persistence_patterns[@]}"; do
 done
 
 rg -q "StorageDriver" internal/config/config.go etc/*.yaml
+rg -q "ObjectStorageConfig" internal/config/config.go
+rg -q "NewStore" internal/objectstorage/factory.go
+rg -q "PresignPut" internal/objectstorage/store.go internal/objectstorage/minio.go
+rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go cmd/user-api/main.go cmd/message-api/main.go cmd/gateway-ws/main.go
+rg -q "ValidateMessageMedia" internal/logic/medialogic.go internal/logic/messagelogic.go
+rg -q "media_objects" db/migrations/001_init_postgres.sql docs/product-specs/message-chain.md docs/product-specs/frontend-backend-contract.md
+rg -q "PATCH /me/avatar" docs/product-specs/frontend-backend-contract.md
+rg -q "POST /media/uploads" docs/product-specs/frontend-backend-contract.md
 rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go internal/auth/repository/postgres.go
 rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
 rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
