@@ -36,6 +36,8 @@ export type Conversation = {
   previewOrigin?: MessageOrigin;
   time: string;
   unread: number;
+  maxSeq?: number;
+  hasReadSeq?: number;
   color: ConversationAccent;
   chatType: ChatType;
   receiverId?: string;

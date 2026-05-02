@@ -1,9 +1,12 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
 import { vi } from 'vitest';
 import App from './App';
 import type { UserProfile, UserProfilePatch } from './api/user';
 import { AUTH_STORAGE_KEY, type AuthSession } from './auth/session';
+
+const stylesCss = readFileSync('src/styles.css', 'utf8');
 
 const initialProfile: UserProfile = {
   user_id: 'usr_000001',
@@ -185,6 +188,13 @@ describe('WeChat-inspired app shell', () => {
     expect(screen.getByRole('tab', { name: /发现/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /我的/i })).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/conversations/seqs?conversationIds=', expect.anything()));
+  });
+
+  it('defines a desktop shell breakpoint that expands beyond the mobile phone frame', () => {
+    expect(stylesCss).toContain('@media (min-width: 900px)');
+    expect(stylesCss).toMatch(/@media \(min-width: 900px\)[\s\S]*\.app-shell\s*{[\s\S]*place-items:\s*stretch/);
+    expect(stylesCss).toMatch(/@media \(min-width: 900px\)[\s\S]*\.phone-frame\s*{[\s\S]*width:\s*100%/);
+    expect(stylesCss).toMatch(/@media \(min-width: 900px\)[\s\S]*\.content-area\s*{[\s\S]*max-width:\s*none/);
   });
 
   it('defaults to the real messages page and switches pages from the bottom navigation', async () => {
@@ -404,6 +414,21 @@ describe('WeChat-inspired app shell', () => {
           },
         }),
       )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            user_id: 'usr_000002',
+            identifier: 'usr_000002',
+            display_name: 'usr_000002',
+            name: 'usr_000002',
+            gender: '',
+            age: 0,
+            region: '',
+          },
+        }),
+      )
       .mockResolvedValueOnce(emptySeqsResponse())
       .mockResolvedValueOnce(emptySeqsResponse());
 
@@ -422,6 +447,7 @@ describe('WeChat-inspired app shell', () => {
 
     expect(await screen.findByRole('heading', { name: 'usr_000002', level: 2 })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '输入消息' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/users/usr_000002', expect.objectContaining({ method: 'GET' }));
   });
 
   it('loads friends automatically again after session restore', async () => {
@@ -513,6 +539,21 @@ describe('WeChat-inspired app shell', () => {
           code: 'OK',
           message: 'ok',
           data: {
+            user_id: 'usr_000002',
+            identifier: 'usr_000002',
+            display_name: 'usr_000002',
+            name: 'usr_000002',
+            gender: '',
+            age: 0,
+            region: '',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
             states: [
               {
                 conversationId: 'single:usr_000001:usr_000002',
@@ -565,6 +606,16 @@ describe('WeChat-inspired app shell', () => {
             nextSeq: 2,
           },
         }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            conversationId: 'single:usr_000001:usr_000002',
+            hasReadSeq: 1,
+          },
+        }),
       );
 
     render(<App />);
@@ -578,6 +629,11 @@ describe('WeChat-inspired app shell', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       '/conversations/single%3Ausr_000001%3Ausr_000002/messages?fromSeq=1&limit=50&order=asc',
       expect.objectContaining({ method: 'GET' }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith('/users/usr_000002', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/conversations/single%3Ausr_000001%3Ausr_000002/read',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ hasReadSeq: 1 }) }),
     );
   });
 
@@ -787,6 +843,16 @@ describe('WeChat-inspired app shell', () => {
             ],
             isEnd: true,
             nextSeq: 2,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            conversationId: 'single:usr_000001:usr_000002',
+            hasReadSeq: 1,
           },
         }),
       )
