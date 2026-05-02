@@ -530,7 +530,8 @@ truncate table
   groups,
   friendships,
   auth_credentials,
-  users
+  profiles,
+  accounts
 cascade
 `); err != nil {
 		t.Fatal(err)

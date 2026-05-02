@@ -1561,6 +1561,9 @@ done
 account_terminology_doc_patterns=(
   "Account Service"
   "account_type=user|agent|admin"
+  "Snowflake"
+  "accounts"
+  "profiles"
   "user_id"
   "account id alias"
   "V0 compatibility"
@@ -1585,11 +1588,15 @@ done
 account_code_patterns=(
   "AccountTypeUser  AccountType = \"user\""
   "AccountTypeNormal AccountType = AccountTypeUser"
-  "type Account = User"
+  "type Account struct"
+  "type Profile struct"
+  "AccountID"
+  "NewAccountProfile"
   "type AccountRepository interface"
   "type UserRepository = AccountRepository"
   "type AccountProfile = UserProfile"
   "func NewAccountLogic"
+  "idgen.NewString"
   "AccountLogic"
   "Path:    \"/accounts\""
   "Path:    \"/accounts/exists\""
@@ -1597,13 +1604,16 @@ account_code_patterns=(
 )
 
 for pattern in "${account_code_patterns[@]}"; do
-  rg -qF "$pattern" internal/model/user.go internal/repository/repository.go internal/logic/userlogic.go internal/svc/service_context.go internal/handler/gozero_routes.go
+  rg -qF "$pattern" internal/model/user.go internal/repository/repository.go internal/repository/memory.go internal/repository/postgres_user_friends.go internal/logic/userlogic.go internal/svc/service_context.go internal/handler/gozero_routes.go
 done
 
 account_storage_patterns=(
+  "create table if not exists accounts"
+  "create table if not exists profiles"
+  "account_id text primary key"
+  "account_id ~ '^[0-9]+$'"
   "account_type text not null default 'user'"
   "account_type in ('user', 'agent', 'admin')"
-  "where account_type = 'normal'"
 )
 
 for pattern in "${account_storage_patterns[@]}"; do
@@ -1631,7 +1641,8 @@ rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/mai
 rg -q "NewMessageLogicWithMediaValidator" internal/rpcgen/message/internal/svc/service_context.go
 rg -q "NewMessageRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
 pg_persistence_patterns=(
-  "users"
+  "accounts"
+  "profiles"
   "auth_credentials"
   "friendships"
   "groups"

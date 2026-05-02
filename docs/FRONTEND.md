@@ -37,7 +37,7 @@
 - 会话种子来自后端 `getConversationSeqs` 返回的 `states/conversations/seqs`；如果没有会话，页面显示“暂无会话”和“发起聊天”动作，不自动插入假会话。
 - “发起聊天”使用 `UserApi.getPublicProfileByIdentifier -> GET /users/:identifier` 搜索真实公开资料。选择搜索结果后只创建本地 `draft-single:{user_id}` 空会话，直到用户发送第一条消息才调用 `messageApi.sendMessage -> POST /messages` 并用服务端返回的 `conversationId` 替换本地 draft id。
 - 发送消息先追加本地 `sending` UI 状态，但最终状态必须来自 `messageApi.sendMessage -> POST /messages` 的真实返回；失败会显示错误，不静默兜底为成功。
-- 从发起聊天搜索结果创建的会话标题优先使用 `display_name / name / identifier`。从消息 API 直接加载的历史会话目前只包含 canonical `usr_...` ID；前端不会伪造 `/users/id/{user_id}`，因此在后端提供按 user_id 查询公开资料的前端契约前，历史会话标题只能回退显示内部 user ID。
+- 从发起聊天搜索结果创建的会话标题优先使用 `display_name / name / identifier`。从消息 API 直接加载的历史会话目前只包含 numeric account ID；前端不会伪造 `/users/id/{user_id}`，因此在后端提供按 user_id 查询公开资料的前端契约前，历史会话标题只能回退显示内部 user ID。
 - 聊天窗口展示已确认消息时按服务端 `conversationId + seq` 排序，不按 `sendTime`、fetch 数组顺序或 WebSocket 到达顺序排序；重复消息按 `serverMsgId` / `clientMsgId` 去重。
 - 本地 optimistic 消息在服务端确认后必须用相同 `clientMsgId` 替换为 canonical server message，并保留 `serverMsgId`、`seq` 等服务端字段；没有 `seq` 的本地 pending 消息排在已确认消息之后。
 - 打开有未读的会话并展示到带 `seq` 的消息后，前端调用 `messageApi.markRead -> POST /conversations/:conversation_id/read` 推进 `hasReadSeq`，成功后立即清除已读范围内的本地未读标记；失败必须显示错误状态，不伪造成功。

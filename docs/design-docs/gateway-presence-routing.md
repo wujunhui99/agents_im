@@ -85,7 +85,7 @@ Client command request payloads are unchanged. The `heartbeat` response keeps ex
   "status": "ok",
   "data": {
     "connection_id": "conn_...",
-    "user_id": "usr_...",
+    "user_id": "numeric account IDs",
     "instance_id": "gateway-a",
     "server_time": 1710000000000
   }

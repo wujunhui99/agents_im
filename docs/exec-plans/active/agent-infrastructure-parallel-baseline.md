@@ -36,7 +36,7 @@
 
 范围：
 
-- `users.account_type` migration，默认 `user`；`users` 表名为 V0 storage compatibility。
+- `accounts.account_type` migration，默认 `user`；账号展示资料存储在 `profiles`。
 - Go domain/model/repository/API/RPC 类型增加 account_type。
 - 创建 human user 账号默认 `user`。
 - 支持创建 Agent 用户时 account_type=`agent` 的内部能力。
