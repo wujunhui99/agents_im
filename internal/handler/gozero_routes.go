@@ -6,6 +6,7 @@ import (
 	agenthandler "github.com/wujunhui99/agents_im/internal/handler/agent"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
+	mediahandler "github.com/wujunhui99/agents_im/internal/handler/media"
 	messagehandler "github.com/wujunhui99/agents_im/internal/handler/message"
 	userhandler "github.com/wujunhui99/agents_im/internal/handler/user"
 	"github.com/wujunhui99/agents_im/internal/health"
@@ -23,9 +24,11 @@ func RegisterGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) 
 			componentCheck("message_logic", serverCtx != nil && serverCtx.MessageLogic != nil, "configured"),
 			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
 			componentCheck("message_repository", serverCtx != nil && serverCtx.MessageRepo != nil, "configured"),
+			componentCheck("media_logic", serverCtx != nil && serverCtx.MediaLogic != nil, "configured"),
 		}
 	})
 	addUserRoutes(server, serverCtx)
+	addMediaRoutes(server, serverCtx)
 	addFriendsRoutes(server, serverCtx)
 	addMessageRoutes(server, serverCtx)
 }
@@ -36,9 +39,11 @@ func RegisterUserGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceConte
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
 			componentCheck("user_logic", serverCtx != nil && serverCtx.UserLogic != nil, "configured"),
 			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
+			componentCheck("media_logic", serverCtx != nil && serverCtx.MediaLogic != nil, "configured"),
 		}
 	})
 	addUserRoutes(server, serverCtx)
+	addMediaRoutes(server, serverCtx)
 }
 
 func RegisterFriendsGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
@@ -125,6 +130,11 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/me",
 			Handler: userhandler.UpdateMeHandler(serverCtx),
 		},
+		{
+			Method:  http.MethodPatch,
+			Path:    "/me/avatar",
+			Handler: userhandler.UpdateMeAvatarHandler(serverCtx),
+		},
 	}, jwtOption(serverCtx))
 
 	server.AddRoutes([]rest.Route{
@@ -144,6 +154,26 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Handler: userhandler.GetUserByIdentifierHandler(serverCtx),
 		},
 	})
+}
+
+func addMediaRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodPost,
+			Path:    "/media/uploads",
+			Handler: mediahandler.CreateUploadIntentHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/media/uploads/:media_id/complete",
+			Handler: mediahandler.CompleteUploadHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/media/:media_id/download-url",
+			Handler: mediahandler.GetDownloadURLHandler(serverCtx),
+		},
+	}, jwtOption(serverCtx))
 }
 
 func addFriendsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {

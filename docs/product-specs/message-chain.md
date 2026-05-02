@@ -25,7 +25,7 @@ The first contract intentionally does not require:
 - offline push notification implementation;
 - per-device sync state;
 - message recall/delete;
-- reactions, edits, typing, mentions, rich media processing;
+- reactions, edits, typing, mentions;
 - end-to-end encryption;
 - distributed database sharding.
 
@@ -48,11 +48,50 @@ Phase 1 supports:
 
 ## Message content
 
-Phase 1 supports text messages only at product level.
+Phase 1 supports these `content_type` values:
+
+- `text`
+- `image`
+- `file`
 
 Future message content types should be versioned through `content_type` and `content` without changing sequence/read contracts.
 
 Text `content` must be non-empty after trimming and must be 4096 characters or fewer.
+
+Image and file messages are media-backed. The binary object is uploaded through the Media API first, then the message references a ready media object. Message send must reject image/file content unless the media object:
+
+- exists in `media_objects`;
+- is owned by the authenticated sender;
+- has `status=ready`;
+- has the matching `purpose`;
+- satisfies the documented MIME type and size limit.
+
+Image message `content` is a JSON string with at least:
+
+```json
+{
+  "mediaId": "med_000001",
+  "width": 1080,
+  "height": 720
+}
+```
+
+`width` and `height` are optional in the message payload because the authoritative dimensions are stored on the media object when provided at upload-intent time. The referenced media object must have `purpose=message_image`, an allowed image MIME type, and `size_bytes <= 10 MiB`.
+
+File message `content` is a JSON string with:
+
+```json
+{
+  "mediaId": "med_000002",
+  "filename": "report.pdf",
+  "sizeBytes": 123456,
+  "contentType": "application/pdf"
+}
+```
+
+The referenced media object must have `purpose=message_file`, `status=ready`, `size_bytes <= 100 MiB`, and the message `filename`, `sizeBytes`, and `contentType` metadata must match the media record. HTML and SVG are not allowed as first-phase file/image content types for inline rendering safety.
+
+Avatar uploads use the same media storage but are bound through `/me/avatar`, not through message content.
 
 ## Message identity
 

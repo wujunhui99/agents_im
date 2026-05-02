@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
@@ -23,14 +24,24 @@ func validateCreateMessageInput(input CreateMessageInput) (string, error) {
 	if err := validateMessageRequiredID(input.ClientMsgID, "client_msg_id"); err != nil {
 		return "", err
 	}
-	if input.ContentType != ContentTypeText {
-		return "", apperror.InvalidArgument("content_type must be text")
-	}
-	if strings.TrimSpace(input.Content) == "" {
-		return "", apperror.InvalidArgument("content is required")
-	}
-	if len([]rune(input.Content)) > maxMessageContentLength {
-		return "", apperror.InvalidArgument("content must be 4096 characters or fewer")
+	switch input.ContentType {
+	case ContentTypeText:
+		if strings.TrimSpace(input.Content) == "" {
+			return "", apperror.InvalidArgument("content is required")
+		}
+		if len([]rune(input.Content)) > maxMessageContentLength {
+			return "", apperror.InvalidArgument("content must be 4096 characters or fewer")
+		}
+	case ContentTypeImage:
+		if err := validateImageMessageContent(input.Content); err != nil {
+			return "", err
+		}
+	case ContentTypeFile:
+		if err := validateFileMessageContent(input.Content); err != nil {
+			return "", err
+		}
+	default:
+		return "", apperror.InvalidArgument("content_type must be text, image, or file")
 	}
 	for _, userID := range input.ParticipantUserIDs {
 		if userID == "" {
@@ -41,6 +52,50 @@ func validateCreateMessageInput(input CreateMessageInput) (string, error) {
 		}
 	}
 	return inputConversationID(input)
+}
+
+func validateImageMessageContent(content string) error {
+	if strings.TrimSpace(content) == "" {
+		return apperror.InvalidArgument("content is required")
+	}
+	var body struct {
+		MediaID string `json:"mediaId"`
+	}
+	if err := json.Unmarshal([]byte(content), &body); err != nil {
+		return apperror.InvalidArgument("image content must be a JSON object")
+	}
+	if strings.TrimSpace(body.MediaID) == "" {
+		return apperror.InvalidArgument("image content mediaId is required")
+	}
+	return nil
+}
+
+func validateFileMessageContent(content string) error {
+	if strings.TrimSpace(content) == "" {
+		return apperror.InvalidArgument("content is required")
+	}
+	var body struct {
+		MediaID     string `json:"mediaId"`
+		Filename    string `json:"filename"`
+		SizeBytes   int64  `json:"sizeBytes"`
+		ContentType string `json:"contentType"`
+	}
+	if err := json.Unmarshal([]byte(content), &body); err != nil {
+		return apperror.InvalidArgument("file content must be a JSON object")
+	}
+	if strings.TrimSpace(body.MediaID) == "" {
+		return apperror.InvalidArgument("file content mediaId is required")
+	}
+	if strings.TrimSpace(body.Filename) == "" {
+		return apperror.InvalidArgument("file content filename is required")
+	}
+	if body.SizeBytes <= 0 {
+		return apperror.InvalidArgument("file content sizeBytes must be positive")
+	}
+	if strings.TrimSpace(body.ContentType) == "" {
+		return apperror.InvalidArgument("file content contentType is required")
+	}
+	return nil
 }
 
 func normalizeMessagePullRange(fromSeq, toSeq int64, limit int, order string) (int64, int64, int, string, error) {

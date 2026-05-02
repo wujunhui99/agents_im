@@ -2,6 +2,7 @@ create sequence if not exists agents_im_users_id_seq;
 create sequence if not exists agents_im_groups_id_seq;
 create sequence if not exists agents_im_messages_id_seq;
 create sequence if not exists agents_im_outbox_events_id_seq;
+create sequence if not exists agents_im_media_id_seq;
 create sequence if not exists agents_im_agent_prompts_id_seq;
 create sequence if not exists agents_im_mcp_servers_id_seq;
 create sequence if not exists agents_im_agent_tools_id_seq;
@@ -35,6 +36,47 @@ alter table users
 
 alter table users
   add constraint users_account_type_check check (account_type in ('normal', 'agent', 'admin'));
+
+alter table users
+  add column if not exists avatar_media_id text not null default '';
+
+create table if not exists media_objects (
+  media_id text primary key default ('med_' || lpad(nextval('agents_im_media_id_seq')::text, 6, '0')),
+  owner_user_id text not null references users(user_id) on delete restrict,
+  bucket text not null,
+  object_key text not null,
+  sha256 text not null default '',
+  content_type text not null,
+  size_bytes bigint not null,
+  width integer,
+  height integer,
+  original_filename text not null default '',
+  purpose text not null,
+  status text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint media_objects_owner_not_blank check (owner_user_id <> ''),
+  constraint media_objects_bucket_not_blank check (bucket <> ''),
+  constraint media_objects_object_key_not_blank check (object_key <> ''),
+  constraint media_objects_object_key_uniq unique (object_key),
+  constraint media_objects_sha256_check check (sha256 = '' or sha256 ~ '^[0-9a-f]{64}$'),
+  constraint media_objects_content_type_not_blank check (content_type <> ''),
+  constraint media_objects_size_check check (size_bytes > 0),
+  constraint media_objects_dimensions_check check (
+    (width is null or width > 0)
+    and
+    (height is null or height > 0)
+  ),
+  constraint media_objects_purpose_check check (purpose in ('avatar', 'message_image', 'message_file', 'agent_skill')),
+  constraint media_objects_status_check check (status in ('pending', 'ready', 'rejected', 'deleted'))
+);
+
+create index if not exists media_objects_owner_status_created_idx
+  on media_objects (owner_user_id, status, created_at desc);
+
+create index if not exists media_objects_sha256_idx
+  on media_objects (sha256)
+  where sha256 <> '';
 
 create table if not exists auth_credentials (
   identifier text primary key,

@@ -109,7 +109,7 @@ It uses real business logic and a real WebSocket gateway test server in one proc
 7. send `send_message` over WebSocket;
 8. assert Alice receives ACK and Bob receives live `message_received` push.
 
-This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, and Redpanda when the environment is clean.
+This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, Redpanda, and MinIO when the environment is clean.
 
 ### Local E2E Debug Notes
 
@@ -140,8 +140,31 @@ Environment note from the debug session: on one local machine, default ports `80
 | PostgreSQL | `localhost:5432` |
 | Redis | `localhost:6379` |
 | Redpanda Kafka | `localhost:19092` |
+| MinIO API | `http://localhost:9000` |
+| MinIO Console | `http://localhost:9001` |
 
-`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share users, credentials, friendships, groups, Agent profiles, and message history. Agent creation still fails closed until the account-type checker is wired to a user service that can verify `account_type=agent`.
+`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share users, credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and writes `ObjectStorage` config into the generated `user-api` config. Agent creation still fails closed until the account-type checker is wired to a user service that can verify `account_type=agent`.
+
+## Local Object Storage
+
+Local media uploads use MinIO/S3-compatible object storage. Development defaults are in `.env.example`:
+
+```bash
+MINIO_ROOT_USER=agents_im_minio
+MINIO_ROOT_PASSWORD=agents_im_minio_dev_password
+MINIO_API_PORT=9000
+MINIO_CONSOLE_PORT=9001
+OBJECT_STORAGE_DRIVER=minio
+OBJECT_STORAGE_ENDPOINT=localhost:9000
+OBJECT_STORAGE_EXTERNAL_ENDPOINT=localhost:9000
+OBJECT_STORAGE_BUCKET=agents-im-media
+OBJECT_STORAGE_REGION=us-east-1
+OBJECT_STORAGE_USE_SSL=false
+OBJECT_STORAGE_ACCESS_KEY_ID=agents_im_minio
+OBJECT_STORAGE_SECRET_ACCESS_KEY=agents_im_minio_dev_password
+```
+
+The MinIO API is available at `http://localhost:9000`; the console is available at `http://localhost:9001`. The bucket is private and is created by `user-api` at startup. Unit tests use the explicit memory object store and do not require live MinIO.
 
 ## Demo Data
 
@@ -158,7 +181,7 @@ The script prints demo IDs and a conversation ID. It does not print tokens or pa
 When you only need database middleware:
 
 ```bash
-docker compose up -d postgres redis redpanda
+docker compose up -d postgres redis redpanda minio
 bash scripts/migrate-postgres.sh
 ```
 

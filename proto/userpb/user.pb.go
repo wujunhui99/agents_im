@@ -33,6 +33,7 @@ type User struct {
 	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	AccountType   string                 `protobuf:"bytes,10,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
+	AvatarMediaId string                 `protobuf:"bytes,11,opt,name=avatar_media_id,json=avatarMediaId,proto3" json:"avatar_media_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -133,6 +134,13 @@ func (x *User) GetUpdatedAt() string {
 func (x *User) GetAccountType() string {
 	if x != nil {
 		return x.AccountType
+	}
+	return ""
+}
+
+func (x *User) GetAvatarMediaId() string {
+	if x != nil {
+		return x.AvatarMediaId
 	}
 	return ""
 }
@@ -545,7 +553,7 @@ var File_proto_user_proto protoreflect.FileDescriptor
 
 const file_proto_user_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/user.proto\x12\auser.v1\"\x99\x02\n" +
+	"\x10proto/user.proto\x12\auser.v1\"\xc1\x02\n" +
 	"\x04User\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1e\n" +
 	"\n" +
@@ -561,7 +569,8 @@ const file_proto_user_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\t \x01(\tR\tupdatedAt\x12!\n" +
 	"\faccount_type\x18\n" +
-	" \x01(\tR\vaccountType\"\xcf\x01\n" +
+	" \x01(\tR\vaccountType\x12&\n" +
+	"\x0favatar_media_id\x18\v \x01(\tR\ravatarMediaId\"\xcf\x01\n" +
 	"\x11CreateUserRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +

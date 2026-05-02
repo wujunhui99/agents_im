@@ -129,7 +129,8 @@ HTTP 响应格式：
 
 - `GET /me` 必须携带 `Authorization: Bearer <access_token>`。
 - `PATCH /me` 必须携带 `Authorization: Bearer <access_token>`。
-- go-zero middleware 校验 token 后将 `user_id` claim 注入 context，再由 logic adapter 调用 `GetUserByID` 或 `UpdateUserProfile`。
+- `PATCH /me/avatar` 必须携带 `Authorization: Bearer <access_token>`，并且只能绑定当前用户拥有的 `purpose=avatar`、`status=ready` media object。
+- go-zero middleware 校验 token 后将 `user_id` claim 注入 context，再由 logic adapter 调用 `GetUserByID`、`UpdateUserProfile` 或 `UpdateUserAvatar`。
 
 `X-User-Id` 不作为生产鉴权路径；测试仅验证它不能绕过 JWT。
 
@@ -156,6 +157,7 @@ go run ./cmd/user-rpc -f etc/user-rpc.yaml
 - `ExistsByIdentifier` 返回存在和不存在两种结果。
 - `/me` 缺少 Bearer token 返回未认证。
 - `PATCH /me` 只能更新允许字段。
+- `PATCH /me/avatar` 拒绝非 owner、非 avatar purpose 或 not-ready media。
 - 资料模型和 HTTP/RPC 响应不包含密码或认证秘密。
 
 ## 后续演进
