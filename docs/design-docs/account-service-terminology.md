@@ -12,22 +12,23 @@ IM 身份主体不只包含人类用户。Agent、admin、未来服务号/公众
 - Account Service：账号资料权威服务，负责 identifier、展示名、性别、年龄、地区、`account_type` 等资料，不负责 credential/password/token。
 - Auth Service：认证与凭据边界，负责 password hash、salt、token 签发与校验，不负责账号展示资料。
 - `account_type`：账号类型，当前支持 `user`、`agent`、`admin`。`user` 是 account type，不是服务名。
+- `account_id`：Account Service 内部 source-of-truth ID，由 Snowflake 算法生成，保存为无前缀数字字符串。
 - `user_id`：V0 public compatibility 字段，是 account id alias。friends/groups/message/gateway/read state 中的 `user_id` 均指向 Account Service 管理的 account id。
 
 ## V0 Compatibility
 
 - Public REST 继续保留 `/me`、`/users`、`/users/exists`、`/users/:identifier`，避免破坏前端 MVP 和外部调用方。
 - Account Service 同时提供 `/accounts`、`/accounts/exists`、`/accounts/:identifier` aliases，语义与对应 `/users` path 相同。
-- JSON/RPC 中的 `user_id` 当前不批量改名；它是 account id alias。后续如新增 `account_id` 字段，必须先提供双写/双读兼容层和测试。
+- JSON/RPC 中的 `user_id` 当前不批量改名；它是 account id alias。新增 public `account_id` 字段时必须保留 `user_id` alias 并提供兼容测试。
 - `proto/user.proto`、`cmd/user-api`、`cmd/user-rpc`、`api/user.api` 文件路径和部分 Go generated symbol 仍保留 `user`，作为 V0 transport compatibility。新增业务代码应优先使用 Account 术语或本仓库提供的 account alias seam。
-- PostgreSQL 存储使用 `accounts` + `profiles`。`accounts.account_id` 是无前缀数字字符串；`profiles` 保存 human user、agent、admin 的展示资料和头像引用。
-- 旧 `users` 表和 `account_type=normal` 行不再作为 PostgreSQL 兼容输入；本次 schema refactor 允许清空中间件 PostgreSQL 数据。
+- PostgreSQL source-of-truth 表为 `accounts` 与 `profiles`。`accounts` 保存 `account_id`、`identifier`、`account_type` 和账号时间戳；`profiles` 保存展示名、名称、性别、年龄、地区、头像 media 和资料时间戳。
+- 旧 `account_type=normal` 仅作为迁移输入兼容，写入与返回统一归一化为 `user`。
 
 ## Service Boundary
 
 Account Service owns:
 
-- account id / V0 `user_id` generation and lookup; PostgreSQL 默认生成无前缀数字字符串；
+- Snowflake account id / V0 `user_id` alias generation and lookup;
 - `identifier` uniqueness and public profile lookup;
 - profile fields such as `display_name`、`name`、`gender`、`age`、`region`;
 - `account_type=user|agent|admin`;
@@ -46,8 +47,8 @@ Auth registers or logs in credentials and collaborates with Account Service thro
 
 The codebase now exposes account-named seams while preserving existing generated names:
 
-- `model.Account` aliases the persisted profile model.
-- `repository.AccountRepository` is the profile repository contract; `UserRepository` remains a V0 alias.
+- `model.Account` owns account identity fields and `model.Profile` owns profile/avatar fields; `model.User` remains a flattened V0 aggregate alias for existing callers.
+- `repository.AccountRepository` is the account/profile repository contract; `UserRepository` remains a V0 alias.
 - `logic.AccountProfile` and account-named methods on `UserLogic` expose Account terminology for new callers.
 - `svc.ServiceContext.AccountLogic` points at the same implementation as `UserLogic`.
 
@@ -56,7 +57,8 @@ New application code should prefer Account naming when it is not constrained by 
 ## Next Phase
 
 - Decide whether to generate first-class `account.api` / `account.proto` files or continue using V0 transport names.
-- Add `account_id` response fields only with compatibility tests proving existing `user_id` clients still work.
+- Expand first-class `account_id` response fields only with compatibility tests proving existing `user_id` clients still work.
+- Decide whether to keep `user_id` as a long-term public alias after frontend API models move to account terminology.
 - Update downstream friends/groups/message contracts only when frontend and API clients can consume both names.
 
 ## 验证方式

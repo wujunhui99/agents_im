@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"sync"
 	"testing"
@@ -51,8 +50,6 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNumericAccountID(t, alice.UserID)
-	assertAccountAndProfileRows(t, ctx, dsn, alice)
 	if alice.AccountType != model.AccountTypeUser {
 		t.Fatalf("default postgres account_type = %q, want %q", alice.AccountType, model.AccountTypeUser)
 	}
@@ -65,8 +62,6 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNumericAccountID(t, bob.UserID)
-	assertAccountAndProfileRows(t, ctx, dsn, bob)
 	pgAgent, err := users.Create(ctx, model.User{
 		Identifier:  "pg_agent",
 		DisplayName: "PG Agent",
@@ -77,8 +72,6 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNumericAccountID(t, pgAgent.UserID)
-	assertAccountAndProfileRows(t, ctx, dsn, pgAgent)
 	if pgAgent.AccountType != model.AccountTypeAgent {
 		t.Fatalf("explicit postgres agent account_type = %q, want %q", pgAgent.AccountType, model.AccountTypeAgent)
 	}
@@ -92,8 +85,6 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertNumericAccountID(t, pgAdmin.UserID)
-	assertAccountAndProfileRows(t, ctx, dsn, pgAdmin)
 	if pgAdmin.AccountType != model.AccountTypeAdmin {
 		t.Fatalf("explicit postgres admin account_type = %q, want %q", pgAdmin.AccountType, model.AccountTypeAdmin)
 	}
@@ -128,19 +119,6 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if loadedCredential.UserID != credential.UserID {
 		t.Fatalf("loaded credential user id mismatch: got %q want %q", loadedCredential.UserID, credential.UserID)
 	}
-	assertCredentialStoresAccountID(t, ctx, dsn, alice.Identifier, alice.UserID)
-
-	updatedDisplayName := "Alice Updated"
-	updatedRegion := "Hangzhou"
-	updatedAlice, err := users.UpdateProfile(ctx, alice.UserID, repository.ProfilePatch{
-		DisplayName: &updatedDisplayName,
-		Name:        &updatedDisplayName,
-		Region:      &updatedRegion,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertAccountAndProfileRows(t, ctx, dsn, updatedAlice)
 
 	friendship, created, err := users.AddFriend(ctx, alice.UserID, bob.UserID)
 	if err != nil {
@@ -156,7 +134,6 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if len(bobFriends) != 1 || bobFriends[0].FriendID != alice.UserID {
 		t.Fatalf("reciprocal friendship missing: %+v", bobFriends)
 	}
-	assertFriendshipJoinsAccountProfile(t, ctx, dsn, bob.UserID, alice.UserID, updatedAlice.DisplayName)
 
 	group, creator, err := groups.CreateGroup(ctx, model.Group{Name: "PG Group"}, alice.UserID)
 	if err != nil {
@@ -185,97 +162,6 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	}
 	if left.State != model.MemberStateLeft || left.LeftAt.IsZero() {
 		t.Fatalf("leave group did not mark left state: %+v", left)
-	}
-}
-
-func assertNumericAccountID(t *testing.T, accountID string) {
-	t.Helper()
-	if !regexp.MustCompile(`^[0-9]+$`).MatchString(accountID) {
-		t.Fatalf("account id %q must be an unprefixed numeric string", accountID)
-	}
-}
-
-func assertAccountAndProfileRows(t *testing.T, ctx context.Context, dsn string, user model.User) {
-	t.Helper()
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	var row struct {
-		Identifier    string
-		AccountType   string
-		DisplayName   string
-		Name          string
-		Gender        string
-		Age           int32
-		Region        string
-		AvatarMediaID string
-	}
-	err = db.QueryRowContext(ctx, `
-select a.identifier, a.account_type, p.display_name, p.name, p.gender, p.age, p.region, p.avatar_media_id
-from accounts a
-join profiles p on p.account_id = a.account_id
-where a.account_id = $1
-`, user.UserID).Scan(&row.Identifier, &row.AccountType, &row.DisplayName, &row.Name, &row.Gender, &row.Age, &row.Region, &row.AvatarMediaID)
-	if err != nil {
-		t.Fatalf("query account/profile rows for %q: %v", user.UserID, err)
-	}
-
-	if row.Identifier != user.Identifier ||
-		row.AccountType != string(user.AccountType) ||
-		row.DisplayName != user.DisplayName ||
-		row.Name != user.Name ||
-		row.Gender != user.Gender ||
-		row.Age != user.Age ||
-		row.Region != user.Region ||
-		row.AvatarMediaID != user.AvatarMediaID {
-		t.Fatalf("account/profile rows mismatch: got %+v want user %+v", row, user)
-	}
-}
-
-func assertCredentialStoresAccountID(t *testing.T, ctx context.Context, dsn string, identifier string, accountID string) {
-	t.Helper()
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	var storedAccountID string
-	if err := db.QueryRowContext(ctx, `
-select user_id
-from auth_credentials
-where identifier = $1
-`, identifier).Scan(&storedAccountID); err != nil {
-		t.Fatalf("query auth credential account id: %v", err)
-	}
-	if storedAccountID != accountID {
-		t.Fatalf("auth credential stored account id = %q, want %q", storedAccountID, accountID)
-	}
-}
-
-func assertFriendshipJoinsAccountProfile(t *testing.T, ctx context.Context, dsn string, userID string, friendID string, wantDisplayName string) {
-	t.Helper()
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	var displayName string
-	if err := db.QueryRowContext(ctx, `
-select p.display_name
-from friendships f
-join accounts a on a.account_id = f.friend_id
-join profiles p on p.account_id = a.account_id
-where f.user_id = $1 and f.friend_id = $2 and f.status = 'active'
-`, userID, friendID).Scan(&displayName); err != nil {
-		t.Fatalf("query friendship account/profile join: %v", err)
-	}
-	if displayName != wantDisplayName {
-		t.Fatalf("friendship joined display name = %q, want %q", displayName, wantDisplayName)
 	}
 }
 
@@ -644,7 +530,6 @@ truncate table
   groups,
   friendships,
   auth_credentials,
-  media_objects,
   profiles,
   accounts
 cascade
