@@ -27,14 +27,13 @@ func NewCreateUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Create
 
 func (l *CreateUserLogic) CreateUser(in *userpb.CreateUserRequest) (*userpb.UserResponse, error) {
 	profile, err := l.svcCtx.UserLogic.CreateUser(l.ctx, business.CreateUserRequest{
-		Identifier:          in.GetIdentifier(),
-		DisplayName:         in.GetDisplayName(),
-		Name:                in.GetName(),
-		Gender:              in.GetGender(),
-		BirthDate:           in.GetBirthDate(),
-		Region:              in.GetRegion(),
-		AccountType:         in.GetAccountType(),
-		AccountTypeProvided: in.GetAccountType() != 0,
+		Identifier:  in.GetIdentifier(),
+		DisplayName: in.GetDisplayName(),
+		Name:        in.GetName(),
+		Gender:      in.GetGender(),
+		BirthDate:   in.GetBirthDate(),
+		Region:      in.GetRegion(),
+		AccountType: in.GetAccountType(),
 	})
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)

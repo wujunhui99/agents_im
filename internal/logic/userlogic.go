@@ -40,7 +40,7 @@ type UserProfile struct {
 	Gender        string `json:"gender"`
 	BirthDate     string `json:"birth_date"`
 	Region        string `json:"region"`
-	AccountType   int32  `json:"account_type"`
+	AccountType   string `json:"account_type"`
 	AvatarMediaID string `json:"avatar_media_id"`
 	CreatedAt     string `json:"created_at"`
 	UpdatedAt     string `json:"updated_at"`
@@ -49,14 +49,13 @@ type UserProfile struct {
 type AccountProfile = UserProfile
 
 type CreateUserRequest struct {
-	Identifier          string `json:"identifier"`
-	DisplayName         string `json:"display_name"`
-	Name                string `json:"name"`
-	Gender              string `json:"gender"`
-	BirthDate           string `json:"birth_date"`
-	Region              string `json:"region"`
-	AccountType         int32  `json:"account_type"`
-	AccountTypeProvided bool   `json:"-"`
+	Identifier  string `json:"identifier"`
+	DisplayName string `json:"display_name"`
+	Name        string `json:"name"`
+	Gender      string `json:"gender"`
+	BirthDate   string `json:"birth_date"`
+	Region      string `json:"region"`
+	AccountType string `json:"account_type"`
 }
 
 type CreateAccountRequest = CreateUserRequest
@@ -121,24 +120,19 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 		return UserProfile{}, err
 	}
 
-	rawAccountType := model.AccountType(req.AccountType)
-	if rawAccountType == 0 && !req.AccountTypeProvided {
-		rawAccountType = model.AccountTypeUser
-	}
-	accountType, ok := model.NormalizeAccountType(rawAccountType)
+	accountType, ok := model.NormalizeAccountType(req.AccountType)
 	if !ok {
-		return UserProfile{}, apperror.InvalidArgument("account_type must be 0(admin), 1(user), or 2(agent)")
+		return UserProfile{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
 	}
 
 	user, err := l.repo.Create(ctx, model.User{
-		Identifier:     identifier,
-		DisplayName:    displayName,
-		Name:           name,
-		Gender:         gender,
-		BirthDate:      strings.TrimSpace(req.BirthDate),
-		Region:         region,
-		AccountType:    accountType,
-		AccountTypeSet: true,
+		Identifier:  identifier,
+		DisplayName: displayName,
+		Name:        name,
+		Gender:      gender,
+		BirthDate:   strings.TrimSpace(req.BirthDate),
+		Region:      region,
+		AccountType: accountType,
 	})
 	if err != nil {
 		return UserProfile{}, err
@@ -368,7 +362,7 @@ func toProfile(user model.User) UserProfile {
 		Gender:        user.Gender,
 		BirthDate:     user.BirthDate,
 		Region:        user.Region,
-		AccountType:   int32(user.AccountType),
+		AccountType:   string(user.AccountType),
 		AvatarMediaID: user.AvatarMediaID,
 		CreatedAt:     formatTime(user.CreatedAt),
 		UpdatedAt:     formatTime(user.UpdatedAt),

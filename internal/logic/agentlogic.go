@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	AccountTypeAgent = int32(model.AccountTypeAgent)
+	AccountTypeAgent = "agent"
 
 	AgentStatusDraft    = model.AgentStatusDraft
 	AgentStatusActive   = model.AgentStatusActive
@@ -19,14 +19,14 @@ const (
 )
 
 type UserAccountTypeChecker interface {
-	EnsureUserAccountType(ctx context.Context, userID string, accountType int32) error
+	EnsureUserAccountType(ctx context.Context, userID string, accountType string) error
 }
 
 type AccountTypeChecker = UserAccountTypeChecker
 
-type UserAccountTypeCheckerFunc func(ctx context.Context, userID string, accountType int32) error
+type UserAccountTypeCheckerFunc func(ctx context.Context, userID string, accountType string) error
 
-func (f UserAccountTypeCheckerFunc) EnsureUserAccountType(ctx context.Context, userID string, accountType int32) error {
+func (f UserAccountTypeCheckerFunc) EnsureUserAccountType(ctx context.Context, userID string, accountType string) error {
 	if f == nil {
 		return apperror.Internal("account_type checker is not configured")
 	}
@@ -39,7 +39,7 @@ func NewFailClosedUserAccountTypeChecker() FailClosedUserAccountTypeChecker {
 	return FailClosedUserAccountTypeChecker{}
 }
 
-func (FailClosedUserAccountTypeChecker) EnsureUserAccountType(context.Context, string, int32) error {
+func (FailClosedUserAccountTypeChecker) EnsureUserAccountType(context.Context, string, string) error {
 	return apperror.Internal("account_type checker is not configured")
 }
 
@@ -51,7 +51,7 @@ func NewUserLogicAccountTypeChecker(userLogic *UserLogic) UserLogicAccountTypeCh
 	return UserLogicAccountTypeChecker{userLogic: userLogic}
 }
 
-func (c UserLogicAccountTypeChecker) EnsureUserAccountType(ctx context.Context, userID string, accountType int32) error {
+func (c UserLogicAccountTypeChecker) EnsureUserAccountType(ctx context.Context, userID string, accountType string) error {
 	if c.userLogic == nil {
 		return apperror.Internal("account_type checker is not configured")
 	}
@@ -60,7 +60,7 @@ func (c UserLogicAccountTypeChecker) EnsureUserAccountType(ctx context.Context, 
 		return err
 	}
 	if profile.AccountType != accountType {
-		return apperror.Forbidden("account_type must be 2(agent)")
+		return apperror.Forbidden("account_type must be " + accountType)
 	}
 	return nil
 }

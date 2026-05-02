@@ -139,7 +139,7 @@ type FriendProfile struct {
 	Gender        string `json:"gender"`
 	BirthDate     string `json:"birth_date"`
 	Region        string `json:"region"`
-	AccountType   int32  `json:"account_type"`
+	AccountType   string `json:"account_type"`
 	AvatarMediaID string `json:"avatar_media_id"`
 	CreatedAt     string `json:"created_at"`
 	UpdatedAt     string `json:"updated_at"`
@@ -460,7 +460,7 @@ type User struct {
 	Gender        string `json:"gender"`
 	BirthDate     string `json:"birth_date"`
 	Region        string `json:"region"`
-	AccountType   int32  `json:"account_type"`
+	AccountType   string `json:"account_type"`
 	AvatarMediaID string `json:"avatar_media_id"`
 	CreatedAt     string `json:"created_at"`
 	UpdatedAt     string `json:"updated_at"`

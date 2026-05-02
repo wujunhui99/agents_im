@@ -17,9 +17,9 @@ func TestAgentLogicCreateRequiresAgentAccountType(t *testing.T) {
 	ctx := context.Background()
 	agentRepo := repository.NewMemoryAgentRepository()
 	agentLogic := logic.NewAgentLogic(agentRepo, testAccountTypeChecker{
-		accountTypes: map[string]int32{
+		accountTypes: map[string]string{
 			"usr_agent": logic.AccountTypeAgent,
-			"usr_user":  int32(model.AccountTypeUser),
+			"usr_user":  string(model.AccountTypeUser),
 		},
 	})
 
@@ -139,7 +139,7 @@ func TestAgentLogicUpdateListStatusAndArchive(t *testing.T) {
 	ctx := context.Background()
 	agentRepo := repository.NewMemoryAgentRepository()
 	agentLogic := logic.NewAgentLogic(agentRepo, testAccountTypeChecker{
-		accountTypes: map[string]int32{
+		accountTypes: map[string]string{
 			"usr_agent_one": logic.AccountTypeAgent,
 			"usr_agent_two": logic.AccountTypeAgent,
 		},
@@ -199,9 +199,9 @@ func TestAgentLogicUpdateListStatusAndArchive(t *testing.T) {
 func TestAgentHTTPHandlers(t *testing.T) {
 	serviceContext := svc.NewAgentServiceContextWithAuth(
 		repository.NewMemoryAgentRepository(),
-		testAccountTypeChecker{accountTypes: map[string]int32{
+		testAccountTypeChecker{accountTypes: map[string]string{
 			"usr_agent": logic.AccountTypeAgent,
-			"usr_user":  int32(model.AccountTypeUser),
+			"usr_user":  string(model.AccountTypeUser),
 		}},
 		testJWTAuthConfig(),
 	)
@@ -313,10 +313,10 @@ func ptr(value string) *string {
 }
 
 type testAccountTypeChecker struct {
-	accountTypes map[string]int32
+	accountTypes map[string]string
 }
 
-func (c testAccountTypeChecker) EnsureUserAccountType(_ context.Context, userID string, accountType int32) error {
+func (c testAccountTypeChecker) EnsureUserAccountType(_ context.Context, userID string, accountType string) error {
 	actual, exists := c.accountTypes[userID]
 	if !exists {
 		return apperror.NotFound("user not found")

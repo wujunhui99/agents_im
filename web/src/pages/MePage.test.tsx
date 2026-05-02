@@ -11,7 +11,7 @@ const profile: UserProfile = {
   gender: 'female',
   birth_date: '1996-05-02',
   region: 'Shanghai',
-  account_type: 1,
+  account_type: 'user',
 };
 
 describe('MePage', () => {
