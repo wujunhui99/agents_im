@@ -90,6 +90,24 @@ RESTART_ROLLOUT=true
 
 This keeps existing image tags, skips Docker Compose middleware startup and database migrations, applies the k3s manifests, then restarts and waits only for the selected deployment. ConfigMap changes do not reliably recreate Pods by themselves, so config-only deploy must use `RESTART_ROLLOUT=true` for affected services.
 
+### go-zero RPC config naming note
+
+RPC config structs embed `zrpc.RpcServerConf`, which already contains a go-zero transport-level `Auth bool` option. A business field named exactly `Auth` conflicts with that embedded field through go-zero's anonymous-field config loader and can fail startup with `conflict key auth, pay attention to anonymous fields`.
+
+`JWTAuth` does not reproduce that conflict in go-zero v1.10.1, but `auth-rpc` intentionally uses `TokenAuth` for the token-signing configuration because the service owns token issuance/verification rather than go-zero HTTP JWT middleware. This keeps three concepts distinct:
+
+- `zrpc.RpcServerConf.Auth`: go-zero RPC transport auth switch.
+- REST API `Auth`: go-zero HTTP JWT middleware config block.
+- `auth-rpc` `TokenAuth`: business token/JWT signing settings used by the auth domain.
+
+```yaml
+TokenAuth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: 86400
+```
+
+If a rollout fails with a log like `conflict key ... pay attention to anonymous fields`, inspect the affected service's config struct and generated ConfigMap first. In the May 2026 incident, `auth-rpc` entered `CrashLoopBackOff` with `conflict key auth`; the confirmed unsafe pattern is a business config field named `Auth` alongside the embedded `zrpc.RpcServerConf`. Keep the business field distinct (`TokenAuth`) and cover it with a config-load regression test instead of hiding the failure with a remote-only manual patch.
+
 ## Ports and host networking
 
 Current k3s manifests use `hostNetwork: true`, so each service binds host ports directly. Keep `ListenOn`, container ports, and Service `port` / `targetPort` aligned.
