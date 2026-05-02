@@ -90,9 +90,15 @@ RESTART_ROLLOUT=true
 
 This keeps existing image tags, skips Docker Compose middleware startup and database migrations, applies the k3s manifests, then restarts and waits only for the selected deployment. ConfigMap changes do not reliably recreate Pods by themselves, so config-only deploy must use `RESTART_ROLLOUT=true` for affected services.
 
-### go-zero RPC config collision note
+### go-zero RPC config naming note
 
-RPC config structs embed `zrpc.RpcServerConf`, which already contains a go-zero transport-level `Auth` option. Do not name business token/JWT config fields as variants that can collide with `Auth` through go-zero's anonymous-field config loader. The `auth-rpc` business token signing config is intentionally named `TokenAuth` in code and YAML:
+RPC config structs embed `zrpc.RpcServerConf`, which already contains a go-zero transport-level `Auth bool` option. A business field named exactly `Auth` conflicts with that embedded field through go-zero's anonymous-field config loader and can fail startup with `conflict key auth, pay attention to anonymous fields`.
+
+`JWTAuth` does not reproduce that conflict in go-zero v1.10.1, but `auth-rpc` intentionally uses `TokenAuth` for the token-signing configuration because the service owns token issuance/verification rather than go-zero HTTP JWT middleware. This keeps three concepts distinct:
+
+- `zrpc.RpcServerConf.Auth`: go-zero RPC transport auth switch.
+- REST API `Auth`: go-zero HTTP JWT middleware config block.
+- `auth-rpc` `TokenAuth`: business token/JWT signing settings used by the auth domain.
 
 ```yaml
 TokenAuth:
@@ -100,7 +106,7 @@ TokenAuth:
   AccessExpire: 86400
 ```
 
-If a rollout fails with a log like `conflict key ... pay attention to anonymous fields`, inspect the affected service's config struct and generated ConfigMap first. In the May 2026 incident, `auth-rpc` entered `CrashLoopBackOff` because its business JWT config key conflicted with go-zero anonymous-field parsing around the embedded RPC server config. The durable fix is to keep the business field distinct (`TokenAuth`) and cover it with a config-load regression test, not to hide the failure with a remote-only manual patch.
+If a rollout fails with a log like `conflict key ... pay attention to anonymous fields`, inspect the affected service's config struct and generated ConfigMap first. In the May 2026 incident, `auth-rpc` entered `CrashLoopBackOff` with `conflict key auth`; the confirmed unsafe pattern is a business config field named `Auth` alongside the embedded `zrpc.RpcServerConf`. Keep the business field distinct (`TokenAuth`) and cover it with a config-load regression test instead of hiding the failure with a remote-only manual patch.
 
 ## Ports and host networking
 
