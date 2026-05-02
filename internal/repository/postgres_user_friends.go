@@ -2,26 +2,30 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/idgen"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
-type postgresUserRow struct {
-	UserID        string    `db:"user_id"`
-	Identifier    string    `db:"identifier"`
-	DisplayName   string    `db:"display_name"`
-	Name          string    `db:"name"`
-	Gender        string    `db:"gender"`
-	Age           int32     `db:"age"`
-	Region        string    `db:"region"`
-	AccountType   string    `db:"account_type"`
-	AvatarMediaID string    `db:"avatar_media_id"`
-	CreatedAt     time.Time `db:"created_at"`
-	UpdatedAt     time.Time `db:"updated_at"`
+type postgresAccountProfileRow struct {
+	AccountID        string    `db:"account_id"`
+	Identifier       string    `db:"identifier"`
+	AccountType      string    `db:"account_type"`
+	AccountCreatedAt time.Time `db:"account_created_at"`
+	AccountUpdatedAt time.Time `db:"account_updated_at"`
+	DisplayName      string    `db:"display_name"`
+	Name             string    `db:"name"`
+	Gender           string    `db:"gender"`
+	BirthDate        string    `db:"birth_date"`
+	Region           string    `db:"region"`
+	AvatarMediaID    string    `db:"avatar_media_id"`
+	ProfileCreatedAt time.Time `db:"profile_created_at"`
+	ProfileUpdatedAt time.Time `db:"profile_updated_at"`
 }
 
 type postgresFriendshipRow struct {
@@ -38,27 +42,42 @@ func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model
 		return model.User{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
 	}
 
-	var row postgresUserRow
-	var err error
-	if strings.TrimSpace(user.UserID) == "" {
-		err = r.conn.QueryRowCtx(ctx, &row, `
-insert into users (identifier, display_name, name, gender, age, region, account_type)
-values ($1, $2, $3, $4, $5, $6, $7)
-returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
-`, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region, accountType)
-	} else {
-		err = r.conn.QueryRowCtx(ctx, &row, `
-insert into users (user_id, identifier, display_name, name, gender, age, region, account_type)
-values ($1, $2, $3, $4, $5, $6, $7, $8)
-returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
-`, user.UserID, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region, accountType)
+	accountID := strings.TrimSpace(user.AccountID)
+	if accountID == "" {
+		accountID = strings.TrimSpace(user.UserID)
 	}
+	if accountID == "" {
+		generated, err := idgen.NewString()
+		if err != nil {
+			return model.User{}, err
+		}
+		accountID = generated
+	}
+
+	var row postgresAccountProfileRow
+	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+		if _, err := session.ExecCtx(ctx, `
+insert into accounts (account_id, identifier, account_type)
+values ($1, $2, $3)
+`, accountID, user.Identifier, accountType); err != nil {
+			return err
+		}
+
+		if _, err := session.ExecCtx(ctx, `
+insert into profiles (account_id, display_name, name, gender, birth_date, region, avatar_media_id)
+values ($1, $2, $3, $4, nullif($5, '')::date, $6, $7)
+`, accountID, user.DisplayName, user.Name, user.Gender, user.BirthDate, user.Region, strings.TrimSpace(user.AvatarMediaID)); err != nil {
+			return err
+		}
+
+		return session.QueryRowCtx(ctx, &row, accountProfileByIDQuery, accountID)
+	})
 	if err != nil {
 		if isPostgresUniqueViolation(err) {
 			return model.User{}, apperror.AlreadyExists("identifier already exists")
 		}
 		if isPostgresCheckViolation(err) {
-			return model.User{}, apperror.InvalidArgument("invalid user profile or account_type")
+			return model.User{}, apperror.InvalidArgument("invalid account profile or account_type")
 		}
 		return model.User{}, err
 	}
@@ -67,15 +86,20 @@ returning user_id, identifier, display_name, name, gender, age, region, account_
 }
 
 func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier string) (model.User, error) {
-	var row postgresUserRow
+	var row postgresAccountProfileRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
-from users
-where identifier = $1
+select
+  a.account_id, a.identifier, a.account_type,
+  a.created_at as account_created_at, a.updated_at as account_updated_at,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id,
+  p.created_at as profile_created_at, p.updated_at as profile_updated_at
+from accounts a
+join profiles p on p.account_id = a.account_id
+where a.identifier = $1
 `, identifier)
 	if err != nil {
 		if isNotFound(err) {
-			return model.User{}, apperror.NotFound("user not found")
+			return model.User{}, apperror.NotFound("account not found")
 		}
 		return model.User{}, err
 	}
@@ -85,26 +109,33 @@ where identifier = $1
 func (r *PostgresRepository) ExistsByIdentifier(ctx context.Context, identifier string) (bool, error) {
 	var exists bool
 	err := r.conn.QueryRowCtx(ctx, &exists, `
-select exists(select 1 from users where identifier = $1)
+select exists(select 1 from accounts where identifier = $1)
 `, identifier)
 	return exists, err
 }
 
 func (r *PostgresRepository) GetByID(ctx context.Context, userID string) (model.User, error) {
-	var row postgresUserRow
-	err := r.conn.QueryRowCtx(ctx, &row, `
-select user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
-from users
-where user_id = $1
-`, userID)
+	var row postgresAccountProfileRow
+	err := r.conn.QueryRowCtx(ctx, &row, accountProfileByIDQuery, userID)
 	if err != nil {
 		if isNotFound(err) {
-			return model.User{}, apperror.NotFound("user not found")
+			return model.User{}, apperror.NotFound("account not found")
 		}
 		return model.User{}, err
 	}
 	return row.user(), nil
 }
+
+const accountProfileByIDQuery = `
+select
+  a.account_id, a.identifier, a.account_type,
+  a.created_at as account_created_at, a.updated_at as account_updated_at,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id,
+  p.created_at as profile_created_at, p.updated_at as profile_updated_at
+from accounts a
+join profiles p on p.account_id = a.account_id
+where a.account_id = $1
+`
 
 func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID string, patch ProfilePatch) (model.User, error) {
 	setters := make([]string, 0, 5)
@@ -123,8 +154,8 @@ func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID string, p
 	if patch.Gender != nil {
 		addSetter("gender", *patch.Gender)
 	}
-	if patch.Age != nil {
-		addSetter("age", *patch.Age)
+	if patch.BirthDate != nil {
+		addSetter("birth_date", sql.NullString{String: *patch.BirthDate, Valid: strings.TrimSpace(*patch.BirthDate) != ""})
 	}
 	if patch.Region != nil {
 		addSetter("region", *patch.Region)
@@ -135,38 +166,38 @@ func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID string, p
 
 	args = append(args, userID)
 	query := `
-update users
+update profiles
 set ` + strings.Join(setters, ", ") + `, updated_at = now()
-where user_id = $` + itoa(len(args)) + `
-returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
+where account_id = $` + itoa(len(args)) + `
+returning account_id
 `
-	var row postgresUserRow
-	if err := r.conn.QueryRowCtx(ctx, &row, query, args...); err != nil {
+	var accountID string
+	if err := r.conn.QueryRowCtx(ctx, &accountID, query, args...); err != nil {
 		if isNotFound(err) {
-			return model.User{}, apperror.NotFound("user not found")
+			return model.User{}, apperror.NotFound("account not found")
 		}
 		if isPostgresCheckViolation(err) {
-			return model.User{}, apperror.InvalidArgument("invalid user profile")
+			return model.User{}, apperror.InvalidArgument("invalid account profile")
 		}
 		return model.User{}, err
 	}
-	return row.user(), nil
+	return r.GetByID(ctx, accountID)
 }
 
 func (r *PostgresRepository) UpdateAvatar(ctx context.Context, userID string, avatarMediaID string) (model.User, error) {
-	var row postgresUserRow
-	if err := r.conn.QueryRowCtx(ctx, &row, `
-update users
+	var accountID string
+	if err := r.conn.QueryRowCtx(ctx, &accountID, `
+update profiles
 set avatar_media_id = $2, updated_at = now()
-where user_id = $1
-returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
+where account_id = $1
+returning account_id
 `, userID, strings.TrimSpace(avatarMediaID)); err != nil {
 		if isNotFound(err) {
-			return model.User{}, apperror.NotFound("user not found")
+			return model.User{}, apperror.NotFound("account not found")
 		}
 		return model.User{}, err
 	}
-	return row.user(), nil
+	return r.GetByID(ctx, accountID)
 }
 
 func (r *PostgresRepository) AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error) {
@@ -297,24 +328,31 @@ returning user_id, friend_id, status, created_at, updated_at
 	return row.friendship(), nil
 }
 
-func (r postgresUserRow) user() model.User {
+func (r postgresAccountProfileRow) user() model.User {
 	accountType, ok := model.NormalizeAccountType(r.AccountType)
 	if !ok {
 		accountType = model.AccountType(r.AccountType)
 	}
-	return model.User{
-		UserID:        r.UserID,
-		Identifier:    r.Identifier,
-		DisplayName:   r.DisplayName,
-		Name:          r.Name,
-		Gender:        r.Gender,
-		Age:           r.Age,
-		Region:        r.Region,
-		AccountType:   accountType,
-		AvatarMediaID: r.AvatarMediaID,
-		CreatedAt:     r.CreatedAt,
-		UpdatedAt:     r.UpdatedAt,
-	}
+	return model.NewAccountProfile(
+		model.Account{
+			AccountID:   r.AccountID,
+			Identifier:  r.Identifier,
+			AccountType: accountType,
+			CreatedAt:   r.AccountCreatedAt,
+			UpdatedAt:   r.AccountUpdatedAt,
+		},
+		model.Profile{
+			AccountID:     r.AccountID,
+			DisplayName:   r.DisplayName,
+			Name:          r.Name,
+			Gender:        r.Gender,
+			BirthDate:     r.BirthDate,
+			Region:        r.Region,
+			AvatarMediaID: r.AvatarMediaID,
+			CreatedAt:     r.ProfileCreatedAt,
+			UpdatedAt:     r.ProfileUpdatedAt,
+		},
+	)
 }
 
 func (r postgresFriendshipRow) friendship() model.Friendship {

@@ -5,9 +5,9 @@ import { MessagesPage } from './MessagesPage';
 import type { MessageApi, SendMessageRequest, SendMessageResponse, ServerMessage } from '../../api/messages';
 import type { UserApi, UserProfile, UserProfilePatch } from '../../api/user';
 
-const conversationId = 'single:usr_000001:usr_000002';
-const currentUserId = 'usr_000001';
-const peerUserId = 'usr_000002';
+const conversationId = 'single:1001:2002';
+const currentUserId = '1001';
+const peerUserId = '2002';
 
 const bobProfile: UserProfile = {
   user_id: peerUserId,
@@ -15,7 +15,7 @@ const bobProfile: UserProfile = {
   display_name: 'Bob Lin',
   name: 'Bob Lin',
   gender: '',
-  age: 0,
+  birth_date: '',
   region: '',
 };
 
@@ -105,7 +105,7 @@ function deferred<T>() {
 
 async function openSeededConversation(messageApi: MessageApi) {
   render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
-  await userEvent.click(await screen.findByRole('button', { name: /usr_000002/ }));
+  await userEvent.click(await screen.findByRole('button', { name: /未知联系人/ }));
   return screen.findByRole('log', { name: '聊天消息' });
 }
 
@@ -117,6 +117,38 @@ function expectTextOrder(container: HTMLElement, labels: string[]) {
 }
 
 describe('MessagesPage real API mode', () => {
+  it('uses an unknown label instead of an internal id when conversation profiles are unavailable', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: '来自历史会话' })]);
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
+
+    const row = await screen.findByRole('button', { name: /未知联系人/ });
+    expect(within(row).getByText('未知联系人')).toBeInTheDocument();
+    expect(screen.queryByText(peerUserId)).not.toBeInTheDocument();
+
+    await user.click(row);
+
+    expect(await screen.findByRole('heading', { name: '未知联系人' })).toBeInTheDocument();
+    expect(screen.queryByText(peerUserId)).not.toBeInTheDocument();
+  });
+
+  it('shows start-chat profile labels without exposing the internal profile id', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([]);
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} userApi={createUserApi()} />);
+
+    await user.click(await screen.findByRole('button', { name: '发起聊天' }));
+    await user.type(screen.getByLabelText('按 identifier 搜索聊天对象'), 'bob_002');
+    await user.click(screen.getByRole('button', { name: '搜索聊天对象' }));
+
+    const startChatRegion = screen.getByRole('region', { name: '发起聊天' });
+    expect(await within(startChatRegion).findByText('Bob Lin')).toBeInTheDocument();
+    expect(within(startChatRegion).getByText('bob_002')).toBeInTheDocument();
+    expect(within(startChatRegion).queryByText(peerUserId)).not.toBeInTheDocument();
+  });
+
   it('marks visible unread messages as read when a conversation is opened', async () => {
     const user = userEvent.setup();
     const messageApi = createMessageApi([
@@ -127,12 +159,12 @@ describe('MessagesPage real API mode', () => {
     render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
 
     expect(await screen.findByText('2')).toBeInTheDocument();
-    await user.click(await screen.findByRole('button', { name: /usr_000002/ }));
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
 
     await waitFor(() => expect(messageApi.markRead).toHaveBeenCalledWith(conversationId, { hasReadSeq: 3 }));
     await user.click(screen.getByRole('button', { name: '返回消息列表' }));
 
-    const row = await screen.findByRole('button', { name: /usr_000002/ });
+    const row = await screen.findByRole('button', { name: /未知联系人/ });
     expect(within(row).queryByText('2')).not.toBeInTheDocument();
   });
 
@@ -143,7 +175,7 @@ describe('MessagesPage real API mode', () => {
 
     render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
 
-    await user.click(await screen.findByRole('button', { name: /usr_000002/ }));
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('mark read failed'));
   });
@@ -185,7 +217,7 @@ describe('MessagesPage real API mode', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('已加载 1 个会话'));
     await user.click(screen.getByRole('button', { name: '返回消息列表' }));
 
-    const row = await screen.findByRole('button', { name: /Bob Lin|usr_000002/ });
+    const row = await screen.findByRole('button', { name: /Bob Lin|未知联系人/ });
     expect(within(row).getByText('fresh outgoing')).toBeInTheDocument();
     expect(within(row).queryByText('1')).not.toBeInTheDocument();
   });
@@ -213,7 +245,7 @@ describe('MessagesPage real API mode', () => {
 
     expect(await screen.findByText('真实后端会话消息')).toBeInTheDocument();
     expect(await screen.findByText('AI/Agent')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /usr_000002/ }));
+    await user.click(screen.getByRole('button', { name: /未知联系人/ }));
     await user.type(screen.getByRole('textbox', { name: '输入消息' }), '你好 Bob');
     await user.click(screen.getByRole('button', { name: '发送' }));
 

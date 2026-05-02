@@ -2,19 +2,18 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/idgen"
 	"github.com/wujunhui99/agents_im/internal/model"
 )
 
 type MemoryRepository struct {
 	mu           sync.RWMutex
-	nextID       uint64
 	byID         map[string]model.User
 	identifierID map[string]string
 	friendships  map[string]model.Friendship
@@ -43,16 +42,40 @@ func (r *MemoryRepository) Create(_ context.Context, user model.User) (model.Use
 	}
 	user.AccountType = accountType
 
-	r.nextID++
 	if user.UserID == "" {
-		user.UserID = fmt.Sprintf("usr_%06d", r.nextID)
+		accountID, err := idgen.NewString()
+		if err != nil {
+			return model.User{}, err
+		}
+		user.UserID = accountID
 	}
+	if user.AccountID == "" {
+		user.AccountID = user.UserID
+	}
+	user.UserID = user.AccountID
 	now := r.now().UTC()
-	user.CreatedAt = now
-	user.UpdatedAt = now
+	account := model.Account{
+		AccountID:   user.AccountID,
+		Identifier:  user.Identifier,
+		AccountType: user.AccountType,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	profile := model.Profile{
+		AccountID:     user.AccountID,
+		DisplayName:   user.DisplayName,
+		Name:          user.Name,
+		Gender:        user.Gender,
+		BirthDate:     user.BirthDate,
+		Region:        user.Region,
+		AvatarMediaID: user.AvatarMediaID,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	user = model.NewAccountProfile(account, profile)
 
-	r.byID[user.UserID] = user.Clone()
-	r.identifierID[user.Identifier] = user.UserID
+	r.byID[user.AccountID] = user.Clone()
+	r.identifierID[user.Identifier] = user.AccountID
 	return user.Clone(), nil
 }
 
@@ -106,15 +129,16 @@ func (r *MemoryRepository) UpdateProfile(_ context.Context, userID string, patch
 	if patch.Gender != nil {
 		user.Gender = *patch.Gender
 	}
-	if patch.Age != nil {
-		user.Age = *patch.Age
+	if patch.BirthDate != nil {
+		user.BirthDate = *patch.BirthDate
 	}
 	if patch.Region != nil {
 		user.Region = *patch.Region
 	}
-	user.UpdatedAt = r.now().UTC()
+	user.ProfileUpdatedAt = r.now().UTC()
+	user.UpdatedAt = user.ProfileUpdatedAt
 
-	r.byID[user.UserID] = user.Clone()
+	r.byID[user.AccountID] = user.Clone()
 	return user.Clone(), nil
 }
 
@@ -128,8 +152,9 @@ func (r *MemoryRepository) UpdateAvatar(_ context.Context, userID string, avatar
 	}
 
 	user.AvatarMediaID = strings.TrimSpace(avatarMediaID)
-	user.UpdatedAt = r.now().UTC()
-	r.byID[user.UserID] = user.Clone()
+	user.ProfileUpdatedAt = r.now().UTC()
+	user.UpdatedAt = user.ProfileUpdatedAt
+	r.byID[user.AccountID] = user.Clone()
 	return user.Clone(), nil
 }
 

@@ -6,14 +6,15 @@ export type UserProfile = {
   display_name: string;
   name?: string;
   gender: string;
-  age: number;
+  birth_date: string;
   region: string;
   account_type?: 'user' | 'agent' | 'admin';
+  avatar_media_id?: string;
   created_at?: string;
   updated_at?: string;
 };
 
-export type UserProfilePatch = Partial<Pick<UserProfile, 'display_name' | 'name' | 'gender' | 'age' | 'region'>>;
+export type UserProfilePatch = Partial<Pick<UserProfile, 'display_name' | 'name' | 'gender' | 'birth_date' | 'region'>>;
 
 export type IdentifierExistsResponse = {
   exists: boolean;
@@ -27,7 +28,7 @@ export type UserApi = {
   getPublicProfileByIdentifier: (identifier: string) => Promise<UserProfile>;
 };
 
-const mutableProfileKeys = ['display_name', 'name', 'gender', 'age', 'region'] as const;
+const mutableProfileKeys = ['display_name', 'name', 'gender', 'birth_date', 'region'] as const;
 
 export function toUserProfilePatch(input: Record<string, unknown>): UserProfilePatch {
   const patch = mutableProfileKeys.reduce<Record<string, unknown>>((nextPatch, key) => {

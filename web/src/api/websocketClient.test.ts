@@ -56,7 +56,7 @@ describe('message WebSocket client', () => {
       command: 'send_message',
       payload: {
         chatType: 'single',
-        receiverId: 'usr_000002',
+        receiverId: '2002',
         clientMsgId: 'web-uuid-003',
         contentType: 'text',
         content: 'hello over websocket',
@@ -68,7 +68,7 @@ describe('message WebSocket client', () => {
       command: 'send_message',
       payload: {
         chatType: 'single',
-        receiverId: 'usr_000002',
+        receiverId: '2002',
         clientMsgId: 'web-uuid-003',
         contentType: 'text',
         content: 'hello over websocket',

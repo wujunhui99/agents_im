@@ -13,7 +13,7 @@ func toUserResponse(profile business.UserProfile) *userpb.UserResponse {
 			DisplayName:   profile.DisplayName,
 			Name:          profile.Name,
 			Gender:        profile.Gender,
-			Age:           profile.Age,
+			BirthDate:     profile.BirthDate,
 			Region:        profile.Region,
 			AccountType:   profile.AccountType,
 			AvatarMediaId: profile.AvatarMediaID,

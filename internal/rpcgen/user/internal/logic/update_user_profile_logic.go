@@ -31,7 +31,7 @@ func (l *UpdateUserProfileLogic) UpdateUserProfile(in *userpb.UpdateUserProfileR
 		DisplayName: in.DisplayName,
 		Name:        in.Name,
 		Gender:      in.Gender,
-		Age:         in.Age,
+		BirthDate:   in.BirthDate,
 		Region:      in.Region,
 	})
 	if err != nil {

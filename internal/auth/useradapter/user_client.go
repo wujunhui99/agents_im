@@ -16,7 +16,7 @@ type CreateUserRequest struct {
 	DisplayName string
 	Name        string
 	Gender      string
-	Age         int32
+	BirthDate   string
 	Region      string
 }
 
@@ -26,7 +26,7 @@ type UserProfile struct {
 	DisplayName string
 	Name        string
 	Gender      string
-	Age         int32
+	BirthDate   string
 	Region      string
 	AccountType string
 	CreatedAt   string
@@ -70,7 +70,7 @@ func (c *LogicClient) CreateUser(ctx context.Context, req CreateUserRequest) (Us
 		DisplayName: req.DisplayName,
 		Name:        req.Name,
 		Gender:      req.Gender,
-		Age:         req.Age,
+		BirthDate:   req.BirthDate,
 		Region:      req.Region,
 	})
 	if err != nil {
@@ -83,7 +83,7 @@ func (c *LogicClient) CreateUser(ctx context.Context, req CreateUserRequest) (Us
 		DisplayName: profile.DisplayName,
 		Name:        profile.Name,
 		Gender:      profile.Gender,
-		Age:         profile.Age,
+		BirthDate:   profile.BirthDate,
 		Region:      profile.Region,
 		AccountType: profile.AccountType,
 		CreatedAt:   profile.CreatedAt,

@@ -36,7 +36,7 @@
 
 - Account Service 仍只负责账号资料，不管理密码、Agent 配置或工具配置。
 - `auth` 服务继续负责认证秘密；Agent 账号默认不通过账号密码登录，除非后续明确支持内部凭证或 owner 代理操作。
-- Agent 的 IM 展示身份来自 Account Service（V0 storage 表名仍为 `users`），详细 Agent 配置来自 `agents`。
+- Agent 的 IM 展示身份来自 Account Service 的 `accounts` + `profiles`，详细 Agent 配置来自 `agents`。
 - 普通用户是否能搜索、添加或邀请 Agent，需要由 Agent 的发布状态和可见性策略控制。
 
 ## 核心对象
@@ -110,7 +110,7 @@ Agent 是由 profile、系统提示词、工具、skills、模型配置和运行
 
 约束：
 
-- Agent 配置只写入 `agents` 表，不写入 `users` 表。
+- Agent 配置只写入 `agents` 表，不写入 `accounts` / `profiles` 的资料字段。
 - 创建 Agent 必须绑定 `account_type=agent` 的现有 IM account。
 - 生产 wiring 必须使用真实 `UserAccountTypeChecker` 验证账号类型；无法验证账号类型时创建必须失败，不能静默创建假用户或假 Agent。
 

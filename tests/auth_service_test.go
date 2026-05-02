@@ -30,7 +30,7 @@ func TestAuthLogicRegisterLoginAndValidateToken(t *testing.T) {
 		Password:    "correct-password",
 		DisplayName: "Alice",
 		Gender:      "female",
-		Age:         30,
+		BirthDate:   "1996-05-02",
 		Region:      "Shanghai",
 	})
 	if err != nil {

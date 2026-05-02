@@ -9,13 +9,14 @@ import { AUTH_STORAGE_KEY, type AuthSession } from './auth/session';
 const stylesCss = readFileSync('src/styles.css', 'utf8');
 
 const initialProfile: UserProfile = {
-  user_id: 'usr_000001',
+  user_id: '1001',
   identifier: 'alice_001',
   display_name: 'Alice',
   name: 'Alice',
   gender: 'female',
-  age: 30,
+  birth_date: '1996-05-02',
   region: 'Shanghai',
+  account_type: 'user',
   created_at: '2026-04-29T12:00:00Z',
   updated_at: '2026-04-29T12:00:00Z',
 };
@@ -32,11 +33,11 @@ function storeSession(overrides?: Partial<AuthSession>) {
   const session: AuthSession = {
     token: 'test-token',
     user: {
-      userId: 'usr_000001',
+      userId: '1001',
       identifier: 'alice_001',
       displayName: 'Alice Chen',
       gender: 'female',
-      age: 30,
+      birth_date: '1996-05-02',
       region: 'Shanghai',
     },
     ...overrides,
@@ -71,7 +72,7 @@ describe('Auth flow', () => {
         code: 'OK',
         message: 'ok',
         data: {
-          user_id: 'usr_000001',
+          user_id: '1001',
           identifier: 'alice_001',
           display_name: 'Alice Chen',
           token: 'login-token',
@@ -110,7 +111,7 @@ describe('Auth flow', () => {
         code: 'OK',
         message: 'ok',
         data: {
-          user_id: 'usr_000002',
+          user_id: '2002',
           identifier: 'new_user',
           token: 'register-token',
           expires_at: '2026-04-30T12:00:00Z',
@@ -259,24 +260,26 @@ describe('WeChat-inspired app shell', () => {
 
     await user.click(screen.getByRole('tab', { name: /我的/i }));
 
-    expect(screen.getByText('usr_000001')).toBeInTheDocument();
+    expect(screen.queryByText('user_id')).not.toBeInTheDocument();
+    expect(screen.queryByText('1001')).not.toBeInTheDocument();
     expect(screen.getByText('alice_001')).toBeInTheDocument();
+    expect(screen.getByText('用户')).toBeInTheDocument();
     expect(screen.getByText('female')).toBeInTheDocument();
-    expect(screen.getByText('30')).toBeInTheDocument();
+    expect(screen.getByText('1996-05-02')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '编辑个人资料' }));
     await user.clear(screen.getByLabelText('display_name'));
     await user.type(screen.getByLabelText('display_name'), 'Alice Chen');
     await user.clear(screen.getByLabelText('region'));
     await user.type(screen.getByLabelText('region'), 'Hangzhou');
-    await user.clear(screen.getByLabelText('age'));
-    await user.type(screen.getByLabelText('age'), '31');
+    await user.clear(screen.getByLabelText('生日'));
+    await user.type(screen.getByLabelText('生日'), '1995-05-02');
     await user.click(screen.getByRole('button', { name: '保存' }));
 
     expect(patchCurrentUser).toHaveBeenCalledWith({
       display_name: 'Alice Chen',
       gender: 'female',
-      age: 31,
+      birth_date: '1995-05-02',
       region: 'Hangzhou',
     });
     expect((await screen.findAllByText('Alice Chen')).length).toBeGreaterThan(0);
@@ -300,12 +303,12 @@ describe('WeChat-inspired app shell', () => {
           code: 'OK',
           message: 'ok',
           data: {
-            user_id: 'usr_000002',
+            user_id: '2002',
             identifier: 'bob_002',
             display_name: 'Bob Lin',
             name: 'Bob Lin',
             gender: '',
-            age: 0,
+            birth_date: '',
             region: '',
           },
         }),
@@ -316,8 +319,8 @@ describe('WeChat-inspired app shell', () => {
           message: 'ok',
           data: {
             friendship: {
-              user_id: 'usr_000001',
-              friend_id: 'usr_000002',
+              user_id: '1001',
+              friend_id: '2002',
               status: 'accepted',
               is_friend: true,
               created_at: '2026-04-29T12:00:00Z',
@@ -334,8 +337,8 @@ describe('WeChat-inspired app shell', () => {
           data: {
             friends: [
               {
-                user_id: 'usr_000001',
-                friend_id: 'usr_000002',
+                user_id: '1001',
+                friend_id: '2002',
                 status: 'accepted',
                 is_friend: true,
                 created_at: '2026-04-29T12:00:00Z',
@@ -365,10 +368,11 @@ describe('WeChat-inspired app shell', () => {
       '/friends',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ user_id: 'usr_000002' }),
+        body: JSON.stringify({ user_id: '2002' }),
       }),
     );
-    expect(await screen.findByText('usr_000002')).toBeInTheDocument();
+    expect(screen.queryByText('2002')).not.toBeInTheDocument();
+    expect((await screen.findAllByText('Bob Lin')).length).toBeGreaterThan(0);
   });
 
 
@@ -385,8 +389,8 @@ describe('WeChat-inspired app shell', () => {
           data: {
             friends: [
               {
-                user_id: 'usr_000001',
-                friend_id: 'usr_000002',
+                user_id: '1001',
+                friend_id: '2002',
                 status: 'accepted',
                 is_friend: true,
                 created_at: '2026-04-29T12:00:00Z',
@@ -403,17 +407,17 @@ describe('WeChat-inspired app shell', () => {
           data: {
             friends: [
               {
-                user_id: 'usr_000001',
-                friend_id: 'usr_000002',
+                user_id: '1001',
+                friend_id: '2002',
                 status: 'accepted',
                 is_friend: true,
                 friend: {
-                  user_id: 'usr_000002',
+                  user_id: '2002',
                   identifier: 'bob_002',
                   display_name: 'Bob',
                   name: 'Bob',
                   gender: '',
-                  age: 0,
+                  birth_date: '',
                   region: '',
                 },
                 created_at: '2026-04-29T12:00:00Z',
@@ -430,7 +434,8 @@ describe('WeChat-inspired app shell', () => {
 
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
 
-    expect(await screen.findByRole('button', { name: '和 usr_000002 聊天' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '和 未知联系人 聊天' })).toBeInTheDocument();
+    expect(screen.queryByText('2002')).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/friends', expect.objectContaining({ method: 'GET' }));
 
     await user.click(screen.getByRole('tab', { name: /发现/i }));
@@ -440,7 +445,7 @@ describe('WeChat-inspired app shell', () => {
 
     expect(await screen.findByRole('heading', { name: 'Bob', level: 2 })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '输入消息' })).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalledWith('/users/usr_000002', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).not.toHaveBeenCalledWith('/users/2002', expect.objectContaining({ method: 'GET' }));
   });
 
   it('loads friends automatically again after session restore', async () => {
@@ -455,8 +460,8 @@ describe('WeChat-inspired app shell', () => {
           data: {
             friends: [
               {
-                user_id: 'usr_000001',
-                friend_id: 'usr_000002',
+                user_id: '1001',
+                friend_id: '2002',
                 status: 'accepted',
                 is_friend: true,
                 created_at: '2026-04-29T12:00:00Z',
@@ -474,8 +479,8 @@ describe('WeChat-inspired app shell', () => {
           data: {
             friends: [
               {
-                user_id: 'usr_000001',
-                friend_id: 'usr_000003',
+                user_id: '1001',
+                friend_id: '2003',
                 status: 'accepted',
                 is_friend: true,
                 created_at: '2026-04-29T12:10:00Z',
@@ -489,7 +494,7 @@ describe('WeChat-inspired app shell', () => {
     const firstRender = render(<App />);
 
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
-    expect(await screen.findByRole('button', { name: '和 usr_000002 聊天' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '和 未知联系人 聊天' })).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/friends', expect.objectContaining({ method: 'GET' })));
 
     firstRender.unmount();
@@ -497,7 +502,7 @@ describe('WeChat-inspired app shell', () => {
     render(<App />);
 
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
-    expect(await screen.findByRole('button', { name: '和 usr_000003 聊天' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '和 未知联系人 聊天' })).toBeInTheDocument();
     await waitFor(() => {
       const friendLoads = fetchMock.mock.calls.filter(([url]) => url === '/friends');
       expect(friendLoads).toHaveLength(2);
@@ -516,17 +521,17 @@ describe('WeChat-inspired app shell', () => {
           data: {
             friends: [
               {
-                user_id: 'usr_000001',
-                friend_id: 'usr_000002',
+                user_id: '1001',
+                friend_id: '2002',
                 status: 'accepted',
                 is_friend: true,
                 friend: {
-                  user_id: 'usr_000002',
+                  user_id: '2002',
                   identifier: 'bob_002',
                   display_name: 'Bob',
                   name: 'Bob',
                   gender: '',
-                  age: 0,
+                  birth_date: '',
                   region: '',
                 },
                 created_at: '2026-04-29T12:00:00Z',
@@ -543,7 +548,7 @@ describe('WeChat-inspired app shell', () => {
           data: {
             states: [
               {
-                conversationId: 'single:usr_000001:usr_000002',
+                conversationId: 'single:1001:2002',
                 maxSeq: 1,
                 hasReadSeq: 0,
                 unreadCount: 1,
@@ -551,10 +556,10 @@ describe('WeChat-inspired app shell', () => {
                 lastMessage: {
                   serverMsgId: 'srv-existing-1',
                   clientMsgId: 'client-existing-1',
-                  conversationId: 'single:usr_000001:usr_000002',
+                  conversationId: 'single:1001:2002',
                   seq: 1,
-                  senderId: 'usr_000002',
-                  receiverId: 'usr_000001',
+                  senderId: '2002',
+                  receiverId: '1001',
                   groupId: '',
                   chatType: 'single',
                   contentType: 'text',
@@ -572,15 +577,15 @@ describe('WeChat-inspired app shell', () => {
           code: 'OK',
           message: 'ok',
           data: {
-            conversationId: 'single:usr_000001:usr_000002',
+            conversationId: 'single:1001:2002',
             messages: [
               {
                 serverMsgId: 'srv-existing-1',
                 clientMsgId: 'client-existing-1',
-                conversationId: 'single:usr_000001:usr_000002',
+                conversationId: 'single:1001:2002',
                 seq: 1,
-                senderId: 'usr_000002',
-                receiverId: 'usr_000001',
+                senderId: '2002',
+                receiverId: '1001',
                 groupId: '',
                 chatType: 'single',
                 contentType: 'text',
@@ -599,7 +604,7 @@ describe('WeChat-inspired app shell', () => {
           code: 'OK',
           message: 'ok',
           data: {
-            conversationId: 'single:usr_000001:usr_000002',
+            conversationId: 'single:1001:2002',
             hasReadSeq: 1,
           },
         }),
@@ -614,12 +619,12 @@ describe('WeChat-inspired app shell', () => {
     expect(await screen.findByText('existing chat from Bob')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/conversations/seqs?conversationIds=', expect.objectContaining({ method: 'GET' }));
     expect(fetchMock).toHaveBeenCalledWith(
-      '/conversations/single%3Ausr_000001%3Ausr_000002/messages?fromSeq=1&limit=50&order=asc',
+      '/conversations/single%3A1001%3A2002/messages?fromSeq=1&limit=50&order=asc',
       expect.objectContaining({ method: 'GET' }),
     );
-    expect(fetchMock).not.toHaveBeenCalledWith('/users/usr_000002', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).not.toHaveBeenCalledWith('/users/2002', expect.objectContaining({ method: 'GET' }));
     expect(fetchMock).toHaveBeenCalledWith(
-      '/conversations/single%3Ausr_000001%3Ausr_000002/read',
+      '/conversations/single%3A1001%3A2002/read',
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ hasReadSeq: 1 }) }),
     );
   });
@@ -635,7 +640,7 @@ describe('WeChat-inspired app shell', () => {
           data: {
             states: [
               {
-                conversationId: 'single:usr_000001:usr_000002',
+                conversationId: 'single:1001:2002',
                 maxSeq: 1,
                 hasReadSeq: 0,
                 unreadCount: 1,
@@ -643,10 +648,10 @@ describe('WeChat-inspired app shell', () => {
                 lastMessage: {
                   serverMsgId: 'srv-1',
                   clientMsgId: 'client-1',
-                  conversationId: 'single:usr_000001:usr_000002',
+                  conversationId: 'single:1001:2002',
                   seq: 1,
-                  senderId: 'usr_000002',
-                  receiverId: 'usr_000001',
+                  senderId: '2002',
+                  receiverId: '1001',
                   groupId: '',
                   chatType: 'single',
                   contentType: 'text',
@@ -664,15 +669,15 @@ describe('WeChat-inspired app shell', () => {
           code: 'OK',
           message: 'ok',
           data: {
-            conversationId: 'single:usr_000001:usr_000002',
+            conversationId: 'single:1001:2002',
             messages: [
               {
                 serverMsgId: 'srv-1',
                 clientMsgId: 'client-1',
-                conversationId: 'single:usr_000001:usr_000002',
+                conversationId: 'single:1001:2002',
                 seq: 1,
-                senderId: 'usr_000002',
-                receiverId: 'usr_000001',
+                senderId: '2002',
+                receiverId: '1001',
                 groupId: '',
                 chatType: 'single',
                 contentType: 'text',
@@ -700,7 +705,7 @@ describe('WeChat-inspired app shell', () => {
           data: {
             states: [
               {
-                conversationId: 'single:usr_000001:usr_000002',
+                conversationId: 'single:1001:2002',
                 maxSeq: 1,
                 hasReadSeq: 0,
                 unreadCount: 1,
@@ -708,10 +713,10 @@ describe('WeChat-inspired app shell', () => {
                 lastMessage: {
                   serverMsgId: 'srv-1',
                   clientMsgId: 'client-1',
-                  conversationId: 'single:usr_000001:usr_000002',
+                  conversationId: 'single:1001:2002',
                   seq: 1,
-                  senderId: 'usr_000002',
-                  receiverId: 'usr_000001',
+                  senderId: '2002',
+                  receiverId: '1001',
                   groupId: '',
                   chatType: 'single',
                   contentType: 'text',
@@ -729,15 +734,15 @@ describe('WeChat-inspired app shell', () => {
           code: 'OK',
           message: 'ok',
           data: {
-            conversationId: 'single:usr_000001:usr_000002',
+            conversationId: 'single:1001:2002',
             messages: [
               {
                 serverMsgId: 'srv-1',
                 clientMsgId: 'client-1',
-                conversationId: 'single:usr_000001:usr_000002',
+                conversationId: 'single:1001:2002',
                 seq: 1,
-                senderId: 'usr_000002',
-                receiverId: 'usr_000001',
+                senderId: '2002',
+                receiverId: '1001',
                 groupId: '',
                 chatType: 'single',
                 contentType: 'text',
@@ -754,12 +759,13 @@ describe('WeChat-inspired app shell', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: /usr_000002/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /未知联系人/ })).toBeInTheDocument();
+    expect(screen.queryByText('2002')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
     await user.click(screen.getByRole('tab', { name: /消息/i }));
 
-    expect(await screen.findByRole('button', { name: /usr_000002/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /未知联系人/ })).toBeInTheDocument();
     expect(screen.getByText('hello alice')).toBeInTheDocument();
   });
 
@@ -774,7 +780,7 @@ describe('WeChat-inspired app shell', () => {
           data: {
             states: [
               {
-                conversationId: 'single:usr_000001:usr_000002',
+                conversationId: 'single:1001:2002',
                 maxSeq: 1,
                 hasReadSeq: 0,
                 unreadCount: 1,
@@ -782,16 +788,16 @@ describe('WeChat-inspired app shell', () => {
                 lastMessage: {
                   serverMsgId: 'srv-1',
                   clientMsgId: 'client-1',
-                  conversationId: 'single:usr_000001:usr_000002',
+                  conversationId: 'single:1001:2002',
                   seq: 1,
-                  senderId: 'usr_000002',
-                  receiverId: 'usr_000001',
+                  senderId: '2002',
+                  receiverId: '1001',
                   groupId: '',
                   chatType: 'single',
                   contentType: 'text',
                   content: 'hello alice',
                   messageOrigin: 'ai',
-                  agentAccountId: 'usr_000002',
+                  agentAccountId: '2002',
                   triggerServerMsgId: 'srv-human-1',
                   agentRunId: 'run-app-1',
                   sendTime: 1777464300000,
@@ -807,21 +813,21 @@ describe('WeChat-inspired app shell', () => {
           code: 'OK',
           message: 'ok',
           data: {
-            conversationId: 'single:usr_000001:usr_000002',
+            conversationId: 'single:1001:2002',
             messages: [
               {
                 serverMsgId: 'srv-1',
                 clientMsgId: 'client-1',
-                conversationId: 'single:usr_000001:usr_000002',
+                conversationId: 'single:1001:2002',
                 seq: 1,
-                senderId: 'usr_000002',
-                receiverId: 'usr_000001',
+                senderId: '2002',
+                receiverId: '1001',
                 groupId: '',
                 chatType: 'single',
                 contentType: 'text',
                 content: 'hello alice',
                 messageOrigin: 'ai',
-                agentAccountId: 'usr_000002',
+                agentAccountId: '2002',
                 triggerServerMsgId: 'srv-human-1',
                 agentRunId: 'run-app-1',
                 sendTime: 1777464300000,
@@ -838,7 +844,7 @@ describe('WeChat-inspired app shell', () => {
           code: 'OK',
           message: 'ok',
           data: {
-            conversationId: 'single:usr_000001:usr_000002',
+            conversationId: 'single:1001:2002',
             hasReadSeq: 1,
           },
         }),
@@ -851,10 +857,10 @@ describe('WeChat-inspired app shell', () => {
             message: {
               serverMsgId: 'srv-2',
               clientMsgId: 'web-client-2',
-              conversationId: 'single:usr_000001:usr_000002',
+              conversationId: 'single:1001:2002',
               seq: 2,
-              senderId: 'usr_000001',
-              receiverId: 'usr_000002',
+              senderId: '1001',
+              receiverId: '2002',
               groupId: '',
               chatType: 'single',
               contentType: 'text',
@@ -869,7 +875,7 @@ describe('WeChat-inspired app shell', () => {
 
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: /usr_000002/ }));
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
     expect(await screen.findByText('hello alice')).toBeInTheDocument();
     expect(await screen.findByText('AI/Agent')).toBeInTheDocument();
 

@@ -31,18 +31,20 @@ Account Service 是账号资料的权威服务，先于 `auth`、`friends`、`gr
 
 第一阶段账号资料包含：
 
-- `user_id`：系统生成的 account id，字段名为 V0 compatibility alias。
+- `account_id`：系统生成的 Snowflake account id，无前缀数字字符串，是内部 source of truth。
+- `user_id`：V0 compatibility alias，值等于 `account_id`。
 - `identifier`：账号唯一标识，供注册检查和公开查询使用。
 - `display_name`：展示名。
 - `name`：名称字段，第一阶段与 `display_name` 等价保留，便于客户端兼容。
 - `gender`：性别，支持 `unknown`、`male`、`female`、`other`。
-- `age`：年龄，允许未设置。
+- `birth_date`：生日，允许未设置；不落库存储会随时间变化的年龄。
 - `region`：地区，允许未设置。
 - `account_type`：账号类型，支持 `user`、`agent`、`admin`；公开 HTTP 注册/创建路径默认并固定为 `user`，内部 User RPC/logic 可显式创建 `agent` 或 `admin`。
 - `avatar_media_id`：当前头像绑定的 media id，允许为空。头像文件本身由 Media API 上传到 MinIO/S3-compatible object storage，用户资料只保存 ready media 的引用。
 - `created_at` / `updated_at`：资料创建和更新时间。
 
-旧 `account_type=normal` 仅作为迁移输入兼容，写入与返回统一归一化为 `user`。
+旧 `account_type=normal` 不再作为有效输入兼容；迁移前必须转换为 `user`，否则按非法 `account_type` 失败。
+PostgreSQL 存储拆分为 `accounts` 与 `profiles`：`accounts` 负责 account id、identifier、account_type 和账号时间戳，`profiles` 负责展示资料和头像引用。创建账号必须同时创建 account 与 profile。
 
 ## 接口能力
 
@@ -52,7 +54,7 @@ V0 path：`POST /users`
 
 Account alias：`POST /accounts`
 
-请求方通常是 `auth` 注册流程或内部管理流程。请求必须包含 `identifier`，可选 `display_name`、`name`、`gender`、`age`、`region`。HTTP `POST /users` 与 `POST /accounts` 不接受客户端设置 `account_type`，即使请求体包含该字段也按 `user` 创建；需要创建 `agent` 或 `admin` 时必须走内部 User RPC/logic 能力，并通过服务端权限策略保护调用方。
+请求方通常是 `auth` 注册流程或内部管理流程。请求必须包含 `identifier`，可选 `display_name`、`name`、`gender`、`birth_date`、`region`。HTTP `POST /users` 与 `POST /accounts` 不接受客户端设置 `account_type`，即使请求体包含该字段也按 `user` 创建；需要创建 `agent` 或 `admin` 时必须走内部 User RPC/logic 能力，并通过服务端权限策略保护调用方。
 
 验收标准：
 
@@ -102,7 +104,7 @@ Account alias：`GET /accounts/:identifier`
 
 `PATCH /me`
 
-通过 token `user_id` 确认当前账号，只允许更新自己的 `display_name`/`name`、`gender`、`age`、`region`。
+通过 token `user_id` 确认当前账号，只允许更新自己的 `display_name`/`name`、`gender`、`birth_date`、`region`。
 
 验收标准：
 
@@ -144,4 +146,4 @@ Account alias：`GET /accounts/:identifier`
 - `identifier` 是否允许修改、是否大小写敏感，后续需要产品确认。第一阶段按小写规范化后唯一处理。
 - 所有需要当前账号身份的接口必须使用 JWT Bearer token；`X-User-Id` 只允许作为明确标记的测试绕过断言或历史兼容说明。
 - 第一阶段可使用内存 repository 支撑本地开发和测试；共享本地开发使用 PostgreSQL repository。
-- PostgreSQL `users` 表是 V0 storage compatibility；下一阶段如迁移为 `accounts` 表，需要独立执行计划、数据校验和回滚方案。
+- PostgreSQL `accounts` / `profiles` 是账号资料权威存储；旧 `users` 仅保留为 transport/path/field 命名兼容概念，不再作为表名。
