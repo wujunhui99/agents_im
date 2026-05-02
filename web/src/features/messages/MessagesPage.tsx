@@ -4,6 +4,14 @@ import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/
 import { createMessageApi } from '../../api/messages';
 import type { UserApi, UserProfile } from '../../api/user';
 import { createUserApi } from '../../api/user';
+import { Avatar } from '../../components/ui/Avatar';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
+import { ListItem } from '../../components/ui/ListItem';
+import { MessageBubble } from '../../components/ui/MessageBubble';
+import { SearchBox } from '../../components/ui/SearchBox';
+import { TextField } from '../../components/ui/TextField';
 import type { ChatMessage, Conversation, MessageStatus } from '../../models/messages';
 
 type MessagesPageProps = {
@@ -157,36 +165,46 @@ function ConversationList({
       <p className="inline-status" role="status">
         {status}
       </p>
-      {conversations.length === 0 ? (
+{conversations.length === 0 ? (
         <div className="empty-state empty-state-action">
           <p>暂无会话</p>
-          <button type="button" className="compact-command" onClick={onOpenStartChat}>
+          <Button className="compact-command" type="button" onClick={onOpenStartChat}>
             <MessageCircle size={17} />
             <span>发起聊天</span>
-          </button>
+          </Button>
         </div>
       ) : null}
-      <section className="list-card conversation-list" role="list" aria-label="消息列表">
+      <Card className="list-card conversation-list" role="list" aria-label="消息列表">
         {conversations.map((item) => (
           <div className="conversation-list-item" role="listitem" key={item.id}>
-            <button type="button" className="conversation-row conversation-button" onClick={() => onSelect(item.id)}>
-              <div className={`avatar avatar-${item.color}`}>{item.avatar}</div>
-              <div className="row-main">
-                <div className="row-title-line">
-                  <strong>{item.title}</strong>
+            <ListItem
+              className="conversation-row conversation-button"
+              onClick={() => onSelect(item.id)}
+              leading={<Avatar label={item.avatar} color={item.color} />}
+              headline={
+                <span className="row-title-line">
+                  <span>{item.title}</span>
                   <time>{item.time}</time>
-                </div>
-                <p>
+</span>
+              }
+              supportingText={
+                <>
                   {item.previewOrigin === 'ai' ? <span className="conversation-origin-badge">AI/Agent</span> : null}
                   {item.previewOrigin === 'system' ? <span className="conversation-origin-badge conversation-origin-system">系统</span> : null}
                   {item.preview}
-                </p>
-              </div>
-              {item.unread > 0 ? <span className="unread-badge">{item.unread}</span> : null}
-            </button>
+                </>
+              }
+              trailing={
+                item.unread > 0 ? (
+                  <Badge tone="error" className="unread-badge">
+                    {item.unread}
+                  </Badge>
+                ) : null
+              }
+            />
           </div>
         ))}
-      </section>
+      </Card>
     </div>
   );
 }
@@ -233,45 +251,51 @@ function StartChatPanel({
     <section className="start-chat-card" aria-label="发起聊天">
       <div className="start-chat-heading">
         <h2>发起聊天</h2>
-        <button type="button" className="text-command" onClick={onClose}>
+        <Button type="button" className="text-command" variant="text" onClick={onClose}>
           关闭
-        </button>
+        </Button>
       </div>
       <form className="identifier-search-form" onSubmit={handleSubmit}>
-        <label className="search-box identifier-field">
-          <Search size={17} />
-          <input
-            placeholder="输入唯一 identifier"
-            aria-label="按 identifier 搜索聊天对象"
-            value={identifier}
-            onChange={(event) => setIdentifier(event.target.value)}
-          />
-        </label>
-        <button className="compact-command" type="submit" aria-label="搜索聊天对象" disabled={submitting}>
+        <TextField
+          label="按 identifier 搜索聊天对象"
+          hideLabel
+          placeholder="输入唯一 identifier"
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
+          leadingIcon={<Search size={17} />}
+          fieldClassName="search-box identifier-field"
+        />
+        <Button className="compact-command" type="submit" aria-label="搜索聊天对象" disabled={submitting}>
           <Search size={17} />
           <span>搜索</span>
-        </button>
+        </Button>
       </form>
       <p className="inline-status" role="status">
         {status}
       </p>
       {result ? (
-        <article className="search-result">
-          <div className="avatar avatar-blue">{avatarText(profileDisplayName(result))}</div>
-          <div className="row-main">
-            <strong>{profileDisplayName(result)}</strong>
-            <p>{result.identifier}</p>
-            <p>{result.user_id}</p>
-          </div>
-          <button
-            className="text-command"
-            type="button"
-            aria-label={`发起聊天 ${profileDisplayName(result)}`}
-            onClick={() => onStartChat(result)}
-          >
-            发起聊天
-          </button>
-        </article>
+        <ListItem
+          className="search-result"
+          leading={<Avatar label={avatarText(profileDisplayName(result))} color="blue" />}
+          headline={profileDisplayName(result)}
+          supportingText={
+            <span className="friend-supporting-lines">
+              <span>{result.identifier}</span>
+              <span>{result.user_id}</span>
+            </span>
+          }
+          trailing={
+            <Button
+              className="text-command"
+              variant="tonal"
+              size="small"
+              aria-label={`发起聊天 ${profileDisplayName(result)}`}
+              onClick={() => onStartChat(result)}
+            >
+              发起聊天
+            </Button>
+          }
+        />
       ) : null}
     </section>
   );
@@ -295,9 +319,9 @@ function ChatWindow({
   return (
     <section className="chat-window" aria-label={`${conversation.title} 聊天窗口`}>
       <header className="chat-header">
-        <button type="button" className="chat-back-button" aria-label="返回消息列表" onClick={onBack}>
+        <Button variant="icon" className="chat-back-button" aria-label="返回消息列表" onClick={onBack}>
           <ChevronLeft size={24} />
-        </button>
+        </Button>
         <h2>{conversation.title}</h2>
       </header>
       <p className="inline-status" role="status">
@@ -311,12 +335,18 @@ function ChatWindow({
             aria-label={messageAriaLabel(message)}
           >
             <div className="message-body">
-              {message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
+{message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
               {message.messageOrigin === 'system' ? <span className="message-origin-badge message-origin-system">系统</span> : null}
-              <p className="message-bubble">{message.content}</p>
-              {message.direction === 'outgoing' ? (
-                <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>
-              ) : null}
+              <MessageBubble
+                direction={message.direction}
+                status={
+                  message.direction === 'outgoing' ? (
+                    <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>
+                  ) : null
+                }
+              >
+                {message.content}
+              </MessageBubble>
             </div>
           </article>
         ))}
@@ -343,27 +373,20 @@ function SendMessageComposer({ onSend, sending }: { onSend: (content: string) =>
 
   return (
     <form className="message-composer" aria-label="发送消息" onSubmit={handleSubmit}>
-      <input
-        aria-label="输入消息"
+<TextField
+        label="输入消息"
+        hideLabel
         value={draft}
         placeholder="输入消息"
         disabled={sending}
         onChange={(event) => setDraft(event.target.value)}
+        fieldClassName="message-composer-field"
       />
-      <button type="submit" disabled={sending || !trimmedDraft}>
+      <Button className="message-send-button" type="submit" disabled={sending || !trimmedDraft}>
         <SendHorizontal size={17} />
         <span>{sending ? '发送中' : '发送'}</span>
-      </button>
+      </Button>
     </form>
-  );
-}
-
-function SearchBox({ placeholder }: { placeholder: string }) {
-  return (
-    <label className="search-box">
-      <Search size={17} />
-      <input placeholder={placeholder} aria-label={placeholder} />
-    </label>
   );
 }
 
@@ -442,7 +465,7 @@ function appendMessage(conversations: Conversation[], conversationId: string, me
     const nextMessages = canonicalChatMessages([...conversation.messages, message]);
     return {
       ...conversation,
-preview: conversationPreview(nextMessages, message.content),
+      preview: conversationPreview(nextMessages, message.content),
       previewOrigin: message.messageOrigin,
       time: '刚刚',
       unread: 0,
@@ -721,6 +744,7 @@ function stableMessageTieBreaker(message: ChatMessage) {
 
 function uniqueStrings(values: string[]) {
   return values.filter((value, index) => value !== '' && values.indexOf(value) === index);
+}
 
 function messageAriaLabel(message: ChatMessage) {
   if (message.messageOrigin === 'ai') {
