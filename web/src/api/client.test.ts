@@ -25,7 +25,7 @@ describe('REST API client', () => {
       jsonResponse({
         code: 'OK',
         message: 'ok',
-        data: { user_id: 'usr_000001', identifier: 'alice_001' },
+        data: { user_id: '1001', identifier: 'alice_001' },
       }),
     );
 
@@ -35,7 +35,7 @@ describe('REST API client', () => {
     });
 
     await expect(client.get('/me')).resolves.toEqual({
-      user_id: 'usr_000001',
+      user_id: '1001',
       identifier: 'alice_001',
     });
 

@@ -9,13 +9,15 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { ListItem } from './ui/ListItem';
 import { TextField } from './ui/TextField';
+import { accountTypeLabel, avatarText, firstNonEmpty, profileDisplayName, profileIdentifier } from '../utils/profileDisplay';
 
 type Friend = {
   userId: string;
   name: string;
-  identifier: string;
+  identifier?: string;
   initial: string;
   avatar: string;
+  accountType?: UserProfile['account_type'];
   profile?: UserProfile;
 };
 
@@ -104,7 +106,7 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
       onStartChat(profile);
       setFriendStatus(`已打开 ${profileDisplayName(profile)} 的聊天`);
     } catch (error) {
-      setFriendStatus(error instanceof Error ? error.message : `打开 ${friend.identifier} 的聊天失败`);
+      setFriendStatus(error instanceof Error ? error.message : `打开 ${friend.identifier ?? friend.name} 的聊天失败`);
     } finally {
       setOpeningFriendId(null);
     }
@@ -158,7 +160,7 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
     try {
       const profile = await userApi.getPublicProfileByIdentifier(query);
       setResult(profile);
-      setStatus(`找到 ${profile.display_name || profile.name || profile.identifier}`);
+      setStatus(`找到 ${profileDisplayName(profile)}`);
     } catch (error) {
       setResult(null);
       setStatus(error instanceof Error ? error.message : `未找到 ${query}`);
@@ -208,9 +210,9 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
       {result ? (
 <ListItem
           className="search-result"
-          leading={<Avatar label={avatarText(result.display_name || result.name || result.identifier)} color="blue" />}
-          headline={result.display_name || result.name || result.identifier}
-          supportingText={result.identifier}
+          leading={<Avatar label={avatarText(profileDisplayName(result))} color="blue" />}
+          headline={profileDisplayName(result)}
+          supportingText={<ProfileSupportingLines identifier={profileIdentifier(result)} accountType={result.account_type} />}
           trailing={
             <Button
               className="text-command"
@@ -275,21 +277,17 @@ function FriendDirectory({
           <Card className="list-card">
             {groupedFriends.map((friend) => {
               const isOpening = openingFriendId === friend.userId;
+              const chatLabel = friend.identifier ?? friend.name;
               return (
                 <ListItem
                   className="friend-row"
                   key={friend.userId}
                   onClick={() => onOpenFriendChat(friend)}
-                  ariaLabel={`和 ${friend.identifier} 聊天`}
+                  ariaLabel={`和 ${chatLabel} 聊天`}
                   ariaDisabled={isOpening}
                   leading={<Avatar label={friend.avatar} color="blue" />}
                   headline={friend.name}
-                  supportingText={
-                    <span className="friend-supporting-lines">
-                      <span>{friend.identifier}</span>
-                      <span>{friend.userId}</span>
-                    </span>
-                  }
+                  supportingText={<ProfileSupportingLines identifier={friend.identifier} accountType={friend.accountType} />}
                   trailing={isOpening ? <span className="row-badge">打开中</span> : <ChevronRight size={18} />}
                 />
               );
@@ -313,13 +311,14 @@ function groupFriends(directoryFriends: Friend[]) {
 }
 
 function userProfileToFriend(profile: UserProfile): Friend {
-  const name = profile.display_name || profile.name || profile.identifier;
+  const name = profileDisplayName(profile);
   return {
     userId: profile.user_id,
     name,
-    identifier: profile.identifier,
+    identifier: profileIdentifier(profile),
     initial: avatarText(name).slice(0, 1),
     avatar: avatarText(name),
+    accountType: profile.account_type,
     profile,
   };
 }
@@ -331,27 +330,30 @@ function friendshipToFriend(friendship: Friendship): Friend {
 function friendToUserProfile(friend: Friend): UserProfile {
   return {
     user_id: friend.userId,
-    identifier: friend.identifier,
+    identifier: friend.identifier ?? '',
     display_name: friend.name,
     name: friend.name,
     gender: '',
     age: 0,
     region: '',
+    account_type: friend.accountType,
   };
 }
 
 function friendshipToUserProfile(friendship: Friendship): UserProfile {
   const profile = friendship.friend ?? friendship.friend_profile ?? friendship.profile ?? {};
   const userId = profile.user_id || friendship.friend_id;
-  const identifier = profile.identifier || friendship.friend_identifier || friendship.identifier || userId;
+  const identifier = firstNonEmpty(profile.identifier, friendship.friend_identifier, friendship.identifier) ?? '';
   const displayName =
-    profile.display_name ||
-    profile.name ||
-    friendship.friend_display_name ||
-    friendship.friend_name ||
-    friendship.display_name ||
-    friendship.name ||
-    identifier;
+    firstNonEmpty(
+      profile.display_name,
+      profile.name,
+      friendship.friend_display_name,
+      friendship.friend_name,
+      friendship.display_name,
+      friendship.name,
+      identifier,
+    ) ?? '未知联系人';
 
   return {
     user_id: userId,
@@ -362,6 +364,7 @@ function friendshipToUserProfile(friendship: Friendship): UserProfile {
     age: profile.age ?? 0,
     region: profile.region ?? '',
     account_type: profile.account_type,
+    avatar_media_id: profile.avatar_media_id,
     created_at: profile.created_at,
     updated_at: profile.updated_at,
   };
@@ -374,12 +377,13 @@ function upsertFriend(friends: Friend[], friend: Friend) {
   return [...friends, friend];
 }
 
-function profileDisplayName(profile: UserProfile) {
-  return profile.display_name || profile.name || profile.identifier || profile.user_id;
-}
-
-function avatarText(value: string) {
-  return value.trim().slice(0, 2).toUpperCase() || 'U';
+function ProfileSupportingLines({ identifier, accountType }: { identifier?: string; accountType?: UserProfile['account_type'] }) {
+  return (
+    <span className="friend-supporting-lines">
+      <span>{identifier ?? '资料未同步'}</span>
+      <span>{accountTypeLabel(accountType)}</span>
+    </span>
+  );
 }
 
 export default ContactsPage;
