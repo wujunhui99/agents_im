@@ -207,6 +207,17 @@ describe('WeChat-inspired app shell', () => {
     expect(screen.getAllByText(/alice_001/).length).toBeGreaterThan(0);
   });
 
+  it('wires the message top-bar add button to the start-chat panel', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('暂无会话')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '新增' }));
+
+    expect(screen.getByRole('region', { name: '发起聊天' })).toBeInTheDocument();
+    expect(screen.getByLabelText('按 identifier 搜索聊天对象')).toBeInTheDocument();
+  });
+
   it('shows MVP placeholder entrances on the discover page without real scan behavior', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -331,6 +342,7 @@ describe('WeChat-inspired app shell', () => {
     await user.click(screen.getByRole('button', { name: '添加好友 bob_002' }));
 
     await waitFor(() => expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('已添加好友：bob_002'));
+    expect(screen.getByRole('button', { name: '已添加' })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledWith('/users/bob_002', expect.objectContaining({ method: 'GET' }));
     expect(fetchMock).toHaveBeenCalledWith(
       '/friends',
