@@ -477,6 +477,10 @@ spec:
           image: ghcr.io/wujunhui99/agents_im/auth-rpc:latest
           imagePullPolicy: IfNotPresent
           args: ["-f", "/config/auth-rpc.yaml"]
+          env:
+            # Temporary compatibility guard until duplicate auth.proto descriptors are fully regenerated.
+            - name: GOLANG_PROTOBUF_REGISTRATION_CONFLICT
+              value: "warn"
           envFrom:
             - configMapRef:
                 name: agents-im-config
