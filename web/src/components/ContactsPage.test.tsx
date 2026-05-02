@@ -52,7 +52,81 @@ function createContactsApi(): ContactsApi {
   };
 }
 
+function createContactsApiWithFriend(): ContactsApi {
+  const api = createContactsApi();
+  api.listFriends = vi.fn(async () => ({
+    friends: [
+      {
+        user_id: 'usr_000001',
+        friend_id: 'usr_000002',
+        status: 'active',
+        is_friend: true,
+        created_at: '2026-04-29T12:00:00Z',
+        updated_at: '2026-04-29T12:00:00Z',
+        friend: {
+          user_id: 'usr_000002',
+          identifier: 'bob_002',
+          display_name: 'Cached Bob',
+          name: 'Cached Bob',
+        },
+      },
+    ],
+  }));
+  return api;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('ContactsPage', () => {
+  it('fetches the friend public profile before opening a chat from the friend row', async () => {
+    const user = userEvent.setup();
+    const profileLookup = deferred<UserProfile>();
+    const userApi = createUserApi({ ...bobProfile, display_name: 'Bob Current', name: 'Bob Current' });
+    vi.mocked(userApi.getPublicProfileByIdentifier).mockReturnValueOnce(profileLookup.promise);
+    const onStartChat = vi.fn();
+
+    render(<ContactsPage userApi={userApi} contactsApi={createContactsApiWithFriend()} onStartChat={onStartChat} />);
+
+    await user.click(await screen.findByRole('button', { name: '和 bob_002 聊天' }));
+
+    expect(userApi.getPublicProfileByIdentifier).toHaveBeenCalledWith('bob_002');
+    expect(onStartChat).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('正在打开 bob_002 的聊天'),
+    );
+
+    profileLookup.resolve({ ...bobProfile, display_name: 'Bob Current', name: 'Bob Current' });
+
+    await waitFor(() =>
+      expect(onStartChat).toHaveBeenCalledWith(expect.objectContaining({ identifier: 'bob_002', display_name: 'Bob Current' })),
+    );
+    expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('已打开 Bob Current 的聊天');
+  });
+
+  it('surfaces profile lookup failures when opening a friend chat', async () => {
+    const user = userEvent.setup();
+    const userApi = createUserApi();
+    vi.mocked(userApi.getPublicProfileByIdentifier).mockRejectedValueOnce(new Error('profile service unavailable'));
+    const onStartChat = vi.fn();
+
+    render(<ContactsPage userApi={userApi} contactsApi={createContactsApiWithFriend()} onStartChat={onStartChat} />);
+
+    await user.click(await screen.findByRole('button', { name: '和 bob_002 聊天' }));
+
+    await waitFor(() =>
+      expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('profile service unavailable'),
+    );
+    expect(onStartChat).not.toHaveBeenCalled();
+  });
+
   it('marks a search result as added and disabled after add-friend succeeds', async () => {
     const user = userEvent.setup();
     const contactsApi = createContactsApi();

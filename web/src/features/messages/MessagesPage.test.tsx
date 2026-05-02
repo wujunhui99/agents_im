@@ -117,6 +117,79 @@ function expectTextOrder(container: HTMLElement, labels: string[]) {
 }
 
 describe('MessagesPage real API mode', () => {
+  it('marks visible unread messages as read when a conversation is opened', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([
+      serverMessage({ seq: 1, content: 'older unread' }),
+      serverMessage({ seq: 3, content: 'newest unread' }),
+    ]);
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
+
+    expect(await screen.findByText('2')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /usr_000002/ }));
+
+    await waitFor(() => expect(messageApi.markRead).toHaveBeenCalledWith(conversationId, { hasReadSeq: 3 }));
+    await user.click(screen.getByRole('button', { name: '返回消息列表' }));
+
+    const row = await screen.findByRole('button', { name: /usr_000002/ });
+    expect(within(row).queryByText('2')).not.toBeInTheDocument();
+  });
+
+  it('keeps mark-read failures visible instead of faking success', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'unread that fails read ack' })]);
+    vi.mocked(messageApi.markRead).mockRejectedValueOnce(new Error('mark read failed'));
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
+
+    await user.click(await screen.findByRole('button', { name: /usr_000002/ }));
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('mark read failed'));
+  });
+
+  it('keeps a sent preview and cleared unread state when a stale conversation reload merges afterward', async () => {
+    const user = userEvent.setup();
+    const seqs = deferred<Awaited<ReturnType<MessageApi['getConversationSeqs']>>>();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'stale server preview' })]);
+    vi.mocked(messageApi.getConversationSeqs).mockReturnValueOnce(seqs.promise);
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        pendingChatProfile={bobProfile}
+        onPendingChatConsumed={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Bob Lin' })).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: '输入消息' }), 'fresh outgoing');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(screen.getByText('已发送')).toBeInTheDocument());
+
+    seqs.resolve({
+      conversations: [
+        {
+          conversationId,
+          maxSeq: 1,
+          hasReadSeq: 0,
+          unreadCount: 1,
+          maxSeqTime: 1777464000000,
+          lastMessage: serverMessage({ seq: 1, content: 'stale server preview' }),
+        },
+      ],
+    });
+
+    await waitFor(() => expect(messageApi.pullMessages).toHaveBeenCalledWith(conversationId, expect.anything()));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('已加载 1 个会话'));
+    await user.click(screen.getByRole('button', { name: '返回消息列表' }));
+
+    const row = await screen.findByRole('button', { name: /Bob Lin|usr_000002/ });
+    expect(within(row).getByText('fresh outgoing')).toBeInTheDocument();
+    expect(within(row).queryByText('1')).not.toBeInTheDocument();
+  });
+
   it('loads conversations from the message API and sends through POST /messages', async () => {
     const user = userEvent.setup();
     const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({
