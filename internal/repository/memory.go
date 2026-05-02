@@ -36,11 +36,16 @@ func (r *MemoryRepository) Create(_ context.Context, user model.User) (model.Use
 	if _, exists := r.identifierID[user.Identifier]; exists {
 		return model.User{}, apperror.AlreadyExists("identifier already exists")
 	}
-	accountType, ok := model.NormalizeAccountType(string(user.AccountType))
+	rawAccountType := user.AccountType
+	if rawAccountType == 0 && !user.AccountTypeSet {
+		rawAccountType = model.AccountTypeUser
+	}
+	accountType, ok := model.NormalizeAccountType(rawAccountType)
 	if !ok {
-		return model.User{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
+		return model.User{}, apperror.InvalidArgument("account_type must be 0(admin), 1(user), or 2(agent)")
 	}
 	user.AccountType = accountType
+	user.AccountTypeSet = true
 
 	if user.UserID == "" {
 		accountID, err := idgen.NewString()

@@ -57,14 +57,14 @@ func TestPostgresCreateAccountWritesAccountsAndProfiles(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`(?s)insert\s+into\s+accounts\s+\(account_id,\s+identifier,\s+account_type\)`).
-		WithArgs(accountID, "pg_alice", "user").
+		WithArgs(accountID, "pg_alice", int32(model.AccountTypeUser)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`(?s)insert\s+into\s+profiles\s+\(account_id,\s+display_name,\s+name,\s+gender,\s+birth_date,\s+region,\s+avatar_media_id\)`).
 		WithArgs(accountID, "Alice", "Alice", "unknown", "", "", "").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`(?s)from\s+accounts\s+a\s+join\s+profiles\s+p\s+on\s+p\.account_id\s+=\s+a\.account_id`).
 		WithArgs(accountID).
-		WillReturnRows(postgresUserRows().AddRow(accountID, "pg_alice", "user", now, now, "Alice", "Alice", "unknown", "", "", "", now, now))
+		WillReturnRows(postgresUserRows().AddRow(accountID, "pg_alice", int32(model.AccountTypeUser), now, now, "Alice", "Alice", "unknown", "", "", "", now, now))
 	mock.ExpectCommit()
 
 	got, err := repo.Create(context.Background(), model.User{
@@ -103,7 +103,7 @@ func TestPostgresUpdateProfileWritesProfilesTable(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"account_id"}).AddRow(accountID))
 	mock.ExpectQuery(`(?s)from\s+accounts\s+a\s+join\s+profiles\s+p\s+on\s+p\.account_id\s+=\s+a\.account_id`).
 		WithArgs(accountID).
-		WillReturnRows(postgresUserRows().AddRow(accountID, "pg_alice", "user", now, now, displayName, displayName, "unknown", "", region, "", now, now))
+		WillReturnRows(postgresUserRows().AddRow(accountID, "pg_alice", int32(model.AccountTypeUser), now, now, displayName, displayName, "unknown", "", region, "", now, now))
 
 	got, err := repo.UpdateProfile(context.Background(), accountID, ProfilePatch{
 		DisplayName: &displayName,

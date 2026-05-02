@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-第一阶段 PostgreSQL migration 已覆盖账号资料、认证、好友、群聊、消息、outbox、delivery attempt、Agent 管理表、Agent prompt/tool/skill registry 元数据表和 Agent audit 表。`accounts.account_type` 支持 `user`、`agent`、`admin`，默认 `user`；账号资料拆分为 `accounts` 与 `profiles`。
+第一阶段 PostgreSQL migration 已覆盖账号资料、认证、好友、群聊、消息、outbox、delivery attempt、Agent 管理表、Agent prompt/tool/skill registry 元数据表和 Agent audit 表。`accounts.account_type` 支持 `user`、`agent`、`admin`，默认 1（用户）；账号资料拆分为 `accounts` 与 `profiles`。
 
 ## 当前覆盖
 
@@ -55,7 +55,7 @@
 - `agent_id` 为无前缀 Snowflake 数字字符串。
 - `account_id` 唯一，并引用 `accounts(account_id)`。
 - `status` 只能为 `draft`、`active`、`disabled`、`archived`。
-- Agent 配置独立于 `profiles` 表；Agent 展示资料和头像来自 `profiles`，类型来源为 `accounts.account_type=agent`。
+- Agent 配置独立于 `profiles` 表；Agent 展示资料和头像来自 `profiles`，类型来源为 `accounts.account_type=2`（Agent）。
 
 ## 后续预期覆盖
 

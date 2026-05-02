@@ -12,13 +12,13 @@ export function profileIdentifier(profile: Pick<UserProfile, 'identifier'>) {
 }
 
 export function accountTypeLabel(accountType?: UserProfile['account_type']) {
-  if (accountType === 'agent') {
+  if (accountType === 2) {
     return 'Agent';
   }
-  if (accountType === 'admin') {
+  if (accountType === 0) {
     return '管理员';
   }
-  if (accountType === 'user') {
+  if (accountType === 1) {
     return '用户';
   }
   return UNKNOWN_ACCOUNT_TYPE_LABEL;

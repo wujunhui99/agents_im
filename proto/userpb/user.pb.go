@@ -34,7 +34,7 @@ type User struct {
 	Region        string                 `protobuf:"bytes,7,opt,name=region,proto3" json:"region,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	AccountType   string                 `protobuf:"bytes,10,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
+	AccountType   int32                  `protobuf:"varint,10,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
 	AvatarMediaId string                 `protobuf:"bytes,11,opt,name=avatar_media_id,json=avatarMediaId,proto3" json:"avatar_media_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -133,11 +133,11 @@ func (x *User) GetUpdatedAt() string {
 	return ""
 }
 
-func (x *User) GetAccountType() string {
+func (x *User) GetAccountType() int32 {
 	if x != nil {
 		return x.AccountType
 	}
-	return ""
+	return 0
 }
 
 func (x *User) GetAvatarMediaId() string {
@@ -155,7 +155,7 @@ type CreateUserRequest struct {
 	Gender        string                 `protobuf:"bytes,4,opt,name=gender,proto3" json:"gender,omitempty"`
 	BirthDate     string                 `protobuf:"bytes,5,opt,name=birth_date,json=birthDate,proto3" json:"birth_date,omitempty"`
 	Region        string                 `protobuf:"bytes,6,opt,name=region,proto3" json:"region,omitempty"`
-	AccountType   string                 `protobuf:"bytes,7,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
+	AccountType   int32                  `protobuf:"varint,7,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -232,11 +232,11 @@ func (x *CreateUserRequest) GetRegion() string {
 	return ""
 }
 
-func (x *CreateUserRequest) GetAccountType() string {
+func (x *CreateUserRequest) GetAccountType() int32 {
 	if x != nil {
 		return x.AccountType
 	}
-	return ""
+	return 0
 }
 
 type GetUserByIdentifierRequest struct {
@@ -573,7 +573,7 @@ const file_user_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\t \x01(\tR\tupdatedAt\x12!\n" +
 	"\faccount_type\x18\n" +
-	" \x01(\tR\vaccountType\x12&\n" +
+	" \x01(\x05R\vaccountType\x12&\n" +
 	"\x0favatar_media_id\x18\v \x01(\tR\ravatarMediaId\"\xdc\x01\n" +
 	"\x11CreateUserRequest\x12\x1e\n" +
 	"\n" +
@@ -585,7 +585,7 @@ const file_user_proto_rawDesc = "" +
 	"\n" +
 	"birth_date\x18\x05 \x01(\tR\tbirthDate\x12\x16\n" +
 	"\x06region\x18\x06 \x01(\tR\x06region\x12!\n" +
-	"\faccount_type\x18\a \x01(\tR\vaccountType\"<\n" +
+	"\faccount_type\x18\a \x01(\x05R\vaccountType\"<\n" +
 	"\x1aGetUserByIdentifierRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +

@@ -116,7 +116,7 @@ Authorization: Bearer <access_token>
     "gender": "female",
     "birth_date": "1996-05-02",
     "region": "Shanghai",
-    "account_type": "user",
+    "account_type": 1,
     "avatar_media_id": "med_000001",
     "created_at": "2026-04-29T12:00:00Z",
     "updated_at": "2026-04-29T12:00:00Z"
@@ -124,7 +124,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-`account_type` is one of `user`, `agent`, or `admin`. Public registration and public account creation always create `user`; clients cannot self-select `agent` or `admin` through the frontend-visible REST API. Legacy server data that still contains `normal` is invalid and must be migrated before use.
+`account_type` is integer enum: 0=admin, 1=user, 2=agent. Public registration and public account creation always create account_type=1 (user); clients cannot self-select 0 (admin) or 2 (agent) through the frontend-visible REST API. Legacy server data that still contains `normal` is invalid and must be migrated before use.
 
 ### Update Current User
 
