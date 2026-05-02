@@ -38,7 +38,10 @@ function serverMessage(overrides: Partial<ServerMessage> & Pick<ServerMessage, '
   };
 }
 
-function createMessageApi(messages: ServerMessage[] = [serverMessage({ seq: 1, content: '真实后端会话消息' })], sendMessage?: ReturnType<typeof vi.fn>): MessageApi {
+function createMessageApi(
+  messages: ServerMessage[] = [serverMessage({ seq: 1, content: '真实后端会话消息' })],
+  sendMessage?: MessageApi['sendMessage'],
+): MessageApi {
   const send =
     sendMessage ??
     vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({

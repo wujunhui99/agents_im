@@ -7,7 +7,10 @@ import { createContactsApi, type ContactsApi } from './api/contacts';
 import { createMessageApi, type MessageApi } from './api/messages';
 import { createUserApi, type UserApi, type UserProfile, type UserProfilePatch } from './api/user';
 import ContactsPage from './components/ContactsPage';
+import { Avatar } from './components/ui/Avatar';
+import { Button } from './components/ui/Button';
 import { TabBar, type TabDefinition } from './components/ui/TabBar';
+import { TextField } from './components/ui/TextField';
 import { TopBar } from './components/ui/TopBar';
 import { MessagesPage } from './features/messages/MessagesPage';
 import { DiscoverPage } from './pages/DiscoverPage';
@@ -81,7 +84,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppPr
   }
 
   return (
-    <main className="app-shell" aria-label="Agents IM 微信风格主框架">
+    <main className="app-shell" aria-label="Agents IM Material 3-inspired 微信式主框架">
       <section className="phone-frame">
         <TopBar
           title={activeLabel}
@@ -142,68 +145,67 @@ function AuthPage() {
     <main className="app-shell auth-app-shell" aria-label="Agents IM 认证">
       <section className="phone-frame auth-frame">
         <div className="auth-hero">
-          <div className="avatar avatar-green avatar-large">
-            <ShieldCheck size={30} />
-          </div>
-          <div>
+          <Avatar label={<ShieldCheck size={30} />} color="green" size="large" />
+          <div className="auth-hero-copy">
             <p className="auth-kicker">Agents IM</p>
             <h1>{isRegister ? '注册 Agents IM' : '登录 Agents IM'}</h1>
           </div>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          <label className="auth-field" htmlFor="auth-identifier">
-            <span>账号</span>
-            <input
-              id="auth-identifier"
-              value={identifier}
-              onChange={(event) => setIdentifier(event.target.value)}
-              autoComplete="username"
-              required
-            />
-          </label>
+          <TextField
+            id="auth-identifier"
+            label="账号"
+            value={identifier}
+            onChange={(event) => setIdentifier(event.target.value)}
+            autoComplete="username"
+            required
+            fieldClassName="auth-field"
+          />
 
           {isRegister ? (
-            <label className="auth-field" htmlFor="auth-display-name">
-              <span>昵称</span>
-              <input
-                id="auth-display-name"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                autoComplete="nickname"
-                required
-              />
-            </label>
+            <TextField
+              id="auth-display-name"
+              label="昵称"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              autoComplete="nickname"
+              required
+              fieldClassName="auth-field"
+            />
           ) : null}
 
-          <label className="auth-field" htmlFor="auth-password">
-            <span>密码</span>
-            <input
-              id="auth-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              autoComplete={isRegister ? 'new-password' : 'current-password'}
-              required
-            />
-          </label>
+          <TextField
+            id="auth-password"
+            label="密码"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            type="password"
+            autoComplete={isRegister ? 'new-password' : 'current-password'}
+            required
+            fieldClassName="auth-field"
+          />
 
-          {error ? <p className="auth-error" role="alert">{error}</p> : null}
+          {error ? (
+            <p className="auth-error" role="alert">
+              {error}
+            </p>
+          ) : null}
 
-          <button className="auth-submit" type="submit" disabled={submitting}>
+          <Button className="auth-submit" type="submit" disabled={submitting}>
             {submitting ? '请稍候' : isRegister ? '注册并登录' : '登录'}
-          </button>
+          </Button>
         </form>
 
         <div className="auth-switch">
           {isRegister ? (
-            <button type="button" onClick={() => switchMode('login')}>
+            <Button variant="text" onClick={() => switchMode('login')}>
               已有账号，去登录
-            </button>
+            </Button>
           ) : (
-            <button type="button" onClick={() => switchMode('register')}>
+            <Button variant="text" onClick={() => switchMode('register')}>
               注册账号
-            </button>
+            </Button>
           )}
         </div>
       </section>
@@ -243,9 +245,9 @@ function renderPage(
   return (
     <>
       <MePage profile={currentUser} onUpdateProfile={onUpdateProfile} />
-      <button type="button" className="logout-button" onClick={onLogout}>
+      <Button variant="tonal" className="logout-button" onClick={onLogout}>
         退出登录
-      </button>
+      </Button>
     </>
   );
 }
