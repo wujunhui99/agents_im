@@ -70,6 +70,9 @@ func (r *PostgresGroupsRepository) CreateGroup(ctx context.Context, group model.
 		if isPostgresCheckViolation(err) {
 			return model.Group{}, model.GroupMember{}, apperror.InvalidArgument("invalid group")
 		}
+		if isPostgresForeignKeyViolation(err) {
+			return model.Group{}, model.GroupMember{}, apperror.NotFound("creator account not found")
+		}
 		return model.Group{}, model.GroupMember{}, err
 	}
 
@@ -113,8 +116,11 @@ func (r *PostgresGroupsRepository) AddMember(ctx context.Context, groupID string
 		return nil
 	})
 	if err != nil {
-		if isNotFound(err) || isPostgresForeignKeyViolation(err) {
+		if isNotFound(err) {
 			return model.GroupMember{}, false, apperror.NotFound("group not found")
+		}
+		if isPostgresForeignKeyViolation(err) {
+			return model.GroupMember{}, false, apperror.NotFound("account not found")
 		}
 		if isPostgresCheckViolation(err) {
 			return model.GroupMember{}, false, apperror.InvalidArgument("invalid group member")

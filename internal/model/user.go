@@ -11,10 +11,6 @@ const (
 	AccountTypeUser  AccountType = "user"
 	AccountTypeAgent AccountType = "agent"
 	AccountTypeAdmin AccountType = "admin"
-
-	// AccountTypeNormal is a temporary V0 compatibility alias for older code and
-	// persisted rows that used "normal" before the domain moved to Account.
-	AccountTypeNormal AccountType = AccountTypeUser
 )
 
 type Account = User
@@ -41,8 +37,6 @@ func NormalizeAccountType(value string) (AccountType, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(value))
 	switch AccountType(normalized) {
 	case "", AccountTypeUser:
-		return AccountTypeUser, true
-	case "normal":
 		return AccountTypeUser, true
 	case AccountTypeAgent:
 		return AccountTypeAgent, true
