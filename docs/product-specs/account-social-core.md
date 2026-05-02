@@ -29,7 +29,7 @@ V0 compatibility：
 
 - Public REST 继续保留 `/users/*`，并提供 `/accounts/*` aliases。
 - Public JSON 的 `user_id` 继续保留，语义是 account id alias。
-- 数据表 `users` 第一阶段保留为账号资料存储兼容层。
+- PostgreSQL 使用 `accounts` + `profiles`；内部 account id 为无前缀数字字符串。
 
 明确不负责：
 

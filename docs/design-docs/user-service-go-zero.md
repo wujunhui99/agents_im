@@ -9,9 +9,9 @@ Account Service 是账号资料的权威边界。Account 可代表 human user、
 术语规则：
 
 - 领域与服务名使用 Account Service。
-- `account_type` 支持 `user`、`agent`、`admin`；旧 `normal` 仅作为迁移输入兼容并归一化为 `user`。
+- `account_type` 支持 `user`、`agent`、`admin`；`account_type` 决定账号代表 human user、agent 或 admin。
 - Public JSON/RPC 字段 `user_id` 是 account id alias，第一阶段不批量改名。
-- PostgreSQL `users` 表作为 V0 storage compatibility 保留，逻辑语义是 account profiles。
+- PostgreSQL 存储使用 `accounts` + `profiles`；public JSON/RPC 继续保留 `user_id` 作为 account id alias。
 
 ## 服务组成
 
@@ -97,7 +97,7 @@ tests/user_service_test.go
 - `Gender` 只允许空值、`unknown`、`male`、`female`、`other`。
 - `Age` 为 `0` 表示未设置；设置时范围为 `1..150`。
 - `AccountType` 只允许空值、`user`、`agent`、`admin`；空值在 logic 和 repository 层统一归一化为 `user`。
-- 旧 `normal` 输入只为 V0 迁移兼容保留，写入/返回统一为 `user`。
+- PostgreSQL repository 生成无前缀数字字符串 account id；前端展示必须使用 `identifier`、`display_name` 或其他 profile 字段，不展示内部 account id。
 - `UserID` 由 repository 生成，内存实现使用递增 ID；字段名是 V0 account id alias。
 
 禁止字段：
@@ -179,6 +179,6 @@ go run ./cmd/user-rpc -f etc/user-rpc.yaml
 ## 后续演进
 
 - 评估新增一等 `account.api` / `account.proto`，或继续使用 V0 user transport 名称。
-- 将 `users` 表迁移到 `accounts` 或 view-backed compatibility 层，增加独立迁移计划和唯一索引校验。
+- 评估新增 public `account_id` 字段；新增前必须继续返回 `user_id` 兼容字段。
 - 为 `auth` 注册流程增加幂等创建、补偿或 outbox 设计。
 - 接入 gateway 长连接鉴权、trace_id 透传和结构化日志。

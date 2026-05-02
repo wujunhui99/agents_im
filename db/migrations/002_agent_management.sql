@@ -2,7 +2,7 @@ create sequence if not exists agents_im_agents_id_seq;
 
 create table if not exists agents (
   agent_id text primary key default ('agt_' || lpad(nextval('agents_im_agents_id_seq')::text, 6, '0')),
-  im_user_id text not null references users(user_id) on delete restrict,
+  im_user_id text not null references accounts(account_id) on delete restrict,
   name text not null,
   description text not null default '',
   status text not null default 'disabled',

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/idgen"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
@@ -38,21 +39,40 @@ func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model
 		return model.User{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
 	}
 
-	var row postgresUserRow
-	var err error
-	if strings.TrimSpace(user.UserID) == "" {
-		err = r.conn.QueryRowCtx(ctx, &row, `
-insert into users (identifier, display_name, name, gender, age, region, account_type)
-values ($1, $2, $3, $4, $5, $6, $7)
-returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
-`, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region, accountType)
-	} else {
-		err = r.conn.QueryRowCtx(ctx, &row, `
-insert into users (user_id, identifier, display_name, name, gender, age, region, account_type)
-values ($1, $2, $3, $4, $5, $6, $7, $8)
-returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
-`, user.UserID, user.Identifier, user.DisplayName, user.Name, user.Gender, user.Age, user.Region, accountType)
+	accountID := strings.TrimSpace(user.UserID)
+	if accountID == "" {
+		generatedID, err := idgen.NewString()
+		if err != nil {
+			return model.User{}, err
+		}
+		accountID = generatedID
 	}
+	if !isNumericID(accountID) {
+		return model.User{}, apperror.InvalidArgument("account id must be an unprefixed numeric string")
+	}
+
+	var row postgresUserRow
+	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+		if _, err := session.ExecCtx(ctx, `
+insert into accounts (account_id, identifier, account_type)
+values ($1, $2, $3)
+`, accountID, user.Identifier, accountType); err != nil {
+			return err
+		}
+		if _, err := session.ExecCtx(ctx, `
+insert into profiles (account_id, display_name, name, gender, age, region, avatar_media_id)
+values ($1, $2, $3, $4, $5, $6, $7)
+`, accountID, user.DisplayName, user.Name, user.Gender, user.Age, user.Region, strings.TrimSpace(user.AvatarMediaID)); err != nil {
+			return err
+		}
+
+		accountProfile, err := queryAccountProfileByID(ctx, session, accountID)
+		if err != nil {
+			return err
+		}
+		row = accountProfile
+		return nil
+	})
 	if err != nil {
 		if isPostgresUniqueViolation(err) {
 			return model.User{}, apperror.AlreadyExists("identifier already exists")
@@ -67,12 +87,7 @@ returning user_id, identifier, display_name, name, gender, age, region, account_
 }
 
 func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier string) (model.User, error) {
-	var row postgresUserRow
-	err := r.conn.QueryRowCtx(ctx, &row, `
-select user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
-from users
-where identifier = $1
-`, identifier)
+	row, err := queryAccountProfileByIdentifier(ctx, r.conn, identifier)
 	if err != nil {
 		if isNotFound(err) {
 			return model.User{}, apperror.NotFound("user not found")
@@ -85,18 +100,13 @@ where identifier = $1
 func (r *PostgresRepository) ExistsByIdentifier(ctx context.Context, identifier string) (bool, error) {
 	var exists bool
 	err := r.conn.QueryRowCtx(ctx, &exists, `
-select exists(select 1 from users where identifier = $1)
+select exists(select 1 from accounts where identifier = $1)
 `, identifier)
 	return exists, err
 }
 
 func (r *PostgresRepository) GetByID(ctx context.Context, userID string) (model.User, error) {
-	var row postgresUserRow
-	err := r.conn.QueryRowCtx(ctx, &row, `
-select user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
-from users
-where user_id = $1
-`, userID)
+	row, err := queryAccountProfileByID(ctx, r.conn, userID)
 	if err != nil {
 		if isNotFound(err) {
 			return model.User{}, apperror.NotFound("user not found")
@@ -135,10 +145,14 @@ func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID string, p
 
 	args = append(args, userID)
 	query := `
-update users
+update profiles
 set ` + strings.Join(setters, ", ") + `, updated_at = now()
-where user_id = $` + itoa(len(args)) + `
-returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
+from accounts a
+where profiles.account_id = a.account_id
+  and profiles.account_id = $` + itoa(len(args)) + `
+returning a.account_id as user_id, a.identifier, profiles.display_name, profiles.name, profiles.gender,
+          profiles.age, profiles.region, a.account_type, profiles.avatar_media_id,
+          a.created_at, profiles.updated_at
 `
 	var row postgresUserRow
 	if err := r.conn.QueryRowCtx(ctx, &row, query, args...); err != nil {
@@ -156,10 +170,14 @@ returning user_id, identifier, display_name, name, gender, age, region, account_
 func (r *PostgresRepository) UpdateAvatar(ctx context.Context, userID string, avatarMediaID string) (model.User, error) {
 	var row postgresUserRow
 	if err := r.conn.QueryRowCtx(ctx, &row, `
-update users
+update profiles
 set avatar_media_id = $2, updated_at = now()
-where user_id = $1
-returning user_id, identifier, display_name, name, gender, age, region, account_type, avatar_media_id, created_at, updated_at
+from accounts a
+where profiles.account_id = a.account_id
+  and profiles.account_id = $1
+returning a.account_id as user_id, a.identifier, profiles.display_name, profiles.name, profiles.gender,
+          profiles.age, profiles.region, a.account_type, profiles.avatar_media_id,
+          a.created_at, profiles.updated_at
 `, userID, strings.TrimSpace(avatarMediaID)); err != nil {
 		if isNotFound(err) {
 			return model.User{}, apperror.NotFound("user not found")
@@ -197,9 +215,38 @@ func (r *PostgresRepository) AddFriend(ctx context.Context, userID string, frien
 		if isPostgresCheckViolation(err) {
 			return model.Friendship{}, false, apperror.InvalidArgument("invalid friendship")
 		}
+		if isPostgresForeignKeyViolation(err) {
+			return model.Friendship{}, false, apperror.NotFound("account not found")
+		}
 		return model.Friendship{}, false, err
 	}
 	return friendship.Clone(), created, nil
+}
+
+func queryAccountProfileByID(ctx context.Context, session sqlx.Session, accountID string) (postgresUserRow, error) {
+	var row postgresUserRow
+	err := session.QueryRowCtx(ctx, &row, `
+select a.account_id as user_id, a.identifier, p.display_name, p.name, p.gender,
+       p.age, p.region, a.account_type, p.avatar_media_id,
+       a.created_at, p.updated_at
+from accounts a
+join profiles p on p.account_id = a.account_id
+where a.account_id = $1
+`, accountID)
+	return row, err
+}
+
+func queryAccountProfileByIdentifier(ctx context.Context, session sqlx.Session, identifier string) (postgresUserRow, error) {
+	var row postgresUserRow
+	err := session.QueryRowCtx(ctx, &row, `
+select a.account_id as user_id, a.identifier, p.display_name, p.name, p.gender,
+       p.age, p.region, a.account_type, p.avatar_media_id,
+       a.created_at, p.updated_at
+from accounts a
+join profiles p on p.account_id = a.account_id
+where a.identifier = $1
+`, identifier)
+	return row, err
 }
 
 func (r *PostgresRepository) DeleteFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error) {
@@ -325,6 +372,18 @@ func (r postgresFriendshipRow) friendship() model.Friendship {
 		CreatedAt: r.CreatedAt,
 		UpdatedAt: r.UpdatedAt,
 	}
+}
+
+func isNumericID(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func itoa(value int) string {
