@@ -134,7 +134,7 @@ describe('MessagesPage real API mode', () => {
         createdAt: 1777464300000,
       }),
     }));
-    const messageApi = createMessageApi([serverMessage({ seq: 1, content: '真实后端会话消息' })], sendMessage);
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: '真实后端会话消息', messageOrigin: 'ai' })], sendMessage);
 
     render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
 
