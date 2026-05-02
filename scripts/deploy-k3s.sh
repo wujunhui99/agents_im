@@ -56,20 +56,40 @@ known_service() {
   return 1
 }
 
-selected_services() {
+array_contains() {
+  local needle="$1"
+  shift
+  local item
+  for item in "$@"; do
+    if [[ "${item}" == "${needle}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+read_selected_services() {
   local service_list="$1"
+  local -n out_ref="$2"
   local service
+  out_ref=()
   if [[ -n "${service_list}" ]]; then
     for service in ${service_list}; do
       if ! known_service "${service}"; then
         echo "unknown deployment service: ${service}" >&2
         exit 1
       fi
-      printf '%s\n' "${service}"
+      out_ref+=("${service}")
     done
   else
-    printf '%s\n' "${SERVICES[@]}"
+    out_ref=("${SERVICES[@]}")
   fi
+}
+
+selected_services() {
+  local services=()
+  read_selected_services "$1" services
+  printf '%s\n' "${services[@]}"
 }
 
 image_services() {
@@ -86,6 +106,55 @@ restart_services() {
   elif bool_true "${RESTART_ROLLOUT}"; then
     rollout_services
   fi
+}
+
+capture_current_images() {
+  CURRENT_IMAGES=()
+  local service image
+  for service in "${SERVICES[@]}"; do
+    image="$(${KUBECTL} -n "${NAMESPACE}" get deployment "${service}" -o "jsonpath={.spec.template.spec.containers[?(@.name=='${service}')].image}" 2>/dev/null || true)"
+    CURRENT_IMAGES+=("${service}=${image}")
+  done
+}
+
+current_image_for() {
+  local service="$1"
+  local pair
+  for pair in "${CURRENT_IMAGES[@]:-}"; do
+    if [[ "${pair}" == "${service}="* ]]; then
+      printf '%s\n' "${pair#*=}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+restore_unselected_images() {
+  local selected=("$@")
+  local service image
+  for service in "${SERVICES[@]}"; do
+    if array_contains "${service}" "${selected[@]}"; then
+      continue
+    fi
+    image="$(current_image_for "${service}")"
+    if [[ -n "${image}" ]]; then
+      ${KUBECTL} -n "${NAMESPACE}" set image "deployment/${service}" "${service}=${image}" --record=false
+      RESTORED_SERVICES+=("${service}")
+    fi
+  done
+}
+
+unique_services() {
+  local seen=" "
+  local service
+  for service in "$@"; do
+    [[ -z "${service}" ]] && continue
+    if [[ "${seen}" == *" ${service} "* ]]; then
+      continue
+    fi
+    seen+="${service} "
+    printf '%s\n' "${service}"
+  done
 }
 
 ensure_secret() {
@@ -133,6 +202,13 @@ run_migrations() {
 }
 
 apply_manifests() {
+  local selected_image_services=()
+  local restored_services=()
+  RESTORED_SERVICES=()
+
+  capture_current_images
+  read_selected_services "${IMAGE_SERVICES}" selected_image_services
+
   ${KUBECTL} apply -f "${MANIFEST_DIR}/namespace.yaml"
   ensure_secret
   ensure_image_pull_secret
@@ -140,11 +216,16 @@ apply_manifests() {
 
   if bool_true "${SKIP_SET_IMAGE}"; then
     echo "Skipping image updates; keeping currently deployed image tags."
+    restore_unselected_images
+    restored_services=("${RESTORED_SERVICES[@]:-}")
   else
-    while IFS= read -r service; do
+    local service
+    for service in "${selected_image_services[@]}"; do
       [[ -z "${service}" ]] && continue
       ${KUBECTL} -n "${NAMESPACE}" set image "deployment/${service}" "${service}=${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}" --record=false
-    done < <(image_services)
+    done
+    restore_unselected_images "${selected_image_services[@]}"
+    restored_services=("${RESTORED_SERVICES[@]:-}")
   fi
 
   if [[ -n "${RESTART_SERVICES}" ]] || bool_true "${RESTART_ROLLOUT}"; then
@@ -154,10 +235,13 @@ apply_manifests() {
     done < <(restart_services)
   fi
 
-  while IFS= read -r service; do
+  mapfile -t rollout_wait_services < <(
+    unique_services "${selected_image_services[@]}" "${restored_services[@]:-}"
+  )
+  for service in "${rollout_wait_services[@]}"; do
     [[ -z "${service}" ]] && continue
     ${KUBECTL} -n "${NAMESPACE}" rollout status "deployment/${service}" --timeout=180s
-  done < <(rollout_services)
+  done
 
   ${KUBECTL} -n "${NAMESPACE}" get pods -o wide
   ${KUBECTL} -n "${NAMESPACE}" get svc,ingress
