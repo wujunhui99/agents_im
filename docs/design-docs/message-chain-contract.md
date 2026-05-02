@@ -126,6 +126,20 @@ send_time       int64   // server timestamp in milliseconds
 created_at      int64
 ```
 
+### Ordering and duplicate identity
+
+`conversation_id + seq` is the only authoritative ordering key for confirmed messages. Message Service assigns `seq` while holding the per-conversation storage lock or an equivalent atomic allocation primitive. Downstream Gateway, WebSocket, Kafka, push, and frontend code must treat network arrival order as non-authoritative.
+
+Storage and clients use identity for duplicate suppression:
+
+```text
+server_msg_id                // canonical identity after acceptance
+sender_id + client_msg_id    // idempotent send identity before/at acceptance
+conversation_id + seq        // authoritative position inside a conversation
+```
+
+If a repeated delivery has the same `server_msg_id`, it is the same message. If a pending local message has the same `client_msg_id` as an accepted server response from the same sender, the client replaces the pending item with the server snapshot. Reusing the same `sender_id + client_msg_id` with a different payload is an idempotency conflict, not a new message.
+
 ### ConversationThread
 
 Global conversation state:
@@ -536,6 +550,18 @@ unique(conversation_id, seq)
 unique(sender_id, client_msg_id)
 unique(server_msg_id)
 ```
+
+The PostgreSQL implementation allocates seq by upserting/selecting the `conversation_threads` row `for update`, then inserting the message and idempotency row in the same transaction. A unique-constraint race on `sender_id + client_msg_id` must resolve to the existing message only when the payload hash matches; otherwise it must surface an idempotency conflict. The failed racing transaction must not commit a consumed seq.
+
+Pull APIs must return messages ordered by numeric `seq` for the requested direction. `last_message` and `max_seq_time` in conversation state must reflect the visible max seq row, not the newest wall-clock `send_time`.
+
+Client sync responsibilities:
+
+- Sort confirmed messages by `conversation_id + seq`.
+- Deduplicate by `server_msg_id`, then by `client_msg_id` for local pending replacement.
+- Keep pending local messages without seq after confirmed messages in local enqueue order.
+- On detected seq gaps, pull the missing range from the highest local contiguous seq plus one through the server `max_seq`.
+- Serialize or queue same-conversation local sends, or disable the composer until the previous send is accepted or failed.
 
 ## Validation and dependencies
 

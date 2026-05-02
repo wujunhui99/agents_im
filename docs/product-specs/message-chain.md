@@ -98,7 +98,23 @@ Product behavior:
 - `seq` starts at 1 for the first persisted message in a conversation.
 - `seq` increases by 1 for each persisted message in that conversation.
 - `seq` is unique only within a conversation.
-- Clients use `conversation_id + seq` to pull and de-duplicate messages.
+- `conversation_id + seq` is the server-authoritative ordering key for storage, sync, and display.
+- Network arrival order, WebSocket push order, retry timing, and local optimistic enqueue timing are not display order.
+- Clients use `conversation_id + seq` to pull missing ranges and to place confirmed messages in the visible timeline.
+
+## Client ordering and duplicate handling
+
+Clients must render confirmed messages by ascending numeric `seq` within each `conversation_id`, regardless of HTTP/WebSocket arrival order or `send_time`. `send_time` is metadata for display, not the ordering authority.
+
+Clients must deduplicate repeated deliveries and send retries by message identity:
+
+- Prefer `server_msg_id` when present.
+- Before a server ID is known, match optimistic local messages by `client_msg_id`.
+- When an optimistic local message is accepted, replace the local pending item with the canonical server snapshot, preserving `server_msg_id`, `conversation_id`, `seq`, `send_time`, and content fields from the server.
+
+Pending local messages without a server `seq` may be shown after confirmed messages in stable local enqueue order. They must not be interleaved ahead of confirmed server messages based on local clock time.
+
+If a client observes a gap, for example it has local seq `7` and receives or queries server `max_seq = 10` while seq `8` or `9` is missing, it should call `PullMessages(conversation_id, from_seq = local_contiguous_seq + 1, to_seq = server max_seq)` and apply the response idempotently.
 
 ## Send message behavior
 
@@ -120,6 +136,8 @@ When a user sends a message, the system must:
 10. Return the accepted message metadata.
 
 Phase 1 can complete all steps synchronously in the message service.
+
+Clients should avoid concurrent local sends into the same conversation. The UI may either queue same-conversation sends or disable the composer until the previous send is accepted or fails. A visible `sending` or failed state is required; clients must not silently ignore a send or fake success.
 
 ## Send response behavior
 

@@ -282,7 +282,11 @@ A dedicated `GET /groups` or `ListGroups` endpoint is not present in this worktr
 
 ## Messages REST
 
-Message history is authoritative in the message service. WebSocket delivery is best-effort and may be duplicated, so clients should deduplicate by `serverMsgId` or by `conversationId + seq`.
+Message history is authoritative in the message service. WebSocket delivery is best-effort, may be duplicated, and may arrive out of order. Frontend display order must not use network arrival order.
+
+Confirmed messages are ordered by numeric `seq` inside each `conversationId`; the pair `conversationId + seq` is the authoritative timeline position. `sendTime` is display metadata and is not a sorting authority. Clients should deduplicate repeated deliveries by `serverMsgId`; while a send is pending, the eventual server response should replace the optimistic item by `clientMsgId` and preserve canonical server fields including `serverMsgId` and `seq`.
+
+Pending local messages without `seq` may remain after confirmed messages in local enqueue order. Same-conversation sends should be queued or the composer should be disabled with a visible sending state until the prior send is accepted or fails.
 
 ### Send Message
 
@@ -547,9 +551,11 @@ After connect or reconnect:
 
 1. Send `get_conversation_seqs`.
 2. Compare each returned `maxSeq` with the local last seq.
-3. Send `pull_messages` from local last seq plus one.
+3. If the client detects a gap, send `pull_messages` from the highest local contiguous seq plus one through server `maxSeq`.
 4. Apply messages idempotently.
 5. Send `mark_conversation_read` when the user has viewed the conversation.
+
+Push events must be applied through the same ordering path: deduplicate by message identity, place confirmed messages by `conversationId + seq`, and repair missing seq ranges with `pull_messages`.
 
 ## Local Acceptance
 

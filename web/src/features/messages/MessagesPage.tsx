@@ -80,6 +80,10 @@ export function MessagesPage({
     if (!selectedConversation) {
       return;
     }
+    if (conversationHasInFlightSend(selectedConversation)) {
+      setStatus('上一条消息发送中');
+      return;
+    }
 
     const pendingMessage = createPendingMessage(selectedConversation, content, currentUserId);
     setItems((current) => appendMessage(current, selectedConversation.id, pendingMessage));
@@ -108,6 +112,7 @@ export function MessagesPage({
         onBack={() => setSelectedConversationId(null)}
         onSend={handleSend}
         status={status}
+        sending={conversationHasInFlightSend(selectedConversation)}
       />
     );
   }
@@ -273,16 +278,15 @@ function ChatWindow({
   onBack,
   onSend,
   status,
+  sending,
 }: {
   conversation: Conversation;
   onBack: () => void;
   onSend: (content: string) => void;
   status: string;
+  sending: boolean;
 }) {
-  const sortedMessages = useMemo(
-    () => [...conversation.messages].sort((left, right) => left.sendTime - right.sendTime),
-    [conversation.messages],
-  );
+  const sortedMessages = useMemo(() => orderedChatMessages(conversation.messages), [conversation.messages]);
 
   return (
     <section className="chat-window" aria-label={`${conversation.title} 聊天窗口`}>
@@ -308,18 +312,18 @@ function ChatWindow({
         ))}
       </div>
 
-      <SendMessageComposer onSend={onSend} />
+      <SendMessageComposer onSend={onSend} sending={sending} />
     </section>
   );
 }
 
-function SendMessageComposer({ onSend }: { onSend: (content: string) => void }) {
+function SendMessageComposer({ onSend, sending }: { onSend: (content: string) => void; sending: boolean }) {
   const [draft, setDraft] = useState('');
   const trimmedDraft = draft.trim();
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!trimmedDraft) {
+    if (sending || !trimmedDraft) {
       return;
     }
 
@@ -329,10 +333,16 @@ function SendMessageComposer({ onSend }: { onSend: (content: string) => void }) 
 
   return (
     <form className="message-composer" aria-label="发送消息" onSubmit={handleSubmit}>
-      <input aria-label="输入消息" value={draft} placeholder="输入消息" onChange={(event) => setDraft(event.target.value)} />
-      <button type="submit" disabled={!trimmedDraft}>
+      <input
+        aria-label="输入消息"
+        value={draft}
+        placeholder="输入消息"
+        disabled={sending}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <button type="submit" disabled={sending || !trimmedDraft}>
         <SendHorizontal size={17} />
-        <span>发送</span>
+        <span>{sending ? '发送中' : '发送'}</span>
       </button>
     </form>
   );
@@ -393,8 +403,9 @@ function upsertStartedConversation(conversations: Conversation[], existingConver
 }
 
 function conversationStateToView(state: ConversationSeqState, currentUserId: string, messages: ServerMessage[]): Conversation {
-  const chatMessages = messages.map((message) => serverMessageToChatMessage(message, currentUserId));
-  const lastMessage = chatMessages[chatMessages.length - 1] ?? serverLastMessage(state.lastMessage, currentUserId);
+  const chatMessages = canonicalChatMessages(messages.map((message) => serverMessageToChatMessage(message, currentUserId)));
+  const orderedMessages = orderedChatMessages(chatMessages);
+  const lastMessage = orderedMessages[orderedMessages.length - 1] ?? serverLastMessage(state.lastMessage, currentUserId);
   const peerId = inferPeerId(state.conversationId, currentUserId, lastMessage);
   return {
     id: state.conversationId,
@@ -417,12 +428,13 @@ function appendMessage(conversations: Conversation[], conversationId: string, me
       return conversation;
     }
 
+    const nextMessages = canonicalChatMessages([...conversation.messages, message]);
     return {
       ...conversation,
-      preview: message.content,
+      preview: conversationPreview(nextMessages, message.content),
       time: '刚刚',
       unread: 0,
-      messages: [...conversation.messages, message],
+      messages: nextMessages,
     };
   });
 }
@@ -433,11 +445,12 @@ function updateMessage(conversations: Conversation[], conversationId: string, me
       return conversation;
     }
 
+    const nextMessages = upsertCanonicalMessage(conversation.messages, messageId, nextMessage);
     return {
       ...conversation,
-      preview: nextMessage.content,
+      preview: conversationPreview(nextMessages, nextMessage.content),
       time: '刚刚',
-      messages: conversation.messages.map((message) => (message.id === messageId ? nextMessage : message)),
+      messages: nextMessages,
     };
   });
 }
@@ -561,4 +574,132 @@ function profileDisplayName(profile: UserProfile) {
 
 function avatarText(value: string) {
   return value.trim().slice(0, 2).toUpperCase() || 'C';
+}
+
+function conversationHasInFlightSend(conversation: Conversation) {
+  return conversation.messages.some((message) => message.status === 'sending' && !hasAuthoritativeSeq(message));
+}
+
+function conversationPreview(messages: ChatMessage[], fallback: string) {
+  const orderedMessages = orderedChatMessages(messages);
+  return orderedMessages[orderedMessages.length - 1]?.content ?? fallback;
+}
+
+function orderedChatMessages(messages: ChatMessage[]) {
+  return canonicalMessageEntries(messages)
+    .sort((left, right) => compareMessageEntries(left, right))
+    .map((entry) => entry.message);
+}
+
+function canonicalChatMessages(messages: ChatMessage[]) {
+  return canonicalMessageEntries(messages).map((entry) => entry.message);
+}
+
+function upsertCanonicalMessage(messages: ChatMessage[], pendingMessageId: string, nextMessage: ChatMessage) {
+  let replaced = false;
+  const nextIdentityKeys = new Set(messageIdentityKeys(nextMessage));
+  const updatedMessages = messages.map((message) => {
+    if (message.id === pendingMessageId || messageIdentityKeys(message).some((key) => nextIdentityKeys.has(key))) {
+      replaced = true;
+      return chooseCanonicalMessage(message, nextMessage);
+    }
+    return message;
+  });
+
+  if (!replaced) {
+    updatedMessages.push(nextMessage);
+  }
+  return canonicalChatMessages(updatedMessages);
+}
+
+type MessageEntry = {
+  message: ChatMessage;
+  index: number;
+};
+
+function canonicalMessageEntries(messages: ChatMessage[]) {
+  const entries = new Map<string, MessageEntry>();
+  const aliases = new Map<string, string>();
+
+  messages.forEach((message, index) => {
+    const identityKeys = messageIdentityKeys(message);
+    const existingKey =
+      identityKeys.map((key) => aliases.get(key)).find((key): key is string => Boolean(key)) ??
+      identityKeys.find((key) => entries.has(key)) ??
+      identityKeys[0];
+    const existing = entries.get(existingKey);
+    if (!existing) {
+      entries.set(existingKey, { message, index });
+    } else {
+      entries.set(existingKey, {
+        message: chooseCanonicalMessage(existing.message, message),
+        index: Math.min(existing.index, index),
+      });
+    }
+
+    identityKeys.forEach((key) => aliases.set(key, existingKey));
+  });
+
+  return Array.from(entries.values());
+}
+
+function compareMessageEntries(left: MessageEntry, right: MessageEntry) {
+  const leftSeq = authoritativeSeq(left.message);
+  const rightSeq = authoritativeSeq(right.message);
+  if (leftSeq !== undefined && rightSeq !== undefined && leftSeq !== rightSeq) {
+    return leftSeq - rightSeq;
+  }
+  if (leftSeq !== undefined && rightSeq === undefined) {
+    return -1;
+  }
+  if (leftSeq === undefined && rightSeq !== undefined) {
+    return 1;
+  }
+  if (leftSeq === undefined && rightSeq === undefined) {
+    return left.index - right.index;
+  }
+  return stableMessageTieBreaker(left.message).localeCompare(stableMessageTieBreaker(right.message));
+}
+
+function hasAuthoritativeSeq(message: ChatMessage): message is ChatMessage & { seq: number } {
+  return authoritativeSeq(message) !== undefined;
+}
+
+function authoritativeSeq(message: ChatMessage) {
+  return typeof message.seq === 'number' && Number.isFinite(message.seq) && message.seq > 0 ? message.seq : undefined;
+}
+
+function messageIdentityKeys(message: ChatMessage) {
+  return uniqueStrings([
+    message.serverMsgId ? `server:${message.serverMsgId}` : '',
+    message.clientMsgId ? `client:${message.clientMsgId}` : '',
+    `local:${message.id}`,
+  ]);
+}
+
+function chooseCanonicalMessage(current: ChatMessage, candidate: ChatMessage) {
+  const currentCanonical = isServerCanonical(current);
+  const candidateCanonical = isServerCanonical(candidate);
+  if (candidateCanonical && !currentCanonical) {
+    return candidate;
+  }
+  if (currentCanonical && !candidateCanonical) {
+    return current;
+  }
+  if (candidate.status === 'sent' && current.status !== 'sent') {
+    return candidate;
+  }
+  return candidate;
+}
+
+function isServerCanonical(message: ChatMessage) {
+  return Boolean(message.serverMsgId) || hasAuthoritativeSeq(message);
+}
+
+function stableMessageTieBreaker(message: ChatMessage) {
+  return message.serverMsgId ?? message.clientMsgId ?? message.id;
+}
+
+function uniqueStrings(values: string[]) {
+  return values.filter((value, index) => value !== '' && values.indexOf(value) === index);
 }
