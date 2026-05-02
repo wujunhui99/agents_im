@@ -6,6 +6,7 @@ resources:
   - services.yaml
   - deployments.yaml
   - ingress.yaml
+  - cert-manager-issuers.yaml
 configMapGenerator:
   - name: agents-im-etc
     namespace: agents-im

@@ -19,6 +19,8 @@ type MessagesPageProps = {
   messageApi?: MessageApi;
   userApi?: UserApi;
   startChatSignal?: number;
+  pendingChatProfile?: UserProfile | null;
+  onPendingChatConsumed?: () => void;
 };
 
 const statusLabels: Record<MessageStatus, string> = {
@@ -32,6 +34,8 @@ export function MessagesPage({
   messageApi = createMessageApi(),
   userApi = createUserApi(),
   startChatSignal = 0,
+  pendingChatProfile = null,
+  onPendingChatConsumed,
 }: MessagesPageProps) {
   const [items, setItems] = useState<Conversation[]>([]);
   const [status, setStatus] = useState('正在加载会话');
@@ -48,7 +52,7 @@ export function MessagesPage({
         const states = response.states ?? response.conversations ?? response.seqs ?? [];
         const conversations = await Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi)));
         if (!cancelled) {
-          setItems(conversations);
+          setItems((current) => mergeLoadedConversations(current, conversations));
           setStatus(conversations.length > 0 ? `已加载 ${conversations.length} 个会话` : '暂无会话');
         }
       } catch (error) {
@@ -70,6 +74,28 @@ export function MessagesPage({
       setSelectedConversationId(null);
     }
   }, [startChatSignal]);
+
+  useEffect(() => {
+    if (!pendingChatProfile) {
+      return;
+    }
+    handleStartChat(pendingChatProfile);
+    onPendingChatConsumed?.();
+  }, [pendingChatProfile, onPendingChatConsumed]);
+
+  useEffect(() => {
+    if (!selectedConversationId?.startsWith('draft-single:')) {
+      return;
+    }
+
+    const peerId = draftPeerId(selectedConversationId);
+    const loadedConversation = items.find(
+      (conversation) => conversation.id !== selectedConversationId && isSingleConversationWithPeer(conversation, peerId),
+    );
+    if (loadedConversation) {
+      setSelectedConversationId(loadedConversation.id);
+    }
+  }, [items, selectedConversationId]);
 
   function handleStartChat(profile: UserProfile) {
     const draftConversation = userProfileToDraftConversation(profile);
@@ -412,6 +438,24 @@ function userProfileToDraftConversation(profile: UserProfile): Conversation {
   };
 }
 
+function mergeLoadedConversations(current: Conversation[], loaded: Conversation[]) {
+  if (loaded.length === 0) {
+    return current;
+  }
+
+  const mergedLoaded = loaded.map((loadedConversation) => {
+    const currentConversation = current.find((conversation) => conversationsRepresentSameThread(conversation, loadedConversation));
+    return currentConversation ? mergeConversation(currentConversation, loadedConversation) : loadedConversation;
+  });
+  const preservedLocalConversations = current.filter(
+    (conversation) =>
+      isLocalConversation(conversation) &&
+      !mergedLoaded.some((loadedConversation) => conversationsRepresentSameThread(conversation, loadedConversation)),
+  );
+
+  return [...mergedLoaded, ...preservedLocalConversations];
+}
+
 function upsertStartedConversation(conversations: Conversation[], existingConversationId: string | undefined, draftConversation: Conversation) {
   if (existingConversationId) {
     return conversations.map((conversation) =>
@@ -476,7 +520,7 @@ function appendMessage(conversations: Conversation[], conversationId: string, me
 
 function updateMessage(conversations: Conversation[], conversationId: string, messageId: string, nextMessage: ChatMessage) {
   return conversations.map((conversation) => {
-    if (conversation.id !== conversationId) {
+    if (conversation.id !== conversationId && !conversation.messages.some((message) => message.id === messageId)) {
       return conversation;
     }
 
@@ -492,7 +536,11 @@ function updateMessage(conversations: Conversation[], conversationId: string, me
 
 function confirmSentMessage(conversations: Conversation[], conversationId: string, messageId: string, nextMessage: ChatMessage) {
   return conversations.map((conversation) => {
-    if (conversation.id !== conversationId) {
+    if (
+      conversation.id !== conversationId &&
+      conversation.id !== nextMessage.conversationId &&
+      !conversation.messages.some((message) => message.id === messageId)
+    ) {
       return conversation;
     }
 
@@ -608,6 +656,10 @@ function requiredField(value: string | undefined, fieldName: string) {
 
 function draftConversationId(userId: string) {
   return `draft-single:${userId}`;
+}
+
+function draftPeerId(conversationId: string) {
+  return conversationId.replace(/^draft-single:/, '');
 }
 
 function profileDisplayName(profile: UserProfile) {
@@ -754,4 +806,52 @@ function messageAriaLabel(message: ChatMessage) {
     return `系统消息：${message.content}`;
   }
   return message.direction === 'outgoing' ? `我发送的消息：${message.content}` : `收到的消息：${message.content}`;
+}
+
+function conversationsRepresentSameThread(left: Conversation, right: Conversation) {
+  if (left.id === right.id) {
+    return true;
+  }
+  if (left.chatType === 'single' && right.chatType === 'single') {
+    return Boolean(left.receiverId && left.receiverId === right.receiverId);
+  }
+  if (left.chatType === 'group' && right.chatType === 'group') {
+    return Boolean(left.groupId && left.groupId === right.groupId);
+  }
+  return false;
+}
+
+function isLocalConversation(conversation: Conversation) {
+  return (
+    conversation.id.startsWith('draft-') ||
+    conversation.messages.some((message) => message.status !== 'sent' || !isServerCanonical(message))
+  );
+}
+
+function mergeConversation(current: Conversation, loaded: Conversation): Conversation {
+  const messages = canonicalChatMessages([...current.messages, ...loaded.messages]);
+  const orderedMessages = orderedChatMessages(messages);
+  const lastMessage = orderedMessages[orderedMessages.length - 1];
+  const title = shouldKeepCurrentTitle(current, loaded) ? current.title : loaded.title;
+
+  return {
+    ...loaded,
+    title,
+    avatar: title === current.title ? current.avatar : loaded.avatar,
+    preview: lastMessage?.content ?? loaded.preview,
+    previewOrigin: lastMessage?.messageOrigin ?? loaded.previewOrigin,
+    time: lastMessage ? '刚刚' : loaded.time,
+    messages,
+  };
+}
+
+function shouldKeepCurrentTitle(current: Conversation, loaded: Conversation) {
+  if (!current.id.startsWith('draft-')) {
+    return false;
+  }
+  return Boolean(current.title && current.title !== loaded.title && current.title !== current.receiverId);
+}
+
+function isSingleConversationWithPeer(conversation: Conversation, peerId: string) {
+  return conversation.chatType === 'single' && conversation.receiverId === peerId;
 }

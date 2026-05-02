@@ -282,6 +282,13 @@ describe('WeChat-inspired app shell', () => {
         jsonResponse({
           code: 'OK',
           message: 'ok',
+          data: { friends: [] },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
           data: {
             user_id: 'usr_000002',
             identifier: 'bob_002',
@@ -352,6 +359,365 @@ describe('WeChat-inspired app shell', () => {
       }),
     );
     expect(await screen.findByText('usr_000002')).toBeInTheDocument();
+  });
+
+
+
+  it('loads friends automatically when entering contacts and opens a friend chat from the contact row', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockReset();
+    fetchMock
+      .mockResolvedValueOnce(emptySeqsResponse())
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            friends: [
+              {
+                user_id: 'usr_000001',
+                friend_id: 'usr_000002',
+                status: 'accepted',
+                is_friend: true,
+                created_at: '2026-04-29T12:00:00Z',
+                updated_at: '2026-04-29T12:00:00Z',
+              },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            friends: [
+              {
+                user_id: 'usr_000001',
+                friend_id: 'usr_000002',
+                status: 'accepted',
+                is_friend: true,
+                created_at: '2026-04-29T12:00:00Z',
+                updated_at: '2026-04-29T12:00:00Z',
+              },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(emptySeqsResponse())
+      .mockResolvedValueOnce(emptySeqsResponse());
+
+    render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+
+    expect(await screen.findByRole('button', { name: '和 usr_000002 聊天' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/friends', expect.objectContaining({ method: 'GET' }));
+
+    await user.click(screen.getByRole('tab', { name: /发现/i }));
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+    expect(await screen.findByRole('button', { name: '和 usr_000002 聊天' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '和 usr_000002 聊天' }));
+
+    expect(await screen.findByRole('heading', { name: 'usr_000002', level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '输入消息' })).toBeInTheDocument();
+  });
+
+  it('loads friends automatically again after session restore', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockReset();
+    fetchMock
+      .mockResolvedValueOnce(emptySeqsResponse())
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            friends: [
+              {
+                user_id: 'usr_000001',
+                friend_id: 'usr_000002',
+                status: 'accepted',
+                is_friend: true,
+                created_at: '2026-04-29T12:00:00Z',
+                updated_at: '2026-04-29T12:00:00Z',
+              },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(emptySeqsResponse())
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            friends: [
+              {
+                user_id: 'usr_000001',
+                friend_id: 'usr_000003',
+                status: 'accepted',
+                is_friend: true,
+                created_at: '2026-04-29T12:10:00Z',
+                updated_at: '2026-04-29T12:10:00Z',
+              },
+            ],
+          },
+        }),
+      );
+
+    const firstRender = render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+    expect(await screen.findByRole('button', { name: '和 usr_000002 聊天' })).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/friends', expect.objectContaining({ method: 'GET' })));
+
+    firstRender.unmount();
+
+    render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+    expect(await screen.findByRole('button', { name: '和 usr_000003 聊天' })).toBeInTheDocument();
+    await waitFor(() => {
+      const friendLoads = fetchMock.mock.calls.filter(([url]) => url === '/friends');
+      expect(friendLoads).toHaveLength(2);
+    });
+  });
+
+  it('opens a chat from a friend by loading the existing direct conversation', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockReset();
+    fetchMock
+      .mockResolvedValueOnce(emptySeqsResponse())
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            friends: [
+              {
+                user_id: 'usr_000001',
+                friend_id: 'usr_000002',
+                status: 'accepted',
+                is_friend: true,
+                created_at: '2026-04-29T12:00:00Z',
+                updated_at: '2026-04-29T12:00:00Z',
+              },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            states: [
+              {
+                conversationId: 'single:usr_000001:usr_000002',
+                maxSeq: 1,
+                hasReadSeq: 0,
+                unreadCount: 1,
+                maxSeqTime: 1777464300000,
+                lastMessage: {
+                  serverMsgId: 'srv-existing-1',
+                  clientMsgId: 'client-existing-1',
+                  conversationId: 'single:usr_000001:usr_000002',
+                  seq: 1,
+                  senderId: 'usr_000002',
+                  receiverId: 'usr_000001',
+                  groupId: '',
+                  chatType: 'single',
+                  contentType: 'text',
+                  content: 'existing chat from Bob',
+                  sendTime: 1777464300000,
+                  createdAt: 1777464300000,
+                },
+              },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            conversationId: 'single:usr_000001:usr_000002',
+            messages: [
+              {
+                serverMsgId: 'srv-existing-1',
+                clientMsgId: 'client-existing-1',
+                conversationId: 'single:usr_000001:usr_000002',
+                seq: 1,
+                senderId: 'usr_000002',
+                receiverId: 'usr_000001',
+                groupId: '',
+                chatType: 'single',
+                contentType: 'text',
+                content: 'existing chat from Bob',
+                sendTime: 1777464300000,
+                createdAt: 1777464300000,
+              },
+            ],
+            isEnd: true,
+            nextSeq: 2,
+          },
+        }),
+      );
+
+    render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+    await user.click(await screen.findByRole('button', { name: '和 usr_000002 聊天' }));
+
+    expect(await screen.findByRole('heading', { name: 'usr_000002', level: 2 })).toBeInTheDocument();
+    expect(await screen.findByText('existing chat from Bob')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/conversations/seqs?conversationIds=', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/conversations/single%3Ausr_000001%3Ausr_000002/messages?fromSeq=1&limit=50&order=asc',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  it('shows existing conversations immediately when opening the messages tab after navigation', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockReset();
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            states: [
+              {
+                conversationId: 'single:usr_000001:usr_000002',
+                maxSeq: 1,
+                hasReadSeq: 0,
+                unreadCount: 1,
+                maxSeqTime: 1777464300000,
+                lastMessage: {
+                  serverMsgId: 'srv-1',
+                  clientMsgId: 'client-1',
+                  conversationId: 'single:usr_000001:usr_000002',
+                  seq: 1,
+                  senderId: 'usr_000002',
+                  receiverId: 'usr_000001',
+                  groupId: '',
+                  chatType: 'single',
+                  contentType: 'text',
+                  content: 'hello alice',
+                  sendTime: 1777464300000,
+                  createdAt: 1777464300000,
+                },
+              },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            conversationId: 'single:usr_000001:usr_000002',
+            messages: [
+              {
+                serverMsgId: 'srv-1',
+                clientMsgId: 'client-1',
+                conversationId: 'single:usr_000001:usr_000002',
+                seq: 1,
+                senderId: 'usr_000002',
+                receiverId: 'usr_000001',
+                groupId: '',
+                chatType: 'single',
+                contentType: 'text',
+                content: 'hello alice',
+                sendTime: 1777464300000,
+                createdAt: 1777464300000,
+              },
+            ],
+            isEnd: true,
+            nextSeq: 2,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: { friends: [] },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            states: [
+              {
+                conversationId: 'single:usr_000001:usr_000002',
+                maxSeq: 1,
+                hasReadSeq: 0,
+                unreadCount: 1,
+                maxSeqTime: 1777464300000,
+                lastMessage: {
+                  serverMsgId: 'srv-1',
+                  clientMsgId: 'client-1',
+                  conversationId: 'single:usr_000001:usr_000002',
+                  seq: 1,
+                  senderId: 'usr_000002',
+                  receiverId: 'usr_000001',
+                  groupId: '',
+                  chatType: 'single',
+                  contentType: 'text',
+                  content: 'hello alice',
+                  sendTime: 1777464300000,
+                  createdAt: 1777464300000,
+                },
+              },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            conversationId: 'single:usr_000001:usr_000002',
+            messages: [
+              {
+                serverMsgId: 'srv-1',
+                clientMsgId: 'client-1',
+                conversationId: 'single:usr_000001:usr_000002',
+                seq: 1,
+                senderId: 'usr_000002',
+                receiverId: 'usr_000001',
+                groupId: '',
+                chatType: 'single',
+                contentType: 'text',
+                content: 'hello alice',
+                sendTime: 1777464300000,
+                createdAt: 1777464300000,
+              },
+            ],
+            isEnd: true,
+            nextSeq: 2,
+          },
+        }),
+      );
+
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: /usr_000002/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+    await user.click(screen.getByRole('tab', { name: /消息/i }));
+
+    expect(await screen.findByRole('button', { name: /usr_000002/ })).toBeInTheDocument();
+    expect(screen.getByText('hello alice')).toBeInTheDocument();
   });
 
   it('loads real conversations and sends messages through the message API', async () => {

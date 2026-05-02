@@ -3,10 +3,17 @@ kind: Ingress
 metadata:
   name: agents-im
   namespace: agents-im
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - agenticim.xyz
+      secretName: agenticim-xyz-tls
   rules:
-    - http:
+    - host: agenticim.xyz
+      http:
         paths:
           - path: /auth
             pathType: Prefix

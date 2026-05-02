@@ -56,6 +56,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppPr
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
   const [startChatSignal, setStartChatSignal] = useState(0);
+  const [pendingChatProfile, setPendingChatProfile] = useState<UserProfile | null>(null);
   const activeLabel = useMemo(() => tabs.find((tab) => tab.key === activeTab)?.label ?? '消息', [activeTab]);
   const { session, logout } = useAuth();
   const effectiveUserApi = useMemo(
@@ -83,6 +84,21 @@ function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppPr
     setCurrentUser(updatedUser);
   }
 
+  function openChatFromContact(profile: UserProfile) {
+    setPendingChatProfile({ ...profile });
+    setActiveTab('messages');
+  }
+
+  function clearPendingChatProfile() {
+    setPendingChatProfile((current) => {
+      if (!current) {
+        return current;
+      }
+      window.setTimeout(() => setPendingChatProfile(null), 0);
+      return current;
+    });
+  }
+
   return (
     <main className="app-shell" aria-label="Agents IM Material 3-inspired 微信式主框架">
       <section className="phone-frame">
@@ -92,7 +108,19 @@ function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppPr
         />
 
         <section className="content-area">
-          {renderPage(activeTab, currentUser, updateProfile, logout, effectiveUserApi, contactsApi, messageApi, startChatSignal)}
+          {renderPage(
+            activeTab,
+            currentUser,
+            updateProfile,
+            logout,
+            effectiveUserApi,
+            contactsApi,
+            messageApi,
+            startChatSignal,
+            pendingChatProfile,
+            clearPendingChatProfile,
+            openChatFromContact,
+          )}
         </section>
 
         <TabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
@@ -222,6 +250,9 @@ function renderPage(
   contactsApi: ContactsApi,
   messageApi: MessageApi,
   startChatSignal: number,
+  pendingChatProfile: UserProfile | null,
+  onPendingChatConsumed: () => void,
+  onOpenChatFromContact: (profile: UserProfile) => void,
 ) {
   if (tab === 'messages') {
     return (
@@ -230,12 +261,14 @@ function renderPage(
         userApi={userApi}
         messageApi={messageApi}
         startChatSignal={startChatSignal}
+        pendingChatProfile={pendingChatProfile}
+        onPendingChatConsumed={onPendingChatConsumed}
       />
     );
   }
 
   if (tab === 'contacts') {
-    return <ContactsPage userApi={userApi} contactsApi={contactsApi} />;
+    return <ContactsPage userApi={userApi} contactsApi={contactsApi} onStartChat={onOpenChatFromContact} />;
   }
 
   if (tab === 'discover') {
