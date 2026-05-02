@@ -65,6 +65,9 @@ returning media_id, owner_user_id, bucket, object_key, sha256, content_type, siz
 		if isPostgresCheckViolation(err) {
 			return model.MediaObject{}, apperror.InvalidArgument("invalid media object")
 		}
+		if isPostgresForeignKeyViolation(err) {
+			return model.MediaObject{}, apperror.NotFound("owner account not found")
+		}
 		return model.MediaObject{}, err
 	}
 	return row.mediaObject(), nil

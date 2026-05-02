@@ -94,10 +94,10 @@ Payload shape:
   "message": {
     "serverMsgId": "msg_000001",
     "clientMsgId": "client-1",
-    "conversationId": "single:usr_a:usr_b",
+    "conversationId": "single:740000000000000001:740000000000000002",
     "seq": 1,
-    "senderId": "usr_a",
-    "receiverId": "usr_b",
+    "senderId": "740000000000000001",
+    "receiverId": "740000000000000002",
     "groupId": "",
     "chatType": "single",
     "contentType": "text",
@@ -110,7 +110,7 @@ Payload shape:
     "sendTime": 1710000000000,
     "createdAt": 1710000000000
   },
-  "visible_user_ids": ["usr_a", "usr_b"]
+  "visible_user_ids": ["740000000000000001", "740000000000000002"]
 }
 ```
 

@@ -30,6 +30,7 @@ type postgresCredentialRow struct {
 }
 
 const pgUniqueViolationCode = "23505"
+const pgForeignKeyViolationCode = "23503"
 
 func NewPostgresRepository(dataSource string) (*PostgresRepository, error) {
 	dataSource = strings.TrimSpace(dataSource)
@@ -65,6 +66,9 @@ returning identifier, user_id, password_hash, salt, hash_version, created_at, up
 	if err != nil {
 		if isPgUniqueViolation(err) {
 			return model.Credential{}, apperror.AlreadyExists("auth credential already exists")
+		}
+		if isPgForeignKeyViolation(err) {
+			return model.Credential{}, apperror.NotFound("account not found")
 		}
 		return model.Credential{}, err
 	}
@@ -104,4 +108,9 @@ func (r postgresCredentialRow) credential() model.Credential {
 func isPgUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolationCode
+}
+
+func isPgForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolationCode
 }

@@ -82,7 +82,7 @@ Follow-up command after `scripts/migrate-postgres.sh` has started and migrated l
 export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
 goctl model pg datasource \
   -url "$DATABASE_URL" \
-  -table "users,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys" \
+  -table "accounts,profiles,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys" \
   -dir ./internal/model/pg \
   --style go_zero
 ```

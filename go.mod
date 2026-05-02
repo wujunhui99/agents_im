@@ -3,6 +3,7 @@ module github.com/wujunhui99/agents_im
 go 1.24.1
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/cloudwego/eino v0.8.13
 	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.5
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674

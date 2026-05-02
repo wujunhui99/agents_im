@@ -29,15 +29,12 @@ func TestAccountTypeDefaultsAndExplicitInternalCreate(t *testing.T) {
 		t.Fatalf("default account_type = %q, want %q", userAccount.AccountType, model.AccountTypeUser)
 	}
 
-	legacyNormal, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
+	_, err = userLogic.CreateUser(ctx, logic.CreateUserRequest{
 		Identifier:  "legacy_normal_001",
 		AccountType: "normal",
 	})
-	if err != nil {
-		t.Fatalf("create legacy normal account_type: %v", err)
-	}
-	if legacyNormal.AccountType != string(model.AccountTypeUser) {
-		t.Fatalf("legacy normal account_type = %q, want %q", legacyNormal.AccountType, model.AccountTypeUser)
+	if err == nil || apperror.From(err).Code != apperror.CodeInvalidArgument {
+		t.Fatalf("legacy normal account_type error = %v, want INVALID_ARGUMENT", err)
 	}
 
 	agent, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{

@@ -36,7 +36,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 ### Account Service
 
-负责账号资料的权威数据，不管理密码或认证秘密。Account 是身份与资料主体，可代表 human user、agent、admin，未来可扩展 service/official accounts。核心能力包括唯一标识符（类似微信号）、名称、性别、年龄、地区、`account_type=user|agent|admin` 等资料维护，`/me` 查询，公开资料查询，以及供 `auth` 注册流程使用的账号存在性检查。V0 public/API/storage compatibility 继续保留 `/users`、`user-api`、`user-rpc`、`users` 表和 `user_id` 字段；这些 `user_id` 均是 account id alias。术语边界见 [`docs/design-docs/account-service-terminology.md`](./docs/design-docs/account-service-terminology.md)。
+负责账号资料的权威数据，不管理密码或认证秘密。Account 是身份与资料主体，可代表 human user、agent、admin，未来可扩展 service/official accounts。核心能力包括唯一标识符（类似微信号）、名称、性别、年龄、地区、`account_type=user|agent|admin` 等资料维护，`/me` 查询，公开资料查询，以及供 `auth` 注册流程使用的账号存在性检查。V0 public/API compatibility 继续保留 `/users`、`user-api`、`user-rpc` 和 `user_id` 字段；这些 `user_id` 均是 account id alias。PostgreSQL 存储使用 `accounts` + `profiles` 表。术语边界见 [`docs/design-docs/account-service-terminology.md`](./docs/design-docs/account-service-terminology.md)。
 
 ### Auth Service
 
@@ -110,7 +110,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 ### Storage Layer
 
-- PostgreSQL：持久化账号资料（V0 存储表名仍为 `users`）、会话、消息、Agent 配置、工具调用记录等核心数据。
+- PostgreSQL：持久化账号身份 `accounts`、账号/Agent 资料 `profiles`、会话、消息、Agent 配置、工具调用记录等核心数据。
 - Redis：缓存会话状态、在线状态、幂等键、热点数据和短期运行状态。Presence 场景中 Redis 只保存连接 hash、用户连接集合和短期 online marker；丢失后由 Gateway 连接重建，不作为持久业务数据权威。
 - MinIO/S3-compatible object storage：保存用户头像、图片消息和文件消息的二进制对象。PostgreSQL 的 `media_objects` 保存 owner、purpose、status、content type、size、sha256 和 object key；对象 key 由后端生成，客户端只能使用短时预签名 URL 上传/下载。
 

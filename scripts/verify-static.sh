@@ -1584,7 +1584,7 @@ done
 
 account_code_patterns=(
   "AccountTypeUser  AccountType = \"user\""
-  "AccountTypeNormal AccountType = AccountTypeUser"
+  "AccountTypeAgent AccountType = \"agent\""
   "type Account = User"
   "type AccountRepository interface"
   "type UserRepository = AccountRepository"
@@ -1601,9 +1601,12 @@ for pattern in "${account_code_patterns[@]}"; do
 done
 
 account_storage_patterns=(
+  "create table if not exists accounts"
+  "create table if not exists profiles"
+  "account_id text primary key"
   "account_type text not null default 'user'"
   "account_type in ('user', 'agent', 'admin')"
-  "where account_type = 'normal'"
+  "auth_credentials_user_id_account_fk"
 )
 
 for pattern in "${account_storage_patterns[@]}"; do
@@ -1611,8 +1614,6 @@ for pattern in "${account_storage_patterns[@]}"; do
 done
 
 rg -qF "account_type?: 'user' | 'agent' | 'admin'" web/src/api/user.ts
-rg -qF "Legacy server data that still contains \`normal\` is normalized by the backend to \`user\`" docs/product-specs/frontend-backend-contract.md
-rg -qF "旧 \`account_type=normal\` 仅作为迁移输入兼容" docs/design-docs/account-service-terminology.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
 rg -qF "Account Service 术语与 V0 compatibility" AGENTS.md docs/design-docs/index.md
 rg -qF "Account Service 第一阶段产品规格" docs/product-specs/index.md docs/product-specs/user-service.md
 rg -qF "Account Service go-zero 实现设计" docs/design-docs/index.md docs/design-docs/user-service-go-zero.md
@@ -1631,7 +1632,8 @@ rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/mai
 rg -q "NewMessageLogicWithMediaValidator" internal/rpcgen/message/internal/svc/service_context.go
 rg -q "NewMessageRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
 pg_persistence_patterns=(
-  "users"
+  "accounts"
+  "profiles"
   "auth_credentials"
   "friendships"
   "groups"

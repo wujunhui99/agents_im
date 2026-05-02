@@ -92,7 +92,7 @@
   "code": "OK",
   "message": "ok",
   "data": {
-    "user_id": "usr_000001",
+    "user_id": "740000000000000001",
     "identifier": "alice_001",
     "token": "<token>",
     "expires_at": "2026-04-29T12:00:00Z"
@@ -131,7 +131,7 @@
   "message": "ok",
   "data": {
     "valid": true,
-    "user_id": "usr_000001",
+    "user_id": "740000000000000001",
     "identifier": "alice_001",
     "expires_at": "2026-04-29T12:00:00Z"
   }
