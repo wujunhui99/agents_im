@@ -35,7 +35,7 @@ type postgresFriendshipRow struct {
 func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model.User, error) {
 	accountType, ok := model.NormalizeAccountType(string(user.AccountType))
 	if !ok {
-		return model.User{}, apperror.InvalidArgument("account_type must be normal, agent, or admin")
+		return model.User{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
 	}
 
 	var row postgresUserRow
@@ -298,6 +298,10 @@ returning user_id, friend_id, status, created_at, updated_at
 }
 
 func (r postgresUserRow) user() model.User {
+	accountType, ok := model.NormalizeAccountType(r.AccountType)
+	if !ok {
+		accountType = model.AccountType(r.AccountType)
+	}
 	return model.User{
 		UserID:        r.UserID,
 		Identifier:    r.Identifier,
@@ -306,7 +310,7 @@ func (r postgresUserRow) user() model.User {
 		Gender:        r.Gender,
 		Age:           r.Age,
 		Region:        r.Region,
-		AccountType:   model.AccountType(r.AccountType),
+		AccountType:   accountType,
 		AvatarMediaID: r.AvatarMediaID,
 		CreatedAt:     r.CreatedAt,
 		UpdatedAt:     r.UpdatedAt,

@@ -8,7 +8,7 @@ export type UserProfile = {
   gender: string;
   age: number;
   region: string;
-  account_type?: 'normal' | 'agent' | 'admin';
+  account_type?: 'user' | 'agent' | 'admin';
   created_at?: string;
   updated_at?: string;
 };

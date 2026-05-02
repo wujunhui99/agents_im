@@ -18,7 +18,7 @@ For agents_im phase 1, we keep the core semantics but implement a simpler synchr
 
 ```text
 message-api / message-rpc
-  -> validate auth/user/friends/groups
+  -> validate auth/account/friends/groups
   -> assign conversation seq
   -> store message
   -> update conversation state and read state
@@ -66,9 +66,11 @@ Responsibilities:
 - expose pull/sync/read APIs;
 - write `message.created` events into PostgreSQL outbox for future Kafka/Message Transfer/Push integration.
 
-#### User Service
+V0 `user_id`, `sender_id`, `receiver_id`, and read-state `user_id` fields are account id aliases. They point to Account Service profiles and are preserved for API/frontend compatibility.
 
-Used by message service to verify users exist.
+#### Account Service
+
+Used by message service to verify accounts exist. Current code may still use V0 user-rpc/UserLookup names for transport compatibility.
 
 #### Friends Service
 

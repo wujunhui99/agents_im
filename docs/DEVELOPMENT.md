@@ -130,7 +130,7 @@ Environment note from the debug session: on one local machine, default ports `80
 
 | Service | URL |
 | --- | --- |
-| User API | `http://127.0.0.1:8080` |
+| Account API (V0 `user-api`) | `http://127.0.0.1:8080` |
 | Auth API | `http://127.0.0.1:8081` |
 | Friends API | `http://127.0.0.1:8082` |
 | Message API | `http://127.0.0.1:8083` |
@@ -143,15 +143,15 @@ Environment note from the debug session: on one local machine, default ports `80
 | MinIO API | `http://localhost:9000` |
 | MinIO Console | `http://localhost:9001` |
 
-`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share users, credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and writes `ObjectStorage` config into the generated `user-api` config. Agent creation still fails closed until the account-type checker is wired to a user service that can verify `account_type=agent`.
+`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and writes `ObjectStorage` config into the generated `user-api` config. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
 
 ## Local Object Storage
 
-Local media uploads use MinIO/S3-compatible object storage. Development defaults are in `.env.example`:
+Local media uploads use MinIO/S3-compatible object storage. Development defaults are in `.env.example` using local-only placeholder credentials; do not reuse them outside development.
 
 ```bash
 MINIO_ROOT_USER=agents_im_minio
-MINIO_ROOT_PASSWORD=agents_im_minio_dev_password
+MINIO_ROOT_PASSWORD=agents...word
 MINIO_API_PORT=9000
 MINIO_CONSOLE_PORT=9001
 OBJECT_STORAGE_DRIVER=minio
@@ -161,14 +161,14 @@ OBJECT_STORAGE_BUCKET=agents-im-media
 OBJECT_STORAGE_REGION=us-east-1
 OBJECT_STORAGE_USE_SSL=false
 OBJECT_STORAGE_ACCESS_KEY_ID=agents_im_minio
-OBJECT_STORAGE_SECRET_ACCESS_KEY=agents_im_minio_dev_password
+OBJECT_STORAGE_SECRET_ACCESS_KEY=agents...word
 ```
 
 The MinIO API is available at `http://localhost:9000`; the console is available at `http://localhost:9001`. The bucket is private and is created by `user-api` at startup. Unit tests use the explicit memory object store and do not require live MinIO.
 
 ## Demo Data
 
-After `scripts/dev-up.sh` succeeds, seed two users, one friendship, one group, and one single-chat message:
+After `scripts/dev-up.sh` succeeds, seed two user-type accounts, one friendship, one group, and one single-chat message:
 
 ```bash
 scripts/dev-demo-data.sh

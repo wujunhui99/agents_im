@@ -174,6 +174,7 @@ required_files=(
   "docs/product-specs/frontend-sync-contract.md"
   "docs/product-specs/read-receipts.md"
   "docs/design-docs/user-service-go-zero.md"
+  "docs/design-docs/account-service-terminology.md"
   "docs/design-docs/auth-service-go-zero.md"
   "docs/design-docs/friends-service-go-zero.md"
   "docs/design-docs/groups-service-go-zero.md"
@@ -247,6 +248,7 @@ required_files=(
   "docs/exec-plans/completed/gateway-push-delivery.md"
   "docs/exec-plans/completed/transfer-gateway-dispatcher.md"
   "docs/exec-plans/completed/gateway-presence-routing.md"
+  "docs/exec-plans/completed/account-service-terminology.md"
   "docs/exec-plans/active/agent-system-v0.md"
   "docs/exec-plans/active/agent-infrastructure-parallel-baseline.md"
 )
@@ -361,8 +363,11 @@ api_patterns=(
   "get /me"
   "patch /me"
   "post /users"
+  "post /accounts"
   "get /users/exists"
+  "get /accounts/exists"
   "get /users/:identifier"
+  "get /accounts/:identifier"
 )
 
 for pattern in "${api_patterns[@]}"; do
@@ -467,6 +472,7 @@ frontend_contract_patterns=(
   "/auth/login"
   "/me"
   "/users/exists"
+  "/accounts/exists"
   "/friends"
   "/groups"
   "/messages"
@@ -1377,7 +1383,7 @@ social_mvp_account_patterns=(
   "AddFriend"
   "重复添加同一有效好友"
   "添加自己为好友"
-  "目标用户不存在"
+  "目标账号不存在"
   "MVP 群默认允许公开加入"
   "非成员或已退出成员发送群消息必须失败"
 )
@@ -1421,6 +1427,75 @@ social_mvp_test_patterns=(
 for pattern in "${social_mvp_test_patterns[@]}"; do
   rg -q "$pattern" tests
 done
+
+account_terminology_doc_patterns=(
+  "Account Service"
+  "account_type=user|agent|admin"
+  "user_id"
+  "account id alias"
+  "V0 compatibility"
+  "Auth Service"
+  "credential/password/token"
+)
+
+for pattern in "${account_terminology_doc_patterns[@]}"; do
+  rg -qF "$pattern" docs/design-docs/account-service-terminology.md
+done
+
+account_terminology_entry_patterns=(
+  "Account Service"
+  "account id alias"
+  "account_type=user|agent|admin"
+)
+
+for pattern in "${account_terminology_entry_patterns[@]}"; do
+  rg -qF "$pattern" AGENTS.md ARCHITECTURE.md docs/product-specs/account-social-core.md docs/product-specs/frontend-backend-contract.md docs/design-docs/user-auth-friends-groups-boundaries.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
+done
+
+account_code_patterns=(
+  "AccountTypeUser  AccountType = \"user\""
+  "AccountTypeNormal AccountType = AccountTypeUser"
+  "type Account = User"
+  "type AccountRepository interface"
+  "type UserRepository = AccountRepository"
+  "type AccountProfile = UserProfile"
+  "func NewAccountLogic"
+  "AccountLogic    *logic.AccountLogic"
+  "Path:    \"/accounts\""
+  "Path:    \"/accounts/exists\""
+  "Path:    \"/accounts/:identifier\""
+)
+
+for pattern in "${account_code_patterns[@]}"; do
+  rg -qF "$pattern" internal/model/user.go internal/repository/repository.go internal/logic/userlogic.go internal/svc/service_context.go internal/handler/gozero_routes.go
+done
+
+account_storage_patterns=(
+  "account_type text not null default 'user'"
+  "account_type in ('user', 'agent', 'admin')"
+  "where account_type = 'normal'"
+)
+
+for pattern in "${account_storage_patterns[@]}"; do
+  rg -qF "$pattern" db/migrations/001_init_postgres.sql
+done
+
+rg -qF "account_type?: 'user' | 'agent' | 'admin'" web/src/api/user.ts
+rg -qF "Legacy server data that still contains \`normal\` is normalized by the backend to \`user\`" docs/product-specs/frontend-backend-contract.md
+rg -qF "旧 \`account_type=normal\` 仅作为迁移输入兼容" docs/design-docs/account-service-terminology.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
+rg -qF "Account Service 术语与 V0 compatibility" AGENTS.md docs/design-docs/index.md
+rg -qF "Account Service 第一阶段产品规格" docs/product-specs/index.md docs/product-specs/user-service.md
+rg -qF "Account Service go-zero 实现设计" docs/design-docs/index.md docs/design-docs/user-service-go-zero.md
+
+if rg -n 'account_type.*normal|normal.*account_type|`normal`' \
+  docs/product-specs/agent-system.md \
+  docs/design-docs/agent-system-architecture.md \
+  docs/exec-plans/active/agent-system-v0.md \
+  docs/exec-plans/active/agent-infrastructure-parallel-baseline.md \
+  web/src/api/user.ts; then
+  echo "account_type docs/frontend must use user|agent|admin; normal may appear only in explicit migration compatibility docs" >&2
+  exit 1
+fi
 
 rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go internal/rpcgen/message/internal/svc/service_context.go
 rg -q "NewMessageLogicWithMediaValidator" internal/rpcgen/message/internal/svc/service_context.go

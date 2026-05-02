@@ -31,20 +31,22 @@ The first contract intentionally does not require:
 
 These should remain compatible with the interface contract but are not part of the first implementation.
 
-## Users and actors
+## Accounts and actors
 
-- Sender: authenticated user sending a message.
-- Receiver: user receiving a single-chat message.
-- Group member: user receiving or sending messages in a group.
+- Sender: authenticated account sending a message.
+- Receiver: account receiving a single-chat message.
+- Group member: account receiving or sending messages in a group.
 - Client: mobile/web/desktop app. Phase 1 can use HTTP APIs instead of WebSocket.
 - Message service: service owning message sequence, message persistence, and read state.
+
+V0 `user_id`, `sender_id`, `receiver_id`, and read-state `user_id` fields are account id aliases. They point to Account Service profiles and are kept for frontend/API compatibility.
 
 ## Chat types
 
 Phase 1 supports:
 
-1. Single chat: user-to-user messages.
-2. Group chat: user-to-group messages.
+1. Single chat: account-to-account messages.
+2. Group chat: account-to-group messages.
 
 ## Message content
 
@@ -114,7 +116,7 @@ Each message belongs to one conversation.
 
 Phase 1 conversation ID rules:
 
-- Single chat: deterministic from the two user IDs, independent of sender order.
+- Single chat: deterministic from the two account IDs, independent of sender order.
 - Group chat: deterministic from `group_id`.
 
 Example logical forms:
