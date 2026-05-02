@@ -174,3 +174,5 @@ Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trac
 - Kafka topic 设计与消息 schema 第一版见 [`docs/design-docs/kafka-message-events.md`](./docs/design-docs/kafka-message-events.md)，后续需随 outbox/transfer/push 实现继续细化。
 - PostgreSQL 表结构和迁移方案。
 - Agent 工具权限模型第一版见 `docs/design-docs/agent-system-architecture.md`，后续需随 MCP、MinIO skill 和 Python Executor 实现继续细化。
+
+- `docs/deployment-k3s-pitfalls.md` — k3s/GitHub Actions deployment pitfalls and runbook.
