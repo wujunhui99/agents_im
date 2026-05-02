@@ -31,7 +31,7 @@ func (l *CreateUserLogic) CreateUser(in *userpb.CreateUserRequest) (*userpb.User
 		DisplayName: in.GetDisplayName(),
 		Name:        in.GetName(),
 		Gender:      in.GetGender(),
-		Age:         in.GetAge(),
+		BirthDate:   in.GetBirthDate(),
 		Region:      in.GetRegion(),
 		AccountType: in.GetAccountType(),
 	})

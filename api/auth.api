@@ -20,7 +20,7 @@ type RegisterReq {
 	DisplayName string `json:"display_name,optional"`
 	Name        string `json:"name,optional"`
 	Gender      string `json:"gender,optional"`
-	Age         int32  `json:"age,optional"`
+	BirthDate   string `json:"birth_date,optional"`
 	Region      string `json:"region,optional"`
 }
 

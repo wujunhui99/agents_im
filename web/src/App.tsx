@@ -292,7 +292,7 @@ function userProfileFromAuth(user: AuthUser): UserProfile {
     display_name: user.displayName,
     name: user.displayName,
     gender: user.gender ?? '',
-    age: user.age ?? 0,
+    birth_date: user.birth_date ?? '',
     region: user.region ?? '',
   };
 }

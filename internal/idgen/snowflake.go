@@ -28,6 +28,10 @@ type Snowflake struct {
 	now      func() time.Time
 }
 
+func New(nodeID int64) (*Snowflake, error) {
+	return NewSnowflake(nodeID)
+}
+
 func NewSnowflake(nodeID int64) (*Snowflake, error) {
 	if nodeID < 0 || nodeID > maxNodeID {
 		return nil, fmt.Errorf("snowflake node id must be between 0 and %d", maxNodeID)
@@ -37,6 +41,10 @@ func NewSnowflake(nodeID int64) (*Snowflake, error) {
 		lastMs: -1,
 		now:    time.Now,
 	}, nil
+}
+
+func (g *Snowflake) NewString() (string, error) {
+	return g.NextString()
 }
 
 func (g *Snowflake) NextString() (string, error) {

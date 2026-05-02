@@ -334,7 +334,7 @@ function friendToUserProfile(friend: Friend): UserProfile {
     display_name: friend.name,
     name: friend.name,
     gender: '',
-    age: 0,
+    birth_date: '',
     region: '',
     account_type: friend.accountType,
   };
@@ -361,7 +361,7 @@ function friendshipToUserProfile(friendship: Friendship): UserProfile {
     display_name: displayName,
     name: profile.name || displayName,
     gender: profile.gender ?? '',
-    age: profile.age ?? 0,
+    birth_date: profile.birth_date ?? '',
     region: profile.region ?? '',
     account_type: profile.account_type,
     avatar_media_id: profile.avatar_media_id,

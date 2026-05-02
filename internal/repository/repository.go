@@ -10,7 +10,7 @@ type ProfilePatch struct {
 	DisplayName *string
 	Name        *string
 	Gender      *string
-	Age         *int32
+	BirthDate   *string
 	Region      *string
 }
 

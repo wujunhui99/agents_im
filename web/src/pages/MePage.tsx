@@ -12,7 +12,7 @@ import { accountTypeLabel, avatarText, firstNonEmpty, profileDisplayName } from 
 type ProfileDraft = {
   display_name: string;
   gender: string;
-  age: string;
+  birth_date: string;
   region: string;
 };
 
@@ -40,7 +40,7 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
       await onUpdateProfile({
         display_name: draft.display_name.trim(),
         gender: draft.gender.trim(),
-        age: Number(draft.age),
+        birth_date: draft.birth_date.trim(),
         region: draft.region.trim(),
       });
       setIsEditing(false);
@@ -91,8 +91,8 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
             <dd>{profile.gender}</dd>
           </div>
           <div>
-            <dt>age</dt>
-            <dd>{profile.age}</dd>
+            <dt>生日</dt>
+            <dd>{profile.birth_date || '未设置'}</dd>
           </div>
           <div>
             <dt>region</dt>
@@ -117,11 +117,10 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
               fieldClassName="profile-field"
             />
             <TextField
-              label="age"
-              type="number"
-              min="0"
-              value={draft.age}
-              onChange={(event) => setDraft((current) => ({ ...current, age: event.target.value }))}
+              label="生日"
+              type="date"
+              value={draft.birth_date}
+              onChange={(event) => setDraft((current) => ({ ...current, birth_date: event.target.value }))}
               fieldClassName="profile-field"
             />
             <TextField
@@ -159,7 +158,7 @@ function createDraft(profile: UserProfile): ProfileDraft {
   return {
     display_name: profile.display_name,
     gender: profile.gender,
-    age: String(profile.age),
+    birth_date: profile.birth_date ?? '',
     region: profile.region,
   };
 }

@@ -38,7 +38,7 @@ type UserProfile struct {
 	DisplayName   string `json:"display_name"`
 	Name          string `json:"name"`
 	Gender        string `json:"gender"`
-	Age           int32  `json:"age"`
+	BirthDate     string `json:"birth_date"`
 	Region        string `json:"region"`
 	AccountType   string `json:"account_type"`
 	AvatarMediaID string `json:"avatar_media_id"`
@@ -53,7 +53,7 @@ type CreateUserRequest struct {
 	DisplayName string `json:"display_name"`
 	Name        string `json:"name"`
 	Gender      string `json:"gender"`
-	Age         int32  `json:"age"`
+	BirthDate   string `json:"birth_date"`
 	Region      string `json:"region"`
 	AccountType string `json:"account_type"`
 }
@@ -88,7 +88,7 @@ type UpdateUserProfileRequest struct {
 	DisplayName *string `json:"display_name,omitempty"`
 	Name        *string `json:"name,omitempty"`
 	Gender      *string `json:"gender,omitempty"`
-	Age         *int32  `json:"age,omitempty"`
+	BirthDate   *string `json:"birth_date,omitempty"`
 	Region      *string `json:"region,omitempty"`
 }
 
@@ -115,10 +115,6 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 		return UserProfile{}, err
 	}
 
-	if err := validateAge(req.Age); err != nil {
-		return UserProfile{}, err
-	}
-
 	region, err := normalizeRegion(req.Region)
 	if err != nil {
 		return UserProfile{}, err
@@ -134,7 +130,7 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 		DisplayName: displayName,
 		Name:        name,
 		Gender:      gender,
-		Age:         req.Age,
+		BirthDate:   strings.TrimSpace(req.BirthDate),
 		Region:      region,
 		AccountType: accountType,
 	})
@@ -233,11 +229,9 @@ func (l *UserLogic) UpdateUserProfile(ctx context.Context, req UpdateUserProfile
 		}
 		patch.Gender = &value
 	}
-	if req.Age != nil {
-		if err := validateAge(*req.Age); err != nil {
-			return UserProfile{}, err
-		}
-		patch.Age = req.Age
+	if req.BirthDate != nil {
+		value := strings.TrimSpace(*req.BirthDate)
+		patch.BirthDate = &value
 	}
 	if req.Region != nil {
 		value, err := normalizeRegion(*req.Region)
@@ -349,13 +343,6 @@ func normalizeGender(gender string) (string, error) {
 	}
 }
 
-func validateAge(age int32) error {
-	if age < 0 || age > 150 {
-		return apperror.InvalidArgument("age must be between 0 and 150")
-	}
-	return nil
-}
-
 func normalizeRegion(region string) (string, error) {
 	region = strings.TrimSpace(region)
 	if len([]rune(region)) > 128 {
@@ -373,7 +360,7 @@ func toProfile(user model.User) UserProfile {
 		DisplayName:   user.DisplayName,
 		Name:          user.Name,
 		Gender:        user.Gender,
-		Age:           user.Age,
+		BirthDate:     user.BirthDate,
 		Region:        user.Region,
 		AccountType:   string(user.AccountType),
 		AvatarMediaID: user.AvatarMediaID,

@@ -15,7 +15,7 @@ const bobProfile: UserProfile = {
   display_name: 'Bob Lin',
   name: 'Bob Lin',
   gender: '',
-  age: 0,
+  birth_date: '',
   region: '',
 };
 

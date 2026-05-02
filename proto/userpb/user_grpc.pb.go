@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v3.19.4
-// source: proto/user.proto
+// source: user.proto
 
 package userpb
 
@@ -29,6 +29,11 @@ const (
 // UserServiceClient is the client API for UserService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// UserService is the V0 transport name for the account/profile service.
+// New domain documentation should refer to Account Service semantics; public
+// user_id fields remain account_id aliases for compatibility. Account IDs are
+// Snowflake numeric strings without type prefixes.
 type UserServiceClient interface {
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*UserResponse, error)
 	GetUserByIdentifier(ctx context.Context, in *GetUserByIdentifierRequest, opts ...grpc.CallOption) (*UserResponse, error)
@@ -98,6 +103,11 @@ func (c *userServiceClient) UpdateUserProfile(ctx context.Context, in *UpdateUse
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
+//
+// UserService is the V0 transport name for the account/profile service.
+// New domain documentation should refer to Account Service semantics; public
+// user_id fields remain account_id aliases for compatibility. Account IDs are
+// Snowflake numeric strings without type prefixes.
 type UserServiceServer interface {
 	CreateUser(context.Context, *CreateUserRequest) (*UserResponse, error)
 	GetUserByIdentifier(context.Context, *GetUserByIdentifierRequest) (*UserResponse, error)
@@ -269,5 +279,5 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/user.proto",
+	Metadata: "user.proto",
 }
