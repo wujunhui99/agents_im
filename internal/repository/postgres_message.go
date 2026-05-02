@@ -20,20 +20,25 @@ type PostgresMessageRepository struct {
 }
 
 type postgresMessageRow struct {
-	ServerMsgID    string    `db:"server_msg_id"`
-	ClientMsgID    string    `db:"client_msg_id"`
-	SenderID       string    `db:"sender_id"`
-	ConversationID string    `db:"conversation_id"`
-	Seq            int64     `db:"seq"`
-	ChatType       string    `db:"chat_type"`
-	ReceiverID     string    `db:"receiver_id"`
-	GroupID        string    `db:"group_id"`
-	ContentType    string    `db:"content_type"`
-	Content        []byte    `db:"content"`
-	PayloadHash    string    `db:"payload_hash"`
-	SendTime       time.Time `db:"send_time"`
-	CreatedAt      time.Time `db:"created_at"`
-	UpdatedAt      time.Time `db:"updated_at"`
+	ServerMsgID           string    `db:"server_msg_id"`
+	ClientMsgID           string    `db:"client_msg_id"`
+	SenderID              string    `db:"sender_id"`
+	ConversationID        string    `db:"conversation_id"`
+	Seq                   int64     `db:"seq"`
+	ChatType              string    `db:"chat_type"`
+	ReceiverID            string    `db:"receiver_id"`
+	GroupID               string    `db:"group_id"`
+	ContentType           string    `db:"content_type"`
+	Content               []byte    `db:"content"`
+	MessageOrigin         string    `db:"message_origin"`
+	AgentAccountID        string    `db:"agent_account_id"`
+	TriggerServerMsgID    string    `db:"trigger_server_msg_id"`
+	AgentRunID            string    `db:"agent_run_id"`
+	AllowRecursiveTrigger bool      `db:"allow_recursive_trigger"`
+	PayloadHash           string    `db:"payload_hash"`
+	SendTime              time.Time `db:"send_time"`
+	CreatedAt             time.Time `db:"created_at"`
+	UpdatedAt             time.Time `db:"updated_at"`
 }
 
 type postgresMessageIdempotencyRow struct {
@@ -69,6 +74,9 @@ func NewPostgresMessageRepositoryFromConn(conn sqlx.SqlConn) *PostgresMessageRep
 }
 
 func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context, input CreateMessageInput) (Message, bool, error) {
+	if _, err := normalizeMessageOriginInput(&input); err != nil {
+		return Message{}, false, err
+	}
 	conversationID, err := validateCreateMessageInput(input)
 	if err != nil {
 		return Message{}, false, err
@@ -175,7 +183,9 @@ select max_seq from conversation_threads where conversation_id = $1
 
 	query := `
 select server_msg_id, client_msg_id, sender_id, conversation_id, seq, chat_type,
-       receiver_id, group_id, content_type, content, payload_hash, send_time, created_at, updated_at
+       receiver_id, group_id, content_type, content, message_origin, agent_account_id,
+       trigger_server_msg_id, agent_run_id, allow_recursive_trigger,
+       payload_hash, send_time, created_at, updated_at
 from messages
 where conversation_id = $1 and seq >= $2 and seq <= $3
 order by seq ` + order + `
@@ -337,13 +347,17 @@ func insertMessage(ctx context.Context, session sqlx.Session, input CreateMessag
 	err = session.QueryRowCtx(ctx, &row, `
 insert into messages (
   client_msg_id, sender_id, conversation_id, seq, chat_type,
-  receiver_id, group_id, content_type, content, payload_hash, send_time
+  receiver_id, group_id, content_type, content, message_origin, agent_account_id,
+  trigger_server_msg_id, agent_run_id, allow_recursive_trigger, payload_hash, send_time
 )
-values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)
+values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16)
 returning server_msg_id, client_msg_id, sender_id, conversation_id, seq, chat_type,
-          receiver_id, group_id, content_type, content, payload_hash, send_time, created_at, updated_at
+          receiver_id, group_id, content_type, content, message_origin, agent_account_id,
+          trigger_server_msg_id, agent_run_id, allow_recursive_trigger,
+          payload_hash, send_time, created_at, updated_at
 `, input.ClientMsgID, input.SenderID, conversationID, seq, input.ChatType, input.ReceiverID, input.GroupID,
-		input.ContentType, string(contentJSON), payloadHash, sendTime)
+		input.ContentType, string(contentJSON), input.MessageOrigin, input.AgentAccountID, input.TriggerServerMsgID,
+		input.AgentRunID, input.AllowRecursiveTrigger, payloadHash, sendTime)
 	return row, err
 }
 
@@ -450,7 +464,9 @@ func queryMessageByServerID(ctx context.Context, session sqlx.Session, serverMsg
 	var row postgresMessageRow
 	err := session.QueryRowCtx(ctx, &row, `
 select server_msg_id, client_msg_id, sender_id, conversation_id, seq, chat_type,
-       receiver_id, group_id, content_type, content, payload_hash, send_time, created_at, updated_at
+       receiver_id, group_id, content_type, content, message_origin, agent_account_id,
+       trigger_server_msg_id, agent_run_id, allow_recursive_trigger,
+       payload_hash, send_time, created_at, updated_at
 from messages
 where server_msg_id = $1
 `, serverMsgID)
@@ -461,7 +477,9 @@ func queryMessageBySenderClient(ctx context.Context, session sqlx.Session, sende
 	var row postgresMessageRow
 	err := session.QueryRowCtx(ctx, &row, `
 select server_msg_id, client_msg_id, sender_id, conversation_id, seq, chat_type,
-       receiver_id, group_id, content_type, content, payload_hash, send_time, created_at, updated_at
+       receiver_id, group_id, content_type, content, message_origin, agent_account_id,
+       trigger_server_msg_id, agent_run_id, allow_recursive_trigger,
+       payload_hash, send_time, created_at, updated_at
 from messages
 where sender_id = $1 and client_msg_id = $2
 `, senderID, clientMsgID)
@@ -499,23 +517,33 @@ func (r *PostgresMessageRepository) existingMessageForIdempotency(ctx context.Co
 
 func messagePayloadHash(input CreateMessageInput, conversationID string) string {
 	payload := struct {
-		SenderID       string `json:"sender_id"`
-		ClientMsgID    string `json:"client_msg_id"`
-		ConversationID string `json:"conversation_id"`
-		ChatType       string `json:"chat_type"`
-		ReceiverID     string `json:"receiver_id"`
-		GroupID        string `json:"group_id"`
-		ContentType    string `json:"content_type"`
-		Content        string `json:"content"`
+		SenderID              string `json:"sender_id"`
+		ClientMsgID           string `json:"client_msg_id"`
+		ConversationID        string `json:"conversation_id"`
+		ChatType              string `json:"chat_type"`
+		ReceiverID            string `json:"receiver_id"`
+		GroupID               string `json:"group_id"`
+		ContentType           string `json:"content_type"`
+		Content               string `json:"content"`
+		MessageOrigin         string `json:"message_origin"`
+		AgentAccountID        string `json:"agent_account_id,omitempty"`
+		TriggerServerMsgID    string `json:"trigger_server_msg_id,omitempty"`
+		AgentRunID            string `json:"agent_run_id,omitempty"`
+		AllowRecursiveTrigger bool   `json:"allow_recursive_trigger,omitempty"`
 	}{
-		SenderID:       input.SenderID,
-		ClientMsgID:    input.ClientMsgID,
-		ConversationID: conversationID,
-		ChatType:       input.ChatType,
-		ReceiverID:     input.ReceiverID,
-		GroupID:        input.GroupID,
-		ContentType:    input.ContentType,
-		Content:        input.Content,
+		SenderID:              input.SenderID,
+		ClientMsgID:           input.ClientMsgID,
+		ConversationID:        conversationID,
+		ChatType:              input.ChatType,
+		ReceiverID:            input.ReceiverID,
+		GroupID:               input.GroupID,
+		ContentType:           input.ContentType,
+		Content:               input.Content,
+		MessageOrigin:         input.MessageOrigin,
+		AgentAccountID:        input.AgentAccountID,
+		TriggerServerMsgID:    input.TriggerServerMsgID,
+		AgentRunID:            input.AgentRunID,
+		AllowRecursiveTrigger: input.AllowRecursiveTrigger,
 	}
 	encoded, _ := json.Marshal(payload)
 	sum := sha256.Sum256(encoded)
@@ -548,18 +576,23 @@ func visibleUserIDs(input CreateMessageInput) []string {
 
 func (r postgresMessageRow) message() Message {
 	return Message{
-		ServerMsgID:    r.ServerMsgID,
-		ClientMsgID:    r.ClientMsgID,
-		ConversationID: r.ConversationID,
-		Seq:            r.Seq,
-		SenderID:       r.SenderID,
-		ReceiverID:     r.ReceiverID,
-		GroupID:        r.GroupID,
-		ChatType:       r.ChatType,
-		ContentType:    r.ContentType,
-		Content:        decodeMessageContent(r.Content),
-		SendTime:       r.SendTime.UTC().UnixMilli(),
-		CreatedAt:      r.CreatedAt.UTC().UnixMilli(),
+		ServerMsgID:           r.ServerMsgID,
+		ClientMsgID:           r.ClientMsgID,
+		ConversationID:        r.ConversationID,
+		Seq:                   r.Seq,
+		SenderID:              r.SenderID,
+		ReceiverID:            r.ReceiverID,
+		GroupID:               r.GroupID,
+		ChatType:              r.ChatType,
+		ContentType:           r.ContentType,
+		Content:               decodeMessageContent(r.Content),
+		MessageOrigin:         r.MessageOrigin,
+		AgentAccountID:        r.AgentAccountID,
+		TriggerServerMsgID:    r.TriggerServerMsgID,
+		AgentRunID:            r.AgentRunID,
+		AllowRecursiveTrigger: r.AllowRecursiveTrigger,
+		SendTime:              r.SendTime.UTC().UnixMilli(),
+		CreatedAt:             r.CreatedAt.UTC().UnixMilli(),
 	}
 }
 

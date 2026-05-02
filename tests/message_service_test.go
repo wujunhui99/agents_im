@@ -306,6 +306,79 @@ func TestMessageSendCreatesOutboxEvent(t *testing.T) {
 	}
 }
 
+func TestMessageOriginAndAgentMetadataPersistAcrossPullAndOutbox(t *testing.T) {
+	repo := repository.NewMemoryMessageRepository()
+	messageLogic := logic.NewMessageLogic(repo)
+	ctx := context.Background()
+
+	human, err := messageLogic.SendMessage(ctx, testSendRequest("usr_a", "agent_1", "client-origin-human", "hello agent"))
+	if err != nil {
+		t.Fatalf("send human message: %v", err)
+	}
+	if human.Message.MessageOrigin != logic.MessageOriginHuman {
+		t.Fatalf("default origin = %q, want human", human.Message.MessageOrigin)
+	}
+
+	ai, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
+		SenderID:              "agent_1",
+		ReceiverID:            "usr_a",
+		ChatType:              logic.MessageChatTypeSingle,
+		ClientMsgID:           "client-origin-ai",
+		ContentType:           logic.MessageContentTypeText,
+		Content:               "AI response",
+		MessageOrigin:         logic.MessageOriginAI,
+		AgentAccountID:        "agent_1",
+		TriggerServerMsgID:    human.Message.ServerMsgID,
+		AgentRunID:            "run_1",
+		AllowRecursiveTrigger: false,
+	})
+	if err != nil {
+		t.Fatalf("send ai message: %v", err)
+	}
+	if ai.Message.MessageOrigin != logic.MessageOriginAI ||
+		ai.Message.AgentAccountID != "agent_1" ||
+		ai.Message.TriggerServerMsgID != human.Message.ServerMsgID ||
+		ai.Message.AgentRunID != "run_1" ||
+		ai.Message.AllowRecursiveTrigger {
+		t.Fatalf("ai metadata mismatch: %+v", ai.Message)
+	}
+
+	pulled, err := messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
+		UserID:         "usr_a",
+		ConversationID: human.Message.ConversationID,
+		FromSeq:        1,
+		Limit:          10,
+		Order:          "asc",
+	})
+	if err != nil {
+		t.Fatalf("pull messages: %v", err)
+	}
+	if len(pulled.Messages) != 2 || pulled.Messages[1].MessageOrigin != logic.MessageOriginAI {
+		t.Fatalf("pulled messages missing ai origin: %+v", pulled.Messages)
+	}
+
+	events, err := repo.PollPending(ctx, "origin-worker", 10, time.Minute)
+	if err != nil {
+		t.Fatalf("poll outbox: %v", err)
+	}
+	var aiPayload repository.MessageCreatedOutboxPayload
+	for _, event := range events {
+		var payload repository.MessageCreatedOutboxPayload
+		if err := json.Unmarshal(event.Payload, &payload); err != nil {
+			t.Fatalf("decode outbox payload: %v", err)
+		}
+		if payload.Message.ServerMsgID == ai.Message.ServerMsgID {
+			aiPayload = payload
+			break
+		}
+	}
+	if aiPayload.Message.MessageOrigin != logic.MessageOriginAI ||
+		aiPayload.Message.AgentAccountID != "agent_1" ||
+		aiPayload.Message.TriggerServerMsgID != human.Message.ServerMsgID {
+		t.Fatalf("outbox payload missing ai metadata: %+v", aiPayload.Message)
+	}
+}
+
 func TestMessageGroupSendRequiresActiveMembership(t *testing.T) {
 	ctx := context.Background()
 	userRepo := repository.NewMemoryRepository()

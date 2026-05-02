@@ -95,6 +95,16 @@ The referenced media object must have `purpose=message_file`, `status=ready`, `s
 
 Avatar uploads use the same media storage but are bound through `/me/avatar`, not through message content.
 
+## Message origin
+
+Every persisted message exposes `message_origin`:
+
+- `human`: normal human account sends. This is the default for public send APIs.
+- `ai`: Agent/AI automatic reply. AI messages must be written through Message Service and carry `agent_account_id`, `trigger_server_msg_id`, `agent_run_id`, and `allow_recursive_trigger`.
+- `system`: system prompt/status message. System messages are visible as system-origin messages and do not carry Agent metadata.
+
+Agent/AI code must not insert `messages` rows directly. A successful AI reply has the same durable identity, conversation `seq`, outbox event, read-state behavior, and pull-message visibility as a human message.
+
 ## Message identity
 
 Each message has two IDs:
@@ -188,6 +198,8 @@ A successful send response should include:
 - `client_msg_id`;
 - `conversation_id`;
 - `seq`;
+- `message_origin`;
+- Agent metadata for AI messages: `agent_account_id`, `trigger_server_msg_id`, `agent_run_id`, `allow_recursive_trigger`;
 - `send_time`;
 - persisted message snapshot.
 
@@ -276,4 +288,6 @@ The first message contract is ready when:
 - message, gateway, and storage agents can implement against the same contract;
 - read state uses `user_id + conversation_id -> has_read_seq`;
 - send and read behavior are idempotent/monotonic;
+- messages expose `message_origin=human|ai|system`, and AI messages expose Agent trigger metadata;
+- Agent/AI replies are written through Message Service and duplicate triggers do not create duplicate AI messages;
 - the contract clearly separates phase 1 synchronous implementation from future MQ/gateway work.

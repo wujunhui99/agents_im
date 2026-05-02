@@ -18,6 +18,11 @@ type Message {
 	ChatType       string `json:"chatType"`
 	ContentType    string `json:"contentType"`
 	Content        string `json:"content"`
+	MessageOrigin  string `json:"messageOrigin"`
+	AgentAccountID string `json:"agentAccountId,optional"`
+	TriggerServerMsgID string `json:"triggerServerMsgId,optional"`
+	AgentRunID string `json:"agentRunId,optional"`
+	AllowRecursiveTrigger bool `json:"allowRecursiveTrigger,optional"`
 	SendTime       int64  `json:"sendTime"`
 	CreatedAt      int64  `json:"createdAt"`
 }
@@ -30,6 +35,11 @@ type SendMessageReq {
 	ClientMsgID string `json:"clientMsgId"`
 	ContentType string `json:"contentType"`
 	Content     string `json:"content"`
+	MessageOrigin string `json:"messageOrigin,optional"`
+	AgentAccountID string `json:"agentAccountId,optional"`
+	TriggerServerMsgID string `json:"triggerServerMsgId,optional"`
+	AgentRunID string `json:"agentRunId,optional"`
+	AllowRecursiveTrigger bool `json:"allowRecursiveTrigger,optional"`
 }
 
 type SendMessageData {

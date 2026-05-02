@@ -12,6 +12,10 @@ const (
 	ContentTypeText  = "text"
 	ContentTypeImage = "image"
 	ContentTypeFile  = "file"
+
+	MessageOriginHuman  = "human"
+	MessageOriginAI     = "ai"
+	MessageOriginSystem = "system"
 )
 
 type Message struct {
@@ -25,8 +29,14 @@ type Message struct {
 	ChatType       string `json:"chatType"`
 	ContentType    string `json:"contentType"`
 	Content        string `json:"content"`
-	SendTime       int64  `json:"sendTime"`
-	CreatedAt      int64  `json:"createdAt"`
+	MessageOrigin  string `json:"messageOrigin"`
+	AgentAccountID string `json:"agentAccountId,omitempty"`
+	// TriggerServerMsgID is the human/system message that caused this AI response.
+	TriggerServerMsgID    string `json:"triggerServerMsgId,omitempty"`
+	AgentRunID            string `json:"agentRunId,omitempty"`
+	AllowRecursiveTrigger bool   `json:"allowRecursiveTrigger,omitempty"`
+	SendTime              int64  `json:"sendTime"`
+	CreatedAt             int64  `json:"createdAt"`
 }
 
 func (m Message) Clone() Message {
@@ -51,14 +61,19 @@ func (s ConversationSeqState) Clone() ConversationSeqState {
 }
 
 type CreateMessageInput struct {
-	SenderID           string
-	ReceiverID         string
-	GroupID            string
-	ChatType           string
-	ClientMsgID        string
-	ContentType        string
-	Content            string
-	ParticipantUserIDs []string
+	SenderID              string
+	ReceiverID            string
+	GroupID               string
+	ChatType              string
+	ClientMsgID           string
+	ContentType           string
+	Content               string
+	MessageOrigin         string
+	AgentAccountID        string
+	TriggerServerMsgID    string
+	AgentRunID            string
+	AllowRecursiveTrigger bool
+	ParticipantUserIDs    []string
 }
 
 type MessageRepository interface {

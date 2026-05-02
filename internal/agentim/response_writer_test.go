@@ -13,14 +13,18 @@ func TestResponseWriterUsesMessageSenderSeam(t *testing.T) {
 	sender := &recordingMessageSender{
 		resp: logic.SendMessageResponse{
 			Message: logic.Message{
-				ServerMsgID:    "msg_agent_1",
-				ConversationID: "single:agent_1:user_1",
-				Seq:            8,
-				SenderID:       "agent_1",
-				ReceiverID:     "user_1",
-				ChatType:       logic.MessageChatTypeSingle,
-				ContentType:    logic.MessageContentTypeText,
-				Content:        "answer",
+				ServerMsgID:        "msg_agent_1",
+				ConversationID:     "single:agent_1:user_1",
+				Seq:                8,
+				SenderID:           "agent_1",
+				ReceiverID:         "user_1",
+				ChatType:           logic.MessageChatTypeSingle,
+				ContentType:        logic.MessageContentTypeText,
+				Content:            "answer",
+				MessageOrigin:      logic.MessageOriginAI,
+				AgentAccountID:     "agent_1",
+				TriggerServerMsgID: "msg_user_1",
+				AgentRunID:         "run_1",
 			},
 		},
 	}
@@ -55,6 +59,12 @@ func TestResponseWriterUsesMessageSenderSeam(t *testing.T) {
 	}
 	if sender.lastReq.ContentType != logic.MessageContentTypeText || sender.lastReq.Content != "answer" {
 		t.Fatalf("unexpected content request: %+v", sender.lastReq)
+	}
+	if sender.lastReq.MessageOrigin != logic.MessageOriginAI ||
+		sender.lastReq.AgentAccountID != "agent_1" ||
+		sender.lastReq.TriggerServerMsgID != "msg_user_1" ||
+		sender.lastReq.AgentRunID != "run_1" {
+		t.Fatalf("agent response did not send ai metadata through MessageLogic: %+v", sender.lastReq)
 	}
 	if resp.Message.ServerMsgID != "msg_agent_1" || resp.Metadata.AgentRunID != "run_1" {
 		t.Fatalf("unexpected response: %+v", resp)

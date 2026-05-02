@@ -43,6 +43,8 @@ Phase-1 tables:
 - `message_idempotency_keys`: explicit sender/client idempotency record.
 - `message_outbox`: transactional outbox rows for accepted message events.
 - `delivery_attempts`: per-recipient delivery state for accepted/published/delivered/offline/failed outcomes.
+- `agent_conversation_hosting`: conversation-level Agent hosting config.
+- `agent_trigger_idempotency`: Agent trigger idempotency and status records.
 
 ## Service Boundary Constraints
 
@@ -107,6 +109,7 @@ Repository files:
 - `internal/repository/postgres_groups.go`
 - `internal/repository/postgres_message.go`
 - `internal/repository/postgres_outbox.go`
+- `internal/repository/postgres_agent_hosting.go`
 
 Normal tests continue to use memory repositories. PostgreSQL integration tests are build-tagged with `integration` and skip when no DSN is configured.
 
@@ -123,11 +126,13 @@ Message writes use one PostgreSQL transaction:
 7. Advance sender `has_read_seq`.
 8. Update conversation max seq and last-message fields.
 9. Insert accepted `delivery_attempts` rows for message recipients, excluding the sender.
-10. Insert one `message_outbox` row for the `message.created` event.
+10. Insert one `message_outbox` row for the `message.created` event, including `message_origin` and Agent metadata when present.
 
 The locked conversation row is the serialization point, preserving contiguous per-conversation seq values.
 
 The outbox row is committed atomically with the accepted message. It is a reliable asynchronous event source for later Kafka/Message Transfer/Push workers and does not change the synchronous send response semantics.
+
+Agent hosting writes are separate from message persistence. `agent_conversation_hosting` controls whether a conversation is hosted by an Agent account. `agent_trigger_idempotency` prevents duplicate Agent replies for the same trigger while still recording explicit failed trigger attempts.
 
 ## goctl Model Decision
 
@@ -139,7 +144,7 @@ Follow-up command after local PG is running and migrated:
 export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
 goctl model pg datasource \
   -url "$DATABASE_URL" \
-  -table "users,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys,message_outbox,delivery_attempts" \
+  -table "users,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys,message_outbox,delivery_attempts,agent_conversation_hosting,agent_trigger_idempotency" \
   -dir ./internal/model/pg \
   --style go_zero
 ```

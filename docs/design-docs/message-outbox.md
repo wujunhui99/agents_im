@@ -32,7 +32,7 @@ The outbox adds a durable event source inside PostgreSQL so workers can publish 
 
 ## Schema
 
-Migration: [`../../db/migrations/001_init_postgres.sql`](../../db/migrations/001_init_postgres.sql)
+Migration: [`../../db/migrations/001_init_postgres.sql`](../../db/migrations/001_init_postgres.sql); Agent message origin metadata is extended in [`../../db/migrations/003_agent_conversation_hosting.sql`](../../db/migrations/003_agent_conversation_hosting.sql).
 
 Table: `message_outbox`
 
@@ -102,6 +102,11 @@ Payload shape:
     "chatType": "single",
     "contentType": "text",
     "content": "hello",
+    "messageOrigin": "human",
+    "agentAccountId": "",
+    "triggerServerMsgId": "",
+    "agentRunId": "",
+    "allowRecursiveTrigger": false,
     "sendTime": 1710000000000,
     "createdAt": 1710000000000
   },
