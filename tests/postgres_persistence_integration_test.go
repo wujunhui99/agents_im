@@ -68,6 +68,7 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 		Name:        "PG Agent",
 		Gender:      "unknown",
 		AccountType: model.AccountTypeAgent,
+		AccountTypeSet: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +82,7 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 		Name:        "PG Admin",
 		Gender:      "unknown",
 		AccountType: model.AccountTypeAdmin,
+		AccountTypeSet: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +95,8 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 		DisplayName: "PG Invalid",
 		Name:        "PG Invalid",
 		Gender:      "unknown",
-		AccountType: model.AccountType("root"),
+		AccountType: model.AccountType(99),
+		AccountTypeSet: true,
 	}); err == nil || apperror.From(err).Code != apperror.CodeInvalidArgument {
 		t.Fatalf("postgres invalid account_type error = %v, want INVALID_ARGUMENT", err)
 	}

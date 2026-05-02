@@ -28,7 +28,7 @@ type UserProfile struct {
 	Gender      string
 	BirthDate   string
 	Region      string
-	AccountType string
+	AccountType int32
 	CreatedAt   string
 	UpdatedAt   string
 }

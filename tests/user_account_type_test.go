@@ -26,14 +26,14 @@ func TestAccountTypeDefaultsAndExplicitInternalCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create default user: %v", err)
 	}
-	if userAccount.AccountType != string(model.AccountTypeUser) {
-		t.Fatalf("default account_type = %q, want %q", userAccount.AccountType, model.AccountTypeUser)
+	if userAccount.AccountType != int32(model.AccountTypeUser) {
+		t.Fatalf("default account_type = %d, want %d", userAccount.AccountType, model.AccountTypeUser)
 	}
 	assertNumericSnowflakeID(t, userAccount.UserID)
 
 	_, err = userLogic.CreateUser(ctx, logic.CreateUserRequest{
 		Identifier:  "legacy_normal_001",
-		AccountType: "normal",
+		AccountType: -1,
 	})
 	if err == nil || apperror.From(err).Code != apperror.CodeInvalidArgument {
 		t.Fatalf("legacy normal account_type error = %v, want INVALID_ARGUMENT", err)
@@ -41,30 +41,31 @@ func TestAccountTypeDefaultsAndExplicitInternalCreate(t *testing.T) {
 
 	agent, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
 		Identifier:  "agent_001",
-		AccountType: string(model.AccountTypeAgent),
+		AccountType: int32(model.AccountTypeAgent),
 	})
 	if err != nil {
 		t.Fatalf("create agent user: %v", err)
 	}
-	if agent.AccountType != string(model.AccountTypeAgent) {
-		t.Fatalf("agent account_type = %q, want %q", agent.AccountType, model.AccountTypeAgent)
+	if agent.AccountType != int32(model.AccountTypeAgent) {
+		t.Fatalf("agent account_type = %d, want %d", agent.AccountType, model.AccountTypeAgent)
 	}
 	assertNumericSnowflakeID(t, agent.UserID)
 
 	admin, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
-		Identifier:  "admin_001",
-		AccountType: string(model.AccountTypeAdmin),
+		Identifier:          "admin_001",
+		AccountType:         int32(model.AccountTypeAdmin),
+		AccountTypeProvided: true,
 	})
 	if err != nil {
 		t.Fatalf("create admin user: %v", err)
 	}
-	if admin.AccountType != string(model.AccountTypeAdmin) {
-		t.Fatalf("admin account_type = %q, want %q", admin.AccountType, model.AccountTypeAdmin)
+	if admin.AccountType != int32(model.AccountTypeAdmin) {
+		t.Fatalf("admin account_type = %d, want %d", admin.AccountType, model.AccountTypeAdmin)
 	}
 
 	_, err = userLogic.CreateUser(ctx, logic.CreateUserRequest{
 		Identifier:  "invalid_001",
-		AccountType: "superuser",
+		AccountType: 99,
 	})
 	if err == nil {
 		t.Fatal("expected invalid account_type to fail")
@@ -128,7 +129,7 @@ func TestMemoryRepositoryAccountTypeSemantics(t *testing.T) {
 		DisplayName: "Repo Invalid",
 		Name:        "Repo Invalid",
 		Gender:      "unknown",
-		AccountType: model.AccountType("root"),
+		AccountType: model.AccountType(99),
 	})
 	if err == nil || apperror.From(err).Code != apperror.CodeInvalidArgument {
 		t.Fatalf("repository invalid account_type error = %v, want INVALID_ARGUMENT", err)
@@ -139,15 +140,15 @@ func TestPublicAccountCreateIgnoresAccountTypeAndDefaultsUser(t *testing.T) {
 	serviceContext := newTestUserServiceContext()
 	mux := newUserGoZeroRouter(t, serviceContext)
 
-	createResp := performJSON(mux, "POST", "/users", `{"identifier":"public_agent_attempt","account_type":"admin"}`)
+	createResp := performJSON(mux, "POST", "/users", `{"identifier":"public_agent_attempt","account_type":0}`)
 	if createResp.Code != 200 {
 		t.Fatalf("create status = %d, body = %s", createResp.Code, createResp.Body.String())
 	}
 
 	var created envelope[logic.UserProfile]
 	decodeEnvelope(t, createResp.Body.Bytes(), &created)
-	if created.Data.AccountType != string(model.AccountTypeUser) {
-		t.Fatalf("public create account_type = %q, want default %q", created.Data.AccountType, model.AccountTypeUser)
+	if created.Data.AccountType != int32(model.AccountTypeUser) {
+		t.Fatalf("public create account_type = %d, want default %d", created.Data.AccountType, model.AccountTypeUser)
 	}
 }
 
@@ -160,7 +161,7 @@ func TestAuthRegisterCreatesUserAccountTypeByDefault(t *testing.T) {
 	)
 	mux := newAuthGoZeroRouter(t, serviceContext)
 
-	registerResp := performJSON(mux, "POST", "/auth/register", `{"identifier":"auth_agent_attempt","password":"correct-password","account_type":"admin"}`)
+	registerResp := performJSON(mux, "POST", "/auth/register", `{"identifier":"auth_agent_attempt","password": "redacted-password","account_type":0}`)
 	if registerResp.Code != 200 {
 		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())
 	}
@@ -172,20 +173,20 @@ func TestAuthRegisterCreatesUserAccountTypeByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load registered user: %v", err)
 	}
-	if profile.AccountType != string(model.AccountTypeUser) {
-		t.Fatalf("auth register account_type = %q, want %q", profile.AccountType, model.AccountTypeUser)
+	if profile.AccountType != int32(model.AccountTypeUser) {
+		t.Fatalf("auth register account_type = %d, want %d", profile.AccountType, model.AccountTypeUser)
 	}
 }
 
 func TestUserRPCAccountTypeContract(t *testing.T) {
-	req := &userpb.CreateUserRequest{AccountType: string(model.AccountTypeAgent)}
-	if req.GetAccountType() != string(model.AccountTypeAgent) {
-		t.Fatalf("rpc create account_type = %q, want %q", req.GetAccountType(), model.AccountTypeAgent)
+	req := &userpb.CreateUserRequest{AccountType: int32(model.AccountTypeAgent)}
+	if req.GetAccountType() != int32(model.AccountTypeAgent) {
+		t.Fatalf("rpc create account_type = %d, want %d", req.GetAccountType(), model.AccountTypeAgent)
 	}
 
-	user := &userpb.User{AccountType: string(model.AccountTypeAdmin)}
-	if user.GetAccountType() != string(model.AccountTypeAdmin) {
-		t.Fatalf("rpc user account_type = %q, want %q", user.GetAccountType(), model.AccountTypeAdmin)
+	user := &userpb.User{AccountType: int32(model.AccountTypeAdmin)}
+	if user.GetAccountType() != int32(model.AccountTypeAdmin) {
+		t.Fatalf("rpc user account_type = %d, want %d", user.GetAccountType(), model.AccountTypeAdmin)
 	}
 }
 

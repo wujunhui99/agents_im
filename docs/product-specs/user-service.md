@@ -17,7 +17,7 @@ Account Service 是账号资料的权威服务，先于 `auth`、`friends`、`gr
 - 提供按 `user_id` 查询账号资料的 RPC 能力，其中 `user_id` 是 account id alias。
 - 提供 `/me` 查询当前账号资料的 HTTP 能力。
 - 提供当前账号更新自己资料字段的 HTTP 能力。
-- 支持 `account_type=user|agent|admin`。
+- 支持 `account_type=0|1|2`（0=管理员，1=用户，2=Agent）。
 
 ## 非目标
 
@@ -39,11 +39,11 @@ Account Service 是账号资料的权威服务，先于 `auth`、`friends`、`gr
 - `gender`：性别，支持 `unknown`、`male`、`female`、`other`。
 - `birth_date`：生日，允许未设置；不落库存储会随时间变化的年龄。
 - `region`：地区，允许未设置。
-- `account_type`：账号类型，支持 `user`、`agent`、`admin`；公开 HTTP 注册/创建路径默认并固定为 `user`，内部 User RPC/logic 可显式创建 `agent` 或 `admin`。
+- `account_type`：账号类型，使用整数枚举：0=管理员、1=用户、2=Agent；公开 HTTP 注册/创建路径默认并固定为 1，内部 User RPC/logic 可显式创建 0 或 2。
 - `avatar_media_id`：当前头像绑定的 media id，允许为空。头像文件本身由 Media API 上传到 MinIO/S3-compatible object storage，用户资料只保存 ready media 的引用。
 - `created_at` / `updated_at`：资料创建和更新时间。
 
-旧 `account_type=normal` 不再作为有效输入兼容；迁移前必须转换为 `user`，否则按非法 `account_type` 失败。
+旧 `account_type=normal` 不再作为有效输入兼容；迁移前必须转换为 1（用户），否则按非法 `account_type` 失败。
 PostgreSQL 存储拆分为 `accounts` 与 `profiles`：`accounts` 负责 account id、identifier、account_type 和账号时间戳，`profiles` 负责展示资料和头像引用。创建账号必须同时创建 account 与 profile。
 
 ## 接口能力

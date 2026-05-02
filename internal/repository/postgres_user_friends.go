@@ -15,7 +15,7 @@ import (
 type postgresAccountProfileRow struct {
 	AccountID        string    `db:"account_id"`
 	Identifier       string    `db:"identifier"`
-	AccountType      string    `db:"account_type"`
+	AccountType      int32     `db:"account_type"`
 	AccountCreatedAt time.Time `db:"account_created_at"`
 	AccountUpdatedAt time.Time `db:"account_updated_at"`
 	DisplayName      string    `db:"display_name"`
@@ -37,9 +37,13 @@ type postgresFriendshipRow struct {
 }
 
 func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model.User, error) {
-	accountType, ok := model.NormalizeAccountType(string(user.AccountType))
+	rawAccountType := user.AccountType
+	if rawAccountType == 0 && !user.AccountTypeSet {
+		rawAccountType = model.AccountTypeUser
+	}
+	accountType, ok := model.NormalizeAccountType(rawAccountType)
 	if !ok {
-		return model.User{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
+		return model.User{}, apperror.InvalidArgument("account_type must be 0(admin), 1(user), or 2(agent)")
 	}
 
 	accountID := strings.TrimSpace(user.AccountID)
@@ -329,7 +333,7 @@ returning user_id, friend_id, status, created_at, updated_at
 }
 
 func (r postgresAccountProfileRow) user() model.User {
-	accountType, ok := model.NormalizeAccountType(r.AccountType)
+	accountType, ok := model.NormalizeAccountType(model.AccountType(r.AccountType))
 	if !ok {
 		accountType = model.AccountType(r.AccountType)
 	}
