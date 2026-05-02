@@ -337,18 +337,23 @@ type GetMediaDownloadURLResp struct {
 }
 
 type Message struct {
-	ServerMsgID    string `json:"serverMsgId"`
-	ClientMsgID    string `json:"clientMsgId"`
-	ConversationID string `json:"conversationId"`
-	Seq            int64  `json:"seq"`
-	SenderID       string `json:"senderId"`
-	ReceiverID     string `json:"receiverId"`
-	GroupID        string `json:"groupId"`
-	ChatType       string `json:"chatType"`
-	ContentType    string `json:"contentType"`
-	Content        string `json:"content"`
-	SendTime       int64  `json:"sendTime"`
-	CreatedAt      int64  `json:"createdAt"`
+	ServerMsgID           string `json:"serverMsgId"`
+	ClientMsgID           string `json:"clientMsgId"`
+	ConversationID        string `json:"conversationId"`
+	Seq                   int64  `json:"seq"`
+	SenderID              string `json:"senderId"`
+	ReceiverID            string `json:"receiverId"`
+	GroupID               string `json:"groupId"`
+	ChatType              string `json:"chatType"`
+	ContentType           string `json:"contentType"`
+	Content               string `json:"content"`
+	MessageOrigin         string `json:"messageOrigin"`
+	AgentAccountID        string `json:"agentAccountId,optional"`
+	TriggerServerMsgID    string `json:"triggerServerMsgId,optional"`
+	AgentRunID            string `json:"agentRunId,optional"`
+	AllowRecursiveTrigger bool   `json:"allowRecursiveTrigger,optional"`
+	SendTime              int64  `json:"sendTime"`
+	CreatedAt             int64  `json:"createdAt"`
 }
 
 type PullMessagesData struct {
@@ -387,13 +392,18 @@ type SendMessageData struct {
 }
 
 type SendMessageReq struct {
-	SenderID    string `json:"senderId,optional"`
-	ReceiverID  string `json:"receiverId,optional"`
-	GroupID     string `json:"groupId,optional"`
-	ChatType    string `json:"chatType"`
-	ClientMsgID string `json:"clientMsgId"`
-	ContentType string `json:"contentType"`
-	Content     string `json:"content"`
+	SenderID              string `json:"senderId,optional"`
+	ReceiverID            string `json:"receiverId,optional"`
+	GroupID               string `json:"groupId,optional"`
+	ChatType              string `json:"chatType"`
+	ClientMsgID           string `json:"clientMsgId"`
+	ContentType           string `json:"contentType"`
+	Content               string `json:"content"`
+	MessageOrigin         string `json:"messageOrigin,optional"`
+	AgentAccountID        string `json:"agentAccountId,optional"`
+	TriggerServerMsgID    string `json:"triggerServerMsgId,optional"`
+	AgentRunID            string `json:"agentRunId,optional"`
+	AllowRecursiveTrigger bool   `json:"allowRecursiveTrigger,optional"`
 }
 
 type SendMessageResp struct {

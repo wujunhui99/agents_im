@@ -166,6 +166,8 @@ OBJECT_STORAGE_SECRET_ACCESS_KEY=agents...word
 
 The MinIO API is available at `http://localhost:9000`; the console is available at `http://localhost:9001`. The bucket is private and is created by `user-api` at startup. Unit tests use the explicit memory object store and do not require live MinIO.
 
+Message API responses include `messageOrigin=human|ai|system` and Agent metadata when present. Local dev does not enable a production LLM by default; Agent conversation hosting must be wired with an explicit runtime/provider config and otherwise fail closed instead of returning fake AI replies.
+
 ## Demo Data
 
 After `scripts/dev-up.sh` succeeds, seed two user-type accounts, one friendship, one group, and one single-chat message:

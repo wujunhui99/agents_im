@@ -176,7 +176,11 @@ function ConversationList({
                   <strong>{item.title}</strong>
                   <time>{item.time}</time>
                 </div>
-                <p>{item.preview}</p>
+                <p>
+                  {item.previewOrigin === 'ai' ? <span className="conversation-origin-badge">AI/Agent</span> : null}
+                  {item.previewOrigin === 'system' ? <span className="conversation-origin-badge conversation-origin-system">系统</span> : null}
+                  {item.preview}
+                </p>
               </div>
               {item.unread > 0 ? <span className="unread-badge">{item.unread}</span> : null}
             </button>
@@ -301,8 +305,14 @@ function ChatWindow({
       </p>
       <div className="message-thread" role="log" aria-label="聊天消息">
         {sortedMessages.map((message) => (
-          <article className={`message-row message-${message.direction}`} key={message.id}>
+          <article
+            className={`message-row message-${message.direction} message-origin-${message.messageOrigin}`}
+            key={message.id}
+            aria-label={messageAriaLabel(message)}
+          >
             <div className="message-body">
+              {message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
+              {message.messageOrigin === 'system' ? <span className="message-origin-badge message-origin-system">系统</span> : null}
               <p className="message-bubble">{message.content}</p>
               {message.direction === 'outgoing' ? (
                 <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>
@@ -412,6 +422,7 @@ function conversationStateToView(state: ConversationSeqState, currentUserId: str
     title: peerId || state.conversationId,
     avatar: avatarText(peerId || state.conversationId),
     preview: lastMessage?.content ?? '暂无消息',
+    previewOrigin: lastMessage?.messageOrigin,
     time: state.maxSeqTime ? '刚刚' : '',
     unread: state.unreadCount ?? 0,
     color: state.conversationId.startsWith('group:') ? 'green' : 'blue',
@@ -431,7 +442,8 @@ function appendMessage(conversations: Conversation[], conversationId: string, me
     const nextMessages = canonicalChatMessages([...conversation.messages, message]);
     return {
       ...conversation,
-      preview: conversationPreview(nextMessages, message.content),
+preview: conversationPreview(nextMessages, message.content),
+      previewOrigin: message.messageOrigin,
       time: '刚刚',
       unread: 0,
       messages: nextMessages,
@@ -465,6 +477,7 @@ function confirmSentMessage(conversations: Conversation[], conversationId: strin
       ...conversation,
       id: nextMessage.conversationId,
       preview: nextMessage.content,
+      previewOrigin: nextMessage.messageOrigin,
       time: '刚刚',
       unread: 0,
       receiverId: nextMessage.receiverId ?? conversation.receiverId,
@@ -488,6 +501,7 @@ function createPendingMessage(conversation: Conversation, content: string, curre
     chatType: conversation.chatType,
     contentType: 'text',
     content,
+    messageOrigin: 'human',
     sendTime: now,
     direction: 'outgoing',
     status: 'sending',
@@ -532,6 +546,11 @@ function serverMessageToChatMessage(message: ServerMessage, currentUserId: strin
     chatType: message.chatType,
     contentType: message.contentType,
     content: message.content,
+    messageOrigin: message.messageOrigin ?? 'human',
+    agentAccountId: message.agentAccountId,
+    triggerServerMsgId: message.triggerServerMsgId,
+    agentRunId: message.agentRunId,
+    allowRecursiveTrigger: message.allowRecursiveTrigger,
     sendTime: message.sendTime,
     createdAt: message.createdAt,
     direction: message.senderId === currentUserId ? 'outgoing' : 'incoming',
@@ -702,4 +721,13 @@ function stableMessageTieBreaker(message: ChatMessage) {
 
 function uniqueStrings(values: string[]) {
   return values.filter((value, index) => value !== '' && values.indexOf(value) === index);
+
+function messageAriaLabel(message: ChatMessage) {
+  if (message.messageOrigin === 'ai') {
+    return `AI Agent 消息：${message.content}`;
+  }
+  if (message.messageOrigin === 'system') {
+    return `系统消息：${message.content}`;
+  }
+  return message.direction === 'outgoing' ? `我发送的消息：${message.content}` : `收到的消息：${message.content}`;
 }

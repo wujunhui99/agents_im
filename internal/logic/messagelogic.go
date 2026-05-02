@@ -17,17 +17,44 @@ const (
 	MessageContentTypeText  = repository.ContentTypeText
 	MessageContentTypeImage = repository.ContentTypeImage
 	MessageContentTypeFile  = repository.ContentTypeFile
+
+	MessageOriginHuman  = repository.MessageOriginHuman
+	MessageOriginAI     = repository.MessageOriginAI
+	MessageOriginSystem = repository.MessageOriginSystem
 )
 
 type GroupMemberLister interface {
 	ListMembers(ctx context.Context, req ListMembersRequest) (ListMembersResponse, error)
 }
 
+type MessageCreatedHook interface {
+	OnMessageCreated(ctx context.Context, input MessageCreatedHookInput) error
+}
+
+type MessageCreatedHookFunc func(ctx context.Context, input MessageCreatedHookInput) error
+
+func (f MessageCreatedHookFunc) OnMessageCreated(ctx context.Context, input MessageCreatedHookInput) error {
+	if f == nil {
+		return nil
+	}
+	return f(ctx, input)
+}
+
+type MessageCreatedHookInput struct {
+	EventID          string
+	OperationID      string
+	TraceID          string
+	Message          Message
+	Deduplicated     bool
+	RecipientUserIDs []string
+}
+
 type MessageLogic struct {
-	repo       repository.MessageRepository
-	userExists UserExistenceChecker
-	groups     GroupMemberLister
-	media      MessageMediaValidator
+	repo               repository.MessageRepository
+	userExists         UserExistenceChecker
+	groups             GroupMemberLister
+	media              MessageMediaValidator
+	messageCreatedHook MessageCreatedHook
 }
 
 type MessageMediaValidator interface {
@@ -53,18 +80,30 @@ func (l *MessageLogic) WithMediaValidator(media MessageMediaValidator) *MessageL
 	return l
 }
 
+func (l *MessageLogic) SetMessageCreatedHook(hook MessageCreatedHook) {
+	if l == nil {
+		return
+	}
+	l.messageCreatedHook = hook
+}
+
 type Message = repository.Message
 
 type ConversationSeqState = repository.ConversationSeqState
 
 type SendMessageRequest struct {
-	SenderID    string `json:"senderId"`
-	ReceiverID  string `json:"receiverId"`
-	GroupID     string `json:"groupId"`
-	ChatType    string `json:"chatType"`
-	ClientMsgID string `json:"clientMsgId"`
-	ContentType string `json:"contentType"`
-	Content     string `json:"content"`
+	SenderID              string `json:"senderId"`
+	ReceiverID            string `json:"receiverId"`
+	GroupID               string `json:"groupId"`
+	ChatType              string `json:"chatType"`
+	ClientMsgID           string `json:"clientMsgId"`
+	ContentType           string `json:"contentType"`
+	Content               string `json:"content"`
+	MessageOrigin         string `json:"messageOrigin,omitempty"`
+	AgentAccountID        string `json:"agentAccountId,omitempty"`
+	TriggerServerMsgID    string `json:"triggerServerMsgId,omitempty"`
+	AgentRunID            string `json:"agentRunId,omitempty"`
+	AllowRecursiveTrigger bool   `json:"allowRecursiveTrigger,omitempty"`
 }
 
 type SendMessageResponse struct {
@@ -139,10 +178,23 @@ func (l *MessageLogic) SendMessage(ctx context.Context, req SendMessageRequest) 
 		metricsStatus = "deduplicated"
 	}
 
+	recipientUserIDs := repository.DeliveryRecipientUserIDs(input)
+	if l.messageCreatedHook != nil {
+		if err := l.messageCreatedHook.OnMessageCreated(ctx, MessageCreatedHookInput{
+			EventID:          messageCreatedHookEventID(message),
+			Message:          message.Clone(),
+			Deduplicated:     deduplicated,
+			RecipientUserIDs: append([]string(nil), recipientUserIDs...),
+		}); err != nil {
+			metricsStatus = "failed"
+			return SendMessageResponse{}, err
+		}
+	}
+
 	return SendMessageResponse{
 		Message:          message,
 		Deduplicated:     deduplicated,
-		RecipientUserIDs: repository.DeliveryRecipientUserIDs(input),
+		RecipientUserIDs: recipientUserIDs,
 	}, nil
 }
 
@@ -259,6 +311,9 @@ func (l *MessageLogic) normalizeSendMessage(ctx context.Context, req SendMessage
 		ContentType: contentType,
 		Content:     content,
 	}
+	if err := l.applyMessageOriginMetadata(&input, req); err != nil {
+		return repository.CreateMessageInput{}, err
+	}
 
 	switch chatType {
 	case MessageChatTypeSingle:
@@ -334,6 +389,36 @@ func (l *MessageLogic) normalizeMessageContent(ctx context.Context, senderID str
 	default:
 		return "", "", apperror.InvalidArgument("content_type must be text, image, or file")
 	}
+}
+
+func (l *MessageLogic) applyMessageOriginMetadata(input *repository.CreateMessageInput, req SendMessageRequest) error {
+	origin := strings.ToLower(strings.TrimSpace(req.MessageOrigin))
+	if origin == "" {
+		origin = MessageOriginHuman
+	}
+	switch origin {
+	case MessageOriginHuman, MessageOriginAI, MessageOriginSystem:
+	default:
+		return apperror.InvalidArgument("message_origin must be human, ai, or system")
+	}
+	input.MessageOrigin = origin
+	input.AgentAccountID = strings.TrimSpace(req.AgentAccountID)
+	input.TriggerServerMsgID = strings.TrimSpace(req.TriggerServerMsgID)
+	input.AgentRunID = strings.TrimSpace(req.AgentRunID)
+	input.AllowRecursiveTrigger = req.AllowRecursiveTrigger
+	if origin != MessageOriginAI {
+		if input.AgentAccountID != "" || input.TriggerServerMsgID != "" || input.AgentRunID != "" || input.AllowRecursiveTrigger {
+			return apperror.InvalidArgument("agent metadata is only allowed for ai messages")
+		}
+		return nil
+	}
+	if input.AgentAccountID == "" {
+		input.AgentAccountID = input.SenderID
+	}
+	if input.AgentAccountID != input.SenderID {
+		return apperror.InvalidArgument("agent_account_id must match sender_id for ai messages")
+	}
+	return nil
 }
 
 func (l *MessageLogic) ensureUserExists(ctx context.Context, userID string) error {
@@ -451,4 +536,11 @@ func normalizePullRange(fromSeq, toSeq int64, limit int, order string) (int64, i
 		return 0, 0, 0, "", apperror.InvalidArgument("order must be asc or desc")
 	}
 	return fromSeq, toSeq, limit, order, nil
+}
+
+func messageCreatedHookEventID(message Message) string {
+	if strings.TrimSpace(message.ServerMsgID) == "" {
+		return ""
+	}
+	return "message.created:" + message.ServerMsgID
 }

@@ -73,6 +73,11 @@ Gateway writes server push events as WebSocket JSON frames with no `request_id`,
     "chat_type": "single",
     "content_type": "text",
     "content": "hello",
+    "message_origin": "human",
+    "agent_account_id": "",
+    "trigger_server_msg_id": "",
+    "agent_run_id": "",
+    "allow_recursive_trigger": false,
     "content_metadata": {
       "encoding": "plain"
     },

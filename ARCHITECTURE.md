@@ -58,6 +58,8 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 第一阶段不新增独立 `media-api` 进程；媒体上传意图、上传完成校验、下载 URL 和头像绑定作为受保护 REST 路由挂在 `user-api` 上。`user-api` 负责创建私有对象存储 bucket、生成后端控制的 object key、签发上传/下载 URL，并把媒体元数据写入 PostgreSQL `media_objects`。Message API/RPC/Gateway 只验证媒体元数据的 owner、purpose、status、content type 和 size，不直接访问对象存储。
 
+负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为后续 Kafka、Message Transfer、Push 服务提供可靠事件源。这里的 `user_id` 是 V0 account id alias。消息持久化包含 `message_origin=human|ai|system`；Agent/AI 写回消息还记录 `agent_account_id`、`trigger_server_msg_id`、`agent_run_id` 和递归策略。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)、[`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md) 和 [`docs/design-docs/agent-conversation-hosting.md`](./docs/design-docs/agent-conversation-hosting.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
+
 ### Message Transfer Worker
 
 负责消费 Message Outbox 或 Kafka/Redpanda 中的 `message.accepted` 事件，并通过 Delivery Dispatcher 触发在线投递、离线推送或后续 delivery ACK 流程。第一阶段提供独立入口 `cmd/message-transfer`；默认可使用 in-memory consumer/noop dispatcher，不依赖真实 Kafka、Redpanda、PostgreSQL outbox 或 Gateway fanout。Kafka consumer adapter 消费 `message.events.v1`，将 canonical `messaging.MessageEvent` 映射为 worker `Envelope`，成功处理后提交 offset，retry/failed hook 保留给后续 retry topic 或 dead-letter policy。当前已提供 `internal/transfer/gateway` 适配器，将 Transfer worker 的 `DeliveryDispatcher` 接口桥接到 Gateway `delivery.Dispatcher` 契约，用于本进程内 Gateway 投递集成测试和后续共址 wiring；它不实现远程 Gateway 网络调用或 Redis 跨实例路由。MVP 投递可靠性通过 `delivery_attempts` 记录 `accepted`、`published`、`delivered`、`offline`、`failed`，其中 `delivered` 不等于已读；Worker 不拥有消息历史、会话 seq 或已读状态，这些仍由 Message Service 和 PostgreSQL 权威维护。设计见 [`docs/design-docs/message-transfer-worker.md`](./docs/design-docs/message-transfer-worker.md)、[`docs/design-docs/kafka-transfer-consumer.md`](./docs/design-docs/kafka-transfer-consumer.md)、[`docs/design-docs/transfer-gateway-dispatcher.md`](./docs/design-docs/transfer-gateway-dispatcher.md) 和 [`docs/design-docs/message-delivery-reliability.md`](./docs/design-docs/message-delivery-reliability.md)。
@@ -96,7 +98,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - 当前 Python executor 只提供 `internal/agent/pythonexec` 契约和 disabled 默认实现；未配置真实沙箱时必须返回 `ErrPythonExecutorDisabled`，不得在 Go 主服务进程内直接运行 Python 或 shell。
 - 当前 Eino runtime core 只提供 `internal/agentruntime` 本地接口、领域请求/结果类型和 fail-first 归一化校验；不导入 Eino、不调用 LLM、不执行工具、不写回 IM。设计见 [`docs/design-docs/agent-runtime-eino.md`](./docs/design-docs/agent-runtime-eino.md)。
 - Agent 响应必须通过 Message Service 写回 IM，不能绕过 IM 消息链路或直接推送 WebSocket。
-- Agent-IM 第一阶段 Go 契约位于 `internal/agentim`：定义用户私聊 Agent、群聊 @Agent、管理员手动 run 三类触发；`AgentRunOrchestrator` 通过 `RuntimeRequestBuilder` 调用统一的 `internal/agentruntime.Runtime`，响应 writer 只依赖 `MessageLogic.SendMessage` / Message Service seam，并通过 Agent 消息元数据默认阻止递归触发。
+- Agent-IM 第一阶段 Go 契约位于 `internal/agentim`：定义用户私聊 Agent、群聊 @Agent、管理员手动 run 三类触发；`AgentRunOrchestrator` 通过 `RuntimeRequestBuilder` 调用统一的 `internal/agentruntime.Runtime`，响应 writer 只依赖 `MessageLogic.SendMessage` / Message Service seam，并通过 Agent 消息元数据默认阻止递归触发。Agent 会话托管第一阶段由 `MessageLogic` 的 `MessageCreatedHook` 把已持久化的 `message.created` 快照交给 `ConversationHostingService`，读取 `agent_conversation_hosting` 配置和 `agent_trigger_idempotency`，再通过同一 Message Service 写回 AI 消息。
 
 ### Webhook Dispatcher
 
@@ -151,11 +153,11 @@ Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trac
 ### Agent 响应消息
 
 1. IM Core 产生会话消息事件。
-2. Webhook Dispatcher 将事件投递给 Agent Service。
-3. Agent Service 加载 Agent 配置和上下文。
-4. Agent 根据上下文推理，必要时调用工具。
-5. Agent Service 将响应写回 IM Core。
-6. IM Core 通过消息链路投递给会话成员。
+2. Webhook Dispatcher 或第一阶段 Agent hosting seam 将事件投递给 Agent Service。
+3. Agent Service 根据 hosted conversation 配置、私聊 Agent 或显式目标 Agent 构造 trigger，并用 `event_id/server_msg_id + agent_account_id` 幂等。
+4. Agent Service 加载 Agent 配置和上下文，通过 runtime seam 推理，必要时调用工具。
+5. Agent Service 通过 Message Service / `MessageLogic.SendMessage` 写回 `message_origin=ai` 的普通 IM 消息。
+6. IM Core 通过消息链路投递给会话成员；AI 消息默认不再触发 AI，除非策略和消息 metadata 均显式允许递归。
 
 ## 设计原则
 

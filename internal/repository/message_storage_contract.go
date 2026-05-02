@@ -31,35 +31,45 @@ type MessageStorageRepository interface {
 }
 
 type CreateStoredMessageInput struct {
-	ServerMsgID    string
-	ClientMsgID    string
-	SenderID       string
-	ConversationID string
-	ChatType       string
-	ReceiverID     string
-	GroupID        string
-	ContentType    string
-	Content        []byte
-	PayloadHash    string
-	VisibleUserIDs []string
-	SendTime       time.Time
+	ServerMsgID           string
+	ClientMsgID           string
+	SenderID              string
+	ConversationID        string
+	ChatType              string
+	ReceiverID            string
+	GroupID               string
+	ContentType           string
+	Content               []byte
+	MessageOrigin         string
+	AgentAccountID        string
+	TriggerServerMsgID    string
+	AgentRunID            string
+	AllowRecursiveTrigger bool
+	PayloadHash           string
+	VisibleUserIDs        []string
+	SendTime              time.Time
 }
 
 type StoredMessage struct {
-	ServerMsgID    string
-	ClientMsgID    string
-	SenderID       string
-	ConversationID string
-	Seq            int64
-	ChatType       string
-	ReceiverID     string
-	GroupID        string
-	ContentType    string
-	Content        []byte
-	PayloadHash    string
-	SendTime       time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ServerMsgID           string
+	ClientMsgID           string
+	SenderID              string
+	ConversationID        string
+	Seq                   int64
+	ChatType              string
+	ReceiverID            string
+	GroupID               string
+	ContentType           string
+	Content               []byte
+	MessageOrigin         string
+	AgentAccountID        string
+	TriggerServerMsgID    string
+	AgentRunID            string
+	AllowRecursiveTrigger bool
+	PayloadHash           string
+	SendTime              time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type MessagePullQuery struct {

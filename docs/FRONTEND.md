@@ -33,6 +33,7 @@
 - 同一会话内发送请求未完成时，composer 显示 `发送中` 并禁用输入/按钮；失败消息保留 `发送失败` 状态，不伪造成功。
 - `web/src/models/messages.ts` 定义前端会话与消息模型，发送状态仅用于本地 UI 呈现。
 - `web/src/api/messages.ts` 是消息 REST 薄 adapter，函数签名覆盖 `sendMessage`、`pullMessages`、`getConversationSeqs`、`markRead`，字段名保持与前后端合约一致，并基于统一 `createApiClient`。
+- 消息模型包含 `messageOrigin: human | ai | system` 和 AI metadata；`MessagesPage` 必须用 `AI/Agent` 标签明显标注 `ai` 消息，系统消息使用系统标签。
 - `web/src/api/websocketClient.ts` 是 WebSocket client wrapper，提供 `connect`、`send`、`close`，浏览器侧使用 `/ws?token=***` query fallback，并将后端 snake_case ACK 解析为 typed frontend ACK。
 
 ## 目录

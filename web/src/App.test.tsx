@@ -381,6 +381,10 @@ describe('WeChat-inspired app shell', () => {
                   chatType: 'single',
                   contentType: 'text',
                   content: 'hello alice',
+                  messageOrigin: 'ai',
+                  agentAccountId: 'usr_000002',
+                  triggerServerMsgId: 'srv-human-1',
+                  agentRunId: 'run-app-1',
                   sendTime: 1777464300000,
                   createdAt: 1777464300000,
                 },
@@ -407,6 +411,10 @@ describe('WeChat-inspired app shell', () => {
                 chatType: 'single',
                 contentType: 'text',
                 content: 'hello alice',
+                messageOrigin: 'ai',
+                agentAccountId: 'usr_000002',
+                triggerServerMsgId: 'srv-human-1',
+                agentRunId: 'run-app-1',
                 sendTime: 1777464300000,
                 createdAt: 1777464300000,
               },
@@ -444,6 +452,7 @@ describe('WeChat-inspired app shell', () => {
 
     await user.click(await screen.findByRole('button', { name: /usr_000002/ }));
     expect(await screen.findByText('hello alice')).toBeInTheDocument();
+    expect(await screen.findByText('AI/Agent')).toBeInTheDocument();
 
     await user.type(screen.getByRole('textbox', { name: '输入消息' }), '这是测试消息');
     await user.click(screen.getByRole('button', { name: '发送' }));

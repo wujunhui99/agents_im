@@ -1,5 +1,5 @@
 import { createApiClient, type ApiClient } from './client';
-import type { ChatType, MessageContentType } from '../models/messages';
+import type { ChatType, MessageContentType, MessageOrigin } from '../models/messages';
 
 export type ServerMessage = {
   serverMsgId: string;
@@ -12,6 +12,11 @@ export type ServerMessage = {
   chatType: ChatType;
   contentType: MessageContentType;
   content: string;
+  messageOrigin?: MessageOrigin;
+  agentAccountId?: string;
+  triggerServerMsgId?: string;
+  agentRunId?: string;
+  allowRecursiveTrigger?: boolean;
   sendTime: number;
   createdAt: number;
 };
