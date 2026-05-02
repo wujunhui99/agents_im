@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,6 +48,157 @@ func TestMessageRepositoryContractPostgresOptIn(t *testing.T) {
 }
 
 func runMessageRepositoryContract(t *testing.T, newRepo func(t *testing.T) MessageRepository) {
+	t.Run("concurrent same conversation sends allocate contiguous seqs", func(t *testing.T) {
+		repo := newRepo(t)
+		ctx := context.Background()
+		prefix := messageContractPrefix()
+		const messageCount = 32
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		results := make([]Message, messageCount)
+		errs := make([]error, messageCount)
+		for i := 0; i < messageCount; i++ {
+			i := i
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				input := contractInput(prefix, i+1)
+				message, deduplicated, err := repo.CreateMessageIdempotent(ctx, input)
+				if err != nil {
+					errs[i] = err
+					return
+				}
+				if deduplicated {
+					errs[i] = fmt.Errorf("message %d unexpectedly deduplicated", i+1)
+					return
+				}
+				results[i] = message
+			}()
+		}
+		close(start)
+		wg.Wait()
+
+		for i, err := range errs {
+			if err != nil {
+				t.Fatalf("concurrent create %d: %v", i+1, err)
+			}
+		}
+
+		conversationID := repositoryConversationID(t, results)
+		gotSeqs := make([]int64, 0, messageCount)
+		for _, message := range results {
+			if message.ConversationID != conversationID {
+				t.Fatalf("message conversation_id=%q, want %q", message.ConversationID, conversationID)
+			}
+			gotSeqs = append(gotSeqs, message.Seq)
+		}
+		sort.Slice(gotSeqs, func(i, j int) bool { return gotSeqs[i] < gotSeqs[j] })
+		wantSeqs := make([]int64, 0, messageCount)
+		for seq := int64(1); seq <= messageCount; seq++ {
+			wantSeqs = append(wantSeqs, seq)
+		}
+		if !reflect.DeepEqual(gotSeqs, wantSeqs) {
+			t.Fatalf("allocated seqs = %v, want %v", gotSeqs, wantSeqs)
+		}
+
+		pulled, isEnd, nextSeq, err := repo.GetMessages(ctx, conversationID, 1, 0, messageCount+1, MessageStorageOrderAsc)
+		if err != nil {
+			t.Fatalf("pull after concurrent sends: %v", err)
+		}
+		assertMessageSeqs(t, pulled, wantSeqs)
+		if !isEnd || nextSeq != messageCount+1 {
+			t.Fatalf("pull cursor isEnd=%v nextSeq=%d, want true/%d", isEnd, nextSeq, messageCount+1)
+		}
+
+		state := mustRepositorySeqState(t, repo, ctx, prefix+"_a", conversationID)
+		if state.MaxSeq != messageCount || state.LastMessage == nil || state.LastMessage.Seq != messageCount {
+			t.Fatalf("state should reflect max seq %d, got %+v", messageCount, state)
+		}
+	})
+
+	t.Run("idempotent retry preserves seq without consuming another seq", func(t *testing.T) {
+		repo := newRepo(t)
+		ctx := context.Background()
+		prefix := messageContractPrefix()
+
+		input := contractInput(prefix, 1)
+		first, deduplicated, err := repo.CreateMessageIdempotent(ctx, input)
+		if err != nil {
+			t.Fatalf("first send: %v", err)
+		}
+		if deduplicated || first.Seq != 1 {
+			t.Fatalf("first send message=%+v deduplicated=%v, want seq 1 without dedupe", first, deduplicated)
+		}
+
+		again, deduplicated, err := repo.CreateMessageIdempotent(ctx, input)
+		if err != nil {
+			t.Fatalf("retry send: %v", err)
+		}
+		if !deduplicated || again.ServerMsgID != first.ServerMsgID || again.Seq != first.Seq {
+			t.Fatalf("retry should return original message: first=%+v again=%+v deduplicated=%v", first, again, deduplicated)
+		}
+
+		conflicting := input
+		conflicting.Content = "different payload"
+		_, _, err = repo.CreateMessageIdempotent(ctx, conflicting)
+		assertAppErrorCode(t, err, apperror.CodeAlreadyExists)
+
+		secondInput := contractInput(prefix, 2)
+		second, deduplicated, err := repo.CreateMessageIdempotent(ctx, secondInput)
+		if err != nil {
+			t.Fatalf("second unique send: %v", err)
+		}
+		if deduplicated || second.Seq != 2 {
+			t.Fatalf("second unique send message=%+v deduplicated=%v, want seq 2 without dedupe", second, deduplicated)
+		}
+
+		pulled, _, _, err := repo.GetMessages(ctx, first.ConversationID, 1, 0, 10, MessageStorageOrderAsc)
+		if err != nil {
+			t.Fatalf("pull after idempotent retry: %v", err)
+		}
+		assertMessageSeqs(t, pulled, []int64{1, 2})
+	})
+
+	t.Run("last message state follows max seq instead of latest timestamp", func(t *testing.T) {
+		repo := newRepo(t)
+		ctx := context.Background()
+		prefix := messageContractPrefix()
+
+		firstInput := contractInput(prefix, 1)
+		secondInput := contractInput(prefix, 2)
+		firstInput.SenderID = prefix + "_a"
+		firstInput.ReceiverID = prefix + "_b"
+		firstInput.ParticipantUserIDs = []string{prefix + "_a", prefix + "_b"}
+		secondInput.SenderID = prefix + "_a"
+		secondInput.ReceiverID = prefix + "_b"
+		secondInput.ParticipantUserIDs = firstInput.ParticipantUserIDs
+		secondInput.Content = "seq two but older timestamp"
+
+		setRepositoryNow(repo, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
+		first, _, err := repo.CreateMessageIdempotent(ctx, firstInput)
+		if err != nil {
+			t.Fatalf("first send: %v", err)
+		}
+		setRepositoryNow(repo, time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC))
+		second, _, err := repo.CreateMessageIdempotent(ctx, secondInput)
+		if err != nil {
+			t.Fatalf("second send: %v", err)
+		}
+		if first.SendTime <= second.SendTime {
+			t.Fatalf("test setup expected second send_time before first: first=%d second=%d", first.SendTime, second.SendTime)
+		}
+
+		state := mustRepositorySeqState(t, repo, ctx, prefix+"_b", first.ConversationID)
+		if state.MaxSeq != 2 || state.LastMessage == nil || state.LastMessage.ServerMsgID != second.ServerMsgID {
+			t.Fatalf("last message should be max seq message, state=%+v second=%+v", state, second)
+		}
+		if state.MaxSeqTime != second.SendTime {
+			t.Fatalf("max seq time = %d, want second seq send_time %d", state.MaxSeqTime, second.SendTime)
+		}
+	})
+
 	t.Run("pagination order range and malicious order", func(t *testing.T) {
 		repo := newRepo(t)
 		ctx := context.Background()
@@ -295,6 +447,41 @@ func assertAppErrorCode(t *testing.T, err error, want apperror.Code) {
 	}
 	if got := apperror.From(err).Code; got != want {
 		t.Fatalf("error code = %s from %v, want %s", got, err, want)
+	}
+}
+
+func repositoryConversationID(t *testing.T, messages []Message) string {
+	t.Helper()
+
+	if len(messages) == 0 {
+		t.Fatal("messages is empty")
+	}
+	conversationID := messages[0].ConversationID
+	if conversationID == "" {
+		t.Fatal("first message conversation id is empty")
+	}
+	return conversationID
+}
+
+func mustRepositorySeqState(t *testing.T, repo MessageRepository, ctx context.Context, userID string, conversationID string) ConversationSeqState {
+	t.Helper()
+
+	states, err := repo.GetConversationSeqStates(ctx, userID, []string{conversationID})
+	if err != nil {
+		t.Fatalf("get conversation seq state: %v", err)
+	}
+	if len(states) != 1 {
+		t.Fatalf("got %d states, want 1: %+v", len(states), states)
+	}
+	return states[0]
+}
+
+func setRepositoryNow(repo MessageRepository, now time.Time) {
+	switch r := repo.(type) {
+	case *MemoryMessageRepository:
+		r.now = func() time.Time { return now }
+	case *PostgresMessageRepository:
+		r.now = func() time.Time { return now }
 	}
 }
 
