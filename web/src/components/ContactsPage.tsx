@@ -16,6 +16,7 @@ type Friend = {
   identifier: string;
   initial: string;
   avatar: string;
+  profile?: UserProfile;
 };
 
 type ContactEntry = {
@@ -98,9 +99,8 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
     }
 
     setOpeningFriendId(friend.userId);
-    setFriendStatus(`正在打开 ${friend.identifier} 的聊天`);
     try {
-      const profile = await userApi.getPublicProfileByIdentifier(friend.identifier);
+      const profile = friend.profile ?? friendToUserProfile(friend);
       onStartChat(profile);
       setFriendStatus(`已打开 ${profileDisplayName(profile)} 的聊天`);
     } catch (error) {
@@ -320,11 +320,24 @@ function userProfileToFriend(profile: UserProfile): Friend {
     identifier: profile.identifier,
     initial: avatarText(name).slice(0, 1),
     avatar: avatarText(name),
+    profile,
   };
 }
 
 function friendshipToFriend(friendship: Friendship): Friend {
   return userProfileToFriend(friendshipToUserProfile(friendship));
+}
+
+function friendToUserProfile(friend: Friend): UserProfile {
+  return {
+    user_id: friend.userId,
+    identifier: friend.identifier,
+    display_name: friend.name,
+    name: friend.name,
+    gender: '',
+    age: 0,
+    region: '',
+  };
 }
 
 function friendshipToUserProfile(friendship: Friendship): UserProfile {

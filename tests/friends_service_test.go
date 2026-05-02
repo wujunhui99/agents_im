@@ -46,6 +46,9 @@ func TestFriendsLogicAddDuplicateDeleteAndList(t *testing.T) {
 	if len(aliceList.Friends) != 1 || aliceList.Friends[0].FriendID != bob.UserID {
 		t.Fatalf("unexpected alice friends: %+v", aliceList.Friends)
 	}
+	if aliceList.Friends[0].Friend == nil || aliceList.Friends[0].Friend.Identifier != bob.Identifier {
+		t.Fatalf("alice friend list should include bob profile: %+v", aliceList.Friends[0])
+	}
 
 	bobList, err := friendsLogic.ListFriends(ctx, logic.ListFriendsRequest{UserID: bob.UserID})
 	if err != nil {
@@ -195,6 +198,9 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 	decodeEnvelope(t, listResp.Body.Bytes(), &list)
 	if len(list.Data.Friends) != 1 || list.Data.Friends[0].FriendID != bob.UserID {
 		t.Fatalf("unexpected list response: %+v", list.Data.Friends)
+	}
+	if list.Data.Friends[0].Friend.UserID != bob.UserID || list.Data.Friends[0].Friend.Identifier != bob.Identifier {
+		t.Fatalf("list response should include friend profile for chat open: %+v", list.Data.Friends[0])
 	}
 
 	getResp := httptest.NewRecorder()

@@ -23,12 +23,13 @@ func NewFriendsLogic(repo repository.FriendshipRepository, users UserLookup) *Fr
 }
 
 type FriendshipView struct {
-	UserID    string `json:"user_id"`
-	FriendID  string `json:"friend_id"`
-	Status    string `json:"status"`
-	IsFriend  bool   `json:"is_friend"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	UserID    string       `json:"user_id"`
+	FriendID  string       `json:"friend_id"`
+	Status    string       `json:"status"`
+	IsFriend  bool         `json:"is_friend"`
+	Friend    *UserProfile `json:"friend,omitempty"`
+	CreatedAt string       `json:"created_at"`
+	UpdatedAt string       `json:"updated_at"`
 }
 
 type AddFriendRequest struct {
@@ -127,7 +128,13 @@ func (l *FriendsLogic) ListFriends(ctx context.Context, req ListFriendsRequest) 
 
 	friends := make([]FriendshipView, 0, len(friendships))
 	for _, friendship := range friendships {
-		friends = append(friends, toFriendshipView(friendship))
+		view := toFriendshipView(friendship)
+		if profile, profileErr := l.lookupFriendProfile(ctx, friendship.FriendID); profileErr == nil {
+			view.Friend = &profile
+		} else {
+			return ListFriendsResponse{}, profileErr
+		}
+		friends = append(friends, view)
 	}
 
 	return ListFriendsResponse{Friends: friends}, nil
@@ -166,12 +173,15 @@ func (l *FriendsLogic) ensureUsersExist(ctx context.Context, userID string, frie
 	return l.ensureUserExists(ctx, friendID)
 }
 
-func (l *FriendsLogic) ensureUserExists(ctx context.Context, userID string) error {
+func (l *FriendsLogic) lookupFriendProfile(ctx context.Context, userID string) (UserProfile, error) {
 	if l.users == nil {
-		return apperror.Internal("user lookup is not configured")
+		return UserProfile{}, apperror.Internal("user lookup is not configured")
 	}
+	return l.users.GetUserByID(ctx, GetUserByIDRequest{UserID: userID})
+}
 
-	_, err := l.users.GetUserByID(ctx, GetUserByIDRequest{UserID: userID})
+func (l *FriendsLogic) ensureUserExists(ctx context.Context, userID string) error {
+	_, err := l.lookupFriendProfile(ctx, userID)
 	return err
 }
 
