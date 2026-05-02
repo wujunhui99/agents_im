@@ -1,4 +1,5 @@
 import { createApiClient, type ApiClient } from './client';
+import type { UserProfile } from './user';
 
 export type Friendship = {
   user_id: string;
@@ -7,6 +8,15 @@ export type Friendship = {
   is_friend: boolean;
   created_at: string;
   updated_at: string;
+  friend?: Partial<UserProfile>;
+  friend_profile?: Partial<UserProfile>;
+  profile?: Partial<UserProfile>;
+  identifier?: string;
+  display_name?: string;
+  name?: string;
+  friend_identifier?: string;
+  friend_display_name?: string;
+  friend_name?: string;
 };
 
 export type ListFriendsData = {

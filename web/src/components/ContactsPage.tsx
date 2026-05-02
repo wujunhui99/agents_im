@@ -40,10 +40,8 @@ const contactEntries: ContactEntry[] = [
   { id: 'official', label: '公众号', helper: '系统通知与服务号暂未开放', accent: 'gray', icon: Megaphone, available: false },
 ];
 
-let cachedFriends: Friend[] = [];
-
 function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsApi(), onStartChat }: ContactsPageProps) {
-  const [friends, setFriends] = useState<Friend[]>(() => cachedFriends);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [friendStatus, setFriendStatus] = useState('正在加载好友列表');
 
   useEffect(() => {
@@ -57,7 +55,6 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
           return;
         }
         const nextFriends = response.friends.map(friendshipToFriend);
-        cachedFriends = nextFriends;
         setFriends(nextFriends);
         setFriendStatus(response.friends.length > 0 ? `已加载 ${response.friends.length} 位好友` : '暂无好友');
       } catch (error) {
@@ -78,7 +75,6 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
     try {
       const response = await contactsApi.listFriends();
       const nextFriends = response.friends.map(friendshipToFriend);
-      cachedFriends = nextFriends;
       setFriends(nextFriends);
       setFriendStatus(response.friends.length > 0 ? `已加载 ${response.friends.length} 位好友` : '暂无好友');
     } catch (error) {
@@ -90,7 +86,6 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
     await contactsApi.addFriend(profile.user_id);
     setFriends((current) => {
       const nextFriends = upsertFriend(current, userProfileToFriend(profile));
-      cachedFriends = nextFriends;
       return nextFriends;
     });
     setFriendStatus(`已添加好友：${profile.identifier}`);
@@ -310,13 +305,33 @@ function friendToUserProfile(friend: Friend): UserProfile {
 }
 
 function friendshipToFriend(friendship: Friendship): Friend {
-  const name = friendship.friend_id;
+  return userProfileToFriend(friendshipToUserProfile(friendship));
+}
+
+function friendshipToUserProfile(friendship: Friendship): UserProfile {
+  const profile = friendship.friend ?? friendship.friend_profile ?? friendship.profile ?? {};
+  const userId = profile.user_id || friendship.friend_id;
+  const identifier = profile.identifier || friendship.friend_identifier || friendship.identifier || userId;
+  const displayName =
+    profile.display_name ||
+    profile.name ||
+    friendship.friend_display_name ||
+    friendship.friend_name ||
+    friendship.display_name ||
+    friendship.name ||
+    identifier;
+
   return {
-    userId: friendship.friend_id,
-    name,
-    identifier: friendship.friend_id,
-    initial: avatarText(name).slice(0, 1),
-    avatar: avatarText(name),
+    user_id: userId,
+    identifier,
+    display_name: displayName,
+    name: profile.name || displayName,
+    gender: profile.gender ?? '',
+    age: profile.age ?? 0,
+    region: profile.region ?? '',
+    account_type: profile.account_type,
+    created_at: profile.created_at,
+    updated_at: profile.updated_at,
   };
 }
 
