@@ -131,13 +131,28 @@ type FriendPathReq struct {
 	UserID string `path:"user_id"`
 }
 
+type FriendProfile struct {
+	UserID        string `json:"user_id"`
+	Identifier    string `json:"identifier"`
+	DisplayName   string `json:"display_name"`
+	Name          string `json:"name"`
+	Gender        string `json:"gender"`
+	Age           int32  `json:"age"`
+	Region        string `json:"region"`
+	AccountType   string `json:"account_type"`
+	AvatarMediaID string `json:"avatar_media_id"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
+}
+
 type Friendship struct {
-	UserID    string `json:"user_id"`
-	FriendID  string `json:"friend_id"`
-	Status    string `json:"status"`
-	IsFriend  bool   `json:"is_friend"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	UserID    string        `json:"user_id"`
+	FriendID  string        `json:"friend_id"`
+	Status    string        `json:"status"`
+	IsFriend  bool          `json:"is_friend"`
+	Friend    FriendProfile `json:"friend,optional"`
+	CreatedAt string        `json:"created_at"`
+	UpdatedAt string        `json:"updated_at"`
 }
 
 type FriendshipData struct {
