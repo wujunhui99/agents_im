@@ -1,8 +1,8 @@
 syntax = "v1"
 
 info (
-	title:   "User API"
-	desc:    "User profile service HTTP API"
+	title:   "Account API"
+	desc:    "Account profile service HTTP API; V0 keeps /users compatibility and exposes /accounts aliases."
 	author:  "Codex"
 	version: "v0.1.0"
 )
@@ -16,6 +16,7 @@ type User {
 	Age         int32  `json:"age"`
 	Region      string `json:"region"`
 	AccountType string `json:"account_type"`
+	AvatarMediaID string `json:"avatar_media_id"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
@@ -37,6 +38,10 @@ type UpdateMeReq {
 	Gender      string `json:"gender,optional"`
 	Age         int32  `json:"age,optional"`
 	Region      string `json:"region,optional"`
+}
+
+type UpdateMeAvatarReq {
+	MediaID string `json:"mediaId"`
 }
 
 type GetMeReq {
@@ -77,6 +82,9 @@ service user-api {
 
 	@handler updateMe
 	patch /me (UpdateMeReq) returns (UserResp)
+
+	@handler updateMeAvatar
+	patch /me/avatar (UpdateMeAvatarReq) returns (UserResp)
 }
 
 @server (
@@ -86,9 +94,18 @@ service user-api {
 	@handler createUser
 	post /users (CreateUserReq) returns (UserResp)
 
+	@handler createAccount
+	post /accounts (CreateUserReq) returns (UserResp)
+
 	@handler existsUser
 	get /users/exists (ExistsReq) returns (ExistsResp)
 
+	@handler existsAccount
+	get /accounts/exists (ExistsReq) returns (ExistsResp)
+
 	@handler getUserByIdentifier
 	get /users/:identifier (GetUserByIdentifierReq) returns (UserResp)
+
+	@handler getAccountByIdentifier
+	get /accounts/:identifier (GetUserByIdentifierReq) returns (UserResp)
 }

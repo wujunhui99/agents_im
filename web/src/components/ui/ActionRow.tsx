@@ -1,5 +1,7 @@
 import { Bell, ChevronRight, MoreHorizontal, UsersRound } from 'lucide-react';
 import type { ComponentType } from 'react';
+import { Badge } from './Badge';
+import { ListItem } from './ListItem';
 
 type Accent = 'green' | 'blue' | 'purple' | 'orange' | 'gray';
 
@@ -16,19 +18,22 @@ export function ActionRow({ label, helper, accent, badge, icon, trailingIcon: Tr
   const LeadingIcon = icon ?? defaultIconForAccent(accent);
 
   return (
-    <article className="action-row">
-      <div className={`action-icon action-${accent}`}>
-        <LeadingIcon size={19} />
-      </div>
-      <div className="row-main">
-        <strong>{label}</strong>
-        <p>{helper}</p>
-      </div>
-      <div className="row-trailing">
-        {badge ? <span className="row-badge">{badge}</span> : null}
-        <TrailingIcon size={18} />
-      </div>
-    </article>
+    <ListItem
+      className="action-row"
+      leading={
+        <div className={`action-icon action-${accent}`}>
+          <LeadingIcon size={19} />
+        </div>
+      }
+      headline={label}
+      supportingText={helper}
+      trailing={
+        <>
+          {badge ? <Badge className="row-badge">{badge}</Badge> : null}
+          <TrailingIcon size={18} />
+        </>
+      }
+    />
   );
 }
 

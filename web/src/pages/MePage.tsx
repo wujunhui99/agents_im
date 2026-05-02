@@ -3,7 +3,10 @@ import { Settings } from 'lucide-react';
 import type { UserProfile, UserProfilePatch } from '../api/user';
 import { ActionRow } from '../components/ui/ActionRow';
 import { Avatar } from '../components/ui/Avatar';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
 import { ListCard } from '../components/ui/ListCard';
+import { TextField } from '../components/ui/TextField';
 
 type ProfileDraft = {
   display_name: string;
@@ -55,17 +58,17 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
 
   return (
     <div className="page-stack me-page">
-      <section className="profile-card">
+      <Card className="profile-card" variant="elevated">
         <Avatar label={profileInitial(profile)} color="green" size="large" />
         <div className="profile-main">
           <strong>{profile.display_name}</strong>
           <p>账号：{profile.identifier}</p>
           <p>地区：{profile.region}</p>
         </div>
-        <button type="button" className="profile-edit-button" aria-label="编辑个人资料" onClick={() => setIsEditing(true)}>
+        <Button variant="tonal" size="small" className="profile-edit-button" aria-label="编辑个人资料" onClick={() => setIsEditing(true)}>
           <span>编辑资料</span>
-        </button>
-      </section>
+        </Button>
+      </Card>
 
       <ListCard ariaLabel="个人资料详情" className="profile-detail-card">
         <dl className="profile-detail-list">
@@ -99,48 +102,40 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
       {isEditing ? (
         <ListCard ariaLabel="编辑个人资料" className="profile-edit-card">
           <form className="profile-edit-form" onSubmit={handleSubmit}>
-            <label className="profile-field">
-              <span>display_name</span>
-              <input
-                aria-label="display_name"
-                value={draft.display_name}
-                onChange={(event) => setDraft((current) => ({ ...current, display_name: event.target.value }))}
-              />
-            </label>
-            <label className="profile-field">
-              <span>gender</span>
-              <input
-                aria-label="gender"
-                value={draft.gender}
-                onChange={(event) => setDraft((current) => ({ ...current, gender: event.target.value }))}
-              />
-            </label>
-            <label className="profile-field">
-              <span>age</span>
-              <input
-                aria-label="age"
-                type="number"
-                min="0"
-                value={draft.age}
-                onChange={(event) => setDraft((current) => ({ ...current, age: event.target.value }))}
-              />
-            </label>
-            <label className="profile-field">
-              <span>region</span>
-              <input
-                aria-label="region"
-                value={draft.region}
-                onChange={(event) => setDraft((current) => ({ ...current, region: event.target.value }))}
-              />
-            </label>
+            <TextField
+              label="display_name"
+              value={draft.display_name}
+              onChange={(event) => setDraft((current) => ({ ...current, display_name: event.target.value }))}
+              fieldClassName="profile-field"
+            />
+            <TextField
+              label="gender"
+              value={draft.gender}
+              onChange={(event) => setDraft((current) => ({ ...current, gender: event.target.value }))}
+              fieldClassName="profile-field"
+            />
+            <TextField
+              label="age"
+              type="number"
+              min="0"
+              value={draft.age}
+              onChange={(event) => setDraft((current) => ({ ...current, age: event.target.value }))}
+              fieldClassName="profile-field"
+            />
+            <TextField
+              label="region"
+              value={draft.region}
+              onChange={(event) => setDraft((current) => ({ ...current, region: event.target.value }))}
+              fieldClassName="profile-field"
+            />
             {error ? <p className="form-error">{error}</p> : null}
             <div className="profile-form-actions">
-              <button type="button" className="secondary-button" onClick={cancelEdit}>
+              <Button variant="tonal" className="secondary-button" onClick={cancelEdit}>
                 取消
-              </button>
-              <button type="submit" className="primary-button" disabled={isSaving}>
+              </Button>
+              <Button type="submit" className="primary-button" disabled={isSaving}>
                 {isSaving ? '保存中' : '保存'}
-              </button>
+              </Button>
             </div>
           </form>
         </ListCard>

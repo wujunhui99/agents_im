@@ -87,6 +87,11 @@ The canonical Go contract is [`../../internal/messaging/event.go`](../../interna
     "receiver_ids": ["user_b"],
     "content_type": "text",
     "content": {"text": "hello"},
+    "message_origin": "human",
+    "agent_account_id": "",
+    "trigger_server_msg_id": "",
+    "agent_run_id": "",
+    "allow_recursive_trigger": false,
     "trace_id": "trace_..."
   }
 }
@@ -106,7 +111,7 @@ created_at
 payload
 ```
 
-`message.accepted` requires `server_msg_id`, positive `seq`, and `sender_id`. `message.read` can leave message-specific fields empty and uses `payload.user_id`, `payload.has_read_seq`, and `payload.read_at`.
+`message.accepted` requires `server_msg_id`, positive `seq`, and `sender_id`. The payload carries Message Service origin metadata (`message_origin=human|ai|system` plus Agent metadata for AI messages) so downstream Transfer/Gateway consumers can label and route without querying message storage. `message.read` can leave message-specific fields empty and uses `payload.user_id`, `payload.has_read_seq`, and `payload.read_at`.
 
 ## Event Types
 

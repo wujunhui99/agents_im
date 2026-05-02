@@ -4,14 +4,14 @@
 
 ## 背景
 
-`auth` 是认证边界，负责注册、登录、密码哈希和 token 签发。`user` 已提供用户资料权威能力，`auth` 注册流程必须依赖 `user-rpc` 的 `ExistsByIdentifier` 和 `CreateUser`，但不能把密码、密码哈希、salt、验证码或第三方登录凭据写入 `user` 模型或响应。
+`auth` 是认证边界，负责注册、登录、密码哈希和 token 签发。Account Service 已提供账号资料权威能力，`auth` 注册流程必须依赖 V0 `user-rpc` 的 `ExistsByIdentifier` 和 `CreateUser`，但不能把密码、密码哈希、salt、验证码或第三方登录凭据写入 Account profile 模型或响应。
 
 ## 目标
 
 - 支持账号密码注册。
 - 支持账号密码登录。
 - 注册前按唯一标识符检查账号是否已存在。
-- 注册成功时创建 user 资料，并在 auth 内部保存密码哈希与 salt。
+- 注册成功时创建 account 资料，并在 auth 内部保存密码哈希与 salt。
 - 登录成功后签发带过期时间的 JWT access token。
 - 提供 token 校验接口，便于后续 gateway 或其他服务验证登录态。
 - 为手机号验证码、微信扫码登录等后续方式保留扩展点，但第一阶段不实现。
@@ -21,17 +21,17 @@
 - 不实现手机号验证码注册或登录。
 - 不实现微信扫码、OAuth 或第三方登录。
 - 不实现密码找回、多因素认证、设备管理、刷新 token 或登出黑名单。
-- 不维护用户展示资料、好友关系或群成员关系。
-- 不把 `password`、`password_hash`、`salt` 等认证秘密写入 `user` 服务。
+- 不维护账号展示资料、好友关系或群成员关系。
+- 不把 `password`、`password_hash`、`salt` 等认证秘密写入 Account Service。
 
 ## 用户场景
 
 ### 账号密码注册
 
 1. 客户端提交 `identifier`、`password`，可选提交 `display_name`、`name`、`gender`、`age`、`region`。
-2. `auth` 调用或适配 `user` 的 `ExistsByIdentifier`。
+2. `auth` 调用或适配 Account Service 的 `ExistsByIdentifier`。
 3. 如果唯一标识符已存在，注册失败。
-4. 如果不存在，`auth` 调用或适配 `user` 的 `CreateUser` 创建基础资料。
+4. 如果不存在，`auth` 调用或适配 Account Service 的 `CreateUser` 创建基础资料。
 5. `auth` 生成 salt 和 password_hash，并仅在 auth 内部保存认证记录。
 6. `auth` 签发 token 并返回 `user_id`、`identifier`、`token`、`expires_at`。
 
@@ -39,7 +39,7 @@
 
 - 重复 `identifier` 返回明确冲突错误。
 - 注册响应不包含明文密码、密码哈希或 salt。
-- `user` 模型与 user 响应不出现任何认证秘密字段。
+- Account profile 模型与 Account Service 响应不出现任何认证秘密字段。
 - 注册成功后可用返回 token 通过 auth token 校验。
 
 ### 账号密码登录

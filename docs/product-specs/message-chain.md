@@ -25,34 +25,85 @@ The first contract intentionally does not require:
 - offline push notification implementation;
 - per-device sync state;
 - message recall/delete;
-- reactions, edits, typing, mentions, rich media processing;
+- reactions, edits, typing, mentions;
 - end-to-end encryption;
 - distributed database sharding.
 
 These should remain compatible with the interface contract but are not part of the first implementation.
 
-## Users and actors
+## Accounts and actors
 
-- Sender: authenticated user sending a message.
-- Receiver: user receiving a single-chat message.
-- Group member: user receiving or sending messages in a group.
+- Sender: authenticated account sending a message.
+- Receiver: account receiving a single-chat message.
+- Group member: account receiving or sending messages in a group.
 - Client: mobile/web/desktop app. Phase 1 can use HTTP APIs instead of WebSocket.
 - Message service: service owning message sequence, message persistence, and read state.
+
+V0 `user_id`, `sender_id`, `receiver_id`, and read-state `user_id` fields are account id aliases. They point to Account Service profiles and are kept for frontend/API compatibility.
 
 ## Chat types
 
 Phase 1 supports:
 
-1. Single chat: user-to-user messages.
-2. Group chat: user-to-group messages.
+1. Single chat: account-to-account messages.
+2. Group chat: account-to-group messages.
 
 ## Message content
 
-Phase 1 supports text messages only at product level.
+Phase 1 supports these `content_type` values:
+
+- `text`
+- `image`
+- `file`
 
 Future message content types should be versioned through `content_type` and `content` without changing sequence/read contracts.
 
 Text `content` must be non-empty after trimming and must be 4096 characters or fewer.
+
+Image and file messages are media-backed. The binary object is uploaded through the Media API first, then the message references a ready media object. Message send must reject image/file content unless the media object:
+
+- exists in `media_objects`;
+- is owned by the authenticated sender;
+- has `status=ready`;
+- has the matching `purpose`;
+- satisfies the documented MIME type and size limit.
+
+Image message `content` is a JSON string with at least:
+
+```json
+{
+  "mediaId": "med_000001",
+  "width": 1080,
+  "height": 720
+}
+```
+
+`width` and `height` are optional in the message payload because the authoritative dimensions are stored on the media object when provided at upload-intent time. The referenced media object must have `purpose=message_image`, an allowed image MIME type, and `size_bytes <= 10 MiB`.
+
+File message `content` is a JSON string with:
+
+```json
+{
+  "mediaId": "med_000002",
+  "filename": "report.pdf",
+  "sizeBytes": 123456,
+  "contentType": "application/pdf"
+}
+```
+
+The referenced media object must have `purpose=message_file`, `status=ready`, `size_bytes <= 100 MiB`, and the message `filename`, `sizeBytes`, and `contentType` metadata must match the media record. HTML and SVG are not allowed as first-phase file/image content types for inline rendering safety.
+
+Avatar uploads use the same media storage but are bound through `/me/avatar`, not through message content.
+
+## Message origin
+
+Every persisted message exposes `message_origin`:
+
+- `human`: normal human account sends. This is the default for public send APIs.
+- `ai`: Agent/AI automatic reply. AI messages must be written through Message Service and carry `agent_account_id`, `trigger_server_msg_id`, `agent_run_id`, and `allow_recursive_trigger`.
+- `system`: system prompt/status message. System messages are visible as system-origin messages and do not carry Agent metadata.
+
+Agent/AI code must not insert `messages` rows directly. A successful AI reply has the same durable identity, conversation `seq`, outbox event, read-state behavior, and pull-message visibility as a human message.
 
 ## Message identity
 
@@ -75,7 +126,7 @@ Each message belongs to one conversation.
 
 Phase 1 conversation ID rules:
 
-- Single chat: deterministic from the two user IDs, independent of sender order.
+- Single chat: deterministic from the two account IDs, independent of sender order.
 - Group chat: deterministic from `group_id`.
 
 Example logical forms:
@@ -98,7 +149,23 @@ Product behavior:
 - `seq` starts at 1 for the first persisted message in a conversation.
 - `seq` increases by 1 for each persisted message in that conversation.
 - `seq` is unique only within a conversation.
-- Clients use `conversation_id + seq` to pull and de-duplicate messages.
+- `conversation_id + seq` is the server-authoritative ordering key for storage, sync, and display.
+- Network arrival order, WebSocket push order, retry timing, and local optimistic enqueue timing are not display order.
+- Clients use `conversation_id + seq` to pull missing ranges and to place confirmed messages in the visible timeline.
+
+## Client ordering and duplicate handling
+
+Clients must render confirmed messages by ascending numeric `seq` within each `conversation_id`, regardless of HTTP/WebSocket arrival order or `send_time`. `send_time` is metadata for display, not the ordering authority.
+
+Clients must deduplicate repeated deliveries and send retries by message identity:
+
+- Prefer `server_msg_id` when present.
+- Before a server ID is known, match optimistic local messages by `client_msg_id`.
+- When an optimistic local message is accepted, replace the local pending item with the canonical server snapshot, preserving `server_msg_id`, `conversation_id`, `seq`, `send_time`, and content fields from the server.
+
+Pending local messages without a server `seq` may be shown after confirmed messages in stable local enqueue order. They must not be interleaved ahead of confirmed server messages based on local clock time.
+
+If a client observes a gap, for example it has local seq `7` and receives or queries server `max_seq = 10` while seq `8` or `9` is missing, it should call `PullMessages(conversation_id, from_seq = local_contiguous_seq + 1, to_seq = server max_seq)` and apply the response idempotently.
 
 ## Send message behavior
 
@@ -121,6 +188,8 @@ When a user sends a message, the system must:
 
 Phase 1 can complete all steps synchronously in the message service.
 
+Clients should avoid concurrent local sends into the same conversation. The UI may either queue same-conversation sends or disable the composer until the previous send is accepted or fails. A visible `sending` or failed state is required; clients must not silently ignore a send or fake success.
+
 ## Send response behavior
 
 A successful send response should include:
@@ -129,6 +198,8 @@ A successful send response should include:
 - `client_msg_id`;
 - `conversation_id`;
 - `seq`;
+- `message_origin`;
+- Agent metadata for AI messages: `agent_account_id`, `trigger_server_msg_id`, `agent_run_id`, `allow_recursive_trigger`;
 - `send_time`;
 - persisted message snapshot.
 
@@ -217,4 +288,6 @@ The first message contract is ready when:
 - message, gateway, and storage agents can implement against the same contract;
 - read state uses `user_id + conversation_id -> has_read_seq`;
 - send and read behavior are idempotent/monotonic;
+- messages expose `message_origin=human|ai|system`, and AI messages expose Agent trigger metadata;
+- Agent/AI replies are written through Message Service and duplicate triggers do not create duplicate AI messages;
 - the contract clearly separates phase 1 synchronous implementation from future MQ/gateway work.

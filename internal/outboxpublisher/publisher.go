@@ -244,12 +244,17 @@ func MessageEventFromOutbox(event repository.OutboxEvent) (messaging.MessageEven
 		ChatType:       message.ChatType,
 		CreatedAt:      messageCreatedAt(message, event),
 		Payload: messaging.MessageEventPayload{
-			ClientMsgID: message.ClientMsgID,
-			ReceiverID:  message.ReceiverID,
-			ReceiverIDs: receiverIDs(message, payload.VisibleUserIDs),
-			GroupID:     message.GroupID,
-			ContentType: message.ContentType,
-			Content:     content,
+			ClientMsgID:           message.ClientMsgID,
+			ReceiverID:            message.ReceiverID,
+			ReceiverIDs:           receiverIDs(message, payload.VisibleUserIDs),
+			GroupID:               message.GroupID,
+			ContentType:           message.ContentType,
+			Content:               content,
+			MessageOrigin:         message.MessageOrigin,
+			AgentAccountID:        message.AgentAccountID,
+			TriggerServerMsgID:    message.TriggerServerMsgID,
+			AgentRunID:            message.AgentRunID,
+			AllowRecursiveTrigger: message.AllowRecursiveTrigger,
 		},
 	}
 	if err := accepted.Validate(); err != nil {

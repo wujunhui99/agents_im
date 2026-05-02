@@ -42,14 +42,19 @@ type messageIdempotencyRecord struct {
 }
 
 type messageIdempotencyPayload struct {
-	senderID       string
-	receiverID     string
-	groupID        string
-	chatType       string
-	clientMsgID    string
-	contentType    string
-	content        string
-	conversationID string
+	senderID              string
+	receiverID            string
+	groupID               string
+	chatType              string
+	clientMsgID           string
+	contentType           string
+	content               string
+	messageOrigin         string
+	agentAccountID        string
+	triggerServerMsgID    string
+	agentRunID            string
+	allowRecursiveTrigger bool
+	conversationID        string
 }
 
 func NewMemoryMessageRepository() *MemoryMessageRepository {
@@ -64,19 +69,27 @@ func NewMemoryMessageRepository() *MemoryMessageRepository {
 }
 
 func (r *MemoryMessageRepository) CreateMessageIdempotent(_ context.Context, input CreateMessageInput) (Message, bool, error) {
+	if _, err := normalizeMessageOriginInput(&input); err != nil {
+		return Message{}, false, err
+	}
 	conversationID, err := validateCreateMessageInput(input)
 	if err != nil {
 		return Message{}, false, err
 	}
 	payload := messageIdempotencyPayload{
-		senderID:       input.SenderID,
-		receiverID:     input.ReceiverID,
-		groupID:        input.GroupID,
-		chatType:       input.ChatType,
-		clientMsgID:    input.ClientMsgID,
-		contentType:    input.ContentType,
-		content:        input.Content,
-		conversationID: conversationID,
+		senderID:              input.SenderID,
+		receiverID:            input.ReceiverID,
+		groupID:               input.GroupID,
+		chatType:              input.ChatType,
+		clientMsgID:           input.ClientMsgID,
+		contentType:           input.ContentType,
+		content:               input.Content,
+		messageOrigin:         input.MessageOrigin,
+		agentAccountID:        input.AgentAccountID,
+		triggerServerMsgID:    input.TriggerServerMsgID,
+		agentRunID:            input.AgentRunID,
+		allowRecursiveTrigger: input.AllowRecursiveTrigger,
+		conversationID:        conversationID,
 	}
 
 	r.mu.Lock()
@@ -101,18 +114,23 @@ func (r *MemoryMessageRepository) CreateMessageIdempotent(_ context.Context, inp
 
 	r.nextMessageID++
 	message := Message{
-		ServerMsgID:    fmt.Sprintf("msg_%06d", r.nextMessageID),
-		ClientMsgID:    input.ClientMsgID,
-		ConversationID: conversationID,
-		Seq:            conversation.maxSeq,
-		SenderID:       input.SenderID,
-		ReceiverID:     input.ReceiverID,
-		GroupID:        input.GroupID,
-		ChatType:       input.ChatType,
-		ContentType:    input.ContentType,
-		Content:        input.Content,
-		SendTime:       nowMillis,
-		CreatedAt:      nowMillis,
+		ServerMsgID:           fmt.Sprintf("msg_%06d", r.nextMessageID),
+		ClientMsgID:           input.ClientMsgID,
+		ConversationID:        conversationID,
+		Seq:                   conversation.maxSeq,
+		SenderID:              input.SenderID,
+		ReceiverID:            input.ReceiverID,
+		GroupID:               input.GroupID,
+		ChatType:              input.ChatType,
+		ContentType:           input.ContentType,
+		Content:               input.Content,
+		MessageOrigin:         input.MessageOrigin,
+		AgentAccountID:        input.AgentAccountID,
+		TriggerServerMsgID:    input.TriggerServerMsgID,
+		AgentRunID:            input.AgentRunID,
+		AllowRecursiveTrigger: input.AllowRecursiveTrigger,
+		SendTime:              nowMillis,
+		CreatedAt:             nowMillis,
 	}
 
 	conversation.messages = append(conversation.messages, message.Clone())

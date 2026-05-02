@@ -25,18 +25,27 @@ func NewUserLogic(repo repository.UserRepository) *UserLogic {
 	return &UserLogic{repo: repo}
 }
 
-type UserProfile struct {
-	UserID      string `json:"user_id"`
-	Identifier  string `json:"identifier"`
-	DisplayName string `json:"display_name"`
-	Name        string `json:"name"`
-	Gender      string `json:"gender"`
-	Age         int32  `json:"age"`
-	Region      string `json:"region"`
-	AccountType string `json:"account_type"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+type AccountLogic = UserLogic
+
+func NewAccountLogic(repo repository.AccountRepository) *AccountLogic {
+	return NewUserLogic(repo)
 }
+
+type UserProfile struct {
+	UserID        string `json:"user_id"`
+	Identifier    string `json:"identifier"`
+	DisplayName   string `json:"display_name"`
+	Name          string `json:"name"`
+	Gender        string `json:"gender"`
+	Age           int32  `json:"age"`
+	Region        string `json:"region"`
+	AccountType   string `json:"account_type"`
+	AvatarMediaID string `json:"avatar_media_id"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
+}
+
+type AccountProfile = UserProfile
 
 type CreateUserRequest struct {
 	Identifier  string `json:"identifier"`
@@ -48,9 +57,13 @@ type CreateUserRequest struct {
 	AccountType string `json:"account_type"`
 }
 
+type CreateAccountRequest = CreateUserRequest
+
 type GetUserByIdentifierRequest struct {
 	Identifier string `json:"identifier"`
 }
+
+type GetAccountByIdentifierRequest = GetUserByIdentifierRequest
 
 type ExistsByIdentifierRequest struct {
 	Identifier string `json:"identifier"`
@@ -61,9 +74,13 @@ type ExistsByIdentifierResponse struct {
 	Exists     bool   `json:"exists"`
 }
 
+type AccountExistsByIdentifierResponse = ExistsByIdentifierResponse
+
 type GetUserByIDRequest struct {
 	UserID string `json:"user_id"`
 }
+
+type GetAccountByIDRequest = GetUserByIDRequest
 
 type UpdateUserProfileRequest struct {
 	UserID      string  `json:"user_id"`
@@ -72,6 +89,13 @@ type UpdateUserProfileRequest struct {
 	Gender      *string `json:"gender,omitempty"`
 	Age         *int32  `json:"age,omitempty"`
 	Region      *string `json:"region,omitempty"`
+}
+
+type UpdateAccountProfileRequest = UpdateUserProfileRequest
+
+type UpdateUserAvatarRequest struct {
+	UserID  string `json:"user_id"`
+	MediaID string `json:"media_id"`
 }
 
 func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (UserProfile, error) {
@@ -101,7 +125,7 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 
 	accountType, ok := model.NormalizeAccountType(req.AccountType)
 	if !ok {
-		return UserProfile{}, apperror.InvalidArgument("account_type must be normal, agent, or admin")
+		return UserProfile{}, apperror.InvalidArgument("account_type must be user, agent, or admin")
 	}
 
 	user, err := l.repo.Create(ctx, model.User{
@@ -120,6 +144,10 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 	return toProfile(user), nil
 }
 
+func (l *UserLogic) CreateAccount(ctx context.Context, req CreateAccountRequest) (AccountProfile, error) {
+	return l.CreateUser(ctx, req)
+}
+
 func (l *UserLogic) GetUserByIdentifier(ctx context.Context, req GetUserByIdentifierRequest) (UserProfile, error) {
 	identifier, err := NormalizeIdentifier(req.Identifier)
 	if err != nil {
@@ -132,6 +160,10 @@ func (l *UserLogic) GetUserByIdentifier(ctx context.Context, req GetUserByIdenti
 	}
 
 	return toProfile(user), nil
+}
+
+func (l *UserLogic) GetAccountByIdentifier(ctx context.Context, req GetAccountByIdentifierRequest) (AccountProfile, error) {
+	return l.GetUserByIdentifier(ctx, req)
 }
 
 func (l *UserLogic) ExistsByIdentifier(ctx context.Context, req ExistsByIdentifierRequest) (ExistsByIdentifierResponse, error) {
@@ -160,6 +192,10 @@ func (l *UserLogic) GetUserByID(ctx context.Context, req GetUserByIDRequest) (Us
 	}
 
 	return toProfile(user), nil
+}
+
+func (l *UserLogic) GetAccountByID(ctx context.Context, req GetAccountByIDRequest) (AccountProfile, error) {
+	return l.GetUserByID(ctx, req)
 }
 
 func (l *UserLogic) UpdateUserProfile(ctx context.Context, req UpdateUserProfileRequest) (UserProfile, error) {
@@ -215,6 +251,27 @@ func (l *UserLogic) UpdateUserProfile(ctx context.Context, req UpdateUserProfile
 		return UserProfile{}, err
 	}
 
+	return toProfile(user), nil
+}
+
+func (l *UserLogic) UpdateAccountProfile(ctx context.Context, req UpdateAccountProfileRequest) (AccountProfile, error) {
+	return l.UpdateUserProfile(ctx, req)
+}
+
+func (l *UserLogic) UpdateUserAvatar(ctx context.Context, req UpdateUserAvatarRequest) (UserProfile, error) {
+	userID := strings.TrimSpace(req.UserID)
+	if userID == "" {
+		return UserProfile{}, apperror.InvalidArgument("user_id is required")
+	}
+	mediaID := strings.TrimSpace(req.MediaID)
+	if mediaID == "" {
+		return UserProfile{}, apperror.InvalidArgument("media_id is required")
+	}
+
+	user, err := l.repo.UpdateAvatar(ctx, userID, mediaID)
+	if err != nil {
+		return UserProfile{}, err
+	}
 	return toProfile(user), nil
 }
 
@@ -308,16 +365,17 @@ func normalizeRegion(region string) (string, error) {
 
 func toProfile(user model.User) UserProfile {
 	return UserProfile{
-		UserID:      user.UserID,
-		Identifier:  user.Identifier,
-		DisplayName: user.DisplayName,
-		Name:        user.Name,
-		Gender:      user.Gender,
-		Age:         user.Age,
-		Region:      user.Region,
-		AccountType: string(user.AccountType),
-		CreatedAt:   formatTime(user.CreatedAt),
-		UpdatedAt:   formatTime(user.UpdatedAt),
+		UserID:        user.UserID,
+		Identifier:    user.Identifier,
+		DisplayName:   user.DisplayName,
+		Name:          user.Name,
+		Gender:        user.Gender,
+		Age:           user.Age,
+		Region:        user.Region,
+		AccountType:   string(user.AccountType),
+		AvatarMediaID: user.AvatarMediaID,
+		CreatedAt:     formatTime(user.CreatedAt),
+		UpdatedAt:     formatTime(user.UpdatedAt),
 	}
 }
 

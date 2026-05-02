@@ -4,7 +4,7 @@
 
 ## 背景
 
-`friends` 服务负责好友关系维护，位于 `user` 之后开发。当前 REST 与 RPC transport 已按 goctl/go-zero 生成结构校准，旧手写 RPC wrapper 已移除；业务 logic、repository 和测试继续保留。
+`friends` 服务负责好友关系维护，位于 Account Service 之后开发。当前 REST 与 RPC transport 已按 goctl/go-zero 生成结构校准，旧手写 RPC wrapper 已移除；业务 logic、repository 和测试继续保留。V0 `user_id` / `friend_id` 字段是 account id alias。
 
 ## 服务组成
 
@@ -13,8 +13,8 @@
 职责：
 
 - 提供内部好友关系能力。
-- 添加好友前依赖 `user-rpc.GetUserByID` 校验双方用户存在。
-- 维护好友关系状态，不保存用户资料权威数据。
+- 添加好友前依赖 V0 `user-rpc.GetUserByID` 校验双方账号存在。
+- 维护好友关系状态，不保存账号资料权威数据。
 
 RPC 方法：
 
@@ -28,7 +28,7 @@ RPC 方法：
 职责：
 
 - 对外提供 HTTP 好友关系接口。
-- 从 JWT context `user_id` 读取当前用户身份。
+- 从 JWT context `user_id` 读取当前 account id。
 - 调用 friends logic 完成添加、删除、列表和关系查询。
 
 HTTP 接口：

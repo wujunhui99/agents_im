@@ -16,7 +16,7 @@
 
 ### Task 1: Add account type contract tests
 
-**Objective:** Define `normal`, `agent`, and `admin` account type behavior before implementation.
+**Objective:** Define `user`, `agent`, and `admin` account type behavior before implementation.
 
 **Files:**
 - Modify: `api/user.api`
@@ -33,11 +33,11 @@ Expected first result before implementation: failing tests that show `account_ty
 
 ### Task 2: Implement account type persistence
 
-**Objective:** Persist and return `account_type` while preserving existing normal-user registration behavior.
+**Objective:** Persist and return `account_type` while preserving existing human-user registration behavior.
 
 **Files:**
 - Modify: user repository/model files
-- Modify: auth registration path to default to `normal`
+- Modify: auth registration path to default to `user`
 - Modify: frontend/backend contract docs if response shape changes
 
 **Verification:**
@@ -49,8 +49,8 @@ bash scripts/verify-static.sh
 
 **Feature branch note (`feature/agent-account-types`):**
 
-- `account_type` foundation is implemented only for the user domain: `normal` default plus validated internal `agent`/`admin` creation.
-- Public HTTP `POST /users` and `auth` register do not accept account type elevation and continue to create `normal` users by default.
+- `account_type` foundation is implemented for the Account domain: `user` default plus validated internal `agent`/`admin` creation.
+- Public HTTP `POST /users` and `auth` register do not accept account type elevation and continue to create `user` type accounts by default.
 - No Agent config tables, prompt/tool/skill CRUD, Python executor, shell execution, or LLM integration are part of this branch.
 - Validation recorded for this branch: `goctl --version`, `goctl api validate` for all `api/*.api`, `gofmt`, `go test ./...`, `go test -tags=integration ./tests -run TestPostgresUserAuthFriendsGroupsRepositories -count=1` with no DSN, `bash scripts/verify-static.sh`, `docker compose config`, and `git diff --check`.
 

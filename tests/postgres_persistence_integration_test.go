@@ -6,9 +6,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,8 +50,8 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if alice.AccountType != model.AccountTypeNormal {
-		t.Fatalf("default postgres account_type = %q, want %q", alice.AccountType, model.AccountTypeNormal)
+	if alice.AccountType != model.AccountTypeUser {
+		t.Fatalf("default postgres account_type = %q, want %q", alice.AccountType, model.AccountTypeUser)
 	}
 	bob, err := users.Create(ctx, model.User{
 		Identifier:  "pg_bob",
@@ -328,6 +330,96 @@ func TestPostgresMessageRepositoryIdempotencyAndReadState(t *testing.T) {
 	}
 	if len(remainingOutboxEvents) != 0 {
 		t.Fatalf("published outbox event should not be pending: %+v", remainingOutboxEvents)
+	}
+}
+
+func TestPostgresMessageRepositoryConcurrentOrdering(t *testing.T) {
+	ctx := context.Background()
+	dsn := integrationPostgresDSN(t)
+	migrateAndCleanPostgres(t, ctx, dsn)
+
+	messages, err := repository.NewPostgresMessageRepository(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const messageCount = 24
+	const senderID = "usr_pg_order_sender"
+	const receiverID = "usr_pg_order_receiver"
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	results := make([]repository.Message, messageCount)
+	errs := make([]error, messageCount)
+	for i := 0; i < messageCount; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			message, deduplicated, err := messages.CreateMessageIdempotent(ctx, repository.CreateMessageInput{
+				SenderID:           senderID,
+				ReceiverID:         receiverID,
+				ChatType:           repository.ChatTypeSingle,
+				ClientMsgID:        fmt.Sprintf("client-pg-order-%02d", i+1),
+				ContentType:        repository.ContentTypeText,
+				Content:            fmt.Sprintf("postgres concurrent message %02d", i+1),
+				ParticipantUserIDs: []string{senderID, receiverID},
+			})
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			if deduplicated {
+				errs[i] = fmt.Errorf("message %d unexpectedly deduplicated", i+1)
+				return
+			}
+			results[i] = message
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent postgres send %d: %v", i+1, err)
+		}
+	}
+
+	gotSeqs := make([]int64, 0, messageCount)
+	for _, message := range results {
+		gotSeqs = append(gotSeqs, message.Seq)
+		if message.ConversationID != repository.SingleConversationID(senderID, receiverID) {
+			t.Fatalf("conversation_id = %q, want single conversation", message.ConversationID)
+		}
+	}
+	sort.Slice(gotSeqs, func(i, j int) bool { return gotSeqs[i] < gotSeqs[j] })
+	for index, seq := range gotSeqs {
+		want := int64(index + 1)
+		if seq != want {
+			t.Fatalf("postgres concurrent seqs = %v, want contiguous 1..%d", gotSeqs, messageCount)
+		}
+	}
+
+	conversationID := repository.SingleConversationID(senderID, receiverID)
+	pulled, isEnd, nextSeq, err := messages.GetMessages(ctx, conversationID, 1, 0, messageCount+1, repository.MessageStorageOrderAsc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !isEnd || nextSeq != messageCount+1 || len(pulled) != messageCount {
+		t.Fatalf("pull after concurrent sends len=%d isEnd=%v nextSeq=%d", len(pulled), isEnd, nextSeq)
+	}
+	for index, message := range pulled {
+		if message.Seq != int64(index+1) {
+			t.Fatalf("pulled message %d seq=%d, want %d", index, message.Seq, index+1)
+		}
+	}
+
+	states, err := messages.GetConversationSeqStates(ctx, receiverID, []string{conversationID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(states) != 1 || states[0].MaxSeq != messageCount || states[0].LastMessage == nil || states[0].LastMessage.Seq != messageCount {
+		t.Fatalf("postgres state should reflect max seq %d: %+v", messageCount, states)
 	}
 }
 

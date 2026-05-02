@@ -18,7 +18,7 @@ For agents_im phase 1, we keep the core semantics but implement a simpler synchr
 
 ```text
 message-api / message-rpc
-  -> validate auth/user/friends/groups
+  -> validate auth/account/friends/groups
   -> assign conversation seq
   -> store message
   -> update conversation state and read state
@@ -66,9 +66,11 @@ Responsibilities:
 - expose pull/sync/read APIs;
 - write `message.created` events into PostgreSQL outbox for future Kafka/Message Transfer/Push integration.
 
-#### User Service
+V0 `user_id`, `sender_id`, `receiver_id`, and read-state `user_id` fields are account id aliases. They point to Account Service profiles and are preserved for API/frontend compatibility.
 
-Used by message service to verify users exist.
+#### Account Service
+
+Used by message service to verify accounts exist. Current code may still use V0 user-rpc/UserLookup names for transport compatibility.
 
 #### Friends Service
 
@@ -103,9 +105,11 @@ Phase 1:
 
 ```text
 text
+image
+file
 ```
 
-Future-compatible values can be added later, e.g. `image`, `file`, `custom`, `agent_result`.
+Future-compatible values can be added later, e.g. `custom`, `agent_result`.
 
 ### Message
 
@@ -122,9 +126,30 @@ group_id        string  // group chat only
 chat_type       string  // single | group
 content_type    string
 content         string or JSON payload
+message_origin  string  // human | ai | system
+agent_account_id        string // ai only
+trigger_server_msg_id   string // ai only
+agent_run_id            string // ai only
+allow_recursive_trigger bool   // ai only, default false
 send_time       int64   // server timestamp in milliseconds
 created_at      int64
 ```
+
+### Ordering and duplicate identity
+
+`conversation_id + seq` is the only authoritative ordering key for confirmed messages. Message Service assigns `seq` while holding the per-conversation storage lock or an equivalent atomic allocation primitive. Downstream Gateway, WebSocket, Kafka, push, and frontend code must treat network arrival order as non-authoritative.
+
+Storage and clients use identity for duplicate suppression:
+
+```text
+server_msg_id                // canonical identity after acceptance
+sender_id + client_msg_id    // idempotent send identity before/at acceptance
+conversation_id + seq        // authoritative position inside a conversation
+```
+
+If a repeated delivery has the same `server_msg_id`, it is the same message. If a pending local message has the same `client_msg_id` as an accepted server response from the same sender, the client replaces the pending item with the server snapshot. Reusing the same `sender_id + client_msg_id` with a different payload is an idempotency conflict, not a new message.
+
+`message_origin` is authoritative metadata owned by Message Service. Public REST sends default to `human`; service-to-service Agent writeback can send `ai` with Agent metadata. System status messages use `system`. AI messages remain ordinary stored messages and must still pass idempotency, conversation seq, outbox, pull, and read-state rules.
 
 ### ConversationThread
 
@@ -205,8 +230,13 @@ message SendMessageRequest {
   string group_id = 3;
   string chat_type = 4;       // single | group
   string client_msg_id = 5;
-  string content_type = 6;    // text for phase 1
+  string content_type = 6;    // text | image | file
   string content = 7;
+  string message_origin = 8;  // service-to-service only; public REST defaults human
+  string agent_account_id = 9;
+  string trigger_server_msg_id = 10;
+  string agent_run_id = 11;
+  bool allow_recursive_trigger = 12;
 }
 ```
 
@@ -225,6 +255,9 @@ Behavior:
 - For single chat, `receiver_id` is required and `group_id` must be empty.
 - For group chat, `group_id` is required and `receiver_id` must be empty.
 - `client_msg_id` is required.
+- `text` content is plain text, non-empty after trim, <= 4096 characters.
+- `image` content is JSON with at least `mediaId`; the media record must be owned by the sender, `purpose=message_image`, `status=ready`, `content_type=image/*` from the allowlist, and under the image size limit.
+- `file` content is JSON with `mediaId`, `filename`, `sizeBytes`, and `contentType`; the media record must be owned by the sender, `purpose=message_file`, `status=ready`, and the message metadata must match the media record.
 - Same `sender_id + client_msg_id` returns the prior message if payload matches.
 - Different payload for same idempotency key returns idempotency conflict.
 
@@ -338,8 +371,13 @@ message Message {
   string chat_type = 8;
   string content_type = 9;
   string content = 10;
-  int64 send_time = 11;
-  int64 created_at = 12;
+  string message_origin = 11;
+  string agent_account_id = 12;
+  string trigger_server_msg_id = 13;
+  string agent_run_id = 14;
+  bool allow_recursive_trigger = 15;
+  int64 send_time = 16;
+  int64 created_at = 17;
 }
 ```
 
@@ -377,6 +415,30 @@ Request:
 }
 ```
 
+Image message:
+
+```json
+{
+  "chatType": "single",
+  "receiverId": "user_b",
+  "clientMsgId": "client-generated-image-id",
+  "contentType": "image",
+  "content": "{\"mediaId\":\"med_000001\",\"width\":1080,\"height\":720}"
+}
+```
+
+File message:
+
+```json
+{
+  "chatType": "single",
+  "receiverId": "user_b",
+  "clientMsgId": "client-generated-file-id",
+  "contentType": "file",
+  "content": "{\"mediaId\":\"med_000002\",\"filename\":\"report.pdf\",\"sizeBytes\":123456,\"contentType\":\"application/pdf\"}"
+}
+```
+
 Response:
 
 ```json
@@ -392,6 +454,7 @@ Response:
     "chatType": "single",
     "contentType": "text",
     "content": "hello",
+    "messageOrigin": "human",
     "sendTime": 1710000000000
   },
   "deduplicated": false
@@ -512,6 +575,12 @@ Emitted after `has_read_seq` advances.
 - Storage worker, when introduced, owns asynchronous durable storage.
 - Message service must not depend on gateway internals.
 
+## Media dependency
+
+Media metadata is stored in PostgreSQL `media_objects`; object bytes live in MinIO/S3-compatible storage. Message send does not trust client-provided object keys or URLs. For image/file messages it validates only a `mediaId` reference and requires the media record to be ready and owned by the sender before persisting the message.
+
+Phase 1 download URL authorization for `/media/:media_id/download-url` is owner-only. When frontend media messaging is wired end to end, message attachment reads must add conversation-participant authorization before participants can fetch media they did not upload.
+
 ## Storage contract
 
 Phase 1 can use an in-memory repository, but repository interfaces should match persistent storage behavior.
@@ -537,6 +606,18 @@ unique(sender_id, client_msg_id)
 unique(server_msg_id)
 ```
 
+The PostgreSQL implementation allocates seq by upserting/selecting the `conversation_threads` row `for update`, then inserting the message and idempotency row in the same transaction. A unique-constraint race on `sender_id + client_msg_id` must resolve to the existing message only when the payload hash matches; otherwise it must surface an idempotency conflict. The failed racing transaction must not commit a consumed seq.
+
+Pull APIs must return messages ordered by numeric `seq` for the requested direction. `last_message` and `max_seq_time` in conversation state must reflect the visible max seq row, not the newest wall-clock `send_time`.
+
+Client sync responsibilities:
+
+- Sort confirmed messages by `conversation_id + seq`.
+- Deduplicate by `server_msg_id`, then by `client_msg_id` for local pending replacement.
+- Keep pending local messages without seq after confirmed messages in local enqueue order.
+- On detected seq gaps, pull the missing range from the highest local contiguous seq plus one through the server `max_seq`.
+- Serialize or queue same-conversation local sends, or disable the composer until the previous send is accepted or failed.
+
 ## Validation and dependencies
 
 ### Single chat send
@@ -553,6 +634,7 @@ Message service needs:
 - `groups` check group exists;
 - `groups` check sender is group member;
 - `groups` list group member IDs for future delivery fanout.
+- `media` check for image/file message owner, purpose, ready status, content type, and size.
 
 ### Pull/read
 

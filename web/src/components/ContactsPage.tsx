@@ -4,6 +4,11 @@ import type { ContactsApi, Friendship } from '../api/contacts';
 import { createContactsApi } from '../api/contacts';
 import type { UserApi, UserProfile } from '../api/user';
 import { createUserApi } from '../api/user';
+import { Avatar } from './ui/Avatar';
+import { Button } from './ui/Button';
+import { Card } from './ui/Card';
+import { ListItem } from './ui/ListItem';
+import { TextField } from './ui/TextField';
 
 type Friend = {
   userId: string;
@@ -19,6 +24,7 @@ type ContactEntry = {
   helper: string;
   accent: string;
   icon: ComponentType<{ size?: number }>;
+  available: boolean;
 };
 
 type ContactsPageProps = {
@@ -27,10 +33,10 @@ type ContactsPageProps = {
 };
 
 const contactEntries: ContactEntry[] = [
-  { id: 'new', label: '新的朋友', helper: '通过账号搜索并添加好友', accent: 'orange', icon: UserPlus },
-  { id: 'groups', label: '群聊', helper: '群聊能力走 groups API，后续在群聊页展开', accent: 'green', icon: UsersRound },
-  { id: 'tags', label: '标签', helper: '标签功能暂未实现', accent: 'blue', icon: Tag },
-  { id: 'official', label: '公众号', helper: '系统通知与服务号暂未实现', accent: 'gray', icon: Megaphone },
+  { id: 'new', label: '新的朋友', helper: '通过账号搜索并添加好友', accent: 'orange', icon: UserPlus, available: true },
+  { id: 'groups', label: '群聊', helper: '群聊入口暂未开放', accent: 'green', icon: UsersRound, available: false },
+  { id: 'tags', label: '标签', helper: '标签功能暂未开放', accent: 'blue', icon: Tag, available: false },
+  { id: 'official', label: '公众号', helper: '系统通知与服务号暂未开放', accent: 'gray', icon: Megaphone, available: false },
 ];
 
 function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsApi() }: ContactsPageProps) {
@@ -61,9 +67,9 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
       <section aria-label="好友列表">
         <div className="panel-heading">
           <h2>好友</h2>
-          <button className="text-command" type="button" onClick={refreshFriends}>
+          <Button className="text-command" variant="tonal" size="small" onClick={refreshFriends}>
             刷新好友
-          </button>
+          </Button>
         </div>
         <p className="inline-status" role="status">
           {friendStatus}
@@ -80,6 +86,8 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
   const [status, setStatus] = useState('按唯一 identifier 搜索用户');
   const [submitting, setSubmitting] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [addedUserIds, setAddedUserIds] = useState<Set<string>>(() => new Set());
+  const isAdded = result ? addedUserIds.has(result.user_id) : false;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,6 +122,7 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
     setStatus('正在添加好友');
     try {
       await onAddFriend(result);
+      setAddedUserIds((current) => new Set(current).add(result.user_id));
       setStatus(`已添加好友：${result.identifier}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '添加好友失败');
@@ -125,40 +134,42 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
   return (
     <section className="identifier-search-card" aria-label="账号搜索">
       <form className="identifier-search-form" onSubmit={handleSubmit}>
-        <label className="search-box identifier-field">
-          <Search size={17} />
-          <input
-            placeholder="输入唯一 identifier"
-            aria-label="按 identifier 搜索用户"
-            value={identifier}
-            onChange={(event) => setIdentifier(event.target.value)}
-          />
-        </label>
-        <button className="compact-command" type="submit" aria-label="搜索用户" disabled={submitting}>
+        <TextField
+          label="按 identifier 搜索用户"
+          hideLabel
+          placeholder="输入唯一 identifier"
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
+          leadingIcon={<Search size={17} />}
+          fieldClassName="search-box identifier-field"
+        />
+        <Button className="compact-command" type="submit" aria-label="搜索用户" disabled={submitting}>
           <Search size={17} />
           <span>搜索</span>
-        </button>
+        </Button>
       </form>
       <p className="inline-status" role="status">
         {status}
       </p>
       {result ? (
-        <article className="search-result">
-          <div className="avatar avatar-blue">{avatarText(result.display_name || result.name || result.identifier)}</div>
-          <div className="row-main">
-            <strong>{result.display_name || result.name || result.identifier}</strong>
-            <p>{result.identifier}</p>
-          </div>
-          <button
-            className="text-command"
-            type="button"
-            aria-label={`添加好友 ${result.identifier}`}
-            disabled={adding}
-            onClick={handleAddFriend}
-          >
-            {adding ? '添加中' : '添加好友'}
-          </button>
-        </article>
+<ListItem
+          className="search-result"
+          leading={<Avatar label={avatarText(result.display_name || result.name || result.identifier)} color="blue" />}
+          headline={result.display_name || result.name || result.identifier}
+          supportingText={result.identifier}
+          trailing={
+            <Button
+              className="text-command"
+              variant="tonal"
+              size="small"
+              aria-label={isAdded ? '已添加' : `添加好友 ${result.identifier}`}
+              disabled={adding || isAdded}
+              onClick={handleAddFriend}
+            >
+              {isAdded ? '已添加' : adding ? '添加中' : '添加好友'}
+            </Button>
+          }
+        />
       ) : null}
     </section>
   );
@@ -166,18 +177,22 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
 
 function ContactEntryButton({ entry }: { entry: ContactEntry }) {
   const Icon = entry.icon;
+  const disabled = !entry.available;
 
   return (
-    <div className="action-row" aria-label={entry.label}>
-      <div className={`action-icon action-${entry.accent}`}>
-        <Icon size={19} />
-      </div>
-      <div className="row-main">
-        <strong>{entry.label}</strong>
-        <p>{entry.helper}</p>
-      </div>
-      <ChevronRight size={18} />
-    </div>
+<ListItem
+      className={`action-row${disabled ? ' action-row-disabled' : ''}`}
+      ariaLabel={disabled ? `${entry.label} 暂未开放` : entry.label}
+      ariaDisabled={disabled}
+      leading={
+        <div className={`action-icon action-${entry.accent}`}>
+          <Icon size={19} />
+        </div>
+      }
+      headline={entry.label}
+      supportingText={entry.helper}
+      trailing={disabled ? <span className="row-badge">暂未开放</span> : <ChevronRight size={18} />}
+    />
   );
 }
 
@@ -195,18 +210,22 @@ function FriendDirectory({ friends }: { friends: Friend[] }) {
           <h2 className="section-label" id={`friend-group-${initial}`}>
             {initial}
           </h2>
-          <div className="list-card">
+          <Card className="list-card">
             {groupedFriends.map((friend) => (
-              <article className="friend-row" key={friend.userId}>
-                <div className="avatar avatar-blue">{friend.avatar}</div>
-                <div>
-                  <strong>{friend.name}</strong>
-                  <p>{friend.identifier}</p>
-                  <p>{friend.userId}</p>
-                </div>
-              </article>
+              <ListItem
+                className="friend-row"
+                key={friend.userId}
+                leading={<Avatar label={friend.avatar} color="blue" />}
+                headline={friend.name}
+                supportingText={
+                  <span className="friend-supporting-lines">
+                    <span>{friend.identifier}</span>
+                    <span>{friend.userId}</span>
+                  </span>
+                }
+              />
             ))}
-          </div>
+          </Card>
         </section>
       ))}
     </>
