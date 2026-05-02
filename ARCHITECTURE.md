@@ -36,7 +36,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 ### Account Service
 
-负责账号资料的权威数据，不管理密码或认证秘密。Account 是身份与资料主体，可代表 human user、agent、admin，未来可扩展 service/official accounts。核心能力包括 Snowflake account id、唯一标识符（类似微信号）、名称、性别、年龄、地区、头像、`account_type=user|agent|admin` 等资料维护，`/me` 查询，公开资料查询，以及供 `auth` 注册流程使用的账号存在性检查。PostgreSQL source-of-truth 为 `accounts` + `profiles`；V0 public/API compatibility 继续保留 `/users`、`user-api`、`user-rpc` 和 `user_id` 字段，这些 `user_id` 均是 account id alias。术语边界见 [`docs/design-docs/account-service-terminology.md`](./docs/design-docs/account-service-terminology.md)。
+负责账号资料的权威数据，不管理密码或认证秘密。Account 是身份与资料主体，可代表 human user、agent、admin，未来可扩展 service/official accounts。核心能力包括 Snowflake account id、唯一标识符（类似微信号）、名称、性别、年龄、地区、头像、`account_type=0|1|2`（0=管理员，1=用户，2=Agent） 等资料维护，`/me` 查询，公开资料查询，以及供 `auth` 注册流程使用的账号存在性检查。PostgreSQL source-of-truth 为 `accounts` + `profiles`；V0 public/API compatibility 继续保留 `/users`、`user-api`、`user-rpc` 和 `user_id` 字段，这些 `user_id` 均是 account id alias。术语边界见 [`docs/design-docs/account-service-terminology.md`](./docs/design-docs/account-service-terminology.md)。
 
 ### Auth Service
 
@@ -84,8 +84,8 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 负责 Agent 生命周期、配置组装、运行时能力和工具调用审计。第一版设计见 [`docs/product-specs/agent-system.md`](./docs/product-specs/agent-system.md)、[`docs/design-docs/agent-system-architecture.md`](./docs/design-docs/agent-system-architecture.md) 和 [`docs/exec-plans/active/agent-system-v0.md`](./docs/exec-plans/active/agent-system-v0.md)。核心能力包括：
 
-- 在账号系统中配合 `user` / `agent` / `admin` 账号类型，让 Agent 账号作为 IM 会话成员参与单聊和群聊。
-- 当前 `cmd/agent-api` 和 `api/agent.api` 提供 Agent profile 管理基础，配置单独持久化到 `agents` 表；创建 Agent 必须通过 Account Service 资料能力验证绑定账号为 `account_type=agent`，验证不可用时必须失败。
+- 在账号系统中配合 0（管理员）/ 1（用户）/ 2（Agent） 账号类型，让 Agent 账号作为 IM 会话成员参与单聊和群聊。
+- 当前 `cmd/agent-api` 和 `api/agent.api` 提供 Agent profile 管理基础，配置单独持久化到 `agents` 表；创建 Agent 必须通过 Account Service 资料能力验证绑定账号为 `account_type=2`（Agent），验证不可用时必须失败。
 - 管理系统提示词、工具、Agent skills 和 Agent 配置，并将元数据持久化在 PostgreSQL。
 - 使用系统提示词、工具和 skills 组装 Agent runtime。
 - 通过 MinIO/S3-compatible object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。

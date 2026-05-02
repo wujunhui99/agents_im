@@ -10,7 +10,7 @@
 
 必须覆盖：
 
-1. 扩展账号系统 `account_type`: `user` / `agent` / `admin`。
+1. 扩展账号系统 `account_type`: 0（管理员）/ 1（用户）/ 2（Agent）。
 2. Agent 账号作为 IM Account 参与聊天；Agent 配置另建 `agents` 表，不塞入 Account Service 资料表。
 3. 系统提示词、工具、skills 独立管理并持久化。
 4. Skill 文件使用 MinIO/OSS 对象存储；PG 只保存元数据、object key、sha256。
@@ -36,10 +36,10 @@
 
 范围：
 
-- `accounts.account_type` migration，默认 `user`；账号展示资料存储在 `profiles`。
+- `accounts.account_type` migration，默认 1（用户）；账号展示资料存储在 `profiles`。
 - Go domain/model/repository/API/RPC 类型增加 account_type。
-- 创建 human user 账号默认 `user`。
-- 支持创建 Agent 用户时 account_type=`agent` 的内部能力。
+- 创建 human user 账号默认 1（用户）。
+- 支持创建 Agent 用户时 account_type=2（Agent） 的内部能力。
 - admin 能力只保留类型和校验，不做完整 RBAC。
 
 不得做：Agent 配置表、prompt/tool/skill CRUD、Python executor。
@@ -52,7 +52,7 @@
 
 当前分支落地说明：
 
-- `user`、`agent`、`admin` 作为 Account domain 合法枚举写入 Go model、REST response、User RPC compatibility contract 和 PostgreSQL migration。
+- 0（管理员）、1（用户）、2（Agent）作为 Account domain 合法枚举写入 Go model、REST response、User RPC compatibility contract 和 PostgreSQL migration。
 - 内存与 PostgreSQL repository 均把空 `account_type` 归一化为 `user`，非法值返回明确参数错误。
 - HTTP 公开创建与 auth 注册路径不传递请求体中的 `account_type`，避免公开注册为 `admin` 或 `agent`。
 
@@ -66,7 +66,7 @@
 
 - 新增 agent domain/repository/logic/API 契约。
 - `agents` 表：agent_id、im_user_id、name、description、status、created_by、prompt/tool/skill binding 引用字段或关系表。
-- Agent 必须绑定一个 account_type=`agent` 的 IM user。
+- Agent 必须绑定一个 account_type=2（Agent） 的 IM user。
 - 提供基础 CRUD/list/get/status。
 - 不允许 Agent 配置写入 `users` 表。
 
@@ -83,7 +83,7 @@
 - 已新增 `api/agent.api`、`cmd/agent-api`、`etc/agent-api.yaml`。
 - 已新增 `agents` 表迁移 `db/migrations/002_agent_management.sql`，Agent 配置与 `users` 表分离。
 - 已新增 Agent domain、logic、memory/PostgreSQL repository、go-zero handler/logic adapter。
-- 创建 Agent 通过 `UserAccountTypeChecker` 校验 `account_type=agent`；由于本分支尚未合入账号类型持久化，真实服务默认 fail closed，测试使用显式 test fixture checker。
+- 创建 Agent 通过 `UserAccountTypeChecker` 校验 `account_type=2`（Agent）；由于本分支尚未合入账号类型持久化，真实服务默认 fail closed，测试使用显式 test fixture checker。
 - 已覆盖 create/list/get/update/status/archive、非 agent 用户拒绝、缺失 checker 失败优先和 HTTP handler 测试。
 
 验证记录（2026-04-30）：
