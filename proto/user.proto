@@ -28,7 +28,7 @@ message User {
   string region = 7;
   string created_at = 8;
   string updated_at = 9;
-  int32 account_type = 10;
+  string account_type = 10;
   string avatar_media_id = 11;
 }
 
@@ -39,7 +39,7 @@ message CreateUserRequest {
   string gender = 4;
   string birth_date = 5;
   string region = 6;
-  int32 account_type = 7;
+  string account_type = 7;
 }
 
 message GetUserByIdentifierRequest {

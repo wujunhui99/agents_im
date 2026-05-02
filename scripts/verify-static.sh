@@ -1560,7 +1560,7 @@ done
 
 account_terminology_doc_patterns=(
   "Account Service"
-  "account_type=0|1|2"
+  "account_type=user|agent|admin"
   "Snowflake"
   "accounts"
   "profiles"
@@ -1578,7 +1578,7 @@ done
 account_terminology_entry_patterns=(
   "Account Service"
   "account id alias"
-  "account_type=0|1|2"
+  "account_type=user|agent|admin"
 )
 
 for pattern in "${account_terminology_entry_patterns[@]}"; do
@@ -1586,7 +1586,7 @@ for pattern in "${account_terminology_entry_patterns[@]}"; do
 done
 
 account_code_patterns=(
-  "AccountTypeUser  AccountType = 1"
+  "AccountTypeUser  AccountType = \"user\""
   "type Account struct"
   "type Profile struct"
   "AccountID"
@@ -1611,15 +1611,15 @@ account_storage_patterns=(
   "create table if not exists profiles"
   "account_id text primary key"
   "account_id ~ '^[0-9]+$'"
-  "account_type integer not null default 1"
-  "account_type in (0, 1, 2)"
+  "account_type text not null default 'user'"
+  "account_type in ('user', 'agent', 'admin')"
 )
 
 for pattern in "${account_storage_patterns[@]}"; do
   rg -qF "$pattern" db/migrations/001_init_postgres.sql
 done
 
-rg -qF "account_type?: 0 | 1 | 2" web/src/api/user.ts
+rg -qF "account_type?: 'user' | 'agent' | 'admin'" web/src/api/user.ts
 rg -qF "Legacy server data that still contains \`normal\` is invalid and must be migrated before use" docs/product-specs/frontend-backend-contract.md
 rg -qF "旧 \`account_type=normal\` 不再作为有效输入兼容" docs/design-docs/account-service-terminology.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
 rg -qF "Account Service 术语与 V0 compatibility" AGENTS.md docs/design-docs/index.md
@@ -1632,7 +1632,7 @@ if rg -n 'account_type.*normal|normal.*account_type|`normal`' \
   docs/exec-plans/active/agent-system-v0.md \
   docs/exec-plans/active/agent-infrastructure-parallel-baseline.md \
   web/src/api/user.ts; then
-  echo "account_type docs/frontend must use numeric 0(admin)|1(user)|2(agent); normal may appear only in explicit migration compatibility docs" >&2
+  echo "account_type docs/frontend must use user|agent|admin; normal may appear only in explicit migration compatibility docs" >&2
   exit 1
 fi
 

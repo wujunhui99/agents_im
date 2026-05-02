@@ -9,7 +9,7 @@ Account Service 是账号资料的权威边界。Account 可代表 human user、
 术语规则：
 
 - 领域与服务名使用 Account Service。
-- `account_type` 使用整数枚举：0=管理员、1=用户、2=Agent；旧 `account_type=normal` 不再作为有效输入兼容。
+- `account_type` 支持 `user`、`agent`、`admin`；旧 `account_type=normal` 不再作为有效输入兼容。
 - Public JSON/RPC 字段 `user_id` 是 account id alias，第一阶段不批量改名。
 - PostgreSQL source-of-truth 表为 `accounts` 与 `profiles`，不再使用 `users` 表保存资料。
 - Account/Agent ID 均由 Snowflake 算法生成，为无前缀数字字符串。
@@ -83,7 +83,7 @@ Account identity 字段：
 
 - `AccountID string`：Snowflake account id，无前缀数字字符串。
 - `Identifier string`
-- `AccountType int32`
+- `AccountType string`
 - `AccountCreatedAt time.Time`
 - `AccountUpdatedAt time.Time`
 
@@ -104,7 +104,7 @@ Profile 字段（当前 Go/Proto V0 类型名仍为 `User`）：
 - `Identifier` 经 `NormalizeIdentifier` 处理后唯一。
 - `Gender` 只允许空值、`unknown`、`male`、`female`、`other`。
 - `BirthDate` 为生日日期字符串；不存储年龄，年龄如需展示只能动态计算。
-- `AccountType` 只允许 0、1、2；缺省值在 logic 和 repository 层统一归一化为 1（用户）。
+- `AccountType` 只允许空值、`user`、`agent`、`admin`；空值在 logic 和 repository 层统一归一化为 `user`。
 - 旧 `account_type=normal` 不再作为有效输入兼容；非法值必须映射为 `INVALID_ARGUMENT`/gRPC `InvalidArgument`，不能降级为 `user`。
 - `UserID` / `AccountID` 由 repository 通过 Snowflake 生成；`UserID` 是 V0 account id alias。
 
@@ -118,9 +118,9 @@ Profile 字段（当前 Go/Proto V0 类型名仍为 `User`）：
 
 账号类型边界：
 
-- HTTP `POST /users` / `POST /accounts` 不把请求体中的 `account_type` 传入业务 logic，公开创建始终得到 1（用户）。
-- `auth` 注册通过 user adapter 创建账号资料，未传 `account_type`，因此始终得到 1（用户）。
-- User RPC `CreateUserRequest.account_type` 是内部能力，可创建 0（管理员）或 2（Agent）；非法值必须映射为 `INVALID_ARGUMENT`/gRPC `InvalidArgument`，不能降级为 `user`。
+- HTTP `POST /users` / `POST /accounts` 不把请求体中的 `account_type` 传入业务 logic，公开创建始终得到 `user`。
+- `auth` 注册通过 user adapter 创建账号资料，未传 `account_type`，因此始终得到 `user`。
+- User RPC `CreateUserRequest.account_type` 是内部能力，可创建 `agent` 或 `admin`；非法值必须映射为 `INVALID_ARGUMENT`/gRPC `InvalidArgument`，不能降级为 `user`。
 - 后续若新增 Account RPC transport，必须先提供兼容层，不能破坏当前 User RPC client。
 
 ## 错误处理
@@ -182,7 +182,7 @@ go run ./cmd/user-rpc -f etc/user-rpc.yaml
 - `PATCH /me/avatar` 拒绝非 owner、非 avatar purpose 或 not-ready media。
 - 资料模型和 HTTP/RPC 响应不包含密码或认证秘密。
 - `/accounts/*` aliases 与 `/users/*` 使用同一真实 handler。
-- `account_type` 默认输出 1（用户），内部创建支持 0（管理员）、2（Agent），非法值失败。
+- `account_type` 默认输出 `user`，内部创建支持 `agent`、`admin`，非法值失败。
 
 ## 后续演进
 

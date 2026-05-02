@@ -61,7 +61,7 @@ Agent 会话托管第一阶段设计见 [`agent-conversation-hosting.md`](./agen
 - 仓储契约：`internal/repository/agent_repository.go`，默认测试仓储：`internal/repository/agent_memory.go`，PostgreSQL 仓储：`internal/repository/postgres_agent.go`。
 - PostgreSQL schema：`db/migrations/002_agent_management.sql`。
 
-创建 Agent 时，业务逻辑先调用窄接口 `UserAccountTypeChecker` 验证绑定账号为 `account_type=2`（Agent），再写入 `agents` 表。当前 `agent-api` wiring 使用真实 Account Service profile repository 校验账号类型；无法验证时必须返回明确错误。此设计避免在 Account profile 中塞入 Agent 配置，也避免用假账号或静默 fallback 冒充账号类型能力。
+创建 Agent 时，业务逻辑先调用窄接口 `UserAccountTypeChecker` 验证绑定账号为 `account_type=agent`，再写入 `agents` 表。当前 `agent-api` wiring 使用真实 Account Service profile repository 校验账号类型；无法验证时必须返回明确错误。此设计避免在 Account profile 中塞入 Agent 配置，也避免用假账号或静默 fallback 冒充账号类型能力。
 
 ### Prompt Management
 

@@ -1,15 +1,16 @@
 package model
 
 import (
+	"strings"
 	"time"
 )
 
-type AccountType int32
+type AccountType string
 
 const (
-	AccountTypeAdmin AccountType = 0
-	AccountTypeUser  AccountType = 1
-	AccountTypeAgent AccountType = 2
+	AccountTypeUser  AccountType = "user"
+	AccountTypeAgent AccountType = "agent"
+	AccountTypeAdmin AccountType = "admin"
 )
 
 type Account struct {
@@ -41,19 +42,18 @@ func (p Profile) Clone() Profile {
 }
 
 type User struct {
-	AccountID      string
-	UserID         string
-	Identifier     string
-	DisplayName    string
-	Name           string
-	Gender         string
-	BirthDate      string
-	Region         string
-	AccountType    AccountType
-	AccountTypeSet bool
-	AvatarMediaID  string
-	CreatedAt      time.Time // V0 compatibility alias for ProfileCreatedAt.
-	UpdatedAt      time.Time // V0 compatibility alias for ProfileUpdatedAt.
+	AccountID     string
+	UserID        string
+	Identifier    string
+	DisplayName   string
+	Name          string
+	Gender        string
+	BirthDate     string
+	Region        string
+	AccountType   AccountType
+	AvatarMediaID string
+	CreatedAt     time.Time // V0 compatibility alias for ProfileCreatedAt.
+	UpdatedAt     time.Time // V0 compatibility alias for ProfileUpdatedAt.
 
 	AccountCreatedAt time.Time
 	AccountUpdatedAt time.Time
@@ -104,7 +104,6 @@ func NewAccountProfile(account Account, profile Profile) User {
 		BirthDate:        profile.BirthDate,
 		Region:           profile.Region,
 		AccountType:      account.AccountType,
-		AccountTypeSet:   true,
 		AvatarMediaID:    profile.AvatarMediaID,
 		CreatedAt:        profile.CreatedAt,
 		UpdatedAt:        profile.UpdatedAt,
@@ -143,20 +142,18 @@ func (u User) ToProfile() Profile {
 	}
 }
 
-func NormalizeAccountType(value AccountType) (AccountType, bool) {
-	switch value {
-	case AccountTypeUser, AccountTypeAgent, AccountTypeAdmin:
-		return value, true
+func NormalizeAccountType(value string) (AccountType, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch AccountType(normalized) {
+	case "", AccountTypeUser:
+		return AccountTypeUser, true
+	case AccountTypeAgent:
+		return AccountTypeAgent, true
+	case AccountTypeAdmin:
+		return AccountTypeAdmin, true
 	default:
-		return AccountTypeUser, false
+		return "", false
 	}
-}
-
-func DefaultAccountTypeIfUnset(value AccountType) AccountType {
-	if value == 0 {
-		return AccountTypeUser
-	}
-	return value
 }
 
 func (t AccountType) IsValid() bool {

@@ -143,7 +143,7 @@ Environment note from the debug session: on one local machine, default ports `80
 | MinIO API | `http://localhost:9000` |
 | MinIO Console | `http://localhost:9001` |
 
-`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and writes `ObjectStorage` config into the generated `user-api` config. Agent creation verifies `account_type=2`（Agent） through the Account Service profile repository; unavailable verification fails closed.
+`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and writes `ObjectStorage` config into the generated `user-api` config. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
 
 ## Local Object Storage
 

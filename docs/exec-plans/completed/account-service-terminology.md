@@ -10,7 +10,7 @@ Completed: 2026-05-01
 ## 目标
 
 - 将入口文档和契约说明统一到 Account Service。
-- 明确 `account_type=0|1|2`（0=管理员，1=用户，2=Agent），并把旧 `normal` 作为临时迁移输入兼容。
+- 明确 `account_type=user|agent|admin`，并把旧 `normal` 作为临时迁移输入兼容。
 - 保留 `/me`、`/users/*` 和 `user_id` V0 compatibility，说明它们是 account id alias。
 - 增加 account 命名的代码 seam，避免新业务继续依赖 user domain 命名。
 - 更新静态检查，防止 Account 术语和兼容说明回退。
@@ -53,9 +53,9 @@ Completed: 2026-05-01
 
 已完成：
 
-- 新增 [`docs/design-docs/account-service-terminology.md`](../../design-docs/account-service-terminology.md)，明确 Account Service、`account_type=0|1|2`（0=管理员，1=用户，2=Agent）、`user_id` account id alias 和 V0 compatibility。
+- 新增 [`docs/design-docs/account-service-terminology.md`](../../design-docs/account-service-terminology.md)，明确 Account Service、`account_type=user|agent|admin`、`user_id` account id alias 和 V0 compatibility。
 - 更新 AGENTS、ARCHITECTURE、Account/social/product/frontend contracts、go-zero 设计、auth/friends/groups/message 相关文档中的 Account 术语。
-- 将默认 `account_type` 从旧 `normal` 迁移为 1（用户），保留旧 `normal` 输入归一化兼容。
+- 将默认 `account_type` 从 `normal` 迁移为 `user`，保留旧 `normal` 输入归一化兼容。
 - 增加 `/accounts`、`/accounts/exists`、`/accounts/:identifier` aliases，并保留 `/users/*` V0 paths。
 - 增加 account 命名代码 seam：`model.Account`、`repository.AccountRepository`、`logic.AccountProfile`、`NewAccountLogic`、`ServiceContext.AccountLogic`。
 - 更新 `scripts/verify-static.sh`，覆盖 terminology doc、account aliases、account_type values、V0 compatibility 和 storage migration。
