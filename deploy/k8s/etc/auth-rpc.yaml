@@ -4,5 +4,5 @@ ListenOn: 0.0.0.0:9091
 JWTAuth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
-StorageDriver: postgres
+StorageDriver: postgresql
 DataSource: ${DATABASE_URL}
