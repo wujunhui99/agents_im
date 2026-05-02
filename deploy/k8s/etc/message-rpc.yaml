@@ -1,5 +1,5 @@
 Name: message-rpc
 ListenOn: 0.0.0.0:9094
 
-StorageDriver: postgresql
+StorageDriver: postgres
 DataSource: ${DATABASE_URL}
