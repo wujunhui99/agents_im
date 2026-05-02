@@ -43,6 +43,7 @@ const contactEntries: ContactEntry[] = [
 function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsApi(), onStartChat }: ContactsPageProps) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendStatus, setFriendStatus] = useState('正在加载好友列表');
+  const [openingFriendId, setOpeningFriendId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +92,24 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
     setFriendStatus(`已添加好友：${profile.identifier}`);
   }
 
+  async function openFriendChat(friend: Friend) {
+    if (!onStartChat || openingFriendId) {
+      return;
+    }
+
+    setOpeningFriendId(friend.userId);
+    setFriendStatus(`正在打开 ${friend.identifier} 的聊天`);
+    try {
+      const profile = await userApi.getPublicProfileByIdentifier(friend.identifier);
+      onStartChat(profile);
+      setFriendStatus(`已打开 ${profileDisplayName(profile)} 的聊天`);
+    } catch (error) {
+      setFriendStatus(error instanceof Error ? error.message : `打开 ${friend.identifier} 的聊天失败`);
+    } finally {
+      setOpeningFriendId(null);
+    }
+  }
+
   return (
     <div className="page-stack contacts-page">
       <IdentifierSearch userApi={userApi} onAddFriend={addFriend} />
@@ -109,7 +128,7 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
         <p className="inline-status" role="status">
           {friendStatus}
         </p>
-        <FriendDirectory friends={friends} onStartChat={onStartChat} />
+        <FriendDirectory friends={friends} openingFriendId={openingFriendId} onOpenFriendChat={openFriendChat} />
       </section>
     </div>
   );
@@ -231,7 +250,15 @@ function ContactEntryButton({ entry }: { entry: ContactEntry }) {
   );
 }
 
-function FriendDirectory({ friends, onStartChat }: { friends: Friend[]; onStartChat?: (profile: UserProfile) => void }) {
+function FriendDirectory({
+  friends,
+  openingFriendId,
+  onOpenFriendChat,
+}: {
+  friends: Friend[];
+  openingFriendId: string | null;
+  onOpenFriendChat: (friend: Friend) => void;
+}) {
   const groups = useMemo(() => groupFriends(friends), [friends]);
 
   if (friends.length === 0) {
@@ -246,23 +273,27 @@ function FriendDirectory({ friends, onStartChat }: { friends: Friend[]; onStartC
             {initial}
           </h2>
           <Card className="list-card">
-            {groupedFriends.map((friend) => (
-              <ListItem
-                className="friend-row"
-                key={friend.userId}
-                onClick={onStartChat ? () => onStartChat(friendToUserProfile(friend)) : undefined}
-                ariaLabel={`和 ${friend.identifier} 聊天`}
-                leading={<Avatar label={friend.avatar} color="blue" />}
-                headline={friend.name}
-                supportingText={
-                  <span className="friend-supporting-lines">
-                    <span>{friend.identifier}</span>
-                    <span>{friend.userId}</span>
-                  </span>
-                }
-                trailing={<ChevronRight size={18} />}
-              />
-            ))}
+            {groupedFriends.map((friend) => {
+              const isOpening = openingFriendId === friend.userId;
+              return (
+                <ListItem
+                  className="friend-row"
+                  key={friend.userId}
+                  onClick={() => onOpenFriendChat(friend)}
+                  ariaLabel={`和 ${friend.identifier} 聊天`}
+                  ariaDisabled={isOpening}
+                  leading={<Avatar label={friend.avatar} color="blue" />}
+                  headline={friend.name}
+                  supportingText={
+                    <span className="friend-supporting-lines">
+                      <span>{friend.identifier}</span>
+                      <span>{friend.userId}</span>
+                    </span>
+                  }
+                  trailing={isOpening ? <span className="row-badge">打开中</span> : <ChevronRight size={18} />}
+                />
+              );
+            })}
           </Card>
         </section>
       ))}
@@ -289,18 +320,6 @@ function userProfileToFriend(profile: UserProfile): Friend {
     identifier: profile.identifier,
     initial: avatarText(name).slice(0, 1),
     avatar: avatarText(name),
-  };
-}
-
-function friendToUserProfile(friend: Friend): UserProfile {
-  return {
-    user_id: friend.userId,
-    identifier: friend.identifier,
-    display_name: friend.name,
-    name: friend.name,
-    gender: '',
-    age: 0,
-    region: '',
   };
 }
 
@@ -340,6 +359,10 @@ function upsertFriend(friends: Friend[], friend: Friend) {
     return friends.map((item) => (item.userId === friend.userId ? friend : item));
   }
   return [...friends, friend];
+}
+
+function profileDisplayName(profile: UserProfile) {
+  return profile.display_name || profile.name || profile.identifier || profile.user_id;
 }
 
 function avatarText(value: string) {

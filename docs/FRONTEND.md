@@ -15,7 +15,7 @@
 前端第一阶段参考微信主框架，完成四个一级页面：
 
 1. **消息**：会话列表、未读数、最近消息预览；登录和恢复会话后默认通过 `GET /conversations/seqs`、`GET /conversations/:conversation_id/messages` 拉真实后端消息，不依赖先发送新消息，并通过 `POST /messages` 发送。无会话时支持通过 identifier 搜索用户并发起单聊。
-2. **联系人**：新的朋友、群聊、标签、公众号入口；进入联系人页后自动调用 `GET /friends` 拉真实好友列表，`刷新好友` 仅作为失败后的手动重试；支持 identifier 搜索用户、添加好友动作，均走真实 `user/friends` REST adapter。`群聊 / 标签 / 公众号` 入口在第一阶段明确标记为 `暂未开放`。
+2. **联系人**：新的朋友、群聊、标签、公众号入口；进入联系人页后自动调用 `GET /friends` 拉真实好友列表，`刷新好友` 仅作为失败后的手动重试；支持 identifier 搜索用户、添加好友动作，均走真实 `user/friends` REST adapter。点击好友发起聊天前会先通过公开资料 API 重新获取好友资料，失败时显示错误，不用好友列表缓存伪造成功打开。`群聊 / 标签 / 公众号` 入口在第一阶段明确标记为 `暂未开放`。
 3. **发现**：朋友圈、扫一扫、小程序等发现入口为明确的 `MVP 占位`；不会伪造真实扫码/内容生态能力。
 4. **我的**：个人资料卡、用户详情、服务、收藏、朋友圈、设置入口；支持编辑 `display_name`、`gender`、`age`、`region` 等可变资料字段，并支持退出登录。
 
@@ -40,6 +40,8 @@
 - 从发起聊天搜索结果创建的会话标题优先使用 `display_name / name / identifier`。从消息 API 直接加载的历史会话目前只包含 canonical `usr_...` ID；前端不会伪造 `/users/id/{user_id}`，因此在后端提供按 user_id 查询公开资料的前端契约前，历史会话标题只能回退显示内部 user ID。
 - 聊天窗口展示已确认消息时按服务端 `conversationId + seq` 排序，不按 `sendTime`、fetch 数组顺序或 WebSocket 到达顺序排序；重复消息按 `serverMsgId` / `clientMsgId` 去重。
 - 本地 optimistic 消息在服务端确认后必须用相同 `clientMsgId` 替换为 canonical server message，并保留 `serverMsgId`、`seq` 等服务端字段；没有 `seq` 的本地 pending 消息排在已确认消息之后。
+- 打开有未读的会话并展示到带 `seq` 的消息后，前端调用 `messageApi.markRead -> POST /conversations/:conversation_id/read` 推进 `hasReadSeq`，成功后立即清除已读范围内的本地未读标记；失败必须显示错误状态，不伪造成功。
+- 会话列表合并重新加载结果时保留本地已确认的新消息、最新预览和已读进度，避免旧的 REST reload 把正在查看或刚发送后的会话回退成陈旧未读状态。
 - 同一会话内发送请求未完成时，composer 显示 `发送中` 并禁用输入/按钮；失败消息保留 `发送失败` 状态，不伪造成功。
 - `web/src/models/messages.ts` 定义前端会话与消息模型，发送状态仅用于本地 UI 呈现。
 - `web/src/api/messages.ts` 是消息 REST 薄 adapter，函数签名覆盖 `sendMessage`、`pullMessages`、`getConversationSeqs`、`markRead`，字段名保持与前后端合约一致，并基于统一 `createApiClient`。
@@ -110,7 +112,7 @@ make status
 ## 设计约定
 
 - 主导航固定底部，使用四个 tab：`消息 / 联系人 / 发现 / 我的`。
-- 移动端优先；桌面环境使用 phone frame 预览，方便后续做响应式适配。
+- 移动端优先；桌面宽屏从 `900px` 起展开为全视口 Web shell，不再保持窄手机画幅，内容区域在宽屏下使用最大阅读宽度约束。
 - 视觉上采用 Material 3-inspired surface 层级、tonal container、state feedback、elevation 和圆角节奏，同时保留微信式四 Tab 信息架构。
 - 列表、卡片、按钮、输入框、导航、消息气泡等基础 UI 必须优先复用 `web/src/components/ui/` 的轻量组件和 `web/src/styles/tokens.css` tokens。
 - 联系人页入口固定为：`新的朋友 / 群聊 / 标签 / 公众号`。
