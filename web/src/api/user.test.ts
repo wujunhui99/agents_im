@@ -3,12 +3,12 @@ import { createApiClient } from './client';
 import { createUserApi, type UserProfile } from './user';
 
 const profile: UserProfile = {
-  user_id: 'usr_000001',
+  user_id: '1001',
   identifier: 'alice_001',
   display_name: 'Alice Chen',
   name: 'Alice Chen',
   gender: 'female',
-  age: 30,
+  birth_date: '1996-05-02',
   region: 'Hangzhou',
   created_at: '2026-04-29T12:00:00Z',
   updated_at: '2026-04-29T12:30:00Z',
@@ -26,7 +26,7 @@ describe('user API adapter', () => {
     const api = createUserApi(client);
 
     await api.patchCurrentUser({
-      user_id: 'usr_changed',
+      user_id: '9999',
       identifier: 'changed_identifier',
       display_name: 'Alice Chen',
       region: 'Hangzhou',

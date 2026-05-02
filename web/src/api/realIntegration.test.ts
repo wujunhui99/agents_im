@@ -17,10 +17,10 @@ describe('frontend real API integration adapters', () => {
     const fetcher = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
       if (url.endsWith('/me')) {
-        return jsonResponse({ user_id: 'usr_000001', identifier: 'alice_001', display_name: 'Alice' });
+        return jsonResponse({ user_id: '1001', identifier: 'alice_001', display_name: 'Alice' });
       }
       if (url.endsWith('/users/bob_002')) {
-        return jsonResponse({ user_id: 'usr_000002', identifier: 'bob_002', display_name: 'Bob' });
+        return jsonResponse({ user_id: '2002', identifier: 'bob_002', display_name: 'Bob' });
       }
       if (url.endsWith('/friends')) {
         return jsonResponse({ friends: [] });
@@ -28,7 +28,7 @@ describe('frontend real API integration adapters', () => {
       if (url.endsWith('/groups/grp_000001')) {
         return jsonResponse({ group_id: 'grp_000001', name: 'Frontend Demo' });
       }
-      if (url.endsWith('/conversations/seqs?conversationIds=single%3Ausr_000001%3Ausr_000002')) {
+      if (url.endsWith('/conversations/seqs?conversationIds=single%3A1001%3A2002')) {
         return jsonResponse({ conversations: [] });
       }
       return jsonResponse({});
@@ -40,14 +40,14 @@ describe('frontend real API integration adapters', () => {
     await createUserApi(client).getPublicProfileByIdentifier('bob_002');
     await createContactsApi(client).listFriends();
     await createGroupsApi(client).getGroup('grp_000001');
-    await createMessageApi(client).getConversationSeqs(['single:usr_000001:usr_000002']);
+    await createMessageApi(client).getConversationSeqs(['single:1001:2002']);
 
     expect(fetcher.mock.calls.map(([input]) => String(input))).toEqual([
       '/api/me',
       '/api/users/bob_002',
       '/api/friends',
       '/api/groups/grp_000001',
-      '/api/conversations/seqs?conversationIds=single%3Ausr_000001%3Ausr_000002',
+      '/api/conversations/seqs?conversationIds=single%3A1001%3A2002',
     ]);
     expect(fetcher.mock.calls[0]?.[1]?.headers).toEqual(
       expect.objectContaining({ Authorization: 'Bearer shared-session-token' }),

@@ -1561,6 +1561,9 @@ done
 account_terminology_doc_patterns=(
   "Account Service"
   "account_type=user|agent|admin"
+  "Snowflake"
+  "accounts"
+  "profiles"
   "user_id"
   "account id alias"
   "V0 compatibility"
@@ -1584,12 +1587,15 @@ done
 
 account_code_patterns=(
   "AccountTypeUser  AccountType = \"user\""
-  "AccountTypeNormal AccountType = AccountTypeUser"
-  "type Account = User"
+  "type Account struct"
+  "type Profile struct"
+  "AccountID"
+  "NewAccountProfile"
   "type AccountRepository interface"
   "type UserRepository = AccountRepository"
   "type AccountProfile = UserProfile"
   "func NewAccountLogic"
+  "idgen.NewString"
   "AccountLogic"
   "Path:    \"/accounts\""
   "Path:    \"/accounts/exists\""
@@ -1597,13 +1603,16 @@ account_code_patterns=(
 )
 
 for pattern in "${account_code_patterns[@]}"; do
-  rg -qF "$pattern" internal/model/user.go internal/repository/repository.go internal/logic/userlogic.go internal/svc/service_context.go internal/handler/gozero_routes.go
+  rg -qF "$pattern" internal/model/user.go internal/repository/repository.go internal/repository/memory.go internal/repository/postgres_user_friends.go internal/logic/userlogic.go internal/svc/service_context.go internal/handler/gozero_routes.go
 done
 
 account_storage_patterns=(
+  "create table if not exists accounts"
+  "create table if not exists profiles"
+  "account_id text primary key"
+  "account_id ~ '^[0-9]+$'"
   "account_type text not null default 'user'"
   "account_type in ('user', 'agent', 'admin')"
-  "where account_type = 'normal'"
 )
 
 for pattern in "${account_storage_patterns[@]}"; do
@@ -1611,8 +1620,8 @@ for pattern in "${account_storage_patterns[@]}"; do
 done
 
 rg -qF "account_type?: 'user' | 'agent' | 'admin'" web/src/api/user.ts
-rg -qF "Legacy server data that still contains \`normal\` is normalized by the backend to \`user\`" docs/product-specs/frontend-backend-contract.md
-rg -qF "旧 \`account_type=normal\` 仅作为迁移输入兼容" docs/design-docs/account-service-terminology.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
+rg -qF "Legacy server data that still contains \`normal\` is invalid and must be migrated before use" docs/product-specs/frontend-backend-contract.md
+rg -qF "旧 \`account_type=normal\` 不再作为有效输入兼容" docs/design-docs/account-service-terminology.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
 rg -qF "Account Service 术语与 V0 compatibility" AGENTS.md docs/design-docs/index.md
 rg -qF "Account Service 第一阶段产品规格" docs/product-specs/index.md docs/product-specs/user-service.md
 rg -qF "Account Service go-zero 实现设计" docs/design-docs/index.md docs/design-docs/user-service-go-zero.md
@@ -1631,7 +1640,8 @@ rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/mai
 rg -q "NewMessageLogicWithMediaValidator" internal/rpcgen/message/internal/svc/service_context.go
 rg -q "NewMessageRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
 pg_persistence_patterns=(
-  "users"
+  "accounts"
+  "profiles"
   "auth_credentials"
   "friendships"
   "groups"
@@ -1792,8 +1802,15 @@ fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
-  internal/model internal/logic internal/repository internal/handler internal/rpcgen/user internal/svc; then
+  internal/model internal/logic internal/handler internal/rpcgen/user internal/svc; then
   echo "forbidden auth secret field found in service source" >&2
+  exit 1
+fi
+
+if rg -n "password|password_hash|verification_code|oauth_token|credential" \
+  internal/repository \
+  --glob '!postgres_account_profiles_test.go'; then
+  echo "forbidden auth secret field found in repository source" >&2
   exit 1
 fi
 

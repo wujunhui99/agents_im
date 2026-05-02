@@ -1,4 +1,3 @@
-create sequence if not exists agents_im_users_id_seq;
 create sequence if not exists agents_im_groups_id_seq;
 create sequence if not exists agents_im_messages_id_seq;
 create sequence if not exists agents_im_outbox_events_id_seq;
@@ -8,48 +7,37 @@ create sequence if not exists agents_im_mcp_servers_id_seq;
 create sequence if not exists agents_im_agent_tools_id_seq;
 create sequence if not exists agents_im_agent_skills_id_seq;
 
-create table if not exists users (
-  user_id text primary key default ('usr_' || lpad(nextval('agents_im_users_id_seq')::text, 6, '0')),
+create table if not exists accounts (
+  account_id text primary key,
   identifier text not null,
-  display_name text not null,
-  name text not null,
-  gender text not null default 'unknown',
-  age integer not null default 0,
-  region text not null default '',
   account_type text not null default 'user',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint users_identifier_uniq unique (identifier),
-  constraint users_identifier_not_blank check (identifier <> ''),
-  constraint users_display_name_not_blank check (display_name <> ''),
-  constraint users_name_not_blank check (name <> ''),
-  constraint users_gender_check check (gender in ('unknown', 'male', 'female', 'other')),
-  constraint users_age_check check (age >= 0 and age <= 150),
-  constraint users_account_type_check check (account_type in ('user', 'agent', 'admin'))
+  constraint accounts_id_numeric_check check (account_id ~ '^[0-9]+$'),
+  constraint accounts_identifier_uniq unique (identifier),
+  constraint accounts_identifier_not_blank check (identifier <> ''),
+  constraint accounts_account_type_check check (account_type in ('user', 'agent', 'admin'))
 );
 
-alter table users
-  add column if not exists account_type text not null default 'user';
-
-alter table users
-  drop constraint if exists users_account_type_check;
-
-update users
-set account_type = 'user'
-where account_type = 'normal';
-
-alter table users
-  alter column account_type set default 'user';
-
-alter table users
-  add constraint users_account_type_check check (account_type in ('user', 'agent', 'admin'));
-
-alter table users
-  add column if not exists avatar_media_id text not null default '';
+create table if not exists profiles (
+  account_id text primary key references accounts(account_id) on delete cascade,
+  display_name text not null,
+  name text not null,
+  gender text not null default 'unknown',
+  birth_date date,
+  region text not null default '',
+  avatar_media_id text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint profiles_display_name_not_blank check (display_name <> ''),
+  constraint profiles_name_not_blank check (name <> ''),
+  constraint profiles_gender_check check (gender in ('unknown', 'male', 'female', 'other')),
+  constraint profiles_birth_date_check check (birth_date is null or birth_date <= current_date)
+);
 
 create table if not exists media_objects (
   media_id text primary key default ('med_' || lpad(nextval('agents_im_media_id_seq')::text, 6, '0')),
-  owner_user_id text not null references users(user_id) on delete restrict,
+  owner_user_id text not null references accounts(account_id) on delete restrict,
   bucket text not null,
   object_key text not null,
   sha256 text not null default '',
@@ -63,6 +51,7 @@ create table if not exists media_objects (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint media_objects_owner_not_blank check (owner_user_id <> ''),
+  constraint media_objects_owner_account_fk foreign key (owner_user_id) references accounts(account_id) on delete restrict,
   constraint media_objects_bucket_not_blank check (bucket <> ''),
   constraint media_objects_object_key_not_blank check (object_key <> ''),
   constraint media_objects_object_key_uniq unique (object_key),
@@ -97,7 +86,8 @@ create table if not exists auth_credentials (
   constraint auth_credentials_identifier_not_blank check (identifier <> ''),
   constraint auth_credentials_user_id_not_blank check (user_id <> ''),
   constraint auth_credentials_password_hash_not_blank check (password_hash <> ''),
-  constraint auth_credentials_hash_version_not_blank check (hash_version <> '')
+  constraint auth_credentials_hash_version_not_blank check (hash_version <> ''),
+  constraint auth_credentials_user_id_account_fk foreign key (user_id) references accounts(account_id) on delete cascade
 );
 
 create table if not exists friendships (
@@ -108,7 +98,9 @@ create table if not exists friendships (
   updated_at timestamptz not null default now(),
   primary key (user_id, friend_id),
   constraint friendships_distinct_users_check check (user_id <> friend_id),
-  constraint friendships_status_check check (status in ('active', 'deleted'))
+  constraint friendships_status_check check (status in ('active', 'deleted')),
+  constraint friendships_user_id_account_fk foreign key (user_id) references accounts(account_id) on delete cascade,
+  constraint friendships_friend_id_account_fk foreign key (friend_id) references accounts(account_id) on delete cascade
 );
 
 create index if not exists friendships_user_status_idx

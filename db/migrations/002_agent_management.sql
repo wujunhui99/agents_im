@@ -1,16 +1,15 @@
-create sequence if not exists agents_im_agents_id_seq;
-
 create table if not exists agents (
-  agent_id text primary key default ('agt_' || lpad(nextval('agents_im_agents_id_seq')::text, 6, '0')),
-  im_user_id text not null references users(user_id) on delete restrict,
+  agent_id text primary key,
+  account_id text not null references accounts(account_id) on delete restrict,
   name text not null,
   description text not null default '',
   status text not null default 'disabled',
   created_by text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint agents_im_user_id_uniq unique (im_user_id),
-  constraint agents_im_user_id_not_blank check (im_user_id <> ''),
+  constraint agents_id_numeric_check check (agent_id ~ '^[0-9]+$'),
+  constraint agents_account_id_uniq unique (account_id),
+  constraint agents_account_id_not_blank check (account_id <> ''),
   constraint agents_name_not_blank check (name <> ''),
   constraint agents_created_by_not_blank check (created_by <> ''),
   constraint agents_status_check check (status in ('draft', 'active', 'disabled', 'archived'))

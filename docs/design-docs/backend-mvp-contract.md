@@ -62,7 +62,7 @@ Authorization: Bearer <access_token>
 Required MVP operations:
 
 - query current user profile.
-- update own profile fields: display name, gender, age, region.
+- update own profile fields: display name, gender, birth date, region.
 - query public user profile by user id or unique identifier.
 - check whether identifier exists.
 

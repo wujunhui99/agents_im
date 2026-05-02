@@ -35,6 +35,7 @@ func TestAgentLogicCreateRequiresAgentAccountType(t *testing.T) {
 	if created.AgentID == "" || created.IMUserID != "usr_agent" || created.Status != logic.AgentStatusDisabled {
 		t.Fatalf("unexpected created agent: %+v", created)
 	}
+	assertNumericSnowflakeID(t, created.AgentID)
 
 	_, err = agentLogic.CreateAgent(ctx, logic.CreateAgentRequest{
 		IMUserID:  "usr_agent",
@@ -99,6 +100,7 @@ func TestAgentLogicUsesUserLogicAccountTypeChecker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create agent user: %v", err)
 	}
+	assertNumericSnowflakeID(t, agentUser.UserID)
 	userTypeAccount, err := userLogic.CreateUser(ctx, logic.CreateUserRequest{
 		Identifier:  "humantypeuser",
 		DisplayName: "Human Type User",
@@ -106,17 +108,23 @@ func TestAgentLogicUsesUserLogicAccountTypeChecker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create user-type account: %v", err)
 	}
+	assertNumericSnowflakeID(t, userTypeAccount.UserID)
 
 	agentLogic := logic.NewAgentLogic(
 		repository.NewMemoryAgentRepository(),
 		logic.NewUserLogicAccountTypeChecker(userLogic),
 	)
-	if _, err := agentLogic.CreateAgent(ctx, logic.CreateAgentRequest{
+	agent, err := agentLogic.CreateAgent(ctx, logic.CreateAgentRequest{
 		IMUserID:  agentUser.UserID,
 		Name:      "Real Checker Bot",
 		CreatedBy: "usr_admin",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("create agent with real account type checker: %v", err)
+	}
+	assertNumericSnowflakeID(t, agent.AgentID)
+	if agent.IMUserID != agentUser.UserID {
+		t.Fatalf("agent im_user_id = %q, want account id %q", agent.IMUserID, agentUser.UserID)
 	}
 	if _, err := agentLogic.CreateAgent(ctx, logic.CreateAgentRequest{
 		IMUserID:  userTypeAccount.UserID,

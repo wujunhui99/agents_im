@@ -7,11 +7,12 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { ListCard } from '../components/ui/ListCard';
 import { TextField } from '../components/ui/TextField';
+import { accountTypeLabel, avatarText, firstNonEmpty, profileDisplayName } from '../utils/profileDisplay';
 
 type ProfileDraft = {
   display_name: string;
   gender: string;
-  age: string;
+  birth_date: string;
   region: string;
 };
 
@@ -39,7 +40,7 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
       await onUpdateProfile({
         display_name: draft.display_name.trim(),
         gender: draft.gender.trim(),
-        age: Number(draft.age),
+        birth_date: draft.birth_date.trim(),
         region: draft.region.trim(),
       });
       setIsEditing(false);
@@ -61,8 +62,9 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
       <Card className="profile-card" variant="elevated">
         <Avatar label={profileInitial(profile)} color="green" size="large" />
         <div className="profile-main">
-          <strong>{profile.display_name}</strong>
+          <strong>{profileDisplayName(profile)}</strong>
           <p>账号：{profile.identifier}</p>
+          <p>类型：{accountTypeLabel(profile.account_type)}</p>
           <p>地区：{profile.region}</p>
         </div>
         <Button variant="tonal" size="small" className="profile-edit-button" aria-label="编辑个人资料" onClick={() => setIsEditing(true)}>
@@ -73,24 +75,24 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
       <ListCard ariaLabel="个人资料详情" className="profile-detail-card">
         <dl className="profile-detail-list">
           <div>
-            <dt>user_id</dt>
-            <dd>{profile.user_id}</dd>
-          </div>
-          <div>
             <dt>identifier</dt>
             <dd>{profile.identifier}</dd>
           </div>
           <div>
             <dt>display_name</dt>
-            <dd>{profile.display_name}</dd>
+            <dd>{profileDisplayName(profile)}</dd>
+          </div>
+          <div>
+            <dt>account_type</dt>
+            <dd>{accountTypeLabel(profile.account_type)}</dd>
           </div>
           <div>
             <dt>gender</dt>
             <dd>{profile.gender}</dd>
           </div>
           <div>
-            <dt>age</dt>
-            <dd>{profile.age}</dd>
+            <dt>生日</dt>
+            <dd>{profile.birth_date || '未设置'}</dd>
           </div>
           <div>
             <dt>region</dt>
@@ -115,11 +117,10 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
               fieldClassName="profile-field"
             />
             <TextField
-              label="age"
-              type="number"
-              min="0"
-              value={draft.age}
-              onChange={(event) => setDraft((current) => ({ ...current, age: event.target.value }))}
+              label="生日"
+              type="date"
+              value={draft.birth_date}
+              onChange={(event) => setDraft((current) => ({ ...current, birth_date: event.target.value }))}
               fieldClassName="profile-field"
             />
             <TextField
@@ -157,16 +158,11 @@ function createDraft(profile: UserProfile): ProfileDraft {
   return {
     display_name: profile.display_name,
     gender: profile.gender,
-    age: String(profile.age),
+    birth_date: profile.birth_date ?? '',
     region: profile.region,
   };
 }
 
 function profileInitial(profile: UserProfile) {
-  const displayName = profile.display_name.trim();
-  if (displayName) {
-    return displayName.slice(0, 2).toUpperCase();
-  }
-
-  return profile.identifier.slice(0, 2).toUpperCase();
+  return avatarText(firstNonEmpty(profile.display_name, profile.name, profile.identifier) ?? '');
 }

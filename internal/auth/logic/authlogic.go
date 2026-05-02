@@ -37,7 +37,7 @@ type RegisterRequest struct {
 	DisplayName string `json:"display_name"`
 	Name        string `json:"name"`
 	Gender      string `json:"gender"`
-	Age         int32  `json:"age"`
+	BirthDate   string `json:"birth_date"`
 	Region      string `json:"region"`
 }
 
@@ -82,7 +82,7 @@ func (l *AuthLogic) Register(ctx context.Context, req RegisterRequest) (AuthResp
 		DisplayName: req.DisplayName,
 		Name:        req.Name,
 		Gender:      req.Gender,
-		Age:         req.Age,
+		BirthDate:   req.BirthDate,
 		Region:      req.Region,
 	})
 	if err != nil {

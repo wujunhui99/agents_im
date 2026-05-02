@@ -46,7 +46,7 @@ Content-Type: application/json
   "password": "[REDACTED]",
   "display_name": "Alice",
   "gender": "female",
-  "age": 30,
+  "birth_date": "1996-05-02",
   "region": "Shanghai"
 }
 ```
@@ -58,7 +58,7 @@ Success:
   "code": "OK",
   "message": "ok",
   "data": {
-    "user_id": "usr_000001",
+    "user_id": "1001",
     "identifier": "alice_001",
     "token": "[REDACTED]",
     "expires_at": "2026-04-30T12:00:00Z"
@@ -109,12 +109,12 @@ Authorization: Bearer <access_token>
   "code": "OK",
   "message": "ok",
   "data": {
-    "user_id": "usr_000001",
+    "user_id": "1001",
     "identifier": "alice_001",
     "display_name": "Alice",
     "name": "Alice",
     "gender": "female",
-    "age": 30,
+    "birth_date": "1996-05-02",
     "region": "Shanghai",
     "account_type": "user",
     "avatar_media_id": "med_000001",
@@ -124,7 +124,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-`account_type` is one of `user`, `agent`, or `admin`. Public registration and public account creation always create `user`; clients cannot self-select `agent` or `admin` through the frontend-visible REST API. Legacy server data that still contains `normal` is normalized by the backend to `user`.
+`account_type` is one of `user`, `agent`, or `admin`. Public registration and public account creation always create `user`; clients cannot self-select `agent` or `admin` through the frontend-visible REST API. Legacy server data that still contains `normal` is invalid and must be migrated before use.
 
 ### Update Current User
 
@@ -187,7 +187,7 @@ GET /accounts/alice_001
 
 ### Current Gap
 
-A frontend-visible `GET /users/id/:user_id` public-profile endpoint is not present in this worktree. Message conversation IDs use canonical `usr_...` IDs, so clients can only show a friendly conversation title when they already have profile data from `/users/:identifier` or another real source; otherwise they must fall back to the internal user ID instead of inventing a lookup path.
+A frontend-visible `GET /users/id/:user_id` public-profile endpoint is not present in this worktree. Message conversation IDs contain internal account IDs, so clients can only show a friendly conversation title when they already have profile data from `/users/:identifier` or another real source. Otherwise, clients must show `未知联系人` instead of exposing the internal account ID or inventing a lookup path.
 
 ## Friends
 
@@ -204,7 +204,7 @@ Content-Type: application/json
 
 ```json
 {
-  "user_id": "usr_000002"
+  "user_id": "2002"
 }
 ```
 
@@ -216,8 +216,8 @@ Success:
   "message": "ok",
   "data": {
     "friendship": {
-      "user_id": "usr_000001",
-      "friend_id": "usr_000002",
+      "user_id": "1001",
+      "friend_id": "2002",
       "status": "active",
       "is_friend": true,
       "created_at": "2026-04-29T12:01:00Z",
@@ -238,14 +238,14 @@ Authorization: Bearer <access_token>
 ### Get Friendship
 
 ```http
-GET /friends/usr_000002
+GET /friends/2002
 Authorization: Bearer <access_token>
 ```
 
 ### Delete Friend
 
 ```http
-DELETE /friends/usr_000002
+DELETE /friends/2002
 Authorization: Bearer <access_token>
 ```
 
@@ -287,7 +287,7 @@ Content-Type: application/json
 
 ```json
 {
-  "user_id": "usr_000002"
+  "user_id": "2002"
 }
 ```
 
@@ -344,7 +344,7 @@ Success:
   "message": "ok",
   "data": {
     "mediaId": "med_000001",
-    "objectKey": "users/usr_000001/media/med_000001/cat.jpg",
+    "objectKey": "users/1001/media/med_000001/cat.jpg",
     "uploadUrl": "http://localhost:9000/agents-im-media/...",
     "expiresAt": 1777464000000
   }
@@ -411,7 +411,7 @@ Single chat:
 
 ```json
 {
-  "receiverId": "usr_000002",
+  "receiverId": "2002",
   "chatType": "single",
   "clientMsgId": "web-uuid-001",
   "contentType": "text",
@@ -423,7 +423,7 @@ Image message after media upload is completed:
 
 ```json
 {
-  "receiverId": "usr_000002",
+  "receiverId": "2002",
   "chatType": "single",
   "clientMsgId": "web-image-uuid-001",
   "contentType": "image",
@@ -435,7 +435,7 @@ File message after media upload is completed:
 
 ```json
 {
-  "receiverId": "usr_000002",
+  "receiverId": "2002",
   "chatType": "single",
   "clientMsgId": "web-file-uuid-001",
   "contentType": "file",
@@ -467,10 +467,10 @@ Success:
     "message": {
       "serverMsgId": "msg_000001",
       "clientMsgId": "web-uuid-001",
-      "conversationId": "single:usr_000001:usr_000002",
+      "conversationId": "single:1001:2002",
       "seq": 1,
-      "senderId": "usr_000001",
-      "receiverId": "usr_000002",
+      "senderId": "1001",
+      "receiverId": "2002",
       "chatType": "single",
       "contentType": "text",
       "content": "hello",
@@ -490,21 +490,21 @@ Success:
 ### Get Conversation Seq States
 
 ```http
-GET /conversations/seqs?conversationIds=single:usr_000001:usr_000002
+GET /conversations/seqs?conversationIds=single:1001:2002
 Authorization: Bearer <access_token>
 ```
 
 ### Pull Messages
 
 ```http
-GET /conversations/single:usr_000001:usr_000002/messages?fromSeq=1&limit=50&order=asc
+GET /conversations/single:1001:2002/messages?fromSeq=1&limit=50&order=asc
 Authorization: Bearer <access_token>
 ```
 
 ### Mark Conversation Read
 
 ```http
-POST /conversations/single:usr_000001:usr_000002/read
+POST /conversations/single:1001:2002/read
 Authorization: Bearer <access_token>
 Content-Type: application/json
 ```
@@ -555,7 +555,7 @@ The current server ACK shape is snake_case:
   "status": "ok",
   "data": {
     "connection_id": "conn_abc",
-    "user_id": "usr_000001",
+    "user_id": "1001",
     "instance_id": "gateway-local",
     "server_time": 1777464000000
   }
@@ -586,7 +586,7 @@ WebSocket error codes include the REST application codes plus `IDEMPOTENCY_CONFL
   "command": "send_message",
   "payload": {
     "chatType": "single",
-    "receiverId": "usr_000002",
+    "receiverId": "2002",
     "clientMsgId": "web-uuid-003",
     "contentType": "text",
     "content": "hello over websocket"
@@ -603,7 +603,7 @@ The ACK means the message command completed and history can be pulled. It does n
   "requestId": "req-seqs-1",
   "command": "get_conversation_seqs",
   "payload": {
-    "conversationIds": ["single:usr_000001:usr_000002"]
+    "conversationIds": ["single:1001:2002"]
   }
 }
 ```
@@ -615,7 +615,7 @@ The ACK means the message command completed and history can be pulled. It does n
   "requestId": "req-pull-1",
   "command": "pull_messages",
   "payload": {
-    "conversationId": "single:usr_000001:usr_000002",
+    "conversationId": "single:1001:2002",
     "fromSeq": 1,
     "toSeq": 0,
     "limit": 50,
@@ -631,7 +631,7 @@ The ACK means the message command completed and history can be pulled. It does n
   "requestId": "req-read-1",
   "command": "mark_conversation_read",
   "payload": {
-    "conversationId": "single:usr_000001:usr_000002",
+    "conversationId": "single:1001:2002",
     "hasReadSeq": 1
   }
 }
@@ -657,10 +657,10 @@ Push event envelope:
   "data": {
     "server_msg_id": "msg_000001",
     "client_msg_id": "web-uuid-001",
-    "conversation_id": "single:usr_000001:usr_000002",
+    "conversation_id": "single:1001:2002",
     "seq": 1,
-    "sender_id": "usr_000001",
-    "receiver_id": "usr_000002",
+    "sender_id": "1001",
+    "receiver_id": "2002",
     "chat_type": "single",
     "content_type": "text",
     "content": "hello",
@@ -682,10 +682,10 @@ Delivery status push event:
   "type": "message_delivered",
   "data": {
     "server_msg_id": "msg_000001",
-    "conversation_id": "single:usr_000001:usr_000002",
+    "conversation_id": "single:1001:2002",
     "seq": 1,
-    "sender_id": "usr_000001",
-    "receiver_id": "usr_000002",
+    "sender_id": "1001",
+    "receiver_id": "2002",
     "chat_type": "single",
     "content_type": "text",
     "message_origin": "human"

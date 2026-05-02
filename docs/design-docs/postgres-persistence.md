@@ -14,7 +14,7 @@ Phase 1 previously used in-memory repositories for user, auth, friends, groups, 
 ## Goals
 
 - Provide local PostgreSQL through `docker-compose.yml`.
-- Store phase-1 user, auth credential, friendship, group, message, conversation, read-state, idempotency, outbox, and delivery-attempt data in PostgreSQL.
+- Store phase-1 account/profile, auth credential, friendship, group, message, conversation, read-state, idempotency, outbox, and delivery-attempt data in PostgreSQL.
 - Keep normal `go test ./...` independent from Docker/PostgreSQL.
 - Preserve existing domain repository interfaces.
 - Keep auth secrets owned by auth storage, not user/message storage.
@@ -32,7 +32,8 @@ Migration SQL lives under [`../../db/migrations/001_init_postgres.sql`](../../db
 
 Phase-1 tables:
 
-- `users`: user profile authority; contains no password, hash, salt, token, or credential fields.
+- `accounts`: account identity authority; stores Snowflake `account_id`, unique `identifier`, `account_type`, and account timestamps.
+- `profiles`: account profile authority; stores display fields, avatar media reference, and profile timestamps for human users, agents, and admins. It contains no password, hash, salt, token, or credential fields.
 - `auth_credentials`: auth-owned credential row keyed by identifier; stores password hash, salt, and hash version.
 - `friendships`: directional friendship rows; repository writes reciprocal rows in one transaction.
 - `groups`: group metadata.
@@ -59,7 +60,7 @@ Strong foreign keys are only used inside a service-owned aggregate:
 
 Cross-service references are logical constraints:
 
-- `auth_credentials.user_id` references an account created through the auth/Account Service registration flow, but has no database FK to V0 `users`.
+- `auth_credentials.user_id` references an account created through the auth/Account Service registration flow, but has no database FK to `accounts`.
 - `friendships.user_id` and `friendships.friend_id` are account id aliases validated by the friends logic through Account Service lookup.
 - `groups.creator_user_id` and `group_members.user_id` are account id aliases validated by groups logic through Account Service lookup.
 - Message sender/receiver/member IDs are validated before repository writes when validators are configured.
@@ -144,7 +145,7 @@ Follow-up command after local PG is running and migrated:
 export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
 goctl model pg datasource \
   -url "$DATABASE_URL" \
-  -table "users,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys,message_outbox,delivery_attempts,agent_conversation_hosting,agent_trigger_idempotency" \
+  -table "accounts,profiles,auth_credentials,friendships,groups,group_members,messages,conversation_threads,user_conversation_states,message_idempotency_keys,message_outbox,delivery_attempts,agent_conversation_hosting,agent_trigger_idempotency" \
   -dir ./internal/model/pg \
   --style go_zero
 ```
