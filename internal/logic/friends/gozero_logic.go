@@ -158,12 +158,32 @@ func (l *ListFriendsLogic) ListFriends(req *types.ListFriendsReq) (*types.ListFr
 }
 
 func toFriendship(friendship business.FriendshipView) types.Friendship {
-	return types.Friendship{
+	view := types.Friendship{
 		UserID:    friendship.UserID,
 		FriendID:  friendship.FriendID,
 		Status:    friendship.Status,
 		IsFriend:  friendship.IsFriend,
 		CreatedAt: friendship.CreatedAt,
 		UpdatedAt: friendship.UpdatedAt,
+	}
+	if friendship.Friend != nil {
+		view.Friend = toFriendProfile(*friendship.Friend)
+	}
+	return view
+}
+
+func toFriendProfile(profile business.UserProfile) types.FriendProfile {
+	return types.FriendProfile{
+		UserID:        profile.UserID,
+		Identifier:    profile.Identifier,
+		DisplayName:   profile.DisplayName,
+		Name:          profile.Name,
+		Gender:        profile.Gender,
+		Age:           profile.Age,
+		Region:        profile.Region,
+		AccountType:   profile.AccountType,
+		AvatarMediaID: profile.AvatarMediaID,
+		CreatedAt:     profile.CreatedAt,
+		UpdatedAt:     profile.UpdatedAt,
 	}
 }

@@ -407,25 +407,19 @@ describe('WeChat-inspired app shell', () => {
                 friend_id: 'usr_000002',
                 status: 'accepted',
                 is_friend: true,
+                friend: {
+                  user_id: 'usr_000002',
+                  identifier: 'bob_002',
+                  display_name: 'Bob',
+                  name: 'Bob',
+                  gender: '',
+                  age: 0,
+                  region: '',
+                },
                 created_at: '2026-04-29T12:00:00Z',
                 updated_at: '2026-04-29T12:00:00Z',
               },
             ],
-          },
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          code: 'OK',
-          message: 'ok',
-          data: {
-            user_id: 'usr_000002',
-            identifier: 'usr_000002',
-            display_name: 'usr_000002',
-            name: 'usr_000002',
-            gender: '',
-            age: 0,
-            region: '',
           },
         }),
       )
@@ -441,13 +435,12 @@ describe('WeChat-inspired app shell', () => {
 
     await user.click(screen.getByRole('tab', { name: /发现/i }));
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
-    expect(await screen.findByRole('button', { name: '和 usr_000002 聊天' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '和 usr_000002 聊天' }));
+    await user.click(screen.getByRole('button', { name: '和 bob_002 聊天' }));
 
-    expect(await screen.findByRole('heading', { name: 'usr_000002', level: 2 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Bob', level: 2 })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '输入消息' })).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith('/users/usr_000002', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).not.toHaveBeenCalledWith('/users/usr_000002', expect.objectContaining({ method: 'GET' }));
   });
 
   it('loads friends automatically again after session restore', async () => {
@@ -527,25 +520,19 @@ describe('WeChat-inspired app shell', () => {
                 friend_id: 'usr_000002',
                 status: 'accepted',
                 is_friend: true,
+                friend: {
+                  user_id: 'usr_000002',
+                  identifier: 'bob_002',
+                  display_name: 'Bob',
+                  name: 'Bob',
+                  gender: '',
+                  age: 0,
+                  region: '',
+                },
                 created_at: '2026-04-29T12:00:00Z',
                 updated_at: '2026-04-29T12:00:00Z',
               },
             ],
-          },
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          code: 'OK',
-          message: 'ok',
-          data: {
-            user_id: 'usr_000002',
-            identifier: 'usr_000002',
-            display_name: 'usr_000002',
-            name: 'usr_000002',
-            gender: '',
-            age: 0,
-            region: '',
           },
         }),
       )
@@ -621,16 +608,16 @@ describe('WeChat-inspired app shell', () => {
     render(<App />);
 
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
-    await user.click(await screen.findByRole('button', { name: '和 usr_000002 聊天' }));
+    await user.click(await screen.findByRole('button', { name: '和 bob_002 聊天' }));
 
-    expect(await screen.findByRole('heading', { name: 'usr_000002', level: 2 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Bob', level: 2 })).toBeInTheDocument();
     expect(await screen.findByText('existing chat from Bob')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/conversations/seqs?conversationIds=', expect.objectContaining({ method: 'GET' }));
     expect(fetchMock).toHaveBeenCalledWith(
       '/conversations/single%3Ausr_000001%3Ausr_000002/messages?fromSeq=1&limit=50&order=asc',
       expect.objectContaining({ method: 'GET' }),
     );
-    expect(fetchMock).toHaveBeenCalledWith('/users/usr_000002', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).not.toHaveBeenCalledWith('/users/usr_000002', expect.objectContaining({ method: 'GET' }));
     expect(fetchMock).toHaveBeenCalledWith(
       '/conversations/single%3Ausr_000001%3Ausr_000002/read',
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ hasReadSeq: 1 }) }),
