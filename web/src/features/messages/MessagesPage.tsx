@@ -1,5 +1,5 @@
 import { ChevronLeft, MessageCircle, Search, SendHorizontal } from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
 import { createMessageApi } from '../../api/messages';
 import type { UserApi, UserProfile } from '../../api/user';
@@ -41,6 +41,7 @@ export function MessagesPage({
   const [status, setStatus] = useState('正在加载会话');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [showStartChat, setShowStartChat] = useState(false);
+  const readSyncsInFlight = useRef<Set<string>>(new Set());
   const selectedConversation = items.find((conversation) => conversation.id === selectedConversationId) ?? null;
 
   useEffect(() => {
@@ -96,6 +97,40 @@ export function MessagesPage({
       setSelectedConversationId(loadedConversation.id);
     }
   }, [items, selectedConversationId]);
+
+  useEffect(() => {
+    if (!selectedConversation) {
+      return;
+    }
+    if (selectedConversation.unread <= 0) {
+      return;
+    }
+
+    const visibleMaxSeq = maxReadableSeq(selectedConversation.messages);
+    if (visibleMaxSeq === undefined || visibleMaxSeq <= (selectedConversation.hasReadSeq ?? 0)) {
+      return;
+    }
+
+    const syncKey = `${selectedConversation.id}:${visibleMaxSeq}`;
+    if (readSyncsInFlight.current.has(syncKey)) {
+      return;
+    }
+
+    readSyncsInFlight.current.add(syncKey);
+    void messageApi
+      .markRead(selectedConversation.id, { hasReadSeq: visibleMaxSeq })
+      .then((response) => {
+        const confirmedReadSeq = response.hasReadSeq ?? visibleMaxSeq;
+        setItems((current) => markConversationRead(current, selectedConversation.id, confirmedReadSeq));
+        setStatus(`已读到 ${confirmedReadSeq}`);
+      })
+      .catch((error) => {
+        setStatus(error instanceof Error ? error.message : '标记已读失败');
+      })
+      .finally(() => {
+        readSyncsInFlight.current.delete(syncKey);
+      });
+  }, [messageApi, selectedConversation]);
 
   function handleStartChat(profile: UserProfile) {
     const draftConversation = userProfileToDraftConversation(profile);
@@ -431,6 +466,8 @@ function userProfileToDraftConversation(profile: UserProfile): Conversation {
     preview: '暂无消息',
     time: '',
     unread: 0,
+    maxSeq: 0,
+    hasReadSeq: 0,
     color: 'blue',
     chatType: 'single',
     receiverId: profile.user_id,
@@ -447,13 +484,13 @@ function mergeLoadedConversations(current: Conversation[], loaded: Conversation[
     const currentConversation = current.find((conversation) => conversationsRepresentSameThread(conversation, loadedConversation));
     return currentConversation ? mergeConversation(currentConversation, loadedConversation) : loadedConversation;
   });
-  const preservedLocalConversations = current.filter(
+  const preservedCurrentConversations = current.filter(
     (conversation) =>
-      isLocalConversation(conversation) &&
+      shouldPreserveMissingCurrentConversation(conversation) &&
       !mergedLoaded.some((loadedConversation) => conversationsRepresentSameThread(conversation, loadedConversation)),
   );
 
-  return [...mergedLoaded, ...preservedLocalConversations];
+  return [...mergedLoaded, ...preservedCurrentConversations];
 }
 
 function upsertStartedConversation(conversations: Conversation[], existingConversationId: string | undefined, draftConversation: Conversation) {
@@ -492,6 +529,8 @@ function conversationStateToView(state: ConversationSeqState, currentUserId: str
     previewOrigin: lastMessage?.messageOrigin,
     time: state.maxSeqTime ? '刚刚' : '',
     unread: state.unreadCount ?? 0,
+    maxSeq: state.maxSeq,
+    hasReadSeq: state.hasReadSeq ?? 0,
     color: state.conversationId.startsWith('group:') ? 'green' : 'blue',
     chatType: state.conversationId.startsWith('group:') ? 'group' : 'single',
     receiverId: state.conversationId.startsWith('group:') ? undefined : peerId,
@@ -513,6 +552,7 @@ function appendMessage(conversations: Conversation[], conversationId: string, me
       previewOrigin: message.messageOrigin,
       time: '刚刚',
       unread: 0,
+      maxSeq: nextConversationMaxSeq(conversation, message),
       messages: nextMessages,
     };
   });
@@ -529,6 +569,7 @@ function updateMessage(conversations: Conversation[], conversationId: string, me
       ...conversation,
       preview: conversationPreview(nextMessages, nextMessage.content),
       time: '刚刚',
+      maxSeq: nextConversationMaxSeq(conversation, nextMessage),
       messages: nextMessages,
     };
   });
@@ -551,10 +592,22 @@ function confirmSentMessage(conversations: Conversation[], conversationId: strin
       previewOrigin: nextMessage.messageOrigin,
       time: '刚刚',
       unread: 0,
+      maxSeq: nextConversationMaxSeq(conversation, nextMessage),
+      hasReadSeq: nextMessage.seq ? Math.max(conversation.hasReadSeq ?? 0, nextMessage.seq) : conversation.hasReadSeq,
       receiverId: nextMessage.receiverId ?? conversation.receiverId,
       groupId: nextMessage.groupId ?? conversation.groupId,
       messages: conversation.messages.map((message) => (message.id === messageId ? nextMessage : message)),
     };
+  });
+}
+
+function markConversationRead(conversations: Conversation[], conversationId: string, hasReadSeq: number) {
+  return conversations.map((conversation) => {
+    if (conversation.id !== conversationId) {
+      return conversation;
+    }
+
+    return applyReadSeq(conversation, hasReadSeq);
   });
 }
 
@@ -677,6 +730,21 @@ function conversationHasInFlightSend(conversation: Conversation) {
 function conversationPreview(messages: ChatMessage[], fallback: string) {
   const orderedMessages = orderedChatMessages(messages);
   return orderedMessages[orderedMessages.length - 1]?.content ?? fallback;
+}
+
+function nextConversationMaxSeq(conversation: Conversation, message: ChatMessage) {
+  const nextSeq = authoritativeSeq(message) ?? 0;
+  return Math.max(conversation.maxSeq ?? 0, nextSeq);
+}
+
+function maxReadableSeq(messages: ChatMessage[]) {
+  return orderedChatMessages(messages).reduce<number | undefined>((maxSeq, message) => {
+    const seq = authoritativeSeq(message);
+    if (seq === undefined) {
+      return maxSeq;
+    }
+    return maxSeq === undefined ? seq : Math.max(maxSeq, seq);
+  }, undefined);
 }
 
 function orderedChatMessages(messages: ChatMessage[]) {
@@ -828,11 +896,18 @@ function isLocalConversation(conversation: Conversation) {
   );
 }
 
+function shouldPreserveMissingCurrentConversation(conversation: Conversation) {
+  return isLocalConversation(conversation) || conversation.messages.length > 0;
+}
+
 function mergeConversation(current: Conversation, loaded: Conversation): Conversation {
   const messages = canonicalChatMessages([...current.messages, ...loaded.messages]);
   const orderedMessages = orderedChatMessages(messages);
   const lastMessage = orderedMessages[orderedMessages.length - 1];
   const title = shouldKeepCurrentTitle(current, loaded) ? current.title : loaded.title;
+  const maxSeq = Math.max(current.maxSeq ?? 0, loaded.maxSeq ?? 0, maxReadableSeq(messages) ?? 0);
+  const hasReadSeq = Math.max(current.hasReadSeq ?? 0, loaded.hasReadSeq ?? 0);
+  const unread = unreadAfterRead({ ...loaded, maxSeq, messages }, hasReadSeq);
 
   return {
     ...loaded,
@@ -841,8 +916,31 @@ function mergeConversation(current: Conversation, loaded: Conversation): Convers
     preview: lastMessage?.content ?? loaded.preview,
     previewOrigin: lastMessage?.messageOrigin ?? loaded.previewOrigin,
     time: lastMessage ? '刚刚' : loaded.time,
+    unread,
+    maxSeq,
+    hasReadSeq,
     messages,
   };
+}
+
+function applyReadSeq(conversation: Conversation, hasReadSeq: number): Conversation {
+  const nextHasReadSeq = Math.max(conversation.hasReadSeq ?? 0, hasReadSeq);
+  return {
+    ...conversation,
+    hasReadSeq: nextHasReadSeq,
+    unread: unreadAfterRead(conversation, nextHasReadSeq),
+  };
+}
+
+function unreadAfterRead(conversation: Conversation, hasReadSeq: number) {
+  const maxSeq = conversation.maxSeq ?? maxReadableSeq(conversation.messages) ?? 0;
+  if (hasReadSeq >= maxSeq) {
+    return 0;
+  }
+
+  const previousReadSeq = conversation.hasReadSeq ?? 0;
+  const readDelta = Math.max(0, hasReadSeq - previousReadSeq);
+  return Math.max(0, conversation.unread - readDelta);
 }
 
 function shouldKeepCurrentTitle(current: Conversation, loaded: Conversation) {
