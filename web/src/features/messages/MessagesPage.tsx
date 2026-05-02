@@ -13,6 +13,7 @@ import { MessageBubble } from '../../components/ui/MessageBubble';
 import { SearchBox } from '../../components/ui/SearchBox';
 import { TextField } from '../../components/ui/TextField';
 import type { ChatMessage, Conversation, MessageStatus } from '../../models/messages';
+import { UNKNOWN_CONTACT_LABEL, accountTypeLabel, avatarText, profileDisplayName, profileIdentifier } from '../../utils/profileDisplay';
 
 type MessagesPageProps = {
   currentUserId: string;
@@ -341,8 +342,8 @@ function StartChatPanel({
           headline={profileDisplayName(result)}
           supportingText={
             <span className="friend-supporting-lines">
-              <span>{result.identifier}</span>
-              <span>{result.user_id}</span>
+              <span>{profileIdentifier(result) ?? '资料未同步'}</span>
+              <span>{accountTypeLabel(result.account_type)}</span>
             </span>
           }
           trailing={
@@ -521,20 +522,22 @@ function conversationStateToView(state: ConversationSeqState, currentUserId: str
   const orderedMessages = orderedChatMessages(chatMessages);
   const lastMessage = orderedMessages[orderedMessages.length - 1] ?? serverLastMessage(state.lastMessage, currentUserId);
   const peerId = inferPeerId(state.conversationId, currentUserId, lastMessage);
+  const isGroup = state.conversationId.startsWith('group:');
+  const title = isGroup ? '群聊' : UNKNOWN_CONTACT_LABEL;
   return {
     id: state.conversationId,
-    title: peerId || state.conversationId,
-    avatar: avatarText(peerId || state.conversationId),
+    title,
+    avatar: avatarText(title),
     preview: lastMessage?.content ?? '暂无消息',
     previewOrigin: lastMessage?.messageOrigin,
     time: state.maxSeqTime ? '刚刚' : '',
     unread: state.unreadCount ?? 0,
     maxSeq: state.maxSeq,
     hasReadSeq: state.hasReadSeq ?? 0,
-    color: state.conversationId.startsWith('group:') ? 'green' : 'blue',
-    chatType: state.conversationId.startsWith('group:') ? 'group' : 'single',
-    receiverId: state.conversationId.startsWith('group:') ? undefined : peerId,
-    groupId: state.conversationId.startsWith('group:') ? state.conversationId.replace(/^group:/, '') : undefined,
+    color: isGroup ? 'green' : 'blue',
+    chatType: isGroup ? 'group' : 'single',
+    receiverId: isGroup ? undefined : peerId,
+    groupId: isGroup ? state.conversationId.replace(/^group:/, '') : undefined,
     messages: chatMessages,
   };
 }
@@ -713,14 +716,6 @@ function draftConversationId(userId: string) {
 
 function draftPeerId(conversationId: string) {
   return conversationId.replace(/^draft-single:/, '');
-}
-
-function profileDisplayName(profile: UserProfile) {
-  return profile.display_name || profile.name || profile.identifier || profile.user_id;
-}
-
-function avatarText(value: string) {
-  return value.trim().slice(0, 2).toUpperCase() || 'C';
 }
 
 function conversationHasInFlightSend(conversation: Conversation) {

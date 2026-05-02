@@ -6,7 +6,7 @@ import type { UserApi, UserProfile, UserProfilePatch } from '../api/user';
 import ContactsPage from './ContactsPage';
 
 const bobProfile: UserProfile = {
-  user_id: 'usr_000002',
+  user_id: '2002',
   identifier: 'bob_002',
   display_name: 'Bob Lin',
   name: 'Bob Lin',
@@ -29,7 +29,7 @@ function createContactsApi(): ContactsApi {
     listFriends: vi.fn(async () => ({ friends: [] })),
     addFriend: vi.fn(async (userId) => ({
       friendship: {
-        user_id: 'usr_000001',
+        user_id: '1001',
         friend_id: userId,
         status: 'active',
         is_friend: true,
@@ -40,7 +40,7 @@ function createContactsApi(): ContactsApi {
     })),
     deleteFriend: vi.fn(async (userId) => ({
       friendship: {
-        user_id: 'usr_000001',
+        user_id: '1001',
         friend_id: userId,
         status: 'deleted',
         is_friend: false,
@@ -57,14 +57,14 @@ function createContactsApiWithFriend(): ContactsApi {
   api.listFriends = vi.fn(async () => ({
     friends: [
       {
-        user_id: 'usr_000001',
-        friend_id: 'usr_000002',
+        user_id: '1001',
+        friend_id: '2002',
         status: 'active',
         is_friend: true,
         created_at: '2026-04-29T12:00:00Z',
         updated_at: '2026-04-29T12:00:00Z',
         friend: {
-          user_id: 'usr_000002',
+          user_id: '2002',
           identifier: 'bob_002',
           display_name: 'Cached Bob',
           name: 'Cached Bob',
@@ -92,14 +92,45 @@ describe('ContactsPage', () => {
     expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('已打开 Cached Bob 的聊天');
   });
 
+  it('renders friend profile labels without exposing the internal friend id', async () => {
+    const contactsApi = createContactsApi();
+    contactsApi.listFriends = vi.fn(async () => ({
+      friends: [
+        {
+          user_id: '1001',
+          friend_id: '2002',
+          status: 'active',
+          is_friend: true,
+          created_at: '2026-04-29T12:00:00Z',
+          updated_at: '2026-04-29T12:00:00Z',
+          friend_profile: {
+            user_id: '2002',
+            identifier: 'bob_002',
+            display_name: 'Bob Lin',
+            name: 'Bob Lin',
+            account_type: 'agent' as const,
+          },
+        },
+      ],
+    }));
+
+    render(<ContactsPage userApi={createUserApi()} contactsApi={contactsApi} onStartChat={vi.fn()} />);
+
+    const row = await screen.findByRole('button', { name: '和 bob_002 聊天' });
+    expect(within(row).getByText('Bob Lin')).toBeInTheDocument();
+    expect(within(row).getByText('bob_002')).toBeInTheDocument();
+    expect(within(row).getByText('Agent')).toBeInTheDocument();
+    expect(screen.queryByText('2002')).not.toBeInTheDocument();
+  });
+
   it('opens a friend chat using a fallback profile when only friend id is available', async () => {
     const user = userEvent.setup();
     const contactsApi = createContactsApi();
     contactsApi.listFriends = vi.fn(async () => ({
       friends: [
         {
-          user_id: 'usr_000001',
-          friend_id: 'usr_000002',
+          user_id: '1001',
+          friend_id: '2002',
           status: 'active',
           is_friend: true,
           created_at: '2026-04-29T12:00:00Z',
@@ -112,12 +143,12 @@ describe('ContactsPage', () => {
 
     render(<ContactsPage userApi={userApi} contactsApi={contactsApi} onStartChat={onStartChat} />);
 
-    await user.click(await screen.findByRole('button', { name: '和 usr_000002 聊天' }));
+    await user.click(await screen.findByRole('button', { name: '和 未知联系人 聊天' }));
 
     expect(userApi.getPublicProfileByIdentifier).not.toHaveBeenCalled();
-    await waitFor(() =>
-      expect(onStartChat).toHaveBeenCalledWith(expect.objectContaining({ user_id: 'usr_000002', identifier: 'usr_000002' })),
-    );
+    await waitFor(() => expect(onStartChat).toHaveBeenCalledWith(expect.objectContaining({ user_id: '2002' })));
+    expect(screen.queryByText('2002')).not.toBeInTheDocument();
+    expect(screen.getAllByText('未知联系人').length).toBeGreaterThan(0);
   });
 
   it('marks a search result as added and disabled after add-friend succeeds', async () => {
@@ -133,7 +164,7 @@ describe('ContactsPage', () => {
     await waitFor(() => expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('已添加好友：bob_002'));
     const searchRegion = screen.getByRole('region', { name: '账号搜索' });
     expect(within(searchRegion).getByRole('button', { name: '已添加' })).toBeDisabled();
-    expect(contactsApi.addFriend).toHaveBeenCalledWith('usr_000002');
+    expect(contactsApi.addFriend).toHaveBeenCalledWith('2002');
     expect(screen.getAllByText('Bob Lin').length).toBeGreaterThan(0);
   });
 
