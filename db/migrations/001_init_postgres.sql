@@ -10,13 +10,13 @@ create sequence if not exists agents_im_agent_skills_id_seq;
 create table if not exists accounts (
   account_id text primary key,
   identifier text not null,
-  account_type text not null default 'user',
+  account_type integer not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint accounts_id_numeric_check check (account_id ~ '^[0-9]+$'),
   constraint accounts_identifier_uniq unique (identifier),
   constraint accounts_identifier_not_blank check (identifier <> ''),
-  constraint accounts_account_type_check check (account_type in ('user', 'agent', 'admin'))
+  constraint accounts_account_type_check check (account_type in (0, 1, 2))
 );
 
 create table if not exists profiles (

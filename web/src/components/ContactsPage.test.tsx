@@ -108,7 +108,7 @@ describe('ContactsPage', () => {
             identifier: 'bob_002',
             display_name: 'Bob Lin',
             name: 'Bob Lin',
-            account_type: 'agent' as const,
+            account_type: 2 as const,
           },
         },
       ],

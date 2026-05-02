@@ -16,7 +16,7 @@ const initialProfile: UserProfile = {
   gender: 'female',
   birth_date: '1996-05-02',
   region: 'Shanghai',
-  account_type: 'user',
+  account_type: 1,
   created_at: '2026-04-29T12:00:00Z',
   updated_at: '2026-04-29T12:00:00Z',
 };
