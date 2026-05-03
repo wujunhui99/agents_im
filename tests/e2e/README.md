@@ -57,3 +57,34 @@ node tests/e2e/ws_live_push_regression.mjs
 Artifacts default to `/tmp/agents-im-ws-live-push-e2e/<timestamp>/` and can be overridden with `AGENTS_IM_E2E_OUTPUT_DIR`. The artifact set includes `report.txt`, `observations.redacted.json`, `ws-events.redacted.json`, `console.redacted.json`, and screenshots when available.
 
 Do not commit generated evidence, screenshots, secrets, real passwords, JWTs, cookies, or account credentials.
+
+## Bidirectional no-refresh send regression
+
+`ws_bidirectional_send_regression.mjs` covers the follow-up regression where B receives A's live message in an existing single conversation, stays on that same chat page, and then B's reply POSTs `/messages` with the wrong target and receives `400 Bad Request`.
+
+The harness creates fresh QA accounts, establishes friendship through real APIs, seeds an existing A/B conversation, opens both A and B browser sessions on that conversation, sends a unique A->B message, verifies B sees it without refresh, then sends B->A from B's unchanged chat window. It writes `report.txt`, redacted JSON observations/network/console/WebSocket artifacts, and screenshots under `/tmp/agents-im-ws-bidirectional-send-e2e/<timestamp>/`.
+
+Production:
+
+```bash
+AGENTS_IM_E2E_TARGET=production \
+AGENTS_IM_E2E_BASE_URL=https://agenticim.xyz \
+NODE_PATH=/tmp/ws-e2e-run/node_modules \
+node tests/e2e/ws_bidirectional_send_regression.mjs
+```
+
+Local:
+
+```bash
+AGENTS_IM_E2E_TARGET=local \
+AGENTS_IM_E2E_BASE_URL=http://127.0.0.1:5173 \
+NODE_PATH=/tmp/ws-e2e-run/node_modules \
+node tests/e2e/ws_bidirectional_send_regression.mjs
+```
+
+Classifications:
+
+- `bidirectional-send-success`
+- `reverse-send-bad-request`
+- `reverse-send-ui-disabled-or-missing-target`
+- `setup-or-harness-failed`

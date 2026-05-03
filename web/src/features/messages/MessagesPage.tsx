@@ -686,7 +686,7 @@ function upsertLiveServerMessage(conversations: Conversation[], message: ChatMes
       time: '刚刚',
       unread: message.direction === 'incoming' ? conversation.unread + 1 : conversation.unread,
       maxSeq: nextConversationMaxSeq(conversation, message),
-      receiverId: message.receiverId ?? conversation.receiverId,
+      receiverId: liveMessagePeerTarget(message) ?? conversation.receiverId,
       groupId: message.groupId ?? conversation.groupId,
       messages: nextMessages,
     };
@@ -714,10 +714,17 @@ function liveMessageToConversation(message: ChatMessage): Conversation {
     hasReadSeq: 0,
     color: isGroup ? 'green' : 'blue',
     chatType: message.chatType,
-    receiverId: isGroup ? undefined : message.senderId,
+    receiverId: isGroup ? undefined : liveMessagePeerTarget(message),
     groupId: message.groupId,
     messages: [message],
   };
+}
+
+function liveMessagePeerTarget(message: ChatMessage) {
+  if (message.chatType !== 'single') {
+    return undefined;
+  }
+  return message.direction === 'incoming' ? message.senderId : message.receiverId;
 }
 
 function conversationsRepresentSameMessageThread(conversation: Conversation, message: ChatMessage) {

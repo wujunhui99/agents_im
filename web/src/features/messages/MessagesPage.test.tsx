@@ -215,6 +215,60 @@ describe('MessagesPage real API mode', () => {
     expect(messageApi.getConversationSeqs).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the peer as the send target after an incoming live message in an open single chat', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({
+      deduplicated: false,
+      message: serverMessage({
+        serverMsgId: 'srv_reverse_reply',
+        clientMsgId: request.clientMsgId,
+        seq: 3,
+        senderId: currentUserId,
+        receiverId: request.chatType === 'single' ? request.receiverId : undefined,
+        groupId: request.chatType === 'group' ? request.groupId : undefined,
+        chatType: request.chatType,
+        content: request.content,
+        sendTime: 1777464500000,
+        createdAt: 1777464500000,
+      }),
+    }));
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed existing conversation' })], sendMessage);
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        contactsApi={createContactsApi()}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_live_before_reply', seq: 2, content: 'live message before reply' }));
+    });
+    expect(await screen.findByText('live message before reply')).toBeInTheDocument();
+
+    await user.type(screen.getByRole('textbox', { name: '输入消息' }), 'reply from same open chat');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        receiverId: peerUserId,
+        chatType: 'single',
+        contentType: 'text',
+        content: 'reply from same open chat',
+      }),
+    );
+    expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ receiverId: currentUserId }));
+  });
+
   it('uses an unknown label instead of an internal id when conversation profiles are unavailable', async () => {
     const user = userEvent.setup();
     const messageApi = createMessageApi([serverMessage({ seq: 1, content: '来自历史会话' })]);
