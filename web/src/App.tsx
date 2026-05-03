@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Compass, Contact, MessageCircle, ShieldCheck, UserRound } from 'lucide-react';
 import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
@@ -133,12 +133,15 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
 
 function AuthPage() {
   const { login, register } = useAuth();
+  const loginUserApi = useMemo(() => createUserApi(createApiClient()), []);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [identifier, setIdentifier] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [identifierCheckMessage, setIdentifierCheckMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const identifierCheckRequest = useRef(0);
   const isRegister = mode === 'register';
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -167,8 +170,42 @@ function AuthPage() {
   }
 
   function switchMode(nextMode: 'login' | 'register') {
+    identifierCheckRequest.current += 1;
     setMode(nextMode);
     setError('');
+    setIdentifierCheckMessage('');
+  }
+
+  function handleIdentifierChange(event: ChangeEvent<HTMLInputElement>) {
+    identifierCheckRequest.current += 1;
+    setIdentifier(event.target.value);
+    setIdentifierCheckMessage('');
+  }
+
+  async function checkLoginIdentifierExists() {
+    if (isRegister) {
+      return;
+    }
+    const query = identifier.trim();
+    identifierCheckRequest.current += 1;
+    const requestID = identifierCheckRequest.current;
+    setIdentifierCheckMessage('');
+    if (!query) {
+      return;
+    }
+
+    try {
+      const result = await loginUserApi.identifierExists(query);
+      if (identifierCheckRequest.current !== requestID) {
+        return;
+      }
+      setIdentifierCheckMessage(result.exists ? '' : '账号不存在，请检查后再输入密码');
+    } catch {
+      if (identifierCheckRequest.current !== requestID) {
+        return;
+      }
+      setIdentifierCheckMessage('暂时无法确认账号是否存在，请稍后重试');
+    }
   }
 
   return (
@@ -187,7 +224,7 @@ function AuthPage() {
             id="auth-identifier"
             label="账号"
             value={identifier}
-            onChange={(event) => setIdentifier(event.target.value)}
+            onChange={handleIdentifierChange}
             autoComplete="username"
             required
             fieldClassName="auth-field"
@@ -210,11 +247,18 @@ function AuthPage() {
             label="密码"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            onFocus={checkLoginIdentifierExists}
             type="password"
             autoComplete={isRegister ? 'new-password' : 'current-password'}
             required
             fieldClassName="auth-field"
           />
+
+          {!isRegister && identifierCheckMessage ? (
+            <p className="auth-error" role="alert">
+              {identifierCheckMessage}
+            </p>
+          ) : null}
 
           {error ? (
             <p className="auth-error" role="alert">

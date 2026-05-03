@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
+	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	authsvc "github.com/wujunhui99/agents_im/internal/auth/svc"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
@@ -90,6 +92,38 @@ func TestAuthLogicRegisterLoginAndValidateToken(t *testing.T) {
 	if !validated.Valid || validated.UserID != registered.UserID || validated.Identifier != registered.Identifier {
 		t.Fatalf("unexpected token validation response: %+v", validated)
 	}
+}
+
+func TestAuthLogicRegisterThenLoginWithPersistentBcryptCredentialShape(t *testing.T) {
+	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
+	authLogic := authlogic.NewAuthLogic(
+		newPostgresShapeCredentialRepository(),
+		useradapter.NewLogicClient(userLogic),
+		authlogic.NewPasswordHasher(),
+		token.NewHMACTokenManager("test-secret", time.Hour),
+	)
+	ctx := context.Background()
+
+	registered, err := authLogic.Register(ctx, authlogic.RegisterRequest{
+		Identifier:  "Persisted_Bcrypt_001",
+		Password:    "correct-password",
+		DisplayName: "Persisted Bcrypt",
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	loggedIn, err := authLogic.Login(ctx, authlogic.LoginRequest{
+		Identifier: "persisted_bcrypt_001",
+		Password:   "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("login after register with persistent credential shape: %v", err)
+	}
+	if loggedIn.UserID != registered.UserID || loggedIn.Identifier != registered.Identifier {
+		t.Fatalf("login user mismatch: registered=%+v loggedIn=%+v", registered, loggedIn)
+	}
+	assertLooksLikeJWT(t, loggedIn.Token)
 }
 
 func TestAuthTokenExpires(t *testing.T) {
@@ -222,6 +256,91 @@ func newAuthLogic(userLogic *userlogic.UserLogic) *authlogic.AuthLogic {
 		authlogic.NewPasswordHasher(),
 		token.NewHMACTokenManager("test-secret", time.Hour),
 	)
+}
+
+type postgresShapeCredentialRepository struct {
+	mu           sync.RWMutex
+	byIdentifier map[string]postgresShapeCredential
+	byUserID     map[string]string
+	now          func() time.Time
+}
+
+type postgresShapeCredential struct {
+	Identifier   string
+	UserID       string
+	PasswordHash string
+	PasswordAlgo int16
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func newPostgresShapeCredentialRepository() *postgresShapeCredentialRepository {
+	return &postgresShapeCredentialRepository{
+		byIdentifier: make(map[string]postgresShapeCredential),
+		byUserID:     make(map[string]string),
+		now:          time.Now,
+	}
+}
+
+func (r *postgresShapeCredentialRepository) Create(_ context.Context, credential authmodel.Credential) (authmodel.Credential, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.byIdentifier[credential.Identifier]; exists {
+		return authmodel.Credential{}, apperror.AlreadyExists("auth credential already exists")
+	}
+	if _, exists := r.byUserID[credential.UserID]; exists {
+		return authmodel.Credential{}, apperror.AlreadyExists("auth credential already exists")
+	}
+
+	now := r.now().UTC()
+	row := postgresShapeCredential{
+		Identifier:   credential.Identifier,
+		UserID:       credential.UserID,
+		PasswordHash: credential.PasswordHash,
+		PasswordAlgo: persistentPasswordAlgo(credential.HashVersion),
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	r.byIdentifier[row.Identifier] = row
+	r.byUserID[row.UserID] = row.Identifier
+	return row.credential(), nil
+}
+
+func (r *postgresShapeCredentialRepository) GetByIdentifier(_ context.Context, identifier string) (authmodel.Credential, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	row, exists := r.byIdentifier[identifier]
+	if !exists {
+		return authmodel.Credential{}, apperror.NotFound("auth credential not found")
+	}
+	return row.credential(), nil
+}
+
+func (r postgresShapeCredential) credential() authmodel.Credential {
+	return authmodel.Credential{
+		Identifier:   r.Identifier,
+		UserID:       r.UserID,
+		PasswordHash: r.PasswordHash,
+		HashVersion:  persistentPasswordVersion(r.PasswordAlgo),
+		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    r.UpdatedAt,
+	}
+}
+
+func persistentPasswordAlgo(version string) int16 {
+	if version == "sha256-iter-v1" {
+		return 2
+	}
+	return 1
+}
+
+func persistentPasswordVersion(algo int16) string {
+	if algo == 2 {
+		return "sha256-iter-v1"
+	}
+	return "bcrypt-v1"
 }
 
 func assertLooksLikeJWT(t *testing.T, raw string) {
