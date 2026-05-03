@@ -12,8 +12,10 @@ const (
 	genderDBFemale  int16 = 2
 	genderDBOther   int16 = 3
 
-	friendshipStatusDBActive  int16 = 1
-	friendshipStatusDBDeleted int16 = 2
+	friendshipStatusDBPending  int16 = 1
+	friendshipStatusDBAccepted int16 = 2
+	friendshipStatusDBRejected int16 = 3
+	friendshipStatusDBDeleted  int16 = 4
 
 	groupMemberRoleDBOwner    int16 = 1
 	groupMemberRoleDBMember   int16 = 2
@@ -80,17 +82,29 @@ func genderFromDB(v int16) string {
 }
 
 func friendshipStatusToDB(status string) int16 {
-	if status == model.FriendshipStatusDeleted {
+	switch status {
+	case model.FriendshipStatusAccepted:
+		return friendshipStatusDBAccepted
+	case model.FriendshipStatusRejected:
+		return friendshipStatusDBRejected
+	case model.FriendshipStatusDeleted:
 		return friendshipStatusDBDeleted
+	default:
+		return friendshipStatusDBPending
 	}
-	return friendshipStatusDBActive
 }
 
 func friendshipStatusFromDB(v int16) string {
-	if v == friendshipStatusDBDeleted {
+	switch v {
+	case friendshipStatusDBAccepted:
+		return model.FriendshipStatusAccepted
+	case friendshipStatusDBRejected:
+		return model.FriendshipStatusRejected
+	case friendshipStatusDBDeleted:
 		return model.FriendshipStatusDeleted
+	default:
+		return model.FriendshipStatusPending
 	}
-	return model.FriendshipStatusActive
 }
 
 func memberStateToDB(state string) int16 {

@@ -70,6 +70,7 @@ create table if not exists friendships (
   primary key (account_id, friend_account_id)
 );
 
+-- friendships.status: 1=pending, 2=accepted, 3=rejected, 4=deleted.
 create index if not exists friendships_account_status_idx
   on friendships (account_id, status, friend_account_id);
 

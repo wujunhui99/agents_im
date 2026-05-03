@@ -31,7 +31,7 @@ function createContactsApi(): ContactsApi {
       friendship: {
         user_id: '1001',
         friend_id: userId,
-        status: 'active',
+        status: 'accepted',
         is_friend: true,
         created_at: '2026-04-29T12:00:00Z',
         updated_at: '2026-04-29T12:00:00Z',
@@ -49,6 +49,29 @@ function createContactsApi(): ContactsApi {
       },
       deleted: true,
     })),
+    listFriendRequests: vi.fn(async () => ({ incoming: [], outgoing: [] })),
+    acceptFriendRequest: vi.fn(async (userId) => ({
+      friendship: {
+        user_id: '1001',
+        friend_id: userId,
+        status: 'accepted',
+        is_friend: true,
+        created_at: '2026-04-29T12:00:00Z',
+        updated_at: '2026-04-29T12:00:00Z',
+      },
+      updated: true,
+    })),
+    rejectFriendRequest: vi.fn(async (userId) => ({
+      friendship: {
+        user_id: userId,
+        friend_id: '1001',
+        status: 'rejected',
+        is_friend: false,
+        created_at: '2026-04-29T12:00:00Z',
+        updated_at: '2026-04-29T12:00:00Z',
+      },
+      updated: true,
+    })),
   };
 }
 
@@ -59,7 +82,7 @@ function createContactsApiWithFriend(): ContactsApi {
       {
         user_id: '1001',
         friend_id: '2002',
-        status: 'active',
+        status: 'accepted',
         is_friend: true,
         created_at: '2026-04-29T12:00:00Z',
         updated_at: '2026-04-29T12:00:00Z',
@@ -99,7 +122,7 @@ describe('ContactsPage', () => {
         {
           user_id: '1001',
           friend_id: '2002',
-          status: 'active',
+          status: 'accepted',
           is_friend: true,
           created_at: '2026-04-29T12:00:00Z',
           updated_at: '2026-04-29T12:00:00Z',
@@ -131,7 +154,7 @@ describe('ContactsPage', () => {
         {
           user_id: '1001',
           friend_id: '2002',
-          status: 'active',
+          status: 'accepted',
           is_friend: true,
           created_at: '2026-04-29T12:00:00Z',
           updated_at: '2026-04-29T12:00:00Z',
@@ -151,21 +174,90 @@ describe('ContactsPage', () => {
     expect(screen.getAllByText('未知联系人').length).toBeGreaterThan(0);
   });
 
-  it('marks a search result as added and disabled after add-friend succeeds', async () => {
+  it('marks a search result as pending and keeps it out of the friend list until accepted', async () => {
     const user = userEvent.setup();
     const contactsApi = createContactsApi();
 
+    contactsApi.addFriend = vi.fn(async (userId) => ({
+      friendship: {
+        user_id: '1001',
+        friend_id: userId,
+        status: 'pending',
+        is_friend: false,
+        created_at: '2026-04-29T12:00:00Z',
+        updated_at: '2026-04-29T12:00:00Z',
+        friend: bobProfile,
+      },
+      created: true,
+    }));
+
     render(<ContactsPage userApi={createUserApi()} contactsApi={contactsApi} />);
 
-    await user.type(screen.getByLabelText('按 identifier 搜索用户'), 'bob_002');
+    await user.type(screen.getByLabelText('按账号搜索用户'), 'bob_002');
     await user.click(screen.getByRole('button', { name: '搜索用户' }));
     await user.click(await screen.findByRole('button', { name: '添加好友 bob_002' }));
 
-    await waitFor(() => expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('已添加好友：bob_002'));
+    await waitFor(() => expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('已发送好友申请，等待对方确认'));
     const searchRegion = screen.getByRole('region', { name: '账号搜索' });
-    expect(within(searchRegion).getByRole('button', { name: '已添加' })).toBeDisabled();
+    expect(within(searchRegion).getByRole('button', { name: '等待对方确认' })).toBeDisabled();
     expect(contactsApi.addFriend).toHaveBeenCalledWith('2002');
-    expect(screen.getAllByText('Bob Lin').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('等待对方确认').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: '和 bob_002 聊天' })).not.toBeInTheDocument();
+  });
+
+
+  it('allows accepting an incoming friend request and then shows the requester in friends', async () => {
+    const user = userEvent.setup();
+    const contactsApi = createContactsApi();
+    contactsApi.listFriendRequests = vi.fn(async () => ({
+      incoming: [
+        {
+          user_id: '2002',
+          friend_id: '1001',
+          status: 'pending',
+          is_friend: false,
+          created_at: '2026-04-29T12:00:00Z',
+          updated_at: '2026-04-29T12:00:00Z',
+          profile: bobProfile,
+        },
+      ],
+      outgoing: [],
+    }));
+
+    render(<ContactsPage userApi={createUserApi()} contactsApi={contactsApi} onStartChat={vi.fn()} />);
+
+    await user.click(await screen.findByRole('button', { name: '同意 bob_002' }));
+
+    await waitFor(() => expect(contactsApi.acceptFriendRequest).toHaveBeenCalledWith('2002'));
+    await waitFor(() => expect(screen.getByRole('button', { name: '和 bob_002 聊天' })).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: '同意 bob_002' })).not.toBeInTheDocument();
+  });
+
+  it('allows rejecting an incoming friend request without adding the requester as a friend', async () => {
+    const user = userEvent.setup();
+    const contactsApi = createContactsApi();
+    contactsApi.listFriendRequests = vi.fn(async () => ({
+      incoming: [
+        {
+          user_id: '2002',
+          friend_id: '1001',
+          status: 'pending',
+          is_friend: false,
+          created_at: '2026-04-29T12:00:00Z',
+          updated_at: '2026-04-29T12:00:00Z',
+          profile: bobProfile,
+        },
+      ],
+      outgoing: [],
+    }));
+
+    render(<ContactsPage userApi={createUserApi()} contactsApi={contactsApi} onStartChat={vi.fn()} />);
+
+    await user.click(await screen.findByRole('button', { name: '拒绝 bob_002' }));
+
+    await waitFor(() => expect(contactsApi.rejectFriendRequest).toHaveBeenCalledWith('2002'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: '拒绝 bob_002' })).not.toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: '和 bob_002 聊天' })).not.toBeInTheDocument();
   });
 
   it('marks roadmap contact entries as unavailable instead of normal working actions', async () => {

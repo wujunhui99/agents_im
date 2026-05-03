@@ -3,9 +3,14 @@ package model
 import "time"
 
 const (
-	FriendshipStatusNone    = "none"
-	FriendshipStatusActive  = "active"
-	FriendshipStatusDeleted = "deleted"
+	FriendshipStatusNone     = "none"
+	FriendshipStatusPending  = "pending"
+	FriendshipStatusAccepted = "accepted"
+	FriendshipStatusRejected = "rejected"
+	FriendshipStatusDeleted  = "deleted"
+
+	// FriendshipStatusActive is a V0 compatibility alias for accepted friendships.
+	FriendshipStatusActive = FriendshipStatusAccepted
 )
 
 type Friendship struct {

@@ -33,10 +33,23 @@ export type DeleteFriendData = {
   deleted: boolean;
 };
 
+export type FriendRequestsData = {
+  incoming: Friendship[];
+  outgoing: Friendship[];
+};
+
+export type FriendRequestDecisionData = {
+  friendship: Friendship;
+  updated: boolean;
+};
+
 export type ContactsApi = {
   listFriends: () => Promise<ListFriendsData>;
   addFriend: (userId: string) => Promise<AddFriendData>;
   deleteFriend: (userId: string) => Promise<DeleteFriendData>;
+  listFriendRequests: () => Promise<FriendRequestsData>;
+  acceptFriendRequest: (userId: string) => Promise<FriendRequestDecisionData>;
+  rejectFriendRequest: (userId: string) => Promise<FriendRequestDecisionData>;
 };
 
 export function createContactsApi(api: ApiClient = createApiClient()): ContactsApi {
@@ -49,6 +62,15 @@ export function createContactsApi(api: ApiClient = createApiClient()): ContactsA
     },
     deleteFriend(userId: string) {
       return api.delete<DeleteFriendData>(`/friends/${encodeURIComponent(userId)}`);
+    },
+    listFriendRequests() {
+      return api.get<FriendRequestsData>('/friends/requests');
+    },
+    acceptFriendRequest(userId: string) {
+      return api.post<FriendRequestDecisionData>(`/friends/requests/${encodeURIComponent(userId)}/accept`, {});
+    },
+    rejectFriendRequest(userId: string) {
+      return api.post<FriendRequestDecisionData>(`/friends/requests/${encodeURIComponent(userId)}/reject`, {});
     },
   };
 }
