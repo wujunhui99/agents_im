@@ -7,7 +7,7 @@
 - [core-beliefs.md](./core-beliefs.md)：Agent-first 工程核心理念
 - [system-boundaries.md](./system-boundaries.md)：IM 后端、Agent 系统、前端系统职责与边界
 - [im-agent-contract.md](./im-agent-contract.md)：IM 与 Agent 第一阶段 API/Event Contract
-- [account-service-terminology.md](./account-service-terminology.md)：Account Service 术语、account_type 和 V0 compatibility
+- [account-service-terminology.md](./account-service-terminology.md)：Account Service 术语与 V0 compatibility、account_type
 - [user-auth-friends-groups-boundaries.md](./user-auth-friends-groups-boundaries.md)：Account/Auth/Friends/Groups 微服务边界
 - [jwt-auth-middleware.md](./jwt-auth-middleware.md)：统一 JWT 鉴权中间件与 context user 规则
 - [user-service-go-zero.md](./user-service-go-zero.md)：Account Service go-zero 实现设计

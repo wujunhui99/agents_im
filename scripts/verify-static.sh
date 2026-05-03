@@ -882,6 +882,15 @@ done
 rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
 rg -q "AllowQueryToken: true" deploy/k8s/etc/gateway-ws.yaml
 rg -q 'GATEWAY_WS_ALLOW_QUERY_TOKEN: "true"' deploy/k8s/configmap.yaml
+rg -q 'GATEWAY_WS_ALLOWED_ORIGINS: "https://agenticim\.xyz"' deploy/k8s/configmap.yaml
+if rg -q 'GATEWAY_WS_ALLOWED_ORIGINS:\s*""' deploy/k8s/configmap.yaml; then
+  echo "production k8s websocket origins must not be empty" >&2
+  exit 1
+fi
+rg -F -q 'AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}' deploy/k8s/etc/gateway-ws.yaml
+rg -q 'AllowedOrigins: http://localhost:5173,http://127\.0\.0\.1:5173' etc/gateway-ws.yaml
+rg -q "AllowQueryToken: true" etc/gateway-ws.yaml
+rg -q "TestWebSocketOriginPolicyUsesConfiguredExactOrigins" internal/gateway/ws/server_test.go
 rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "websocket-gateway" docs/exec-plans/completed/websocket-gateway.md
 
