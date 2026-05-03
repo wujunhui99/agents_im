@@ -15,12 +15,12 @@ import (
 type postgresAccountProfileRow struct {
 	AccountID        string    `db:"account_id"`
 	Identifier       string    `db:"identifier"`
-	AccountType      string    `db:"account_type"`
+	AccountType      int16     `db:"account_type"`
 	AccountCreatedAt time.Time `db:"account_created_at"`
 	AccountUpdatedAt time.Time `db:"account_updated_at"`
 	DisplayName      string    `db:"display_name"`
 	Name             string    `db:"name"`
-	Gender           string    `db:"gender"`
+	Gender           int16     `db:"gender"`
 	BirthDate        string    `db:"birth_date"`
 	Region           string    `db:"region"`
 	AvatarMediaID    string    `db:"avatar_media_id"`
@@ -29,9 +29,9 @@ type postgresAccountProfileRow struct {
 }
 
 type postgresFriendshipRow struct {
-	UserID    string    `db:"user_id"`
-	FriendID  string    `db:"friend_id"`
-	Status    string    `db:"status"`
+	UserID    string    `db:"account_id"`
+	FriendID  string    `db:"friend_account_id"`
+	Status    int16     `db:"status"`
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
 }
@@ -59,14 +59,14 @@ func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model
 		if _, err := session.ExecCtx(ctx, `
 insert into accounts (account_id, identifier, account_type)
 values ($1, $2, $3)
-`, accountID, user.Identifier, accountType); err != nil {
+`, accountID, user.Identifier, accountTypeToDB(accountType)); err != nil {
 			return err
 		}
 
 		if _, err := session.ExecCtx(ctx, `
 insert into profiles (account_id, display_name, name, gender, birth_date, region, avatar_media_id)
 values ($1, $2, $3, $4, nullif($5, '')::date, $6, $7)
-`, accountID, user.DisplayName, user.Name, user.Gender, user.BirthDate, user.Region, strings.TrimSpace(user.AvatarMediaID)); err != nil {
+`, accountID, user.DisplayName, user.Name, genderToDB(user.Gender), user.BirthDate, user.Region, strings.TrimSpace(user.AvatarMediaID)); err != nil {
 			return err
 		}
 
@@ -152,7 +152,7 @@ func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID string, p
 		addSetter("name", *patch.Name)
 	}
 	if patch.Gender != nil {
-		addSetter("gender", *patch.Gender)
+		addSetter("gender", genderToDB(*patch.Gender))
 	}
 	if patch.BirthDate != nil {
 		addSetter("birth_date", sql.NullString{String: *patch.BirthDate, Valid: strings.TrimSpace(*patch.BirthDate) != ""})
@@ -240,16 +240,16 @@ func (r *PostgresRepository) DeleteFriend(ctx context.Context, userID string, fr
 		if err := session.QueryRowCtx(ctx, &row, `
 update friendships
 set status = $3, updated_at = now()
-where user_id = $1 and friend_id = $2 and status = $4
-returning user_id, friend_id, status, created_at, updated_at
-`, userID, friendID, model.FriendshipStatusDeleted, model.FriendshipStatusActive); err != nil {
+where account_id = $1 and friend_account_id = $2 and status = $4
+returning account_id, friend_account_id, status, created_at, updated_at
+`, userID, friendID, friendshipStatusToDB(model.FriendshipStatusDeleted), friendshipStatusToDB(model.FriendshipStatusActive)); err != nil {
 			return err
 		}
 		_, err := session.ExecCtx(ctx, `
 update friendships
 set status = $3, updated_at = now()
-where user_id = $1 and friend_id = $2 and status = $4
-`, friendID, userID, model.FriendshipStatusDeleted, model.FriendshipStatusActive)
+where account_id = $1 and friend_account_id = $2 and status = $4
+`, friendID, userID, friendshipStatusToDB(model.FriendshipStatusDeleted), friendshipStatusToDB(model.FriendshipStatusActive))
 		if err != nil {
 			return err
 		}
@@ -268,11 +268,11 @@ where user_id = $1 and friend_id = $2 and status = $4
 func (r *PostgresRepository) ListFriends(ctx context.Context, userID string) ([]model.Friendship, error) {
 	var rows []postgresFriendshipRow
 	err := r.conn.QueryRowsCtx(ctx, &rows, `
-select user_id, friend_id, status, created_at, updated_at
+select account_id, friend_account_id, status, created_at, updated_at
 from friendships
-where user_id = $1 and status = $2
-order by friend_id asc
-`, userID, model.FriendshipStatusActive)
+where account_id = $1 and status = $2
+order by friend_account_id asc
+`, userID, friendshipStatusToDB(model.FriendshipStatusActive))
 	if err != nil {
 		return nil, err
 	}
@@ -297,9 +297,9 @@ func (r *PostgresRepository) GetFriendship(ctx context.Context, userID string, f
 
 func queryFriendship(ctx context.Context, session sqlx.Session, userID string, friendID string, forUpdate bool) (model.Friendship, error) {
 	query := `
-select user_id, friend_id, status, created_at, updated_at
+select account_id, friend_account_id, status, created_at, updated_at
 from friendships
-where user_id = $1 and friend_id = $2
+where account_id = $1 and friend_account_id = $2
 `
 	if forUpdate {
 		query += " for update"
@@ -315,24 +315,21 @@ where user_id = $1 and friend_id = $2
 func upsertActiveFriendship(ctx context.Context, session sqlx.Session, userID string, friendID string) (model.Friendship, error) {
 	var row postgresFriendshipRow
 	if err := session.QueryRowCtx(ctx, &row, `
-insert into friendships (user_id, friend_id, status)
+insert into friendships (account_id, friend_account_id, status)
 values ($1, $2, $3)
-on conflict (user_id, friend_id) do update
+on conflict (account_id, friend_account_id) do update
 set status = excluded.status,
     created_at = now(),
     updated_at = now()
-returning user_id, friend_id, status, created_at, updated_at
-`, userID, friendID, model.FriendshipStatusActive); err != nil {
+returning account_id, friend_account_id, status, created_at, updated_at
+`, userID, friendID, friendshipStatusToDB(model.FriendshipStatusActive)); err != nil {
 		return model.Friendship{}, err
 	}
 	return row.friendship(), nil
 }
 
 func (r postgresAccountProfileRow) user() model.User {
-	accountType, ok := model.NormalizeAccountType(r.AccountType)
-	if !ok {
-		accountType = model.AccountType(r.AccountType)
-	}
+	accountType := accountTypeFromDB(r.AccountType)
 	return model.NewAccountProfile(
 		model.Account{
 			AccountID:   r.AccountID,
@@ -345,7 +342,7 @@ func (r postgresAccountProfileRow) user() model.User {
 			AccountID:     r.AccountID,
 			DisplayName:   r.DisplayName,
 			Name:          r.Name,
-			Gender:        r.Gender,
+			Gender:        genderFromDB(r.Gender),
 			BirthDate:     r.BirthDate,
 			Region:        r.Region,
 			AvatarMediaID: r.AvatarMediaID,
@@ -359,7 +356,7 @@ func (r postgresFriendshipRow) friendship() model.Friendship {
 	return model.Friendship{
 		UserID:    r.UserID,
 		FriendID:  r.FriendID,
-		Status:    r.Status,
+		Status:    friendshipStatusFromDB(r.Status),
 		CreatedAt: r.CreatedAt,
 		UpdatedAt: r.UpdatedAt,
 	}

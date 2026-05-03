@@ -20,32 +20,25 @@ type PostgresMessageRepository struct {
 }
 
 type postgresMessageRow struct {
-	ServerMsgID           string    `db:"server_msg_id"`
+	ServerMsgID           string    `db:"message_id"`
 	ClientMsgID           string    `db:"client_msg_id"`
-	SenderID              string    `db:"sender_id"`
+	SenderID              string    `db:"sender_account_id"`
 	ConversationID        string    `db:"conversation_id"`
 	Seq                   int64     `db:"seq"`
-	ChatType              string    `db:"chat_type"`
-	ReceiverID            string    `db:"receiver_id"`
+	ConversationType      int16     `db:"conversation_type"`
+	ReceiverID            string    `db:"receiver_account_id"`
 	GroupID               string    `db:"group_id"`
-	ContentType           string    `db:"content_type"`
+	ContentTypeValue      int16     `db:"content_type"`
 	Content               []byte    `db:"content"`
-	MessageOrigin         string    `db:"message_origin"`
+	MessageOriginValue    int16     `db:"message_origin"`
 	AgentAccountID        string    `db:"agent_account_id"`
-	TriggerServerMsgID    string    `db:"trigger_server_msg_id"`
+	TriggerServerMsgID    string    `db:"trigger_message_id"`
 	AgentRunID            string    `db:"agent_run_id"`
 	AllowRecursiveTrigger bool      `db:"allow_recursive_trigger"`
 	PayloadHash           string    `db:"payload_hash"`
-	SendTime              time.Time `db:"send_time"`
-	CreatedAt             time.Time `db:"created_at"`
+	SendTime              time.Time `db:"client_send_time"`
+	CreatedAt             time.Time `db:"server_received_at"`
 	UpdatedAt             time.Time `db:"updated_at"`
-}
-
-type postgresMessageIdempotencyRow struct {
-	PayloadHash    string `db:"payload_hash"`
-	ServerMsgID    string `db:"server_msg_id"`
-	ConversationID string `db:"conversation_id"`
-	Seq            int64  `db:"seq"`
 }
 
 type postgresConversationLockRow struct {
@@ -86,16 +79,12 @@ func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context,
 	var stored Message
 	deduplicated := false
 	err = r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
-		existing, err := queryMessageIdempotency(ctx, session, input.SenderID, input.ClientMsgID)
+		existing, err := queryMessageBySenderClient(ctx, session, input.SenderID, input.ClientMsgID)
 		if err == nil {
 			if existing.PayloadHash != payloadHash {
 				return apperror.AlreadyExists("idempotency conflict")
 			}
-			message, err := queryMessageByServerID(ctx, session, existing.ServerMsgID)
-			if err != nil {
-				return err
-			}
-			stored = message.message()
+			stored = existing.message()
 			deduplicated = true
 			return nil
 		}
@@ -114,9 +103,6 @@ func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		if err := insertMessageIdempotency(ctx, session, input, messageRow); err != nil {
-			return err
-		}
 		if err := upsertVisibleConversationStates(ctx, session, input, conversationID, nextSeq); err != nil {
 			return err
 		}
@@ -124,9 +110,6 @@ func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context,
 			return err
 		}
 		if err := updateConversationThreadAfterMessage(ctx, session, conversationID, messageRow.ServerMsgID, nextSeq, sendTime); err != nil {
-			return err
-		}
-		if err := insertDeliveryAttemptsForMessage(ctx, session, messageRow, input); err != nil {
 			return err
 		}
 		if err := insertMessageOutboxEvent(ctx, session, messageRow, input); err != nil {
@@ -182,10 +165,11 @@ select max_seq from conversation_threads where conversation_id = $1
 	}
 
 	query := `
-select server_msg_id, client_msg_id, sender_id, conversation_id, seq, chat_type,
-       receiver_id, group_id, content_type, content, message_origin, agent_account_id,
-       trigger_server_msg_id, agent_run_id, allow_recursive_trigger,
-       payload_hash, send_time, created_at, updated_at
+select message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+       receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
+       trigger_message_id, agent_run_id, allow_recursive_trigger,
+       payload_hash, coalesce(client_send_time, server_received_at) as client_send_time,
+       server_received_at, updated_at
 from messages
 where conversation_id = $1 and seq >= $2 and seq <= $3
 order by seq ` + order + `
@@ -223,7 +207,7 @@ func (r *PostgresMessageRepository) GetConversationSeqStates(ctx context.Context
 		if err := r.conn.QueryRowsCtx(ctx, &ids, `
 select conversation_id
 from user_conversation_states
-where user_id = $1
+where account_id = $1
 order by updated_at desc, conversation_id asc
 `, userID); err != nil {
 			return nil, err
@@ -253,13 +237,13 @@ func (r *PostgresMessageRepository) SetUserHasReadSeqMax(ctx context.Context, us
 	updated := false
 	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		var stateRow struct {
-			HasReadSeq     int64 `db:"has_read_seq"`
-			LastVisibleSeq int64 `db:"last_visible_seq"`
+			HasReadSeq     int64 `db:"last_read_seq"`
+			LastVisibleSeq int64 `db:"visible_start_seq"`
 		}
 		if err := session.QueryRowCtx(ctx, &stateRow, `
-select has_read_seq, last_visible_seq
+select last_read_seq, visible_start_seq
 from user_conversation_states
-where user_id = $1 and conversation_id = $2
+where account_id = $1 and conversation_id = $2
 for update
 `, userID, conversationID); err != nil {
 			return err
@@ -271,9 +255,9 @@ for update
 		updated = seq > stateRow.HasReadSeq
 		if _, err := session.ExecCtx(ctx, `
 update user_conversation_states
-set has_read_seq = greatest(has_read_seq, $3),
+set last_read_seq = greatest(last_read_seq, $3),
     updated_at = now()
-where user_id = $1 and conversation_id = $2
+where account_id = $1 and conversation_id = $2
 `, userID, conversationID, seq); err != nil {
 			return err
 		}
@@ -294,33 +278,27 @@ where user_id = $1 and conversation_id = $2
 	return state.Clone(), updated, nil
 }
 
-func queryMessageIdempotency(ctx context.Context, session sqlx.Session, senderID string, clientMsgID string) (postgresMessageIdempotencyRow, error) {
-	var row postgresMessageIdempotencyRow
-	err := session.QueryRowCtx(ctx, &row, `
-select payload_hash, server_msg_id, conversation_id, seq
-from message_idempotency_keys
-where sender_id = $1 and client_msg_id = $2
-`, senderID, clientMsgID)
-	return row, err
-}
-
 func upsertAndLockConversation(ctx context.Context, session sqlx.Session, conversationID string, input CreateMessageInput) (postgresConversationLockRow, error) {
+	conversationType, err := conversationTypeValue(input.ChatType)
+	if err != nil {
+		return postgresConversationLockRow{}, err
+	}
 	switch input.ChatType {
 	case ChatTypeSingle:
 		userA, userB := MessageStorageOrderedSingleUsers(input.SenderID, input.ReceiverID)
 		if _, err := session.ExecCtx(ctx, `
-insert into conversation_threads (conversation_id, chat_type, single_user_a, single_user_b)
+insert into conversation_threads (conversation_id, conversation_type, single_account_a, single_account_b)
 values ($1, $2, $3, $4)
 on conflict (conversation_id) do nothing
-`, conversationID, input.ChatType, userA, userB); err != nil {
+`, conversationID, conversationType, userA, userB); err != nil {
 			return postgresConversationLockRow{}, err
 		}
 	case ChatTypeGroup:
 		if _, err := session.ExecCtx(ctx, `
-insert into conversation_threads (conversation_id, chat_type, group_id)
+insert into conversation_threads (conversation_id, conversation_type, group_id)
 values ($1, $2, $3)
 on conflict (conversation_id) do nothing
-`, conversationID, input.ChatType, input.GroupID); err != nil {
+`, conversationID, conversationType, input.GroupID); err != nil {
 			return postgresConversationLockRow{}, err
 		}
 	default:
@@ -328,7 +306,7 @@ on conflict (conversation_id) do nothing
 	}
 
 	var row postgresConversationLockRow
-	err := session.QueryRowCtx(ctx, &row, `
+	err = session.QueryRowCtx(ctx, &row, `
 select max_seq
 from conversation_threads
 where conversation_id = $1
@@ -342,21 +320,34 @@ func insertMessage(ctx context.Context, session sqlx.Session, input CreateMessag
 	if err != nil {
 		return postgresMessageRow{}, err
 	}
+	conversationType, err := conversationTypeValue(input.ChatType)
+	if err != nil {
+		return postgresMessageRow{}, err
+	}
+	contentType, err := contentTypeValue(input.ContentType)
+	if err != nil {
+		return postgresMessageRow{}, err
+	}
+	messageOrigin, err := messageOriginValue(input.MessageOrigin)
+	if err != nil {
+		return postgresMessageRow{}, err
+	}
 
 	var row postgresMessageRow
 	err = session.QueryRowCtx(ctx, &row, `
 insert into messages (
-  client_msg_id, sender_id, conversation_id, seq, chat_type,
-  receiver_id, group_id, content_type, content, message_origin, agent_account_id,
-  trigger_server_msg_id, agent_run_id, allow_recursive_trigger, payload_hash, send_time
+	  client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+	  receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
+	  trigger_message_id, agent_run_id, allow_recursive_trigger, payload_hash, client_send_time
 )
 values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16)
-returning server_msg_id, client_msg_id, sender_id, conversation_id, seq, chat_type,
-          receiver_id, group_id, content_type, content, message_origin, agent_account_id,
-          trigger_server_msg_id, agent_run_id, allow_recursive_trigger,
-          payload_hash, send_time, created_at, updated_at
-`, input.ClientMsgID, input.SenderID, conversationID, seq, input.ChatType, input.ReceiverID, input.GroupID,
-		input.ContentType, string(contentJSON), input.MessageOrigin, input.AgentAccountID, input.TriggerServerMsgID,
+returning message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+	      receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
+	      trigger_message_id, agent_run_id, allow_recursive_trigger,
+	      payload_hash, coalesce(client_send_time, server_received_at) as client_send_time,
+	      server_received_at, updated_at
+`, input.ClientMsgID, input.SenderID, conversationID, seq, conversationType, input.ReceiverID, input.GroupID,
+		contentType, string(contentJSON), messageOrigin, input.AgentAccountID, input.TriggerServerMsgID,
 		input.AgentRunID, input.AllowRecursiveTrigger, payloadHash, sendTime)
 	return row, err
 }
@@ -374,23 +365,13 @@ func messageContentJSON(input CreateMessageInput) ([]byte, error) {
 	return raw, nil
 }
 
-func insertMessageIdempotency(ctx context.Context, session sqlx.Session, input CreateMessageInput, message postgresMessageRow) error {
-	_, err := session.ExecCtx(ctx, `
-insert into message_idempotency_keys (
-  sender_id, client_msg_id, payload_hash, server_msg_id, conversation_id, seq, status
-)
-values ($1, $2, $3, $4, $5, $6, $7)
-`, input.SenderID, input.ClientMsgID, message.PayloadHash, message.ServerMsgID, message.ConversationID, message.Seq, "accepted")
-	return err
-}
-
 func upsertVisibleConversationStates(ctx context.Context, session sqlx.Session, input CreateMessageInput, conversationID string, seq int64) error {
 	for _, userID := range visibleUserIDs(input) {
 		if _, err := session.ExecCtx(ctx, `
-insert into user_conversation_states (user_id, conversation_id, last_visible_seq)
+insert into user_conversation_states (account_id, conversation_id, visible_start_seq)
 values ($1, $2, $3)
-on conflict (user_id, conversation_id) do update
-set last_visible_seq = greatest(user_conversation_states.last_visible_seq, excluded.last_visible_seq),
+on conflict (account_id, conversation_id) do update
+set visible_start_seq = greatest(user_conversation_states.visible_start_seq, excluded.visible_start_seq),
     updated_at = now()
 `, userID, conversationID, seq); err != nil {
 			return err
@@ -401,11 +382,11 @@ set last_visible_seq = greatest(user_conversation_states.last_visible_seq, exclu
 
 func upsertSenderReadState(ctx context.Context, session sqlx.Session, senderID string, conversationID string, seq int64) error {
 	_, err := session.ExecCtx(ctx, `
-insert into user_conversation_states (user_id, conversation_id, has_read_seq, last_visible_seq)
+insert into user_conversation_states (account_id, conversation_id, last_read_seq, visible_start_seq)
 values ($1, $2, $3, $3)
-on conflict (user_id, conversation_id) do update
-set has_read_seq = greatest(user_conversation_states.has_read_seq, excluded.has_read_seq),
-    last_visible_seq = greatest(user_conversation_states.last_visible_seq, excluded.last_visible_seq),
+on conflict (account_id, conversation_id) do update
+set last_read_seq = greatest(user_conversation_states.last_read_seq, excluded.last_read_seq),
+    visible_start_seq = greatest(user_conversation_states.visible_start_seq, excluded.visible_start_seq),
     updated_at = now()
 `, senderID, conversationID, seq)
 	return err
@@ -427,15 +408,15 @@ func queryConversationSeqState(ctx context.Context, session sqlx.Session, userID
 	var row postgresConversationStateRow
 	if err := session.QueryRowCtx(ctx, &row, `
 select t.conversation_id,
-       s.last_visible_seq as max_seq,
-       s.has_read_seq,
-       m.send_time as max_seq_time,
-       coalesce(m.server_msg_id, '') as last_message_id,
-       s.updated_at
+	       s.visible_start_seq as max_seq,
+	       s.last_read_seq as has_read_seq,
+	       m.client_send_time as max_seq_time,
+	       coalesce(m.message_id, '') as last_message_id,
+	       s.updated_at
 from conversation_threads t
 join user_conversation_states s on s.conversation_id = t.conversation_id
-left join messages m on m.conversation_id = t.conversation_id and m.seq = s.last_visible_seq
-where s.user_id = $1 and t.conversation_id = $2
+left join messages m on m.conversation_id = t.conversation_id and m.seq = s.visible_start_seq
+where s.account_id = $1 and t.conversation_id = $2
 `, userID, conversationID); err != nil {
 		return ConversationSeqState{}, err
 	}
@@ -463,12 +444,13 @@ where s.user_id = $1 and t.conversation_id = $2
 func queryMessageByServerID(ctx context.Context, session sqlx.Session, serverMsgID string) (postgresMessageRow, error) {
 	var row postgresMessageRow
 	err := session.QueryRowCtx(ctx, &row, `
-select server_msg_id, client_msg_id, sender_id, conversation_id, seq, chat_type,
-       receiver_id, group_id, content_type, content, message_origin, agent_account_id,
-       trigger_server_msg_id, agent_run_id, allow_recursive_trigger,
-       payload_hash, send_time, created_at, updated_at
+select message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+	       receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
+	       trigger_message_id, agent_run_id, allow_recursive_trigger,
+	       payload_hash, coalesce(client_send_time, server_received_at) as client_send_time,
+	       server_received_at, updated_at
 from messages
-where server_msg_id = $1
+where message_id = $1
 `, serverMsgID)
 	return row, err
 }
@@ -476,27 +458,24 @@ where server_msg_id = $1
 func queryMessageBySenderClient(ctx context.Context, session sqlx.Session, senderID string, clientMsgID string) (postgresMessageRow, error) {
 	var row postgresMessageRow
 	err := session.QueryRowCtx(ctx, &row, `
-select server_msg_id, client_msg_id, sender_id, conversation_id, seq, chat_type,
-       receiver_id, group_id, content_type, content, message_origin, agent_account_id,
-       trigger_server_msg_id, agent_run_id, allow_recursive_trigger,
-       payload_hash, send_time, created_at, updated_at
+select message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+	       receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
+	       trigger_message_id, agent_run_id, allow_recursive_trigger,
+	       payload_hash, coalesce(client_send_time, server_received_at) as client_send_time,
+	       server_received_at, updated_at
 from messages
-where sender_id = $1 and client_msg_id = $2
+where sender_account_id = $1 and client_msg_id = $2
 `, senderID, clientMsgID)
 	return row, err
 }
 
 func (r *PostgresMessageRepository) existingMessageForIdempotency(ctx context.Context, input CreateMessageInput, payloadHash string) (Message, bool, error) {
-	existing, err := queryMessageIdempotency(ctx, r.conn, input.SenderID, input.ClientMsgID)
+	existing, err := queryMessageBySenderClient(ctx, r.conn, input.SenderID, input.ClientMsgID)
 	if err == nil {
 		if existing.PayloadHash != payloadHash {
 			return Message{}, false, apperror.AlreadyExists("idempotency conflict")
 		}
-		message, err := queryMessageByServerID(ctx, r.conn, existing.ServerMsgID)
-		if err != nil {
-			return Message{}, false, err
-		}
-		return message.message(), true, nil
+		return existing.message(), true, nil
 	}
 	if err != nil && !isNotFound(err) {
 		return Message{}, false, err
@@ -583,10 +562,10 @@ func (r postgresMessageRow) message() Message {
 		SenderID:              r.SenderID,
 		ReceiverID:            r.ReceiverID,
 		GroupID:               r.GroupID,
-		ChatType:              r.ChatType,
-		ContentType:           r.ContentType,
+		ChatType:              conversationTypeString(r.ConversationType),
+		ContentType:           contentTypeString(r.ContentTypeValue),
 		Content:               decodeMessageContent(r.Content),
-		MessageOrigin:         r.MessageOrigin,
+		MessageOrigin:         messageOriginString(r.MessageOriginValue),
 		AgentAccountID:        r.AgentAccountID,
 		TriggerServerMsgID:    r.TriggerServerMsgID,
 		AgentRunID:            r.AgentRunID,

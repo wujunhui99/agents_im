@@ -9,7 +9,6 @@ import (
 	"time"
 
 	gatewaydelivery "github.com/wujunhui99/agents_im/internal/gateway/delivery"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/transfer"
 )
 
@@ -141,123 +140,20 @@ func TestWorkerRetryDecisionForGatewayError(t *testing.T) {
 	}
 }
 
-func TestWorkerRecordsDeliveredDeliveryAttempt(t *testing.T) {
-	envelope := testEnvelope("evt_record_delivered")
+func TestWorkerRecordsLiveDeliveryMetricsOnly(t *testing.T) {
+	envelope := testEnvelope("evt_record_metrics_only")
 	consumer := transfer.NewInMemoryConsumer(envelope)
-	deliveryAttempts := repository.NewMemoryMessageRepository()
 	fake := newFakeGatewayDispatcher(deliveredResult(envelope.Event.ConversationID, "user_b"))
 	worker := transfer.NewWorker(
 		consumer,
 		NewDispatcher(fake),
 		transfer.WithIdempotencyStore(transfer.NewMemoryIdempotencyStore()),
-		transfer.WithDeliveryAttemptRecorder(transfer.NewRepositoryDeliveryAttemptRecorder(deliveryAttempts)),
+		transfer.WithDeliveryAttemptRecorder(transfer.NewMetricsDeliveryAttemptRecorder()),
 	)
 
 	result := worker.RunOnce(context.Background())
 	if result.Status != transfer.StatusSucceeded {
 		t.Fatalf("result = %+v, want succeeded", result)
-	}
-	attempts, err := deliveryAttempts.ListDeliveryAttemptsByMessage(context.Background(), envelope.Event.ServerMsgID)
-	if err != nil {
-		t.Fatalf("list delivery attempts: %v", err)
-	}
-	if len(attempts) != 1 ||
-		attempts[0].RecipientUserID != "user_b" ||
-		attempts[0].Status != repository.DeliveryStatusDelivered ||
-		attempts[0].AttemptCount != 1 {
-		t.Fatalf("delivered attempt mismatch: %+v", attempts)
-	}
-}
-
-func TestWorkerRecordsOfflineDeliveryAttempt(t *testing.T) {
-	envelope := testEnvelope("evt_record_offline")
-	consumer := transfer.NewInMemoryConsumer(envelope)
-	deliveryAttempts := repository.NewMemoryMessageRepository()
-	fake := newFakeGatewayDispatcher(offlineResult(envelope.Event.ConversationID, "user_b"))
-	worker := transfer.NewWorker(
-		consumer,
-		NewDispatcher(fake),
-		transfer.WithIdempotencyStore(transfer.NewMemoryIdempotencyStore()),
-		transfer.WithDeliveryAttemptRecorder(transfer.NewRepositoryDeliveryAttemptRecorder(deliveryAttempts)),
-	)
-
-	result := worker.RunOnce(context.Background())
-	if result.Status != transfer.StatusSucceeded {
-		t.Fatalf("result = %+v, want succeeded for offline", result)
-	}
-	attempts, err := deliveryAttempts.ListDeliveryAttemptsByMessage(context.Background(), envelope.Event.ServerMsgID)
-	if err != nil {
-		t.Fatalf("list delivery attempts: %v", err)
-	}
-	if len(attempts) != 1 ||
-		attempts[0].Status != repository.DeliveryStatusOffline ||
-		attempts[0].AttemptCount != 1 ||
-		!attempts[0].NextRetryAt.IsZero() {
-		t.Fatalf("offline attempt mismatch: %+v", attempts)
-	}
-}
-
-func TestWorkerRecordsRetryableFailedDeliveryAttempt(t *testing.T) {
-	envelope := testEnvelope("evt_record_retry")
-	consumer := transfer.NewInMemoryConsumer(envelope)
-	deliveryAttempts := repository.NewMemoryMessageRepository()
-	fake := newFakeGatewayDispatcher(gatewaydelivery.Result{})
-	fake.SetError(errors.New("gateway unavailable"))
-	worker := transfer.NewWorker(
-		consumer,
-		NewDispatcher(fake, WithRetryAfter(25*time.Millisecond)),
-		transfer.WithIdempotencyStore(transfer.NewMemoryIdempotencyStore()),
-		transfer.WithRetryBackoff(100*time.Millisecond),
-		transfer.WithMaxAttempts(3),
-		transfer.WithDeliveryAttemptRecorder(transfer.NewRepositoryDeliveryAttemptRecorder(deliveryAttempts)),
-	)
-
-	result := worker.RunOnce(context.Background())
-	if result.Status != transfer.StatusRetryable || !result.Retryable {
-		t.Fatalf("result = %+v, want retryable", result)
-	}
-	attempts, err := deliveryAttempts.ListDeliveryAttemptsByMessage(context.Background(), envelope.Event.ServerMsgID)
-	if err != nil {
-		t.Fatalf("list delivery attempts: %v", err)
-	}
-	if len(attempts) != 1 ||
-		attempts[0].Status != repository.DeliveryStatusFailed ||
-		attempts[0].AttemptCount != 1 ||
-		!strings.Contains(attempts[0].LastError, "gateway unavailable") ||
-		attempts[0].NextRetryAt.IsZero() {
-		t.Fatalf("failed retry attempt mismatch: %+v", attempts)
-	}
-}
-
-func TestWorkerRecordsTerminalFailedDeliveryAttemptAtMaxAttempts(t *testing.T) {
-	envelope := testEnvelope("evt_record_terminal")
-	envelope.Attempt = 3
-	consumer := transfer.NewInMemoryConsumer(envelope)
-	deliveryAttempts := repository.NewMemoryMessageRepository()
-	fake := newFakeGatewayDispatcher(gatewaydelivery.Result{})
-	fake.SetError(errors.New("gateway unavailable"))
-	worker := transfer.NewWorker(
-		consumer,
-		NewDispatcher(fake, WithRetryAfter(25*time.Millisecond)),
-		transfer.WithIdempotencyStore(transfer.NewMemoryIdempotencyStore()),
-		transfer.WithRetryBackoff(100*time.Millisecond),
-		transfer.WithMaxAttempts(3),
-		transfer.WithDeliveryAttemptRecorder(transfer.NewRepositoryDeliveryAttemptRecorder(deliveryAttempts)),
-	)
-
-	result := worker.RunOnce(context.Background())
-	if result.Status != transfer.StatusFailed || result.Retryable {
-		t.Fatalf("result = %+v, want terminal failed", result)
-	}
-	attempts, err := deliveryAttempts.ListDeliveryAttemptsByMessage(context.Background(), envelope.Event.ServerMsgID)
-	if err != nil {
-		t.Fatalf("list delivery attempts: %v", err)
-	}
-	if len(attempts) != 1 ||
-		attempts[0].Status != repository.DeliveryStatusFailed ||
-		attempts[0].AttemptCount != 3 ||
-		!attempts[0].NextRetryAt.IsZero() {
-		t.Fatalf("terminal failed attempt mismatch: %+v", attempts)
 	}
 }
 

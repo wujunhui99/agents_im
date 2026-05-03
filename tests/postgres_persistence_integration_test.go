@@ -191,15 +191,6 @@ func TestPostgresMessageRepositoryIdempotencyAndReadState(t *testing.T) {
 	if deduplicated || first.Seq != 1 {
 		t.Fatalf("first send should allocate seq 1 without dedupe: message=%+v dedupe=%v", first, deduplicated)
 	}
-	deliveryAttempts, err := messages.ListDeliveryAttemptsByMessage(ctx, first.ServerMsgID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(deliveryAttempts) != 1 ||
-		deliveryAttempts[0].RecipientUserID != input.ReceiverID ||
-		deliveryAttempts[0].Status != repository.DeliveryStatusAccepted {
-		t.Fatalf("accepted delivery attempt mismatch: %+v", deliveryAttempts)
-	}
 
 	again, deduplicated, err := messages.CreateMessageIdempotent(ctx, input)
 	if err != nil {
@@ -298,31 +289,6 @@ func TestPostgresMessageRepositoryIdempotencyAndReadState(t *testing.T) {
 	}
 	if err := messages.MarkPublished(ctx, retriedOutboxEvents[0].EventID, "pg-worker-2"); err != nil {
 		t.Fatal(err)
-	}
-	deliveryAttempts, err = messages.ListDeliveryAttemptsByMessage(ctx, first.ServerMsgID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(deliveryAttempts) != 1 || deliveryAttempts[0].Status != repository.DeliveryStatusPublished {
-		t.Fatalf("published delivery attempt mismatch: %+v", deliveryAttempts)
-	}
-	if err := messages.RecordDeliveryAttemptResult(ctx, repository.RecordDeliveryAttemptInput{
-		ServerMsgID:     first.ServerMsgID,
-		ConversationID:  conversationID,
-		RecipientUserID: input.ReceiverID,
-		Status:          repository.DeliveryStatusDelivered,
-		AttemptCount:    1,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	deliveryAttempts, err = messages.ListDeliveryAttemptsByMessage(ctx, first.ServerMsgID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(deliveryAttempts) != 1 ||
-		deliveryAttempts[0].Status != repository.DeliveryStatusDelivered ||
-		deliveryAttempts[0].AttemptCount != 1 {
-		t.Fatalf("delivered delivery attempt mismatch: %+v", deliveryAttempts)
 	}
 	remainingOutboxEvents, err := messages.PollPending(ctx, "pg-worker-3", 10, time.Minute)
 	if err != nil {
@@ -520,9 +486,7 @@ truncate table
   agent_file_reads,
   agent_tool_calls,
   agent_runs,
-  delivery_attempts,
   message_outbox,
-  message_idempotency_keys,
   user_conversation_states,
   messages,
   conversation_threads,

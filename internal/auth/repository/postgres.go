@@ -20,11 +20,10 @@ type PostgresRepository struct {
 }
 
 type postgresCredentialRow struct {
+	AccountID    string    `db:"account_id"`
 	Identifier   string    `db:"identifier"`
-	UserID       string    `db:"user_id"`
 	PasswordHash string    `db:"password_hash"`
-	Salt         string    `db:"salt"`
-	HashVersion  string    `db:"hash_version"`
+	PasswordAlgo int16     `db:"password_algo"`
 	CreatedAt    time.Time `db:"created_at"`
 	UpdatedAt    time.Time `db:"updated_at"`
 }
@@ -59,10 +58,10 @@ func NewRepositoryForStorage(driver string, dataSource string) (CredentialReposi
 func (r *PostgresRepository) Create(ctx context.Context, credential model.Credential) (model.Credential, error) {
 	var row postgresCredentialRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-insert into auth_credentials (identifier, user_id, password_hash, salt, hash_version)
-values ($1, $2, $3, $4, $5)
-returning identifier, user_id, password_hash, salt, hash_version, created_at, updated_at
-`, credential.Identifier, credential.UserID, credential.PasswordHash, credential.Salt, credential.HashVersion)
+insert into auth_credentials (account_id, password_hash, password_algo)
+values ($1, $2, $3)
+returning account_id, password_hash, password_algo, created_at, updated_at
+`, credential.UserID, credential.PasswordHash, passwordAlgoToDB(credential.HashVersion))
 	if err != nil {
 		if isPgUniqueViolation(err) {
 			return model.Credential{}, apperror.AlreadyExists("auth credential already exists")
@@ -79,9 +78,10 @@ returning identifier, user_id, password_hash, salt, hash_version, created_at, up
 func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier string) (model.Credential, error) {
 	var row postgresCredentialRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select identifier, user_id, password_hash, salt, hash_version, created_at, updated_at
-from auth_credentials
-where identifier = $1
+select c.account_id, a.identifier, c.password_hash, c.password_algo, c.created_at, c.updated_at
+from auth_credentials c
+join accounts a on a.account_id = c.account_id
+where a.identifier = $1
 `, identifier)
 	if err != nil {
 		if errors.Is(err, sqlx.ErrNotFound) {
@@ -96,10 +96,9 @@ where identifier = $1
 func (r postgresCredentialRow) credential() model.Credential {
 	return model.Credential{
 		Identifier:   r.Identifier,
-		UserID:       r.UserID,
+		UserID:       r.AccountID,
 		PasswordHash: r.PasswordHash,
-		Salt:         r.Salt,
-		HashVersion:  r.HashVersion,
+		HashVersion:  passwordAlgoFromDB(r.PasswordAlgo),
 		CreatedAt:    r.CreatedAt,
 		UpdatedAt:    r.UpdatedAt,
 	}
@@ -113,4 +112,12 @@ func isPgUniqueViolation(err error) bool {
 func isPgForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolationCode
+}
+
+func passwordAlgoToDB(version string) int16 {
+	return 1
+}
+
+func passwordAlgoFromDB(algo int16) string {
+	return "sha256-iter-v1"
 }

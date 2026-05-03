@@ -17,17 +17,16 @@ func TestPostgresCredentialCreateStoresSameAccountID(t *testing.T) {
 
 	now := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
 	accountID := "740000000000000003"
-	mock.ExpectQuery(`(?s)insert\s+into\s+auth_credentials\s+\(identifier,\s+user_id,\s+password_hash,\s+salt,\s+hash_version\)`).
-		WithArgs("pg_alice", accountID, "hash", "salt", "v1").
+	mock.ExpectQuery(`(?s)insert\s+into\s+auth_credentials\s+\(account_id,\s+password_hash,\s+password_algo\)`).
+		WithArgs(accountID, "hash", int16(1)).
 		WillReturnRows(sqlmock.NewRows([]string{
+			"account_id",
 			"identifier",
-			"user_id",
 			"password_hash",
-			"salt",
-			"hash_version",
+			"password_algo",
 			"created_at",
 			"updated_at",
-		}).AddRow("pg_alice", accountID, "hash", "salt", "v1", now, now))
+		}).AddRow(accountID, "pg_alice", "hash", int16(1), now, now))
 
 	got, err := repo.Create(context.Background(), model.Credential{
 		Identifier:   "pg_alice",

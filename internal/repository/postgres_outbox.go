@@ -13,14 +13,14 @@ import (
 
 type postgresOutboxRow struct {
 	EventID        string       `db:"event_id"`
-	EventType      string       `db:"event_type"`
-	AggregateType  string       `db:"aggregate_type"`
+	EventType      int16        `db:"event_type"`
+	AggregateType  int16        `db:"aggregate_type"`
 	AggregateID    string       `db:"aggregate_id"`
 	ConversationID string       `db:"conversation_id"`
-	ServerMsgID    string       `db:"server_msg_id"`
+	ServerMsgID    string       `db:"message_id"`
 	Seq            int64        `db:"seq"`
 	Payload        []byte       `db:"payload"`
-	Status         string       `db:"status"`
+	Status         int16        `db:"status"`
 	AttemptCount   int          `db:"attempt_count"`
 	NextAttemptAt  time.Time    `db:"next_attempt_at"`
 	LockedBy       string       `db:"locked_by"`
@@ -66,7 +66,7 @@ set locked_by = $3,
 from picked
 where o.event_id = picked.event_id
 returning o.event_id, o.event_type, o.aggregate_type, o.aggregate_id,
-          o.conversation_id, o.server_msg_id, o.seq, o.payload, o.status,
+	          o.conversation_id, o.message_id, o.seq, o.payload, o.status,
           o.attempt_count, o.next_attempt_at, o.locked_by, o.locked_until,
           o.last_error, o.created_at, o.updated_at, o.published_at
 `, OutboxStatusPending, limit, workerID, lockedUntil); err != nil {
@@ -90,8 +90,7 @@ func (r *PostgresMessageRepository) MarkPublished(ctx context.Context, eventID s
 		return apperror.InvalidArgument("worker_id is required")
 	}
 
-	return r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
-		result, err := session.ExecCtx(ctx, `
+	result, err := r.conn.ExecCtx(ctx, `
 update message_outbox
 set status = $3,
     locked_by = '',
@@ -103,14 +102,10 @@ where event_id = $1
   and status = $4
   and locked_until > now()
 `, eventID, workerID, OutboxStatusPublished, OutboxStatusPending)
-		if err != nil {
-			return err
-		}
-		if err := requireOutboxRowAffected(result); err != nil {
-			return err
-		}
-		return markDeliveryAttemptsPublishedForOutboxEvent(ctx, session, eventID)
-	})
+	if err != nil {
+		return err
+	}
+	return requireOutboxRowAffected(result)
 }
 
 func (r *PostgresMessageRepository) MarkFailed(ctx context.Context, eventID string, workerID string, failure OutboxFailure) error {
@@ -157,8 +152,8 @@ func insertMessageOutboxEvent(ctx context.Context, session sqlx.Session, message
 	}
 	_, err = session.ExecCtx(ctx, `
 insert into message_outbox (
-  event_type, aggregate_type, aggregate_id, conversation_id, server_msg_id,
-  seq, payload, status, next_attempt_at
+	  event_type, aggregate_type, aggregate_id, conversation_id, message_id,
+	  seq, payload, status, next_attempt_at
 )
 values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, now())
 `, OutboxEventTypeMessageCreated, OutboxAggregateTypeMessage, message.ServerMsgID,
