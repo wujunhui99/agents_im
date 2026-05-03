@@ -12,8 +12,9 @@ Presence:
   HeartbeatTTLSeconds: 60
   KeyPrefix: agents_im:presence
 GatewayWS:
+  # Environment-specific exact browser origins, for example production or gray/staging hostnames.
   AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}
-  # Browser-native WebSocket cannot set Authorization headers; production ingress serves /ws same-origin.
+  # Browser-native WebSocket cannot set Authorization headers; keep origins explicit behind ingress.
   AllowQueryToken: true
   PingIntervalSeconds: 30
   HeartbeatTimeoutSeconds: 75
