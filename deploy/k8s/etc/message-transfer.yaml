@@ -1,11 +1,14 @@
 Name: message-transfer
 WorkerID: ${HOSTNAME}
-DryRun: true
+DryRun: false
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 
 Consumer:
-  Driver: kafka
+  # Production live push consumes durable message_outbox rows written by message-api.
+  # Kafka config remains below for future event-bus integrations, but V1 fanout must not
+  # depend on a separate Kafka publish path when messages are already persisted.
+  Driver: outbox
   Topic: ${KAFKA_MESSAGE_EVENTS_TOPIC}
   Group: ${KAFKA_CONSUMER_GROUP}
 

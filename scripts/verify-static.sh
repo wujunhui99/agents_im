@@ -1460,6 +1460,14 @@ if grep -A2 '^Dispatcher:' deploy/k8s/etc/message-transfer.yaml | grep -q 'Drive
   echo "production message-transfer must not use noop dispatcher" >&2
   exit 1
 fi
+if grep -q '^DryRun: true' deploy/k8s/etc/message-transfer.yaml; then
+  echo "production message-transfer must not run in dry-run mode" >&2
+  exit 1
+fi
+if ! grep -A4 '^Consumer:' deploy/k8s/etc/message-transfer.yaml | grep -q 'Driver: outbox'; then
+  echo "production message-transfer must consume message_outbox for V1 live push" >&2
+  exit 1
+fi
 if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/message-transfer.yaml | grep -q 'Driver: gateway'; then
   echo "production message-transfer must dispatch to gateway-ws" >&2
   exit 1
