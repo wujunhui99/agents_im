@@ -255,7 +255,6 @@ func (r postgresGroupMemberRow) member() model.GroupMember {
 	member := model.GroupMember{
 		GroupID:  r.GroupID,
 		UserID:   r.UserID,
-		Role:     groupMemberRoleString(r.Role),
 		State:    memberStateFromDB(r.Status),
 		JoinedAt: r.JoinedAt.UTC(),
 	}
