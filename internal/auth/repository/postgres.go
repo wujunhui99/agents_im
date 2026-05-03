@@ -60,8 +60,8 @@ func (r *PostgresRepository) Create(ctx context.Context, credential model.Creden
 	err := r.conn.QueryRowCtx(ctx, &row, `
 insert into auth_credentials (account_id, password_hash, password_algo)
 values ($1, $2, $3)
-returning account_id, password_hash, password_algo, created_at, updated_at
-`, credential.UserID, credential.PasswordHash, passwordAlgoToDB(credential.HashVersion))
+returning account_id, $4::text as identifier, password_hash, password_algo, created_at, updated_at
+`, credential.UserID, credential.PasswordHash, passwordAlgoToDB(credential.HashVersion), credential.Identifier)
 	if err != nil {
 		if isPgUniqueViolation(err) {
 			return model.Credential{}, apperror.AlreadyExists("auth credential already exists")

@@ -89,11 +89,8 @@ required_files=(
   "internal/repository/postgres_media.go"
   "internal/repository/message_outbox_repository.go"
   "internal/repository/delivery_attempt_repository.go"
-  "internal/repository/delivery_attempt_memory.go"
   "internal/repository/postgres_message.go"
   "internal/repository/postgres_outbox.go"
-  "internal/repository/postgres_delivery_attempt.go"
-  "internal/repository/delivery_attempt_repository_test.go"
   "internal/handler/health_handler.go"
   "internal/handler/gozero_routes.go"
   "internal/handler/media/create_upload_intent_handler.go"
@@ -478,7 +475,6 @@ done
 message_ordering_schema_patterns=(
   "messages_conversation_seq_uniq"
   "messages_sender_client_msg_uniq"
-  "message_idempotency_keys"
   "conversation_threads"
 )
 
@@ -1120,39 +1116,27 @@ done
 
 rg -q "transfer-gateway-dispatcher.md" ARCHITECTURE.md docs/design-docs/index.md
 
-delivery_reliability_code_patterns=(
-  "DeliveryStatusAccepted"
-  "DeliveryStatusPublished"
-  "DeliveryStatusDelivered"
-  "DeliveryStatusOffline"
-  "DeliveryStatusFailed"
-  "type DeliveryAttemptRepository interface"
-  "CreateDeliveryAttemptsAccepted"
-  "MarkDeliveryAttemptsPublished"
-  "RecordDeliveryAttemptResult"
-  "ListDeliveryAttemptsByMessage"
+message_v2_delivery_code_patterns=(
+  "DeliveryRecipientUserIDs"
   "type DeliveryAttemptRecorder interface"
-  "NewRepositoryDeliveryAttemptRecorder"
+  "MetricsDeliveryAttemptRecorder"
   "RecipientDeliveryResult"
-  "delivery_attempts"
+  "message_outbox"
 )
 
-for pattern in "${delivery_reliability_code_patterns[@]}"; do
+for pattern in "${message_v2_delivery_code_patterns[@]}"; do
   rg -q "$pattern" internal/repository internal/transfer db/migrations/001_init_postgres.sql
 done
 
-delivery_reliability_test_patterns=(
-  "TestMemoryMessageRepositoryCreatesAcceptedDeliveryAttempt"
-  "TestMemoryMessageRepositoryMarksDeliveryAttemptPublishedWithOutbox"
-  "TestMemoryMessageRepositoryRecordsDeliveryAttemptResults"
-  "TestWorkerRecordsDeliveredDeliveryAttempt"
-  "TestWorkerRecordsOfflineDeliveryAttempt"
-  "TestWorkerRecordsRetryableFailedDeliveryAttempt"
-  "TestWorkerRecordsTerminalFailedDeliveryAttemptAtMaxAttempts"
+message_v2_removed_table_patterns=(
+  "message_idempotency_keys"
 )
 
-for pattern in "${delivery_reliability_test_patterns[@]}"; do
-  rg -q "$pattern" internal/repository/delivery_attempt_repository_test.go internal/transfer/gateway/dispatcher_test.go
+for pattern in "${message_v2_removed_table_patterns[@]}"; do
+  if rg -q "$pattern" db/migrations/001_init_postgres.sql internal/repository --glob '*.go'; then
+    echo "removed message V2 table still referenced: $pattern" >&2
+    exit 1
+  fi
 done
 
 delivery_reliability_doc_patterns=(
@@ -1610,9 +1594,7 @@ account_storage_patterns=(
   "create table if not exists accounts"
   "create table if not exists profiles"
   "account_id text primary key"
-  "account_id ~ '^[0-9]+$'"
-  "account_type text not null default 'user'"
-  "account_type in ('user', 'agent', 'admin')"
+  "account_type smallint not null default 1"
 )
 
 for pattern in "${account_storage_patterns[@]}"; do
@@ -1650,9 +1632,7 @@ pg_persistence_patterns=(
   "messages"
   "conversation_threads"
   "user_conversation_states"
-  "message_idempotency_keys"
   "message_outbox"
-  "delivery_attempts"
 )
 
 for pattern in "${pg_persistence_patterns[@]}"; do
@@ -1679,7 +1659,7 @@ outbox_schema_patterns=(
   "aggregate_type"
   "aggregate_id"
   "conversation_id"
-  "server_msg_id"
+  "message_id"
   "payload jsonb"
   "attempt_count"
   "next_attempt_at"

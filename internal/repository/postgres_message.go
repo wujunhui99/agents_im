@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/idgen"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
@@ -328,6 +329,10 @@ func insertMessage(ctx context.Context, session sqlx.Session, input CreateMessag
 	if err != nil {
 		return postgresMessageRow{}, err
 	}
+	messageID, err := idgen.NewString()
+	if err != nil {
+		return postgresMessageRow{}, err
+	}
 	messageOrigin, err := messageOriginValue(input.MessageOrigin)
 	if err != nil {
 		return postgresMessageRow{}, err
@@ -336,17 +341,17 @@ func insertMessage(ctx context.Context, session sqlx.Session, input CreateMessag
 	var row postgresMessageRow
 	err = session.QueryRowCtx(ctx, &row, `
 insert into messages (
-	  client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+	  message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
 	  receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
 	  trigger_message_id, agent_run_id, allow_recursive_trigger, payload_hash, client_send_time
 )
-values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16)
+values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17)
 returning message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
 	      receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
 	      trigger_message_id, agent_run_id, allow_recursive_trigger,
 	      payload_hash, coalesce(client_send_time, server_received_at) as client_send_time,
 	      server_received_at, updated_at
-`, input.ClientMsgID, input.SenderID, conversationID, seq, conversationType, input.ReceiverID, input.GroupID,
+`, messageID, input.ClientMsgID, input.SenderID, conversationID, seq, conversationType, input.ReceiverID, input.GroupID,
 		contentType, string(contentJSON), messageOrigin, input.AgentAccountID, input.TriggerServerMsgID,
 		input.AgentRunID, input.AllowRecursiveTrigger, payloadHash, sendTime)
 	return row, err
