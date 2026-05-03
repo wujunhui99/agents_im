@@ -13,7 +13,8 @@ Presence:
   KeyPrefix: agents_im:presence
 GatewayWS:
   AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}
-  AllowQueryToken: false
+  # Browser-native WebSocket cannot set Authorization headers; production ingress serves /ws same-origin.
+  AllowQueryToken: true
   PingIntervalSeconds: 30
   HeartbeatTimeoutSeconds: 75
   CommandRateLimitPerSecond: 20
