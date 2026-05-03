@@ -16,6 +16,7 @@
 - [kafka-transfer-consumer.md](./kafka-transfer-consumer.md)：Message Transfer worker 的 Kafka/Redpanda consumer、event mapping 和 offset commit 语义
 - [message-storage.md](./message-storage.md)：消息存储 PostgreSQL/Redis 契约设计
 - [postgres-persistence.md](./postgres-persistence.md)：第一阶段 PostgreSQL 持久化 schema、配置和 repository 设计
+- [database-schema-v2.md](./database-schema-v2.md)：下一版数据库 schema 讨论稿，记录无物理外键、应用层校验、smallint 枚举、账号/Profile/Auth/Friends/Groups 表改进方向
 - [message-outbox.md](./message-outbox.md)：Message Service transactional outbox 事件源与 worker 轮询契约
 - [outbox-kafka-publisher.md](./outbox-kafka-publisher.md)：Outbox `message.created` 到 Kafka `message.accepted` 的发布模块与 at-least-once 语义
 - [gateway-message-contract.md](./gateway-message-contract.md)：Gateway WebSocket command 到 Message Service RPC 的第一阶段映射契约
