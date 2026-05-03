@@ -27,11 +27,12 @@ type postgresGroupRow struct {
 }
 
 type postgresGroupMemberRow struct {
-	GroupID  string    `db:"group_id"`
-	UserID   string    `db:"account_id"`
-	Role     int16     `db:"role"`
-	Status   int16     `db:"status"`
-	JoinedAt time.Time `db:"join_time"`
+	GroupID  string       `db:"group_id"`
+	UserID   string       `db:"account_id"`
+	Role     int16        `db:"role"`
+	Status   int16        `db:"status"`
+	JoinedAt time.Time    `db:"join_time"`
+	LeftAt   sql.NullTime `db:"left_at"`
 }
 
 func NewPostgresGroupsRepository(dataSource string) (*PostgresGroupsRepository, error) {
@@ -135,9 +136,9 @@ func (r *PostgresGroupsRepository) LeaveGroup(ctx context.Context, groupID strin
 	var row postgresGroupMemberRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
 update group_members
-set status = $3, updated_at = now()
+set status = $3, left_at = now(), updated_at = now()
 where group_id = $1 and account_id = $2 and status = $4
-returning group_id, account_id, role, status, join_time
+returning group_id, account_id, role, status, join_time, left_at
 `, groupID, userID, memberStateToDB(model.MemberStateLeft), memberStateToDB(model.MemberStateActive))
 	if err != nil {
 		if isNotFound(err) {
@@ -196,7 +197,7 @@ func insertGroupMember(ctx context.Context, session sqlx.Session, groupID string
 	err := session.QueryRowCtx(ctx, &row, `
 insert into group_members (group_id, account_id, role, status)
 values ($1, $2, $3, $4)
-returning group_id, account_id, role, status, join_time
+returning group_id, account_id, role, status, join_time, left_at
 `, groupID, userID, groupMemberRoleDBOwner, memberStateToDB(model.MemberStateActive))
 	return row, err
 }
@@ -234,7 +235,7 @@ values ($1, $2, $3, $4)
 on conflict (group_id, account_id) do update
 set status = excluded.status,
     updated_at = now()
-returning group_id, account_id, role, status, join_time
+returning group_id, account_id, role, status, join_time, left_at
 `, groupID, userID, groupMemberRoleDBMember, memberStateToDB(model.MemberStateActive))
 	return row, err
 }
