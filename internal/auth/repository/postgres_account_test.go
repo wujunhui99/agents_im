@@ -18,7 +18,7 @@ func TestPostgresCredentialCreateStoresSameAccountID(t *testing.T) {
 	now := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
 	accountID := "740000000000000003"
 	mock.ExpectQuery(`(?s)insert\s+into\s+auth_credentials\s+\(account_id,\s+password_hash,\s+password_algo\)`).
-		WithArgs(accountID, "hash", int16(1)).
+		WithArgs(accountID, "hash", int16(1), "pg_alice").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"account_id",
 			"identifier",
