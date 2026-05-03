@@ -10,7 +10,8 @@ data:
   KAFKA_MESSAGE_EVENTS_TOPIC: "message.events.v1"
   KAFKA_CONSUMER_GROUP: "message-transfer-worker"
   GATEWAY_WS_ALLOWED_ORIGINS: ""
-  GATEWAY_WS_ALLOW_QUERY_TOKEN: "false"
+  # Browser-native WebSocket uses /ws?token=[REDACTED] on the same production origin.
+  GATEWAY_WS_ALLOW_QUERY_TOKEN: "true"
   GATEWAY_WS_PING_INTERVAL_SECONDS: "30"
   GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS: "75"
   GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND: "20"

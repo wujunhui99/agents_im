@@ -74,13 +74,15 @@ GatewayWS:
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `AllowedOrigins` | empty | Comma-separated exact `http(s)://host[:port]` origins. Empty means no browser cross-origin access; same-origin requests are accepted. Wildcards are rejected. |
-| `AllowQueryToken` | `false` | Enables `?token=` only for controlled local/dev or constrained clients. Production should prefer the `Authorization` header. |
+| `AllowQueryToken` | `false` | Enables `?token=` for constrained clients such as browser-native WebSocket, which cannot set `Authorization` headers. Use only with same-origin or tightly scoped `AllowedOrigins` because URL tokens can leak through logs or history. |
 | `PingIntervalSeconds` | `30` | Server WebSocket ping interval. |
 | `HeartbeatTimeoutSeconds` | `75` | Read deadline extended by pong frames; dead or non-responsive peers are closed after this timeout. |
 | `CommandRateLimitPerSecond` | `20` | Per-connection command token refill rate. |
 | `CommandRateLimitBurst` | `40` | Per-connection command burst capacity. |
 
 Equivalent environment overrides use `GATEWAY_WS_*` names: `GATEWAY_WS_ALLOWED_ORIGINS`, `GATEWAY_WS_ALLOW_QUERY_TOKEN`, `GATEWAY_WS_PING_INTERVAL_SECONDS`, `GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS`, `GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND`, and `GATEWAY_WS_COMMAND_RATE_LIMIT_BURST`. `AGENTS_IM_GATEWAY_WS_*` aliases are also accepted by the config resolver.
+
+The k3s production deployment enables `GATEWAY_WS_ALLOW_QUERY_TOKEN=true` and `GatewayWS.AllowQueryToken=true` so the same-origin frontend can connect with browser-native WebSocket via `/ws?token=[REDACTED]`. This only changes handshake authentication; cross-origin browser access is still governed by `AllowedOrigins`.
 
 ## Handshake
 

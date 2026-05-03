@@ -532,7 +532,7 @@ Fallback for clients that cannot set headers:
 ws://127.0.0.1:8084/ws?token=<access_token>
 ```
 
-The gateway authenticates the same JWT used by REST. Missing or invalid tokens fail the handshake with HTTP 401. Query-token auth is disabled by default and only works when `GatewayWS.AllowQueryToken=true`; browser cross-origin access must match `GatewayWS.AllowedOrigins` exactly, while empty allowed origins only permit same-origin browser requests.
+The gateway authenticates the same JWT used by REST. Missing or invalid tokens fail the handshake with HTTP 401. Query-token auth is disabled by default and only works when `GatewayWS.AllowQueryToken=true`; the k3s production gateway enables it for same-origin browser-native WebSocket connections to `/ws?token=[REDACTED]`. Browser cross-origin access must match `GatewayWS.AllowedOrigins` exactly, while empty allowed origins only permit same-origin browser requests.
 
 ### Command Envelope
 

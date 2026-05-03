@@ -880,6 +880,8 @@ for pattern in "${websocket_gateway_code_patterns[@]}"; do
 done
 
 rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
+rg -q "AllowQueryToken: true" deploy/k8s/etc/gateway-ws.yaml
+rg -q 'GATEWAY_WS_ALLOW_QUERY_TOKEN: "true"' deploy/k8s/configmap.yaml
 rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "websocket-gateway" docs/exec-plans/completed/websocket-gateway.md
 
