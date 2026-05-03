@@ -91,6 +91,7 @@ create table if not exists group_members (
   role smallint not null default 1,
   status smallint not null default 1,
   join_time timestamptz not null default now(),
+  left_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (group_id, account_id)
