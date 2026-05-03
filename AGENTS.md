@@ -20,6 +20,7 @@
 ## 快速导航
 
 - 项目架构总览：[`ARCHITECTURE.md`](./ARCHITECTURE.md)
+- Codex 高密度项目上下文：[`docs/CODEX_CONTEXT.md`](./docs/CODEX_CONTEXT.md)
 - 设计文档索引：[`docs/design-docs/index.md`](./docs/design-docs/index.md)
 - Account Service 术语与 V0 compatibility：[`docs/design-docs/account-service-terminology.md`](./docs/design-docs/account-service-terminology.md)
 - 账号/认证/好友/群聊服务边界：[`docs/design-docs/user-auth-friends-groups-boundaries.md`](./docs/design-docs/user-auth-friends-groups-boundaries.md)
