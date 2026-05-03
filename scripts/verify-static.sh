@@ -319,6 +319,12 @@ done
 rg -qF '@import "./styles/tokens.css";' web/src/styles.css
 rg -qF "createApiClient" web/src/App.tsx web/src/api/client.ts
 rg -qF "POST /messages" docs/FRONTEND.md docs/product-specs/frontend-backend-contract.md
+messages_proxy_line="$(rg -n "'/messages':" web/vite.config.ts | head -n1 | cut -d: -f1)"
+me_proxy_line="$(rg -n "'/me':" web/vite.config.ts | head -n1 | cut -d: -f1)"
+if [[ -z "${messages_proxy_line}" || -z "${me_proxy_line}" || "${messages_proxy_line}" -ge "${me_proxy_line}" ]]; then
+  echo "Vite /messages proxy must be declared before /me; Vite proxy matching is prefix-based" >&2
+  exit 1
+fi
 
 if rg -n "(@material/web|@mui/)" web/package.json web/package-lock.json web/src; then
   echo "frontend must not introduce Material Web or MUI heavy dependencies" >&2

@@ -202,6 +202,9 @@ create table if not exists message_outbox (
   constraint message_outbox_event_aggregate_uniq unique (event_type, aggregate_type, aggregate_id)
 );
 
+alter table message_outbox
+  add column if not exists message_id text not null default '';
+
 create index if not exists message_outbox_pending_idx
   on message_outbox (status, next_attempt_at, created_at, event_id);
 
