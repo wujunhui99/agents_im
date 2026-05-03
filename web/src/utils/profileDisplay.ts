@@ -24,6 +24,23 @@ export function accountTypeLabel(accountType?: UserProfile['account_type']) {
   return UNKNOWN_ACCOUNT_TYPE_LABEL;
 }
 
+export function genderLabel(gender?: string) {
+  switch (gender) {
+    case 'male':
+      return '男';
+    case 'female':
+      return '女';
+    case 'other':
+      return '其他';
+    case 'unknown':
+    case '':
+    case undefined:
+      return '未设置';
+    default:
+      return gender;
+  }
+}
+
 export function avatarText(value: string, fallback = UNKNOWN_CONTACT_LABEL) {
   return (value.trim() || fallback).slice(0, 2).toUpperCase();
 }

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -233,6 +234,7 @@ func TestSendMessagePushesGroupActiveMembersExceptSender(t *testing.T) {
 	if calls[0].conversationID != sent.Message.ConversationID {
 		t.Fatalf("conversation id = %q, want %q", calls[0].conversationID, sent.Message.ConversationID)
 	}
+	sort.Strings(calls[0].recipientUserIDs)
 	if !reflect.DeepEqual(calls[0].recipientUserIDs, []string{"usr_member_b", "usr_member_c"}) {
 		t.Fatalf("group push recipients = %+v, want active members except sender", calls[0].recipientUserIDs)
 	}

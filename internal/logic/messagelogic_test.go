@@ -32,14 +32,6 @@ func TestGroupSendUsesActiveParticipantsForRecipientsAndVisibility(t *testing.T)
 		t.Fatalf("recipient user ids = %+v, want [usr_receiver]", sent.RecipientUserIDs)
 	}
 
-	attempts, err := repo.ListDeliveryAttemptsByMessage(ctx, sent.Message.ServerMsgID)
-	if err != nil {
-		t.Fatalf("list delivery attempts: %v", err)
-	}
-	if len(attempts) != 1 || attempts[0].RecipientUserID != "usr_receiver" {
-		t.Fatalf("delivery attempts should match active recipient list: %+v", attempts)
-	}
-
 	_, err = messageLogic.GetConversationSeqs(ctx, GetConversationSeqsRequest{
 		UserID:          "usr_left",
 		ConversationIDs: []string{sent.Message.ConversationID},

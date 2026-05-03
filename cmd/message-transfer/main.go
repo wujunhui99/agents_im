@@ -91,6 +91,10 @@ func buildConsumer(cfg config.MessageTransferConfig) (transfer.EventConsumer, er
 
 func buildDispatcher(cfg config.MessageTransferConfig) transfer.DeliveryDispatcher {
 	switch cfg.Dispatcher.Driver {
+	case config.TransferDispatcherGateway:
+		return transfer.NewGatewayHTTPDispatcher(transfer.GatewayHTTPDispatcherConfig{
+			Endpoint: cfg.Dispatcher.GatewayEndpoint,
+		})
 	default:
 		return transfer.NoopDispatcher{}
 	}

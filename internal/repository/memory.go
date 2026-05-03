@@ -163,29 +163,114 @@ func (r *MemoryRepository) AddFriend(_ context.Context, userID string, friendID 
 	defer r.mu.Unlock()
 
 	key := friendshipKey(userID, friendID)
-	if existing, exists := r.friendships[key]; exists && existing.Status == model.FriendshipStatusActive {
-		return existing.Clone(), false, nil
+	if existing, exists := r.friendships[key]; exists {
+		if existing.Status == model.FriendshipStatusAccepted || existing.Status == model.FriendshipStatusPending {
+			return existing.Clone(), false, nil
+		}
 	}
 
 	now := r.now().UTC()
+	reverseKey := friendshipKey(friendID, userID)
+	reverse, reverseExists := r.friendships[reverseKey]
+	if reverseExists && reverse.Status == model.FriendshipStatusPending {
+		friendship := model.Friendship{
+			UserID:    userID,
+			FriendID:  friendID,
+			Status:    model.FriendshipStatusAccepted,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		reverse.Status = model.FriendshipStatusAccepted
+		reverse.UpdatedAt = now
+		r.friendships[key] = friendship.Clone()
+		r.friendships[reverseKey] = reverse.Clone()
+		return friendship.Clone(), true, nil
+	}
+
 	friendship := model.Friendship{
 		UserID:    userID,
 		FriendID:  friendID,
-		Status:    model.FriendshipStatusActive,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	reverse := model.Friendship{
-		UserID:    friendID,
-		FriendID:  userID,
-		Status:    model.FriendshipStatusActive,
+		Status:    model.FriendshipStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	r.friendships[key] = friendship.Clone()
-	r.friendships[friendshipKey(friendID, userID)] = reverse.Clone()
 	return friendship.Clone(), true, nil
+}
+
+func (r *MemoryRepository) AcceptFriendRequest(_ context.Context, userID string, requesterID string) (model.Friendship, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	incomingKey := friendshipKey(requesterID, userID)
+	incoming, exists := r.friendships[incomingKey]
+	if !exists || incoming.Status != model.FriendshipStatusPending {
+		return model.Friendship{}, false, apperror.NotFound("friend request not found")
+	}
+
+	now := r.now().UTC()
+	incoming.Status = model.FriendshipStatusAccepted
+	incoming.UpdatedAt = now
+	if incoming.CreatedAt.IsZero() {
+		incoming.CreatedAt = now
+	}
+
+	currentKey := friendshipKey(userID, requesterID)
+	current := model.Friendship{
+		UserID:    userID,
+		FriendID:  requesterID,
+		Status:    model.FriendshipStatusAccepted,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if existing, ok := r.friendships[currentKey]; ok {
+		current.CreatedAt = existing.CreatedAt
+		if current.CreatedAt.IsZero() {
+			current.CreatedAt = now
+		}
+	}
+
+	r.friendships[incomingKey] = incoming.Clone()
+	r.friendships[currentKey] = current.Clone()
+	return current.Clone(), true, nil
+}
+
+func (r *MemoryRepository) RejectFriendRequest(_ context.Context, userID string, requesterID string) (model.Friendship, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	incomingKey := friendshipKey(requesterID, userID)
+	incoming, exists := r.friendships[incomingKey]
+	if !exists || incoming.Status != model.FriendshipStatusPending {
+		return model.Friendship{}, false, apperror.NotFound("friend request not found")
+	}
+
+	now := r.now().UTC()
+	incoming.Status = model.FriendshipStatusRejected
+	incoming.UpdatedAt = now
+	if incoming.CreatedAt.IsZero() {
+		incoming.CreatedAt = now
+	}
+
+	currentKey := friendshipKey(userID, requesterID)
+	current := model.Friendship{
+		UserID:    userID,
+		FriendID:  requesterID,
+		Status:    model.FriendshipStatusRejected,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if existing, ok := r.friendships[currentKey]; ok {
+		current.CreatedAt = existing.CreatedAt
+		if current.CreatedAt.IsZero() {
+			current.CreatedAt = now
+		}
+	}
+
+	r.friendships[incomingKey] = incoming.Clone()
+	r.friendships[currentKey] = current.Clone()
+	return current.Clone(), true, nil
 }
 
 func (r *MemoryRepository) DeleteFriend(_ context.Context, userID string, friendID string) (model.Friendship, bool, error) {
@@ -194,7 +279,7 @@ func (r *MemoryRepository) DeleteFriend(_ context.Context, userID string, friend
 
 	key := friendshipKey(userID, friendID)
 	existing, exists := r.friendships[key]
-	if !exists || existing.Status != model.FriendshipStatusActive {
+	if !exists || existing.Status != model.FriendshipStatusAccepted {
 		return model.Friendship{}, false, apperror.NotFound("friendship not found")
 	}
 
@@ -220,11 +305,43 @@ func (r *MemoryRepository) ListFriends(_ context.Context, userID string) ([]mode
 
 	friendships := make([]model.Friendship, 0)
 	for _, friendship := range r.friendships {
-		if friendship.UserID == userID && friendship.Status == model.FriendshipStatusActive {
+		if friendship.UserID == userID && friendship.Status == model.FriendshipStatusAccepted {
 			friendships = append(friendships, friendship.Clone())
 		}
 	}
 
+	sort.Slice(friendships, func(i int, j int) bool {
+		return friendships[i].FriendID < friendships[j].FriendID
+	})
+	return friendships, nil
+}
+
+func (r *MemoryRepository) ListIncomingFriendRequests(_ context.Context, userID string) ([]model.Friendship, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	friendships := make([]model.Friendship, 0)
+	for _, friendship := range r.friendships {
+		if friendship.FriendID == userID && friendship.Status == model.FriendshipStatusPending {
+			friendships = append(friendships, friendship.Clone())
+		}
+	}
+	sort.Slice(friendships, func(i int, j int) bool {
+		return friendships[i].UserID < friendships[j].UserID
+	})
+	return friendships, nil
+}
+
+func (r *MemoryRepository) ListOutgoingFriendRequests(_ context.Context, userID string) ([]model.Friendship, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	friendships := make([]model.Friendship, 0)
+	for _, friendship := range r.friendships {
+		if friendship.UserID == userID && friendship.Status == model.FriendshipStatusPending {
+			friendships = append(friendships, friendship.Clone())
+		}
+	}
 	sort.Slice(friendships, func(i int, j int) bool {
 		return friendships[i].FriendID < friendships[j].FriendID
 	})
@@ -236,11 +353,25 @@ func (r *MemoryRepository) GetFriendship(_ context.Context, userID string, frien
 	defer r.mu.RUnlock()
 
 	friendship, exists := r.friendships[friendshipKey(userID, friendID)]
-	if !exists {
-		return model.Friendship{}, apperror.NotFound("friendship not found")
+	if exists {
+		return friendship.Clone(), nil
 	}
 
-	return friendship.Clone(), nil
+	// Pending requests are stored once as requester -> recipient. Return a
+	// synthetic reverse pending view so the recipient can still query status
+	// against the requester without turning it into an accepted friendship.
+	reverse, reverseExists := r.friendships[friendshipKey(friendID, userID)]
+	if reverseExists && reverse.Status == model.FriendshipStatusPending {
+		return model.Friendship{
+			UserID:    userID,
+			FriendID:  friendID,
+			Status:    model.FriendshipStatusPending,
+			CreatedAt: reverse.CreatedAt,
+			UpdatedAt: reverse.UpdatedAt,
+		}, nil
+	}
+
+	return model.Friendship{}, apperror.NotFound("friendship not found")
 }
 
 func friendshipKey(userID string, friendID string) string {

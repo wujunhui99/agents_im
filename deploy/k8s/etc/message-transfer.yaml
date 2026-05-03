@@ -15,7 +15,8 @@ Kafka:
   ConsumerGroup: ${KAFKA_CONSUMER_GROUP}
 
 Dispatcher:
-  Driver: noop
+  Driver: gateway
+  GatewayEndpoint: http://127.0.0.1:8084
 
 Worker:
   PollIntervalMillis: 100

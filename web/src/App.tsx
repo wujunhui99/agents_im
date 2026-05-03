@@ -28,6 +28,7 @@ const tabs: TabDefinition<TabKey>[] = [
 type AppProps = {
   initialUser?: UserProfile;
   userApi?: UserApi;
+  webSocketToken?: string;
 };
 
 function App(props: AppProps) {
@@ -52,7 +53,7 @@ type AuthenticatedAppProps = AppProps & {
   authUser: AuthUser;
 };
 
-function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppProps) {
+function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: AuthenticatedAppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
   const [startChatSignal, setStartChatSignal] = useState(0);
@@ -116,6 +117,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi }: AuthenticatedAppPr
             effectiveUserApi,
             contactsApi,
             messageApi,
+            webSocketToken ?? session?.token,
             startChatSignal,
             pendingChatProfile,
             clearPendingChatProfile,
@@ -249,6 +251,7 @@ function renderPage(
   userApi: UserApi,
   contactsApi: ContactsApi,
   messageApi: MessageApi,
+  webSocketToken: string | undefined,
   startChatSignal: number,
   pendingChatProfile: UserProfile | null,
   onPendingChatConsumed: () => void,
@@ -260,6 +263,8 @@ function renderPage(
         currentUserId={currentUser.user_id}
         userApi={userApi}
         messageApi={messageApi}
+        contactsApi={contactsApi}
+        webSocketToken={webSocketToken}
         startChatSignal={startChatSignal}
         pendingChatProfile={pendingChatProfile}
         onPendingChatConsumed={onPendingChatConsumed}

@@ -1,7 +1,3 @@
-create sequence if not exists agents_im_groups_id_seq;
-create sequence if not exists agents_im_messages_id_seq;
-create sequence if not exists agents_im_outbox_events_id_seq;
-create sequence if not exists agents_im_media_id_seq;
 create sequence if not exists agents_im_agent_prompts_id_seq;
 create sequence if not exists agents_im_mcp_servers_id_seq;
 create sequence if not exists agents_im_agent_tools_id_seq;
@@ -10,240 +6,191 @@ create sequence if not exists agents_im_agent_skills_id_seq;
 create table if not exists accounts (
   account_id text primary key,
   identifier text not null,
-  account_type text not null default 'user',
+  account_type smallint not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint accounts_id_numeric_check check (account_id ~ '^[0-9]+$'),
-  constraint accounts_identifier_uniq unique (identifier),
-  constraint accounts_identifier_not_blank check (identifier <> ''),
-  constraint accounts_account_type_check check (account_type in ('user', 'agent', 'admin'))
+  constraint accounts_identifier_uniq unique (identifier)
 );
 
 create table if not exists profiles (
-  account_id text primary key references accounts(account_id) on delete cascade,
+  account_id text primary key,
   display_name text not null,
   name text not null,
-  gender text not null default 'unknown',
+  gender smallint not null default 0,
   birth_date date,
   region text not null default '',
   avatar_media_id text not null default '',
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint profiles_display_name_not_blank check (display_name <> ''),
-  constraint profiles_name_not_blank check (name <> ''),
-  constraint profiles_gender_check check (gender in ('unknown', 'male', 'female', 'other')),
-  constraint profiles_birth_date_check check (birth_date is null or birth_date <= current_date)
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists media_objects (
-  media_id text primary key default ('med_' || lpad(nextval('agents_im_media_id_seq')::text, 6, '0')),
-  owner_user_id text not null references accounts(account_id) on delete restrict,
+  media_id text primary key,
+  owner_account_id text not null default '',
+  conversation_id text not null default '',
+  storage_provider smallint not null default 1,
   bucket text not null,
   object_key text not null,
-  sha256 text not null default '',
+  original_filename text not null default '',
   content_type text not null,
   size_bytes bigint not null,
-  width integer,
-  height integer,
-  original_filename text not null default '',
-  purpose text not null,
-  status text not null,
+  purpose smallint not null,
+  status smallint not null default 1,
+  metadata jsonb not null default '{}'::jsonb,
+  expires_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint media_objects_owner_not_blank check (owner_user_id <> ''),
-  constraint media_objects_owner_account_fk foreign key (owner_user_id) references accounts(account_id) on delete restrict,
-  constraint media_objects_bucket_not_blank check (bucket <> ''),
-  constraint media_objects_object_key_not_blank check (object_key <> ''),
-  constraint media_objects_object_key_uniq unique (object_key),
-  constraint media_objects_sha256_check check (sha256 = '' or sha256 ~ '^[0-9a-f]{64}$'),
-  constraint media_objects_content_type_not_blank check (content_type <> ''),
-  constraint media_objects_size_check check (size_bytes > 0),
-  constraint media_objects_dimensions_check check (
-    (width is null or width > 0)
-    and
-    (height is null or height > 0)
-  ),
-  constraint media_objects_purpose_check check (purpose in ('avatar', 'message_image', 'message_file', 'agent_skill')),
-  constraint media_objects_status_check check (status in ('pending', 'ready', 'rejected', 'deleted'))
+  constraint media_objects_object_key_uniq unique (object_key)
 );
 
 create index if not exists media_objects_owner_status_created_idx
-  on media_objects (owner_user_id, status, created_at desc);
+  on media_objects (owner_account_id, status, created_at desc);
 
-create index if not exists media_objects_sha256_idx
-  on media_objects (sha256)
-  where sha256 <> '';
+create index if not exists media_objects_conversation_status_created_idx
+  on media_objects (conversation_id, status, created_at desc);
+
+create index if not exists media_objects_pending_expiry_idx
+  on media_objects (status, expires_at)
+  where status = 1 and expires_at is not null;
 
 create table if not exists auth_credentials (
-  identifier text primary key,
-  user_id text not null,
+  account_id text primary key,
   password_hash text not null,
-  salt text not null,
-  hash_version text not null,
+  password_algo smallint not null default 1,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint auth_credentials_user_id_uniq unique (user_id),
-  constraint auth_credentials_identifier_not_blank check (identifier <> ''),
-  constraint auth_credentials_user_id_not_blank check (user_id <> ''),
-  constraint auth_credentials_password_hash_not_blank check (password_hash <> ''),
-  constraint auth_credentials_hash_version_not_blank check (hash_version <> ''),
-  constraint auth_credentials_user_id_account_fk foreign key (user_id) references accounts(account_id) on delete cascade
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists friendships (
-  user_id text not null,
-  friend_id text not null,
-  status text not null,
+  account_id text not null,
+  friend_account_id text not null,
+  status smallint not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  primary key (user_id, friend_id),
-  constraint friendships_distinct_users_check check (user_id <> friend_id),
-  constraint friendships_status_check check (status in ('active', 'deleted')),
-  constraint friendships_user_id_account_fk foreign key (user_id) references accounts(account_id) on delete cascade,
-  constraint friendships_friend_id_account_fk foreign key (friend_id) references accounts(account_id) on delete cascade
+  primary key (account_id, friend_account_id)
 );
 
-create index if not exists friendships_user_status_idx
-  on friendships (user_id, status, friend_id);
+-- friendships.status: 1=pending, 2=accepted, 3=rejected, 4=deleted.
+create index if not exists friendships_account_status_idx
+  on friendships (account_id, status, friend_account_id);
+
+create index if not exists friendships_friend_account_idx
+  on friendships (friend_account_id, account_id);
 
 create table if not exists groups (
-  group_id text primary key default ('grp_' || lpad(nextval('agents_im_groups_id_seq')::text, 6, '0')),
+  group_id text primary key,
   name text not null,
   description text not null default '',
-  creator_user_id text not null,
+  creator_account_id text not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint groups_name_not_blank check (name <> ''),
-  constraint groups_creator_not_blank check (creator_user_id <> '')
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists group_members (
-  group_id text not null references groups(group_id) on delete cascade,
-  user_id text not null,
-  state text not null,
-  joined_at timestamptz not null default now(),
+  group_id text not null,
+  account_id text not null,
+  role smallint not null default 1,
+  status smallint not null default 1,
+  join_time timestamptz not null default now(),
   left_at timestamptz,
-  primary key (group_id, user_id),
-  constraint group_members_user_not_blank check (user_id <> ''),
-  constraint group_members_state_check check (state in ('active', 'left')),
-  constraint group_members_left_at_check check (
-    (state = 'active' and left_at is null)
-    or
-    (state = 'left' and left_at is not null)
-  )
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (group_id, account_id)
 );
 
-create index if not exists group_members_group_state_idx
-  on group_members (group_id, state, user_id);
+create index if not exists group_members_group_status_idx
+  on group_members (group_id, status, account_id);
+
+create index if not exists group_members_account_status_idx
+  on group_members (account_id, status, group_id);
 
 create table if not exists conversation_threads (
   conversation_id text primary key,
-  chat_type text not null,
-  single_user_a text not null default '',
-  single_user_b text not null default '',
+  conversation_type smallint not null,
+  single_account_a text not null default '',
+  single_account_b text not null default '',
   group_id text not null default '',
   max_seq bigint not null default 0,
   last_message_id text not null default '',
   last_message_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint conversation_threads_chat_type_check check (chat_type in ('single', 'group')),
-  constraint conversation_threads_max_seq_check check (max_seq >= 0),
-  constraint conversation_threads_shape_check check (
-    (chat_type = 'single' and single_user_a <> '' and single_user_b <> '' and single_user_a < single_user_b and group_id = '')
-    or
-    (chat_type = 'group' and group_id <> '' and single_user_a = '' and single_user_b = '')
-  )
+  updated_at timestamptz not null default now()
 );
 
 create unique index if not exists conversation_threads_single_pair_uniq
-  on conversation_threads (single_user_a, single_user_b)
-  where chat_type = 'single';
+  on conversation_threads (single_account_a, single_account_b)
+  where conversation_type = 1;
 
 create unique index if not exists conversation_threads_group_uniq
   on conversation_threads (group_id)
-  where chat_type = 'group';
+  where conversation_type = 2;
 
 create table if not exists messages (
-  server_msg_id text primary key default ('msg_' || lpad(nextval('agents_im_messages_id_seq')::text, 6, '0')),
+  message_id text primary key,
   client_msg_id text not null,
-  sender_id text not null,
-  conversation_id text not null references conversation_threads(conversation_id) on delete restrict,
+  sender_account_id text not null,
+  conversation_id text not null,
   seq bigint not null,
-  chat_type text not null,
-  receiver_id text not null default '',
+  conversation_type smallint not null,
+  receiver_account_id text not null default '',
   group_id text not null default '',
-  content_type text not null,
+  content_type smallint not null,
   content jsonb not null,
   payload_hash text not null,
-  send_time timestamptz not null,
+  client_send_time timestamptz,
+  server_received_at timestamptz not null default now(),
+  message_state smallint not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  message_origin smallint not null default 1,
+  agent_account_id text not null default '',
+  trigger_message_id text not null default '',
+  agent_run_id text not null default '',
+  allow_recursive_trigger boolean not null default false,
   constraint messages_conversation_seq_uniq unique (conversation_id, seq),
-  constraint messages_sender_client_msg_uniq unique (sender_id, client_msg_id),
-  constraint messages_chat_type_check check (chat_type in ('single', 'group')),
-  constraint messages_seq_positive_check check (seq > 0),
-  constraint messages_content_type_check check (content_type <> ''),
-  constraint messages_content_shape_check check (
-    (chat_type = 'single' and receiver_id <> '' and group_id = '')
-    or
-    (chat_type = 'group' and group_id <> '' and receiver_id = '')
-  )
+  constraint messages_sender_client_msg_uniq unique (sender_account_id, client_msg_id)
 );
 
 create index if not exists messages_conversation_seq_idx
   on messages (conversation_id, seq);
 
 create index if not exists messages_sender_created_idx
-  on messages (sender_id, created_at desc);
+  on messages (sender_account_id, created_at desc);
+
+create index if not exists messages_agent_run_idx
+  on messages (agent_run_id)
+  where agent_run_id <> '';
 
 create table if not exists user_conversation_states (
-  user_id text not null,
-  conversation_id text not null references conversation_threads(conversation_id) on delete cascade,
-  has_read_seq bigint not null default 0,
-  last_visible_seq bigint not null default 0,
+  account_id text not null,
+  conversation_id text not null,
+  last_read_seq bigint not null default 0,
+  visible_start_seq bigint not null default 0,
   muted boolean not null default false,
   archived boolean not null default false,
+  pinned_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  primary key (user_id, conversation_id),
-  constraint user_conversation_states_read_seq_check check (has_read_seq >= 0),
-  constraint user_conversation_states_visible_seq_check check (last_visible_seq >= 0),
-  constraint user_conversation_states_read_visible_check check (has_read_seq <= last_visible_seq)
+  primary key (account_id, conversation_id)
 );
 
-create index if not exists user_conversation_states_user_updated_idx
-  on user_conversation_states (user_id, updated_at desc);
+create index if not exists user_conversation_states_account_updated_idx
+  on user_conversation_states (account_id, updated_at desc);
 
-create table if not exists message_idempotency_keys (
-  sender_id text not null,
-  client_msg_id text not null,
-  payload_hash text not null,
-  server_msg_id text not null references messages(server_msg_id) on delete restrict,
-  conversation_id text not null,
-  seq bigint not null,
-  status text not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (sender_id, client_msg_id),
-  constraint message_idempotency_status_check check (status in ('accepted')),
-  constraint message_idempotency_seq_positive_check check (seq > 0),
-  constraint message_idempotency_server_msg_uniq unique (server_msg_id)
-);
-
-create index if not exists message_idempotency_conversation_seq_idx
-  on message_idempotency_keys (conversation_id, seq);
+create index if not exists user_conversation_states_account_pinned_idx
+  on user_conversation_states (account_id, pinned_at desc)
+  where pinned_at is not null;
 
 create table if not exists message_outbox (
-  event_id text primary key default ('outbox_' || lpad(nextval('agents_im_outbox_events_id_seq')::text, 6, '0')),
-  event_type text not null,
-  aggregate_type text not null,
+  event_id text primary key,
+  event_type smallint not null,
+  aggregate_type smallint not null,
   aggregate_id text not null,
   conversation_id text not null,
-  server_msg_id text not null references messages(server_msg_id) on delete restrict,
-  seq bigint not null,
+  message_id text not null default '',
+  seq bigint not null default 0,
   payload jsonb not null,
-  status text not null default 'pending',
+  status smallint not null default 1,
   attempt_count integer not null default 0,
   next_attempt_at timestamptz not null default now(),
   locked_by text not null default '',
@@ -252,69 +199,20 @@ create table if not exists message_outbox (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   published_at timestamptz,
-  constraint message_outbox_event_type_not_blank check (event_type <> ''),
-  constraint message_outbox_aggregate_type_not_blank check (aggregate_type <> ''),
-  constraint message_outbox_aggregate_id_not_blank check (aggregate_id <> ''),
-  constraint message_outbox_conversation_id_not_blank check (conversation_id <> ''),
-  constraint message_outbox_seq_positive_check check (seq > 0),
-  constraint message_outbox_status_check check (status in ('pending', 'published', 'failed')),
-  constraint message_outbox_attempt_count_check check (attempt_count >= 0),
-  constraint message_outbox_lock_shape_check check (
-    (locked_by = '' and locked_until is null)
-    or
-    (locked_by <> '' and locked_until is not null)
-  ),
-  constraint message_outbox_published_shape_check check (
-    (status = 'published' and published_at is not null)
-    or
-    (status <> 'published')
-  ),
   constraint message_outbox_event_aggregate_uniq unique (event_type, aggregate_type, aggregate_id)
 );
 
 create index if not exists message_outbox_pending_idx
-  on message_outbox (next_attempt_at, created_at, event_id)
-  where status = 'pending';
+  on message_outbox (status, next_attempt_at, created_at, event_id);
 
 create index if not exists message_outbox_locked_idx
-  on message_outbox (locked_until)
-  where status = 'pending' and locked_until is not null;
+  on message_outbox (status, locked_until);
 
 create index if not exists message_outbox_conversation_seq_idx
   on message_outbox (conversation_id, seq);
 
-create index if not exists message_outbox_server_msg_idx
-  on message_outbox (server_msg_id);
-
-create table if not exists delivery_attempts (
-  server_msg_id text not null references messages(server_msg_id) on delete cascade,
-  conversation_id text not null,
-  recipient_user_id text not null,
-  status text not null,
-  attempt_count integer not null default 0,
-  last_error text not null default '',
-  next_retry_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (server_msg_id, recipient_user_id),
-  constraint delivery_attempts_server_msg_id_not_blank check (server_msg_id <> ''),
-  constraint delivery_attempts_conversation_id_not_blank check (conversation_id <> ''),
-  constraint delivery_attempts_recipient_user_id_not_blank check (recipient_user_id <> ''),
-  constraint delivery_attempts_status_check check (status in ('accepted', 'published', 'delivered', 'offline', 'failed')),
-  constraint delivery_attempts_attempt_count_check check (attempt_count >= 0),
-  constraint delivery_attempts_retry_shape_check check (
-    (status = 'failed')
-    or
-    (next_retry_at is null)
-  )
-);
-
-create index if not exists delivery_attempts_conversation_recipient_idx
-  on delivery_attempts (conversation_id, recipient_user_id, updated_at desc);
-
-create index if not exists delivery_attempts_retry_idx
-  on delivery_attempts (next_retry_at, updated_at)
-  where status = 'failed' and next_retry_at is not null;
+create index if not exists message_outbox_message_idx
+  on message_outbox (message_id);
 
 create table if not exists agent_prompts (
   prompt_id text primary key default ('prompt_' || lpad(nextval('agents_im_agent_prompts_id_seq')::text, 6, '0')),

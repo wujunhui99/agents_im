@@ -8,24 +8,24 @@ import (
 )
 
 const (
-	OutboxEventTypeMessageCreated = "message.created"
-	OutboxAggregateTypeMessage    = "message"
+	OutboxEventTypeMessageCreated int16 = 1
+	OutboxAggregateTypeMessage    int16 = 1
 
-	OutboxStatusPending   = "pending"
-	OutboxStatusPublished = "published"
-	OutboxStatusFailed    = "failed"
+	OutboxStatusPending   int16 = 1
+	OutboxStatusPublished int16 = 2
+	OutboxStatusFailed    int16 = 3
 )
 
 type OutboxEvent struct {
 	EventID        string          `json:"eventId"`
-	EventType      string          `json:"eventType"`
-	AggregateType  string          `json:"aggregateType"`
+	EventType      int16           `json:"eventType"`
+	AggregateType  int16           `json:"aggregateType"`
 	AggregateID    string          `json:"aggregateId"`
 	ConversationID string          `json:"conversationId"`
 	ServerMsgID    string          `json:"serverMsgId"`
 	Seq            int64           `json:"seq"`
 	Payload        json.RawMessage `json:"payload"`
-	Status         string          `json:"status"`
+	Status         int16           `json:"status"`
 	AttemptCount   int             `json:"attemptCount"`
 	NextAttemptAt  time.Time       `json:"nextAttemptAt"`
 	LockedBy       string          `json:"lockedBy"`

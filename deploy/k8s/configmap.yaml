@@ -9,8 +9,10 @@ data:
   KAFKA_BROKERS: "127.0.0.1:19092"
   KAFKA_MESSAGE_EVENTS_TOPIC: "message.events.v1"
   KAFKA_CONSUMER_GROUP: "message-transfer-worker"
-  GATEWAY_WS_ALLOWED_ORIGINS: ""
-  GATEWAY_WS_ALLOW_QUERY_TOKEN: "false"
+  # Per-environment exact browser origins. Gray/staging overlays should set their own comma-separated origins.
+  GATEWAY_WS_ALLOWED_ORIGINS: "https://agenticim.xyz"
+  # Browser-native WebSocket uses /ws?token=[REDACTED] on the configured production origin.
+  GATEWAY_WS_ALLOW_QUERY_TOKEN: "true"
   GATEWAY_WS_PING_INTERVAL_SECONDS: "30"
   GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS: "75"
   GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND: "20"
