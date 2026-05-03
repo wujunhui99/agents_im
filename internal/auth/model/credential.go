@@ -2,6 +2,11 @@ package model
 
 import "time"
 
+const (
+	PasswordHashVersionBcrypt       = "bcrypt-v1"
+	PasswordHashVersionLegacySHA256 = "sha256-iter-v1"
+)
+
 type Credential struct {
 	Identifier   string
 	UserID       string

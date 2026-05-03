@@ -57,3 +57,43 @@ node tests/e2e/ws_live_push_regression.mjs
 Artifacts default to `/tmp/agents-im-ws-live-push-e2e/<timestamp>/` and can be overridden with `AGENTS_IM_E2E_OUTPUT_DIR`. The artifact set includes `report.txt`, `observations.redacted.json`, `ws-events.redacted.json`, `console.redacted.json`, and screenshots when available.
 
 Do not commit generated evidence, screenshots, secrets, real passwords, JWTs, cookies, or account credentials.
+
+# Auth register-login E2E regression
+
+`auth_register_login_regression.mjs` is an API-only regression harness for the auth credential persistence path. It creates a fresh unique account through the real `/auth/register`, then logs in through the real `/auth/login` with the exact same identifier/password. Artifacts are redacted and written to `/tmp/agents-im-auth-register-login-e2e/<timestamp>/` by default.
+
+Classifications:
+
+- `register-login-success`
+- `login-invalid-after-register`
+- `register-failed`
+- `setup-or-harness-failed`
+
+## Auth production
+
+```bash
+AGENTS_IM_E2E_TARGET=production \
+AGENTS_IM_E2E_BASE_URL=https://agenticim.xyz \
+node tests/e2e/auth_register_login_regression.mjs
+```
+
+## Auth local
+
+```bash
+AGENTS_IM_E2E_TARGET=local \
+AGENTS_IM_E2E_BASE_URL=http://127.0.0.1:5173 \
+node tests/e2e/auth_register_login_regression.mjs
+```
+
+## Auth evidence mode
+
+Use evidence mode only when collecting proof of the known register-then-login regression. It allows a zero exit for `login-invalid-after-register`; setup and register failures still exit non-zero.
+
+```bash
+AGENTS_IM_E2E_TARGET=production \
+AGENTS_IM_E2E_BASE_URL=https://agenticim.xyz \
+AGENTS_IM_E2E_ALLOW_REPRO_FAILURE=1 \
+node tests/e2e/auth_register_login_regression.mjs
+```
+
+The script also accepts `AGENTS_IM_E2E_API_BASE_URL`, `AGENTS_IM_E2E_OUTPUT_DIR`, and `AGENTS_IM_E2E_REQUEST_TIMEOUT_MS`. Do not commit generated evidence, secrets, real passwords, JWTs, cookies, or account credentials.
