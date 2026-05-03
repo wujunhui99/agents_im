@@ -83,12 +83,26 @@ MESSAGE_API_PORT=18083 \
 GATEWAY_WS_PORT=18084 \
 GROUPS_API_PORT=18085 \
 AGENT_API_PORT=18086 \
+MESSAGE_TRANSFER_OBSERVABILITY_PORT=18087 \
 AGENTS_IM_DEV_STATE_DIR=/tmp/agents-im-dev-e2e \
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH \
 scripts/dev-up.sh --services-only
 ```
 
 Use a separate `AGENTS_IM_DEV_STATE_DIR` when running alternate services so logs, PID files, configs, and binaries do not conflict with the default `.dev/` directory.
+Start the frontend with the same port overrides so Vite proxies to that alternate backend stack:
+
+```bash
+USER_API_PORT=18080 \
+AUTH_API_PORT=18081 \
+FRIENDS_API_PORT=18082 \
+MESSAGE_API_PORT=18083 \
+GATEWAY_WS_PORT=18084 \
+GROUPS_API_PORT=18085 \
+make frontend-start FRONTEND_HOST=127.0.0.1 FRONTEND_PORT=5173
+```
+
+Local `message-transfer` uses the Postgres outbox consumer by default and dispatches to `gateway-ws`, so HTTP `POST /messages` can produce live WebSocket pushes without requiring a separate Kafka publisher process.
 
 ## Single-machine E2E Smoke Command
 

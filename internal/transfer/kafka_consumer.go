@@ -139,7 +139,23 @@ func EnvelopeFromKafkaMessage(message kafka.Message) (Envelope, error) {
 		return Envelope{}, fmt.Errorf("unsupported transfer event_type %q", event.EventType)
 	}
 
-	transferEvent := MessageEvent{
+	transferEvent := MessageEventFromMessagingEvent(event)
+
+	return Envelope{
+		ID:         event.EventID,
+		Topic:      message.Topic,
+		Key:        firstTransferString(string(message.Key), event.PartitionKey()),
+		Partition:  int32(message.Partition),
+		Offset:     message.Offset,
+		Attempt:    1,
+		ReceivedAt: time.Now().UTC(),
+		Event:      transferEvent,
+		RawPayload: append([]byte(nil), message.Value...),
+	}, nil
+}
+
+func MessageEventFromMessagingEvent(event messaging.MessageEvent) MessageEvent {
+	return MessageEvent{
 		EventID:               event.EventID,
 		EventType:             EventTypeMessageAccepted,
 		ConversationID:        event.ConversationID,
@@ -161,18 +177,6 @@ func EnvelopeFromKafkaMessage(message kafka.Message) (Envelope, error) {
 		CreatedAt:             event.CreatedAt,
 		TraceID:               event.Payload.TraceID,
 	}
-
-	return Envelope{
-		ID:         event.EventID,
-		Topic:      message.Topic,
-		Key:        firstTransferString(string(message.Key), event.PartitionKey()),
-		Partition:  int32(message.Partition),
-		Offset:     message.Offset,
-		Attempt:    1,
-		ReceivedAt: time.Now().UTC(),
-		Event:      transferEvent,
-		RawPayload: append([]byte(nil), message.Value...),
-	}, nil
 }
 
 func receiverIDsFromMessagingEvent(event messaging.MessageEvent) []string {
