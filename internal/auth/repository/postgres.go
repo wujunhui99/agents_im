@@ -56,12 +56,17 @@ func NewRepositoryForStorage(driver string, dataSource string) (CredentialReposi
 }
 
 func (r *PostgresRepository) Create(ctx context.Context, credential model.Credential) (model.Credential, error) {
+	passwordAlgo, err := passwordAlgoToDB(credential.HashVersion)
+	if err != nil {
+		return model.Credential{}, err
+	}
+
 	var row postgresCredentialRow
-	err := r.conn.QueryRowCtx(ctx, &row, `
+	err = r.conn.QueryRowCtx(ctx, &row, `
 insert into auth_credentials (account_id, password_hash, password_algo)
 values ($1, $2, $3)
 returning account_id, $4::text as identifier, password_hash, password_algo, created_at, updated_at
-`, credential.UserID, credential.PasswordHash, passwordAlgoToDB(credential.HashVersion), credential.Identifier)
+`, credential.UserID, credential.PasswordHash, passwordAlgo, credential.Identifier)
 	if err != nil {
 		if isPgUniqueViolation(err) {
 			return model.Credential{}, apperror.AlreadyExists("auth credential already exists")
@@ -72,7 +77,7 @@ returning account_id, $4::text as identifier, password_hash, password_algo, crea
 		return model.Credential{}, err
 	}
 
-	return row.credential(), nil
+	return row.credential()
 }
 
 func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier string) (model.Credential, error) {
@@ -90,18 +95,23 @@ where a.identifier = $1
 		return model.Credential{}, err
 	}
 
-	return row.credential(), nil
+	return row.credential()
 }
 
-func (r postgresCredentialRow) credential() model.Credential {
+func (r postgresCredentialRow) credential() (model.Credential, error) {
+	hashVersion, err := passwordAlgoFromDB(r.PasswordAlgo)
+	if err != nil {
+		return model.Credential{}, err
+	}
+
 	return model.Credential{
 		Identifier:   r.Identifier,
 		UserID:       r.AccountID,
 		PasswordHash: r.PasswordHash,
-		HashVersion:  passwordAlgoFromDB(r.PasswordAlgo),
+		HashVersion:  hashVersion,
 		CreatedAt:    r.CreatedAt,
 		UpdatedAt:    r.UpdatedAt,
-	}
+	}, nil
 }
 
 func isPgUniqueViolation(err error) bool {
@@ -114,10 +124,22 @@ func isPgForeignKeyViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolationCode
 }
 
-func passwordAlgoToDB(version string) int16 {
-	return 1
+func passwordAlgoToDB(version string) (int16, error) {
+	switch version {
+	case model.PasswordHashVersionBcrypt:
+		return 1, nil
+	default:
+		return 0, apperror.InvalidArgument("unsupported password hash version")
+	}
 }
 
-func passwordAlgoFromDB(algo int16) string {
-	return "sha256-iter-v1"
+func passwordAlgoFromDB(algo int16) (string, error) {
+	switch algo {
+	case 1:
+		return model.PasswordHashVersionBcrypt, nil
+	case 2:
+		return model.PasswordHashVersionLegacySHA256, nil
+	default:
+		return "", apperror.Internal("unsupported password algorithm")
+	}
 }

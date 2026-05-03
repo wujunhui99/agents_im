@@ -71,19 +71,21 @@ describe('Auth flow', () => {
 
   it('shows a WeChat-style login page before authentication and saves the login token', async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        code: 'OK',
-        message: 'ok',
-        data: {
-          user_id: '1001',
-          identifier: 'alice_001',
-          display_name: 'Alice Chen',
-          token: 'login-token',
-          expires_at: '2026-04-30T12:00:00Z',
-        },
-      }),
-    );
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK', message: 'ok', data: { exists: true, identifier: 'alice_001' } }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            user_id: '1001',
+            identifier: 'alice_001',
+            display_name: 'Alice Chen',
+            token: 'login-token',
+            expires_at: '2026-04-30T12:00:00Z',
+          },
+        }),
+      );
 
     render(<App />);
 
@@ -96,6 +98,12 @@ describe('Auth flow', () => {
 
     expect(await screen.findByRole('heading', { name: '消息' })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
+      '/users/exists?identifier=alice_001',
+      expect.objectContaining({
+        method: 'GET',
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
       '/auth/login',
       expect.objectContaining({
         method: 'POST',
@@ -106,6 +114,25 @@ describe('Auth flow', () => {
       token: 'login-token',
       user: { identifier: 'alice_001', displayName: 'Alice Chen' },
     });
+  });
+
+  it('checks whether the login identifier exists when the password field receives focus', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', message: 'ok', data: { exists: false, identifier: 'missing_001' } }));
+
+    render(<App />);
+
+    await user.type(screen.getByLabelText('账号'), 'missing_001');
+    await user.click(screen.getByLabelText('密码'));
+
+    expect(await screen.findByText('账号不存在，请检查后再输入密码')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/users/exists?identifier=missing_001',
+      expect.objectContaining({
+        method: 'GET',
+      }),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith('/auth/login', expect.anything());
   });
 
   it('registers a new account and enters the four-tab shell', async () => {
