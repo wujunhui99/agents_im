@@ -22,6 +22,7 @@
 - [gateway-message-contract.md](./gateway-message-contract.md)：Gateway WebSocket command 到 Message Service RPC 的第一阶段映射契约
 - [redis-presence.md](./redis-presence.md)：Redis 在线状态与 Gateway 连接元数据契约
 - [websocket-gateway.md](./websocket-gateway.md)：WebSocket Gateway 第一阶段真实入口、JWT handshake、connection manager 和 command router
+- [websocket-production-runbook.md](./websocket-production-runbook.md)：生产 WebSocket、message-transfer fanout 与 k8s/Ingress/ConfigMap 排查坑位手册
 - [websocket-reconnect-sync.md](./websocket-reconnect-sync.md)：WebSocket 重连、缺失消息同步、稳定 ACK error envelope 和重复拉取契约
 - [message-transfer-worker.md](./message-transfer-worker.md)：Message Transfer worker 第一阶段事件消费、投递调度和重试契约
 - [gateway-push-delivery.md](./gateway-push-delivery.md)：Gateway push delivery 第一阶段 dispatcher、server push envelope 和 in-memory fanout
