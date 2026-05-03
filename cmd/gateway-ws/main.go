@@ -67,6 +67,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/ws", wsServer)
+	mux.HandleFunc("/internal/delivery/conversation", wsServer.HandleInternalConversationDelivery)
 	mux.HandleFunc("/healthz", health.LivenessHandler(cfg.Name))
 	mux.HandleFunc("/readyz", health.ReadinessHandler(cfg.Name, func(*http.Request) []health.Check {
 		return []health.Check{

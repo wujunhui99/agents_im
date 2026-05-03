@@ -107,7 +107,8 @@ type TransferConsumerConfig struct {
 }
 
 type TransferDispatcherConfig struct {
-	Driver string
+	Driver          string
+	GatewayEndpoint string
 }
 
 type TransferWorkerConfig struct {
@@ -132,6 +133,7 @@ const (
 	TransferConsumerMemory    = "memory"
 	TransferConsumerKafka     = "kafka"
 	TransferDispatcherNoop    = "noop"
+	TransferDispatcherGateway = "gateway"
 )
 
 const (
@@ -411,6 +413,12 @@ func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
 	} else {
 		cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(cfg.Dispatcher.Driver)
 	}
+	cfg.Dispatcher.GatewayEndpoint = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(values["Dispatcher.GatewayEndpoint"])),
+		strings.TrimSpace(os.ExpandEnv(values["Dispatcher.Endpoint"])),
+		os.Getenv("MESSAGE_TRANSFER_GATEWAY_ENDPOINT"),
+		cfg.Dispatcher.GatewayEndpoint,
+	)
 	if value := firstNonEmpty(values["Worker.PollIntervalMillis"], values["PollIntervalMillis"]); value != "" {
 		interval, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
 		if err != nil {
@@ -502,6 +510,8 @@ func ResolveTransferDispatcherDriver(value string) string {
 		value = strings.ToLower(strings.TrimSpace(os.Getenv("MESSAGE_TRANSFER_DISPATCHER_DRIVER")))
 	}
 	switch value {
+	case TransferDispatcherGateway, "gateway-http", "http":
+		return TransferDispatcherGateway
 	default:
 		return TransferDispatcherNoop
 	}
@@ -517,6 +527,7 @@ func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConf
 	cfg.Consumer.Topic = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Topic)), os.Getenv("MESSAGE_TRANSFER_TOPIC"), cfg.Kafka.MessageEventsTopic, defaultTransferTopic)
 	cfg.Consumer.Group = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Group)), os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"), cfg.Kafka.ConsumerGroup, defaultTransferGroup)
 	cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(cfg.Dispatcher.Driver)
+	cfg.Dispatcher.GatewayEndpoint = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Dispatcher.GatewayEndpoint)), os.Getenv("MESSAGE_TRANSFER_GATEWAY_ENDPOINT"))
 	if cfg.Worker.PollIntervalMillis <= 0 {
 		cfg.Worker.PollIntervalMillis = defaultTransferPollIntervalMillis
 	}

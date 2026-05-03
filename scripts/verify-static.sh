@@ -1446,6 +1446,23 @@ if [[ -n "$legacy_x_user_id_sets" ]]; then
   fi
 fi
 
+if ! grep -q 'AllowQueryToken: true' deploy/k8s/etc/gateway-ws.yaml; then
+  echo "production gateway-ws must allow query token for browser WebSocket" >&2
+  exit 1
+fi
+if grep -A2 '^Dispatcher:' deploy/k8s/etc/message-transfer.yaml | grep -q 'Driver: noop'; then
+  echo "production message-transfer must not use noop dispatcher" >&2
+  exit 1
+fi
+if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/message-transfer.yaml | grep -q 'Driver: gateway'; then
+  echo "production message-transfer must dispatch to gateway-ws" >&2
+  exit 1
+fi
+if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/message-transfer.yaml | grep -q 'GatewayEndpoint: http://127\.0\.0\.1:8084'; then
+  echo "production message-transfer must target colocated gateway-ws internal endpoint" >&2
+  exit 1
+fi
+
 jwt_api_files=(
   "api/user.api"
   "api/friends.api"

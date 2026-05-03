@@ -296,6 +296,31 @@ func (s *Server) PushToConversation(ctx context.Context, conversationID string, 
 	return s.DeliveryDispatcher().DeliverToConversation(ctx, conversationID, recipientUserIDs, event)
 }
 
+func (s *Server) HandleInternalConversationDelivery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	var request struct {
+		ConversationID   string         `json:"conversation_id"`
+		RecipientUserIDs []string       `json:"recipient_user_ids"`
+		Event            delivery.Event `json:"event"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, defaultReadLimit))
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	result, err := s.PushToConversation(r.Context(), request.ConversationID, request.RecipientUserIDs, request.Event)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(result)
+}
+
 func (s *Server) registerPresence(ctx context.Context, conn *Connection) error {
 	if s.presence == nil || conn == nil {
 		return nil
