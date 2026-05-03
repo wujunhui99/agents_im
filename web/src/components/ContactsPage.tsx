@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react';
 import { ChevronRight, Megaphone, Search, Tag, UserPlus, UsersRound } from 'lucide-react';
-import type { ContactsApi, Friendship } from '../api/contacts';
+import type { ContactsApi, Friendship, FriendRequestDecisionData } from '../api/contacts';
 import { createContactsApi } from '../api/contacts';
 import type { UserApi, UserProfile } from '../api/user';
 import { createUserApi } from '../api/user';
@@ -37,62 +37,129 @@ type ContactsPageProps = {
 };
 
 const contactEntries: ContactEntry[] = [
-  { id: 'new', label: '新的朋友', helper: '通过账号搜索并添加好友', accent: 'orange', icon: UserPlus, available: true },
+  { id: 'new', label: '新的朋友', helper: '查看好友申请并添加好友', accent: 'orange', icon: UserPlus, available: true },
   { id: 'groups', label: '群聊', helper: '群聊入口暂未开放', accent: 'green', icon: UsersRound, available: false },
   { id: 'tags', label: '标签', helper: '标签功能暂未开放', accent: 'blue', icon: Tag, available: false },
   { id: 'official', label: '公众号', helper: '系统通知与服务号暂未开放', accent: 'gray', icon: Megaphone, available: false },
 ];
 
+type AddFriendResult = {
+  friendship: Friendship;
+  created: boolean;
+};
+
+type IdentifierSearchState = 'idle' | 'pending' | 'accepted';
+
 function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsApi(), onStartChat }: ContactsPageProps) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendStatus, setFriendStatus] = useState('正在加载好友列表');
   const [openingFriendId, setOpeningFriendId] = useState<string | null>(null);
+  const [incomingRequests, setIncomingRequests] = useState<Friendship[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<Friendship[]>([]);
+  const [requestStatus, setRequestStatus] = useState('正在加载好友申请');
+  const [decidingRequestId, setDecidingRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadFriends() {
-      setFriendStatus('正在加载好友列表');
-      try {
-        const response = await contactsApi.listFriends();
-        if (cancelled) {
-          return;
-        }
-        const nextFriends = response.friends.map(friendshipToFriend);
-        setFriends(nextFriends);
-        setFriendStatus(response.friends.length > 0 ? `已加载 ${response.friends.length} 位好友` : '暂无好友');
-      } catch (error) {
-        if (!cancelled) {
-          setFriendStatus(error instanceof Error ? error.message : '加载好友列表失败');
-        }
-      }
+    async function loadInitialData() {
+      await Promise.all([loadFriends({ cancelled: () => cancelled }), loadFriendRequests({ cancelled: () => cancelled })]);
     }
 
-    void loadFriends();
+    void loadInitialData();
     return () => {
       cancelled = true;
     };
   }, [contactsApi]);
 
-  async function refreshFriends() {
+  async function loadFriends(options?: { cancelled?: () => boolean }) {
     setFriendStatus('正在加载好友列表');
     try {
       const response = await contactsApi.listFriends();
-      const nextFriends = response.friends.map(friendshipToFriend);
+      if (options?.cancelled?.()) {
+        return;
+      }
+      const acceptedFriendships = response.friends.filter(isAcceptedFriendship);
+      const nextFriends = acceptedFriendships.map(friendshipToFriend);
       setFriends(nextFriends);
-      setFriendStatus(response.friends.length > 0 ? `已加载 ${response.friends.length} 位好友` : '暂无好友');
+      setFriendStatus(acceptedFriendships.length > 0 ? `已加载 ${acceptedFriendships.length} 位好友` : '暂无好友');
     } catch (error) {
-      setFriendStatus(error instanceof Error ? error.message : '加载好友列表失败');
+      if (!options?.cancelled?.()) {
+        setFriendStatus(error instanceof Error ? error.message : '加载好友列表失败');
+      }
     }
   }
 
-  async function addFriend(profile: UserProfile) {
-    await contactsApi.addFriend(profile.user_id);
-    setFriends((current) => {
-      const nextFriends = upsertFriend(current, userProfileToFriend(profile));
-      return nextFriends;
-    });
-    setFriendStatus(`已添加好友：${profile.identifier}`);
+  async function loadFriendRequests(options?: { cancelled?: () => boolean }) {
+    setRequestStatus('正在加载好友申请');
+    try {
+      const response = await contactsApi.listFriendRequests();
+      if (options?.cancelled?.()) {
+        return;
+      }
+      setIncomingRequests(response.incoming ?? []);
+      setOutgoingRequests(response.outgoing ?? []);
+      const total = (response.incoming?.length ?? 0) + (response.outgoing?.length ?? 0);
+      setRequestStatus(total > 0 ? `已加载 ${total} 条好友申请` : '暂无好友申请');
+    } catch (error) {
+      if (!options?.cancelled?.()) {
+        setRequestStatus(error instanceof Error ? error.message : '加载好友申请失败');
+      }
+    }
+  }
+
+  async function refreshFriends() {
+    await Promise.all([loadFriends(), loadFriendRequests()]);
+  }
+
+  async function addFriend(profile: UserProfile): Promise<AddFriendResult> {
+    const result = await contactsApi.addFriend(profile.user_id);
+    if (isAcceptedFriendship(result.friendship)) {
+      setFriends((current) => upsertFriend(current, userProfileToFriend(profile)));
+      setFriendStatus(`已添加好友：${profile.identifier}`);
+    } else {
+      setOutgoingRequests((current) => upsertFriendship(current, result.friendship));
+      setRequestStatus(`已发送好友申请：${profile.identifier}`);
+      setFriendStatus(`已发送好友申请：${profile.identifier}`);
+    }
+    return result;
+  }
+
+  async function acceptFriendRequest(request: Friendship) {
+    const requesterID = request.user_id;
+    setDecidingRequestId(requesterID);
+    setRequestStatus('正在同意好友申请');
+    try {
+      const result = await contactsApi.acceptFriendRequest(requesterID);
+      applyAcceptedRequest(result, request);
+      setRequestStatus(`已同意 ${profileDisplayName(friendshipToUserProfile(request))} 的好友申请`);
+      setFriendStatus('好友列表已更新');
+    } catch (error) {
+      setRequestStatus(error instanceof Error ? error.message : '同意好友申请失败');
+    } finally {
+      setDecidingRequestId(null);
+    }
+  }
+
+  async function rejectFriendRequest(request: Friendship) {
+    const requesterID = request.user_id;
+    setDecidingRequestId(requesterID);
+    setRequestStatus('正在拒绝好友申请');
+    try {
+      await contactsApi.rejectFriendRequest(requesterID);
+      setIncomingRequests((current) => current.filter((item) => item.user_id !== requesterID));
+      setRequestStatus(`已拒绝 ${profileDisplayName(friendshipToUserProfile(request))} 的好友申请`);
+    } catch (error) {
+      setRequestStatus(error instanceof Error ? error.message : '拒绝好友申请失败');
+    } finally {
+      setDecidingRequestId(null);
+    }
+  }
+
+  function applyAcceptedRequest(result: FriendRequestDecisionData, request: Friendship) {
+    setIncomingRequests((current) => current.filter((item) => item.user_id !== request.user_id));
+    const profile = friendshipToUserProfile({ ...request, ...result.friendship, friend: request.friend ?? request.friend_profile ?? request.profile });
+    setFriends((current) => upsertFriend(current, userProfileToFriend(profile)));
   }
 
   async function openFriendChat(friend: Friend) {
@@ -120,6 +187,15 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
           <ContactEntryButton key={entry.id} entry={entry} />
         ))}
       </section>
+      <FriendRequestsPanel
+        incomingRequests={incomingRequests}
+        outgoingRequests={outgoingRequests}
+        status={requestStatus}
+        decidingRequestId={decidingRequestId}
+        onRefresh={loadFriendRequests}
+        onAccept={acceptFriendRequest}
+        onReject={rejectFriendRequest}
+      />
       <section aria-label="好友列表">
         <div className="panel-heading">
           <h2>好友</h2>
@@ -136,14 +212,16 @@ function ContactsPage({ userApi = createUserApi(), contactsApi = createContactsA
   );
 }
 
-function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFriend: (profile: UserProfile) => Promise<void> }) {
+function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFriend: (profile: UserProfile) => Promise<AddFriendResult> }) {
   const [identifier, setIdentifier] = useState('');
   const [result, setResult] = useState<UserProfile | null>(null);
-  const [status, setStatus] = useState('按唯一 identifier 搜索用户');
+  const [status, setStatus] = useState('按账号搜索用户');
   const [submitting, setSubmitting] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [addedUserIds, setAddedUserIds] = useState<Set<string>>(() => new Set());
-  const isAdded = result ? addedUserIds.has(result.user_id) : false;
+  const [requestStates, setRequestStates] = useState<Map<string, IdentifierSearchState>>(() => new Map());
+  const requestState = result ? requestStates.get(result.user_id) ?? 'idle' : 'idle';
+  const addButtonLabel = requestState === 'accepted' ? '已添加' : requestState === 'pending' ? '等待对方确认' : adding ? '添加中' : '添加好友';
+  const addButtonAriaLabel = requestState === 'accepted' ? '已添加' : requestState === 'pending' ? '等待对方确认' : `添加好友 ${result?.identifier ?? ''}`;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -151,7 +229,7 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
 
     if (!query) {
       setResult(null);
-      setStatus('请输入 identifier');
+      setStatus('请输入账号');
       return;
     }
 
@@ -177,9 +255,10 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
     setAdding(true);
     setStatus('正在添加好友');
     try {
-      await onAddFriend(result);
-      setAddedUserIds((current) => new Set(current).add(result.user_id));
-      setStatus(`已添加好友：${result.identifier}`);
+      const addResult = await onAddFriend(result);
+      const nextState: IdentifierSearchState = isAcceptedFriendship(addResult.friendship) ? 'accepted' : 'pending';
+      setRequestStates((current) => new Map(current).set(result.user_id, nextState));
+      setStatus(nextState === 'accepted' ? `已添加好友：${result.identifier}` : '已发送好友申请，等待对方确认');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '添加好友失败');
     } finally {
@@ -191,9 +270,9 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
     <section className="identifier-search-card" aria-label="账号搜索">
       <form className="identifier-search-form" onSubmit={handleSubmit}>
         <TextField
-          label="按 identifier 搜索用户"
+          label="按账号搜索用户"
           hideLabel
-          placeholder="输入唯一 identifier"
+          placeholder="输入唯一账号"
           value={identifier}
           onChange={(event) => setIdentifier(event.target.value)}
           leadingIcon={<Search size={17} />}
@@ -208,7 +287,7 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
         {status}
       </p>
       {result ? (
-<ListItem
+        <ListItem
           className="search-result"
           leading={<Avatar label={avatarText(profileDisplayName(result))} color="blue" />}
           headline={profileDisplayName(result)}
@@ -218,11 +297,11 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
               className="text-command"
               variant="tonal"
               size="small"
-              aria-label={isAdded ? '已添加' : `添加好友 ${result.identifier}`}
-              disabled={adding || isAdded}
+              aria-label={addButtonAriaLabel}
+              disabled={adding || requestState !== 'idle'}
               onClick={handleAddFriend}
             >
-              {isAdded ? '已添加' : adding ? '添加中' : '添加好友'}
+              {addButtonLabel}
             </Button>
           }
         />
@@ -236,7 +315,7 @@ function ContactEntryButton({ entry }: { entry: ContactEntry }) {
   const disabled = !entry.available;
 
   return (
-<ListItem
+    <ListItem
       className={`action-row${disabled ? ' action-row-disabled' : ''}`}
       ariaLabel={disabled ? `${entry.label} 暂未开放` : entry.label}
       ariaDisabled={disabled}
@@ -248,6 +327,94 @@ function ContactEntryButton({ entry }: { entry: ContactEntry }) {
       headline={entry.label}
       supportingText={entry.helper}
       trailing={disabled ? <span className="row-badge">暂未开放</span> : <ChevronRight size={18} />}
+    />
+  );
+}
+
+function FriendRequestsPanel({
+  incomingRequests,
+  outgoingRequests,
+  status,
+  decidingRequestId,
+  onRefresh,
+  onAccept,
+  onReject,
+}: {
+  incomingRequests: Friendship[];
+  outgoingRequests: Friendship[];
+  status: string;
+  decidingRequestId: string | null;
+  onRefresh: () => void;
+  onAccept: (request: Friendship) => void;
+  onReject: (request: Friendship) => void;
+}) {
+  return (
+    <section aria-label="好友申请">
+      <div className="panel-heading">
+        <h2>好友申请</h2>
+        <Button className="text-command" variant="tonal" size="small" onClick={onRefresh}>
+          刷新申请
+        </Button>
+      </div>
+      <p className="inline-status" role="status">
+        {status}
+      </p>
+      <Card className="list-card">
+        {incomingRequests.length === 0 && outgoingRequests.length === 0 ? <p className="empty-state">暂无好友申请</p> : null}
+        {incomingRequests.map((request) => (
+          <FriendRequestRow
+            key={`incoming-${request.user_id}`}
+            request={request}
+            direction="incoming"
+            busy={decidingRequestId === request.user_id}
+            onAccept={() => onAccept(request)}
+            onReject={() => onReject(request)}
+          />
+        ))}
+        {outgoingRequests.map((request) => (
+          <FriendRequestRow key={`outgoing-${request.friend_id}`} request={request} direction="outgoing" busy={false} />
+        ))}
+      </Card>
+    </section>
+  );
+}
+
+function FriendRequestRow({
+  request,
+  direction,
+  busy,
+  onAccept,
+  onReject,
+}: {
+  request: Friendship;
+  direction: 'incoming' | 'outgoing';
+  busy: boolean;
+  onAccept?: () => void;
+  onReject?: () => void;
+}) {
+  const profile = friendshipToUserProfile(request);
+  const name = profileDisplayName(profile);
+  const helper = direction === 'incoming' ? '请求添加你为好友' : '等待对方确认';
+  return (
+    <ListItem
+      className="friend-request-row"
+      leading={<Avatar label={avatarText(name)} color={direction === 'incoming' ? 'orange' : 'blue'} />}
+      headline={name}
+      supportingText={<ProfileSupportingLines identifier={profileIdentifier(profile)} accountType={profile.account_type} helper={helper} />}
+      trailing={
+        direction === 'incoming' ? (
+          <span className="request-actions">
+            <Button className="text-command" variant="tonal" size="small" aria-label={`同意 ${profileIdentifier(profile)}`} disabled={busy} onClick={onAccept}>
+              同意
+            </Button>
+            <Button className="text-command" variant="tonal" size="small" aria-label={`拒绝 ${profileIdentifier(profile)}`} disabled={busy} onClick={onReject}>
+              拒绝
+            </Button>
+          </span>
+        ) : (
+          <span className="row-badge">等待对方确认</span>
+        )
+      }
     />
   );
 }
@@ -299,6 +466,10 @@ function FriendDirectory({
   );
 }
 
+function isAcceptedFriendship(friendship: Friendship) {
+  return friendship.status === 'accepted' || friendship.status === 'active' || friendship.is_friend;
+}
+
 function groupFriends(directoryFriends: Friend[]) {
   const grouped = directoryFriends.reduce<Map<string, Friend[]>>((accumulator, friend) => {
     const initial = friend.initial.slice(0, 1).toUpperCase() || '#';
@@ -340,7 +511,7 @@ function friendToUserProfile(friend: Friend): UserProfile {
   };
 }
 
-function friendshipToUserProfile(friendship: Friendship): UserProfile {
+export function friendshipToUserProfile(friendship: Friendship): UserProfile {
   const profile = friendship.friend ?? friendship.friend_profile ?? friendship.profile ?? {};
   const userId = profile.user_id || friendship.friend_id;
   const identifier = firstNonEmpty(profile.identifier, friendship.friend_identifier, friendship.identifier) ?? '';
@@ -377,11 +548,28 @@ function upsertFriend(friends: Friend[], friend: Friend) {
   return [...friends, friend];
 }
 
-function ProfileSupportingLines({ identifier, accountType }: { identifier?: string; accountType?: UserProfile['account_type'] }) {
+function upsertFriendship(friendships: Friendship[], friendship: Friendship) {
+  const key = `${friendship.user_id}:${friendship.friend_id}`;
+  if (friendships.some((item) => `${item.user_id}:${item.friend_id}` === key)) {
+    return friendships.map((item) => (`${item.user_id}:${item.friend_id}` === key ? friendship : item));
+  }
+  return [...friendships, friendship];
+}
+
+function ProfileSupportingLines({
+  identifier,
+  accountType,
+  helper,
+}: {
+  identifier?: string;
+  accountType?: UserProfile['account_type'];
+  helper?: string;
+}) {
   return (
     <span className="friend-supporting-lines">
       <span>{identifier ?? '资料未同步'}</span>
       <span>{accountTypeLabel(accountType)}</span>
+      {helper ? <span>{helper}</span> : null}
     </span>
   );
 }

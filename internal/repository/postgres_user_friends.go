@@ -205,7 +205,7 @@ func (r *PostgresRepository) AddFriend(ctx context.Context, userID string, frien
 	created := true
 	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		existing, err := queryFriendship(ctx, session, userID, friendID, true)
-		if err == nil && existing.Status == model.FriendshipStatusActive {
+		if err == nil && (existing.Status == model.FriendshipStatusAccepted || existing.Status == model.FriendshipStatusPending) {
 			friendship = existing
 			created = false
 			return nil
@@ -214,11 +214,24 @@ func (r *PostgresRepository) AddFriend(ctx context.Context, userID string, frien
 			return err
 		}
 
-		row, err := upsertActiveFriendship(ctx, session, userID, friendID)
-		if err != nil {
-			return err
+		reverse, reverseErr := queryFriendship(ctx, session, friendID, userID, true)
+		if reverseErr != nil && !isNotFound(reverseErr) {
+			return reverseErr
 		}
-		if _, err := upsertActiveFriendship(ctx, session, friendID, userID); err != nil {
+		if reverseErr == nil && reverse.Status == model.FriendshipStatusPending {
+			row, err := upsertFriendshipWithStatus(ctx, session, userID, friendID, model.FriendshipStatusAccepted)
+			if err != nil {
+				return err
+			}
+			if _, err := upsertFriendshipWithStatus(ctx, session, friendID, userID, model.FriendshipStatusAccepted); err != nil {
+				return err
+			}
+			friendship = row
+			return nil
+		}
+
+		row, err := upsertFriendshipWithStatus(ctx, session, userID, friendID, model.FriendshipStatusPending)
+		if err != nil {
 			return err
 		}
 		friendship = row
@@ -233,6 +246,64 @@ func (r *PostgresRepository) AddFriend(ctx context.Context, userID string, frien
 	return friendship.Clone(), created, nil
 }
 
+func (r *PostgresRepository) AcceptFriendRequest(ctx context.Context, userID string, requesterID string) (model.Friendship, bool, error) {
+	var friendship model.Friendship
+	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+		incoming, err := queryFriendship(ctx, session, requesterID, userID, true)
+		if err != nil {
+			return err
+		}
+		if incoming.Status != model.FriendshipStatusPending {
+			return apperror.NotFound("friend request not found")
+		}
+		if _, err := upsertFriendshipWithStatus(ctx, session, requesterID, userID, model.FriendshipStatusAccepted); err != nil {
+			return err
+		}
+		row, err := upsertFriendshipWithStatus(ctx, session, userID, requesterID, model.FriendshipStatusAccepted)
+		if err != nil {
+			return err
+		}
+		friendship = row
+		return nil
+	})
+	if err != nil {
+		if isNotFound(err) {
+			return model.Friendship{}, false, apperror.NotFound("friend request not found")
+		}
+		return model.Friendship{}, false, err
+	}
+	return friendship.Clone(), true, nil
+}
+
+func (r *PostgresRepository) RejectFriendRequest(ctx context.Context, userID string, requesterID string) (model.Friendship, bool, error) {
+	var friendship model.Friendship
+	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+		incoming, err := queryFriendship(ctx, session, requesterID, userID, true)
+		if err != nil {
+			return err
+		}
+		if incoming.Status != model.FriendshipStatusPending {
+			return apperror.NotFound("friend request not found")
+		}
+		if _, err := upsertFriendshipWithStatus(ctx, session, requesterID, userID, model.FriendshipStatusRejected); err != nil {
+			return err
+		}
+		row, err := upsertFriendshipWithStatus(ctx, session, userID, requesterID, model.FriendshipStatusRejected)
+		if err != nil {
+			return err
+		}
+		friendship = row
+		return nil
+	})
+	if err != nil {
+		if isNotFound(err) {
+			return model.Friendship{}, false, apperror.NotFound("friend request not found")
+		}
+		return model.Friendship{}, false, err
+	}
+	return friendship.Clone(), true, nil
+}
+
 func (r *PostgresRepository) DeleteFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error) {
 	var friendship model.Friendship
 	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
@@ -242,14 +313,14 @@ update friendships
 set status = $3, updated_at = now()
 where account_id = $1 and friend_account_id = $2 and status = $4
 returning account_id, friend_account_id, status, created_at, updated_at
-`, userID, friendID, friendshipStatusToDB(model.FriendshipStatusDeleted), friendshipStatusToDB(model.FriendshipStatusActive)); err != nil {
+`, userID, friendID, friendshipStatusToDB(model.FriendshipStatusDeleted), friendshipStatusToDB(model.FriendshipStatusAccepted)); err != nil {
 			return err
 		}
 		_, err := session.ExecCtx(ctx, `
 update friendships
 set status = $3, updated_at = now()
 where account_id = $1 and friend_account_id = $2 and status = $4
-`, friendID, userID, friendshipStatusToDB(model.FriendshipStatusDeleted), friendshipStatusToDB(model.FriendshipStatusActive))
+`, friendID, userID, friendshipStatusToDB(model.FriendshipStatusDeleted), friendshipStatusToDB(model.FriendshipStatusAccepted))
 		if err != nil {
 			return err
 		}
@@ -272,7 +343,45 @@ select account_id, friend_account_id, status, created_at, updated_at
 from friendships
 where account_id = $1 and status = $2
 order by friend_account_id asc
-`, userID, friendshipStatusToDB(model.FriendshipStatusActive))
+`, userID, friendshipStatusToDB(model.FriendshipStatusAccepted))
+	if err != nil {
+		return nil, err
+	}
+
+	friendships := make([]model.Friendship, 0, len(rows))
+	for _, row := range rows {
+		friendships = append(friendships, row.friendship())
+	}
+	return friendships, nil
+}
+
+func (r *PostgresRepository) ListIncomingFriendRequests(ctx context.Context, userID string) ([]model.Friendship, error) {
+	var rows []postgresFriendshipRow
+	err := r.conn.QueryRowsCtx(ctx, &rows, `
+select account_id, friend_account_id, status, created_at, updated_at
+from friendships
+where friend_account_id = $1 and status = $2
+order by account_id asc
+`, userID, friendshipStatusToDB(model.FriendshipStatusPending))
+	if err != nil {
+		return nil, err
+	}
+
+	friendships := make([]model.Friendship, 0, len(rows))
+	for _, row := range rows {
+		friendships = append(friendships, row.friendship())
+	}
+	return friendships, nil
+}
+
+func (r *PostgresRepository) ListOutgoingFriendRequests(ctx context.Context, userID string) ([]model.Friendship, error) {
+	var rows []postgresFriendshipRow
+	err := r.conn.QueryRowsCtx(ctx, &rows, `
+select account_id, friend_account_id, status, created_at, updated_at
+from friendships
+where account_id = $1 and status = $2
+order by friend_account_id asc
+`, userID, friendshipStatusToDB(model.FriendshipStatusPending))
 	if err != nil {
 		return nil, err
 	}
@@ -286,13 +395,27 @@ order by friend_account_id asc
 
 func (r *PostgresRepository) GetFriendship(ctx context.Context, userID string, friendID string) (model.Friendship, error) {
 	friendship, err := queryFriendship(ctx, r.conn, userID, friendID, false)
-	if err != nil {
-		if isNotFound(err) {
-			return model.Friendship{}, apperror.NotFound("friendship not found")
-		}
+	if err == nil {
+		return friendship.Clone(), nil
+	}
+	if !isNotFound(err) {
 		return model.Friendship{}, err
 	}
-	return friendship.Clone(), nil
+
+	reverse, reverseErr := queryFriendship(ctx, r.conn, friendID, userID, false)
+	if reverseErr == nil && reverse.Status == model.FriendshipStatusPending {
+		return model.Friendship{
+			UserID:    userID,
+			FriendID:  friendID,
+			Status:    model.FriendshipStatusPending,
+			CreatedAt: reverse.CreatedAt,
+			UpdatedAt: reverse.UpdatedAt,
+		}, nil
+	}
+	if reverseErr != nil && !isNotFound(reverseErr) {
+		return model.Friendship{}, reverseErr
+	}
+	return model.Friendship{}, apperror.NotFound("friendship not found")
 }
 
 func queryFriendship(ctx context.Context, session sqlx.Session, userID string, friendID string, forUpdate bool) (model.Friendship, error) {
@@ -312,7 +435,7 @@ where account_id = $1 and friend_account_id = $2
 	return row.friendship(), nil
 }
 
-func upsertActiveFriendship(ctx context.Context, session sqlx.Session, userID string, friendID string) (model.Friendship, error) {
+func upsertFriendshipWithStatus(ctx context.Context, session sqlx.Session, userID string, friendID string, status string) (model.Friendship, error) {
 	var row postgresFriendshipRow
 	if err := session.QueryRowCtx(ctx, &row, `
 insert into friendships (account_id, friend_account_id, status)
@@ -322,7 +445,7 @@ set status = excluded.status,
     created_at = now(),
     updated_at = now()
 returning account_id, friend_account_id, status, created_at, updated_at
-`, userID, friendID, friendshipStatusToDB(model.FriendshipStatusActive)); err != nil {
+`, userID, friendID, friendshipStatusToDB(status)); err != nil {
 		return model.Friendship{}, err
 	}
 	return row.friendship(), nil

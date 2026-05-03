@@ -60,6 +60,25 @@ type ListFriendsResponse struct {
 	Friends []FriendshipView `json:"friends"`
 }
 
+type ListFriendRequestsRequest struct {
+	UserID string `json:"user_id"`
+}
+
+type ListFriendRequestsResponse struct {
+	Incoming []FriendshipView `json:"incoming"`
+	Outgoing []FriendshipView `json:"outgoing"`
+}
+
+type FriendRequestDecisionRequest struct {
+	UserID   string `json:"user_id"`
+	FriendID string `json:"friend_id"`
+}
+
+type FriendRequestDecisionResponse struct {
+	Friendship FriendshipView `json:"friendship"`
+	Updated    bool           `json:"updated"`
+}
+
 type GetFriendshipRequest struct {
 	UserID   string `json:"user_id"`
 	FriendID string `json:"friend_id"`
@@ -140,6 +159,77 @@ func (l *FriendsLogic) ListFriends(ctx context.Context, req ListFriendsRequest) 
 	return ListFriendsResponse{Friends: friends}, nil
 }
 
+func (l *FriendsLogic) ListFriendRequests(ctx context.Context, req ListFriendRequestsRequest) (ListFriendRequestsResponse, error) {
+	userID := normalizeUserID(req.UserID)
+	if userID == "" {
+		return ListFriendRequestsResponse{}, apperror.InvalidArgument("user_id is required")
+	}
+	if err := l.ensureUserExists(ctx, userID); err != nil {
+		return ListFriendRequestsResponse{}, err
+	}
+
+	incomingRows, err := l.repo.ListIncomingFriendRequests(ctx, userID)
+	if err != nil {
+		return ListFriendRequestsResponse{}, err
+	}
+	outgoingRows, err := l.repo.ListOutgoingFriendRequests(ctx, userID)
+	if err != nil {
+		return ListFriendRequestsResponse{}, err
+	}
+
+	incoming, err := l.friendshipViewsWithProfiles(ctx, incomingRows)
+	if err != nil {
+		return ListFriendRequestsResponse{}, err
+	}
+	outgoing, err := l.friendshipViewsWithProfiles(ctx, outgoingRows)
+	if err != nil {
+		return ListFriendRequestsResponse{}, err
+	}
+	return ListFriendRequestsResponse{Incoming: incoming, Outgoing: outgoing}, nil
+}
+
+func (l *FriendsLogic) AcceptFriendRequest(ctx context.Context, req FriendRequestDecisionRequest) (FriendRequestDecisionResponse, error) {
+	userID, friendID, err := normalizeFriendshipPair(req.UserID, req.FriendID)
+	if err != nil {
+		return FriendRequestDecisionResponse{}, err
+	}
+	if err := l.ensureUsersExist(ctx, userID, friendID); err != nil {
+		return FriendRequestDecisionResponse{}, err
+	}
+	friendship, updated, err := l.repo.AcceptFriendRequest(ctx, userID, friendID)
+	if err != nil {
+		return FriendRequestDecisionResponse{}, err
+	}
+	view := toFriendshipView(friendship)
+	if profile, profileErr := l.lookupFriendProfile(ctx, friendship.FriendID); profileErr == nil {
+		view.Friend = &profile
+	} else {
+		return FriendRequestDecisionResponse{}, profileErr
+	}
+	return FriendRequestDecisionResponse{Friendship: view, Updated: updated}, nil
+}
+
+func (l *FriendsLogic) RejectFriendRequest(ctx context.Context, req FriendRequestDecisionRequest) (FriendRequestDecisionResponse, error) {
+	userID, friendID, err := normalizeFriendshipPair(req.UserID, req.FriendID)
+	if err != nil {
+		return FriendRequestDecisionResponse{}, err
+	}
+	if err := l.ensureUsersExist(ctx, userID, friendID); err != nil {
+		return FriendRequestDecisionResponse{}, err
+	}
+	friendship, updated, err := l.repo.RejectFriendRequest(ctx, userID, friendID)
+	if err != nil {
+		return FriendRequestDecisionResponse{}, err
+	}
+	view := toFriendshipView(friendship)
+	if profile, profileErr := l.lookupFriendProfile(ctx, friendship.FriendID); profileErr == nil {
+		view.Friend = &profile
+	} else {
+		return FriendRequestDecisionResponse{}, profileErr
+	}
+	return FriendRequestDecisionResponse{Friendship: view, Updated: updated}, nil
+}
+
 func (l *FriendsLogic) GetFriendship(ctx context.Context, req GetFriendshipRequest) (GetFriendshipResponse, error) {
 	userID, friendID, err := normalizeFriendshipPair(req.UserID, req.FriendID)
 	if err != nil {
@@ -164,6 +254,26 @@ func (l *FriendsLogic) GetFriendship(ctx context.Context, req GetFriendshipReque
 	}
 
 	return GetFriendshipResponse{Friendship: toFriendshipView(friendship)}, nil
+}
+
+func (l *FriendsLogic) friendshipViewsWithProfiles(ctx context.Context, friendships []model.Friendship) ([]FriendshipView, error) {
+	views := make([]FriendshipView, 0, len(friendships))
+	for _, friendship := range friendships {
+		view := toFriendshipView(friendship)
+		lookupID := friendship.FriendID
+		if lookupID == normalizeUserID(view.FriendID) && friendship.Status == model.FriendshipStatusPending {
+			// Incoming pending requests are represented as requester -> current user,
+			// so the visible peer profile is the requester.
+			lookupID = friendship.UserID
+		}
+		if profile, profileErr := l.lookupFriendProfile(ctx, lookupID); profileErr == nil {
+			view.Friend = &profile
+		} else {
+			return nil, profileErr
+		}
+		views = append(views, view)
+	}
+	return views, nil
 }
 
 func (l *FriendsLogic) ensureUsersExist(ctx context.Context, userID string, friendID string) error {
@@ -205,7 +315,7 @@ func normalizeUserID(userID string) string {
 }
 
 func toFriendshipView(friendship model.Friendship) FriendshipView {
-	isFriend := friendship.Status == model.FriendshipStatusActive
+	isFriend := friendship.Status == model.FriendshipStatusAccepted || friendship.Status == model.FriendshipStatusActive
 	return FriendshipView{
 		UserID:    friendship.UserID,
 		FriendID:  friendship.FriendID,

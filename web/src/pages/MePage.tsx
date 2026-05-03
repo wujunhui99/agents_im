@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { ListCard } from '../components/ui/ListCard';
 import { TextField } from '../components/ui/TextField';
-import { accountTypeLabel, avatarText, firstNonEmpty, profileDisplayName } from '../utils/profileDisplay';
+import { accountTypeLabel, avatarText, firstNonEmpty, genderLabel, profileDisplayName } from '../utils/profileDisplay';
 
 type ProfileDraft = {
   display_name: string;
@@ -64,7 +64,7 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
         <div className="profile-main">
           <strong>{profileDisplayName(profile)}</strong>
           <p>账号：{profile.identifier}</p>
-          <p>类型：{accountTypeLabel(profile.account_type)}</p>
+          <p>账号类型：{accountTypeLabel(profile.account_type)}</p>
           <p>地区：{profile.region}</p>
         </div>
         <Button variant="tonal" size="small" className="profile-edit-button" aria-label="编辑个人资料" onClick={() => setIsEditing(true)}>
@@ -75,27 +75,27 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
       <ListCard ariaLabel="个人资料详情" className="profile-detail-card">
         <dl className="profile-detail-list">
           <div>
-            <dt>identifier</dt>
+            <dt>账号</dt>
             <dd>{profile.identifier}</dd>
           </div>
           <div>
-            <dt>display_name</dt>
+            <dt>昵称</dt>
             <dd>{profileDisplayName(profile)}</dd>
           </div>
           <div>
-            <dt>account_type</dt>
+            <dt>账号类型</dt>
             <dd>{accountTypeLabel(profile.account_type)}</dd>
           </div>
           <div>
-            <dt>gender</dt>
-            <dd>{profile.gender}</dd>
+            <dt>性别</dt>
+            <dd>{genderLabel(profile.gender)}</dd>
           </div>
           <div>
             <dt>生日</dt>
             <dd>{profile.birth_date || '未设置'}</dd>
           </div>
           <div>
-            <dt>region</dt>
+            <dt>地区</dt>
             <dd>{profile.region}</dd>
           </div>
         </dl>
@@ -105,13 +105,13 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
         <ListCard ariaLabel="编辑个人资料" className="profile-edit-card">
           <form className="profile-edit-form" onSubmit={handleSubmit}>
             <TextField
-              label="display_name"
+              label="昵称"
               value={draft.display_name}
               onChange={(event) => setDraft((current) => ({ ...current, display_name: event.target.value }))}
               fieldClassName="profile-field"
             />
             <TextField
-              label="gender"
+              label="性别"
               value={draft.gender}
               onChange={(event) => setDraft((current) => ({ ...current, gender: event.target.value }))}
               fieldClassName="profile-field"
@@ -124,7 +124,7 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
               fieldClassName="profile-field"
             />
             <TextField
-              label="region"
+              label="地区"
               value={draft.region}
               onChange={(event) => setDraft((current) => ({ ...current, region: event.target.value }))}
               fieldClassName="profile-field"

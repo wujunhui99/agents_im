@@ -223,12 +223,36 @@ type ListFriendsData struct {
 	Friends []Friendship `json:"friends"`
 }
 
+type ListFriendRequestsData struct {
+	Incoming []Friendship `json:"incoming"`
+	Outgoing []Friendship `json:"outgoing"`
+}
+
+type FriendRequestDecisionData struct {
+	Friendship Friendship `json:"friendship"`
+	Updated    bool       `json:"updated"`
+}
+
 type ListFriendsReq struct{}
+
+type ListFriendRequestsReq struct{}
 
 type ListFriendsResp struct {
 	Code    string          `json:"code"`
 	Message string          `json:"message"`
 	Data    ListFriendsData `json:"data"`
+}
+
+type ListFriendRequestsResp struct {
+	Code    string                 `json:"code"`
+	Message string                 `json:"message"`
+	Data    ListFriendRequestsData `json:"data"`
+}
+
+type FriendRequestDecisionResp struct {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    FriendRequestDecisionData `json:"data"`
 }
 
 type ListMembersData struct {
