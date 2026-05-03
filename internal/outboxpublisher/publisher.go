@@ -220,7 +220,7 @@ func MessageEventFromOutbox(event repository.OutboxEvent) (messaging.MessageEven
 	if event.EventType != repository.OutboxEventTypeMessageCreated {
 		return messaging.MessageEvent{}, fmt.Errorf("unsupported outbox event_type %q", event.EventType)
 	}
-	if event.AggregateType != "" && event.AggregateType != repository.OutboxAggregateTypeMessage {
+	if event.AggregateType != 0 && event.AggregateType != repository.OutboxAggregateTypeMessage {
 		return messaging.MessageEvent{}, fmt.Errorf("unsupported outbox aggregate_type %q", event.AggregateType)
 	}
 

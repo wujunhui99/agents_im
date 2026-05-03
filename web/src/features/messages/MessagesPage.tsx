@@ -1,13 +1,18 @@
 import { ChevronLeft, MessageCircle, Search, SendHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import type { ContactsApi, Friendship } from '../../api/contacts';
+import { createContactsApi } from '../../api/contacts';
 import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
 import { createMessageApi } from '../../api/messages';
+import type { WebSocketFactory, WebSocketServerEvent } from '../../api/websocketClient';
+import { createMessageWebSocketClient } from '../../api/websocketClient';
 import type { UserApi, UserProfile } from '../../api/user';
 import { createUserApi } from '../../api/user';
 import { Avatar } from '../../components/ui/Avatar';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { friendshipToUserProfile } from '../../components/ContactsPage';
 import { ListItem } from '../../components/ui/ListItem';
 import { MessageBubble } from '../../components/ui/MessageBubble';
 import { SearchBox } from '../../components/ui/SearchBox';
@@ -18,7 +23,11 @@ import { UNKNOWN_CONTACT_LABEL, accountTypeLabel, avatarText, profileDisplayName
 type MessagesPageProps = {
   currentUserId: string;
   messageApi?: MessageApi;
+  contactsApi?: ContactsApi;
   userApi?: UserApi;
+  webSocketUrl?: string;
+  webSocketToken?: string;
+  webSocketFactory?: WebSocketFactory;
   startChatSignal?: number;
   pendingChatProfile?: UserProfile | null;
   onPendingChatConsumed?: () => void;
@@ -32,12 +41,19 @@ const statusLabels: Record<MessageStatus, string> = {
 
 export function MessagesPage({
   currentUserId,
-  messageApi = createMessageApi(),
-  userApi = createUserApi(),
+  messageApi: messageApiProp,
+  contactsApi: contactsApiProp,
+  userApi: userApiProp,
+  webSocketUrl = '/ws',
+  webSocketToken,
+  webSocketFactory,
   startChatSignal = 0,
   pendingChatProfile = null,
   onPendingChatConsumed,
 }: MessagesPageProps) {
+  const messageApi = useMemo(() => messageApiProp ?? createMessageApi(), [messageApiProp]);
+  const contactsApi = useMemo(() => contactsApiProp ?? createContactsApi(), [contactsApiProp]);
+  const userApi = useMemo(() => userApiProp ?? createUserApi(), [userApiProp]);
   const [items, setItems] = useState<Conversation[]>([]);
   const [status, setStatus] = useState('正在加载会话');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -53,8 +69,12 @@ export function MessagesPage({
         const response = await messageApi.getConversationSeqs([]);
         const states = response.states ?? response.conversations ?? response.seqs ?? [];
         const conversations = await Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi)));
+        const needsFriendProfiles = conversations.some(
+          (conversation) => conversation.chatType === 'single' && conversation.receiverId && conversation.title === UNKNOWN_CONTACT_LABEL,
+        );
+        const friendProfiles = needsFriendProfiles ? await loadAcceptedFriendProfileMap(contactsApi) : new Map<string, UserProfile>();
         if (!cancelled) {
-          setItems((current) => mergeLoadedConversations(current, conversations));
+          setItems((current) => mergeLoadedConversations(current, hydrateConversationTitles(conversations, friendProfiles)));
           setStatus(conversations.length > 0 ? `已加载 ${conversations.length} 个会话` : '暂无会话');
         }
       } catch (error) {
@@ -68,7 +88,33 @@ export function MessagesPage({
     return () => {
       cancelled = true;
     };
-  }, [currentUserId, messageApi]);
+  }, [currentUserId, messageApi, contactsApi]);
+
+  useEffect(() => {
+    if (!webSocketUrl || (!webSocketToken && !webSocketFactory) || (!webSocketFactory && !canUseNativeWebSocket())) {
+      return;
+    }
+
+    const client = createMessageWebSocketClient({
+      url: webSocketUrl,
+      token: webSocketToken,
+      webSocketFactory,
+      onEvent: (event) => {
+        const message = webSocketEventToServerMessage(event);
+        if (!message || !conversationBelongsToCurrentUser(message, currentUserId)) {
+          return;
+        }
+        setItems((current) => upsertLiveServerMessage(current, serverMessageToChatMessage(message, currentUserId)));
+        setStatus('收到新消息');
+      },
+      onClose: () => {
+        setStatus((current) => (current === '收到新消息' ? current : 'WebSocket 已断开'));
+      },
+    });
+
+    client.connect();
+    return () => client.close(1000, 'messages page unmounted');
+  }, [currentUserId, webSocketUrl, webSocketToken, webSocketFactory]);
 
   useEffect(() => {
     if (startChatSignal > 0) {
@@ -282,7 +328,7 @@ function StartChatPanel({
 }) {
   const [identifier, setIdentifier] = useState('');
   const [result, setResult] = useState<UserProfile | null>(null);
-  const [status, setStatus] = useState('输入 identifier 搜索用户');
+  const [status, setStatus] = useState('输入账号搜索用户');
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -291,7 +337,7 @@ function StartChatPanel({
 
     if (!query) {
       setResult(null);
-      setStatus('请输入 identifier');
+      setStatus('请输入账号');
       return;
     }
 
@@ -319,9 +365,9 @@ function StartChatPanel({
       </div>
       <form className="identifier-search-form" onSubmit={handleSubmit}>
         <TextField
-          label="按 identifier 搜索聊天对象"
+          label="按账号搜索聊天对象"
           hideLabel
-          placeholder="输入唯一 identifier"
+          placeholder="输入唯一账号"
           value={identifier}
           onChange={(event) => setIdentifier(event.target.value)}
           leadingIcon={<Search size={17} />}
@@ -494,6 +540,48 @@ function mergeLoadedConversations(current: Conversation[], loaded: Conversation[
   return [...mergedLoaded, ...preservedCurrentConversations];
 }
 
+function hydrateConversationTitles(conversations: Conversation[], friendProfiles: Map<string, UserProfile>) {
+  if (friendProfiles.size === 0) {
+    return conversations;
+  }
+  return conversations.map((conversation) => {
+    if (conversation.chatType !== 'single' || !conversation.receiverId) {
+      return conversation;
+    }
+    const profile = friendProfiles.get(conversation.receiverId);
+    if (!profile) {
+      return conversation;
+    }
+    const title = profileDisplayName(profile);
+    return {
+      ...conversation,
+      title,
+      avatar: avatarText(title),
+    };
+  });
+}
+
+async function loadAcceptedFriendProfileMap(contactsApi: ContactsApi) {
+  try {
+    const response = await contactsApi.listFriends();
+    const friendships = response.friends ?? [];
+    return friendships.reduce<Map<string, UserProfile>>((profiles, friendship) => {
+      if (!isAcceptedFriendship(friendship)) {
+        return profiles;
+      }
+      const profile = friendshipToUserProfile(friendship);
+      profiles.set(profile.user_id, profile);
+      return profiles;
+    }, new Map<string, UserProfile>());
+  } catch {
+    return new Map<string, UserProfile>();
+  }
+}
+
+function isAcceptedFriendship(friendship: Friendship) {
+  return friendship.status === 'accepted' || friendship.status === 'active' || friendship.is_friend;
+}
+
 function upsertStartedConversation(conversations: Conversation[], existingConversationId: string | undefined, draftConversation: Conversation) {
   if (existingConversationId) {
     return conversations.map((conversation) =>
@@ -561,6 +649,10 @@ function appendMessage(conversations: Conversation[], conversationId: string, me
   });
 }
 
+function canUseNativeWebSocket() {
+  return typeof window !== 'undefined' && typeof window.WebSocket === 'function';
+}
+
 function updateMessage(conversations: Conversation[], conversationId: string, messageId: string, nextMessage: ChatMessage) {
   return conversations.map((conversation) => {
     if (conversation.id !== conversationId && !conversation.messages.some((message) => message.id === messageId)) {
@@ -576,6 +668,69 @@ function updateMessage(conversations: Conversation[], conversationId: string, me
       messages: nextMessages,
     };
   });
+}
+
+function upsertLiveServerMessage(conversations: Conversation[], message: ChatMessage) {
+  let matched = false;
+  const nextConversations = conversations.map((conversation) => {
+    if (!conversationsRepresentSameMessageThread(conversation, message)) {
+      return conversation;
+    }
+    matched = true;
+    const nextMessages = upsertCanonicalMessage(conversation.messages, message.id, message);
+    return {
+      ...conversation,
+      id: message.conversationId,
+      preview: conversationPreview(nextMessages, message.content),
+      previewOrigin: message.messageOrigin,
+      time: '刚刚',
+      unread: message.direction === 'incoming' ? conversation.unread + 1 : conversation.unread,
+      maxSeq: nextConversationMaxSeq(conversation, message),
+      receiverId: message.receiverId ?? conversation.receiverId,
+      groupId: message.groupId ?? conversation.groupId,
+      messages: nextMessages,
+    };
+  });
+
+  if (matched) {
+    return nextConversations;
+  }
+
+  return [liveMessageToConversation(message), ...conversations];
+}
+
+function liveMessageToConversation(message: ChatMessage): Conversation {
+  const isGroup = message.chatType === 'group';
+  const title = isGroup ? '群聊' : UNKNOWN_CONTACT_LABEL;
+  return {
+    id: message.conversationId,
+    title,
+    avatar: avatarText(title),
+    preview: message.content,
+    previewOrigin: message.messageOrigin,
+    time: '刚刚',
+    unread: message.direction === 'incoming' ? 1 : 0,
+    maxSeq: message.seq,
+    hasReadSeq: 0,
+    color: isGroup ? 'green' : 'blue',
+    chatType: message.chatType,
+    receiverId: isGroup ? undefined : message.senderId,
+    groupId: message.groupId,
+    messages: [message],
+  };
+}
+
+function conversationsRepresentSameMessageThread(conversation: Conversation, message: ChatMessage) {
+  if (conversation.id === message.conversationId) {
+    return true;
+  }
+  if (conversation.chatType === 'single' && message.chatType === 'single') {
+    return Boolean(conversation.receiverId && (conversation.receiverId === message.senderId || conversation.receiverId === message.receiverId));
+  }
+  if (conversation.chatType === 'group' && message.chatType === 'group') {
+    return Boolean(conversation.groupId && conversation.groupId === message.groupId);
+  }
+  return false;
 }
 
 function confirmSentMessage(conversations: Conversation[], conversationId: string, messageId: string, nextMessage: ChatMessage) {
@@ -658,6 +813,85 @@ function sendMessageWithApi(messageApi: MessageApi, message: ChatMessage): Promi
 
 function serverLastMessage(message: ServerMessage | undefined, currentUserId: string) {
   return message ? serverMessageToChatMessage(message, currentUserId) : undefined;
+}
+
+function webSocketEventToServerMessage(event: WebSocketServerEvent): ServerMessage | null {
+  if (event.type !== 'message_received' || !isRecord(event.data)) {
+    return null;
+  }
+  const data = event.data;
+  const serverMsgId = stringField(data, 'serverMsgId', 'server_msg_id');
+  const conversationId = stringField(data, 'conversationId', 'conversation_id');
+  const senderId = stringField(data, 'senderId', 'sender_id');
+  const chatType = stringField(data, 'chatType', 'chat_type');
+  const contentType = stringField(data, 'contentType', 'content_type');
+  const content = stringField(data, 'content');
+  const seq = numberField(data, 'seq');
+  if (!serverMsgId || !conversationId || !senderId || !chatType || !contentType || content === undefined || seq === undefined) {
+    return null;
+  }
+
+  return {
+    serverMsgId,
+    clientMsgId: stringField(data, 'clientMsgId', 'client_msg_id') ?? '',
+    conversationId,
+    seq,
+    senderId,
+    receiverId: stringField(data, 'receiverId', 'receiver_id'),
+    groupId: stringField(data, 'groupId', 'group_id'),
+    chatType: chatType === 'group' ? 'group' : 'single',
+    contentType: contentType === 'text' ? 'text' : 'text',
+    content,
+    messageOrigin: messageOriginField(data),
+    agentAccountId: stringField(data, 'agentAccountId', 'agent_account_id'),
+    triggerServerMsgId: stringField(data, 'triggerServerMsgId', 'trigger_server_msg_id'),
+    agentRunId: stringField(data, 'agentRunId', 'agent_run_id'),
+    allowRecursiveTrigger: booleanField(data, 'allowRecursiveTrigger', 'allow_recursive_trigger'),
+    sendTime: numberField(data, 'sendTime', 'send_time') ?? Date.now(),
+    createdAt: numberField(data, 'createdAt', 'created_at') ?? Date.now(),
+  };
+}
+
+function conversationBelongsToCurrentUser(message: ServerMessage, currentUserId: string) {
+  if (message.chatType === 'group') {
+    return true;
+  }
+  return message.senderId === currentUserId || message.receiverId === currentUserId;
+}
+
+function stringField(value: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const field = value[key];
+    if (typeof field === 'string') {
+      return field;
+    }
+  }
+  return undefined;
+}
+
+function numberField(value: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const field = value[key];
+    if (typeof field === 'number' && Number.isFinite(field)) {
+      return field;
+    }
+  }
+  return undefined;
+}
+
+function booleanField(value: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const field = value[key];
+    if (typeof field === 'boolean') {
+      return field;
+    }
+  }
+  return undefined;
+}
+
+function messageOriginField(value: Record<string, unknown>) {
+  const origin = stringField(value, 'messageOrigin', 'message_origin');
+  return origin === 'ai' || origin === 'system' || origin === 'human' ? origin : undefined;
 }
 
 function serverMessageToChatMessage(message: ServerMessage, currentUserId: string): ChatMessage {
@@ -859,6 +1093,10 @@ function stableMessageTieBreaker(message: ChatMessage) {
 
 function uniqueStrings(values: string[]) {
   return values.filter((value, index) => value !== '' && values.indexOf(value) === index);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 function messageAriaLabel(message: ChatMessage) {

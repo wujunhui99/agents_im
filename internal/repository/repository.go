@@ -31,8 +31,12 @@ type UserRepository = AccountRepository
 
 type FriendshipRepository interface {
 	AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
+	AcceptFriendRequest(ctx context.Context, userID string, requesterID string) (model.Friendship, bool, error)
+	RejectFriendRequest(ctx context.Context, userID string, requesterID string) (model.Friendship, bool, error)
 	DeleteFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
 	ListFriends(ctx context.Context, userID string) ([]model.Friendship, error)
+	ListIncomingFriendRequests(ctx context.Context, userID string) ([]model.Friendship, error)
+	ListOutgoingFriendRequests(ctx context.Context, userID string) ([]model.Friendship, error)
 	GetFriendship(ctx context.Context, userID string, friendID string) (model.Friendship, error)
 }
 

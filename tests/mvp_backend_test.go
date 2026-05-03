@@ -105,8 +105,15 @@ func TestMVPBackendFriendGroupMessageSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("add friend: %v", err)
 	}
-	if !added.Created || !added.Friendship.IsFriend || added.Friendship.Status != model.FriendshipStatusActive {
-		t.Fatalf("unexpected add friend result: %+v", added)
+	if !added.Created || added.Friendship.IsFriend || added.Friendship.Status != model.FriendshipStatusPending {
+		t.Fatalf("unexpected add friend request result: %+v", added)
+	}
+	accepted, err := friendsLogic.AcceptFriendRequest(ctx, logic.FriendRequestDecisionRequest{UserID: bob.UserID, FriendID: alice.UserID})
+	if err != nil {
+		t.Fatalf("accept friend request: %v", err)
+	}
+	if !accepted.Updated || !accepted.Friendship.IsFriend || accepted.Friendship.Status != model.FriendshipStatusAccepted {
+		t.Fatalf("unexpected accept friend result: %+v", accepted)
 	}
 	friends, err := friendsLogic.ListFriends(ctx, logic.ListFriendsRequest{UserID: alice.UserID})
 	if err != nil {

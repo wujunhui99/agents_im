@@ -25,7 +25,6 @@ type ServiceContext struct {
 	AgentRepo        repository.AgentRepository
 	AgentHostingRepo repository.AgentConversationHostingRepository
 	OutboxRepo       repository.OutboxRepository
-	DeliveryRepo     repository.DeliveryAttemptRepository
 	AgentAuditRepo   repository.AgentAuditRepository
 }
 
@@ -53,7 +52,6 @@ func NewServiceContextWithAuth(repo repository.Repository, auth config.JWTAuthCo
 		MediaRepo:       mediaRepo,
 		ObjectStore:     objectStore,
 		OutboxRepo:      outboxRepositoryFromMessageRepo(messageRepo),
-		DeliveryRepo:    deliveryAttemptRepositoryFromMessageRepo(messageRepo),
 		AgentAuditRepo:  agentAuditRepo,
 	}
 }
@@ -84,7 +82,6 @@ func NewMessageServiceContextWithAuth(repo repository.MessageRepository, userExi
 		MediaLogic:   mediaLogic,
 		MediaRepo:    mediaRepo,
 		OutboxRepo:   outboxRepositoryFromMessageRepo(repo),
-		DeliveryRepo: deliveryAttemptRepositoryFromMessageRepo(repo),
 	}
 }
 
@@ -112,7 +109,6 @@ func NewMessageServiceContextWithMedia(repo repository.MessageRepository, mediaR
 		MediaLogic:   mediaLogic,
 		MediaRepo:    mediaRepo,
 		OutboxRepo:   outboxRepositoryFromMessageRepo(repo),
-		DeliveryRepo: deliveryAttemptRepositoryFromMessageRepo(repo),
 	}
 }
 
@@ -155,9 +151,4 @@ func normalizeAuthConfig(auth config.JWTAuthConfig) config.JWTAuthConfig {
 func outboxRepositoryFromMessageRepo(repo repository.MessageRepository) repository.OutboxRepository {
 	outboxRepo, _ := repo.(repository.OutboxRepository)
 	return outboxRepo
-}
-
-func deliveryAttemptRepositoryFromMessageRepo(repo repository.MessageRepository) repository.DeliveryAttemptRepository {
-	deliveryRepo, _ := repo.(repository.DeliveryAttemptRepository)
-	return deliveryRepo
 }

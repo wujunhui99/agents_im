@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/idgen"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
@@ -20,16 +21,17 @@ type postgresGroupRow struct {
 	GroupID       string    `db:"group_id"`
 	Name          string    `db:"name"`
 	Description   string    `db:"description"`
-	CreatorUserID string    `db:"creator_user_id"`
+	CreatorUserID string    `db:"creator_account_id"`
 	CreatedAt     time.Time `db:"created_at"`
 	UpdatedAt     time.Time `db:"updated_at"`
 }
 
 type postgresGroupMemberRow struct {
 	GroupID  string       `db:"group_id"`
-	UserID   string       `db:"user_id"`
-	State    string       `db:"state"`
-	JoinedAt time.Time    `db:"joined_at"`
+	UserID   string       `db:"account_id"`
+	Role     int16        `db:"role"`
+	Status   int16        `db:"status"`
+	JoinedAt time.Time    `db:"join_time"`
 	LeftAt   sql.NullTime `db:"left_at"`
 }
 
@@ -99,7 +101,7 @@ func (r *PostgresGroupsRepository) AddMember(ctx context.Context, groupID string
 		}
 
 		existing, err := queryGroupMember(ctx, session, groupID, userID, true)
-		if err == nil && existing.State == model.MemberStateActive {
+		if err == nil && memberStateFromDB(existing.Status) == model.MemberStateActive {
 			member = existing.member()
 			alreadyMember = true
 			return nil
@@ -134,10 +136,10 @@ func (r *PostgresGroupsRepository) LeaveGroup(ctx context.Context, groupID strin
 	var row postgresGroupMemberRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
 update group_members
-set state = $3, left_at = now()
-where group_id = $1 and user_id = $2 and state = $4
-returning group_id, user_id, state, joined_at, left_at
-`, groupID, userID, model.MemberStateLeft, model.MemberStateActive)
+set status = $3, left_at = now(), updated_at = now()
+where group_id = $1 and account_id = $2 and status = $4
+returning group_id, account_id, role, status, join_time, left_at
+`, groupID, userID, memberStateToDB(model.MemberStateLeft), memberStateToDB(model.MemberStateActive))
 	if err != nil {
 		if isNotFound(err) {
 			return model.GroupMember{}, apperror.NotFound("member not found")
@@ -157,11 +159,11 @@ func (r *PostgresGroupsRepository) ListActiveMembers(ctx context.Context, groupI
 
 	var rows []postgresGroupMemberRow
 	if err := r.conn.QueryRowsCtx(ctx, &rows, `
-select group_id, user_id, state, joined_at, left_at
+select group_id, account_id, role, status, join_time, left_at
 from group_members
-where group_id = $1 and state = $2
-order by user_id asc
-`, groupID, model.MemberStateActive); err != nil {
+where group_id = $1 and status = $2
+order by account_id asc
+`, groupID, memberStateToDB(model.MemberStateActive)); err != nil {
 		return nil, err
 	}
 
@@ -176,35 +178,34 @@ func insertGroup(ctx context.Context, session sqlx.Session, group model.Group, c
 	var row postgresGroupRow
 	var err error
 	if strings.TrimSpace(group.GroupID) == "" {
-		err = session.QueryRowCtx(ctx, &row, `
-insert into groups (name, description, creator_user_id)
-values ($1, $2, $3)
-returning group_id, name, description, creator_user_id, created_at, updated_at
-`, group.Name, group.Description, creatorUserID)
-	} else {
-		err = session.QueryRowCtx(ctx, &row, `
-insert into groups (group_id, name, description, creator_user_id)
-values ($1, $2, $3, $4)
-returning group_id, name, description, creator_user_id, created_at, updated_at
-`, group.GroupID, group.Name, group.Description, creatorUserID)
+		generated, genErr := idgen.NewString()
+		if genErr != nil {
+			return postgresGroupRow{}, genErr
+		}
+		group.GroupID = generated
 	}
+	err = session.QueryRowCtx(ctx, &row, `
+insert into groups (group_id, name, description, creator_account_id)
+values ($1, $2, $3, $4)
+returning group_id, name, description, creator_account_id, created_at, updated_at
+`, group.GroupID, group.Name, group.Description, creatorUserID)
 	return row, err
 }
 
 func insertGroupMember(ctx context.Context, session sqlx.Session, groupID string, userID string) (postgresGroupMemberRow, error) {
 	var row postgresGroupMemberRow
 	err := session.QueryRowCtx(ctx, &row, `
-insert into group_members (group_id, user_id, state)
-values ($1, $2, $3)
-returning group_id, user_id, state, joined_at, left_at
-`, groupID, userID, model.MemberStateActive)
+insert into group_members (group_id, account_id, role, status)
+values ($1, $2, $3, $4)
+returning group_id, account_id, role, status, join_time, left_at
+`, groupID, userID, groupMemberRoleDBOwner, memberStateToDB(model.MemberStateActive))
 	return row, err
 }
 
 func queryGroup(ctx context.Context, session sqlx.Session, groupID string) (postgresGroupRow, error) {
 	var row postgresGroupRow
 	err := session.QueryRowCtx(ctx, &row, `
-select group_id, name, description, creator_user_id, created_at, updated_at
+select group_id, name, description, creator_account_id, created_at, updated_at
 from groups
 where group_id = $1
 `, groupID)
@@ -213,9 +214,9 @@ where group_id = $1
 
 func queryGroupMember(ctx context.Context, session sqlx.Session, groupID string, userID string, forUpdate bool) (postgresGroupMemberRow, error) {
 	query := `
-select group_id, user_id, state, joined_at, left_at
+select group_id, account_id, role, status, join_time, left_at
 from group_members
-where group_id = $1 and user_id = $2
+where group_id = $1 and account_id = $2
 `
 	if forUpdate {
 		query += " for update"
@@ -229,14 +230,13 @@ where group_id = $1 and user_id = $2
 func upsertActiveGroupMember(ctx context.Context, session sqlx.Session, groupID string, userID string) (postgresGroupMemberRow, error) {
 	var row postgresGroupMemberRow
 	err := session.QueryRowCtx(ctx, &row, `
-insert into group_members (group_id, user_id, state)
-values ($1, $2, $3)
-on conflict (group_id, user_id) do update
-set state = excluded.state,
-    joined_at = now(),
-    left_at = null
-returning group_id, user_id, state, joined_at, left_at
-`, groupID, userID, model.MemberStateActive)
+insert into group_members (group_id, account_id, role, status)
+values ($1, $2, $3, $4)
+on conflict (group_id, account_id) do update
+set status = excluded.status,
+    updated_at = now()
+returning group_id, account_id, role, status, join_time, left_at
+`, groupID, userID, groupMemberRoleDBMember, memberStateToDB(model.MemberStateActive))
 	return row, err
 }
 
@@ -255,11 +255,11 @@ func (r postgresGroupMemberRow) member() model.GroupMember {
 	member := model.GroupMember{
 		GroupID:  r.GroupID,
 		UserID:   r.UserID,
-		State:    r.State,
-		JoinedAt: r.JoinedAt,
+		State:    memberStateFromDB(r.Status),
+		JoinedAt: r.JoinedAt.UTC(),
 	}
 	if r.LeftAt.Valid {
-		member.LeftAt = r.LeftAt.Time
+		member.LeftAt = r.LeftAt.Time.UTC()
 	}
 	return member
 }

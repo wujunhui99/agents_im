@@ -17,20 +17,17 @@ type PostgresMediaRepository struct {
 }
 
 type postgresMediaRow struct {
-	MediaID          string        `db:"media_id"`
-	OwnerUserID      string        `db:"owner_user_id"`
-	Bucket           string        `db:"bucket"`
-	ObjectKey        string        `db:"object_key"`
-	SHA256           string        `db:"sha256"`
-	ContentType      string        `db:"content_type"`
-	SizeBytes        int64         `db:"size_bytes"`
-	Width            sql.NullInt32 `db:"width"`
-	Height           sql.NullInt32 `db:"height"`
-	OriginalFilename string        `db:"original_filename"`
-	Purpose          string        `db:"purpose"`
-	Status           string        `db:"status"`
-	CreatedAt        time.Time     `db:"created_at"`
-	UpdatedAt        time.Time     `db:"updated_at"`
+	MediaID          string    `db:"media_id"`
+	OwnerUserID      string    `db:"owner_account_id"`
+	Bucket           string    `db:"bucket"`
+	ObjectKey        string    `db:"object_key"`
+	ContentType      string    `db:"content_type"`
+	SizeBytes        int64     `db:"size_bytes"`
+	OriginalFilename string    `db:"original_filename"`
+	Purpose          int16     `db:"purpose"`
+	Status           int16     `db:"status"`
+	CreatedAt        time.Time `db:"created_at"`
+	UpdatedAt        time.Time `db:"updated_at"`
 }
 
 func NewPostgresMediaRepository(dataSource string) (*PostgresMediaRepository, error) {
@@ -49,15 +46,15 @@ func (r *PostgresMediaRepository) CreateMediaObject(ctx context.Context, media m
 	var row postgresMediaRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
 insert into media_objects (
-  media_id, owner_user_id, bucket, object_key, sha256, content_type, size_bytes,
-  width, height, original_filename, purpose, status
+  media_id, owner_account_id, bucket, object_key, original_filename, content_type,
+  size_bytes, purpose, status, metadata
 )
-values ($1, $2, $3, $4, $5, $6, $7, nullif($8, 0), nullif($9, 0), $10, $11, $12)
-returning media_id, owner_user_id, bucket, object_key, sha256, content_type, size_bytes,
-          width, height, original_filename, purpose, status, created_at, updated_at
-`, media.MediaID, media.OwnerUserID, media.Bucket, media.ObjectKey, media.SHA256,
-		media.ContentType, media.SizeBytes, media.Width, media.Height, media.OriginalFilename,
-		media.Purpose, media.Status)
+values ($1, $2, $3, $4, $5, $6, $7, $8, $9, jsonb_build_object('sha256', $10, 'width', $11, 'height', $12))
+returning media_id, owner_account_id, bucket, object_key, original_filename, content_type,
+          size_bytes, purpose, status, created_at, updated_at
+`, media.MediaID, media.OwnerUserID, media.Bucket, media.ObjectKey, media.OriginalFilename,
+		media.ContentType, media.SizeBytes, mediaPurposeToDB(media.Purpose), mediaStatusToDB(media.Status),
+		media.SHA256, media.Width, media.Height)
 	if err != nil {
 		if isPostgresUniqueViolation(err) {
 			return model.MediaObject{}, apperror.AlreadyExists("media object already exists")
@@ -76,8 +73,8 @@ returning media_id, owner_user_id, bucket, object_key, sha256, content_type, siz
 func (r *PostgresMediaRepository) GetMediaObject(ctx context.Context, mediaID string) (model.MediaObject, error) {
 	var row postgresMediaRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select media_id, owner_user_id, bucket, object_key, sha256, content_type, size_bytes,
-       width, height, original_filename, purpose, status, created_at, updated_at
+select media_id, owner_account_id, bucket, object_key, original_filename, content_type, size_bytes,
+       purpose, status, created_at, updated_at
 from media_objects
 where media_id = $1
 `, mediaID)
@@ -96,9 +93,9 @@ func (r *PostgresMediaRepository) UpdateMediaStatus(ctx context.Context, mediaID
 update media_objects
 set status = $2, updated_at = now()
 where media_id = $1
-returning media_id, owner_user_id, bucket, object_key, sha256, content_type, size_bytes,
-          width, height, original_filename, purpose, status, created_at, updated_at
-`, mediaID, status)
+returning media_id, owner_account_id, bucket, object_key, original_filename, content_type, size_bytes,
+          purpose, status, created_at, updated_at
+`, mediaID, mediaStatusToDB(status))
 	if err != nil {
 		if isNotFound(err) {
 			return model.MediaObject{}, apperror.NotFound("media object not found")
@@ -117,20 +114,13 @@ func (r postgresMediaRow) mediaObject() model.MediaObject {
 		OwnerUserID:      r.OwnerUserID,
 		Bucket:           r.Bucket,
 		ObjectKey:        r.ObjectKey,
-		SHA256:           r.SHA256,
 		ContentType:      r.ContentType,
 		SizeBytes:        r.SizeBytes,
 		OriginalFilename: r.OriginalFilename,
-		Purpose:          model.MediaPurpose(r.Purpose),
-		Status:           model.MediaStatus(r.Status),
+		Purpose:          mediaPurposeFromDB(r.Purpose),
+		Status:           mediaStatusFromDB(r.Status),
 		CreatedAt:        r.CreatedAt,
 		UpdatedAt:        r.UpdatedAt,
-	}
-	if r.Width.Valid {
-		media.Width = r.Width.Int32
-	}
-	if r.Height.Valid {
-		media.Height = r.Height.Int32
 	}
 	return media
 }

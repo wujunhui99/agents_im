@@ -5,19 +5,6 @@ import (
 	"sort"
 )
 
-const (
-	ChatTypeSingle = "single"
-	ChatTypeGroup  = "group"
-
-	ContentTypeText  = "text"
-	ContentTypeImage = "image"
-	ContentTypeFile  = "file"
-
-	MessageOriginHuman  = "human"
-	MessageOriginAI     = "ai"
-	MessageOriginSystem = "system"
-)
-
 type Message struct {
 	ServerMsgID    string `json:"serverMsgId"`
 	ClientMsgID    string `json:"clientMsgId"`

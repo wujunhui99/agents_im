@@ -27,16 +27,32 @@ func TestFriendsLogicAddDuplicateDeleteAndList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("add friend: %v", err)
 	}
-	if !added.Created || !added.Friendship.IsFriend || added.Friendship.Status != model.FriendshipStatusActive {
-		t.Fatalf("unexpected add response: %+v", added)
+	if !added.Created || added.Friendship.IsFriend || added.Friendship.Status != model.FriendshipStatusPending {
+		t.Fatalf("unexpected pending add response: %+v", added)
 	}
 
 	duplicate, err := friendsLogic.AddFriend(ctx, logic.AddFriendRequest{UserID: alice.UserID, FriendID: bob.UserID})
 	if err != nil {
 		t.Fatalf("duplicate add friend: %v", err)
 	}
-	if duplicate.Created {
-		t.Fatalf("duplicate add should be idempotent: %+v", duplicate)
+	if duplicate.Created || duplicate.Friendship.Status != model.FriendshipStatusPending {
+		t.Fatalf("duplicate pending add should be idempotent: %+v", duplicate)
+	}
+
+	pendingList, err := friendsLogic.ListFriends(ctx, logic.ListFriendsRequest{UserID: alice.UserID})
+	if err != nil {
+		t.Fatalf("list pending alice friends: %v", err)
+	}
+	if len(pendingList.Friends) != 0 {
+		t.Fatalf("pending friendship should not be listed as accepted friend: %+v", pendingList.Friends)
+	}
+
+	accepted, err := friendsLogic.AcceptFriendRequest(ctx, logic.FriendRequestDecisionRequest{UserID: bob.UserID, FriendID: alice.UserID})
+	if err != nil {
+		t.Fatalf("accept friend request: %v", err)
+	}
+	if !accepted.Updated || !accepted.Friendship.IsFriend || accepted.Friendship.Status != model.FriendshipStatusAccepted {
+		t.Fatalf("unexpected accept response: %+v", accepted)
 	}
 
 	aliceList, err := friendsLogic.ListFriends(ctx, logic.ListFriendsRequest{UserID: alice.UserID})
@@ -86,8 +102,8 @@ func TestFriendsLogicAddDuplicateDeleteAndList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("re-add deleted friend: %v", err)
 	}
-	if !readded.Created || !readded.Friendship.IsFriend || readded.Friendship.Status != model.FriendshipStatusActive {
-		t.Fatalf("re-add should reactivate friendship: %+v", readded)
+	if !readded.Created || readded.Friendship.IsFriend || readded.Friendship.Status != model.FriendshipStatusPending {
+		t.Fatalf("re-add should create a new pending request: %+v", readded)
 	}
 }
 
@@ -183,8 +199,8 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 	}
 	var duplicate envelope[logic.AddFriendResponse]
 	decodeEnvelope(t, duplicateResp.Body.Bytes(), &duplicate)
-	if duplicate.Data.Created {
-		t.Fatalf("duplicate add should return created=false: %+v", duplicate.Data)
+	if duplicate.Data.Created || duplicate.Data.Friendship.Status != model.FriendshipStatusPending {
+		t.Fatalf("duplicate pending add should return created=false: %+v", duplicate.Data)
 	}
 
 	listResp := httptest.NewRecorder()
@@ -196,8 +212,41 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 	}
 	var list envelope[logic.ListFriendsResponse]
 	decodeEnvelope(t, listResp.Body.Bytes(), &list)
+	if len(list.Data.Friends) != 0 {
+		t.Fatalf("pending friendship should not be listed: %+v", list.Data.Friends)
+	}
+
+	requestsResp := httptest.NewRecorder()
+	requestsReq := httptest.NewRequest(http.MethodGet, "/friends/requests", nil)
+	requestsReq.Header.Set("Authorization", bearerTokenForUser(t, bob.UserID))
+	mux.ServeHTTP(requestsResp, requestsReq)
+	if requestsResp.Code != http.StatusOK {
+		t.Fatalf("requests status = %d, body = %s", requestsResp.Code, requestsResp.Body.String())
+	}
+	var requests envelope[logic.ListFriendRequestsResponse]
+	decodeEnvelope(t, requestsResp.Body.Bytes(), &requests)
+	if len(requests.Data.Incoming) != 1 || requests.Data.Incoming[0].UserID != alice.UserID {
+		t.Fatalf("unexpected incoming requests: %+v", requests.Data.Incoming)
+	}
+
+	acceptResp := httptest.NewRecorder()
+	acceptReq := httptest.NewRequest(http.MethodPost, "/friends/requests/"+alice.UserID+"/accept", nil)
+	acceptReq.Header.Set("Authorization", bearerTokenForUser(t, bob.UserID))
+	mux.ServeHTTP(acceptResp, acceptReq)
+	if acceptResp.Code != http.StatusOK {
+		t.Fatalf("accept status = %d, body = %s", acceptResp.Code, acceptResp.Body.String())
+	}
+
+	listResp = httptest.NewRecorder()
+	listReq = httptest.NewRequest(http.MethodGet, "/friends", nil)
+	listReq.Header.Set("Authorization", aliceBearer)
+	mux.ServeHTTP(listResp, listReq)
+	if listResp.Code != http.StatusOK {
+		t.Fatalf("list after accept status = %d, body = %s", listResp.Code, listResp.Body.String())
+	}
+	decodeEnvelope(t, listResp.Body.Bytes(), &list)
 	if len(list.Data.Friends) != 1 || list.Data.Friends[0].FriendID != bob.UserID {
-		t.Fatalf("unexpected list response: %+v", list.Data.Friends)
+		t.Fatalf("unexpected accepted list response: %+v", list.Data.Friends)
 	}
 	if list.Data.Friends[0].Friend.UserID != bob.UserID || list.Data.Friends[0].Friend.Identifier != bob.Identifier {
 		t.Fatalf("list response should include friend profile for chat open: %+v", list.Data.Friends[0])
@@ -212,7 +261,7 @@ func TestFriendsHTTPHandlers(t *testing.T) {
 	}
 	var got envelope[logic.GetFriendshipResponse]
 	decodeEnvelope(t, getResp.Body.Bytes(), &got)
-	if !got.Data.Friendship.IsFriend || got.Data.Friendship.Status != model.FriendshipStatusActive {
+	if !got.Data.Friendship.IsFriend || got.Data.Friendship.Status != model.FriendshipStatusAccepted {
 		t.Fatalf("unexpected friendship response: %+v", got.Data.Friendship)
 	}
 

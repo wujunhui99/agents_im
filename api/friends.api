@@ -84,6 +84,28 @@ type FriendshipResp {
 	Data    FriendshipData `json:"data"`
 }
 
+type ListFriendRequestsData {
+	Incoming []Friendship `json:"incoming"`
+	Outgoing []Friendship `json:"outgoing"`
+}
+
+type FriendRequestDecisionData {
+	Friendship Friendship `json:"friendship"`
+	Updated    bool       `json:"updated"`
+}
+
+type ListFriendRequestsResp {
+	Code    string                 `json:"code"`
+	Message string                 `json:"message"`
+	Data    ListFriendRequestsData `json:"data"`
+}
+
+type FriendRequestDecisionResp {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    FriendRequestDecisionData `json:"data"`
+}
+
 @server (
 	jwt:   Auth
 	group: friends
@@ -94,6 +116,15 @@ service friends-api {
 
 	@handler listFriends
 	get /friends (ListFriendsReq) returns (ListFriendsResp)
+
+	@handler listFriendRequests
+	get /friends/requests (ListFriendsReq) returns (ListFriendRequestsResp)
+
+	@handler acceptFriendRequest
+	post /friends/requests/:user_id/accept (FriendPathReq) returns (FriendRequestDecisionResp)
+
+	@handler rejectFriendRequest
+	post /friends/requests/:user_id/reject (FriendPathReq) returns (FriendRequestDecisionResp)
 
 	@handler deleteFriend
 	delete /friends/:user_id (FriendPathReq) returns (DeleteFriendResp)
