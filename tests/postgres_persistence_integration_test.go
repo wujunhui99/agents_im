@@ -127,7 +127,7 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 	if !created || friendship.Status != model.FriendshipStatusPending {
 		t.Fatalf("friendship should be newly pending: created=%v status=%q", created, friendship.Status)
 	}
-	accepted, err := users.AcceptFriendRequest(ctx, bob.UserID, alice.UserID)
+	accepted, _, err := users.AcceptFriendRequest(ctx, bob.UserID, alice.UserID)
 	if err != nil {
 		t.Fatal(err)
 	}
