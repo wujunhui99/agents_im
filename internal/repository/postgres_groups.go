@@ -159,7 +159,7 @@ func (r *PostgresGroupsRepository) ListActiveMembers(ctx context.Context, groupI
 
 	var rows []postgresGroupMemberRow
 	if err := r.conn.QueryRowsCtx(ctx, &rows, `
-select group_id, account_id, role, status, join_time
+select group_id, account_id, role, status, join_time, left_at
 from group_members
 where group_id = $1 and status = $2
 order by account_id asc
@@ -214,7 +214,7 @@ where group_id = $1
 
 func queryGroupMember(ctx context.Context, session sqlx.Session, groupID string, userID string, forUpdate bool) (postgresGroupMemberRow, error) {
 	query := `
-select group_id, account_id, role, status, join_time
+select group_id, account_id, role, status, join_time, left_at
 from group_members
 where group_id = $1 and account_id = $2
 `
