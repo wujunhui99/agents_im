@@ -102,6 +102,12 @@ main() {
     cat "${friend_json}" >&2
     exit 1
   fi
+  status="$(request_json POST "${FRIENDS_API_URL}/friends/${alice_id}/accept" '{}' "${bob_token}" "${friend_json}")"
+  if [[ "${status}" != "200" ]]; then
+    echo "accept friend failed with HTTP ${status}" >&2
+    cat "${friend_json}" >&2
+    exit 1
+  fi
 
   local group_json="${tmp_dir}/group.json"
   status="$(request_json POST "${GROUPS_API_URL}/groups" "{\"name\":\"Frontend Demo\",\"description\":\"MVP smoke room\"}" "${alice_token}" "${group_json}")"

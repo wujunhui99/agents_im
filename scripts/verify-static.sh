@@ -440,6 +440,9 @@ done
 
 friends_api_patterns=(
   "post /friends"
+  "get /friends/requests"
+  "post /friends/:user_id/accept"
+  "post /friends/:user_id/reject"
   "delete /friends/:user_id"
   "get /friends"
   "get /friends/:user_id"
@@ -616,8 +619,11 @@ done
 
 friends_proto_patterns=(
   "rpc AddFriend"
+  "rpc AcceptFriend"
+  "rpc RejectFriend"
   "rpc DeleteFriend"
   "rpc ListFriends"
+  "rpc ListFriendRequests"
   "rpc GetFriendship"
 )
 
@@ -1495,7 +1501,7 @@ rg -q "has_read_seq" docs/product-specs/message-chain.md docs/design-docs/messag
 
 social_mvp_account_patterns=(
   "AddFriend"
-  "重复添加同一有效好友"
+  "重复添加同一 pending 申请"
   "添加自己为好友"
   "目标账号不存在"
   "MVP 群默认允许公开加入"

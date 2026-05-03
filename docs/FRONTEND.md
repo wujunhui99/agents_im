@@ -15,7 +15,7 @@
 前端第一阶段参考微信主框架，完成四个一级页面：
 
 1. **消息**：会话列表、未读数、最近消息预览；登录和恢复会话后默认通过 `GET /conversations/seqs`、`GET /conversations/:conversation_id/messages` 拉真实后端消息，不依赖先发送新消息，并通过 `POST /messages` 发送。无会话时支持通过 identifier 搜索用户并发起单聊。
-2. **联系人**：新的朋友、群聊、标签、公众号入口；进入联系人页后自动调用 `GET /friends` 拉真实好友列表，`刷新好友` 仅作为失败后的手动重试；支持 identifier 搜索用户、添加好友动作，均走真实 `user/friends` REST adapter。点击好友发起聊天前会先通过公开资料 API 重新获取好友资料，失败时显示错误，不用好友列表缓存伪造成功打开。`群聊 / 标签 / 公众号` 入口在第一阶段明确标记为 `暂未开放`。
+2. **联系人**：新的朋友、群聊、标签、公众号入口；进入联系人页后自动调用 `GET /friends` 拉真实已接受好友列表，并调用 `GET /friends/requests` 展示待处理申请；支持 identifier 搜索用户、添加好友、接受申请、拒绝申请动作，均走真实 `user/friends` REST adapter。点击好友发起聊天使用后端返回的好友资料或公开资料，不伪造成功打开。`群聊 / 标签 / 公众号` 入口在第一阶段明确标记为 `暂未开放`。
 3. **发现**：朋友圈、扫一扫、小程序等发现入口为明确的 `MVP 占位`；不会伪造真实扫码/内容生态能力。
 4. **我的**：个人资料卡、用户详情、服务、收藏、朋友圈、设置入口；支持编辑 `display_name`、`gender`、`birth_date`、`region` 等可变资料字段，并支持退出登录。
 
@@ -116,14 +116,14 @@ make status
 - 视觉上采用 Material 3-inspired surface 层级、tonal container、state feedback、elevation 和圆角节奏，同时保留微信式四 Tab 信息架构。
 - 列表、卡片、按钮、输入框、导航、消息气泡等基础 UI 必须优先复用 `web/src/components/ui/` 的轻量组件和 `web/src/styles/tokens.css` tokens。
 - 联系人页入口固定为：`新的朋友 / 群聊 / 标签 / 公众号`。
-- 好友列表在联系人页挂载时自动来自 `GET /friends`；identifier 搜索来自 `GET /users/:identifier`；加好友来自 `POST /friends`。
+- 好友列表在联系人页挂载时自动来自 `GET /friends`，只展示 `accepted`/legacy `active` 关系；好友申请来自 `GET /friends/requests`，接受/拒绝分别来自 `POST /friends/:user_id/accept` 和 `POST /friends/:user_id/reject`；identifier 搜索来自 `GET /users/:identifier`；加好友来自 `POST /friends` 并展示等待确认状态。
 - 不在前端生产代码中写入 mock 用户、mock 会话、真实 token、密码或后端 secret。
 - 前端用户资料更新必须走 `web/src/api/user.ts`，只向 `PATCH /me` 发送可变字段，不发送 `user_id` 或 `identifier`。
 - 默认禁止新增 `@material/web`、`@mui/*` 等重依赖；如未来必须引入，需要先在执行计划和本文档中记录原因、替代方案与验证结果。
 
 ## REST Adapter 约定
 
-- `web/src/api/contacts.ts`：`listFriends` -> `GET /friends`，`addFriend` -> `POST /friends`，`deleteFriend` -> `DELETE /friends/:user_id`。
+- `web/src/api/contacts.ts`：`listFriends` -> `GET /friends`，`listFriendRequests` -> `GET /friends/requests`，`addFriend` -> `POST /friends`，`acceptFriend` -> `POST /friends/:user_id/accept`，`rejectFriend` -> `POST /friends/:user_id/reject`，`deleteFriend` -> `DELETE /friends/:user_id`。
 - `web/src/api/groups.ts`：`getGroup` -> `GET /groups/:group_id`，`createGroup` -> `POST /groups`，`joinGroup` -> `POST /groups/:group_id/members`，`leaveGroup` -> `DELETE /groups/:group_id/members/me`，`listMembers` -> `GET /groups/:group_id/members`。
 - `web/src/api/messages.ts`：`sendMessage` -> `POST /messages`，`pullMessages` -> `GET /conversations/:conversation_id/messages`，`getConversationSeqs` -> `GET /conversations/seqs`，`markRead` -> `POST /conversations/:conversation_id/read`。
 - Adapter 接受可注入 `fetcher` 和 bearer token；示例 token 只能使用 `***` 或测试 fixture 值。

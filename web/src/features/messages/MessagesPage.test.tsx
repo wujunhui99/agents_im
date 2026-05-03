@@ -1,8 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MessagesPage } from './MessagesPage';
+import type { ContactsApi } from '../../api/contacts';
 import type { MessageApi, SendMessageRequest, SendMessageResponse, ServerMessage } from '../../api/messages';
+import type { WebSocketFactory, WebSocketLike } from '../../api/websocketClient';
 import type { UserApi, UserProfile, UserProfilePatch } from '../../api/user';
 
 const conversationId = 'single:1001:2002';
@@ -93,6 +95,72 @@ function createUserApi(profile: UserProfile = bobProfile): UserApi {
   };
 }
 
+function createContactsApi(): ContactsApi {
+  return {
+    listFriends: vi.fn(async () => ({ friends: [] })),
+    listFriendRequests: vi.fn(async () => ({ incoming: [], outgoing: [] })),
+    addFriend: vi.fn(),
+    acceptFriend: vi.fn(),
+    rejectFriend: vi.fn(),
+    deleteFriend: vi.fn(),
+  };
+}
+
+class FakeWebSocket implements WebSocketLike {
+  readyState = 0;
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent<string>) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  sent: string[] = [];
+
+  send(data: string) {
+    this.sent.push(data);
+  }
+
+  close() {
+    this.readyState = 3;
+  }
+
+  open() {
+    this.readyState = 1;
+    this.onopen?.(new Event('open'));
+  }
+
+  receive(payload: unknown) {
+    this.onmessage?.({ data: JSON.stringify(payload) } as MessageEvent<string>);
+  }
+}
+
+function createFakeWebSocketFactory() {
+  const sockets: FakeWebSocket[] = [];
+  const factory: WebSocketFactory = () => {
+    const socket = new FakeWebSocket();
+    sockets.push(socket);
+    return socket;
+  };
+  return { sockets, factory };
+}
+
+function messageReceivedEvent(message: Partial<ServerMessage> & Pick<ServerMessage, 'serverMsgId' | 'seq' | 'content'>) {
+  return {
+    type: 'message_received',
+    data: {
+      client_msg_id: message.clientMsgId ?? `client_${message.seq}`,
+      server_msg_id: message.serverMsgId,
+      conversation_id: message.conversationId ?? conversationId,
+      seq: message.seq,
+      sender_id: message.senderId ?? peerUserId,
+      receiver_id: message.receiverId ?? currentUserId,
+      chat_type: message.chatType ?? 'single',
+      content_type: message.contentType ?? 'text',
+      content: message.content,
+      send_time: message.sendTime ?? 1777464300000,
+      created_at: message.createdAt ?? 1777464300000,
+    },
+  };
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -117,6 +185,36 @@ function expectTextOrder(container: HTMLElement, labels: string[]) {
 }
 
 describe('MessagesPage real API mode', () => {
+  it('receives live websocket message_received events without requiring a manual refresh', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([]);
+    const contactsApi = createContactsApi();
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        contactsApi={contactsApi}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_live_1', seq: 1, content: 'live hello from Bob' }));
+    });
+
+    const row = await screen.findByRole('button', { name: /live hello from Bob/ });
+    expect(within(row).getByText('live hello from Bob')).toBeInTheDocument();
+    await user.click(row);
+    expect(await screen.findByText('live hello from Bob')).toBeInTheDocument();
+    expect(messageApi.getConversationSeqs).toHaveBeenCalledTimes(1);
+  });
+
   it('uses an unknown label instead of an internal id when conversation profiles are unavailable', async () => {
     const user = userEvent.setup();
     const messageApi = createMessageApi([serverMessage({ seq: 1, content: '来自历史会话' })]);
@@ -140,7 +238,7 @@ describe('MessagesPage real API mode', () => {
     render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} userApi={createUserApi()} />);
 
     await user.click(await screen.findByRole('button', { name: '发起聊天' }));
-    await user.type(screen.getByLabelText('按 identifier 搜索聊天对象'), 'bob_002');
+    await user.type(screen.getByLabelText('按账号搜索聊天对象'), 'bob_002');
     await user.click(screen.getByRole('button', { name: '搜索聊天对象' }));
 
     const startChatRegion = screen.getByRole('region', { name: '发起聊天' });
@@ -272,7 +370,7 @@ describe('MessagesPage real API mode', () => {
     await user.click(screen.getByRole('button', { name: '发起聊天' }));
 
     expect(screen.getByRole('region', { name: '发起聊天' })).toBeInTheDocument();
-    expect(screen.getByLabelText('按 identifier 搜索聊天对象')).toBeInTheDocument();
+    expect(screen.getByLabelText('按账号搜索聊天对象')).toBeInTheDocument();
   });
 
   it('starts a single chat by identifier, keeps the friendly title, and sends the first message through the real adapter', async () => {
@@ -284,7 +382,7 @@ describe('MessagesPage real API mode', () => {
       <MessagesPage currentUserId={currentUserId} messageApi={messageApi} userApi={userApi} startChatSignal={1} />,
     );
 
-    await user.type(await screen.findByLabelText('按 identifier 搜索聊天对象'), 'bob_002');
+    await user.type(await screen.findByLabelText('按账号搜索聊天对象'), 'bob_002');
     await user.click(screen.getByRole('button', { name: '搜索聊天对象' }));
 
     expect(await screen.findByText('Bob Lin')).toBeInTheDocument();
@@ -317,7 +415,7 @@ describe('MessagesPage real API mode', () => {
     render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} userApi={userApi} />);
 
     await user.click(await screen.findByRole('button', { name: '发起聊天' }));
-    await user.type(screen.getByLabelText('按 identifier 搜索聊天对象'), 'bob_002');
+    await user.type(screen.getByLabelText('按账号搜索聊天对象'), 'bob_002');
     await user.click(screen.getByRole('button', { name: '搜索聊天对象' }));
     await user.click(await screen.findByRole('button', { name: '发起聊天 bob_002' }));
 

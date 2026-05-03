@@ -23,9 +23,24 @@ export type ListFriendsData = {
   friends: Friendship[];
 };
 
+export type ListFriendRequestsData = {
+  incoming: Friendship[];
+  outgoing: Friendship[];
+};
+
 export type AddFriendData = {
   friendship: Friendship;
   created: boolean;
+};
+
+export type AcceptFriendData = {
+  friendship: Friendship;
+  accepted: boolean;
+};
+
+export type RejectFriendData = {
+  friendship: Friendship;
+  rejected: boolean;
 };
 
 export type DeleteFriendData = {
@@ -35,7 +50,10 @@ export type DeleteFriendData = {
 
 export type ContactsApi = {
   listFriends: () => Promise<ListFriendsData>;
+  listFriendRequests: () => Promise<ListFriendRequestsData>;
   addFriend: (userId: string) => Promise<AddFriendData>;
+  acceptFriend: (userId: string) => Promise<AcceptFriendData>;
+  rejectFriend: (userId: string) => Promise<RejectFriendData>;
   deleteFriend: (userId: string) => Promise<DeleteFriendData>;
 };
 
@@ -44,8 +62,17 @@ export function createContactsApi(api: ApiClient = createApiClient()): ContactsA
     listFriends() {
       return api.get<ListFriendsData>('/friends');
     },
+    listFriendRequests() {
+      return api.get<ListFriendRequestsData>('/friends/requests');
+    },
     addFriend(userId: string) {
       return api.post<AddFriendData>('/friends', { user_id: userId });
+    },
+    acceptFriend(userId: string) {
+      return api.post<AcceptFriendData>(`/friends/${encodeURIComponent(userId)}/accept`, {});
+    },
+    rejectFriend(userId: string) {
+      return api.post<RejectFriendData>(`/friends/${encodeURIComponent(userId)}/reject`, {});
     },
     deleteFriend(userId: string) {
       return api.delete<DeleteFriendData>(`/friends/${encodeURIComponent(userId)}`);

@@ -670,6 +670,14 @@ button.md-list-item:hover,
   gap: 2px;
 }
 
+.request-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .panel-heading {
   display: flex;
   align-items: center;

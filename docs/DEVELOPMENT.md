@@ -102,12 +102,13 @@ It uses real business logic and a real WebSocket gateway test server in one proc
 
 1. register Alice;
 2. register Bob;
-3. add Bob as Alice's friend;
-4. send a single-chat message through message logic;
-5. pull the message as Bob;
-6. connect Alice and Bob to WebSocket;
-7. send `send_message` over WebSocket;
-8. assert Alice receives ACK and Bob receives live `message_received` push.
+3. Alice sends Bob a friend request;
+4. Bob accepts the friend request;
+5. send a single-chat message through message logic;
+6. pull the message as Bob;
+7. connect Alice and Bob to WebSocket;
+8. send `send_message` over WebSocket;
+9. assert Alice receives ACK and Bob receives live `message_received` push.
 
 This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, Redpanda, and MinIO when the environment is clean.
 

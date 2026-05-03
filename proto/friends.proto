@@ -6,8 +6,11 @@ option go_package = "github.com/wujunhui99/agents_im/proto/friendspb";
 
 service FriendsService {
   rpc AddFriend(AddFriendRequest) returns (AddFriendResponse);
+  rpc AcceptFriend(AcceptFriendRequest) returns (AcceptFriendResponse);
+  rpc RejectFriend(RejectFriendRequest) returns (RejectFriendResponse);
   rpc DeleteFriend(DeleteFriendRequest) returns (DeleteFriendResponse);
   rpc ListFriends(ListFriendsRequest) returns (ListFriendsResponse);
+  rpc ListFriendRequests(ListFriendRequestsRequest) returns (ListFriendRequestsResponse);
   rpc GetFriendship(GetFriendshipRequest) returns (GetFriendshipResponse);
 }
 
@@ -40,12 +43,41 @@ message DeleteFriendResponse {
   bool deleted = 2;
 }
 
+message AcceptFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message AcceptFriendResponse {
+  Friendship friendship = 1;
+  bool accepted = 2;
+}
+
+message RejectFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message RejectFriendResponse {
+  Friendship friendship = 1;
+  bool rejected = 2;
+}
+
 message ListFriendsRequest {
   string user_id = 1;
 }
 
 message ListFriendsResponse {
   repeated Friendship friends = 1;
+}
+
+message ListFriendRequestsRequest {
+  string user_id = 1;
+}
+
+message ListFriendRequestsResponse {
+  repeated Friendship incoming = 1;
+  repeated Friendship outgoing = 2;
 }
 
 message GetFriendshipRequest {

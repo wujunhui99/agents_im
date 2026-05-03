@@ -191,8 +191,9 @@ A frontend-visible `GET /users/id/:user_id` public-profile endpoint is not prese
 
 ## Friends
 
-Friendship is immediately accepted in MVP. Duplicate add is idempotent, self-add returns `INVALID_ARGUMENT`, and non-existent users return `NOT_FOUND`.
+Friend requests require approval. `POST /friends` creates a `pending` outgoing request for the requester and an incoming request for the recipient. Only the recipient can accept or reject a pending request. Duplicate pending add is idempotent, self-add returns `INVALID_ARGUMENT`, and non-existent users return `NOT_FOUND`.
 `user_id` and `friend_id` are account id aliases.
+Current statuses are `pending`, `accepted`, `rejected`, `deleted`, and `none`. Legacy `active` may still be accepted by clients for migration compatibility, but new backend responses use `accepted` for effective friendships.
 
 ### Add Friend
 
@@ -218,8 +219,8 @@ Success:
     "friendship": {
       "user_id": "1001",
       "friend_id": "2002",
-      "status": "active",
-      "is_friend": true,
+      "status": "pending",
+      "is_friend": false,
       "created_at": "2026-04-29T12:01:00Z",
       "updated_at": "2026-04-29T12:01:00Z"
     },
@@ -234,6 +235,55 @@ Success:
 GET /friends
 Authorization: Bearer <access_token>
 ```
+
+Only `accepted` friendships are returned. Pending outgoing or incoming requests are not part of the normal friend list.
+
+### List Friend Requests
+
+```http
+GET /friends/requests
+Authorization: Bearer <access_token>
+```
+
+Success:
+
+```json
+{
+  "code": "OK",
+  "message": "ok",
+  "data": {
+    "incoming": [
+      {
+        "user_id": "2002",
+        "friend_id": "1001",
+        "status": "pending",
+        "is_friend": false,
+        "created_at": "2026-04-29T12:01:00Z",
+        "updated_at": "2026-04-29T12:01:00Z"
+      }
+    ],
+    "outgoing": []
+  }
+}
+```
+
+### Accept Friend Request
+
+```http
+POST /friends/1001/accept
+Authorization: Bearer <access_token>
+```
+
+The authenticated user must be the recipient of the pending request from `1001`. Success returns `status=accepted` and `is_friend=true`; both accounts then see each other from `GET /friends`.
+
+### Reject Friend Request
+
+```http
+POST /friends/1001/reject
+Authorization: Bearer <access_token>
+```
+
+The authenticated user must be the recipient of the pending request from `1001`. Success returns `status=rejected` and `is_friend=false`; neither account sees the relationship from `GET /friends`.
 
 ### Get Friendship
 

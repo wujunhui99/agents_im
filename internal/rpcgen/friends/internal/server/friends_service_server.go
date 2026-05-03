@@ -28,6 +28,16 @@ func (s *FriendsServiceServer) AddFriend(ctx context.Context, in *friendspb.AddF
 	return l.AddFriend(in)
 }
 
+func (s *FriendsServiceServer) AcceptFriend(ctx context.Context, in *friendspb.AcceptFriendRequest) (*friendspb.AcceptFriendResponse, error) {
+	l := logic.NewAcceptFriendLogic(ctx, s.svcCtx)
+	return l.AcceptFriend(in)
+}
+
+func (s *FriendsServiceServer) RejectFriend(ctx context.Context, in *friendspb.RejectFriendRequest) (*friendspb.RejectFriendResponse, error) {
+	l := logic.NewRejectFriendLogic(ctx, s.svcCtx)
+	return l.RejectFriend(in)
+}
+
 func (s *FriendsServiceServer) DeleteFriend(ctx context.Context, in *friendspb.DeleteFriendRequest) (*friendspb.DeleteFriendResponse, error) {
 	l := logic.NewDeleteFriendLogic(ctx, s.svcCtx)
 	return l.DeleteFriend(in)
@@ -36,6 +46,11 @@ func (s *FriendsServiceServer) DeleteFriend(ctx context.Context, in *friendspb.D
 func (s *FriendsServiceServer) ListFriends(ctx context.Context, in *friendspb.ListFriendsRequest) (*friendspb.ListFriendsResponse, error) {
 	l := logic.NewListFriendsLogic(ctx, s.svcCtx)
 	return l.ListFriends(in)
+}
+
+func (s *FriendsServiceServer) ListFriendRequests(ctx context.Context, in *friendspb.ListFriendRequestsRequest) (*friendspb.ListFriendRequestsResponse, error) {
+	l := logic.NewListFriendRequestsLogic(ctx, s.svcCtx)
+	return l.ListFriendRequests(in)
 }
 
 func (s *FriendsServiceServer) GetFriendship(ctx context.Context, in *friendspb.GetFriendshipRequest) (*friendspb.GetFriendshipResponse, error) {

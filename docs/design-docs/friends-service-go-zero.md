@@ -69,17 +69,23 @@ tests/friends_service_test.go
 
 状态：
 
-- `active`：有效好友关系。
+- `pending`：已发起、等待接收方确认的好友申请。
+- `accepted`：有效好友关系。
+- `rejected`：接收方已拒绝，当前不是好友。
 - `deleted`：曾经存在但已删除，当前不是好友。
 - `none`：没有关系记录，当前不是好友。
+- `active`：历史兼容状态，新响应应返回 `accepted`。
 
 第一阶段 repository 使用内存实现，通过接口隔离：
 
 ```go
 type FriendshipRepository interface {
     AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
+    AcceptFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
+    RejectFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
     DeleteFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
     ListFriends(ctx context.Context, userID string) ([]model.Friendship, error)
+    ListFriendRequests(ctx context.Context, userID string) ([]model.Friendship, []model.Friendship, error)
     GetFriendship(ctx context.Context, userID string, friendID string) (model.Friendship, error)
 }
 ```
@@ -148,8 +154,10 @@ scripts/verify-static.sh
 
 关键测试用例：
 
-- 添加好友成功并双向可见。
-- 重复添加同一好友返回 `created=false`。
+- 添加好友成功后为 pending，不进入普通好友列表。
+- 接收方可以接受或拒绝 pending 申请，请求方不能越权审批。
+- 接受后双向可见，拒绝后不进入普通好友列表。
+- 重复添加同一好友或同一 pending 申请返回 `created=false`。
 - 删除好友后列表不再返回，关系失效。
 - 查询好友列表只返回有效好友。
 - 不能添加自己。
@@ -159,5 +167,5 @@ scripts/verify-static.sh
 
 - 使用 `goctl api go` 和 `goctl rpc protoc` 重新生成或校准骨架。
 - 将内存 repository 替换为 PostgreSQL repository，补充迁移脚本和唯一索引。
-- 引入好友申请审批、备注、分组和黑名单。
+- 引入好友通知、备注、分组和黑名单。
 - 接入正式 gateway 鉴权、trace_id 透传、结构化日志和指标。

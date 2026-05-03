@@ -3,9 +3,12 @@ package model
 import "time"
 
 const (
-	FriendshipStatusNone    = "none"
-	FriendshipStatusActive  = "active"
-	FriendshipStatusDeleted = "deleted"
+	FriendshipStatusNone     = "none"
+	FriendshipStatusPending  = "pending"
+	FriendshipStatusAccepted = "accepted"
+	FriendshipStatusRejected = "rejected"
+	FriendshipStatusActive   = "active"
+	FriendshipStatusDeleted  = "deleted"
 )
 
 type Friendship struct {
@@ -18,4 +21,8 @@ type Friendship struct {
 
 func (f Friendship) Clone() Friendship {
 	return f
+}
+
+func IsAcceptedFriendshipStatus(status string) bool {
+	return status == FriendshipStatusAccepted || status == FriendshipStatusActive
 }

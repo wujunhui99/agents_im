@@ -48,6 +48,80 @@ func (l *AddFriendLogic) AddFriend(req *types.AddFriendReq) (*types.AddFriendRes
 	}, nil
 }
 
+type AcceptFriendLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewAcceptFriendLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AcceptFriendLogic {
+	return &AcceptFriendLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *AcceptFriendLogic) AcceptFriend(req *types.FriendPathReq) (*types.AcceptFriendResp, error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := l.svcCtx.FriendsLogic.AcceptFriend(l.ctx, business.AcceptFriendRequest{
+		UserID:   userID,
+		FriendID: req.UserID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &types.AcceptFriendResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data: types.AcceptFriendData{
+			Friendship: toFriendship(result.Friendship),
+			Accepted:   result.Accepted,
+		},
+	}, nil
+}
+
+type RejectFriendLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewRejectFriendLogic(ctx context.Context, svcCtx *svc.ServiceContext) *RejectFriendLogic {
+	return &RejectFriendLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *RejectFriendLogic) RejectFriend(req *types.FriendPathReq) (*types.RejectFriendResp, error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := l.svcCtx.FriendsLogic.RejectFriend(l.ctx, business.RejectFriendRequest{
+		UserID:   userID,
+		FriendID: req.UserID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &types.RejectFriendResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data: types.RejectFriendData{
+			Friendship: toFriendship(result.Friendship),
+			Rejected:   result.Rejected,
+		},
+	}, nil
+}
+
 type DeleteFriendLogic struct {
 	logx.Logger
 	ctx    context.Context
@@ -154,6 +228,49 @@ func (l *ListFriendsLogic) ListFriends(req *types.ListFriendsReq) (*types.ListFr
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data:    types.ListFriendsData{Friends: friends},
+	}, nil
+}
+
+type ListFriendRequestsLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewListFriendRequestsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListFriendRequestsLogic {
+	return &ListFriendRequestsLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *ListFriendRequestsLogic) ListFriendRequests(req *types.ListFriendRequestsReq) (*types.ListFriendRequestsResp, error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := l.svcCtx.FriendsLogic.ListFriendRequests(l.ctx, business.ListFriendRequestsRequest{UserID: userID})
+	if err != nil {
+		return nil, err
+	}
+
+	incoming := make([]types.Friendship, 0, len(result.Incoming))
+	for _, friendship := range result.Incoming {
+		incoming = append(incoming, toFriendship(friendship))
+	}
+	outgoing := make([]types.Friendship, 0, len(result.Outgoing))
+	for _, friendship := range result.Outgoing {
+		outgoing = append(outgoing, toFriendship(friendship))
+	}
+	return &types.ListFriendRequestsResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data: types.ListFriendRequestsData{
+			Incoming: incoming,
+			Outgoing: outgoing,
+		},
 	}, nil
 }
 

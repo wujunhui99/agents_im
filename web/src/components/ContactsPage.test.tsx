@@ -27,16 +27,45 @@ function createUserApi(profile: UserProfile = bobProfile): UserApi {
 function createContactsApi(): ContactsApi {
   return {
     listFriends: vi.fn(async () => ({ friends: [] })),
+    listFriendRequests: vi.fn(async () => ({ incoming: [], outgoing: [] })),
     addFriend: vi.fn(async (userId) => ({
       friendship: {
         user_id: '1001',
         friend_id: userId,
-        status: 'active',
-        is_friend: true,
+        status: 'pending',
+        is_friend: false,
         created_at: '2026-04-29T12:00:00Z',
         updated_at: '2026-04-29T12:00:00Z',
       },
       created: true,
+    })),
+    acceptFriend: vi.fn(async (userId) => ({
+      friendship: {
+        user_id: '1001',
+        friend_id: userId,
+        status: 'accepted',
+        is_friend: true,
+        created_at: '2026-04-29T12:00:00Z',
+        updated_at: '2026-04-29T12:00:00Z',
+        friend: {
+          user_id: userId,
+          identifier: 'bob_002',
+          display_name: 'Bob Lin',
+          name: 'Bob Lin',
+        },
+      },
+      accepted: true,
+    })),
+    rejectFriend: vi.fn(async (userId) => ({
+      friendship: {
+        user_id: '1001',
+        friend_id: userId,
+        status: 'rejected',
+        is_friend: false,
+        created_at: '2026-04-29T12:00:00Z',
+        updated_at: '2026-04-29T12:00:00Z',
+      },
+      rejected: true,
     })),
     deleteFriend: vi.fn(async (userId) => ({
       friendship: {
@@ -151,21 +180,75 @@ describe('ContactsPage', () => {
     expect(screen.getAllByText('未知联系人').length).toBeGreaterThan(0);
   });
 
-  it('marks a search result as added and disabled after add-friend succeeds', async () => {
+  it('keeps a new add-friend result pending and out of the accepted friend list', async () => {
     const user = userEvent.setup();
     const contactsApi = createContactsApi();
 
     render(<ContactsPage userApi={createUserApi()} contactsApi={contactsApi} />);
 
-    await user.type(screen.getByLabelText('按 identifier 搜索用户'), 'bob_002');
+    await user.type(screen.getByLabelText('按账号搜索用户'), 'bob_002');
     await user.click(screen.getByRole('button', { name: '搜索用户' }));
     await user.click(await screen.findByRole('button', { name: '添加好友 bob_002' }));
 
-    await waitFor(() => expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('已添加好友：bob_002'));
+    await waitFor(() => expect(screen.getAllByRole('status').map((node) => node.textContent).join(' ')).toContain('已发送好友申请'));
     const searchRegion = screen.getByRole('region', { name: '账号搜索' });
-    expect(within(searchRegion).getByRole('button', { name: '已添加' })).toBeDisabled();
+    expect(within(searchRegion).getByRole('button', { name: '等待对方确认' })).toBeDisabled();
     expect(contactsApi.addFriend).toHaveBeenCalledWith('2002');
-    expect(screen.getAllByText('Bob Lin').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: '和 Bob Lin 聊天' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '好友申请' })).getByText('等待确认')).toBeInTheDocument();
+  });
+
+  it('accepts and rejects incoming friend requests from the contacts page', async () => {
+    const user = userEvent.setup();
+    const contactsApi = createContactsApi();
+    contactsApi.listFriendRequests = vi.fn(async () => ({
+      incoming: [
+        {
+          user_id: '1001',
+          friend_id: '2002',
+          status: 'pending',
+          is_friend: false,
+          created_at: '2026-04-29T12:00:00Z',
+          updated_at: '2026-04-29T12:00:00Z',
+          friend: {
+            user_id: '2002',
+            identifier: 'bob_002',
+            display_name: 'Bob Lin',
+            name: 'Bob Lin',
+          },
+        },
+        {
+          user_id: '1001',
+          friend_id: '2003',
+          status: 'pending',
+          is_friend: false,
+          created_at: '2026-04-29T12:05:00Z',
+          updated_at: '2026-04-29T12:05:00Z',
+          friend: {
+            user_id: '2003',
+            identifier: 'carol_003',
+            display_name: 'Carol',
+            name: 'Carol',
+          },
+        },
+      ],
+      outgoing: [],
+    }));
+
+    render(<ContactsPage userApi={createUserApi()} contactsApi={contactsApi} />);
+
+    const requestRegion = screen.getByRole('region', { name: '好友申请' });
+    await user.click(await within(requestRegion).findByRole('button', { name: '接受 bob_002 的好友申请' }));
+
+    await waitFor(() => expect(contactsApi.acceptFriend).toHaveBeenCalledWith('2002'));
+    expect(await screen.findByRole('button', { name: '和 bob_002 聊天' })).toBeInTheDocument();
+    expect(within(requestRegion).queryByText('Bob Lin')).not.toBeInTheDocument();
+
+    await user.click(within(requestRegion).getByRole('button', { name: '拒绝 carol_003 的好友申请' }));
+
+    await waitFor(() => expect(contactsApi.rejectFriend).toHaveBeenCalledWith('2003'));
+    expect(within(requestRegion).queryByText('Carol')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '和 carol_003 聊天' })).not.toBeInTheDocument();
   });
 
   it('marks roadmap contact entries as unavailable instead of normal working actions', async () => {

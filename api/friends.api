@@ -38,6 +38,9 @@ type AddFriendReq {
 type ListFriendsReq {
 }
 
+type ListFriendRequestsReq {
+}
+
 type FriendPathReq {
 	UserID string `path:"user_id"`
 }
@@ -52,8 +55,23 @@ type DeleteFriendData {
 	Deleted    bool       `json:"deleted"`
 }
 
+type AcceptFriendData {
+	Friendship Friendship `json:"friendship"`
+	Accepted   bool       `json:"accepted"`
+}
+
+type RejectFriendData {
+	Friendship Friendship `json:"friendship"`
+	Rejected   bool       `json:"rejected"`
+}
+
 type ListFriendsData {
 	Friends []Friendship `json:"friends"`
+}
+
+type ListFriendRequestsData {
+	Incoming []Friendship `json:"incoming"`
+	Outgoing []Friendship `json:"outgoing"`
 }
 
 type FriendshipData {
@@ -72,10 +90,28 @@ type DeleteFriendResp {
 	Data    DeleteFriendData `json:"data"`
 }
 
+type AcceptFriendResp {
+	Code    string           `json:"code"`
+	Message string           `json:"message"`
+	Data    AcceptFriendData `json:"data"`
+}
+
+type RejectFriendResp {
+	Code    string           `json:"code"`
+	Message string           `json:"message"`
+	Data    RejectFriendData `json:"data"`
+}
+
 type ListFriendsResp {
 	Code    string          `json:"code"`
 	Message string          `json:"message"`
 	Data    ListFriendsData `json:"data"`
+}
+
+type ListFriendRequestsResp {
+	Code    string                 `json:"code"`
+	Message string                 `json:"message"`
+	Data    ListFriendRequestsData `json:"data"`
 }
 
 type FriendshipResp {
@@ -94,6 +130,15 @@ service friends-api {
 
 	@handler listFriends
 	get /friends (ListFriendsReq) returns (ListFriendsResp)
+
+	@handler listFriendRequests
+	get /friends/requests (ListFriendRequestsReq) returns (ListFriendRequestsResp)
+
+	@handler acceptFriend
+	post /friends/:user_id/accept (FriendPathReq) returns (AcceptFriendResp)
+
+	@handler rejectFriend
+	post /friends/:user_id/reject (FriendPathReq) returns (RejectFriendResp)
 
 	@handler deleteFriend
 	delete /friends/:user_id (FriendPathReq) returns (DeleteFriendResp)

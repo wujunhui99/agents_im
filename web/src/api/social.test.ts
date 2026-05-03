@@ -31,16 +31,22 @@ describe('contacts API adapter', () => {
     const api = createContactsApi(client);
 
     await api.listFriends();
+    await api.listFriendRequests();
     await api.addFriend('2002');
+    await api.acceptFriend('2002');
+    await api.rejectFriend('2002');
     await api.deleteFriend('2002');
 
     expect(calls.map((call) => [String(call.input), call.init?.method ?? 'GET'])).toEqual([
       ['http://api.test/friends', 'GET'],
+      ['http://api.test/friends/requests', 'GET'],
       ['http://api.test/friends', 'POST'],
+      ['http://api.test/friends/2002/accept', 'POST'],
+      ['http://api.test/friends/2002/reject', 'POST'],
       ['http://api.test/friends/2002', 'DELETE'],
     ]);
     expect(headersFor(calls[0]).get('Authorization')).toBe('Bearer ***');
-    expect(JSON.parse(String(calls[1].init?.body))).toEqual({ user_id: '2002' });
+    expect(JSON.parse(String(calls[2].init?.body))).toEqual({ user_id: '2002' });
   });
 });
 

@@ -297,10 +297,10 @@ Purpose: per-account friend relationship view.
 
 Decisions:
 
-- Store two directional rows for an accepted friendship: `A -> B` and `B -> A`.
+- Store one directional row for a pending request: `requester -> recipient`; store two directional rows for an accepted friendship: `A -> B` and `B -> A`.
 - Rename fields from user terminology to account terminology.
 - Use `smallint` friend status.
-- Default status is `1 = normal`.
+- Default status is `1 = accepted` for compatibility with existing active rows.
 - No physical FKs; program validates account existence.
 
 Proposed columns:
@@ -316,24 +316,29 @@ primary key (account_id, friend_account_id)
 
 Status enum:
 
-- `1`: normal
+- `1`: accepted
 - `2`: deleted
-- `3`: blocked
+- `3`: pending
+- `4`: rejected
 
 Semantics:
 
-- `normal`: visible in this account's friend list.
-- `deleted`: this account deleted the friend; the reverse row may remain normal.
-- `blocked`: this account blocked the friend; message sending and interaction checks must inspect the receiver-side block rule where applicable.
+- `pending`: visible as outgoing for `account_id` and incoming for `friend_account_id`; not visible in the accepted friend list.
+- `accepted`: visible in this account's friend list.
+- `rejected`: request was rejected; not visible in the accepted friend list.
+- `deleted`: this account deleted the friend; not visible in the accepted friend list.
 
 Directional examples:
 
 - If A deletes B:
   - `A -> B = deleted`
   - `B -> A` can remain `normal`.
-- If A blocks B:
-  - `A -> B = blocked`
-  - `B -> A` can remain `normal`, but B sending to A should fail because A blocked B.
+- If A requests B:
+  - `A -> B = pending`
+  - no `B -> A` row is required until accept/reject.
+- If B accepts A:
+  - `A -> B = accepted`
+  - `B -> A = accepted`
 
 Indexes:
 

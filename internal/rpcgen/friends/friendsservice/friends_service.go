@@ -14,20 +14,29 @@ import (
 )
 
 type (
-	AddFriendRequest      = friendspb.AddFriendRequest
-	AddFriendResponse     = friendspb.AddFriendResponse
-	DeleteFriendRequest   = friendspb.DeleteFriendRequest
-	DeleteFriendResponse  = friendspb.DeleteFriendResponse
-	Friendship            = friendspb.Friendship
-	GetFriendshipRequest  = friendspb.GetFriendshipRequest
-	GetFriendshipResponse = friendspb.GetFriendshipResponse
-	ListFriendsRequest    = friendspb.ListFriendsRequest
-	ListFriendsResponse   = friendspb.ListFriendsResponse
+	AcceptFriendRequest        = friendspb.AcceptFriendRequest
+	AcceptFriendResponse       = friendspb.AcceptFriendResponse
+	AddFriendRequest           = friendspb.AddFriendRequest
+	AddFriendResponse          = friendspb.AddFriendResponse
+	DeleteFriendRequest        = friendspb.DeleteFriendRequest
+	DeleteFriendResponse       = friendspb.DeleteFriendResponse
+	Friendship                 = friendspb.Friendship
+	GetFriendshipRequest       = friendspb.GetFriendshipRequest
+	GetFriendshipResponse      = friendspb.GetFriendshipResponse
+	ListFriendRequestsRequest  = friendspb.ListFriendRequestsRequest
+	ListFriendRequestsResponse = friendspb.ListFriendRequestsResponse
+	ListFriendsRequest         = friendspb.ListFriendsRequest
+	ListFriendsResponse        = friendspb.ListFriendsResponse
+	RejectFriendRequest        = friendspb.RejectFriendRequest
+	RejectFriendResponse       = friendspb.RejectFriendResponse
 
 	FriendsService interface {
 		AddFriend(ctx context.Context, in *AddFriendRequest, opts ...grpc.CallOption) (*AddFriendResponse, error)
+		AcceptFriend(ctx context.Context, in *AcceptFriendRequest, opts ...grpc.CallOption) (*AcceptFriendResponse, error)
+		RejectFriend(ctx context.Context, in *RejectFriendRequest, opts ...grpc.CallOption) (*RejectFriendResponse, error)
 		DeleteFriend(ctx context.Context, in *DeleteFriendRequest, opts ...grpc.CallOption) (*DeleteFriendResponse, error)
 		ListFriends(ctx context.Context, in *ListFriendsRequest, opts ...grpc.CallOption) (*ListFriendsResponse, error)
+		ListFriendRequests(ctx context.Context, in *ListFriendRequestsRequest, opts ...grpc.CallOption) (*ListFriendRequestsResponse, error)
 		GetFriendship(ctx context.Context, in *GetFriendshipRequest, opts ...grpc.CallOption) (*GetFriendshipResponse, error)
 	}
 
@@ -47,6 +56,16 @@ func (m *defaultFriendsService) AddFriend(ctx context.Context, in *AddFriendRequ
 	return client.AddFriend(ctx, in, opts...)
 }
 
+func (m *defaultFriendsService) AcceptFriend(ctx context.Context, in *AcceptFriendRequest, opts ...grpc.CallOption) (*AcceptFriendResponse, error) {
+	client := friendspb.NewFriendsServiceClient(m.cli.Conn())
+	return client.AcceptFriend(ctx, in, opts...)
+}
+
+func (m *defaultFriendsService) RejectFriend(ctx context.Context, in *RejectFriendRequest, opts ...grpc.CallOption) (*RejectFriendResponse, error) {
+	client := friendspb.NewFriendsServiceClient(m.cli.Conn())
+	return client.RejectFriend(ctx, in, opts...)
+}
+
 func (m *defaultFriendsService) DeleteFriend(ctx context.Context, in *DeleteFriendRequest, opts ...grpc.CallOption) (*DeleteFriendResponse, error) {
 	client := friendspb.NewFriendsServiceClient(m.cli.Conn())
 	return client.DeleteFriend(ctx, in, opts...)
@@ -55,6 +74,11 @@ func (m *defaultFriendsService) DeleteFriend(ctx context.Context, in *DeleteFrie
 func (m *defaultFriendsService) ListFriends(ctx context.Context, in *ListFriendsRequest, opts ...grpc.CallOption) (*ListFriendsResponse, error) {
 	client := friendspb.NewFriendsServiceClient(m.cli.Conn())
 	return client.ListFriends(ctx, in, opts...)
+}
+
+func (m *defaultFriendsService) ListFriendRequests(ctx context.Context, in *ListFriendRequestsRequest, opts ...grpc.CallOption) (*ListFriendRequestsResponse, error) {
+	client := friendspb.NewFriendsServiceClient(m.cli.Conn())
+	return client.ListFriendRequests(ctx, in, opts...)
 }
 
 func (m *defaultFriendsService) GetFriendship(ctx context.Context, in *GetFriendshipRequest, opts ...grpc.CallOption) (*GetFriendshipResponse, error) {

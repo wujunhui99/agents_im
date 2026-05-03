@@ -39,6 +39,17 @@ type AddFriendResp struct {
 	Data    AddFriendData `json:"data"`
 }
 
+type AcceptFriendData struct {
+	Friendship Friendship `json:"friendship"`
+	Accepted   bool       `json:"accepted"`
+}
+
+type AcceptFriendResp struct {
+	Code    string           `json:"code"`
+	Message string           `json:"message"`
+	Data    AcceptFriendData `json:"data"`
+}
+
 type AddMemberReq struct {
 	GroupID string `path:"group_id"`
 	UserID  string `json:"user_id,optional"`
@@ -165,6 +176,19 @@ type FriendshipResp struct {
 	Data    FriendshipData `json:"data"`
 }
 
+type ListFriendRequestsData struct {
+	Incoming []Friendship `json:"incoming"`
+	Outgoing []Friendship `json:"outgoing"`
+}
+
+type ListFriendRequestsReq struct{}
+
+type ListFriendRequestsResp struct {
+	Code    string                 `json:"code"`
+	Message string                 `json:"message"`
+	Data    ListFriendRequestsData `json:"data"`
+}
+
 type GetGroupReq struct {
 	GroupID string `path:"group_id"`
 }
@@ -229,6 +253,17 @@ type ListFriendsResp struct {
 	Code    string          `json:"code"`
 	Message string          `json:"message"`
 	Data    ListFriendsData `json:"data"`
+}
+
+type RejectFriendData struct {
+	Friendship Friendship `json:"friendship"`
+	Rejected   bool       `json:"rejected"`
+}
+
+type RejectFriendResp struct {
+	Code    string           `json:"code"`
+	Message string           `json:"message"`
+	Data    RejectFriendData `json:"data"`
 }
 
 type ListMembersData struct {

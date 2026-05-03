@@ -40,6 +40,8 @@ func main() {
 	friendsLogic := logic.NewFriendsLogic(userRepo, userLogic)
 	_, err = friendsLogic.AddFriend(ctx, logic.AddFriendRequest{UserID: alice.UserID, FriendID: bob.UserID})
 	must("add friend", err)
+	_, err = friendsLogic.AcceptFriend(ctx, logic.AcceptFriendRequest{UserID: bob.UserID, FriendID: alice.UserID})
+	must("accept friend", err)
 
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogicWithValidators(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil)

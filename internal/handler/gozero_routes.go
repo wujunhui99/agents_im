@@ -206,6 +206,21 @@ func addFriendsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Handler: friendshandler.ListFriendsHandler(serverCtx),
 		},
 		{
+			Method:  http.MethodGet,
+			Path:    "/friends/requests",
+			Handler: friendshandler.ListFriendRequestsHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/friends/:user_id/accept",
+			Handler: friendshandler.AcceptFriendHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/friends/:user_id/reject",
+			Handler: friendshandler.RejectFriendHandler(serverCtx),
+		},
+		{
 			Method:  http.MethodDelete,
 			Path:    "/friends/:user_id",
 			Handler: friendshandler.DeleteFriendHandler(serverCtx),

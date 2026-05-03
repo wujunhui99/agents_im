@@ -42,6 +42,26 @@ type AddFriendResponse struct {
 	Created    bool           `json:"created"`
 }
 
+type AcceptFriendRequest struct {
+	UserID   string `json:"user_id"`
+	FriendID string `json:"friend_id"`
+}
+
+type AcceptFriendResponse struct {
+	Friendship FriendshipView `json:"friendship"`
+	Accepted   bool           `json:"accepted"`
+}
+
+type RejectFriendRequest struct {
+	UserID   string `json:"user_id"`
+	FriendID string `json:"friend_id"`
+}
+
+type RejectFriendResponse struct {
+	Friendship FriendshipView `json:"friendship"`
+	Rejected   bool           `json:"rejected"`
+}
+
 type DeleteFriendRequest struct {
 	UserID   string `json:"user_id"`
 	FriendID string `json:"friend_id"`
@@ -58,6 +78,15 @@ type ListFriendsRequest struct {
 
 type ListFriendsResponse struct {
 	Friends []FriendshipView `json:"friends"`
+}
+
+type ListFriendRequestsRequest struct {
+	UserID string `json:"user_id"`
+}
+
+type ListFriendRequestsResponse struct {
+	Incoming []FriendshipView `json:"incoming"`
+	Outgoing []FriendshipView `json:"outgoing"`
 }
 
 type GetFriendshipRequest struct {
@@ -84,9 +113,66 @@ func (l *FriendsLogic) AddFriend(ctx context.Context, req AddFriendRequest) (Add
 		return AddFriendResponse{}, err
 	}
 
+	view, err := l.friendshipViewWithProfile(ctx, friendship)
+	if err != nil {
+		return AddFriendResponse{}, err
+	}
+
 	return AddFriendResponse{
-		Friendship: toFriendshipView(friendship),
+		Friendship: view,
 		Created:    created,
+	}, nil
+}
+
+func (l *FriendsLogic) AcceptFriend(ctx context.Context, req AcceptFriendRequest) (AcceptFriendResponse, error) {
+	userID, friendID, err := normalizeFriendshipPair(req.UserID, req.FriendID)
+	if err != nil {
+		return AcceptFriendResponse{}, err
+	}
+
+	if err := l.ensureUsersExist(ctx, userID, friendID); err != nil {
+		return AcceptFriendResponse{}, err
+	}
+
+	friendship, accepted, err := l.repo.AcceptFriend(ctx, userID, friendID)
+	if err != nil {
+		return AcceptFriendResponse{}, err
+	}
+
+	view, err := l.friendshipViewWithProfile(ctx, friendship)
+	if err != nil {
+		return AcceptFriendResponse{}, err
+	}
+
+	return AcceptFriendResponse{
+		Friendship: view,
+		Accepted:   accepted,
+	}, nil
+}
+
+func (l *FriendsLogic) RejectFriend(ctx context.Context, req RejectFriendRequest) (RejectFriendResponse, error) {
+	userID, friendID, err := normalizeFriendshipPair(req.UserID, req.FriendID)
+	if err != nil {
+		return RejectFriendResponse{}, err
+	}
+
+	if err := l.ensureUsersExist(ctx, userID, friendID); err != nil {
+		return RejectFriendResponse{}, err
+	}
+
+	friendship, rejected, err := l.repo.RejectFriend(ctx, userID, friendID)
+	if err != nil {
+		return RejectFriendResponse{}, err
+	}
+
+	view, err := l.friendshipViewWithProfile(ctx, friendship)
+	if err != nil {
+		return RejectFriendResponse{}, err
+	}
+
+	return RejectFriendResponse{
+		Friendship: view,
+		Rejected:   rejected,
 	}, nil
 }
 
@@ -140,6 +226,36 @@ func (l *FriendsLogic) ListFriends(ctx context.Context, req ListFriendsRequest) 
 	return ListFriendsResponse{Friends: friends}, nil
 }
 
+func (l *FriendsLogic) ListFriendRequests(ctx context.Context, req ListFriendRequestsRequest) (ListFriendRequestsResponse, error) {
+	userID := normalizeUserID(req.UserID)
+	if userID == "" {
+		return ListFriendRequestsResponse{}, apperror.InvalidArgument("user_id is required")
+	}
+
+	if err := l.ensureUserExists(ctx, userID); err != nil {
+		return ListFriendRequestsResponse{}, err
+	}
+
+	incoming, outgoing, err := l.repo.ListFriendRequests(ctx, userID)
+	if err != nil {
+		return ListFriendRequestsResponse{}, err
+	}
+
+	incomingViews, err := l.friendshipViewsWithProfiles(ctx, incoming)
+	if err != nil {
+		return ListFriendRequestsResponse{}, err
+	}
+	outgoingViews, err := l.friendshipViewsWithProfiles(ctx, outgoing)
+	if err != nil {
+		return ListFriendRequestsResponse{}, err
+	}
+
+	return ListFriendRequestsResponse{
+		Incoming: incomingViews,
+		Outgoing: outgoingViews,
+	}, nil
+}
+
 func (l *FriendsLogic) GetFriendship(ctx context.Context, req GetFriendshipRequest) (GetFriendshipResponse, error) {
 	userID, friendID, err := normalizeFriendshipPair(req.UserID, req.FriendID)
 	if err != nil {
@@ -164,6 +280,30 @@ func (l *FriendsLogic) GetFriendship(ctx context.Context, req GetFriendshipReque
 	}
 
 	return GetFriendshipResponse{Friendship: toFriendshipView(friendship)}, nil
+}
+
+func (l *FriendsLogic) friendshipViewsWithProfiles(ctx context.Context, friendships []model.Friendship) ([]FriendshipView, error) {
+	views := make([]FriendshipView, 0, len(friendships))
+	for _, friendship := range friendships {
+		view := toFriendshipView(friendship)
+		profile, err := l.lookupFriendProfile(ctx, friendship.FriendID)
+		if err != nil {
+			return nil, err
+		}
+		view.Friend = &profile
+		views = append(views, view)
+	}
+	return views, nil
+}
+
+func (l *FriendsLogic) friendshipViewWithProfile(ctx context.Context, friendship model.Friendship) (FriendshipView, error) {
+	view := toFriendshipView(friendship)
+	profile, err := l.lookupFriendProfile(ctx, friendship.FriendID)
+	if err != nil {
+		return FriendshipView{}, err
+	}
+	view.Friend = &profile
+	return view, nil
 }
 
 func (l *FriendsLogic) ensureUsersExist(ctx context.Context, userID string, friendID string) error {
@@ -205,11 +345,15 @@ func normalizeUserID(userID string) string {
 }
 
 func toFriendshipView(friendship model.Friendship) FriendshipView {
-	isFriend := friendship.Status == model.FriendshipStatusActive
+	isFriend := model.IsAcceptedFriendshipStatus(friendship.Status)
+	status := friendship.Status
+	if status == model.FriendshipStatusActive {
+		status = model.FriendshipStatusAccepted
+	}
 	return FriendshipView{
 		UserID:    friendship.UserID,
 		FriendID:  friendship.FriendID,
-		Status:    friendship.Status,
+		Status:    status,
 		IsFriend:  isFriend,
 		CreatedAt: formatTime(friendship.CreatedAt),
 		UpdatedAt: formatTime(friendship.UpdatedAt),
