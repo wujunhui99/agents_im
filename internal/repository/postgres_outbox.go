@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/idgen"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
@@ -150,13 +151,17 @@ func insertMessageOutboxEvent(ctx context.Context, session sqlx.Session, message
 	if err != nil {
 		return err
 	}
+	eventID, err := idgen.NewString()
+	if err != nil {
+		return err
+	}
 	_, err = session.ExecCtx(ctx, `
 insert into message_outbox (
-	  event_type, aggregate_type, aggregate_id, conversation_id, message_id,
+	  event_id, event_type, aggregate_type, aggregate_id, conversation_id, message_id,
 	  seq, payload, status, next_attempt_at
 )
-values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, now())
-`, OutboxEventTypeMessageCreated, OutboxAggregateTypeMessage, message.ServerMsgID,
+values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, now())
+`, eventID, OutboxEventTypeMessageCreated, OutboxAggregateTypeMessage, message.ServerMsgID,
 		message.ConversationID, message.ServerMsgID, message.Seq, string(payload), OutboxStatusPending)
 	return err
 }
