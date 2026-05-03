@@ -4,6 +4,7 @@ export PATH := /tmp/go/bin:$(HOME)/go/bin:$(PATH)
 
 FRONTEND_HOST ?= 0.0.0.0
 FRONTEND_PORT ?= 5173
+FRONTEND_STRICT_PORT ?= true
 FRONTEND_PID := .dev/pids/frontend.pid
 FRONTEND_LOG := .dev/logs/frontend.log
 FRONTEND_URL := http://127.0.0.1:$(FRONTEND_PORT)
@@ -35,7 +36,7 @@ frontend-start: ## Start Vite frontend dev server in the background.
 		exit 0; \
 	fi
 	@echo "starting frontend on $(FRONTEND_URL); log=$(FRONTEND_LOG)"
-	@nohup npm --prefix web run dev -- --host $(FRONTEND_HOST) --port $(FRONTEND_PORT) </dev/null > "$(FRONTEND_LOG)" 2>&1 & echo $$! > "$(FRONTEND_PID)"
+	@nohup npm --prefix web run dev -- --host $(FRONTEND_HOST) --port $(FRONTEND_PORT) --strictPort=$(FRONTEND_STRICT_PORT) </dev/null > "$(FRONTEND_LOG)" 2>&1 & echo $$! > "$(FRONTEND_PID)"
 	@for attempt in $$(seq 1 60); do \
 		if curl --silent --fail "$(FRONTEND_URL)" >/dev/null 2>&1; then \
 			echo "frontend ready: $(FRONTEND_URL)"; \

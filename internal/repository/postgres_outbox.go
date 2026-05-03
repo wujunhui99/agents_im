@@ -53,7 +53,7 @@ func (r *PostgresMessageRepository) PollPending(ctx context.Context, workerID st
 with picked as (
   select event_id
   from message_outbox
-  where status = $1
+  where status = $1::smallint
     and next_attempt_at <= now()
     and (locked_until is null or locked_until <= now())
   order by created_at asc, event_id asc
@@ -70,7 +70,7 @@ returning o.event_id, o.event_type, o.aggregate_type, o.aggregate_id,
 	          o.conversation_id, o.message_id, o.seq, o.payload, o.status,
           o.attempt_count, o.next_attempt_at, o.locked_by, o.locked_until,
           o.last_error, o.created_at, o.updated_at, o.published_at
-`, OutboxStatusPending, limit, workerID, lockedUntil); err != nil {
+`, int16(OutboxStatusPending), limit, workerID, lockedUntil); err != nil {
 		return nil, err
 	}
 
@@ -93,16 +93,16 @@ func (r *PostgresMessageRepository) MarkPublished(ctx context.Context, eventID s
 
 	result, err := r.conn.ExecCtx(ctx, `
 update message_outbox
-set status = $3,
+set status = $3::smallint,
     locked_by = '',
     locked_until = null,
     published_at = now(),
     updated_at = now()
 where event_id = $1
   and locked_by = $2
-  and status = $4
+  and status = $4::smallint
   and locked_until > now()
-`, eventID, workerID, OutboxStatusPublished, OutboxStatusPending)
+`, eventID, workerID, int16(OutboxStatusPublished), int16(OutboxStatusPending))
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (r *PostgresMessageRepository) MarkFailed(ctx context.Context, eventID stri
 
 	result, err := r.conn.ExecCtx(ctx, `
 update message_outbox
-set status = $3,
+set status = $3::smallint,
     attempt_count = attempt_count + 1,
     next_attempt_at = $4,
     locked_by = '',
@@ -137,9 +137,9 @@ set status = $3,
     updated_at = now()
 where event_id = $1
   and locked_by = $2
-  and status = $6
+  and status = $6::smallint
   and locked_until > now()
-`, eventID, workerID, status, nextAttemptAt, strings.TrimSpace(failure.LastError), OutboxStatusPending)
+`, eventID, workerID, int16(status), nextAttemptAt, strings.TrimSpace(failure.LastError), int16(OutboxStatusPending))
 	if err != nil {
 		return err
 	}
@@ -160,9 +160,9 @@ insert into message_outbox (
 	  event_id, event_type, aggregate_type, aggregate_id, conversation_id, message_id,
 	  seq, payload, status, next_attempt_at
 )
-values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, now())
-`, eventID, OutboxEventTypeMessageCreated, OutboxAggregateTypeMessage, message.ServerMsgID,
-		message.ConversationID, message.ServerMsgID, message.Seq, string(payload), OutboxStatusPending)
+values ($1, $2::smallint, $3::smallint, $4, $5, $6, $7, $8::jsonb, $9::smallint, now())
+`, eventID, int16(OutboxEventTypeMessageCreated), int16(OutboxAggregateTypeMessage), message.ServerMsgID,
+		message.ConversationID, message.ServerMsgID, message.Seq, string(payload), int16(OutboxStatusPending))
 	return err
 }
 
