@@ -343,3 +343,13 @@ Kafka:
 		t.Fatalf("kafka config mismatch: %+v", cfg.Kafka)
 	}
 }
+
+func TestResolveMessageTransferConsumerDriverSupportsOutbox(t *testing.T) {
+	t.Setenv("MESSAGE_TRANSFER_CONSUMER_DRIVER", "")
+
+	for _, value := range []string{"outbox", "postgres_outbox", "postgres-outbox"} {
+		if got := ResolveTransferConsumerDriver(value); got != TransferConsumerOutbox {
+			t.Fatalf("ResolveTransferConsumerDriver(%q) = %q, want %q", value, got, TransferConsumerOutbox)
+		}
+	}
+}

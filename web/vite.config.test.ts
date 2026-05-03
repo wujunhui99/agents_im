@@ -14,4 +14,12 @@ describe('Vite local backend proxy', () => {
     expect(proxy['/groups']).toMatchObject({ target: 'http://127.0.0.1:8085' });
     expect(proxy['/ws']).toMatchObject({ target: 'ws://127.0.0.1:8084', ws: true });
   });
+
+  it('routes /messages before the shorter /me prefix', () => {
+    const proxyPrefixes = Object.keys(viteConfig.server?.proxy ?? {});
+
+    expect(proxyPrefixes.indexOf('/messages')).toBeGreaterThanOrEqual(0);
+    expect(proxyPrefixes.indexOf('/me')).toBeGreaterThanOrEqual(0);
+    expect(proxyPrefixes.indexOf('/messages')).toBeLessThan(proxyPrefixes.indexOf('/me'));
+  });
 });

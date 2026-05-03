@@ -26,7 +26,7 @@ Options:
   --services-only   Restart only host Go services; skip Docker middleware and migrations.
                    Service ports can be overridden with USER_API_PORT, AUTH_API_PORT,
                    FRIENDS_API_PORT, MESSAGE_API_PORT, GATEWAY_WS_PORT, GROUPS_API_PORT,
-                   and AGENT_API_PORT.
+                   AGENT_API_PORT, and MESSAGE_TRANSFER_OBSERVABILITY_PORT.
   --no-migrate      Skip PostgreSQL migrations.
   --stop            Stop host Go services started by this script.
   -h, --help        Show this help.
@@ -74,10 +74,19 @@ load_env() {
   fi
 
   if [[ -n "${env_file}" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "${env_file}"
-    set +a
+    local line key value
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+      line="${line#"${line%%[![:space:]]*}"}"
+      line="${line%"${line##*[![:space:]]}"}"
+      [[ -z "${line}" || "${line}" == \#* || "${line}" != *=* ]] && continue
+      key="${line%%=*}"
+      value="${line#*=}"
+      key="${key%"${key##*[![:space:]]}"}"
+      value="${value#"${value%%[![:space:]]*}"}"
+      if [[ -n "${key}" && -z "${!key+x}" ]]; then
+        export "${key}=${value}"
+      fi
+    done < "${env_file}"
   fi
 
   export POSTGRES_DB="${POSTGRES_DB:-agents_im}"
@@ -107,6 +116,16 @@ load_env() {
   export GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS="${GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS:-75}"
   export GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND="${GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND:-20}"
   export GATEWAY_WS_COMMAND_RATE_LIMIT_BURST="${GATEWAY_WS_COMMAND_RATE_LIMIT_BURST:-40}"
+  export MESSAGE_TRANSFER_CONSUMER_DRIVER="${MESSAGE_TRANSFER_CONSUMER_DRIVER:-outbox}"
+  export MESSAGE_TRANSFER_DISPATCHER_DRIVER="${MESSAGE_TRANSFER_DISPATCHER_DRIVER:-gateway}"
+  export MESSAGE_TRANSFER_GATEWAY_ENDPOINT="${MESSAGE_TRANSFER_GATEWAY_ENDPOINT:-http://127.0.0.1:${GATEWAY_WS_PORT:-8084}}"
+  export MESSAGE_TRANSFER_OBSERVABILITY_ENABLED="${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED:-true}"
+  export MESSAGE_TRANSFER_OBSERVABILITY_HOST="${MESSAGE_TRANSFER_OBSERVABILITY_HOST:-127.0.0.1}"
+  export MESSAGE_TRANSFER_OBSERVABILITY_PORT="${MESSAGE_TRANSFER_OBSERVABILITY_PORT:-8087}"
+  export MESSAGE_TRANSFER_WORKER_ID="${MESSAGE_TRANSFER_WORKER_ID:-message-transfer-local}"
+  export MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS="${MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS:-100}"
+  export MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS="${MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS:-1000}"
+  export MESSAGE_TRANSFER_MAX_ATTEMPTS="${MESSAGE_TRANSFER_MAX_ATTEMPTS:-5}"
 }
 
 require_command() {
@@ -189,6 +208,40 @@ DataSource: ${DATABASE_URL}
 YAML
 }
 
+write_message_transfer_config() {
+  cat > "${CONFIG_DIR}/message-transfer.yaml" <<YAML
+Name: message-transfer
+WorkerID: ${MESSAGE_TRANSFER_WORKER_ID}
+DryRun: false
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
+
+Consumer:
+  Driver: ${MESSAGE_TRANSFER_CONSUMER_DRIVER}
+  Topic: ${KAFKA_MESSAGE_EVENTS_TOPIC:-message.events.v1}
+  Group: ${KAFKA_CONSUMER_GROUP:-message-transfer-worker}
+
+Kafka:
+  Brokers: ${KAFKA_BROKERS:-localhost:19092}
+  MessageEventsTopic: ${KAFKA_MESSAGE_EVENTS_TOPIC:-message.events.v1}
+  ConsumerGroup: ${KAFKA_CONSUMER_GROUP:-message-transfer-worker}
+
+Dispatcher:
+  Driver: ${MESSAGE_TRANSFER_DISPATCHER_DRIVER}
+  GatewayEndpoint: ${MESSAGE_TRANSFER_GATEWAY_ENDPOINT}
+
+Worker:
+  PollIntervalMillis: ${MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS}
+  RetryBackoffMillis: ${MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS}
+  MaxAttempts: ${MESSAGE_TRANSFER_MAX_ATTEMPTS}
+
+Observability:
+  Enabled: ${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}
+  Host: ${MESSAGE_TRANSFER_OBSERVABILITY_HOST}
+  Port: ${MESSAGE_TRANSFER_OBSERVABILITY_PORT}
+YAML
+}
+
 write_configs() {
   mkdir -p "${CONFIG_DIR}"
   write_api_config "user-api" "${USER_API_PORT:-8080}" "ObjectStorage:
@@ -217,6 +270,7 @@ GatewayWS:
   write_api_config "groups-api" "${GROUPS_API_PORT:-8085}"
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
   write_auth_rpc_config
+  write_message_transfer_config
 }
 
 build_service() {
@@ -299,6 +353,7 @@ main() {
   start_service "friends-api"
   start_service "message-api"
   start_service "gateway-ws"
+  start_service "message-transfer"
   start_service "groups-api"
   start_service "agent-api"
 
@@ -307,6 +362,9 @@ main() {
   wait_http "friends-api" "http://127.0.0.1:${FRIENDS_API_PORT:-8082}/healthz"
   wait_http "message-api" "http://127.0.0.1:${MESSAGE_API_PORT:-8083}/healthz"
   wait_http "gateway-ws" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
+  if [[ "${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}" == "true" ]]; then
+    wait_http "message-transfer" "http://127.0.0.1:${MESSAGE_TRANSFER_OBSERVABILITY_PORT}/healthz"
+  fi
   wait_http "groups-api" "http://127.0.0.1:${GROUPS_API_PORT:-8085}/healthz"
   wait_http "agent-api" "http://127.0.0.1:${AGENT_API_PORT:-8086}/healthz"
 

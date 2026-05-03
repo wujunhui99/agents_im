@@ -132,6 +132,7 @@ const (
 	PresenceDriverRedis       = "redis"
 	TransferConsumerMemory    = "memory"
 	TransferConsumerKafka     = "kafka"
+	TransferConsumerOutbox    = "outbox"
 	TransferDispatcherNoop    = "noop"
 	TransferDispatcherGateway = "gateway"
 )
@@ -499,6 +500,8 @@ func ResolveTransferConsumerDriver(value string) string {
 	switch value {
 	case TransferConsumerKafka, "redpanda":
 		return TransferConsumerKafka
+	case TransferConsumerOutbox, "postgres_outbox", "postgres-outbox":
+		return TransferConsumerOutbox
 	default:
 		return TransferConsumerMemory
 	}
