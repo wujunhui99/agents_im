@@ -139,10 +139,12 @@ Required middleware/server secret values:
 - `OBJECT_STORAGE_BUCKET`
 - `OBJECT_STORAGE_REGION`
 - `OBJECT_STORAGE_USE_SSL`
+- `OBJECT_STORAGE_EXTERNAL_USE_SSL`
 - `OBJECT_STORAGE_ACCESS_KEY_ID`
 - `OBJECT_STORAGE_SECRET_ACCESS_KEY`
 
 Do not commit real MinIO credentials. The example files contain placeholders only.
+When `OBJECT_STORAGE_EXTERNAL_ENDPOINT` differs from the internal `OBJECT_STORAGE_ENDPOINT`, presigned browser URLs default to HTTPS. Set `OBJECT_STORAGE_EXTERNAL_USE_SSL=false` only for an explicitly HTTP external object-storage endpoint.
 
 ## Public entry
 
