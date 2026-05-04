@@ -14,11 +14,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
+	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/svc"
 )
@@ -109,6 +112,55 @@ func TestWebSocketQueryTokenAuthCanBeEnabled(t *testing.T) {
 	_ = conn.Close()
 }
 
+func TestWebSocketHandshakeRejectsInactiveSessionToken(t *testing.T) {
+	auth := testAuthConfig()
+	manager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
+	sessionRepo := authrepo.NewMemoryRepository()
+	userID := "usr_ws_active_session"
+	if _, err := sessionRepo.Create(context.Background(), authmodel.Credential{
+		Identifier:   userID,
+		UserID:       userID,
+		PasswordHash: "hash",
+		HashVersion:  authmodel.PasswordHashVersionBcrypt,
+	}); err != nil {
+		t.Fatalf("create auth credential: %v", err)
+	}
+	inactiveToken, _, err := manager.Issue(userID, userID)
+	if err != nil {
+		t.Fatalf("issue inactive token: %v", err)
+	}
+	activeToken, activeClaims, err := manager.Issue(userID, userID)
+	if err != nil {
+		t.Fatalf("issue active token: %v", err)
+	}
+	if err := sessionRepo.SetActiveSession(context.Background(), authmodel.ActiveSession{
+		UserID:    activeClaims.UserID,
+		SessionID: activeClaims.SessionID,
+		IssuedAt:  activeClaims.IssuedAt,
+		ExpiresAt: activeClaims.ExpiresAt,
+	}); err != nil {
+		t.Fatalf("store active session: %v", err)
+	}
+
+	_, server, cleanup := newWSTestServer(t, WithTokenManager(manager), WithActiveSessionRepository(sessionRepo))
+	defer cleanup()
+
+	inactiveConn, inactiveResp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), bearerHeader(inactiveToken))
+	if err == nil {
+		_ = inactiveConn.Close()
+		t.Fatal("inactive-session websocket dial succeeded")
+	}
+	if responseStatus(inactiveResp) != http.StatusUnauthorized {
+		t.Fatalf("inactive-session status = %v, want 401", responseStatus(inactiveResp))
+	}
+
+	activeConn, activeResp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), bearerHeader(activeToken))
+	if err != nil {
+		t.Fatalf("active-session websocket dial: status=%v err=%v", responseStatus(activeResp), err)
+	}
+	_ = activeConn.Close()
+}
+
 func TestWebSocketPingLoopSendsPingFrames(t *testing.T) {
 	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
 		PingIntervalSeconds:       1,
@@ -181,6 +233,126 @@ func TestWebSocketCommandRateLimitReturnsErrorEnvelope(t *testing.T) {
 	}
 	if second.RequestID != "req-rate-2" || second.Type != CommandHeartbeat || second.Error.Code != "RATE_LIMITED" {
 		t.Fatalf("unexpected rate limit error envelope: %+v", second)
+	}
+}
+
+func TestWebSocketLaterConnectionReplacesExistingUserConnection(t *testing.T) {
+	app, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
+		PingIntervalSeconds:       30,
+		HeartbeatTimeoutSeconds:   75,
+		CommandRateLimitPerSecond: 100,
+		CommandRateLimitBurst:     100,
+	}))
+	defer cleanup()
+
+	userID := "usr_single_ws"
+	first, firstResp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), authHeader(t, userID))
+	if err != nil {
+		t.Fatalf("first websocket dial: status=%v err=%v", responseStatus(firstResp), err)
+	}
+	defer first.Close()
+
+	second, secondResp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), authHeader(t, userID))
+	if err != nil {
+		t.Fatalf("second websocket dial: status=%v err=%v", responseStatus(secondResp), err)
+	}
+	defer second.Close()
+
+	if !waitForCondition(2*time.Second, func() bool {
+		return app.Connections().UserCount(userID) == 1
+	}) {
+		t.Fatalf("user connection count = %d, want 1 after later connection replaces older connection", app.Connections().UserCount(userID))
+	}
+
+	if err := first.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set first websocket read deadline: %v", err)
+	}
+	_, _, err = first.ReadMessage()
+	if !websocket.IsCloseError(err, CloseCodeSessionReplaced) {
+		t.Fatalf("older connection read error = %v, want close code %d", err, CloseCodeSessionReplaced)
+	}
+}
+
+func TestWebSocketHeartbeatTimeoutUnregistersPresence(t *testing.T) {
+	store := presence.NewMemoryStore()
+	app, server, cleanup := newWSTestServer(t,
+		WithPresenceStore(store),
+		WithPresenceTTL(5*time.Second),
+		WithGatewayWSConfig(config.GatewayWSConfig{
+			PingIntervalSeconds:       30,
+			HeartbeatTimeoutSeconds:   1,
+			CommandRateLimitPerSecond: 100,
+			CommandRateLimitBurst:     100,
+		}),
+	)
+	defer cleanup()
+
+	userID := "usr_timeout_presence"
+	conn, resp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), authHeader(t, userID))
+	if err != nil {
+		t.Fatalf("websocket dial: status=%v err=%v", responseStatus(resp), err)
+	}
+	defer conn.Close()
+
+	if !waitForCondition(2*time.Second, func() bool {
+		online, err := store.IsUserOnline(context.Background(), userID)
+		return err == nil && online && app.Connections().UserCount(userID) == 1
+	}) {
+		online, _ := store.IsUserOnline(context.Background(), userID)
+		t.Fatalf("user should become online after websocket register, online=%v count=%d", online, app.Connections().UserCount(userID))
+	}
+
+	if !waitForCondition(4*time.Second, func() bool {
+		online, err := store.IsUserOnline(context.Background(), userID)
+		return err == nil && !online && app.Connections().UserCount(userID) == 0
+	}) {
+		online, _ := store.IsUserOnline(context.Background(), userID)
+		t.Fatalf("user should be offline after heartbeat timeout, online=%v count=%d", online, app.Connections().UserCount(userID))
+	}
+}
+
+func TestGatewayInternalUserPresenceEndpointReportsOnlineState(t *testing.T) {
+	store := presence.NewMemoryStore()
+	app, server, cleanup := newWSTestServer(t,
+		WithPresenceStore(store),
+		WithPresenceTTL(5*time.Second),
+		WithGatewayWSConfig(config.GatewayWSConfig{
+			PingIntervalSeconds:       30,
+			HeartbeatTimeoutSeconds:   75,
+			CommandRateLimitPerSecond: 100,
+			CommandRateLimitBurst:     100,
+		}),
+	)
+	defer cleanup()
+
+	internalMux := http.NewServeMux()
+	internalMux.HandleFunc("/internal/presence/user", app.HandleInternalUserPresence)
+	internalServer := httptest.NewServer(internalMux)
+	defer internalServer.Close()
+
+	userID := "usr_presence_endpoint"
+	offline := fetchPresenceState(t, internalServer.URL, userID)
+	if offline.UserID != userID || offline.Online {
+		t.Fatalf("initial presence state = %+v, want offline", offline)
+	}
+
+	conn, resp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), authHeader(t, userID))
+	if err != nil {
+		t.Fatalf("websocket dial: status=%v err=%v", responseStatus(resp), err)
+	}
+	defer conn.Close()
+
+	if !waitForCondition(2*time.Second, func() bool {
+		return fetchPresenceState(t, internalServer.URL, userID).Online
+	}) {
+		t.Fatalf("presence endpoint did not report user online")
+	}
+
+	_ = conn.Close()
+	if !waitForCondition(2*time.Second, func() bool {
+		return !fetchPresenceState(t, internalServer.URL, userID).Online
+	}) {
+		t.Fatalf("presence endpoint did not report user offline after close")
 	}
 }
 
@@ -326,8 +498,12 @@ func assertSendOK(t *testing.T, resp responseFrame, deduplicated bool) gateway.S
 func authHeader(t *testing.T, userID string) http.Header {
 	t.Helper()
 
+	return bearerHeader(rawTokenForUser(t, userID))
+}
+
+func bearerHeader(rawToken string) http.Header {
 	header := http.Header{}
-	header.Set("Authorization", "Bearer "+rawTokenForUser(t, userID))
+	header.Set("Authorization", "Bearer "+rawToken)
 	return header
 }
 
@@ -386,6 +562,40 @@ func readTestResponse(t *testing.T, conn *websocket.Conn) responseFrame {
 		t.Fatalf("read websocket test response: %v", err)
 	}
 	return resp
+}
+
+type presenceStateResponse struct {
+	UserID string `json:"user_id"`
+	Online bool   `json:"online"`
+}
+
+func fetchPresenceState(t *testing.T, serverURL string, userID string) presenceStateResponse {
+	t.Helper()
+
+	resp, err := http.Get(serverURL + "/internal/presence/user?user_id=" + url.QueryEscape(userID))
+	if err != nil {
+		t.Fatalf("fetch presence state: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("presence state status = %d", resp.StatusCode)
+	}
+	var state presenceStateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&state); err != nil {
+		t.Fatalf("decode presence state: %v", err)
+	}
+	return state
+}
+
+func waitForCondition(timeout time.Duration, condition func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return condition()
 }
 
 func responseStatus(resp *http.Response) int {

@@ -86,3 +86,25 @@ func TestMemoryStoreRejectsInvalidAndExpiredConnections(t *testing.T) {
 		t.Fatalf("expected expired connection to be missing, got %v", err)
 	}
 }
+
+func TestMemoryStoreIsUserOnlineExpiresAfterTTL(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	ttl := 5 * time.Millisecond
+
+	if err := store.RegisterConnection(ctx, ConnectionMetadata{UserID: "user_ttl", ConnectionID: "conn_ttl"}, ttl); err != nil {
+		t.Fatalf("register short lived connection: %v", err)
+	}
+	if online, err := store.IsUserOnline(ctx, "user_ttl"); err != nil || !online {
+		t.Fatalf("user should initially be online, online=%v err=%v", online, err)
+	}
+
+	time.Sleep(ttl + time.Millisecond)
+	online, err := store.IsUserOnline(ctx, "user_ttl")
+	if err != nil {
+		t.Fatalf("online lookup after ttl: %v", err)
+	}
+	if online {
+		t.Fatal("user should be offline after presence ttl expires")
+	}
+}
