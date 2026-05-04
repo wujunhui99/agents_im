@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/config"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
 	"github.com/wujunhui99/agents_im/internal/health"
@@ -64,10 +65,20 @@ func main() {
 		gatewayws.WithInstanceID(gatewayInstanceID()),
 		gatewayws.WithGatewayWSConfig(cfg.GatewayWS),
 	)
+	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
+		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+		if err != nil {
+			log.Fatalf("build auth repository: %v", err)
+		}
+		gatewayws.WithActiveSessionRepository(authRepo)(wsServer)
+	} else {
+		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", config.ResolveStorageDriver(cfg.StorageDriver))
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/ws", wsServer)
 	mux.HandleFunc("/internal/delivery/conversation", wsServer.HandleInternalConversationDelivery)
+	mux.HandleFunc("/internal/presence/user", wsServer.HandleInternalUserPresence)
 	mux.HandleFunc("/healthz", health.LivenessHandler(cfg.Name))
 	mux.HandleFunc("/readyz", health.ReadinessHandler(cfg.Name, func(*http.Request) []health.Check {
 		return []health.Check{

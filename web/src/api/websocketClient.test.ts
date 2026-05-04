@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createMessageWebSocketClient,
   type WebSocketAck,
@@ -32,6 +32,14 @@ class FakeWebSocket implements WebSocketLike {
 }
 
 describe('message WebSocket client', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('uses token query fallback, sends command envelopes, and parses ACK envelopes', () => {
     const sockets: FakeWebSocket[] = [];
     const acks: WebSocketAck[] = [];
@@ -97,5 +105,60 @@ describe('message WebSocket client', () => {
 
     client.close();
     expect(sockets[0].closed).toBe(true);
+  });
+
+  it('sends heartbeat commands and closes when heartbeat ACK is missed', () => {
+    const sockets: FakeWebSocket[] = [];
+    const heartbeatTimeouts: string[] = [];
+    const webSocketFactory: WebSocketFactory = (url) => {
+      const socket = new FakeWebSocket(url);
+      sockets.push(socket);
+      return socket;
+    };
+    const requestIds = ['heartbeat-1', 'heartbeat-2'];
+    const client = createMessageWebSocketClient({
+      url: 'ws://127.0.0.1:8084/ws',
+      token: '***',
+      webSocketFactory,
+      heartbeatIntervalMs: 1000,
+      heartbeatAckTimeoutMs: 500,
+      requestIdFactory: () => requestIds.shift() ?? 'heartbeat-extra',
+      onHeartbeatTimeout: (requestId) => heartbeatTimeouts.push(requestId),
+    });
+
+    client.connect();
+    sockets[0].onopen?.(new Event('open'));
+
+    vi.advanceTimersByTime(1000);
+    expect(JSON.parse(sockets[0].sent[0])).toEqual({
+      requestId: 'heartbeat-1',
+      command: 'heartbeat',
+      payload: {},
+    });
+
+    sockets[0].emitMessage({
+      requestId: 'heartbeat-1',
+      type: 'heartbeat',
+      status: 'ok',
+      data: {
+        connection_id: 'conn_test',
+      },
+    });
+    vi.advanceTimersByTime(500);
+    expect(sockets[0].closed).toBe(false);
+
+    vi.advanceTimersByTime(500);
+    expect(JSON.parse(sockets[0].sent[1])).toEqual({
+      requestId: 'heartbeat-2',
+      command: 'heartbeat',
+      payload: {},
+    });
+
+    vi.advanceTimersByTime(499);
+    expect(sockets[0].closed).toBe(false);
+    vi.advanceTimersByTime(1);
+
+    expect(sockets[0].closed).toBe(true);
+    expect(heartbeatTimeouts).toEqual(['heartbeat-2']);
   });
 });

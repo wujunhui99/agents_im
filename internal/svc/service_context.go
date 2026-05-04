@@ -1,6 +1,7 @@
 package svc
 
 import (
+	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/objectstorage"
@@ -9,6 +10,7 @@ import (
 
 type ServiceContext struct {
 	Auth             config.JWTAuthConfig
+	AuthSessions     authrepo.ActiveSessionRepository
 	AccountLogic     *logic.AccountLogic
 	UserLogic        *logic.UserLogic
 	FriendsLogic     *logic.FriendsLogic

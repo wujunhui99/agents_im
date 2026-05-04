@@ -2,8 +2,10 @@ package token
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"time"
@@ -14,6 +16,7 @@ import (
 type Claims struct {
 	UserID     string
 	Identifier string
+	SessionID  string
 	IssuedAt   time.Time
 	ExpiresAt  time.Time
 }
@@ -64,9 +67,14 @@ func (m *HMACTokenManager) Issue(userID string, identifier string) (string, Clai
 	}
 
 	issuedAt := m.now().UTC()
+	sessionID, err := newSessionID()
+	if err != nil {
+		return "", Claims{}, err
+	}
 	claims := Claims{
 		UserID:     userID,
 		Identifier: identifier,
+		SessionID:  sessionID,
 		IssuedAt:   issuedAt,
 		ExpiresAt:  issuedAt.Add(m.ttl),
 	}
@@ -78,6 +86,7 @@ func (m *HMACTokenManager) Issue(userID string, identifier string) (string, Clai
 	payloadSegment, err := encodeJSON(tokenPayload{
 		UserID:     claims.UserID,
 		Identifier: claims.Identifier,
+		SessionID:  claims.SessionID,
 		IssuedAt:   claims.IssuedAt.Unix(),
 		ExpiresAt:  claims.ExpiresAt.Unix(),
 	})
@@ -130,6 +139,7 @@ func (m *HMACTokenManager) Parse(raw string) (Claims, error) {
 	return Claims{
 		UserID:     payload.UserID,
 		Identifier: payload.Identifier,
+		SessionID:  payload.SessionID,
 		IssuedAt:   time.Unix(payload.IssuedAt, 0).UTC(),
 		ExpiresAt:  time.Unix(payload.ExpiresAt, 0).UTC(),
 	}, nil
@@ -156,6 +166,7 @@ type tokenHeader struct {
 type tokenPayload struct {
 	UserID     string `json:"user_id"`
 	Identifier string `json:"identifier"`
+	SessionID  string `json:"sid,omitempty"`
 	IssuedAt   int64  `json:"iat"`
 	ExpiresAt  int64  `json:"exp"`
 }
@@ -180,4 +191,12 @@ func sign(signingInput string, secret []byte) []byte {
 	mac := hmac.New(sha256.New, secret)
 	_, _ = mac.Write([]byte(signingInput))
 	return mac.Sum(nil)
+}
+
+func newSessionID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", apperror.Internal("session id generation failed")
+	}
+	return "sid_" + hex.EncodeToString(b[:]), nil
 }

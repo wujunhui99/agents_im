@@ -20,3 +20,15 @@ type Credential struct {
 func (c Credential) Clone() Credential {
 	return c
 }
+
+type ActiveSession struct {
+	UserID    string
+	SessionID string
+	IssuedAt  time.Time
+	ExpiresAt time.Time
+	UpdatedAt time.Time
+}
+
+func (s ActiveSession) Clone() ActiveSession {
+	return s
+}

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 
+	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/handler"
 	"github.com/wujunhui99/agents_im/internal/objectstorage"
@@ -41,6 +42,15 @@ func main() {
 		log.Fatalf("ensure object storage bucket: %v", err)
 	}
 	serviceContext := svc.NewUserServiceContextWithMedia(repo, mediaRepo, objectStore, cfg.ObjectStorage.Bucket, cfg.Auth)
+	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
+		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+		if err != nil {
+			log.Fatalf("build auth repository: %v", err)
+		}
+		serviceContext.AuthSessions = authRepo
+	} else {
+		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", config.ResolveStorageDriver(cfg.StorageDriver))
+	}
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
 	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()
