@@ -126,6 +126,63 @@ func TestAuthLogicRegisterThenLoginWithPersistentBcryptCredentialShape(t *testin
 	assertLooksLikeJWT(t, loggedIn.Token)
 }
 
+func TestAuthLogicLoginReplacesActiveSession(t *testing.T) {
+	ctx := context.Background()
+	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
+	now := time.Date(2026, 5, 4, 9, 0, 0, 0, time.UTC)
+	authLogic := authlogic.NewAuthLogic(
+		authrepo.NewMemoryRepository(),
+		useradapter.NewLogicClient(userLogic),
+		authlogic.NewPasswordHasher(),
+		token.NewHMACTokenManagerWithClock("test-secret", time.Hour, func() time.Time {
+			return now
+		}),
+	)
+
+	_, err := authLogic.Register(ctx, authlogic.RegisterRequest{
+		Identifier:  "Single_Device_001",
+		Password:    "correct-password",
+		DisplayName: "Single Device",
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	now = now.Add(time.Second)
+	firstLogin, err := authLogic.Login(ctx, authlogic.LoginRequest{
+		Identifier: "single_device_001",
+		Password:   "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("first login: %v", err)
+	}
+
+	now = now.Add(time.Second)
+	secondLogin, err := authLogic.Login(ctx, authlogic.LoginRequest{
+		Identifier: "single_device_001",
+		Password:   "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("second login: %v", err)
+	}
+	if firstLogin.Token == secondLogin.Token {
+		t.Fatal("two successful logins should issue distinct active sessions")
+	}
+
+	_, err = authLogic.ValidateToken(ctx, authlogic.ValidateTokenRequest{Token: firstLogin.Token})
+	if err == nil || apperror.From(err).Code != apperror.CodeUnauthenticated {
+		t.Fatalf("first login token validation error = %v, want UNAUTHENTICATED", err)
+	}
+
+	validated, err := authLogic.ValidateToken(ctx, authlogic.ValidateTokenRequest{Token: secondLogin.Token})
+	if err != nil {
+		t.Fatalf("second login token should remain valid: %v", err)
+	}
+	if !validated.Valid || validated.UserID != secondLogin.UserID || validated.Identifier != secondLogin.Identifier {
+		t.Fatalf("unexpected active token validation response: %+v", validated)
+	}
+}
+
 func TestAuthTokenExpires(t *testing.T) {
 	now := time.Date(2026, 4, 29, 12, 0, 0, 0, time.UTC)
 	manager := token.NewHMACTokenManagerWithClock("test-secret", time.Second, func() time.Time {
@@ -249,6 +306,61 @@ func TestAuthIssuedBearerTokenAccessesMe(t *testing.T) {
 	}
 }
 
+func TestProtectedRoutesRejectInactiveSessionToken(t *testing.T) {
+	authConfig := testJWTAuthConfig()
+	accountRepo := userrepo.NewMemoryRepository()
+	userLogic := userlogic.NewUserLogic(accountRepo)
+	credentialRepo := authrepo.NewMemoryRepository()
+	authLogic := authlogic.NewAuthLogic(
+		credentialRepo,
+		useradapter.NewLogicClient(userLogic),
+		authlogic.NewPasswordHasher(),
+		token.NewHMACTokenManager(authConfig.AccessSecret, time.Duration(authConfig.AccessExpire)*time.Second),
+	)
+	userServiceContext := rootsvc.NewServiceContextWithAuth(accountRepo, authConfig)
+	userServiceContext.AuthSessions = credentialRepo
+	userMux := newUserGoZeroRouter(t, userServiceContext)
+
+	_, err := authLogic.Register(context.Background(), authlogic.RegisterRequest{
+		Identifier:  "protected_single_device",
+		Password:    "correct-password",
+		DisplayName: "Protected Single Device",
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	firstLogin, err := authLogic.Login(context.Background(), authlogic.LoginRequest{
+		Identifier: "protected_single_device",
+		Password:   "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("first login: %v", err)
+	}
+	secondLogin, err := authLogic.Login(context.Background(), authlogic.LoginRequest{
+		Identifier: "protected_single_device",
+		Password:   "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("second login: %v", err)
+	}
+
+	inactiveResp := httptest.NewRecorder()
+	inactiveReq := httptest.NewRequest(http.MethodGet, "/me", nil)
+	inactiveReq.Header.Set("Authorization", "Bearer "+firstLogin.Token)
+	userMux.ServeHTTP(inactiveResp, inactiveReq)
+	if inactiveResp.Code != http.StatusUnauthorized {
+		t.Fatalf("inactive /me status = %d, body = %s", inactiveResp.Code, inactiveResp.Body.String())
+	}
+
+	activeResp := httptest.NewRecorder()
+	activeReq := httptest.NewRequest(http.MethodGet, "/me", nil)
+	activeReq.Header.Set("Authorization", "Bearer "+secondLogin.Token)
+	userMux.ServeHTTP(activeResp, activeReq)
+	if activeResp.Code != http.StatusOK {
+		t.Fatalf("active /me status = %d, body = %s", activeResp.Code, activeResp.Body.String())
+	}
+}
+
 func newAuthLogic(userLogic *userlogic.UserLogic) *authlogic.AuthLogic {
 	return authlogic.NewAuthLogic(
 		authrepo.NewMemoryRepository(),
@@ -262,6 +374,7 @@ type postgresShapeCredentialRepository struct {
 	mu           sync.RWMutex
 	byIdentifier map[string]postgresShapeCredential
 	byUserID     map[string]string
+	sessions     map[string]authmodel.ActiveSession
 	now          func() time.Time
 }
 
@@ -278,6 +391,7 @@ func newPostgresShapeCredentialRepository() *postgresShapeCredentialRepository {
 	return &postgresShapeCredentialRepository{
 		byIdentifier: make(map[string]postgresShapeCredential),
 		byUserID:     make(map[string]string),
+		sessions:     make(map[string]authmodel.ActiveSession),
 		now:          time.Now,
 	}
 }
@@ -316,6 +430,29 @@ func (r *postgresShapeCredentialRepository) GetByIdentifier(_ context.Context, i
 		return authmodel.Credential{}, apperror.NotFound("auth credential not found")
 	}
 	return row.credential(), nil
+}
+
+func (r *postgresShapeCredentialRepository) SetActiveSession(_ context.Context, session authmodel.ActiveSession) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.byUserID[session.UserID]; !exists {
+		return apperror.NotFound("auth credential not found")
+	}
+	session.UpdatedAt = r.now().UTC()
+	r.sessions[session.UserID] = session.Clone()
+	return nil
+}
+
+func (r *postgresShapeCredentialRepository) GetActiveSession(_ context.Context, userID string) (authmodel.ActiveSession, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	session, exists := r.sessions[userID]
+	if !exists {
+		return authmodel.ActiveSession{}, apperror.NotFound("active session not found")
+	}
+	return session.Clone(), nil
 }
 
 func (r postgresShapeCredential) credential() authmodel.Credential {
