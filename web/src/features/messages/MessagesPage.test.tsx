@@ -215,6 +215,38 @@ describe('MessagesPage real API mode', () => {
     expect(messageApi.getConversationSeqs).toHaveBeenCalledTimes(1);
   });
 
+  it('renders JSON text payloads from live websocket message_received events as plain text', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([]);
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        contactsApi={createContactsApi()}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_live_json_text', seq: 1, content: '{"text":"1"}' }));
+    });
+
+    const row = await screen.findByRole('button', { name: /未知联系人/ });
+    expect(within(row).getByText('1', { selector: 'p' })).toBeInTheDocument();
+    expect(within(row).queryByText('{"text":"1"}')).not.toBeInTheDocument();
+
+    await user.click(row);
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    expect(within(log).getByText('1')).toBeInTheDocument();
+    expect(within(log).queryByText('{"text":"1"}')).not.toBeInTheDocument();
+  });
+
   it('keeps the peer as the send target after an incoming live message in an open single chat', async () => {
     const user = userEvent.setup();
     const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({
