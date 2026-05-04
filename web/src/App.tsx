@@ -4,6 +4,7 @@ import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
 import { createApiClient } from './api/client';
 import { createContactsApi, type ContactsApi } from './api/contacts';
+import { createMediaApi, type MediaApi } from './api/media';
 import { createMessageApi, type MessageApi } from './api/messages';
 import { createUserApi, type UserApi, type UserProfile, type UserProfilePatch } from './api/user';
 import ContactsPage from './components/ContactsPage';
@@ -79,6 +80,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
     [session?.token],
   );
   const messageApi = useMemo(() => createMessageApi(authedApiClient), [authedApiClient]);
+  const mediaApi = useMemo(() => createMediaApi(authedApiClient), [authedApiClient]);
   const contactsApi = useMemo(() => createContactsApi(authedApiClient), [authedApiClient]);
 
   async function updateProfile(patch: UserProfilePatch) {
@@ -143,6 +145,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
                   effectiveUserApi,
                   contactsApi,
                   messageApi,
+                  mediaApi,
                   webSocketToken ?? session?.token,
                   startChatSignal,
                   pendingChatProfile,
@@ -324,6 +327,7 @@ function renderPage(
   userApi: UserApi,
   contactsApi: ContactsApi,
   messageApi: MessageApi,
+  mediaApi: MediaApi,
   webSocketToken: string | undefined,
   startChatSignal: number,
   pendingChatProfile: UserProfile | null,
@@ -336,6 +340,7 @@ function renderPage(
         currentUserId={currentUser.user_id}
         userApi={userApi}
         messageApi={messageApi}
+        mediaApi={mediaApi}
         contactsApi={contactsApi}
         webSocketToken={webSocketToken}
         startChatSignal={startChatSignal}

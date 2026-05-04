@@ -1020,6 +1020,16 @@ button.md-list-item:hover,
   color: var(--md-sys-color-error);
 }
 
+.message-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-attachment svg {
+  flex: 0 0 auto;
+}
+
 .message-composer {
   min-height: 64px;
   display: flex;
@@ -1028,6 +1038,27 @@ button.md-list-item:hover,
   padding: 8px 10px 10px;
   background: var(--md-sys-color-surface-container-low);
   border-top: 1px solid rgba(113, 122, 117, 0.18);
+}
+
+.message-attachment-button {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--md-shape-corner-full);
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+}
+
+.message-attachment-button:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary), transparent 90%);
+}
+
+.message-attachment-button.is-disabled {
+  cursor: default;
+  opacity: 0.48;
 }
 
 .message-composer-field {

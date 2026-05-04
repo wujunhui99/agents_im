@@ -1,7 +1,9 @@
-import { ChevronLeft, MessageCircle, Search, SendHorizontal } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { ChevronLeft, FileText, Image as ImageIcon, MessageCircle, Search, SendHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import type { ContactsApi, Friendship } from '../../api/contacts';
 import { createContactsApi } from '../../api/contacts';
+import type { MediaApi } from '../../api/media';
+import { createMediaApi, uploadMediaBytes } from '../../api/media';
 import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
 import { createMessageApi } from '../../api/messages';
 import type { WebSocketFactory, WebSocketServerEvent } from '../../api/websocketClient';
@@ -17,12 +19,13 @@ import { ListItem } from '../../components/ui/ListItem';
 import { MessageBubble } from '../../components/ui/MessageBubble';
 import { SearchBox } from '../../components/ui/SearchBox';
 import { TextField } from '../../components/ui/TextField';
-import type { ChatMessage, Conversation, MessageStatus } from '../../models/messages';
+import type { ChatMessage, Conversation, MessageContentType, MessageStatus } from '../../models/messages';
 import { UNKNOWN_CONTACT_LABEL, accountTypeLabel, avatarText, profileDisplayName, profileIdentifier } from '../../utils/profileDisplay';
 
 type MessagesPageProps = {
   currentUserId: string;
   messageApi?: MessageApi;
+  mediaApi?: MediaApi;
   contactsApi?: ContactsApi;
   userApi?: UserApi;
   webSocketUrl?: string;
@@ -33,6 +36,20 @@ type MessagesPageProps = {
   onPendingChatConsumed?: () => void;
 };
 
+type AttachmentKind = 'image' | 'file';
+type PendingMessageInput = {
+  contentType: MessageContentType;
+  content: string;
+};
+type ImageDimensions = {
+  width: number;
+  height: number;
+};
+
+const IMAGE_MAX_BYTES = 15 * 1024 * 1024;
+const FILE_MAX_BYTES = 20 * 1024 * 1024;
+const FALLBACK_CONTENT_TYPE = 'application/octet-stream';
+
 const statusLabels: Record<Exclude<MessageStatus, 'sent'>, string> = {
   sending: '发送中',
   failed: '发送失败',
@@ -41,6 +58,7 @@ const statusLabels: Record<Exclude<MessageStatus, 'sent'>, string> = {
 export function MessagesPage({
   currentUserId,
   messageApi: messageApiProp,
+  mediaApi: mediaApiProp,
   contactsApi: contactsApiProp,
   userApi: userApiProp,
   webSocketUrl = '/ws',
@@ -51,14 +69,19 @@ export function MessagesPage({
   onPendingChatConsumed,
 }: MessagesPageProps) {
   const messageApi = useMemo(() => messageApiProp ?? createMessageApi(), [messageApiProp]);
+  const mediaApi = useMemo(() => mediaApiProp ?? createMediaApi(), [mediaApiProp]);
   const contactsApi = useMemo(() => contactsApiProp ?? createContactsApi(), [contactsApiProp]);
   const userApi = useMemo(() => userApiProp ?? createUserApi(), [userApiProp]);
   const [items, setItems] = useState<Conversation[]>([]);
   const [status, setStatus] = useState('正在加载会话');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [showStartChat, setShowStartChat] = useState(false);
+  const [uploadingConversationId, setUploadingConversationId] = useState<string | null>(null);
   const readSyncsInFlight = useRef<Set<string>>(new Set());
   const selectedConversation = items.find((conversation) => conversation.id === selectedConversationId) ?? null;
+  const selectedConversationSending =
+    Boolean(selectedConversation && uploadingConversationId === selectedConversation.id) ||
+    Boolean(selectedConversation && conversationHasInFlightSend(selectedConversation));
 
   useEffect(() => {
     let cancelled = false;
@@ -200,7 +223,7 @@ export function MessagesPage({
       return;
     }
 
-    const pendingMessage = createPendingMessage(selectedConversation, content, currentUserId);
+    const pendingMessage = createPendingMessage(selectedConversation, { contentType: 'text', content }, currentUserId);
     setItems((current) => appendMessage(current, selectedConversation.id, pendingMessage));
 
     void Promise.resolve()
@@ -220,14 +243,79 @@ export function MessagesPage({
       });
   }
 
+  async function handleSendAttachment(file: File, kind: AttachmentKind) {
+    if (!selectedConversation) {
+      return;
+    }
+    if (conversationHasInFlightSend(selectedConversation) || uploadingConversationId === selectedConversation.id) {
+      setStatus('上一条消息发送中');
+      return;
+    }
+
+    const limit = kind === 'image' ? IMAGE_MAX_BYTES : FILE_MAX_BYTES;
+    if (file.size > limit) {
+      setStatus(kind === 'image' ? '图片不能超过 15 MiB' : '文件不能超过 20 MiB');
+      return;
+    }
+
+    const conversationAtStart = selectedConversation;
+    const filename = uploadFilename(file, kind);
+    const contentType = file.type || FALLBACK_CONTENT_TYPE;
+    let pendingMessage: ChatMessage | null = null;
+
+    setUploadingConversationId(conversationAtStart.id);
+    setStatus(kind === 'image' ? '正在上传图片' : '正在上传文件');
+
+    try {
+      const dimensions = kind === 'image' ? await readImageDimensions(file) : undefined;
+      const uploadIntent = await mediaApi.createUploadIntent({
+        purpose: kind === 'image' ? 'message_image' : 'message_file',
+        filename,
+        contentType,
+        sizeBytes: file.size,
+        ...(dimensions ?? {}),
+      });
+      await uploadMediaBytes(uploadIntent.uploadUrl, file, contentType);
+      const completed = await mediaApi.completeUpload(uploadIntent.mediaId);
+      const mediaId = completed.media?.mediaId ?? uploadIntent.mediaId;
+      const content =
+        kind === 'image'
+          ? JSON.stringify({ mediaId, filename, ...(dimensions ?? {}) })
+          : JSON.stringify({ mediaId, filename, sizeBytes: file.size, contentType });
+
+      const nextPendingMessage = createPendingMessage(conversationAtStart, { contentType: kind, content }, currentUserId);
+      pendingMessage = nextPendingMessage;
+      setItems((current) => appendMessage(current, conversationAtStart.id, nextPendingMessage));
+
+      const sentMessage = await sendMessageWithApi(messageApi, nextPendingMessage);
+      setItems((current) => confirmSentMessage(current, conversationAtStart.id, nextPendingMessage.id, sentMessage));
+      setSelectedConversationId(sentMessage.conversationId);
+      setStatus(kind === 'image' ? '图片已发送' : '文件已发送');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '发送附件失败');
+      if (pendingMessage) {
+        const failedMessage = pendingMessage;
+        setItems((current) =>
+          updateMessage(current, conversationAtStart.id, failedMessage.id, {
+            ...failedMessage,
+            status: 'failed',
+          }),
+        );
+      }
+    } finally {
+      setUploadingConversationId((current) => (current === conversationAtStart.id ? null : current));
+    }
+  }
+
   if (selectedConversation) {
     return (
       <ChatWindow
         conversation={selectedConversation}
         onBack={() => setSelectedConversationId(null)}
         onSend={handleSend}
+        onSendAttachment={handleSendAttachment}
         status={status}
-        sending={conversationHasInFlightSend(selectedConversation)}
+        sending={selectedConversationSending}
       />
     );
   }
@@ -412,12 +500,14 @@ function ChatWindow({
   conversation,
   onBack,
   onSend,
+  onSendAttachment,
   status,
   sending,
 }: {
   conversation: Conversation;
   onBack: () => void;
   onSend: (content: string) => void;
+  onSendAttachment: (file: File, kind: AttachmentKind) => void;
   status: string;
   sending: boolean;
 }) {
@@ -448,14 +538,14 @@ function ChatWindow({
                 direction={message.direction}
                 status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
               >
-                {message.content}
+                {renderMessageContent(message)}
               </MessageBubble>
             </div>
           </article>
         ))}
       </div>
 
-      <SendMessageComposer onSend={onSend} sending={sending} />
+      <SendMessageComposer onSend={onSend} onSendAttachment={onSendAttachment} sending={sending} />
     </section>
   );
 }
@@ -477,11 +567,19 @@ function renderOutgoingMessageStatus(message: ChatMessage, hasReadSeq: number | 
   return <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>;
 }
 
-function SendMessageComposer({ onSend, sending }: { onSend: (content: string) => void; sending: boolean }) {
+function SendMessageComposer({
+  onSend,
+  onSendAttachment,
+  sending,
+}: {
+  onSend: (content: string) => void;
+  onSendAttachment: (file: File, kind: AttachmentKind) => void;
+  sending: boolean;
+}) {
   const [draft, setDraft] = useState('');
   const trimmedDraft = draft.trim();
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sending || !trimmedDraft) {
       return;
@@ -491,9 +589,41 @@ function SendMessageComposer({ onSend, sending }: { onSend: (content: string) =>
     setDraft('');
   }
 
+  function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>, kind: AttachmentKind) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file || sending) {
+      return;
+    }
+    onSendAttachment(file, kind);
+  }
+
   return (
     <form className="message-composer" aria-label="发送消息" onSubmit={handleSubmit}>
-<TextField
+      <label className={`message-attachment-button${sending ? ' is-disabled' : ''}`} title="发送图片">
+        <ImageIcon size={18} />
+        <span className="sr-only">发送图片</span>
+        <input
+          className="sr-only"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/*"
+          aria-label="发送图片"
+          disabled={sending}
+          onChange={(event) => handleAttachmentChange(event, 'image')}
+        />
+      </label>
+      <label className={`message-attachment-button${sending ? ' is-disabled' : ''}`} title="发送文件">
+        <FileText size={18} />
+        <span className="sr-only">发送文件</span>
+        <input
+          className="sr-only"
+          type="file"
+          aria-label="发送文件"
+          disabled={sending}
+          onChange={(event) => handleAttachmentChange(event, 'file')}
+        />
+      </label>
+      <TextField
         label="输入消息"
         hideLabel
         value={draft}
@@ -628,7 +758,7 @@ function conversationStateToView(state: ConversationSeqState, currentUserId: str
     id: state.conversationId,
     title,
     avatar: avatarText(title),
-    preview: lastMessage?.content ?? '暂无消息',
+    preview: lastMessage ? messageDisplayText(lastMessage) : '暂无消息',
     previewOrigin: lastMessage?.messageOrigin,
     time: state.maxSeqTime ? '刚刚' : '',
     unread: state.unreadCount ?? 0,
@@ -651,7 +781,7 @@ function appendMessage(conversations: Conversation[], conversationId: string, me
     const nextMessages = canonicalChatMessages([...conversation.messages, message]);
     return {
       ...conversation,
-      preview: conversationPreview(nextMessages, message.content),
+      preview: conversationPreview(nextMessages, messageDisplayText(message)),
       previewOrigin: message.messageOrigin,
       time: '刚刚',
       unread: 0,
@@ -674,7 +804,7 @@ function updateMessage(conversations: Conversation[], conversationId: string, me
     const nextMessages = upsertCanonicalMessage(conversation.messages, messageId, nextMessage);
     return {
       ...conversation,
-      preview: conversationPreview(nextMessages, nextMessage.content),
+      preview: conversationPreview(nextMessages, messageDisplayText(nextMessage)),
       time: '刚刚',
       maxSeq: nextConversationMaxSeq(conversation, nextMessage),
       messages: nextMessages,
@@ -693,7 +823,7 @@ function upsertLiveServerMessage(conversations: Conversation[], message: ChatMes
     return {
       ...conversation,
       id: message.conversationId,
-      preview: conversationPreview(nextMessages, message.content),
+      preview: conversationPreview(nextMessages, messageDisplayText(message)),
       previewOrigin: message.messageOrigin,
       time: '刚刚',
       unread: message.direction === 'incoming' ? conversation.unread + 1 : conversation.unread,
@@ -718,7 +848,7 @@ function liveMessageToConversation(message: ChatMessage): Conversation {
     id: message.conversationId,
     title,
     avatar: avatarText(title),
-    preview: message.content,
+    preview: messageDisplayText(message),
     previewOrigin: message.messageOrigin,
     time: '刚刚',
     unread: message.direction === 'incoming' ? 1 : 0,
@@ -765,7 +895,7 @@ function confirmSentMessage(conversations: Conversation[], conversationId: strin
     return {
       ...conversation,
       id: nextMessage.conversationId,
-      preview: nextMessage.content,
+      preview: messageDisplayText(nextMessage),
       previewOrigin: nextMessage.messageOrigin,
       time: '刚刚',
       unread: 0,
@@ -788,7 +918,7 @@ function markConversationRead(conversations: Conversation[], conversationId: str
   });
 }
 
-function createPendingMessage(conversation: Conversation, content: string, currentUserId: string): ChatMessage {
+function createPendingMessage(conversation: Conversation, messageInput: PendingMessageInput, currentUserId: string): ChatMessage {
   const now = Date.now();
   const clientMsgId = `web-${now}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -800,8 +930,8 @@ function createPendingMessage(conversation: Conversation, content: string, curre
     receiverId: conversation.receiverId,
     groupId: conversation.groupId,
     chatType: conversation.chatType,
-    contentType: 'text',
-    content,
+    contentType: messageInput.contentType,
+    content: messageInput.content,
     messageOrigin: 'human',
     sendTime: now,
     direction: 'outgoing',
@@ -859,7 +989,7 @@ function webSocketEventToServerMessage(event: WebSocketServerEvent): ServerMessa
     receiverId: stringField(data, 'receiverId', 'receiver_id'),
     groupId: stringField(data, 'groupId', 'group_id'),
     chatType: chatType === 'group' ? 'group' : 'single',
-    contentType: contentType === 'text' ? 'text' : 'text',
+    contentType: parseMessageContentType(contentType),
     content,
     messageOrigin: messageOriginField(data),
     agentAccountId: stringField(data, 'agentAccountId', 'agent_account_id'),
@@ -913,6 +1043,10 @@ function messageOriginField(value: Record<string, unknown>) {
   return origin === 'ai' || origin === 'system' || origin === 'human' ? origin : undefined;
 }
 
+function parseMessageContentType(contentType: string): MessageContentType {
+  return contentType === 'image' || contentType === 'file' ? contentType : 'text';
+}
+
 function serverMessageToChatMessage(message: ServerMessage, currentUserId: string): ChatMessage {
   return {
     id: message.serverMsgId,
@@ -955,6 +1089,101 @@ function normalizeMessageContent(contentType: ServerMessage['contentType'], cont
   return content;
 }
 
+function renderMessageContent(message: ChatMessage) {
+  if (message.contentType === 'image') {
+    return (
+      <span className="message-attachment message-attachment-image">
+        <ImageIcon size={16} />
+        <span>{messageDisplayText(message)}</span>
+      </span>
+    );
+  }
+
+  if (message.contentType === 'file') {
+    return (
+      <span className="message-attachment message-attachment-file">
+        <FileText size={16} />
+        <span>{messageDisplayText(message)}</span>
+      </span>
+    );
+  }
+
+  return message.content;
+}
+
+function messageDisplayText(message: ChatMessage) {
+  if (message.contentType === 'image') {
+    const payload = parseContentObject(message.content);
+    const filename = payload ? stringField(payload, 'filename') : undefined;
+    return filename ? `图片 ${filename}` : '图片消息';
+  }
+
+  if (message.contentType === 'file') {
+    const payload = parseContentObject(message.content);
+    const filename = payload ? stringField(payload, 'filename') : undefined;
+    return filename ? `文件 ${filename}` : '文件消息';
+  }
+
+  return message.content;
+}
+
+function parseContentObject(content: string) {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function uploadFilename(file: File, kind: AttachmentKind) {
+  const fallback = kind === 'image' ? 'image' : 'file';
+  return file.name.trim() || fallback;
+}
+
+async function readImageDimensions(file: File): Promise<ImageDimensions | undefined> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const dimensions = bitmap.width > 0 && bitmap.height > 0 ? { width: bitmap.width, height: bitmap.height } : undefined;
+      bitmap.close();
+      return dimensions;
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function' || typeof Image === 'undefined') {
+    return undefined;
+  }
+
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      resolve(undefined);
+    }, 250);
+    function cleanup() {
+      window.clearTimeout(timeout);
+      URL.revokeObjectURL(objectUrl);
+      image.onload = null;
+      image.onerror = null;
+    }
+    image.onload = () => {
+      cleanup();
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      resolve(width > 0 && height > 0 ? { width, height } : undefined);
+    };
+    image.onerror = () => {
+      cleanup();
+      resolve(undefined);
+    };
+    image.src = objectUrl;
+  });
+}
+
 function inferPeerId(conversationId: string, currentUserId: string, lastMessage?: ChatMessage) {
   if (lastMessage) {
     if (lastMessage.senderId && lastMessage.senderId !== currentUserId) {
@@ -994,7 +1223,8 @@ function conversationHasInFlightSend(conversation: Conversation) {
 
 function conversationPreview(messages: ChatMessage[], fallback: string) {
   const orderedMessages = orderedChatMessages(messages);
-  return orderedMessages[orderedMessages.length - 1]?.content ?? fallback;
+  const lastMessage = orderedMessages[orderedMessages.length - 1];
+  return lastMessage ? messageDisplayText(lastMessage) : fallback;
 }
 
 function nextConversationMaxSeq(conversation: Conversation, message: ChatMessage) {
@@ -1136,13 +1366,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function messageAriaLabel(message: ChatMessage) {
+  const label = messageDisplayText(message);
   if (message.messageOrigin === 'ai') {
-    return `AI Agent 消息：${message.content}`;
+    return `AI Agent 消息：${label}`;
   }
   if (message.messageOrigin === 'system') {
-    return `系统消息：${message.content}`;
+    return `系统消息：${label}`;
   }
-  return message.direction === 'outgoing' ? `我发送的消息：${message.content}` : `收到的消息：${message.content}`;
+  return message.direction === 'outgoing' ? `我发送的消息：${label}` : `收到的消息：${label}`;
 }
 
 function conversationsRepresentSameThread(left: Conversation, right: Conversation) {
