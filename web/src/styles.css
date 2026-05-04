@@ -93,6 +93,10 @@ time {
   padding: 12px 0 18px;
 }
 
+.tab-panel {
+  min-height: 100%;
+}
+
 .page-stack {
   display: flex;
   flex-direction: column;
@@ -1080,12 +1084,14 @@ button.md-list-item:hover,
   }
 
   .content-area > .page-stack,
-  .content-area > .chat-window {
+  .content-area > .chat-window,
+  .content-area > .tab-panel {
     width: min(100%, 1120px);
     margin: 0 auto;
   }
 
-  .content-area > .chat-window {
+  .content-area > .chat-window,
+  .content-area > .tab-panel > .chat-window {
     min-height: 100%;
   }
 
