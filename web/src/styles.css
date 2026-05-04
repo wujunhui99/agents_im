@@ -956,6 +956,7 @@ button.md-list-item:hover,
 }
 
 .md-message-bubble p {
+  position: relative;
   margin: 0;
   padding: 10px 12px;
   border-radius: var(--md-shape-corner-large);
@@ -967,13 +968,26 @@ button.md-list-item:hover,
   overflow-wrap: anywhere;
 }
 
+.md-message-bubble-outgoing .md-message-bubble-text-with-status {
+  min-width: 58px;
+  padding-right: 52px;
+  padding-bottom: 14px;
+}
+
 .md-message-bubble-outgoing p {
   color: var(--md-sys-color-on-primary-container);
   background: var(--md-sys-color-primary-container);
 }
 
 .md-message-bubble-status {
-  display: flex;
+  display: inline-flex;
+}
+
+.md-message-bubble-outgoing .md-message-bubble-status {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  align-items: center;
 }
 
 .message-origin-ai .md-message-bubble p {
@@ -986,8 +1000,16 @@ button.md-list-item:hover,
   line-height: 1.2;
 }
 
-.message-outgoing .message-status {
-  margin-left: auto;
+.message-status-check {
+  color: rgba(65, 73, 68, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.message-status-read {
+  color: var(--app-accent-blue);
 }
 
 .message-status-failed {
