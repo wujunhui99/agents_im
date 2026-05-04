@@ -1,8 +1,9 @@
 import { render, screen, waitFor, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { MessagesPage } from './MessagesPage';
 import type { ContactsApi } from '../../api/contacts';
+import type { CompleteMediaUploadResponse, CreateMediaUploadRequest, CreateMediaUploadResponse, MediaApi } from '../../api/media';
 import type { MessageApi, SendMessageRequest, SendMessageResponse, ServerMessage } from '../../api/messages';
 import type { WebSocketFactory, WebSocketLike } from '../../api/websocketClient';
 import type { UserApi, UserProfile, UserProfilePatch } from '../../api/user';
@@ -107,6 +108,44 @@ function createContactsApi(): ContactsApi {
   };
 }
 
+type TestMediaApi = MediaApi & {
+  createUploadIntent: Mock<(request: CreateMediaUploadRequest) => Promise<CreateMediaUploadResponse>>;
+  completeUpload: Mock<(mediaId: string) => Promise<CompleteMediaUploadResponse>>;
+};
+
+function createMediaApi(overrides?: Partial<TestMediaApi>): TestMediaApi {
+  const mediaApi: TestMediaApi = {
+    createUploadIntent: vi.fn(async (request: CreateMediaUploadRequest): Promise<CreateMediaUploadResponse> => ({
+      mediaId: request.purpose === 'message_image' ? 'med_image_1' : 'med_file_1',
+      objectKey: `objects/${request.filename}`,
+      uploadUrl: `https://storage.test/upload/${request.filename}`,
+      expiresAt: 1777465000000,
+    })),
+    completeUpload: vi.fn(async (mediaId: string): Promise<CompleteMediaUploadResponse> => ({
+      media: {
+        mediaId,
+        ownerUserId: currentUserId,
+        bucket: 'agents-im-media',
+        objectKey: `objects/${mediaId}`,
+        sha256: '',
+        contentType: mediaId === 'med_image_1' ? 'image/jpeg' : 'application/pdf',
+        sizeBytes: 1024,
+        originalFilename: mediaId === 'med_image_1' ? 'cat.jpg' : 'report.pdf',
+        purpose: mediaId === 'med_image_1' ? 'message_image' : 'message_file',
+        status: 'ready',
+        createdAt: '2026-05-04T12:00:00Z',
+        updatedAt: '2026-05-04T12:00:00Z',
+      },
+    })),
+  };
+
+  return { ...mediaApi, ...overrides };
+}
+
+function sizedFile(name: string, type: string, sizeBytes: number) {
+  return new File([new Uint8Array(sizeBytes)], name, { type });
+}
+
 class FakeWebSocket implements WebSocketLike {
   readyState = 0;
   onopen: ((event: Event) => void) | null = null;
@@ -184,6 +223,10 @@ function expectTextOrder(container: HTMLElement, labels: string[]) {
     expect(nodes[index].compareDocumentPosition(nodes[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   }
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('MessagesPage real API mode', () => {
   it('receives live websocket message_received events without requiring a manual refresh', async () => {
@@ -448,6 +491,176 @@ describe('MessagesPage real API mode', () => {
     const sentStatus = within(outgoingMessage).getByLabelText('发送成功');
     expect(sentStatus.textContent).toBe('✔');
     expect(within(outgoingMessage).queryByText('已发送')).not.toBeInTheDocument();
+  });
+
+  it('blocks oversized images locally before upload or send', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn<MessageApi['sendMessage']>();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before image upload' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const uploadFetch = vi.fn();
+    vi.stubGlobal('fetch', uploadFetch);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+
+    await user.upload(screen.getByLabelText('发送图片'), sizedFile('huge.jpg', 'image/jpeg', 15 * 1024 * 1024 + 1));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('图片不能超过 15 MiB');
+    expect(mediaApi.createUploadIntent).not.toHaveBeenCalled();
+    expect(mediaApi.completeUpload).not.toHaveBeenCalled();
+    expect(uploadFetch).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('blocks oversized files locally before upload or send', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn<MessageApi['sendMessage']>();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before file upload' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const uploadFetch = vi.fn();
+    vi.stubGlobal('fetch', uploadFetch);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+
+    await user.upload(screen.getByLabelText('发送文件'), sizedFile('huge.pdf', 'application/pdf', 20 * 1024 * 1024 + 1));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('文件不能超过 20 MiB');
+    expect(mediaApi.createUploadIntent).not.toHaveBeenCalled();
+    expect(mediaApi.completeUpload).not.toHaveBeenCalled();
+    expect(uploadFetch).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('uploads a valid image before sending an image message with media metadata', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn<MessageApi['sendMessage']>(async (request) => ({
+      deduplicated: false,
+      message: serverMessage({
+        serverMsgId: 'srv_image_2',
+        clientMsgId: request.clientMsgId,
+        seq: 2,
+        senderId: currentUserId,
+        receiverId: request.chatType === 'single' ? request.receiverId : undefined,
+        groupId: request.chatType === 'group' ? request.groupId : undefined,
+        chatType: request.chatType,
+        contentType: request.contentType,
+        content: request.content,
+        sendTime: 1777464500000,
+        createdAt: 1777464500000,
+      }),
+    }));
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before image upload' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const uploadFetch = vi.fn(async () => new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', uploadFetch);
+    const image = sizedFile('cat.jpg', 'image/jpeg', 1024);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    await user.upload(screen.getByLabelText('发送图片'), image);
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(mediaApi.createUploadIntent).toHaveBeenCalledWith({
+      purpose: 'message_image',
+      filename: 'cat.jpg',
+      contentType: 'image/jpeg',
+      sizeBytes: image.size,
+    });
+    expect(uploadFetch).toHaveBeenCalledWith(
+      'https://storage.test/upload/cat.jpg',
+      expect.objectContaining({
+        method: 'PUT',
+        body: image,
+        headers: { 'Content-Type': 'image/jpeg' },
+      }),
+    );
+    expect(mediaApi.completeUpload).toHaveBeenCalledWith('med_image_1');
+    expect(mediaApi.createUploadIntent.mock.invocationCallOrder[0]).toBeLessThan(uploadFetch.mock.invocationCallOrder[0]);
+    expect(uploadFetch.mock.invocationCallOrder[0]).toBeLessThan(mediaApi.completeUpload.mock.invocationCallOrder[0]);
+    expect(mediaApi.completeUpload.mock.invocationCallOrder[0]).toBeLessThan(sendMessage.mock.invocationCallOrder[0]);
+
+    const request = sendMessage.mock.calls[0][0];
+    expect(request).toEqual(
+      expect.objectContaining({
+        receiverId: peerUserId,
+        chatType: 'single',
+        contentType: 'image',
+      }),
+    );
+    expect(JSON.parse(request.content)).toMatchObject({ mediaId: 'med_image_1' });
+    expect(screen.getByText('图片 cat.jpg')).toBeInTheDocument();
+  });
+
+  it('uploads a valid file before sending a file message with media metadata', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn<MessageApi['sendMessage']>(async (request) => ({
+      deduplicated: false,
+      message: serverMessage({
+        serverMsgId: 'srv_file_2',
+        clientMsgId: request.clientMsgId,
+        seq: 2,
+        senderId: currentUserId,
+        receiverId: request.chatType === 'single' ? request.receiverId : undefined,
+        groupId: request.chatType === 'group' ? request.groupId : undefined,
+        chatType: request.chatType,
+        contentType: request.contentType,
+        content: request.content,
+        sendTime: 1777464500000,
+        createdAt: 1777464500000,
+      }),
+    }));
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before file upload' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const uploadFetch = vi.fn(async () => new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', uploadFetch);
+    const file = sizedFile('report.pdf', 'application/pdf', 4096);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    await user.upload(screen.getByLabelText('发送文件'), file);
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(mediaApi.createUploadIntent).toHaveBeenCalledWith({
+      purpose: 'message_file',
+      filename: 'report.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: file.size,
+    });
+    expect(uploadFetch).toHaveBeenCalledWith(
+      'https://storage.test/upload/report.pdf',
+      expect.objectContaining({
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': 'application/pdf' },
+      }),
+    );
+    expect(mediaApi.completeUpload).toHaveBeenCalledWith('med_file_1');
+
+    const request = sendMessage.mock.calls[0][0];
+    expect(request).toEqual(
+      expect.objectContaining({
+        receiverId: peerUserId,
+        chatType: 'single',
+        contentType: 'file',
+      }),
+    );
+    expect(JSON.parse(request.content)).toEqual({
+      mediaId: 'med_file_1',
+      filename: 'report.pdf',
+      sizeBytes: file.size,
+      contentType: 'application/pdf',
+    });
+    expect(screen.getByText('文件 report.pdf')).toBeInTheDocument();
   });
 
   it('renders a double checkmark when an outgoing sent message is covered by the read threshold', async () => {
