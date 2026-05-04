@@ -23,8 +23,8 @@ const (
 	MediaPurposeMessageFile  = string(model.MediaPurposeMessageFile)
 
 	MediaMaxAvatarBytes = 5 * 1024 * 1024
-	MediaMaxImageBytes  = 10 * 1024 * 1024
-	MediaMaxFileBytes   = 100 * 1024 * 1024
+	MediaMaxImageBytes  = 15 * 1024 * 1024
+	MediaMaxFileBytes   = 20 * 1024 * 1024
 
 	MediaUploadURLTTL   = 15 * time.Minute
 	MediaDownloadURLTTL = 10 * time.Minute
@@ -378,14 +378,14 @@ func validatePurposeContent(purpose model.MediaPurpose, contentType string, size
 			return apperror.InvalidArgument("message_image contentType must be an allowed image type")
 		}
 		if sizeBytes > MediaMaxImageBytes {
-			return apperror.InvalidArgument("message_image sizeBytes must be 10 MiB or less")
+			return apperror.InvalidArgument("message_image sizeBytes must be 15 MiB or less")
 		}
 	case model.MediaPurposeMessageFile:
 		if !isAllowedFileContentType(contentType) {
 			return apperror.InvalidArgument("message_file contentType is not allowed")
 		}
 		if sizeBytes > MediaMaxFileBytes {
-			return apperror.InvalidArgument("message_file sizeBytes must be 100 MiB or less")
+			return apperror.InvalidArgument("message_file sizeBytes must be 20 MiB or less")
 		}
 	default:
 		return apperror.InvalidArgument("purpose is invalid")
