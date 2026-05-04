@@ -913,7 +913,7 @@ function serverMessageToChatMessage(message: ServerMessage, currentUserId: strin
     groupId: message.groupId,
     chatType: message.chatType,
     contentType: message.contentType,
-    content: message.content,
+    content: normalizeMessageContent(message.contentType, message.content),
     messageOrigin: message.messageOrigin ?? 'human',
     agentAccountId: message.agentAccountId,
     triggerServerMsgId: message.triggerServerMsgId,
@@ -924,6 +924,23 @@ function serverMessageToChatMessage(message: ServerMessage, currentUserId: strin
     direction: message.senderId === currentUserId ? 'outgoing' : 'incoming',
     status: 'sent',
   };
+}
+
+function normalizeMessageContent(contentType: ServerMessage['contentType'], content: string) {
+  if (contentType !== 'text') {
+    return content;
+  }
+
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (isRecord(parsed) && typeof parsed.text === 'string') {
+      return parsed.text;
+    }
+  } catch {
+    return content;
+  }
+
+  return content;
 }
 
 function inferPeerId(conversationId: string, currentUserId: string, lastMessage?: ChatMessage) {
