@@ -55,6 +55,7 @@ type AuthenticatedAppProps = AppProps & {
 
 function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: AuthenticatedAppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
+  const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(() => new Set(['messages']));
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
   const [startChatSignal, setStartChatSignal] = useState(0);
   const [pendingChatProfile, setPendingChatProfile] = useState<UserProfile | null>(null);
@@ -87,7 +88,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
 
   function openChatFromContact(profile: UserProfile) {
     setPendingChatProfile({ ...profile });
-    setActiveTab('messages');
+    switchTab('messages');
   }
 
   function clearPendingChatProfile() {
@@ -100,6 +101,16 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
     });
   }
 
+  function switchTab(nextTab: TabKey) {
+    setActiveTab(nextTab);
+    setMountedTabs((current) => {
+      if (current.has(nextTab)) {
+        return current;
+      }
+      return new Set(current).add(nextTab);
+    });
+  }
+
   return (
     <main className="app-shell" aria-label="Agents IM Material 3-inspired 微信式主框架">
       <section className="phone-frame">
@@ -109,23 +120,41 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
         />
 
         <section className="content-area">
-          {renderPage(
-            activeTab,
-            currentUser,
-            updateProfile,
-            logout,
-            effectiveUserApi,
-            contactsApi,
-            messageApi,
-            webSocketToken ?? session?.token,
-            startChatSignal,
-            pendingChatProfile,
-            clearPendingChatProfile,
-            openChatFromContact,
-          )}
+          {tabs.map((tab) => {
+            const isActive = tab.key === activeTab;
+            if (!isActive && !mountedTabs.has(tab.key)) {
+              return null;
+            }
+
+            return (
+              <section
+                className="tab-panel"
+                role="tabpanel"
+                aria-label={tab.label}
+                aria-hidden={isActive ? undefined : true}
+                hidden={!isActive}
+                key={tab.key}
+              >
+                {renderPage(
+                  tab.key,
+                  currentUser,
+                  updateProfile,
+                  logout,
+                  effectiveUserApi,
+                  contactsApi,
+                  messageApi,
+                  webSocketToken ?? session?.token,
+                  startChatSignal,
+                  pendingChatProfile,
+                  clearPendingChatProfile,
+                  openChatFromContact,
+                )}
+              </section>
+            );
+          })}
         </section>
 
-        <TabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+        <TabBar tabs={tabs} activeTab={activeTab} onChange={switchTab} />
       </section>
     </main>
   );
