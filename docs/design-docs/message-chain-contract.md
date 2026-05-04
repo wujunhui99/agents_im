@@ -256,8 +256,8 @@ Behavior:
 - For group chat, `group_id` is required and `receiver_id` must be empty.
 - `client_msg_id` is required.
 - `text` content is plain text, non-empty after trim, <= 4096 characters.
-- `image` content is JSON with at least `mediaId`; the media record must be owned by the sender, `purpose=message_image`, `status=ready`, `content_type=image/*` from the allowlist, and under the image size limit.
-- `file` content is JSON with `mediaId`, `filename`, `sizeBytes`, and `contentType`; the media record must be owned by the sender, `purpose=message_file`, `status=ready`, and the message metadata must match the media record.
+- `image` content is JSON with at least `mediaId`; the media record must be owned by the sender, `purpose=message_image`, `status=ready`, `content_type=image/*` from the allowlist, and <= 15 MiB.
+- `file` content is JSON with `mediaId`, `filename`, `sizeBytes`, and `contentType`; the media record must be owned by the sender, `purpose=message_file`, `status=ready`, <= 20 MiB, and the message metadata must match the media record.
 - Same `sender_id + client_msg_id` returns the prior message if payload matches.
 - Different payload for same idempotency key returns idempotency conflict.
 

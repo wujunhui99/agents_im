@@ -57,6 +57,77 @@ func TestMediaUploadIntentValidationAndObjectKeyGeneration(t *testing.T) {
 	}
 }
 
+func TestMediaUploadIntentMessageSizeLimits(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name    string
+		req     CreateMediaUploadIntentRequest
+		wantErr bool
+	}{
+		{
+			name: "message image accepts fifteen mib",
+			req: CreateMediaUploadIntentRequest{
+				OwnerUserID: "usr_media_limits",
+				Purpose:     MediaPurposeMessageImage,
+				Filename:    "image.jpg",
+				ContentType: "image/jpeg",
+				SizeBytes:   15 * 1024 * 1024,
+				Width:       1080,
+				Height:      720,
+			},
+		},
+		{
+			name: "message image rejects over fifteen mib",
+			req: CreateMediaUploadIntentRequest{
+				OwnerUserID: "usr_media_limits",
+				Purpose:     MediaPurposeMessageImage,
+				Filename:    "image.jpg",
+				ContentType: "image/jpeg",
+				SizeBytes:   15*1024*1024 + 1,
+				Width:       1080,
+				Height:      720,
+			},
+			wantErr: true,
+		},
+		{
+			name: "message file accepts twenty mib",
+			req: CreateMediaUploadIntentRequest{
+				OwnerUserID: "usr_media_limits",
+				Purpose:     MediaPurposeMessageFile,
+				Filename:    "report.pdf",
+				ContentType: "application/pdf",
+				SizeBytes:   20 * 1024 * 1024,
+			},
+		},
+		{
+			name: "message file rejects over twenty mib",
+			req: CreateMediaUploadIntentRequest{
+				OwnerUserID: "usr_media_limits",
+				Purpose:     MediaPurposeMessageFile,
+				Filename:    "report.pdf",
+				ContentType: "application/pdf",
+				SizeBytes:   20*1024*1024 + 1,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mediaLogic := NewMediaLogic(repository.NewMemoryMediaRepository(), objectstorage.NewMemoryStore(), "agents-im-media")
+			_, err := mediaLogic.CreateUploadIntent(ctx, tc.req)
+			if tc.wantErr {
+				assertLogicAppCode(t, err, apperror.CodeInvalidArgument)
+				return
+			}
+			if err != nil {
+				t.Fatalf("create upload intent: %v", err)
+			}
+		})
+	}
+}
+
 func TestMediaCompleteAndDownloadRequireOwnerAndObjectStat(t *testing.T) {
 	ctx := context.Background()
 	store := objectstorage.NewMemoryStore()
