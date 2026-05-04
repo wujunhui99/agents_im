@@ -43,6 +43,7 @@ function serverMessage(overrides: Partial<ServerMessage> & Pick<ServerMessage, '
 function createMessageApi(
   messages: ServerMessage[] = [serverMessage({ seq: 1, content: '真实后端会话消息' })],
   sendMessage?: MessageApi['sendMessage'],
+  options: { hasReadSeq?: number; unreadCount?: number } = {},
 ): MessageApi {
   const send =
     sendMessage ??
@@ -73,8 +74,8 @@ function createMessageApi(
               {
                 conversationId,
                 maxSeq: messages.length,
-                hasReadSeq: 0,
-                unreadCount: messages.length,
+                hasReadSeq: options.hasReadSeq ?? 0,
+                unreadCount: options.unreadCount ?? messages.length,
                 maxSeqTime: messages[messages.length - 1]?.sendTime,
                 lastMessage: messages[messages.length - 1],
               },
@@ -350,7 +351,7 @@ describe('MessagesPage real API mode', () => {
     expect(await screen.findByRole('heading', { name: 'Bob Lin' })).toBeInTheDocument();
     await user.type(screen.getByRole('textbox', { name: '输入消息' }), 'fresh outgoing');
     await user.click(screen.getByRole('button', { name: '发送' }));
-    await waitFor(() => expect(screen.getByText('已发送')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('发送成功')).toHaveTextContent('✔'));
 
     seqs.resolve({
       conversations: [
@@ -366,7 +367,7 @@ describe('MessagesPage real API mode', () => {
     });
 
     await waitFor(() => expect(messageApi.pullMessages).toHaveBeenCalledWith(conversationId, expect.anything()));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('已加载 1 个会话'));
+    await waitFor(() => expect(screen.getByRole('article', { name: '收到的消息：stale server preview' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: '返回消息列表' }));
 
     const row = await screen.findByRole('button', { name: /Bob Lin|未知联系人/ });
@@ -411,7 +412,55 @@ describe('MessagesPage real API mode', () => {
       }),
     );
     const log = screen.getByRole('log', { name: '聊天消息' });
-    expect(within(log).getByText('已发送')).toBeInTheDocument();
+    const outgoingMessage = within(log).getByRole('article', { name: '我发送的消息：你好 Bob' });
+    const sentStatus = within(outgoingMessage).getByLabelText('发送成功');
+    expect(sentStatus.textContent).toBe('✔');
+    expect(within(outgoingMessage).queryByText('已发送')).not.toBeInTheDocument();
+  });
+
+  it('renders a double checkmark when an outgoing sent message is covered by the read threshold', async () => {
+    const messageApi = createMessageApi(
+      [
+        serverMessage({
+          seq: 1,
+          content: 'outgoing covered by read seq',
+          senderId: currentUserId,
+          receiverId: peerUserId,
+        }),
+      ],
+      undefined,
+      { hasReadSeq: 1, unreadCount: 0 },
+    );
+
+    const log = await openSeededConversation(messageApi);
+    const outgoingMessage = within(log).getByRole('article', { name: '我发送的消息：outgoing covered by read seq' });
+    const readStatus = within(outgoingMessage).getByLabelText('对方已读');
+
+    expect(readStatus.textContent).toBe('✔✔');
+  });
+
+  it('keeps pending and failed outgoing message states understandable', async () => {
+    const user = userEvent.setup();
+    const sendDeferred = deferred<SendMessageResponse>();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before failed send' })], () => sendDeferred.promise);
+    const log = await openSeededConversation(messageApi);
+
+    await user.type(screen.getByRole('textbox', { name: '输入消息' }), 'message that will fail');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+
+    expect(within(log).getByText('发送中')).toBeInTheDocument();
+    sendDeferred.reject(new Error('send failed'));
+
+    await waitFor(() => expect(within(log).getByText('发送失败')).toBeInTheDocument());
+  });
+
+  it('does not render outgoing checkmarks for incoming messages', async () => {
+    const log = await openSeededConversation(createMessageApi([serverMessage({ seq: 1, content: 'incoming without checkmarks' })]));
+    const incomingMessage = within(log).getByRole('article', { name: '收到的消息：incoming without checkmarks' });
+
+    expect(within(incomingMessage).queryByLabelText('发送成功')).not.toBeInTheDocument();
+    expect(within(incomingMessage).queryByLabelText('对方已读')).not.toBeInTheDocument();
+    expect(within(incomingMessage).queryByText('✔')).not.toBeInTheDocument();
   });
 
   it('exposes a useful start-chat action when there are no conversations', async () => {
@@ -457,7 +506,7 @@ describe('MessagesPage real API mode', () => {
         content: '第一条消息',
       }),
     );
-    expect(await screen.findByText('已发送')).toBeInTheDocument();
+    expect(await screen.findByLabelText('发送成功')).toHaveTextContent('✔');
     expect(screen.getByRole('heading', { name: 'Bob Lin' })).toBeInTheDocument();
   });
 
@@ -516,7 +565,7 @@ describe('MessagesPage real API mode', () => {
       }),
     });
 
-    await waitFor(() => expect(within(log).getByText('已发送')).toBeInTheDocument());
+    await waitFor(() => expect(within(log).getByLabelText('发送成功')).toHaveTextContent('✔'));
     expect(within(log).queryByText('发送中')).not.toBeInTheDocument();
     expect(within(log).getAllByText('pending becomes seq two')).toHaveLength(1);
     expectTextOrder(log, ['seq one', 'pending becomes seq two']);
@@ -575,7 +624,7 @@ describe('MessagesPage real API mode', () => {
       }),
     });
 
-    await waitFor(() => expect(within(log).getAllByText('已发送')).toHaveLength(2));
+    await waitFor(() => expect(within(log).getAllByLabelText('发送成功')).toHaveLength(2));
     expectTextOrder(log, ['seq one', 'first outgoing', 'second outgoing']);
   });
 });
