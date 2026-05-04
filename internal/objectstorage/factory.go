@@ -18,6 +18,7 @@ func NewStore(cfg appconfig.ObjectStorageConfig) (ObjectStore, error) {
 			Bucket:           cfg.Bucket,
 			Region:           cfg.Region,
 			UseSSL:           cfg.UseSSL,
+			ExternalUseSSL:   cfg.ExternalUseSSL,
 			AccessKeyID:      cfg.AccessKeyID,
 			SecretAccessKey:  cfg.SecretAccessKey,
 		})

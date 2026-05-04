@@ -83,6 +83,7 @@ type ObjectStorageConfig struct {
 	Bucket           string
 	Region           string
 	UseSSL           bool
+	ExternalUseSSL   *bool
 	AccessKeyID      string
 	SecretAccessKey  string
 }
@@ -731,6 +732,16 @@ func ResolveObjectStorageConfig(cfg ObjectStorageConfig, storageDriver string) (
 		return cfg, err
 	}
 	cfg.UseSSL = useSSL
+
+	externalUseSSLFallback := cfg.UseSSL
+	if cfg.ExternalEndpoint != "" && cfg.ExternalEndpoint != cfg.Endpoint {
+		externalUseSSLFallback = true
+	}
+	externalUseSSL, err := resolveOptionalBool(cfg.ExternalUseSSL, externalUseSSLFallback, os.Getenv("OBJECT_STORAGE_EXTERNAL_USE_SSL"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_EXTERNAL_USE_SSL"))
+	if err != nil {
+		return cfg, err
+	}
+	cfg.ExternalUseSSL = externalUseSSL
 	return cfg, nil
 }
 
@@ -870,6 +881,13 @@ func objectStorageConfigFromValues(values map[string]string, storageDriver strin
 		}
 		cfg.UseSSL = useSSL
 	}
+	if value := firstNonEmpty(values["ObjectStorage.ExternalUseSSL"], values["ObjectStorageExternalUseSSL"]); strings.TrimSpace(value) != "" {
+		externalUseSSL, err := parseOptionalBool(value)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.ExternalUseSSL = externalUseSSL
+	}
 	return ResolveObjectStorageConfig(cfg, storageDriver)
 }
 
@@ -971,6 +989,38 @@ func resolveBool(current bool, envValues ...string) (bool, error) {
 		return strconv.ParseBool(value)
 	}
 	return current, nil
+}
+
+func resolveOptionalBool(current *bool, fallback bool, envValues ...string) (*bool, error) {
+	for _, value := range envValues {
+		parsed, err := parseOptionalBool(value)
+		if err != nil {
+			return nil, err
+		}
+		if parsed != nil {
+			return parsed, nil
+		}
+	}
+	if current != nil {
+		return current, nil
+	}
+	return boolPtr(fallback), nil
+}
+
+func parseOptionalBool(value string) (*bool, error) {
+	value = strings.TrimSpace(os.ExpandEnv(value))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 func resolveInt64(current int64, envValues ...string) (int64, error) {
