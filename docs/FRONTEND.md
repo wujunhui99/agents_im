@@ -25,6 +25,7 @@
 
 当前前端保留微信式四 Tab 产品方向：`消息 / 联系人 / 发现 / 我的`，视觉层重构为轻量自研的 Google Material Design 3-inspired 系统。该系统只使用原生 CSS variables 和本仓库 React 组件，不依赖 `@material/web`、`@mui/*` 或其他重型 UI 框架。
 
+- 登录后的四个一级 Tab 在单次 SPA 会话内采用 lazy keepalive：首次打开后保持组件挂载，切换 Tab 只隐藏非当前面板，避免 `消息`/`联系人` 已加载状态被清空并重复请求；页面刷新或 App 重新挂载仍可重新从服务端加载。
 - `web/src/styles/tokens.css` 定义 design tokens：颜色、surface / tonal roles、shape、spacing、typography、state layer、shadow/elevation。
 - `web/src/styles.css` 引入 tokens 并按 app shell、components、pages 组织样式，兼容既有页面 class。
 - `web/src/components/ui/` 提供轻量组件：`Button`、`Card`、`TextField`、`TopAppBar`、`NavigationBar`、`ListItem`、`Avatar`、`Badge`、`MessageBubble`，以及兼容入口 `TopBar`、`TabBar`、`ListCard`、`SearchBox`、`ActionRow`。
