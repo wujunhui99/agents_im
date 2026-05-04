@@ -43,6 +43,7 @@
 - 打开有未读的会话并展示到带 `seq` 的消息后，前端调用 `messageApi.markRead -> POST /conversations/:conversation_id/read` 推进 `hasReadSeq`，成功后立即清除已读范围内的本地未读标记；失败必须显示错误状态，不伪造成功。
 - 会话列表合并重新加载结果时保留本地已确认的新消息、最新预览和已读进度，避免旧的 REST reload 把正在查看或刚发送后的会话回退成陈旧未读状态。
 - 同一会话内发送请求未完成时，composer 显示 `发送中` 并禁用输入/按钮；失败消息保留 `发送失败` 状态，不伪造成功。
+- 发出的已确认消息不再在气泡内显示 `已发送` 文案，而是在右下角显示紧凑对号：`✔` 表示发送成功，`✔✔` 表示已被当前可用的会话已读阈值覆盖。V1 先使用 `Conversation.hasReadSeq` 作为阈值；后端暴露对端 read receipt 后，前端应切换为精确的对端已读状态。
 - `web/src/models/messages.ts` 定义前端会话与消息模型，发送状态仅用于本地 UI 呈现。
 - `web/src/api/messages.ts` 是消息 REST 薄 adapter，函数签名覆盖 `sendMessage`、`pullMessages`、`getConversationSeqs`、`markRead`，字段名保持与前后端合约一致，并基于统一 `createApiClient`。
 - 消息模型包含 `messageOrigin: human | ai | system` 和 AI metadata；`MessagesPage` 必须用 `AI/Agent` 标签明显标注 `ai` 消息，系统消息使用系统标签。

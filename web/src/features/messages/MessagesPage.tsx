@@ -33,9 +33,8 @@ type MessagesPageProps = {
   onPendingChatConsumed?: () => void;
 };
 
-const statusLabels: Record<MessageStatus, string> = {
+const statusLabels: Record<Exclude<MessageStatus, 'sent'>, string> = {
   sending: '发送中',
-  sent: '已发送',
   failed: '发送失败',
 };
 
@@ -447,11 +446,7 @@ function ChatWindow({
               {message.messageOrigin === 'system' ? <span className="message-origin-badge message-origin-system">系统</span> : null}
               <MessageBubble
                 direction={message.direction}
-                status={
-                  message.direction === 'outgoing' ? (
-                    <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>
-                  ) : null
-                }
+                status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
               >
                 {message.content}
               </MessageBubble>
@@ -463,6 +458,23 @@ function ChatWindow({
       <SendMessageComposer onSend={onSend} sending={sending} />
     </section>
   );
+}
+
+function renderOutgoingMessageStatus(message: ChatMessage, hasReadSeq: number | undefined) {
+  if (message.status === 'sent') {
+    const read = message.seq !== undefined && message.seq <= (hasReadSeq ?? 0);
+    return (
+      <span
+        className={`message-status message-status-sent message-status-check${read ? ' message-status-read' : ''}`}
+        role="img"
+        aria-label={read ? '对方已读' : '发送成功'}
+      >
+        {read ? '✔✔' : '✔'}
+      </span>
+    );
+  }
+
+  return <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>;
 }
 
 function SendMessageComposer({ onSend, sending }: { onSend: (content: string) => void; sending: boolean }) {
@@ -758,7 +770,7 @@ function confirmSentMessage(conversations: Conversation[], conversationId: strin
       time: '刚刚',
       unread: 0,
       maxSeq: nextConversationMaxSeq(conversation, nextMessage),
-      hasReadSeq: nextMessage.seq ? Math.max(conversation.hasReadSeq ?? 0, nextMessage.seq) : conversation.hasReadSeq,
+      hasReadSeq: conversation.hasReadSeq,
       receiverId: nextMessage.receiverId ?? conversation.receiverId,
       groupId: nextMessage.groupId ?? conversation.groupId,
       messages: conversation.messages.map((message) => (message.id === messageId ? nextMessage : message)),
