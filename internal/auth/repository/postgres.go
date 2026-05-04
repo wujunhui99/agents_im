@@ -28,6 +28,14 @@ type postgresCredentialRow struct {
 	UpdatedAt    time.Time `db:"updated_at"`
 }
 
+type postgresActiveSessionRow struct {
+	AccountID string    `db:"account_id"`
+	SessionID string    `db:"active_session_id"`
+	IssuedAt  time.Time `db:"active_session_issued_at"`
+	ExpiresAt time.Time `db:"active_session_expires_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
 const pgUniqueViolationCode = "23505"
 const pgForeignKeyViolationCode = "23503"
 
@@ -78,6 +86,59 @@ returning account_id, $4::text as identifier, password_hash, password_algo, crea
 	}
 
 	return row.credential()
+}
+
+func (r *PostgresRepository) SetActiveSession(ctx context.Context, session model.ActiveSession) error {
+	session.UserID = strings.TrimSpace(session.UserID)
+	session.SessionID = strings.TrimSpace(session.SessionID)
+	if session.UserID == "" || session.SessionID == "" {
+		return apperror.InvalidArgument("active session requires user_id and session_id")
+	}
+
+	var row postgresActiveSessionRow
+	err := r.conn.QueryRowCtx(ctx, &row, `
+update auth_credentials
+set active_session_id = $2,
+    active_session_issued_at = $3,
+    active_session_expires_at = $4,
+    updated_at = now()
+where account_id = $1
+returning account_id, active_session_id, active_session_issued_at, active_session_expires_at, updated_at
+`, session.UserID, session.SessionID, session.IssuedAt.UTC(), session.ExpiresAt.UTC())
+	if err != nil {
+		if errors.Is(err, sqlx.ErrNotFound) {
+			return apperror.NotFound("auth credential not found")
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *PostgresRepository) GetActiveSession(ctx context.Context, userID string) (model.ActiveSession, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return model.ActiveSession{}, apperror.InvalidArgument("user_id is required")
+	}
+
+	var row postgresActiveSessionRow
+	err := r.conn.QueryRowCtx(ctx, &row, `
+select account_id, active_session_id, active_session_issued_at, active_session_expires_at, updated_at
+from auth_credentials
+where account_id = $1 and active_session_id <> ''
+`, userID)
+	if err != nil {
+		if errors.Is(err, sqlx.ErrNotFound) {
+			return model.ActiveSession{}, apperror.NotFound("active session not found")
+		}
+		return model.ActiveSession{}, err
+	}
+	return model.ActiveSession{
+		UserID:    row.AccountID,
+		SessionID: row.SessionID,
+		IssuedAt:  row.IssuedAt,
+		ExpiresAt: row.ExpiresAt,
+		UpdatedAt: row.UpdatedAt,
+	}, nil
 }
 
 func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier string) (model.Credential, error) {

@@ -105,7 +105,7 @@ func (l *AuthLogic) Register(ctx context.Context, req RegisterRequest) (AuthResp
 		return AuthResponse{}, err
 	}
 
-	return l.issueToken(credential.UserID, credential.Identifier)
+	return l.issueToken(ctx, credential.UserID, credential.Identifier)
 }
 
 func (l *AuthLogic) Login(ctx context.Context, req LoginRequest) (AuthResponse, error) {
@@ -125,12 +125,15 @@ func (l *AuthLogic) Login(ctx context.Context, req LoginRequest) (AuthResponse, 
 		return AuthResponse{}, apperror.Unauthenticated("invalid identifier or password")
 	}
 
-	return l.issueToken(credential.UserID, credential.Identifier)
+	return l.issueToken(ctx, credential.UserID, credential.Identifier)
 }
 
-func (l *AuthLogic) ValidateToken(_ context.Context, req ValidateTokenRequest) (ValidateTokenResponse, error) {
+func (l *AuthLogic) ValidateToken(ctx context.Context, req ValidateTokenRequest) (ValidateTokenResponse, error) {
 	claims, err := l.tokens.Validate(req.Token)
 	if err != nil {
+		return ValidateTokenResponse{}, err
+	}
+	if err := repository.ValidateActiveSession(ctx, l.repo, claims); err != nil {
 		return ValidateTokenResponse{}, err
 	}
 
@@ -146,9 +149,17 @@ func (l *AuthLogic) ParseToken(_ context.Context, req ValidateTokenRequest) (Val
 	return toValidateTokenResponse(claims), nil
 }
 
-func (l *AuthLogic) issueToken(userID string, identifier string) (AuthResponse, error) {
+func (l *AuthLogic) issueToken(ctx context.Context, userID string, identifier string) (AuthResponse, error) {
 	rawToken, claims, err := l.tokens.Issue(userID, identifier)
 	if err != nil {
+		return AuthResponse{}, err
+	}
+	if err := l.repo.SetActiveSession(ctx, model.ActiveSession{
+		UserID:    claims.UserID,
+		SessionID: claims.SessionID,
+		IssuedAt:  claims.IssuedAt,
+		ExpiresAt: claims.ExpiresAt,
+	}); err != nil {
 		return AuthResponse{}, err
 	}
 

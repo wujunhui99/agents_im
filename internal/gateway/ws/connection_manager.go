@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"sort"
 	"sync"
 	"time"
 )
@@ -37,12 +38,31 @@ func NewConnectionManagerWithPresence(presenceLog PresenceReporter) *ConnectionM
 	}
 }
 
-func (m *ConnectionManager) Register(conn *Connection) {
+func (m *ConnectionManager) Register(conn *Connection) []*Connection {
 	if conn == nil {
-		return
+		return nil
 	}
 
+	var replaced []*Connection
 	m.mu.Lock()
+	if userConnections := m.byUserID[conn.UserID]; len(userConnections) > 0 {
+		ids := make([]string, 0, len(userConnections))
+		for connectionID := range userConnections {
+			if connectionID != conn.ID {
+				ids = append(ids, connectionID)
+			}
+		}
+		sort.Strings(ids)
+		for _, connectionID := range ids {
+			existing := userConnections[connectionID]
+			if existing == nil {
+				continue
+			}
+			replaced = append(replaced, existing)
+			delete(m.byID, connectionID)
+			delete(userConnections, connectionID)
+		}
+	}
 	m.byID[conn.ID] = conn
 	userConnections := m.byUserID[conn.UserID]
 	if userConnections == nil {
@@ -52,9 +72,15 @@ func (m *ConnectionManager) Register(conn *Connection) {
 	userConnections[conn.ID] = conn
 	m.mu.Unlock()
 
+	for _, existing := range replaced {
+		if existing != nil && m.presenceLog != nil {
+			m.presenceLog.Disconnected(existing.Info())
+		}
+	}
 	if m.presenceLog != nil {
 		m.presenceLog.Connected(conn.Info())
 	}
+	return replaced
 }
 
 func (m *ConnectionManager) Unregister(connectionID string) {
