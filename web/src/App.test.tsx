@@ -1309,7 +1309,8 @@ describe('WeChat-inspired app shell', () => {
     await user.click(screen.getByRole('button', { name: '发送' }));
 
     expect(screen.getByText('这是测试消息')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('已发送')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('img', { name: '发送成功' })).toHaveTextContent('✔'));
+    expect(screen.queryByText('已发送')).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/messages',
       expect.objectContaining({
