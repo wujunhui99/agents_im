@@ -403,7 +403,7 @@ func (r *MemoryMessageRepository) UserCanAccessMedia(_ context.Context, userID s
 	defer r.mu.RUnlock()
 
 	prefix := userID + "\x00"
-	for key, visibleSeq := range r.visibleStates {
+	for key, visibleStartSeq := range r.visibleStartSeqs {
 		if !strings.HasPrefix(key, prefix) {
 			continue
 		}
@@ -413,7 +413,7 @@ func (r *MemoryMessageRepository) UserCanAccessMedia(_ context.Context, userID s
 			continue
 		}
 		for _, message := range conversation.messages {
-			if message.Seq > visibleSeq {
+			if message.Seq <= visibleStartSeq {
 				continue
 			}
 			if messageReferencesMedia(message, mediaID) {

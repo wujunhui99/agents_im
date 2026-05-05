@@ -44,6 +44,11 @@ function createMediaApi(): MediaApi {
         updatedAt: '2026-05-04T12:00:00Z',
       },
     })),
+    getDownloadURL: vi.fn(async (mediaId) => ({
+      mediaId,
+      downloadUrl: `https://media.test/download/${mediaId}`,
+      expiresAt: 1777465000000,
+    })),
   };
 }
 
