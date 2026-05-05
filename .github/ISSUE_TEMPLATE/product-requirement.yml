@@ -1,0 +1,125 @@
+name: Product Requirement
+description: Create a product requirement for Hermes + Codex workflow
+title: "[REQ]: "
+labels: ["type:feature", "agent:spec"]
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: Background
+      description: Why do we need this requirement?
+      placeholder: Describe the problem, user pain point, or business background.
+    validations:
+      required: true
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User Story
+      description: Who needs what in which scenario?
+      placeholder: As a ..., I want ..., so that ...
+    validations:
+      required: true
+  - type: textarea
+    id: goals
+    attributes:
+      label: Goals
+      description: What should this requirement achieve?
+    validations:
+      required: true
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals
+      description: What is explicitly out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Functional Scope
+      description: List included features and behaviors.
+    validations:
+      required: true
+  - type: textarea
+    id: interaction_flow
+    attributes:
+      label: Interaction Flow
+      description: Describe user-visible flows from start to finish.
+    validations:
+      required: true
+  - type: textarea
+    id: product_usability
+    attributes:
+      label: Product Usability Requirements
+      description: What must be true for real users to consider this feature usable? Include sender/receiver/history/error UX where relevant.
+      placeholder: |
+        - Sender can ...
+        - Receiver can ...
+        - Refresh/history still ...
+        - Failure states show ...
+    validations:
+      required: true
+  - type: textarea
+    id: data_api_impact
+    attributes:
+      label: Data / API Impact
+      description: Describe API, database, storage, message format, or protocol changes.
+    validations:
+      required: true
+  - type: textarea
+    id: edge_cases
+    attributes:
+      label: Edge Cases
+      description: Describe failure cases, empty states, permission cases, invalid input, historical data behavior, and expired URL/retry behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Concrete checklist that must pass before this issue can be accepted.
+      placeholder: |
+        - [ ] Sender can complete the full flow.
+        - [ ] Receiver can complete the full flow without refresh when online.
+        - [ ] History/refresh still works.
+        - [ ] Error states are visible and not fake success.
+        - [ ] Required regression/E2E tests pass.
+    validations:
+      required: true
+  - type: textarea
+    id: test_plan
+    attributes:
+      label: Test Plan
+      description: Required unit, integration, regression, E2E, or production smoke tests.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: "Use Blocked by #... and Blocking #... if GitHub issue dependencies are unavailable."
+      placeholder: |
+        Blocked by:
+        - None
+
+        Blocking:
+        - None
+    validations:
+      required: false
+  - type: textarea
+    id: implementation_notes
+    attributes:
+      label: Implementation Notes
+      description: Optional technical notes for Codex Dev Mode. Do not replace acceptance criteria with implementation notes.
+    validations:
+      required: false
+  - type: dropdown
+    id: need_research
+    attributes:
+      label: Need Research?
+      options:
+        - "No"
+        - "Yes"
+        - "Unknown"
+    validations:
+      required: true

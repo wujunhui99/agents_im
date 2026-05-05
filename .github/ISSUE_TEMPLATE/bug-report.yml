@@ -1,0 +1,74 @@
+name: Bug Report
+description: Report a bug or production regression for Hermes + Codex workflow
+title: "[BUG]: "
+labels: ["type:bug", "agent:spec"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+    validations:
+      required: true
+  - type: textarea
+    id: user_impact
+    attributes:
+      label: User Impact
+      description: Who is affected and how severe is it?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal reproduction steps. Redact credentials and tokens.
+      placeholder: |
+        1. ...
+        2. ...
+        3. Actual: ...
+        4. Expected: ...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Logs, screenshots, URLs, run IDs, or error messages. Do not include secrets.
+    validations:
+      required: false
+  - type: textarea
+    id: suspected_area
+    attributes:
+      label: Suspected Area
+      description: Frontend, backend service, WebSocket, DB, media storage, deploy, etc.
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What must be true before this bug is accepted as fixed?
+      placeholder: |
+        - [ ] Regression test fails before the fix and passes after.
+        - [ ] User-visible behavior is verified.
+        - [ ] No fake success or silent fallback remains.
+    validations:
+      required: true
+  - type: textarea
+    id: test_plan
+    attributes:
+      label: Test Plan
+      description: Focused regression, integration, E2E, or production smoke tests.
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0
+        - P1
+        - P2
+        - P3
+    validations:
+      required: true

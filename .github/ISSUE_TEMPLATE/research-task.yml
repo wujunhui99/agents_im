@@ -1,0 +1,48 @@
+name: Research Task
+description: Create a research task before implementation
+title: "[RESEARCH]: "
+labels: ["type:research", "agent:spec"]
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: Background
+      description: Why is this research needed?
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Research Question
+      description: What uncertainty must be resolved before development?
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Candidate Options
+      description: List possible approaches.
+    validations:
+      required: true
+  - type: textarea
+    id: comparison
+    attributes:
+      label: Comparison Criteria
+      description: Performance, complexity, cost, compatibility, maintainability, risks, rollout, and user impact.
+    validations:
+      required: true
+  - type: textarea
+    id: expected_output
+    attributes:
+      label: Expected Output
+      description: What should this research issue produce?
+      placeholder: Recommended solution, reasons, risks, and follow-up Ready for Dev issue.
+    validations:
+      required: true
+  - type: textarea
+    id: test_or_spike_plan
+    attributes:
+      label: Test / Spike Plan
+      description: Optional experiments, benchmarks, or proof points required before deciding.
+    validations:
+      required: false
