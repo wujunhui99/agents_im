@@ -59,6 +59,7 @@ func RegisterFriendsGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceCo
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
 			componentCheck("friends_logic", serverCtx != nil && serverCtx.FriendsLogic != nil, "configured"),
 			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
+			componentCheck("media_logic", serverCtx != nil && serverCtx.MediaLogic != nil, "configured"),
 		}
 	})
 	addFriendsRoutes(server, serverCtx)

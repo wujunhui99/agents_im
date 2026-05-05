@@ -32,6 +32,7 @@ export type Conversation = {
   id: string;
   title: string;
   avatar: string;
+  avatarUrl?: string;
   preview: string;
   previewOrigin?: MessageOrigin;
   time: string;

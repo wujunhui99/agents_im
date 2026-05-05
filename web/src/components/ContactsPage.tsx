@@ -17,6 +17,7 @@ type Friend = {
   identifier?: string;
   initial: string;
   avatar: string;
+  avatarUrl?: string;
   accountType?: UserProfile['account_type'];
   profile?: UserProfile;
 };
@@ -289,7 +290,14 @@ function IdentifierSearch({ userApi, onAddFriend }: { userApi: UserApi; onAddFri
       {result ? (
         <ListItem
           className="search-result"
-          leading={<Avatar label={avatarText(profileDisplayName(result))} color="blue" />}
+          leading={
+            <Avatar
+              label={avatarText(profileDisplayName(result))}
+              color="blue"
+              src={result.avatar_url}
+              alt={`${profileDisplayName(result)} 头像`}
+            />
+          }
           headline={profileDisplayName(result)}
           supportingText={<ProfileSupportingLines identifier={profileIdentifier(result)} accountType={result.account_type} />}
           trailing={
@@ -398,7 +406,14 @@ function FriendRequestRow({
   return (
     <ListItem
       className="friend-request-row"
-      leading={<Avatar label={avatarText(name)} color={direction === 'incoming' ? 'orange' : 'blue'} />}
+      leading={
+        <Avatar
+          label={avatarText(name)}
+          color={direction === 'incoming' ? 'orange' : 'blue'}
+          src={profile.avatar_url}
+          alt={`${name} 头像`}
+        />
+      }
       headline={name}
       supportingText={<ProfileSupportingLines identifier={profileIdentifier(profile)} accountType={profile.account_type} helper={helper} />}
       trailing={
@@ -452,7 +467,7 @@ function FriendDirectory({
                   onClick={() => onOpenFriendChat(friend)}
                   ariaLabel={`和 ${chatLabel} 聊天`}
                   ariaDisabled={isOpening}
-                  leading={<Avatar label={friend.avatar} color="blue" />}
+                  leading={<Avatar label={friend.avatar} color="blue" src={friend.avatarUrl} alt={`${friend.name} 头像`} />}
                   headline={friend.name}
                   supportingText={<ProfileSupportingLines identifier={friend.identifier} accountType={friend.accountType} />}
                   trailing={isOpening ? <span className="row-badge">打开中</span> : <ChevronRight size={18} />}
@@ -489,6 +504,7 @@ function userProfileToFriend(profile: UserProfile): Friend {
     identifier: profileIdentifier(profile),
     initial: avatarText(name).slice(0, 1),
     avatar: avatarText(name),
+    avatarUrl: profile.avatar_url,
     accountType: profile.account_type,
     profile,
   };
@@ -508,6 +524,7 @@ function friendToUserProfile(friend: Friend): UserProfile {
     birth_date: '',
     region: '',
     account_type: friend.accountType,
+    avatar_url: friend.avatarUrl,
   };
 }
 
@@ -536,6 +553,8 @@ export function friendshipToUserProfile(friendship: Friendship): UserProfile {
     region: profile.region ?? '',
     account_type: profile.account_type,
     avatar_media_id: profile.avatar_media_id,
+    avatar_url: profile.avatar_url,
+    avatar_url_expires_at: profile.avatar_url_expires_at,
     created_at: profile.created_at,
     updated_at: profile.updated_at,
   };
