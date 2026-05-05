@@ -81,8 +81,9 @@ type ConversationSeqsResp struct {
 }
 
 type CreateGroupReq struct {
-	Name        string `json:"name"`
-	Description string `json:"description,optional"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description,optional"`
+	MemberUserIDs []string `json:"member_user_ids,optional"`
 }
 
 type CreateAgentReq struct {
@@ -185,11 +186,15 @@ type Group struct {
 }
 
 type GroupMember struct {
-	GroupID  string `json:"group_id"`
-	UserID   string `json:"user_id"`
-	State    string `json:"state"`
-	JoinedAt string `json:"joined_at"`
-	LeftAt   string `json:"left_at"`
+	GroupID       string `json:"group_id"`
+	UserID        string `json:"user_id"`
+	State         string `json:"state"`
+	JoinedAt      string `json:"joined_at"`
+	LeftAt        string `json:"left_at"`
+	Identifier    string `json:"identifier,optional"`
+	DisplayName   string `json:"display_name,optional"`
+	Name          string `json:"name,optional"`
+	AvatarMediaID string `json:"avatar_media_id,optional"`
 }
 
 type GroupResp struct {
@@ -268,6 +273,18 @@ type ListMembersResp struct {
 	Code    string          `json:"code"`
 	Message string          `json:"message"`
 	Data    ListMembersData `json:"data"`
+}
+
+type ListGroupsReq struct{}
+
+type ListGroupsData struct {
+	Groups []Group `json:"groups"`
+}
+
+type ListGroupsResp struct {
+	Code    string         `json:"code"`
+	Message string         `json:"message"`
+	Data    ListGroupsData `json:"data"`
 }
 
 type LoginReq struct {

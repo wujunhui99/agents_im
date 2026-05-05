@@ -246,6 +246,11 @@ func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Handler: groupshandler.CreateGroupHandler(serverCtx),
 		},
 		{
+			Method:  http.MethodGet,
+			Path:    "/groups",
+			Handler: groupshandler.ListGroupsHandler(serverCtx),
+		},
+		{
 			Method:  http.MethodPost,
 			Path:    "/groups/:group_id/members",
 			Handler: groupshandler.AddMemberHandler(serverCtx),

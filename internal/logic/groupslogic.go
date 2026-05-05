@@ -14,6 +14,10 @@ type UserExistenceChecker interface {
 	EnsureUserExists(ctx context.Context, userID string) error
 }
 
+type UserProfileLookup interface {
+	LookupUserProfile(ctx context.Context, userID string) (UserProfile, error)
+}
+
 type UserLogicExistenceChecker struct {
 	userLogic *UserLogic
 }
@@ -31,10 +35,19 @@ func (c UserLogicExistenceChecker) EnsureUserExists(ctx context.Context, userID 
 	return err
 }
 
+func (c UserLogicExistenceChecker) LookupUserProfile(ctx context.Context, userID string) (UserProfile, error) {
+	if c.userLogic == nil {
+		return UserProfile{}, apperror.Internal("user profile lookup is not configured")
+	}
+	return c.userLogic.GetUserByID(ctx, GetUserByIDRequest{UserID: userID})
+}
+
 type GroupsLogic struct {
 	repo       repository.GroupsRepository
 	userExists UserExistenceChecker
 }
+
+const maxGroupMembersV1 = 200
 
 func NewGroupsLogic(repo repository.GroupsRepository, userExists UserExistenceChecker) *GroupsLogic {
 	return &GroupsLogic{repo: repo, userExists: userExists}
@@ -50,17 +63,22 @@ type GroupInfo struct {
 }
 
 type GroupMemberInfo struct {
-	GroupID  string `json:"group_id"`
-	UserID   string `json:"user_id"`
-	State    string `json:"state"`
-	JoinedAt string `json:"joined_at"`
-	LeftAt   string `json:"left_at"`
+	GroupID       string `json:"group_id"`
+	UserID        string `json:"user_id"`
+	State         string `json:"state"`
+	JoinedAt      string `json:"joined_at"`
+	LeftAt        string `json:"left_at"`
+	Identifier    string `json:"identifier,omitempty"`
+	DisplayName   string `json:"display_name,omitempty"`
+	Name          string `json:"name,omitempty"`
+	AvatarMediaID string `json:"avatar_media_id,omitempty"`
 }
 
 type CreateGroupRequest struct {
-	CreatorUserID string `json:"creator_user_id"`
-	Name          string `json:"name"`
-	Description   string `json:"description"`
+	CreatorUserID string   `json:"creator_user_id"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description"`
+	MemberUserIDs []string `json:"member_user_ids"`
 }
 
 type GetGroupRequest struct {
@@ -89,6 +107,10 @@ type ListMembersRequest struct {
 	RequesterUserID string `json:"requester_user_id,omitempty"`
 }
 
+type ListGroupsRequest struct {
+	UserID string `json:"user_id"`
+}
+
 type MemberResponse struct {
 	Member        GroupMemberInfo `json:"member"`
 	AlreadyMember bool            `json:"already_member"`
@@ -97,6 +119,10 @@ type MemberResponse struct {
 type ListMembersResponse struct {
 	GroupID string            `json:"group_id"`
 	Members []GroupMemberInfo `json:"members"`
+}
+
+type ListGroupsResponse struct {
+	Groups []GroupInfo `json:"groups"`
 }
 
 func (l *GroupsLogic) CreateGroup(ctx context.Context, req CreateGroupRequest) (GroupInfo, error) {
@@ -117,16 +143,48 @@ func (l *GroupsLogic) CreateGroup(ctx context.Context, req CreateGroupRequest) (
 	if err := l.ensureUserExists(ctx, creatorUserID); err != nil {
 		return GroupInfo{}, err
 	}
+	memberUserIDs, err := normalizeGroupMemberIDs(creatorUserID, req.MemberUserIDs)
+	if err != nil {
+		return GroupInfo{}, err
+	}
+	for _, userID := range memberUserIDs {
+		if userID == creatorUserID {
+			continue
+		}
+		if err := l.ensureUserExists(ctx, userID); err != nil {
+			return GroupInfo{}, err
+		}
+	}
 
 	group, _, err := l.repo.CreateGroup(ctx, model.Group{
 		Name:        name,
 		Description: description,
-	}, creatorUserID)
+	}, creatorUserID, memberUserIDs)
 	if err != nil {
 		return GroupInfo{}, err
 	}
 
 	return toGroupInfo(group), nil
+}
+
+func (l *GroupsLogic) ListGroups(ctx context.Context, req ListGroupsRequest) (ListGroupsResponse, error) {
+	userID, err := normalizeRequiredID(req.UserID, "user_id")
+	if err != nil {
+		return ListGroupsResponse{}, err
+	}
+	if err := l.ensureUserExists(ctx, userID); err != nil {
+		return ListGroupsResponse{}, err
+	}
+
+	groups, err := l.repo.ListGroupsForUser(ctx, userID)
+	if err != nil {
+		return ListGroupsResponse{}, err
+	}
+	result := ListGroupsResponse{Groups: make([]GroupInfo, 0, len(groups))}
+	for _, group := range groups {
+		result.Groups = append(result.Groups, toGroupInfo(group))
+	}
+	return result, nil
 }
 
 func (l *GroupsLogic) GetGroup(ctx context.Context, req GetGroupRequest) (GroupInfo, error) {
@@ -185,13 +243,20 @@ func (l *GroupsLogic) AddMember(ctx context.Context, req AddMemberRequest) (Memb
 			return MemberResponse{}, err
 		}
 	}
+	if err := l.ensureCanAddActiveMember(ctx, groupID, userID); err != nil {
+		return MemberResponse{}, err
+	}
 
 	member, alreadyMember, err := l.repo.AddMember(ctx, groupID, userID)
 	if err != nil {
 		return MemberResponse{}, err
 	}
 
-	return MemberResponse{Member: toGroupMemberInfo(member), AlreadyMember: alreadyMember}, nil
+	memberInfo, err := l.hydrateGroupMemberInfo(ctx, member)
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	return MemberResponse{Member: memberInfo, AlreadyMember: alreadyMember}, nil
 }
 
 func (l *GroupsLogic) JoinGroup(ctx context.Context, req JoinGroupRequest) (MemberResponse, error) {
@@ -210,13 +275,20 @@ func (l *GroupsLogic) JoinGroup(ctx context.Context, req JoinGroupRequest) (Memb
 	if err := l.ensureUserExists(ctx, userID); err != nil {
 		return MemberResponse{}, err
 	}
+	if err := l.ensureCanAddActiveMember(ctx, groupID, userID); err != nil {
+		return MemberResponse{}, err
+	}
 
 	member, alreadyMember, err := l.repo.AddMember(ctx, groupID, userID)
 	if err != nil {
 		return MemberResponse{}, err
 	}
 
-	return MemberResponse{Member: toGroupMemberInfo(member), AlreadyMember: alreadyMember}, nil
+	memberInfo, err := l.hydrateGroupMemberInfo(ctx, member)
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	return MemberResponse{Member: memberInfo, AlreadyMember: alreadyMember}, nil
 }
 
 func (l *GroupsLogic) LeaveGroup(ctx context.Context, req LeaveGroupRequest) (MemberResponse, error) {
@@ -255,7 +327,11 @@ func (l *GroupsLogic) LeaveGroup(ctx context.Context, req LeaveGroupRequest) (Me
 		return MemberResponse{}, err
 	}
 
-	return MemberResponse{Member: toGroupMemberInfo(member)}, nil
+	memberInfo, err := l.hydrateGroupMemberInfo(ctx, member)
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	return MemberResponse{Member: memberInfo}, nil
 }
 
 func (l *GroupsLogic) ListMembers(ctx context.Context, req ListMembersRequest) (ListMembersResponse, error) {
@@ -281,10 +357,30 @@ func (l *GroupsLogic) ListMembers(ctx context.Context, req ListMembersRequest) (
 		Members: make([]GroupMemberInfo, 0, len(members)),
 	}
 	for _, member := range members {
-		result.Members = append(result.Members, toGroupMemberInfo(member))
+		memberInfo, err := l.hydrateGroupMemberInfo(ctx, member)
+		if err != nil {
+			return ListMembersResponse{}, err
+		}
+		result.Members = append(result.Members, memberInfo)
 	}
 
 	return result, nil
+}
+
+func (l *GroupsLogic) ensureCanAddActiveMember(ctx context.Context, groupID string, userID string) error {
+	members, err := l.repo.ListActiveMembers(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	for _, member := range members {
+		if member.UserID == userID && member.State == model.MemberStateActive {
+			return nil
+		}
+	}
+	if len(members) >= maxGroupMembersV1 {
+		return apperror.InvalidArgument("group member limit is 200")
+	}
+	return nil
 }
 
 func (l *GroupsLogic) ensureUserExists(ctx context.Context, userID string) error {
@@ -350,6 +446,55 @@ func normalizeGroupDescription(value string) (string, error) {
 		return "", apperror.InvalidArgument("description must be 256 characters or fewer")
 	}
 	return value, nil
+}
+
+func normalizeGroupMemberIDs(creatorUserID string, rawMemberUserIDs []string) ([]string, error) {
+	seen := map[string]struct{}{
+		creatorUserID: {},
+	}
+	memberUserIDs := []string{creatorUserID}
+	for _, rawUserID := range rawMemberUserIDs {
+		userID, err := normalizeRequiredID(rawUserID, "member_user_ids")
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := seen[userID]; ok {
+			continue
+		}
+		seen[userID] = struct{}{}
+		memberUserIDs = append(memberUserIDs, userID)
+	}
+	if len(memberUserIDs) > maxGroupMembersV1 {
+		return nil, apperror.InvalidArgument("group member limit is 200")
+	}
+	return memberUserIDs, nil
+}
+
+func (l *GroupsLogic) hydrateGroupMemberInfo(ctx context.Context, member model.GroupMember) (GroupMemberInfo, error) {
+	info := toGroupMemberInfo(member)
+	lookup, ok := l.userExists.(UserProfileLookup)
+	if !ok || lookup == nil {
+		return info, nil
+	}
+	profile, err := lookup.LookupUserProfile(ctx, member.UserID)
+	if err != nil {
+		return GroupMemberInfo{}, err
+	}
+	info.Identifier = profile.Identifier
+	info.DisplayName = humanReadableUserName(profile)
+	info.Name = profile.Name
+	info.AvatarMediaID = profile.AvatarMediaID
+	return info, nil
+}
+
+func humanReadableUserName(profile UserProfile) string {
+	for _, value := range []string{profile.DisplayName, profile.Name, profile.Identifier} {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return strings.TrimSpace(profile.UserID)
 }
 
 func toGroupInfo(group model.Group) GroupInfo {

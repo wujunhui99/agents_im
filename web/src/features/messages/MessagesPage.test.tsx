@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { MessagesPage } from './MessagesPage';
 import type { ContactsApi } from '../../api/contacts';
+import type { Group, GroupMember, GroupsApi } from '../../api/groups';
 import type { CompleteMediaUploadResponse, CreateMediaUploadRequest, CreateMediaUploadResponse, MediaApi } from '../../api/media';
 import type { MessageApi, SendMessageRequest, SendMessageResponse, ServerMessage } from '../../api/messages';
 import type { WebSocketFactory, WebSocketLike } from '../../api/websocketClient';
@@ -11,6 +12,8 @@ import type { UserApi, UserProfile, UserProfilePatch } from '../../api/user';
 const conversationId = 'single:1001:2002';
 const currentUserId = '1001';
 const peerUserId = '2002';
+const groupId = 'grp_team';
+const groupConversationId = `group:${groupId}`;
 
 const bobProfile: UserProfile = {
   user_id: peerUserId,
@@ -106,6 +109,61 @@ function createContactsApi(): ContactsApi {
     acceptFriendRequest: vi.fn(),
     rejectFriendRequest: vi.fn(),
   };
+}
+
+function createGroupsApi(overrides?: Partial<GroupsApi>): GroupsApi {
+  const group: Group = {
+    group_id: groupId,
+    name: '项目群',
+    description: '',
+    creator_user_id: currentUserId,
+    created_at: '2026-05-05T12:00:00Z',
+    updated_at: '2026-05-05T12:00:00Z',
+  };
+  const members: GroupMember[] = [
+    {
+      group_id: groupId,
+      user_id: currentUserId,
+      display_name: 'Alice Chen',
+      name: 'Alice Chen',
+      identifier: 'alice_001',
+      avatar_media_id: '',
+      state: 'active',
+      joined_at: '2026-05-05T12:00:00Z',
+      left_at: '',
+    },
+    {
+      group_id: groupId,
+      user_id: peerUserId,
+      display_name: 'Bob Lin',
+      name: 'Bob Lin',
+      identifier: 'bob_002',
+      avatar_media_id: '',
+      state: 'active',
+      joined_at: '2026-05-05T12:00:00Z',
+      left_at: '',
+    },
+  ];
+  return {
+    listGroups: vi.fn(async () => ({ groups: [group] })),
+    getGroup: vi.fn(async () => group),
+    createGroup: vi.fn(async () => group),
+    joinGroup: vi.fn(),
+    leaveGroup: vi.fn(),
+    listMembers: vi.fn(async () => ({ group_id: groupId, members })),
+    ...overrides,
+  };
+}
+
+function groupServerMessage(overrides: Partial<ServerMessage> & Pick<ServerMessage, 'seq' | 'content'>): ServerMessage {
+  return serverMessage({
+    conversationId: groupConversationId,
+    senderId: peerUserId,
+    receiverId: '',
+    groupId,
+    chatType: 'group',
+    ...overrides,
+  });
 }
 
 type TestMediaApi = MediaApi & {
@@ -229,6 +287,150 @@ afterEach(() => {
 });
 
 describe('MessagesPage real API mode', () => {
+  it('hydrates group title and renders sender display names for group history', async () => {
+    const user = userEvent.setup();
+    const groupMessage = groupServerMessage({ seq: 1, content: '大家好' });
+    const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({
+      deduplicated: false,
+      message: groupServerMessage({
+        serverMsgId: 'srv_group_reply',
+        clientMsgId: request.clientMsgId,
+        seq: 2,
+        senderId: currentUserId,
+        content: request.content,
+      }),
+    }));
+    const messageApi = createMessageApi([groupMessage], sendMessage);
+    vi.mocked(messageApi.getConversationSeqs).mockResolvedValueOnce({
+      states: [
+        {
+          conversationId: groupConversationId,
+          maxSeq: 1,
+          hasReadSeq: 0,
+          unreadCount: 1,
+          maxSeqTime: groupMessage.sendTime,
+          lastMessage: groupMessage,
+        },
+      ],
+    });
+    vi.mocked(messageApi.pullMessages).mockResolvedValueOnce({ conversationId: groupConversationId, messages: [groupMessage] });
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} groupsApi={createGroupsApi()} />);
+
+    const row = await screen.findByRole('button', { name: /项目群/ });
+    expect(within(row).getByText('项目群')).toBeInTheDocument();
+    await user.click(row);
+
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    expect(within(log).getByText('Bob Lin')).toBeInTheDocument();
+    expect(within(log).getByText('大家好')).toBeInTheDocument();
+    expect(screen.queryByText(peerUserId)).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('textbox', { name: '输入消息' }), '收到');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          groupId,
+          chatType: 'group',
+          content: '收到',
+        }),
+      ),
+    );
+  });
+
+  it('shows a Chinese group permission error when group send is rejected', async () => {
+    const user = userEvent.setup();
+    const groupMessage = groupServerMessage({ seq: 1, content: 'seed group' });
+    const messageApi = createMessageApi([groupMessage]);
+    vi.mocked(messageApi.getConversationSeqs).mockResolvedValueOnce({
+      states: [{ conversationId: groupConversationId, maxSeq: 1, hasReadSeq: 0, unreadCount: 1, lastMessage: groupMessage }],
+    });
+    vi.mocked(messageApi.pullMessages).mockResolvedValueOnce({ conversationId: groupConversationId, messages: [groupMessage] });
+    vi.mocked(messageApi.sendMessage).mockRejectedValueOnce(new Error('requester is not a group member'));
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} groupsApi={createGroupsApi()} />);
+
+    await user.click(await screen.findByRole('button', { name: /项目群/ }));
+    await user.type(screen.getByRole('textbox', { name: '输入消息' }), '我还能发吗');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('没有群聊权限，无法发送消息'));
+  });
+
+  it('applies live group messages to the current conversation without refresh and keeps sender names', async () => {
+    const user = userEvent.setup();
+    const groupMessage = groupServerMessage({ seq: 1, content: 'seed group' });
+    const messageApi = createMessageApi([groupMessage]);
+    vi.mocked(messageApi.getConversationSeqs).mockResolvedValueOnce({
+      states: [{ conversationId: groupConversationId, maxSeq: 1, hasReadSeq: 0, unreadCount: 0, lastMessage: groupMessage }],
+    });
+    vi.mocked(messageApi.pullMessages).mockResolvedValueOnce({ conversationId: groupConversationId, messages: [groupMessage] });
+    const { sockets, factory } = createFakeWebSocketFactory();
+    const groupsApi = createGroupsApi({
+      listMembers: vi.fn(async () => ({
+        group_id: groupId,
+        members: [
+          {
+            group_id: groupId,
+            user_id: currentUserId,
+            display_name: 'Alice Chen',
+            name: 'Alice Chen',
+            identifier: 'alice_001',
+            avatar_media_id: '',
+            state: 'active',
+            joined_at: '',
+            left_at: '',
+          },
+          {
+            group_id: groupId,
+            user_id: '3003',
+            display_name: 'Carol Wu',
+            name: 'Carol Wu',
+            identifier: 'carol_003',
+            avatar_media_id: '',
+            state: 'active',
+            joined_at: '',
+            left_at: '',
+          },
+        ],
+      })),
+    });
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        groupsApi={groupsApi}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    await user.click(await screen.findByRole('button', { name: /项目群/ }));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(
+        messageReceivedEvent({
+          serverMsgId: 'srv_group_live',
+          conversationId: groupConversationId,
+          seq: 2,
+          senderId: '3003',
+          receiverId: '',
+          groupId,
+          chatType: 'group',
+          content: '实时群消息',
+        }),
+      );
+    });
+
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    expect(within(log).getByText('Carol Wu')).toBeInTheDocument();
+    expect(within(log).getByText('实时群消息')).toBeInTheDocument();
+  });
+
   it('receives live websocket message_received events without requiring a manual refresh', async () => {
     const user = userEvent.setup();
     const messageApi = createMessageApi([]);

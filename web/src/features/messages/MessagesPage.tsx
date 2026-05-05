@@ -2,6 +2,8 @@ import { ChevronLeft, FileText, Image as ImageIcon, MessageCircle, Search, SendH
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import type { ContactsApi, Friendship } from '../../api/contacts';
 import { createContactsApi } from '../../api/contacts';
+import type { Group, GroupMember, GroupsApi } from '../../api/groups';
+import { createGroupsApi } from '../../api/groups';
 import type { MediaApi } from '../../api/media';
 import { createMediaApi, uploadMediaBytes } from '../../api/media';
 import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
@@ -20,20 +22,23 @@ import { MessageBubble } from '../../components/ui/MessageBubble';
 import { SearchBox } from '../../components/ui/SearchBox';
 import { TextField } from '../../components/ui/TextField';
 import type { ChatMessage, Conversation, MessageContentType, MessageStatus } from '../../models/messages';
-import { UNKNOWN_CONTACT_LABEL, accountTypeLabel, avatarText, profileDisplayName, profileIdentifier } from '../../utils/profileDisplay';
+import { UNKNOWN_CONTACT_LABEL, accountTypeLabel, avatarText, firstNonEmpty, profileDisplayName, profileIdentifier } from '../../utils/profileDisplay';
 
 type MessagesPageProps = {
   currentUserId: string;
   messageApi?: MessageApi;
   mediaApi?: MediaApi;
   contactsApi?: ContactsApi;
+  groupsApi?: GroupsApi;
   userApi?: UserApi;
   webSocketUrl?: string;
   webSocketToken?: string;
   webSocketFactory?: WebSocketFactory;
   startChatSignal?: number;
   pendingChatProfile?: UserProfile | null;
+  pendingGroup?: Group | null;
   onPendingChatConsumed?: () => void;
+  onPendingGroupConsumed?: () => void;
 };
 
 type AttachmentKind = 'image' | 'file';
@@ -60,17 +65,21 @@ export function MessagesPage({
   messageApi: messageApiProp,
   mediaApi: mediaApiProp,
   contactsApi: contactsApiProp,
+  groupsApi: groupsApiProp,
   userApi: userApiProp,
   webSocketUrl = '/ws',
   webSocketToken,
   webSocketFactory,
   startChatSignal = 0,
   pendingChatProfile = null,
+  pendingGroup = null,
   onPendingChatConsumed,
+  onPendingGroupConsumed,
 }: MessagesPageProps) {
   const messageApi = useMemo(() => messageApiProp ?? createMessageApi(), [messageApiProp]);
   const mediaApi = useMemo(() => mediaApiProp ?? createMediaApi(), [mediaApiProp]);
   const contactsApi = useMemo(() => contactsApiProp ?? createContactsApi(), [contactsApiProp]);
+  const groupsApi = useMemo(() => groupsApiProp ?? createGroupsApi(), [groupsApiProp]);
   const userApi = useMemo(() => userApiProp ?? createUserApi(), [userApiProp]);
   const [items, setItems] = useState<Conversation[]>([]);
   const [status, setStatus] = useState('正在加载会话');
@@ -90,7 +99,7 @@ export function MessagesPage({
       try {
         const response = await messageApi.getConversationSeqs([]);
         const states = response.states ?? response.conversations ?? response.seqs ?? [];
-        const conversations = await Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi)));
+        const conversations = await Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi, groupsApi)));
         const needsFriendProfiles = conversations.some(
           (conversation) => conversation.chatType === 'single' && conversation.receiverId && conversation.title === UNKNOWN_CONTACT_LABEL,
         );
@@ -110,7 +119,7 @@ export function MessagesPage({
     return () => {
       cancelled = true;
     };
-  }, [currentUserId, messageApi, contactsApi]);
+  }, [currentUserId, messageApi, contactsApi, groupsApi]);
 
   useEffect(() => {
     if (!webSocketUrl || (!webSocketToken && !webSocketFactory) || (!webSocketFactory && !canUseNativeWebSocket())) {
@@ -152,6 +161,14 @@ export function MessagesPage({
     handleStartChat(pendingChatProfile);
     onPendingChatConsumed?.();
   }, [pendingChatProfile, onPendingChatConsumed]);
+
+  useEffect(() => {
+    if (!pendingGroup) {
+      return;
+    }
+    void handleOpenGroup(pendingGroup);
+    onPendingGroupConsumed?.();
+  }, [pendingGroup, onPendingGroupConsumed]);
 
   useEffect(() => {
     if (!selectedConversationId?.startsWith('draft-single:')) {
@@ -214,6 +231,21 @@ export function MessagesPage({
     setStatus(`已打开 ${draftConversation.title} 的聊天`);
   }
 
+  async function handleOpenGroup(group: Group) {
+    const draftConversation = groupToConversation(group);
+    setItems((current) => upsertStartedConversation(current, undefined, draftConversation));
+    setSelectedConversationId(draftConversation.id);
+    setShowStartChat(false);
+    setStatus(`已打开 ${group.name} 的聊天`);
+    try {
+      const members = await groupsApi.listMembers(group.group_id);
+      const memberDisplayNames = groupMemberDisplayNameMap(members.members ?? []);
+      setItems((current) => hydrateGroupConversationMembers(current, group, memberDisplayNames));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '加载群成员失败');
+    }
+  }
+
   function handleSend(content: string) {
     if (!selectedConversation) {
       return;
@@ -233,7 +265,7 @@ export function MessagesPage({
         setSelectedConversationId(sentMessage.conversationId);
       })
       .catch((error) => {
-        setStatus(error instanceof Error ? error.message : '发送消息失败');
+        setStatus(sendErrorMessage(error, selectedConversation.chatType));
         setItems((current) =>
           updateMessage(current, selectedConversation.id, pendingMessage.id, {
             ...pendingMessage,
@@ -532,7 +564,10 @@ function ChatWindow({
             aria-label={messageAriaLabel(message)}
           >
             <div className="message-body">
-{message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
+              {conversation.chatType === 'group' && message.direction === 'incoming' ? (
+                <span className="message-sender-name">{message.senderDisplayName ?? '群成员'}</span>
+              ) : null}
+              {message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
               {message.messageOrigin === 'system' ? <span className="message-origin-badge message-origin-system">系统</span> : null}
               <MessageBubble
                 direction={message.direction}
@@ -640,9 +675,23 @@ function SendMessageComposer({
   );
 }
 
-async function loadConversation(state: ConversationSeqState, currentUserId: string, messageApi: MessageApi): Promise<Conversation> {
+async function loadConversation(
+  state: ConversationSeqState,
+  currentUserId: string,
+  messageApi: MessageApi,
+  groupsApi: GroupsApi,
+): Promise<Conversation> {
   const pulled = await messageApi.pullMessages(state.conversationId, { fromSeq: 1, limit: 50, order: 'asc' });
-  return conversationStateToView(state, currentUserId, pulled.messages);
+  const conversation = conversationStateToView(state, currentUserId, pulled.messages);
+  if (conversation.chatType !== 'group' || !conversation.groupId) {
+    return conversation;
+  }
+  try {
+    const [group, members] = await Promise.all([groupsApi.getGroup(conversation.groupId), groupsApi.listMembers(conversation.groupId)]);
+    return applyGroupMetadata(conversation, group, members.members ?? []);
+  } catch {
+    return conversation;
+  }
 }
 
 function userProfileToDraftConversation(profile: UserProfile): Conversation {
@@ -660,6 +709,23 @@ function userProfileToDraftConversation(profile: UserProfile): Conversation {
     color: 'blue',
     chatType: 'single',
     receiverId: profile.user_id,
+    messages: [],
+  };
+}
+
+function groupToConversation(group: Group): Conversation {
+  return {
+    id: groupConversationId(group.group_id),
+    title: group.name,
+    avatar: avatarText(group.name),
+    preview: '暂无消息',
+    time: '',
+    unread: 0,
+    maxSeq: 0,
+    hasReadSeq: 0,
+    color: 'green',
+    chatType: 'group',
+    groupId: group.group_id,
     messages: [],
   };
 }
@@ -701,6 +767,51 @@ function hydrateConversationTitles(conversations: Conversation[], friendProfiles
       avatar: avatarText(title),
     };
   });
+}
+
+function hydrateGroupConversationMembers(conversations: Conversation[], group: Group, memberDisplayNames: Record<string, string>) {
+  return conversations.map((conversation) => {
+    if (conversation.chatType !== 'group' || conversation.groupId !== group.group_id) {
+      return conversation;
+    }
+    return applyGroupMetadata(conversation, group, memberDisplayNames);
+  });
+}
+
+function applyGroupMetadata(conversation: Conversation, group: Group, members: GroupMember[] | Record<string, string>): Conversation {
+  const memberDisplayNames = Array.isArray(members) ? groupMemberDisplayNameMap(members) : members;
+  const title = group.name || conversation.title || '群聊';
+  return {
+    ...conversation,
+    title,
+    avatar: avatarText(title),
+    groupId: group.group_id,
+    groupMemberDisplayNames: memberDisplayNames,
+    messages: conversation.messages.map((message) => attachGroupSenderDisplayName(message, memberDisplayNames)),
+  };
+}
+
+function groupMemberDisplayNameMap(members: GroupMember[]) {
+  return members.reduce<Record<string, string>>((names, member) => {
+    if (member.user_id) {
+      names[member.user_id] = groupMemberDisplayName(member);
+    }
+    return names;
+  }, {});
+}
+
+function groupMemberDisplayName(member: GroupMember) {
+  return firstNonEmpty(member.display_name, member.name, member.identifier) ?? '群成员';
+}
+
+function attachGroupSenderDisplayName(message: ChatMessage, memberDisplayNames: Record<string, string> | undefined) {
+  if (message.chatType !== 'group' || message.direction !== 'incoming') {
+    return message;
+  }
+  return {
+    ...message,
+    senderDisplayName: memberDisplayNames?.[message.senderId] ?? message.senderDisplayName ?? '群成员',
+  };
 }
 
 async function loadAcceptedFriendProfileMap(contactsApi: ContactsApi) {
@@ -819,17 +930,18 @@ function upsertLiveServerMessage(conversations: Conversation[], message: ChatMes
       return conversation;
     }
     matched = true;
-    const nextMessages = upsertCanonicalMessage(conversation.messages, message.id, message);
+    const nextMessage = attachGroupSenderDisplayName(message, conversation.groupMemberDisplayNames);
+    const nextMessages = upsertCanonicalMessage(conversation.messages, nextMessage.id, nextMessage);
     return {
       ...conversation,
-      id: message.conversationId,
-      preview: conversationPreview(nextMessages, messageDisplayText(message)),
-      previewOrigin: message.messageOrigin,
+      id: nextMessage.conversationId,
+      preview: conversationPreview(nextMessages, messageDisplayText(nextMessage)),
+      previewOrigin: nextMessage.messageOrigin,
       time: '刚刚',
-      unread: message.direction === 'incoming' ? conversation.unread + 1 : conversation.unread,
-      maxSeq: nextConversationMaxSeq(conversation, message),
-      receiverId: liveMessagePeerTarget(message) ?? conversation.receiverId,
-      groupId: message.groupId ?? conversation.groupId,
+      unread: nextMessage.direction === 'incoming' ? conversation.unread + 1 : conversation.unread,
+      maxSeq: nextConversationMaxSeq(conversation, nextMessage),
+      receiverId: liveMessagePeerTarget(nextMessage) ?? conversation.receiverId,
+      groupId: nextMessage.groupId ?? conversation.groupId,
       messages: nextMessages,
     };
   });
@@ -960,6 +1072,14 @@ function sendMessageWithApi(messageApi: MessageApi, message: ChatMessage): Promi
   return messageApi.sendMessage(request).then((response) => serverMessageToChatMessage(response.message, message.senderId));
 }
 
+function sendErrorMessage(error: unknown, chatType: Conversation['chatType']) {
+  const message = error instanceof Error ? error.message : '';
+  if (chatType === 'group' && /group member|群|forbidden|permission/i.test(message)) {
+    return '没有群聊权限，无法发送消息';
+  }
+  return message || '发送消息失败';
+}
+
 function serverLastMessage(message: ServerMessage | undefined, currentUserId: string) {
   return message ? serverMessageToChatMessage(message, currentUserId) : undefined;
 }
@@ -979,6 +1099,8 @@ function webSocketEventToServerMessage(event: WebSocketServerEvent): ServerMessa
   if (!serverMsgId || !conversationId || !senderId || !chatType || !contentType || content === undefined || seq === undefined) {
     return null;
   }
+  const parsedChatType = chatType === 'group' ? 'group' : 'single';
+  const groupId = stringField(data, 'groupId', 'group_id') ?? (parsedChatType === 'group' ? conversationId.replace(/^group:/, '') : undefined);
 
   return {
     serverMsgId,
@@ -987,8 +1109,8 @@ function webSocketEventToServerMessage(event: WebSocketServerEvent): ServerMessa
     seq,
     senderId,
     receiverId: stringField(data, 'receiverId', 'receiver_id'),
-    groupId: stringField(data, 'groupId', 'group_id'),
-    chatType: chatType === 'group' ? 'group' : 'single',
+    groupId,
+    chatType: parsedChatType,
     contentType: parseMessageContentType(contentType),
     content,
     messageOrigin: messageOriginField(data),
@@ -1213,6 +1335,10 @@ function draftConversationId(userId: string) {
   return `draft-single:${userId}`;
 }
 
+function groupConversationId(groupId: string) {
+  return `group:${groupId}`;
+}
+
 function draftPeerId(conversationId: string) {
   return conversationId.replace(/^draft-single:/, '');
 }
@@ -1401,7 +1527,13 @@ function shouldPreserveMissingCurrentConversation(conversation: Conversation) {
 }
 
 function mergeConversation(current: Conversation, loaded: Conversation): Conversation {
-  const messages = canonicalChatMessages([...current.messages, ...loaded.messages]);
+  const groupMemberDisplayNames =
+    current.chatType === 'group' || loaded.chatType === 'group'
+      ? { ...(loaded.groupMemberDisplayNames ?? {}), ...(current.groupMemberDisplayNames ?? {}) }
+      : undefined;
+  const messages = canonicalChatMessages([...current.messages, ...loaded.messages]).map((message) =>
+    attachGroupSenderDisplayName(message, groupMemberDisplayNames),
+  );
   const orderedMessages = orderedChatMessages(messages);
   const lastMessage = orderedMessages[orderedMessages.length - 1];
   const title = shouldKeepCurrentTitle(current, loaded) ? current.title : loaded.title;
@@ -1419,6 +1551,7 @@ function mergeConversation(current: Conversation, loaded: Conversation): Convers
     unread,
     maxSeq,
     hasReadSeq,
+    groupMemberDisplayNames,
     messages,
   };
 }

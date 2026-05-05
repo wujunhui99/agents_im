@@ -27,7 +27,7 @@ func NewMemoryGroupsRepository() *MemoryGroupsRepository {
 	}
 }
 
-func (r *MemoryGroupsRepository) CreateGroup(_ context.Context, group model.Group, creatorUserID string) (model.Group, model.GroupMember, error) {
+func (r *MemoryGroupsRepository) CreateGroup(_ context.Context, group model.Group, creatorUserID string, memberUserIDs []string) (model.Group, []model.GroupMember, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -40,19 +40,34 @@ func (r *MemoryGroupsRepository) CreateGroup(_ context.Context, group model.Grou
 	group.CreatedAt = now
 	group.UpdatedAt = now
 
-	member := model.GroupMember{
-		GroupID:  group.GroupID,
-		UserID:   creatorUserID,
-		State:    model.MemberStateActive,
-		JoinedAt: now,
-	}
-
 	r.groups[group.GroupID] = group.Clone()
-	r.members[group.GroupID] = map[string]model.GroupMember{
-		creatorUserID: member.Clone(),
+	r.members[group.GroupID] = make(map[string]model.GroupMember, len(memberUserIDs))
+
+	members := make([]model.GroupMember, 0, len(memberUserIDs))
+	seen := make(map[string]struct{}, len(memberUserIDs)+1)
+	addMember := func(userID string) {
+		if userID == "" {
+			return
+		}
+		if _, ok := seen[userID]; ok {
+			return
+		}
+		seen[userID] = struct{}{}
+		member := model.GroupMember{
+			GroupID:  group.GroupID,
+			UserID:   userID,
+			State:    model.MemberStateActive,
+			JoinedAt: now,
+		}
+		r.members[group.GroupID][userID] = member.Clone()
+		members = append(members, member.Clone())
+	}
+	addMember(creatorUserID)
+	for _, userID := range memberUserIDs {
+		addMember(userID)
 	}
 
-	return group.Clone(), member.Clone(), nil
+	return group.Clone(), members, nil
 }
 
 func (r *MemoryGroupsRepository) GetGroup(_ context.Context, groupID string) (model.Group, error) {
@@ -65,6 +80,31 @@ func (r *MemoryGroupsRepository) GetGroup(_ context.Context, groupID string) (mo
 	}
 
 	return group.Clone(), nil
+}
+
+func (r *MemoryGroupsRepository) ListGroupsForUser(_ context.Context, userID string) ([]model.Group, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	groups := make([]model.Group, 0)
+	for groupID, groupMembers := range r.members {
+		member, exists := groupMembers[userID]
+		if !exists || member.State != model.MemberStateActive {
+			continue
+		}
+		group, exists := r.groups[groupID]
+		if !exists {
+			continue
+		}
+		groups = append(groups, group.Clone())
+	}
+	sort.Slice(groups, func(i, j int) bool {
+		if groups[i].UpdatedAt.Equal(groups[j].UpdatedAt) {
+			return groups[i].GroupID < groups[j].GroupID
+		}
+		return groups[i].UpdatedAt.After(groups[j].UpdatedAt)
+	})
+	return groups, nil
 }
 
 func (r *MemoryGroupsRepository) AddMember(_ context.Context, groupID string, userID string) (model.GroupMember, bool, error) {

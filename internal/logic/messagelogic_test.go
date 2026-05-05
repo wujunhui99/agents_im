@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -36,8 +37,8 @@ func TestGroupSendUsesActiveParticipantsForRecipientsAndVisibility(t *testing.T)
 		UserID:          "usr_left",
 		ConversationIDs: []string{sent.Message.ConversationID},
 	})
-	if err == nil || apperror.From(err).Code != apperror.CodeNotFound {
-		t.Fatalf("left member seq query error = %v, want NOT_FOUND", err)
+	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("left member seq query error = %v, want FORBIDDEN", err)
 	}
 }
 
@@ -69,12 +70,15 @@ func TestGroupMemberLeftCannotSeeNewMessages(t *testing.T) {
 		t.Fatalf("second recipient user ids = %+v, want [usr_receiver]", second.RecipientUserIDs)
 	}
 
-	leftState := mustSeqState(t, messageLogic, "usr_later_left", first.Message.ConversationID)
-	if leftState.MaxSeq != first.Message.Seq || leftState.UnreadCount != 1 {
-		t.Fatalf("left member visible state should stop at first message: %+v", leftState)
+	_, err = messageLogic.GetConversationSeqs(ctx, GetConversationSeqsRequest{
+		UserID:          "usr_later_left",
+		ConversationIDs: []string{first.Message.ConversationID},
+	})
+	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("left member explicit seq query error = %v, want FORBIDDEN", err)
 	}
 
-	pulled, err := messageLogic.PullMessages(ctx, PullMessagesRequest{
+	_, err = messageLogic.PullMessages(ctx, PullMessagesRequest{
 		UserID:         "usr_later_left",
 		ConversationID: first.Message.ConversationID,
 		FromSeq:        1,
@@ -82,11 +86,8 @@ func TestGroupMemberLeftCannotSeeNewMessages(t *testing.T) {
 		Limit:          10,
 		Order:          "asc",
 	})
-	if err != nil {
-		t.Fatalf("left member pull: %v", err)
-	}
-	if len(pulled.Messages) != 1 || pulled.Messages[0].ServerMsgID != first.Message.ServerMsgID {
-		t.Fatalf("left member should only pull previously visible message: %+v", pulled.Messages)
+	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("left member explicit pull error = %v, want FORBIDDEN", err)
 	}
 
 	_, err = messageLogic.MarkConversationAsRead(ctx, MarkConversationAsReadRequest{
@@ -94,8 +95,59 @@ func TestGroupMemberLeftCannotSeeNewMessages(t *testing.T) {
 		ConversationID: first.Message.ConversationID,
 		HasReadSeq:     second.Message.Seq,
 	})
-	if err == nil || apperror.From(err).Code != apperror.CodeInvalidArgument {
-		t.Fatalf("left member mark read error = %v, want INVALID_ARGUMENT", err)
+	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("left member mark read error = %v, want FORBIDDEN", err)
+	}
+}
+
+func TestGroupNewMemberHistoryStartsAfterJoinBoundary(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemoryMessageRepository()
+	groups := &testGroupMemberLister{
+		members: []GroupMemberInfo{
+			{UserID: "usr_sender", State: "active"},
+			{UserID: "usr_receiver", State: "active"},
+		},
+	}
+	messageLogic := NewMessageLogicWithValidators(repo, nil, groups)
+
+	first, err := messageLogic.SendMessage(ctx, groupSendRequest("usr_sender", "grp_joined_only", "client-before-join", "before join"))
+	if err != nil {
+		t.Fatalf("send first group message: %v", err)
+	}
+
+	groups.members = []GroupMemberInfo{
+		{UserID: "usr_sender", State: "active"},
+		{UserID: "usr_receiver", State: "active"},
+		{UserID: "usr_new_member", State: "active"},
+	}
+	second, err := messageLogic.SendMessage(ctx, groupSendRequest("usr_sender", "grp_joined_only", "client-after-join", "after join"))
+	if err != nil {
+		t.Fatalf("send second group message: %v", err)
+	}
+	sort.Strings(second.RecipientUserIDs)
+	if !reflect.DeepEqual(second.RecipientUserIDs, []string{"usr_new_member", "usr_receiver"}) {
+		t.Fatalf("second recipients = %+v, want new member and receiver", second.RecipientUserIDs)
+	}
+
+	newMemberState := mustSeqState(t, messageLogic, "usr_new_member", first.Message.ConversationID)
+	if newMemberState.MaxSeq != second.Message.Seq || newMemberState.UnreadCount != 1 {
+		t.Fatalf("new member state = %+v, want max seq %d and one unread", newMemberState, second.Message.Seq)
+	}
+
+	pulled, err := messageLogic.PullMessages(ctx, PullMessagesRequest{
+		UserID:         "usr_new_member",
+		ConversationID: first.Message.ConversationID,
+		FromSeq:        1,
+		ToSeq:          second.Message.Seq,
+		Limit:          10,
+		Order:          "asc",
+	})
+	if err != nil {
+		t.Fatalf("new member pull: %v", err)
+	}
+	if len(pulled.Messages) != 1 || pulled.Messages[0].ServerMsgID != second.Message.ServerMsgID {
+		t.Fatalf("new member messages = %+v, want only post-join message %s", pulled.Messages, second.Message.ServerMsgID)
 	}
 }
 
@@ -276,9 +328,21 @@ type testGroupMemberLister struct {
 	members []GroupMemberInfo
 }
 
-func (l *testGroupMemberLister) ListMembers(context.Context, ListMembersRequest) (ListMembersResponse, error) {
+func (l *testGroupMemberLister) ListMembers(_ context.Context, req ListMembersRequest) (ListMembersResponse, error) {
 	members := append([]GroupMemberInfo(nil), l.members...)
-	return ListMembersResponse{GroupID: "grp", Members: members}, nil
+	if strings.TrimSpace(req.RequesterUserID) != "" {
+		active := false
+		for _, member := range members {
+			if member.UserID == req.RequesterUserID && (member.State == "" || member.State == "active") {
+				active = true
+				break
+			}
+		}
+		if !active {
+			return ListMembersResponse{}, apperror.Forbidden("requester is not a group member")
+		}
+	}
+	return ListMembersResponse{GroupID: req.GroupID, Members: members}, nil
 }
 
 func groupSendRequest(senderID, groupID, clientMsgID, content string) SendMessageRequest {
