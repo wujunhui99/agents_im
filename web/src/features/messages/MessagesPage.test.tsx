@@ -317,6 +317,31 @@ afterEach(() => {
 });
 
 describe('MessagesPage real API mode', () => {
+  it('keeps the chat header and composer outside the scrollable message history region', async () => {
+    const manyMessages = Array.from({ length: 80 }, (_, index) =>
+      serverMessage({ seq: index + 1, content: `历史消息 ${index + 1}` }),
+    );
+    const messageApi = createMessageApi(manyMessages);
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} contactsApi={createContactsApiWithAcceptedPeerAvatar()} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Bob Lin/ }));
+
+    const chatWindow = screen.getByRole('region', { name: 'Bob Lin 聊天窗口' });
+    const header = within(chatWindow).getByRole('banner', { name: 'Bob Lin 聊天头部' });
+    const messageThread = within(chatWindow).getByTestId('message-thread-scroll-region');
+    const composer = within(chatWindow).getByRole('form', { name: '发送消息' });
+
+    expect(header.compareDocumentPosition(messageThread) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(messageThread.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header).toHaveTextContent('Bob Lin');
+    expect(within(header).getByRole('button', { name: '返回消息列表' })).toBeInTheDocument();
+    expect(within(composer).getByRole('textbox', { name: '输入消息' })).toBeInTheDocument();
+    expect(messageThread).toHaveClass('message-thread');
+    expect(messageThread).toHaveTextContent('历史消息 1');
+    expect(messageThread).toHaveTextContent('历史消息 80');
+  });
+
   it('hydrates group title and renders sender display names for group history', async () => {
     const user = userEvent.setup();
     const groupMessage = groupServerMessage({ seq: 1, content: '大家好' });
