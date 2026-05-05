@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strconv"
@@ -164,6 +165,7 @@ const (
 
 var ErrDeepSeekAPIKeyMissing = errors.New("deepseek API key is required: set DEEPSEEK_API_KEY")
 var ErrDeepSeekAPIKeyPlaceholder = errors.New("deepseek API key is a placeholder: set a real DEEPSEEK_API_KEY")
+var ErrObjectStorageExternalEndpointLoopback = errors.New("object storage external endpoint cannot be loopback in production")
 
 func DefaultAPIConfig() APIConfig {
 	return APIConfig{
@@ -742,7 +744,34 @@ func ResolveObjectStorageConfig(cfg ObjectStorageConfig, storageDriver string) (
 		return cfg, err
 	}
 	cfg.ExternalUseSSL = externalUseSSL
+	if err := ValidateObjectStorageConfig(cfg, storageDriver); err != nil {
+		return cfg, err
+	}
 	return cfg, nil
+}
+
+func ValidateObjectStorageConfig(cfg ObjectStorageConfig, storageDriver string) error {
+	if !IsProductionEnvironment() {
+		return nil
+	}
+	if ResolveStorageDriver(storageDriver) != StorageDriverPostgres || cfg.Driver != ObjectStorageDriverMinIO {
+		return nil
+	}
+	presignEndpoint := firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.ExternalEndpoint)), strings.TrimSpace(os.ExpandEnv(cfg.Endpoint)))
+	if isBrowserLocalEndpoint(presignEndpoint) {
+		return ErrObjectStorageExternalEndpointLoopback
+	}
+	return nil
+}
+
+func IsProductionEnvironment() bool {
+	for _, key := range []string{"AGENTS_IM_ENV", "APP_ENV", "GO_ENV", "ENVIRONMENT"} {
+		switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+		case "prod", "production":
+			return true
+		}
+	}
+	return false
 }
 
 func ValidateDeepSeekConfig(cfg DeepSeekConfig) error {
@@ -964,6 +993,39 @@ func normalizeOrigin(origin string) (string, error) {
 		return "", fmt.Errorf("gateway websocket allowed origin %q is invalid: expected exact scheme://host[:port]", origin)
 	}
 	return strings.ToLower(parsed.Scheme) + "://" + strings.ToLower(parsed.Host), nil
+}
+
+func isBrowserLocalEndpoint(endpoint string) bool {
+	host := endpointHost(endpoint)
+	if host == "" {
+		return false
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && (ip.IsLoopback() || ip.IsUnspecified())
+}
+
+func endpointHost(endpoint string) string {
+	endpoint = strings.TrimSpace(os.ExpandEnv(endpoint))
+	if endpoint == "" {
+		return ""
+	}
+	if strings.Contains(endpoint, "://") {
+		parsed, err := url.Parse(endpoint)
+		if err == nil {
+			return strings.Trim(parsed.Hostname(), "[]")
+		}
+	}
+	if slash := strings.Index(endpoint, "/"); slash >= 0 {
+		endpoint = endpoint[:slash]
+	}
+	if host, _, err := net.SplitHostPort(endpoint); err == nil {
+		return strings.Trim(host, "[]")
+	}
+	return strings.Trim(endpoint, "[]")
 }
 
 func resolveInt(current int, envValues ...string) (int, error) {

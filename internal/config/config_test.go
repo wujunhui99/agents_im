@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -303,6 +304,38 @@ ObjectStorage:
 	}
 	if cfg.ObjectStorage.ExternalUseSSL == nil || !*cfg.ObjectStorage.ExternalUseSSL {
 		t.Fatalf("external object storage UseSSL = %v, want true", cfg.ObjectStorage.ExternalUseSSL)
+	}
+}
+
+func TestLoadAPIConfigRejectsLoopbackObjectStorageExternalEndpointInProduction(t *testing.T) {
+	t.Setenv("AGENTS_IM_ENV", "production")
+	t.Setenv("OBJECT_STORAGE_USE_SSL", "")
+	t.Setenv("OBJECT_STORAGE_EXTERNAL_USE_SSL", "")
+
+	configPath := filepath.Join(t.TempDir(), "user-api.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: user-api
+StorageDriver: postgres
+ObjectStorage:
+  Driver: minio
+  Endpoint: 127.0.0.1:9000
+  ExternalEndpoint: 127.0.0.1:9000
+  Bucket: agents-im-media
+  Region: us-east-1
+  UseSSL: false
+  AccessKeyID: unit-test-access-key
+  SecretAccessKey: unit-test-secret-key
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = LoadAPIConfig(configPath)
+	if err == nil {
+		t.Fatal("expected production config with loopback object storage external endpoint to fail")
+	}
+	if !strings.Contains(err.Error(), "object storage external endpoint") || !strings.Contains(err.Error(), "loopback") {
+		t.Fatalf("expected loopback external endpoint error, got %v", err)
 	}
 }
 
