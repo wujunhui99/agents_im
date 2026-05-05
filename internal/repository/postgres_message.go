@@ -213,6 +213,9 @@ func (r *PostgresMessageRepository) GetMessagesForUser(ctx context.Context, user
 	if err != nil {
 		return nil, false, 0, err
 	}
+	if err := repairDirectConversationState(ctx, r.conn, userID, conversationID); err != nil {
+		return nil, false, 0, err
+	}
 
 	var state struct {
 		MaxSeq          int64 `db:"max_seq"`
@@ -242,6 +245,9 @@ where s.account_id = $1 and t.conversation_id = $2
 func (r *PostgresMessageRepository) GetConversationSeqStates(ctx context.Context, userID string, conversationIDs []string) ([]ConversationSeqState, error) {
 	ids := conversationIDs
 	if len(ids) == 0 {
+		if err := repairAllDirectConversationStates(ctx, r.conn, userID); err != nil {
+			return nil, err
+		}
 		if err := r.conn.QueryRowsCtx(ctx, &ids, `
 select conversation_id
 from user_conversation_states
@@ -254,6 +260,9 @@ order by updated_at desc, conversation_id asc
 
 	states := make([]ConversationSeqState, 0, len(ids))
 	for _, conversationID := range ids {
+		if err := repairDirectConversationState(ctx, r.conn, userID, conversationID); err != nil {
+			return nil, err
+		}
 		state, err := queryConversationSeqState(ctx, r.conn, userID, conversationID)
 		if err != nil {
 			if isNotFound(err) {
@@ -273,6 +282,9 @@ func (r *PostgresMessageRepository) SetUserHasReadSeqMax(ctx context.Context, us
 
 	var state ConversationSeqState
 	updated := false
+	if err := repairDirectConversationState(ctx, r.conn, userID, conversationID); err != nil {
+		return ConversationSeqState{}, false, err
+	}
 	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		var stateRow struct {
 			HasReadSeq      int64 `db:"last_read_seq"`
@@ -335,7 +347,7 @@ select exists (
   from user_conversation_states s
   join messages m on m.conversation_id = s.conversation_id
   where s.account_id = $1
-    and m.seq <= s.visible_start_seq
+    and m.seq > s.visible_start_seq
     and m.content_type in ($3, $4)
     and m.content ->> 'mediaId' = $2
 )
@@ -513,6 +525,43 @@ where s.account_id = $1 and t.conversation_id = $2
 		state.LastMessage = &message
 	}
 	return state, nil
+}
+
+func repairDirectConversationState(ctx context.Context, session sqlx.Session, userID string, conversationID string) error {
+	_, err := session.ExecCtx(ctx, `
+insert into user_conversation_states (account_id, conversation_id, last_read_seq, visible_start_seq)
+select $1, t.conversation_id, 0, 0
+from conversation_threads t
+where t.conversation_id = $2
+  and t.conversation_type = $3
+  and (t.single_account_a = $1 or t.single_account_b = $1)
+on conflict (account_id, conversation_id) do update
+set visible_start_seq = 0,
+    updated_at = case
+      when user_conversation_states.visible_start_seq <> 0 then now()
+      else user_conversation_states.updated_at
+    end
+where user_conversation_states.visible_start_seq <> 0
+`, userID, conversationID, ConversationTypeSingle)
+	return err
+}
+
+func repairAllDirectConversationStates(ctx context.Context, session sqlx.Session, userID string) error {
+	_, err := session.ExecCtx(ctx, `
+insert into user_conversation_states (account_id, conversation_id, last_read_seq, visible_start_seq)
+select $1, t.conversation_id, 0, 0
+from conversation_threads t
+where t.conversation_type = $2
+  and (t.single_account_a = $1 or t.single_account_b = $1)
+on conflict (account_id, conversation_id) do update
+set visible_start_seq = 0,
+    updated_at = case
+      when user_conversation_states.visible_start_seq <> 0 then now()
+      else user_conversation_states.updated_at
+    end
+where user_conversation_states.visible_start_seq <> 0
+`, userID, ConversationTypeSingle)
+	return err
 }
 
 func queryMessageByServerID(ctx context.Context, session sqlx.Session, serverMsgID string) (postgresMessageRow, error) {

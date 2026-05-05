@@ -592,7 +592,7 @@ function ChatWindow({
       <p className="inline-status" role="status">
         {status}
       </p>
-      <div className="message-thread" role="log" aria-label="聊天消息">
+      <div className="message-thread" role="log" aria-label="聊天消息" data-testid="message-thread-scroll-region">
         {sortedMessages.map((message) => (
           <article
             className={`message-row message-${message.direction} message-origin-${message.messageOrigin}`}
