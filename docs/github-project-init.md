@@ -1,6 +1,6 @@
 # GitHub Project 初始化结果
 
-Generated: 2026-05-05T09:15:34.782147+00:00
+Generated: 2026-05-05T09:39:25.336947+00:00
 
 - Repository: `wujunhui99/agents_im`
 - Repository URL: https://github.com/wujunhui99/agents_im
@@ -8,13 +8,13 @@ Generated: 2026-05-05T09:15:34.782147+00:00
 - Visibility: `PRIVATE`
 - Owner: `wujunhui99`
 - Project Name: `Agentic Development`
-- Project Number: `TODO`
-- Project URL: TODO
-- Project ID: `TODO`
+- Project Number: `2`
+- Project URL: https://github.com/users/wujunhui99/projects/2
+- Project ID: `PVT_kwHOAzF3L84BWv9P`
 - Project Owner: `wujunhui99`
 - 使用方式: GitHub CLI
-- Token 权限检查结果: missing project/read:project scopes; run `gh auth refresh -h github.com -s project -s read:project` interactively
-- 是否已关联当前仓库: TODO — add repository item/field metadata after Project scope is available.
+- Token 权限检查结果: project scope available
+- 是否已关联当前仓库: Yes — linked via `gh project link 2 --owner wujunhui99 --repo agents_im`.
 
 ## Required Project Fields
 
@@ -36,5 +36,5 @@ Create or confirm these fields on the Project:
 - Refresh scopes interactively before using Project automation:
 
 ```bash
-gh auth refresh -h github.com -s project -s read:project
+gh auth refresh -h github.com -s project
 ```
