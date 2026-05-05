@@ -17,14 +17,14 @@ create table if not exists agent_trigger_idempotency (
   idempotency_key text primary key,
   conversation_id text not null,
   agent_account_id text not null,
-  trigger_message_id text not null,
+  trigger_server_msg_id text not null,
   trigger_event_id text not null default '',
-  status smallint not null,
-  response_message_id text not null default '',
+  status text not null,
+  response_server_msg_id text not null default '',
   error_message text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists agent_trigger_idempotency_trigger_idx
-  on agent_trigger_idempotency (trigger_message_id, agent_account_id);
+  on agent_trigger_idempotency (trigger_server_msg_id, agent_account_id);

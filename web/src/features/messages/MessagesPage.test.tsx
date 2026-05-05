@@ -5,7 +5,7 @@ import { MessagesPage } from './MessagesPage';
 import type { ContactsApi } from '../../api/contacts';
 import type { Group, GroupMember, GroupsApi } from '../../api/groups';
 import type { CompleteMediaUploadResponse, CreateMediaUploadRequest, CreateMediaUploadResponse, MediaApi } from '../../api/media';
-import type { MessageApi, SendMessageRequest, SendMessageResponse, ServerMessage } from '../../api/messages';
+import type { AIHostingState, MessageApi, SendMessageRequest, SendMessageResponse, ServerMessage } from '../../api/messages';
 import type { WebSocketFactory, WebSocketLike } from '../../api/websocketClient';
 import type { UserApi, UserProfile, UserProfilePatch } from '../../api/user';
 
@@ -91,6 +91,26 @@ function createMessageApi(
     })),
     pullMessages: vi.fn(async (nextConversationId) => ({ conversationId: nextConversationId, messages })),
     markRead: vi.fn(async (nextConversationId, request) => ({ conversationId: nextConversationId, hasReadSeq: request.hasReadSeq })),
+    getAIHosting: vi.fn(async (nextConversationId) => ({
+      conversationId: nextConversationId,
+      chatType: 'single' as const,
+      enabled: false,
+      available: true,
+      peerEnabled: false,
+      unavailableReason: '',
+      maxRecentMessages: 30,
+      summaryEnabled: false,
+    })),
+    updateAIHosting: vi.fn(async (nextConversationId, request) => ({
+      conversationId: nextConversationId,
+      chatType: 'single' as const,
+      enabled: request.enabled,
+      available: true,
+      peerEnabled: false,
+      unavailableReason: '',
+      maxRecentMessages: 30,
+      summaryEnabled: false,
+    })),
   };
 }
 
@@ -317,6 +337,105 @@ afterEach(() => {
 });
 
 describe('MessagesPage real API mode', () => {
+  it('loads persisted AI hosting state and updates the direct chat toggle', async () => {
+    const user = userEvent.setup();
+    const aiState: AIHostingState = {
+      conversationId,
+      chatType: 'single',
+      enabled: true,
+      available: true,
+      peerEnabled: false,
+      unavailableReason: '',
+      maxRecentMessages: 30,
+      summaryEnabled: false,
+    };
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: '开启过托管的会话' })]);
+    messageApi.getAIHosting = vi.fn(async () => aiState);
+    messageApi.updateAIHosting = vi.fn(async (_nextConversationId, request) => ({ ...aiState, enabled: request.enabled }));
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} contactsApi={createContactsApiWithAcceptedPeerAvatar()} />);
+
+    await user.click(await screen.findByRole('button', { name: /Bob Lin/ }));
+    const hostingSwitch = await screen.findByRole('switch', { name: 'AI 托管' });
+    expect(hostingSwitch).toBeChecked();
+    expect(messageApi.getAIHosting).toHaveBeenCalledWith(conversationId);
+
+    await user.click(hostingSwitch);
+    await waitFor(() => expect(messageApi.updateAIHosting).toHaveBeenCalledWith(conversationId, { enabled: false }));
+    expect(hostingSwitch).not.toBeChecked();
+  });
+
+  it('shows a Chinese peer-hosted reason and disables the AI hosting toggle', async () => {
+    const aiState: AIHostingState = {
+      conversationId,
+      chatType: 'single',
+      enabled: false,
+      available: false,
+      peerEnabled: true,
+      unavailableReason: '对方已开启 AI 托管，本会话暂时只能由一方开启',
+      maxRecentMessages: 30,
+      summaryEnabled: false,
+    };
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: '对方托管中' })]);
+    messageApi.getAIHosting = vi.fn(async () => aiState);
+    messageApi.updateAIHosting = vi.fn();
+
+    const { unmount } = render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} contactsApi={createContactsApiWithAcceptedPeerAvatar()} />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: /Bob Lin/ }));
+    const hostingSwitch = await screen.findByRole('switch', { name: 'AI 托管' });
+    expect(hostingSwitch).toBeDisabled();
+    expect(hostingSwitch).not.toBeChecked();
+    expect(screen.getByText('对方已开启 AI 托管，本会话暂时只能由一方开启')).toBeInTheDocument();
+  });
+
+  it('surfaces AI hosting load errors with retry and hides the control for groups', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: '托管状态加载失败' })]);
+    messageApi.getAIHosting = vi.fn().mockRejectedValueOnce(new Error('AI 托管状态加载失败')).mockResolvedValueOnce({
+      conversationId,
+      chatType: 'single',
+      enabled: false,
+      available: true,
+      peerEnabled: false,
+      unavailableReason: '',
+      maxRecentMessages: 30,
+      summaryEnabled: false,
+    } satisfies AIHostingState);
+    messageApi.updateAIHosting = vi.fn();
+
+    const { unmount } = render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} contactsApi={createContactsApiWithAcceptedPeerAvatar()} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /Bob Lin/ }));
+    expect(await screen.findByText('AI 托管状态加载失败')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '重试 AI 托管状态' }));
+    await waitFor(() => expect(messageApi.getAIHosting).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole('switch', { name: 'AI 托管' })).toBeEnabled();
+    unmount();
+
+    const groupMessage = groupServerMessage({ seq: 1, content: '群聊不显示托管' });
+    vi.mocked(messageApi.getConversationSeqs).mockResolvedValueOnce({
+      states: [
+        {
+          conversationId: groupConversationId,
+          maxSeq: 1,
+          hasReadSeq: 0,
+          unreadCount: 1,
+          maxSeqTime: groupMessage.sendTime,
+          lastMessage: groupMessage,
+        },
+      ],
+    });
+    vi.mocked(messageApi.pullMessages).mockResolvedValueOnce({ conversationId: groupConversationId, messages: [groupMessage] });
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} groupsApi={createGroupsApi()} />);
+    await user.click(await screen.findByRole('button', { name: /项目群/ }));
+    expect(screen.queryByRole('switch', { name: 'AI 托管' })).not.toBeInTheDocument();
+  });
+
   it('keeps the chat header and composer outside the scrollable message history region', async () => {
     const manyMessages = Array.from({ length: 80 }, (_, index) =>
       serverMessage({ seq: index + 1, content: `历史消息 ${index + 1}` }),
