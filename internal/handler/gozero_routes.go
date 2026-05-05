@@ -2,7 +2,11 @@ package handler
 
 import (
 	"net/http"
+	"strings"
+	"time"
 
+	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/internal/auth/token"
 	agenthandler "github.com/wujunhui99/agents_im/internal/handler/agent"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
@@ -13,6 +17,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/svc"
 	"github.com/zeromicro/go-zero/rest"
+	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 func RegisterGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
@@ -121,7 +126,7 @@ func componentCheck(name string, ok bool, readyMessage string) health.Check {
 }
 
 func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
-	server.AddRoutes([]rest.Route{
+	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodGet,
 			Path:    "/me",
@@ -137,7 +142,7 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/me/avatar",
 			Handler: userhandler.UpdateMeAvatarHandler(serverCtx),
 		},
-	}, jwtOption(serverCtx))
+	}), jwtOption(serverCtx))
 
 	server.AddRoutes([]rest.Route{
 		{
@@ -174,7 +179,7 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 }
 
 func addMediaRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
-	server.AddRoutes([]rest.Route{
+	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,
 			Path:    "/media/uploads",
@@ -190,11 +195,11 @@ func addMediaRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/media/:media_id/download-url",
 			Handler: mediahandler.GetDownloadURLHandler(serverCtx),
 		},
-	}, jwtOption(serverCtx))
+	}), jwtOption(serverCtx))
 }
 
 func addFriendsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
-	server.AddRoutes([]rest.Route{
+	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,
 			Path:    "/friends",
@@ -230,11 +235,11 @@ func addFriendsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/friends/:user_id",
 			Handler: friendshandler.GetFriendshipHandler(serverCtx),
 		},
-	}, jwtOption(serverCtx))
+	}), jwtOption(serverCtx))
 }
 
 func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
-	server.AddRoutes([]rest.Route{
+	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,
 			Path:    "/groups",
@@ -260,11 +265,11 @@ func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/groups/:group_id/members",
 			Handler: groupshandler.ListMembersHandler(serverCtx),
 		},
-	}, jwtOption(serverCtx))
+	}), jwtOption(serverCtx))
 }
 
 func addMessageRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
-	server.AddRoutes([]rest.Route{
+	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,
 			Path:    "/messages",
@@ -285,11 +290,11 @@ func addMessageRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/conversations/:conversation_id/read",
 			Handler: messagehandler.MarkConversationAsReadHandler(serverCtx),
 		},
-	}, jwtOption(serverCtx))
+	}), jwtOption(serverCtx))
 }
 
 func addAgentRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
-	server.AddRoutes([]rest.Route{
+	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,
 			Path:    "/agents",
@@ -320,9 +325,47 @@ func addAgentRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Path:    "/agents/:agent_id",
 			Handler: agenthandler.DeleteAgentHandler(serverCtx),
 		},
-	}, jwtOption(serverCtx))
+	}), jwtOption(serverCtx))
 }
 
 func jwtOption(serverCtx *svc.ServiceContext) rest.RouteOption {
 	return rest.WithJwt(serverCtx.Auth.AccessSecret)
+}
+
+func authenticatedRoutes(serverCtx *svc.ServiceContext, routes []rest.Route) []rest.Route {
+	if serverCtx == nil || serverCtx.AuthSessions == nil {
+		return routes
+	}
+	return rest.WithMiddleware(activeSessionMiddleware(serverCtx), routes...)
+}
+
+func activeSessionMiddleware(serverCtx *svc.ServiceContext) rest.Middleware {
+	auth := serverCtx.Auth
+	tokenManager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			claims, err := tokenManager.Validate(bearerToken(r.Header.Get("Authorization")))
+			if err != nil {
+				httpx.ErrorCtx(r.Context(), w, err)
+				return
+			}
+			if err := authrepo.ValidateActiveSession(r.Context(), serverCtx.AuthSessions, claims); err != nil {
+				httpx.ErrorCtx(r.Context(), w, err)
+				return
+			}
+			next(w, r)
+		}
+	}
+}
+
+func bearerToken(headerValue string) string {
+	headerValue = strings.TrimSpace(headerValue)
+	if headerValue == "" {
+		return ""
+	}
+	parts := strings.Fields(headerValue)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+		return strings.TrimSpace(parts[1])
+	}
+	return ""
 }

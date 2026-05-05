@@ -215,7 +215,7 @@ func TestWebSocketGatewayUnregistersPresenceOnDisconnect(t *testing.T) {
 	}, "presence unregister after websocket disconnect")
 }
 
-func TestWebSocketGatewayPresenceTracksMultipleConnections(t *testing.T) {
+func TestWebSocketGatewayPresenceKeepsOnlyLatestConnection(t *testing.T) {
 	store := presence.NewMemoryStore()
 	app, server, cleanup := newGatewayWSAppTestServerWithPresence(t, store)
 	defer cleanup()
@@ -227,8 +227,16 @@ func TestWebSocketGatewayPresenceTracksMultipleConnections(t *testing.T) {
 
 	waitFor(t, func() bool {
 		connections, err := store.ListUserConnections(context.Background(), "usr_ws_presence_multi")
-		return err == nil && len(connections) == 2 && app.Connections().UserCount("usr_ws_presence_multi") == 2
-	}, "two websocket presence records")
+		return err == nil && len(connections) == 1 && app.Connections().UserCount("usr_ws_presence_multi") == 1
+	}, "latest websocket presence record")
+
+	if err := connA.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set replaced connection deadline: %v", err)
+	}
+	_, _, err := connA.ReadMessage()
+	if !websocket.IsCloseError(err, gatewayws.CloseCodeSessionReplaced) {
+		t.Fatalf("replaced connection read error = %v, want close code %d", err, gatewayws.CloseCodeSessionReplaced)
+	}
 
 	result, err := app.PushToUser(context.Background(), "usr_ws_presence_multi", delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
 		ServerMsgID:    "msg_presence_multi_1",
@@ -241,10 +249,9 @@ func TestWebSocketGatewayPresenceTracksMultipleConnections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("push with multiple presence connections: %v", err)
 	}
-	if result.DeliveredConnections != 2 || len(result.Recipients) != 1 || len(result.Recipients[0].Routes) != 2 {
-		t.Fatalf("unexpected multiple connection routing result: %+v", result)
+	if result.DeliveredConnections != 1 || len(result.Recipients) != 1 || len(result.Recipients[0].Routes) != 1 {
+		t.Fatalf("unexpected single connection routing result: %+v", result)
 	}
-	_ = readWSPushEvent(t, connA)
 	_ = readWSPushEvent(t, connB)
 }
 
@@ -307,13 +314,16 @@ func TestWebSocketGatewaySendAndPullMessages(t *testing.T) {
 }
 
 func TestWebSocketGatewaySendMessagePushesToOnlineReceiver(t *testing.T) {
-	server, cleanup := newGatewayWSTestServer(t)
+	app, server, cleanup := newGatewayWSAppTestServer(t)
 	defer cleanup()
 
 	senderConn := dialGatewayWS(t, server.URL, "usr_ws_live_sender")
 	defer senderConn.Close()
 	receiverConn := dialGatewayWS(t, server.URL, "usr_ws_live_receiver")
 	defer receiverConn.Close()
+	waitFor(t, func() bool {
+		return app.Connections().UserCount("usr_ws_live_receiver") == 1
+	}, "receiver websocket registered before live-push send")
 
 	sent := sendWSMessage(t, senderConn, "req-live-send", "usr_ws_live_receiver", "client-live-1", "live hello")
 	push := readWSPushEvent(t, receiverConn)
@@ -500,7 +510,7 @@ func TestWebSocketGatewayInvalidCommandReturnsFrontendErrorEnvelope(t *testing.T
 	}
 }
 
-func TestWebSocketGatewayPushFanoutDeliversToAllUserConnections(t *testing.T) {
+func TestWebSocketGatewayPushDeliversToLatestUserConnectionOnly(t *testing.T) {
 	app, server, cleanup := newGatewayWSAppTestServer(t)
 	defer cleanup()
 
@@ -509,8 +519,16 @@ func TestWebSocketGatewayPushFanoutDeliversToAllUserConnections(t *testing.T) {
 	connB := dialGatewayWS(t, server.URL, "usr_ws_push")
 	defer connB.Close()
 	waitFor(t, func() bool {
-		return app.Connections().UserCount("usr_ws_push") == 2
-	}, "two websocket connections registered")
+		return app.Connections().UserCount("usr_ws_push") == 1
+	}, "latest websocket connection registered")
+
+	if err := connA.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set replaced connection deadline: %v", err)
+	}
+	_, _, err := connA.ReadMessage()
+	if !websocket.IsCloseError(err, gatewayws.CloseCodeSessionReplaced) {
+		t.Fatalf("replaced connection read error = %v, want close code %d", err, gatewayws.CloseCodeSessionReplaced)
+	}
 
 	event := delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
 		ServerMsgID:    "msg_push_1",
@@ -529,22 +547,19 @@ func TestWebSocketGatewayPushFanoutDeliversToAllUserConnections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("push to user: %v", err)
 	}
-	if result.DeliveredRecipients != 1 || result.DeliveredConnections != 2 || result.OfflineRecipients != 0 {
+	if result.DeliveredRecipients != 1 || result.DeliveredConnections != 1 || result.OfflineRecipients != 0 {
 		t.Fatalf("unexpected push result: %+v", result)
 	}
 
-	pushA := readWSPushEvent(t, connA)
-	pushB := readWSPushEvent(t, connB)
-	for name, got := range map[string]delivery.Event{"connA": pushA, "connB": pushB} {
-		if got.Type != delivery.EventMessageReceived {
-			t.Fatalf("%s push type = %q, want %q", name, got.Type, delivery.EventMessageReceived)
-		}
-		if got.Data.ServerMsgID != "msg_push_1" || got.Data.ConversationID != "single:usr_ws_sender:usr_ws_push" || got.Data.Seq != 7 {
-			t.Fatalf("%s push message mismatch: %+v", name, got.Data)
-		}
-		if got.Data.SenderID != "usr_ws_sender" || got.Data.ContentType != "text" || got.Data.ContentMetadata["encoding"] != "plain" {
-			t.Fatalf("%s push content metadata mismatch: %+v", name, got.Data)
-		}
+	push := readWSPushEvent(t, connB)
+	if push.Type != delivery.EventMessageReceived {
+		t.Fatalf("push type = %q, want %q", push.Type, delivery.EventMessageReceived)
+	}
+	if push.Data.ServerMsgID != "msg_push_1" || push.Data.ConversationID != "single:usr_ws_sender:usr_ws_push" || push.Data.Seq != 7 {
+		t.Fatalf("push message mismatch: %+v", push.Data)
+	}
+	if push.Data.SenderID != "usr_ws_sender" || push.Data.ContentType != "text" || push.Data.ContentMetadata["encoding"] != "plain" {
+		t.Fatalf("push content metadata mismatch: %+v", push.Data)
 	}
 }
 

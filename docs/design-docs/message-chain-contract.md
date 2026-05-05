@@ -256,8 +256,8 @@ Behavior:
 - For group chat, `group_id` is required and `receiver_id` must be empty.
 - `client_msg_id` is required.
 - `text` content is plain text, non-empty after trim, <= 4096 characters.
-- `image` content is JSON with at least `mediaId`; the media record must be owned by the sender, `purpose=message_image`, `status=ready`, `content_type=image/*` from the allowlist, and under the image size limit.
-- `file` content is JSON with `mediaId`, `filename`, `sizeBytes`, and `contentType`; the media record must be owned by the sender, `purpose=message_file`, `status=ready`, and the message metadata must match the media record.
+- `image` content is JSON with at least `mediaId`; the media record must be owned by the sender, `purpose=message_image`, `status=ready`, `content_type=image/*` from the allowlist, and <= 15 MiB.
+- `file` content is JSON with `mediaId`, `filename`, `sizeBytes`, and `contentType`; the media record must be owned by the sender, `purpose=message_file`, `status=ready`, <= 20 MiB, and the message metadata must match the media record.
 - Same `sender_id + client_msg_id` returns the prior message if payload matches.
 - Different payload for same idempotency key returns idempotency conflict.
 
@@ -579,7 +579,7 @@ Emitted after `has_read_seq` advances.
 
 Media metadata is stored in PostgreSQL `media_objects`; object bytes live in MinIO/S3-compatible storage. Message send does not trust client-provided object keys or URLs. For image/file messages it validates only a `mediaId` reference and requires the media record to be ready and owned by the sender before persisting the message.
 
-Phase 1 download URL authorization for `/media/:media_id/download-url` is owner-only. When frontend media messaging is wired end to end, message attachment reads must add conversation-participant authorization before participants can fetch media they did not upload.
+Download URL authorization for `/media/:media_id/download-url` is owner-only for non-message media. Image/file message attachments also allow conversation participants who can see the message containing the referenced `mediaId`.
 
 ## Storage contract
 

@@ -107,6 +107,112 @@ func TestMessageMediaValidation(t *testing.T) {
 	}
 }
 
+func TestMessageMediaValidationEnforcesMessageSizeLimits(t *testing.T) {
+	cases := []struct {
+		name        string
+		media       model.MediaObject
+		contentType string
+		content     func(string) string
+		wantErr     bool
+	}{
+		{
+			name: "image accepts fifteen mib",
+			media: model.MediaObject{
+				MediaID:     "med_image_15_mib",
+				OwnerUserID: "usr_sender",
+				Bucket:      "agents-im-media",
+				ObjectKey:   "users/usr_sender/media/med_image_15_mib/image.jpg",
+				ContentType: "image/jpeg",
+				SizeBytes:   15 * 1024 * 1024,
+				Purpose:     model.MediaPurposeMessageImage,
+				Status:      model.MediaStatusReady,
+			},
+			contentType: MessageContentTypeImage,
+			content:     func(mediaID string) string { return fmt.Sprintf(`{"mediaId":%q,"width":100,"height":100}`, mediaID) },
+		},
+		{
+			name: "image rejects over fifteen mib",
+			media: model.MediaObject{
+				MediaID:     "med_image_over_15_mib",
+				OwnerUserID: "usr_sender",
+				Bucket:      "agents-im-media",
+				ObjectKey:   "users/usr_sender/media/med_image_over_15_mib/image.jpg",
+				ContentType: "image/jpeg",
+				SizeBytes:   15*1024*1024 + 1,
+				Purpose:     model.MediaPurposeMessageImage,
+				Status:      model.MediaStatusReady,
+			},
+			contentType: MessageContentTypeImage,
+			content:     func(mediaID string) string { return fmt.Sprintf(`{"mediaId":%q,"width":100,"height":100}`, mediaID) },
+			wantErr:     true,
+		},
+		{
+			name: "file accepts twenty mib",
+			media: model.MediaObject{
+				MediaID:          "med_file_20_mib",
+				OwnerUserID:      "usr_sender",
+				Bucket:           "agents-im-media",
+				ObjectKey:        "users/usr_sender/media/med_file_20_mib/report.pdf",
+				ContentType:      "application/pdf",
+				SizeBytes:        20 * 1024 * 1024,
+				OriginalFilename: "report.pdf",
+				Purpose:          model.MediaPurposeMessageFile,
+				Status:           model.MediaStatusReady,
+			},
+			contentType: MessageContentTypeFile,
+			content: func(mediaID string) string {
+				return fmt.Sprintf(`{"mediaId":%q,"filename":"report.pdf","sizeBytes":20971520,"contentType":"application/pdf"}`, mediaID)
+			},
+		},
+		{
+			name: "file rejects over twenty mib",
+			media: model.MediaObject{
+				MediaID:          "med_file_over_20_mib",
+				OwnerUserID:      "usr_sender",
+				Bucket:           "agents-im-media",
+				ObjectKey:        "users/usr_sender/media/med_file_over_20_mib/report.pdf",
+				ContentType:      "application/pdf",
+				SizeBytes:        20*1024*1024 + 1,
+				OriginalFilename: "report.pdf",
+				Purpose:          model.MediaPurposeMessageFile,
+				Status:           model.MediaStatusReady,
+			},
+			contentType: MessageContentTypeFile,
+			content: func(mediaID string) string {
+				return fmt.Sprintf(`{"mediaId":%q,"filename":"report.pdf","sizeBytes":20971521,"contentType":"application/pdf"}`, mediaID)
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			messageRepo := repository.NewMemoryMessageRepository()
+			mediaRepo := repository.NewMemoryMediaRepository()
+			mediaLogic := NewMediaLogic(mediaRepo, nil, "agents-im-media")
+			messageLogic := NewMessageLogicWithMediaValidator(messageRepo, nil, nil, mediaLogic)
+			media := createMediaForTest(t, mediaRepo, tc.media)
+
+			_, err := messageLogic.SendMessage(ctx, SendMessageRequest{
+				SenderID:    "usr_sender",
+				ReceiverID:  "usr_receiver",
+				ChatType:    MessageChatTypeSingle,
+				ClientMsgID: "client-" + tc.name,
+				ContentType: tc.contentType,
+				Content:     tc.content(media.MediaID),
+			})
+			if tc.wantErr {
+				assertLogicAppCode(t, err, apperror.CodeInvalidArgument)
+				return
+			}
+			if err != nil {
+				t.Fatalf("send message: %v", err)
+			}
+		})
+	}
+}
+
 func TestTextMessagesContinueWithoutMediaValidator(t *testing.T) {
 	messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
 	if _, err := messageLogic.SendMessage(context.Background(), logicTestSendRequest("usr_text_a", "usr_text_b", "client-text-no-media", "hello")); err != nil {

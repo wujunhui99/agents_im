@@ -57,9 +57,21 @@ create table if not exists auth_credentials (
   account_id text primary key,
   password_hash text not null,
   password_algo smallint not null default 1,
+  active_session_id text not null default '',
+  active_session_issued_at timestamptz,
+  active_session_expires_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table if exists auth_credentials
+  add column if not exists active_session_id text not null default '';
+
+alter table if exists auth_credentials
+  add column if not exists active_session_issued_at timestamptz;
+
+alter table if exists auth_credentials
+  add column if not exists active_session_expires_at timestamptz;
 
 create table if not exists friendships (
   account_id text not null,
@@ -201,6 +213,9 @@ create table if not exists message_outbox (
   published_at timestamptz,
   constraint message_outbox_event_aggregate_uniq unique (event_type, aggregate_type, aggregate_id)
 );
+
+alter table message_outbox
+  add column if not exists message_id text not null default '';
 
 create index if not exists message_outbox_pending_idx
   on message_outbox (status, next_attempt_at, created_at, event_id);

@@ -55,6 +55,30 @@ function emptyFriendRequestsResponse() {
   return jsonResponse({ code: 'OK', message: 'ok', data: { incoming: [], outgoing: [] } });
 }
 
+function pendingResponse() {
+  return new Promise<Response>(() => {});
+}
+
+function fetchPath(input: RequestInfo | URL) {
+  if (typeof input === 'string') {
+    return input;
+  }
+  if (input instanceof URL) {
+    return `${input.pathname}${input.search}`;
+  }
+  return input.url;
+}
+
+function fetchMethod(init: RequestInit | undefined) {
+  return init?.method ?? 'GET';
+}
+
+function countFetchCalls(mock: { mock: { calls: unknown[][] } }, path: string, method = 'GET') {
+  return mock.mock.calls.filter(
+    ([input, init]) => fetchPath(input as RequestInfo | URL) === path && fetchMethod(init as RequestInit | undefined) === method,
+  ).length;
+}
+
 describe('Auth flow', () => {
   const fetchMock = vi.fn();
 
@@ -71,19 +95,21 @@ describe('Auth flow', () => {
 
   it('shows a WeChat-style login page before authentication and saves the login token', async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        code: 'OK',
-        message: 'ok',
-        data: {
-          user_id: '1001',
-          identifier: 'alice_001',
-          display_name: 'Alice Chen',
-          token: 'login-token',
-          expires_at: '2026-04-30T12:00:00Z',
-        },
-      }),
-    );
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK', message: 'ok', data: { exists: true, identifier: 'alice_001' } }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            user_id: '1001',
+            identifier: 'alice_001',
+            display_name: 'Alice Chen',
+            token: 'login-token',
+            expires_at: '2026-04-30T12:00:00Z',
+          },
+        }),
+      );
 
     render(<App />);
 
@@ -96,6 +122,12 @@ describe('Auth flow', () => {
 
     expect(await screen.findByRole('heading', { name: '消息' })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
+      '/users/exists?identifier=alice_001',
+      expect.objectContaining({
+        method: 'GET',
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
       '/auth/login',
       expect.objectContaining({
         method: 'POST',
@@ -106,6 +138,25 @@ describe('Auth flow', () => {
       token: 'login-token',
       user: { identifier: 'alice_001', displayName: 'Alice Chen' },
     });
+  });
+
+  it('checks whether the login identifier exists when the password field receives focus', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', message: 'ok', data: { exists: false, identifier: 'missing_001' } }));
+
+    render(<App />);
+
+    await user.type(screen.getByLabelText('账号'), 'missing_001');
+    await user.click(screen.getByLabelText('密码'));
+
+    expect(await screen.findByText('账号不存在，请检查后再输入密码')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/users/exists?identifier=missing_001',
+      expect.objectContaining({
+        method: 'GET',
+      }),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith('/auth/login', expect.anything());
   });
 
   it('registers a new account and enters the four-tab shell', async () => {
@@ -220,6 +271,211 @@ describe('WeChat-inspired app shell', () => {
     await user.click(screen.getByRole('tab', { name: /我的/i }));
     expect(screen.getByRole('heading', { name: '我的' })).toBeInTheDocument();
     expect(screen.getAllByText(/alice_001/).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the loaded contacts tab state when switching away and back without refetching friends or requests', async () => {
+    const user = userEvent.setup();
+    const blockedRefetch = pendingResponse();
+    fetchMock.mockReset();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      if (path === '/conversations/seqs?conversationIds=') {
+        return Promise.resolve(emptySeqsResponse());
+      }
+      if (path === '/friends' && fetchMethod(init) === 'GET') {
+        if (countFetchCalls(fetchMock, '/friends') === 1) {
+          return Promise.resolve(
+            jsonResponse({
+              code: 'OK',
+              message: 'ok',
+              data: {
+                friends: [
+                  {
+                    user_id: '1001',
+                    friend_id: '2002',
+                    status: 'accepted',
+                    is_friend: true,
+                    friend: {
+                      user_id: '2002',
+                      identifier: 'bob_002',
+                      display_name: 'Bob Lin',
+                      name: 'Bob Lin',
+                      gender: '',
+                      birth_date: '',
+                      region: 'Hangzhou',
+                    },
+                    created_at: '2026-04-29T12:00:00Z',
+                    updated_at: '2026-04-29T12:00:00Z',
+                  },
+                ],
+              },
+            }),
+          );
+        }
+        return blockedRefetch;
+      }
+      if (path === '/friends/requests' && fetchMethod(init) === 'GET') {
+        if (countFetchCalls(fetchMock, '/friends/requests') === 1) {
+          return Promise.resolve(
+            jsonResponse({
+              code: 'OK',
+              message: 'ok',
+              data: {
+                incoming: [
+                  {
+                    user_id: '2003',
+                    friend_id: '1001',
+                    status: 'pending',
+                    is_friend: false,
+                    profile: {
+                      user_id: '2003',
+                      identifier: 'carol_003',
+                      display_name: 'Carol Wu',
+                      name: 'Carol Wu',
+                      gender: '',
+                      birth_date: '',
+                      region: '',
+                    },
+                    created_at: '2026-04-29T12:10:00Z',
+                    updated_at: '2026-04-29T12:10:00Z',
+                  },
+                ],
+                outgoing: [],
+              },
+            }),
+          );
+        }
+        return blockedRefetch;
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${path}`));
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+    const friendsRegion = screen.getByRole('region', { name: '好友列表' });
+    expect(await within(friendsRegion).findByRole('button', { name: '和 bob_002 聊天' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '同意 carol_003' })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('按账号搜索用户'), 'cached-search');
+
+    await user.click(screen.getByRole('tab', { name: /发现/i }));
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+
+    expect(within(screen.getByRole('region', { name: '好友列表' })).getByRole('button', { name: '和 bob_002 聊天' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '同意 carol_003' })).toBeInTheDocument();
+    expect(screen.getByLabelText('按账号搜索用户')).toHaveValue('cached-search');
+    expect(countFetchCalls(fetchMock, '/friends')).toBe(1);
+    expect(countFetchCalls(fetchMock, '/friends/requests')).toBe(1);
+  });
+
+  it('keeps the loaded messages tab state when switching away and back without refetching conversation seqs', async () => {
+    const user = userEvent.setup();
+    const blockedRefetch = pendingResponse();
+    fetchMock.mockReset();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      if (path === '/conversations/seqs?conversationIds=' && fetchMethod(init) === 'GET') {
+        if (countFetchCalls(fetchMock, '/conversations/seqs?conversationIds=') === 1) {
+          return Promise.resolve(
+            jsonResponse({
+              code: 'OK',
+              message: 'ok',
+              data: {
+                states: [
+                  {
+                    conversationId: 'single:1001:2002',
+                    maxSeq: 1,
+                    hasReadSeq: 1,
+                    unreadCount: 0,
+                    maxSeqTime: 1777464300000,
+                    lastMessage: {
+                      serverMsgId: 'srv-cache-1',
+                      clientMsgId: 'client-cache-1',
+                      conversationId: 'single:1001:2002',
+                      seq: 1,
+                      senderId: '2002',
+                      receiverId: '1001',
+                      groupId: '',
+                      chatType: 'single',
+                      contentType: 'text',
+                      content: 'cached conversation preview',
+                      sendTime: 1777464300000,
+                      createdAt: 1777464300000,
+                    },
+                  },
+                ],
+              },
+            }),
+          );
+        }
+        return blockedRefetch;
+      }
+      if (path === '/conversations/single%3A1001%3A2002/messages?fromSeq=1&limit=50&order=asc' && fetchMethod(init) === 'GET') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              conversationId: 'single:1001:2002',
+              messages: [
+                {
+                  serverMsgId: 'srv-cache-1',
+                  clientMsgId: 'client-cache-1',
+                  conversationId: 'single:1001:2002',
+                  seq: 1,
+                  senderId: '2002',
+                  receiverId: '1001',
+                  groupId: '',
+                  chatType: 'single',
+                  contentType: 'text',
+                  content: 'cached conversation preview',
+                  sendTime: 1777464300000,
+                  createdAt: 1777464300000,
+                },
+              ],
+            },
+          }),
+        );
+      }
+      if (path === '/friends' && fetchMethod(init) === 'GET') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              friends: [
+                {
+                  user_id: '1001',
+                  friend_id: '2002',
+                  status: 'accepted',
+                  is_friend: true,
+                  friend: {
+                    user_id: '2002',
+                    identifier: 'bob_002',
+                    display_name: 'Bob Lin',
+                    name: 'Bob Lin',
+                  },
+                  created_at: '2026-04-29T12:00:00Z',
+                  updated_at: '2026-04-29T12:00:00Z',
+                },
+              ],
+            },
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${path}`));
+    });
+
+    render(<App />);
+
+    const row = await screen.findByRole('button', { name: /Bob Lin/ });
+    expect(within(row).getByText('cached conversation preview')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /发现/i }));
+    await user.click(screen.getByRole('tab', { name: /消息/i }));
+
+    expect(within(screen.getByRole('button', { name: /Bob Lin/ })).getByText('cached conversation preview')).toBeInTheDocument();
+    expect(countFetchCalls(fetchMock, '/conversations/seqs?conversationIds=')).toBe(1);
   });
 
   it('wires the message top-bar add button to the start-chat panel', async () => {
@@ -346,6 +602,15 @@ describe('WeChat-inspired app shell', () => {
                 friend_id: '2002',
                 status: 'accepted',
                 is_friend: true,
+                friend: {
+                  user_id: '2002',
+                  identifier: 'bob_002',
+                  display_name: 'Bob',
+                  name: 'Bob',
+                  gender: '',
+                  birth_date: '',
+                  region: '',
+                },
                 created_at: '2026-04-29T12:00:00Z',
                 updated_at: '2026-04-29T12:00:00Z',
               },
@@ -552,6 +817,15 @@ describe('WeChat-inspired app shell', () => {
                 friend_id: '2002',
                 status: 'accepted',
                 is_friend: true,
+                friend: {
+                  user_id: '2002',
+                  identifier: 'bob_002',
+                  display_name: 'Bob',
+                  name: 'Bob',
+                  gender: '',
+                  birth_date: '',
+                  region: '',
+                },
                 created_at: '2026-04-29T12:00:00Z',
                 updated_at: '2026-04-29T12:00:00Z',
               },
@@ -595,7 +869,7 @@ describe('WeChat-inspired app shell', () => {
 
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
 
-    expect(await screen.findByRole('button', { name: '和 未知联系人 聊天' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '和 bob_002 聊天' })).toBeInTheDocument();
     expect(screen.queryByText('2002')).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/friends', expect.objectContaining({ method: 'GET' }));
 
@@ -671,7 +945,7 @@ describe('WeChat-inspired app shell', () => {
     });
   });
 
-  it('opens a chat from a friend by loading the existing direct conversation', async () => {
+  it('opens a chat from a friend without remounting or refetching the messages page', async () => {
     const user = userEvent.setup();
     fetchMock.mockReset();
     fetchMock
@@ -779,17 +1053,10 @@ describe('WeChat-inspired app shell', () => {
     await user.click(await screen.findByRole('button', { name: '和 bob_002 聊天' }));
 
     expect(await screen.findByRole('heading', { name: 'Bob', level: 2 })).toBeInTheDocument();
-    expect(await screen.findByText('existing chat from Bob')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '输入消息' })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/conversations/seqs?conversationIds=', expect.objectContaining({ method: 'GET' }));
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/conversations/single%3A1001%3A2002/messages?fromSeq=1&limit=50&order=asc',
-      expect.objectContaining({ method: 'GET' }),
-    );
+    expect(countFetchCalls(fetchMock, '/conversations/seqs?conversationIds=')).toBe(1);
     expect(fetchMock).not.toHaveBeenCalledWith('/users/2002', expect.objectContaining({ method: 'GET' }));
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/conversations/single%3A1001%3A2002/read',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ hasReadSeq: 1 }) }),
-    );
   });
 
   it('shows existing conversations immediately when opening the messages tab after navigation', async () => {
@@ -922,7 +1189,9 @@ describe('WeChat-inspired app shell', () => {
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
     await user.click(screen.getByRole('tab', { name: /消息/i }));
 
-    expect(await screen.findByText('暂无会话')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /未知联系人/ })).toBeInTheDocument();
+    expect(screen.getByText('hello alice')).toBeInTheDocument();
+    expect(countFetchCalls(fetchMock, '/conversations/seqs?conversationIds=')).toBe(1);
   });
 
   it('loads real conversations and sends messages through the message API', async () => {
@@ -1040,7 +1309,8 @@ describe('WeChat-inspired app shell', () => {
     await user.click(screen.getByRole('button', { name: '发送' }));
 
     expect(screen.getByText('这是测试消息')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('已发送')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('img', { name: '发送成功' })).toHaveTextContent('✔'));
+    expect(screen.queryByText('已发送')).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/messages',
       expect.objectContaining({

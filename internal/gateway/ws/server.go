@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
@@ -29,24 +30,27 @@ import (
 const CommandHeartbeat = gateway.CommandHeartbeat
 
 const (
-	defaultReadLimit = 64 * 1024
-	defaultWriteWait = 10 * time.Second
+	CloseCodeSessionReplaced = 4001
+	CloseCodeSessionInvalid  = 4002
+	defaultReadLimit         = 64 * 1024
+	defaultWriteWait         = 10 * time.Second
 )
 
 type Server struct {
-	auth         config.JWTAuthConfig
-	tokenManager token.Manager
-	messageLogic *logic.MessageLogic
-	connections  *ConnectionManager
-	dispatcher   delivery.Dispatcher
-	presence     presence.PresenceStore
-	presenceTTL  time.Duration
-	instanceID   string
-	wsConfig     config.GatewayWSConfig
-	configErr    error
-	origins      map[string]struct{}
-	upgrader     websocket.Upgrader
-	now          func() time.Time
+	auth           config.JWTAuthConfig
+	tokenManager   token.Manager
+	activeSessions authrepo.ActiveSessionRepository
+	messageLogic   *logic.MessageLogic
+	connections    *ConnectionManager
+	dispatcher     delivery.Dispatcher
+	presence       presence.PresenceStore
+	presenceTTL    time.Duration
+	instanceID     string
+	wsConfig       config.GatewayWSConfig
+	configErr      error
+	origins        map[string]struct{}
+	upgrader       websocket.Upgrader
+	now            func() time.Time
 }
 
 type ServerOption func(*Server)
@@ -59,6 +63,7 @@ type Connection struct {
 	UserAgent   string
 	DeviceID    string
 	Platform    string
+	SessionID   string
 	ConnectedAt time.Time
 	TraceID     string
 	RequestID   string
@@ -151,6 +156,12 @@ func WithTokenManager(manager token.Manager) ServerOption {
 		if manager != nil {
 			s.tokenManager = manager
 		}
+	}
+}
+
+func WithActiveSessionRepository(repo authrepo.ActiveSessionRepository) ServerOption {
+	return func(s *Server) {
+		s.activeSessions = repo
 	}
 }
 
@@ -250,6 +261,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		UserAgent:   r.UserAgent(),
 		DeviceID:    strings.TrimSpace(r.Header.Get("X-Device-ID")),
 		Platform:    clientPlatform(r),
+		SessionID:   claims.SessionID,
 		ConnectedAt: now,
 		TraceID:     traceContext.TraceID,
 		RequestID:   traceContext.RequestID,
@@ -258,7 +270,10 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		limiter:     newCommandRateLimiter(s.wsConfig, s.now),
 	}
 	_ = s.registerPresence(r.Context(), conn)
-	s.connections.Register(conn)
+	replaced := s.connections.Register(conn)
+	for _, previous := range replaced {
+		_ = previous.closeWithCode(CloseCodeSessionReplaced, "session replaced")
+	}
 	observability.RecordWebSocketConnectionEvent("opened")
 	observability.SetWebSocketConnections(s.connections.Count())
 	log.Printf("websocket_connected trace_id=%s request_id=%s connection_id=%s user_id=%s instance_id=%s", conn.TraceID, conn.RequestID, conn.ID, conn.UserID, conn.InstanceID)
@@ -321,6 +336,39 @@ func (s *Server) HandleInternalConversationDelivery(w http.ResponseWriter, r *ht
 	_ = json.NewEncoder(w).Encode(result)
 }
 
+func (s *Server) HandleInternalUserPresence(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	userID := strings.TrimSpace(r.URL.Query().Get("user_id"))
+	if userID == "" {
+		http.Error(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+	online, err := s.IsUserOnline(r.Context(), userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(struct {
+		UserID string `json:"user_id"`
+		Online bool   `json:"online"`
+	}{
+		UserID: userID,
+		Online: online,
+	})
+}
+
+func (s *Server) IsUserOnline(ctx context.Context, userID string) (bool, error) {
+	if s.presence == nil {
+		return false, errors.New("presence store is not configured")
+	}
+	return s.presence.IsUserOnline(ctx, userID)
+}
+
 func (s *Server) registerPresence(ctx context.Context, conn *Connection) error {
 	if s.presence == nil || conn == nil {
 		return nil
@@ -365,7 +413,17 @@ func (s *Server) authenticate(r *http.Request) (token.Claims, error) {
 	if strings.TrimSpace(claims.UserID) == "" {
 		return token.Claims{}, apperror.Unauthenticated("authenticated user is required")
 	}
+	if err := s.validateActiveSession(r.Context(), claims); err != nil {
+		return token.Claims{}, err
+	}
 	return claims, nil
+}
+
+func (s *Server) validateActiveSession(ctx context.Context, claims token.Claims) error {
+	if s.activeSessions == nil {
+		return nil
+	}
+	return authrepo.ValidateActiveSession(ctx, s.activeSessions, claims)
 }
 
 func (s *Server) readLoop(ctx context.Context, conn *Connection) {
@@ -385,6 +443,10 @@ func (s *Server) readLoop(ctx context.Context, conn *Connection) {
 		conn.touch(s.now())
 		if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
 			continue
+		}
+		if err := s.validateActiveSession(ctx, token.Claims{UserID: conn.UserID, SessionID: conn.SessionID}); err != nil {
+			_ = conn.closeWithCode(CloseCodeSessionInvalid, "session invalid")
+			return
 		}
 
 		resp := s.handleCommand(ctx, conn, raw)
@@ -665,6 +727,18 @@ func (c *Connection) writeJSON(value interface{}) error {
 
 	_ = c.ws.SetWriteDeadline(time.Now().Add(defaultWriteWait))
 	return c.ws.WriteJSON(value)
+}
+
+func (c *Connection) closeWithCode(code int, reason string) error {
+	if c == nil || c.ws == nil {
+		return nil
+	}
+	c.writeMu.Lock()
+	_ = c.ws.SetWriteDeadline(time.Now().Add(defaultWriteWait))
+	err := c.ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(code, reason), time.Now().Add(defaultWriteWait))
+	c.writeMu.Unlock()
+	_ = c.ws.Close()
+	return err
 }
 
 func decodeCommandFrame(raw []byte) (commandFrame, error) {

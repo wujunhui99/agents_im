@@ -33,6 +33,7 @@
 - 本地开发：[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)
 - 部署：[`deploy/README.md`](./deploy/README.md)
 - Git 工作流：[`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md)
+- Agentic GitHub Project / Issues 工作流：[`docs/AGENTIC_DEVELOPMENT_WORKFLOW.md`](./docs/AGENTIC_DEVELOPMENT_WORKFLOW.md)
 - 安全：[`docs/SECURITY.md`](./docs/SECURITY.md)
 - 可靠性：[`docs/RELIABILITY.md`](./docs/RELIABILITY.md)
 - 前端约定：[`docs/FRONTEND.md`](./docs/FRONTEND.md)

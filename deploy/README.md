@@ -139,10 +139,16 @@ Required middleware/server secret values:
 - `OBJECT_STORAGE_BUCKET`
 - `OBJECT_STORAGE_REGION`
 - `OBJECT_STORAGE_USE_SSL`
+- `OBJECT_STORAGE_EXTERNAL_USE_SSL`
 - `OBJECT_STORAGE_ACCESS_KEY_ID`
 - `OBJECT_STORAGE_SECRET_ACCESS_KEY`
 
 Do not commit real MinIO credentials. The example files contain placeholders only.
+`OBJECT_STORAGE_ENDPOINT` is the server-local MinIO API endpoint used by `user-api`.
+`OBJECT_STORAGE_EXTERNAL_ENDPOINT` is embedded into presigned browser upload/download URLs and must be reachable from end-user browsers; do not set it to `localhost`, `127.0.0.1`, or another loopback/unspecified address in production.
+For the current single-server k3s + Docker Compose topology, use the application origin as the browser-facing endpoint (`agenticim.xyz`) and route the bucket path `/agents-im-media` through Traefik to the server-local MinIO API. The internal endpoint remains `127.0.0.1:9000`; only the browser-facing presigned URL host changes.
+When `OBJECT_STORAGE_EXTERNAL_ENDPOINT` differs from the internal `OBJECT_STORAGE_ENDPOINT`, presigned browser URLs default to HTTPS. Set `OBJECT_STORAGE_EXTERNAL_USE_SSL=false` only for an explicitly HTTP external object-storage endpoint.
+`scripts/bootstrap-server.sh` requires `OBJECT_STORAGE_EXTERNAL_ENDPOINT` and rejects browser-local loopback values before writing the Kubernetes secret.
 
 ## Public entry
 

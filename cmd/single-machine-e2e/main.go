@@ -30,7 +30,8 @@ func main() {
 
 	userRepo := repository.NewMemoryRepository()
 	userLogic := logic.NewUserLogic(userRepo)
-	authLogic := authlogic.NewAuthLogic(authrepo.NewMemoryRepository(), useradapter.NewLogicClient(userLogic), nil, tokenManager)
+	authRepository := authrepo.NewMemoryRepository()
+	authLogic := authlogic.NewAuthLogic(authRepository, useradapter.NewLogicClient(userLogic), nil, tokenManager)
 
 	alice, err := authLogic.Register(ctx, authlogic.RegisterRequest{Identifier: unique("alice"), Password: "password123", DisplayName: "Alice E2E"})
 	must("register alice", err)
@@ -58,7 +59,10 @@ func main() {
 		fail("pull did not return sent REST message")
 	}
 
-	wsServer := gatewayws.NewServer(svc.NewMessageServiceContextWithAuth(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil, testAuth(authSecret)))
+	wsServer := gatewayws.NewServer(
+		svc.NewMessageServiceContextWithAuth(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil, testAuth(authSecret)),
+		gatewayws.WithActiveSessionRepository(authRepository),
+	)
 	httpServer := httptest.NewServer(wsServer)
 	defer httpServer.Close()
 
