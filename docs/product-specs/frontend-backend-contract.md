@@ -389,7 +389,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-Phase 1 requires owner access for download URLs. Conversation-participant access for received message attachments remains a phase 2 integration point.
+Download URLs require the requester to be the media owner or a conversation participant who can see a message attachment referencing the media. Non-message media remains owner-only.
 
 ## Messages REST
 

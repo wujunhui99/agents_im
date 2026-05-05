@@ -1,5 +1,5 @@
-import { ChevronLeft, FileText, Image as ImageIcon, MessageCircle, Search, SendHorizontal } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { ChevronLeft, Download, FileText, Image as ImageIcon, MessageCircle, RefreshCw, Search, SendHorizontal, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { ContactsApi, Friendship } from '../../api/contacts';
 import { createContactsApi } from '../../api/contacts';
 import type { MediaApi } from '../../api/media';
@@ -26,6 +26,7 @@ type MessagesPageProps = {
   currentUserId: string;
   messageApi?: MessageApi;
   mediaApi?: MediaApi;
+  downloadMedia?: MediaDownloadHandler;
   contactsApi?: ContactsApi;
   userApi?: UserApi;
   webSocketUrl?: string;
@@ -45,10 +46,20 @@ type ImageDimensions = {
   width: number;
   height: number;
 };
+type MediaDownloadHandler = (downloadUrl: string, filename: string) => void;
+type ImageMessagePayload = {
+  mediaId?: string;
+  filename?: string;
+  width?: number;
+  height?: number;
+  sizeBytes?: number;
+  contentType?: string;
+};
 
 const IMAGE_MAX_BYTES = 15 * 1024 * 1024;
 const FILE_MAX_BYTES = 20 * 1024 * 1024;
 const FALLBACK_CONTENT_TYPE = 'application/octet-stream';
+const allowedImageMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 const statusLabels: Record<Exclude<MessageStatus, 'sent'>, string> = {
   sending: '发送中',
@@ -59,6 +70,7 @@ export function MessagesPage({
   currentUserId,
   messageApi: messageApiProp,
   mediaApi: mediaApiProp,
+  downloadMedia = defaultDownloadMedia,
   contactsApi: contactsApiProp,
   userApi: userApiProp,
   webSocketUrl = '/ws',
@@ -252,6 +264,11 @@ export function MessagesPage({
       return;
     }
 
+    if (kind === 'image' && !isAllowedMessageImageType(file.type)) {
+      setStatus('请选择 JPG、PNG、WebP 或 GIF 图片');
+      return;
+    }
+
     const limit = kind === 'image' ? IMAGE_MAX_BYTES : FILE_MAX_BYTES;
     if (file.size > limit) {
       setStatus(kind === 'image' ? '图片不能超过 15 MiB' : '文件不能超过 20 MiB');
@@ -280,7 +297,7 @@ export function MessagesPage({
       const mediaId = completed.media?.mediaId ?? uploadIntent.mediaId;
       const content =
         kind === 'image'
-          ? JSON.stringify({ mediaId, filename, ...(dimensions ?? {}) })
+          ? JSON.stringify({ mediaId, filename, sizeBytes: file.size, contentType, ...(dimensions ?? {}) })
           : JSON.stringify({ mediaId, filename, sizeBytes: file.size, contentType });
 
       const nextPendingMessage = createPendingMessage(conversationAtStart, { contentType: kind, content }, currentUserId);
@@ -314,6 +331,9 @@ export function MessagesPage({
         onBack={() => setSelectedConversationId(null)}
         onSend={handleSend}
         onSendAttachment={handleSendAttachment}
+        mediaApi={mediaApi}
+        downloadMedia={downloadMedia}
+        onStatus={setStatus}
         status={status}
         sending={selectedConversationSending}
       />
@@ -501,6 +521,9 @@ function ChatWindow({
   onBack,
   onSend,
   onSendAttachment,
+  mediaApi,
+  downloadMedia,
+  onStatus,
   status,
   sending,
 }: {
@@ -508,6 +531,9 @@ function ChatWindow({
   onBack: () => void;
   onSend: (content: string) => void;
   onSendAttachment: (file: File, kind: AttachmentKind) => void;
+  mediaApi: MediaApi;
+  downloadMedia: MediaDownloadHandler;
+  onStatus: (status: string) => void;
   status: string;
   sending: boolean;
 }) {
@@ -534,12 +560,22 @@ function ChatWindow({
             <div className="message-body">
 {message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
               {message.messageOrigin === 'system' ? <span className="message-origin-badge message-origin-system">系统</span> : null}
-              <MessageBubble
-                direction={message.direction}
-                status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
-              >
-                {renderMessageContent(message)}
-              </MessageBubble>
+              {message.contentType === 'image' ? (
+                <ImageMessageBubble
+                  message={message}
+                  mediaApi={mediaApi}
+                  downloadMedia={downloadMedia}
+                  onStatus={onStatus}
+                  status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
+                />
+              ) : (
+                <MessageBubble
+                  direction={message.direction}
+                  status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
+                >
+                  {renderMessageContent(message)}
+                </MessageBubble>
+              )}
             </div>
           </article>
         ))}
@@ -565,6 +601,207 @@ function renderOutgoingMessageStatus(message: ChatMessage, hasReadSeq: number | 
   }
 
   return <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>;
+}
+
+function ImageMessageBubble({
+  message,
+  mediaApi,
+  downloadMedia,
+  onStatus,
+  status,
+}: {
+  message: ChatMessage;
+  mediaApi: MediaApi;
+  downloadMedia: MediaDownloadHandler;
+  onStatus: (status: string) => void;
+  status: ReactNode;
+}) {
+  const payload = useMemo(() => parseImageMessagePayload(message.content), [message.content]);
+  const mediaId = payload.mediaId;
+  const filename = imageMessageFilename(payload);
+  const label = imageDisplayLabel(payload);
+  const [imageUrl, setImageUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!mediaId) {
+      setImageUrl('');
+      setLoadError('图片信息缺失，无法加载');
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoading(true);
+    setLoadError('');
+    mediaApi
+      .getDownloadURL(mediaId)
+      .then((result) => {
+        if (!cancelled) {
+          setImageUrl(result.downloadUrl);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const message = '图片加载失败，请稍后重试';
+          setLoadError(message);
+          onStatus(message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaApi, mediaId, onStatus]);
+
+  async function retryLoad() {
+    if (!mediaId || loading) {
+      return;
+    }
+    setLoading(true);
+    setLoadError('');
+    try {
+      const result = await mediaApi.getDownloadURL(mediaId);
+      setImageUrl(result.downloadUrl);
+    } catch {
+      const message = '图片加载失败，请稍后重试';
+      setLoadError(message);
+      onStatus(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDownload() {
+    if (!mediaId) {
+      const message = '图片信息缺失，无法下载';
+      setDownloadError(message);
+      onStatus(message);
+      return;
+    }
+    setDownloading(true);
+    setDownloadError('');
+    try {
+      const result = await mediaApi.getDownloadURL(mediaId);
+      downloadMedia(result.downloadUrl, filename);
+      onStatus('已获取图片下载链接');
+    } catch {
+      const message = '下载图片失败，请稍后重试';
+      setDownloadError(message);
+      onStatus(message);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <>
+      <div className={`image-message-card image-message-card-${message.direction}`}>
+        <div className="image-message-frame">
+          {imageUrl ? (
+            <button className="image-preview-button" type="button" aria-label={`预览${label}`} onClick={() => setPreviewOpen(true)}>
+              <img src={imageUrl} alt={label} />
+            </button>
+          ) : (
+            <button
+              className="image-preview-button image-preview-placeholder"
+              type="button"
+              aria-label={loadError ? `重新加载${label}` : label}
+              onClick={retryLoad}
+              disabled={!mediaId || loading}
+            >
+              <ImageIcon size={22} />
+              <span>{loading ? '正在加载图片' : loadError || '图片信息缺失，无法加载'}</span>
+              {loadError ? <RefreshCw size={14} /> : null}
+            </button>
+          )}
+        </div>
+        <div className="image-message-actions">
+          <span className="image-message-filename">{filename}</span>
+          <Button
+            variant="icon"
+            size="small"
+            className="image-download-button"
+            type="button"
+            aria-label={`下载${label}`}
+            onClick={handleDownload}
+            disabled={downloading}
+          >
+            <Download size={16} />
+          </Button>
+          {status ? <span className="image-message-status">{status}</span> : null}
+        </div>
+        {downloadError ? (
+          <p className="image-message-error" role="alert">
+            {downloadError}
+          </p>
+        ) : null}
+      </div>
+      {previewOpen ? (
+        <ImagePreviewDialog
+          imageUrl={imageUrl}
+          label={label}
+          filename={filename}
+          onClose={() => setPreviewOpen(false)}
+          onDownload={handleDownload}
+          downloading={downloading}
+          error={downloadError || loadError}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ImagePreviewDialog({
+  imageUrl,
+  label,
+  filename,
+  onClose,
+  onDownload,
+  downloading,
+  error,
+}: {
+  imageUrl: string;
+  label: string;
+  filename: string;
+  onClose: () => void;
+  onDownload: () => void;
+  downloading: boolean;
+  error: string;
+}) {
+  return (
+    <div className="image-preview-overlay" role="dialog" aria-modal="true" aria-label="图片预览">
+      <div className="image-preview-toolbar">
+        <span>{filename}</span>
+        <div className="image-preview-actions">
+          <Button variant="icon" type="button" aria-label={`下载${label}`} onClick={onDownload} disabled={downloading}>
+            <Download size={18} />
+          </Button>
+          <Button variant="icon" type="button" aria-label="关闭预览" onClick={onClose}>
+            <X size={20} />
+          </Button>
+        </div>
+      </div>
+      <div className="image-preview-content">
+        {imageUrl ? <img src={imageUrl} alt={`预览${label}`} /> : <p>{error || '图片加载中'}</p>}
+      </div>
+      {error ? (
+        <p className="image-preview-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function SendMessageComposer({
@@ -1113,9 +1350,7 @@ function renderMessageContent(message: ChatMessage) {
 
 function messageDisplayText(message: ChatMessage) {
   if (message.contentType === 'image') {
-    const payload = parseContentObject(message.content);
-    const filename = payload ? stringField(payload, 'filename') : undefined;
-    return filename ? `图片 ${filename}` : '图片消息';
+    return imageDisplayLabel(parseImageMessagePayload(message.content));
   }
 
   if (message.contentType === 'file') {
@@ -1136,9 +1371,48 @@ function parseContentObject(content: string) {
   }
 }
 
+function parseImageMessagePayload(content: string): ImageMessagePayload {
+  const payload = parseContentObject(content);
+  if (!payload) {
+    return {};
+  }
+
+  return {
+    mediaId: stringField(payload, 'mediaId'),
+    filename: stringField(payload, 'filename'),
+    width: numberField(payload, 'width'),
+    height: numberField(payload, 'height'),
+    sizeBytes: numberField(payload, 'sizeBytes'),
+    contentType: stringField(payload, 'contentType'),
+  };
+}
+
+function imageMessageFilename(payload: ImageMessagePayload) {
+  return payload.filename?.trim() || '图片消息';
+}
+
+function imageDisplayLabel(payload: ImageMessagePayload) {
+  const filename = payload.filename?.trim();
+  return filename ? `图片 ${filename}` : '图片消息';
+}
+
 function uploadFilename(file: File, kind: AttachmentKind) {
   const fallback = kind === 'image' ? 'image' : 'file';
   return file.name.trim() || fallback;
+}
+
+function isAllowedMessageImageType(contentType: string) {
+  return allowedImageMimeTypes.has(contentType.toLowerCase().trim());
+}
+
+function defaultDownloadMedia(downloadUrl: string, filename: string) {
+  const anchor = document.createElement('a');
+  anchor.href = downloadUrl;
+  anchor.download = filename;
+  anchor.rel = 'noopener';
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 async function readImageDimensions(file: File): Promise<ImageDimensions | undefined> {
@@ -1413,7 +1687,7 @@ function mergeConversation(current: Conversation, loaded: Conversation): Convers
     ...loaded,
     title,
     avatar: title === current.title ? current.avatar : loaded.avatar,
-    preview: lastMessage?.content ?? loaded.preview,
+    preview: lastMessage ? messageDisplayText(lastMessage) : loaded.preview,
     previewOrigin: lastMessage?.messageOrigin ?? loaded.previewOrigin,
     time: lastMessage ? '刚刚' : loaded.time,
     unread,

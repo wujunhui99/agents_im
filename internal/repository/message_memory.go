@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -356,6 +357,38 @@ func (r *MemoryMessageRepository) SetUserHasReadSeqMax(_ context.Context, userID
 	return r.conversationSeqStateLocked(userID, conversation, visibleSeq).Clone(), updated, nil
 }
 
+func (r *MemoryMessageRepository) UserCanAccessMedia(_ context.Context, userID string, mediaID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	mediaID = strings.TrimSpace(mediaID)
+	if userID == "" || mediaID == "" {
+		return false, nil
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	prefix := userID + "\x00"
+	for key, visibleSeq := range r.visibleStates {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		conversationID := strings.TrimPrefix(key, prefix)
+		conversation, exists := r.conversations[conversationID]
+		if !exists {
+			continue
+		}
+		for _, message := range conversation.messages {
+			if message.Seq > visibleSeq {
+				continue
+			}
+			if messageReferencesMedia(message, mediaID) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 func (r *MemoryMessageRepository) ensureConversationLocked(conversationID string, input CreateMessageInput) *memoryConversation {
 	conversation, exists := r.conversations[conversationID]
 	if !exists {
@@ -517,4 +550,17 @@ func messageIdempotencyKey(senderID string, clientMsgID string) string {
 
 func userConversationStateKey(userID string, conversationID string) string {
 	return userID + "\x00" + conversationID
+}
+
+func messageReferencesMedia(message Message, mediaID string) bool {
+	if message.ContentType != ContentTypeImage && message.ContentType != ContentTypeFile {
+		return false
+	}
+	var body struct {
+		MediaID string `json:"mediaId"`
+	}
+	if err := json.Unmarshal([]byte(message.Content), &body); err != nil {
+		return false
+	}
+	return strings.TrimSpace(body.MediaID) == mediaID
 }

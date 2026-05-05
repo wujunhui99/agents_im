@@ -175,6 +175,56 @@ func TestMediaCompleteAndDownloadRequireOwnerAndObjectStat(t *testing.T) {
 	}
 }
 
+func TestMessageParticipantCanGetMediaDownloadURL(t *testing.T) {
+	ctx := context.Background()
+	store := objectstorage.NewMemoryStore()
+	mediaRepo := repository.NewMemoryMediaRepository()
+	messageRepo := repository.NewMemoryMessageRepository()
+	mediaLogic := NewMediaLogic(mediaRepo, store, "agents-im-media").
+		WithAttachmentAccessChecker(NewMessageMediaAccessChecker(messageRepo))
+	messageLogic := NewMessageLogicWithMediaValidator(messageRepo, nil, nil, mediaLogic)
+
+	image := createMediaForTest(t, mediaRepo, model.MediaObject{
+		MediaID:          "med_chat_image_ready",
+		OwnerUserID:      "usr_sender",
+		Bucket:           "agents-im-media",
+		ObjectKey:        "users/usr_sender/media/med_chat_image_ready/cat.jpg",
+		ContentType:      "image/jpeg",
+		SizeBytes:        1024,
+		OriginalFilename: "cat.jpg",
+		Purpose:          model.MediaPurposeMessageImage,
+		Status:           model.MediaStatusReady,
+	})
+
+	if _, err := messageLogic.SendMessage(ctx, SendMessageRequest{
+		SenderID:    "usr_sender",
+		ReceiverID:  "usr_receiver",
+		ChatType:    MessageChatTypeSingle,
+		ClientMsgID: "client-image-access",
+		ContentType: MessageContentTypeImage,
+		Content:     `{"mediaId":"med_chat_image_ready","filename":"cat.jpg"}`,
+	}); err != nil {
+		t.Fatalf("send image message: %v", err)
+	}
+
+	download, err := mediaLogic.GetDownloadURL(ctx, GetMediaDownloadURLRequest{
+		OwnerUserID: "usr_receiver",
+		MediaID:     image.MediaID,
+	})
+	if err != nil {
+		t.Fatalf("receiver get download URL: %v", err)
+	}
+	if download.DownloadURL == "" || download.ExpiresAt == 0 {
+		t.Fatalf("missing receiver download URL fields: %+v", download)
+	}
+
+	_, err = mediaLogic.GetDownloadURL(ctx, GetMediaDownloadURLRequest{
+		OwnerUserID: "usr_outsider",
+		MediaID:     image.MediaID,
+	})
+	assertLogicAppCode(t, err, apperror.CodeForbidden)
+}
+
 func TestAvatarMediaValidationRequiresOwnerPurposeAndReady(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemoryMediaRepository()
