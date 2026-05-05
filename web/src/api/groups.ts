@@ -19,6 +19,8 @@ export type GroupMember = {
   display_name?: string;
   name?: string;
   avatar_media_id?: string;
+  avatar_url?: string;
+  avatar_url_expires_at?: number;
 };
 
 export type CreateGroupRequest = {
