@@ -566,6 +566,76 @@ Content-Type: application/json
 }
 ```
 
+### AI Hosting Settings
+
+AI hosting V1 is available only for direct conversations. The setting is scoped to the authenticated owner account and `conversation_id`; group conversations are rejected for V1.
+
+```http
+GET /conversations/single:1001:2002/ai-hosting
+Authorization: Bearer <access_token>
+```
+
+Default response when neither participant has enabled hosting:
+
+```json
+{
+  "code": "OK",
+  "message": "ok",
+  "data": {
+    "conversationId": "single:1001:2002",
+    "chatType": "single",
+    "enabled": false,
+    "available": true,
+    "peerEnabled": false,
+    "maxRecentMessages": 30,
+    "summaryEnabled": false
+  }
+}
+```
+
+Update:
+
+```http
+PUT /conversations/single:1001:2002/ai-hosting
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+```json
+{
+  "enabled": true
+}
+```
+
+If the peer has already enabled hosting, the current user cannot enable it until the peer disables it. `PUT enabled=true` returns HTTP 409 with code `ALREADY_EXISTS` and the same Chinese reason. A subsequent `GET` returns a disabled UI state with the frontend-displayable reason:
+
+```json
+{
+  "code": "ALREADY_EXISTS",
+  "message": "对方已开启 AI 托管，本会话暂时只能由一方开启",
+  "data": null
+}
+```
+
+```json
+{
+  "code": "OK",
+  "message": "ok",
+  "data": {
+    "conversationId": "single:1001:2002",
+    "chatType": "single",
+    "enabled": false,
+    "available": false,
+    "peerEnabled": true,
+    "unavailableReason": "对方已开启 AI 托管，本会话暂时只能由一方开启",
+    "maxRecentMessages": 30,
+    "summaryEnabled": false
+  }
+}
+```
+
+When enabled and the peer sends a human message, the backend may create an AI-hosted reply on behalf of the enabled owner. The reply goes through the normal message send, storage, outbox, and WebSocket path, and appears as a regular message snapshot with `messageOrigin: "ai"` and AI metadata. AI-origin replies must not recursively trigger more AI replies.
+
 ## WebSocket
 
 ### Connect

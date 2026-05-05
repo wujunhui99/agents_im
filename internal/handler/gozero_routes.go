@@ -81,7 +81,9 @@ func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceCo
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
 			componentCheck("message_logic", serverCtx != nil && serverCtx.MessageLogic != nil, "configured"),
+			componentCheck("ai_hosting_logic", serverCtx != nil && serverCtx.AIHostingLogic != nil, "configured"),
 			componentCheck("message_repository", serverCtx != nil && serverCtx.MessageRepo != nil, "configured"),
+			componentCheck("ai_hosting_repository", serverCtx != nil && serverCtx.AIHostingRepo != nil, "configured"),
 			componentCheck("outbox_repository", serverCtx != nil && serverCtx.OutboxRepo != nil, "configured"),
 		}
 	})
@@ -295,6 +297,16 @@ func addMessageRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Method:  http.MethodPost,
 			Path:    "/conversations/:conversation_id/read",
 			Handler: messagehandler.MarkConversationAsReadHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/conversations/:conversation_id/ai-hosting",
+			Handler: messagehandler.GetConversationAIHostingHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPut,
+			Path:    "/conversations/:conversation_id/ai-hosting",
+			Handler: messagehandler.UpdateConversationAIHostingHandler(serverCtx),
 		},
 	}), jwtOption(serverCtx))
 }

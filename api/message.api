@@ -115,6 +115,32 @@ type MarkConversationAsReadResp {
 	Data    MarkConversationAsReadData `json:"data"`
 }
 
+type ConversationAIHostingReq {
+	ConversationID string `path:"conversation_id"`
+}
+
+type UpdateConversationAIHostingReq {
+	ConversationID string `path:"conversation_id"`
+	Enabled        bool   `json:"enabled"`
+}
+
+type ConversationAIHostingData {
+	ConversationID    string `json:"conversationId"`
+	ChatType          string `json:"chatType"`
+	Enabled           bool   `json:"enabled"`
+	Available         bool   `json:"available"`
+	PeerEnabled       bool   `json:"peerEnabled"`
+	UnavailableReason string `json:"unavailableReason,optional"`
+	MaxRecentMessages int64  `json:"maxRecentMessages"`
+	SummaryEnabled    bool   `json:"summaryEnabled"`
+}
+
+type ConversationAIHostingResp {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    ConversationAIHostingData `json:"data"`
+}
+
 @server (
 	jwt:   Auth
 	group: message
@@ -131,4 +157,10 @@ service message-api {
 
 	@handler markConversationAsRead
 	post /conversations/:conversation_id/read (MarkConversationAsReadReq) returns (MarkConversationAsReadResp)
+
+	@handler getConversationAIHosting
+	get /conversations/:conversation_id/ai-hosting (ConversationAIHostingReq) returns (ConversationAIHostingResp)
+
+	@handler updateConversationAIHosting
+	put /conversations/:conversation_id/ai-hosting (UpdateConversationAIHostingReq) returns (ConversationAIHostingResp)
 }

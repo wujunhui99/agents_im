@@ -62,6 +62,7 @@ func (r AgentRepositoryAccountResolver) IsActiveAgentAccount(ctx context.Context
 
 type ConversationHostingConfig struct {
 	Repository           repository.AgentConversationHostingRepository
+	AIHostingRepository  repository.ConversationAIHostingRepository
 	Runner               AgentTriggerRunner
 	AgentAccountResolver AgentAccountResolver
 	TriggerPolicy        TriggerPolicy
@@ -69,6 +70,7 @@ type ConversationHostingConfig struct {
 
 type ConversationHostingService struct {
 	repo          repository.AgentConversationHostingRepository
+	aiHostingRepo repository.ConversationAIHostingRepository
 	runner        AgentTriggerRunner
 	agentResolver AgentAccountResolver
 	policy        TriggerPolicy
@@ -97,6 +99,7 @@ func NewConversationHostingService(config ConversationHostingConfig) (*Conversat
 	}
 	return &ConversationHostingService{
 		repo:          config.Repository,
+		aiHostingRepo: config.AIHostingRepository,
 		runner:        config.Runner,
 		agentResolver: config.AgentAccountResolver,
 		policy:        config.TriggerPolicy,
@@ -194,6 +197,15 @@ func (s *ConversationHostingService) OnMessageCreated(ctx context.Context, input
 func (s *ConversationHostingService) targetAgentAccountIDs(ctx context.Context, input ConversationHostingMessageCreatedInput) ([]string, TriggerPolicy, error) {
 	targets := uniqueNonEmptyIDs(input.TargetAgentAccountIDs)
 	policy := s.policy
+	if input.Message.MessageOrigin == logic.MessageOriginHuman && input.Message.ChatType == logic.MessageChatTypeSingle && s.aiHostingRepo != nil {
+		hosting, err := s.aiHostingRepo.GetEnabledConversationAIHosting(ctx, input.Message.ConversationID)
+		if err != nil && apperror.From(err).Code != apperror.CodeNotFound {
+			return nil, TriggerPolicy{}, err
+		}
+		if err == nil && hosting.Enabled && hosting.OwnerAccountID != input.Message.SenderID {
+			targets = append(targets, hosting.OwnerAccountID)
+		}
+	}
 	hosting, err := s.repo.GetAgentConversationHosting(ctx, input.Message.ConversationID)
 	if err != nil && apperror.From(err).Code != apperror.CodeNotFound {
 		return nil, TriggerPolicy{}, err

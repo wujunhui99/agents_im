@@ -6,6 +6,8 @@ Status: Draft / accepted for V1 implementation
 
 `agents_im` is adding AI-assisted replies to IM conversations. The first version must be safe, explicit, and cheap enough to use in long conversations. It must not auto-send messages or send the entire conversation history to a model.
 
+Note: this document covers the manual `suggest_only` draft product. Issue #3 AI Conversation Hosting V1 is a separate direct-chat auto-reply product path documented in [agent-conversation-hosting.md](./agent-conversation-hosting.md). Hosting V1 may create `message_origin=ai` messages automatically after a peer human message, but it must still use bounded context and fail visibly when provider configuration is missing.
+
 ## Goals
 
 - Per-user, per-conversation AI reply settings.
