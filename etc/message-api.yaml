@@ -6,3 +6,7 @@ Auth:
   AccessExpire: 86400
 StorageDriver: memory
 DataSource: ${DATABASE_URL}
+DeepSeek:
+  APIKey: ${DEEPSEEK_API_KEY}
+  BaseURL: ${DEEPSEEK_BASE_URL}
+  Model: ${DEEPSEEK_MODEL}

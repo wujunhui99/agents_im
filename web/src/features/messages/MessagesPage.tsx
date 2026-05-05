@@ -1,12 +1,12 @@
-import { ChevronLeft, Download, FileText, Image as ImageIcon, MessageCircle, RefreshCw, Search, SendHorizontal, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { Bot, ChevronLeft, Download, FileText, Image as ImageIcon, MessageCircle, RefreshCw, Search, SendHorizontal, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { ContactsApi, Friendship } from '../../api/contacts';
 import { createContactsApi } from '../../api/contacts';
 import type { Group, GroupMember, GroupsApi } from '../../api/groups';
 import { createGroupsApi } from '../../api/groups';
 import type { MediaApi } from '../../api/media';
 import { createMediaApi, uploadMediaBytes } from '../../api/media';
-import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
+import type { AIHostingState, ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
 import { createMessageApi } from '../../api/messages';
 import type { WebSocketFactory, WebSocketServerEvent } from '../../api/websocketClient';
 import { createMessageWebSocketClient } from '../../api/websocketClient';
@@ -46,6 +46,12 @@ type AttachmentKind = 'image' | 'file';
 type PendingMessageInput = {
   contentType: MessageContentType;
   content: string;
+};
+type AIHostingPanelState = {
+  state?: AIHostingState;
+  loading: boolean;
+  updating: boolean;
+  error: string;
 };
 type ImageDimensions = {
   width: number;
@@ -98,8 +104,10 @@ export function MessagesPage({
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [showStartChat, setShowStartChat] = useState(false);
   const [uploadingConversationId, setUploadingConversationId] = useState<string | null>(null);
+  const [aiHostingByConversation, setAIHostingByConversation] = useState<Record<string, AIHostingPanelState>>({});
   const readSyncsInFlight = useRef<Set<string>>(new Set());
   const selectedConversation = items.find((conversation) => conversation.id === selectedConversationId) ?? null;
+  const selectedAIHosting = selectedConversation ? aiHostingByConversation[selectedConversation.id] : undefined;
   const selectedConversationSending =
     Boolean(selectedConversation && uploadingConversationId === selectedConversation.id) ||
     Boolean(selectedConversation && conversationHasInFlightSend(selectedConversation));
@@ -229,6 +237,113 @@ export function MessagesPage({
         readSyncsInFlight.current.delete(syncKey);
       });
   }, [messageApi, selectedConversation]);
+
+  useEffect(() => {
+    if (!selectedConversation || !conversationSupportsAIHosting(selectedConversation)) {
+      return;
+    }
+
+    let cancelled = false;
+    const conversationID = selectedConversation.id;
+    setAIHostingByConversation((current) => ({
+      ...current,
+      [conversationID]: {
+        ...(current[conversationID] ?? { updating: false }),
+        loading: true,
+        error: '',
+      },
+    }));
+    void messageApi
+      .getAIHosting(conversationID)
+      .then((state) => {
+        if (!cancelled) {
+          setAIHostingByConversation((current) => ({
+            ...current,
+            [conversationID]: { state, loading: false, updating: false, error: '' },
+          }));
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setAIHostingByConversation((current) => ({
+            ...current,
+            [conversationID]: {
+              ...(current[conversationID] ?? { updating: false }),
+              loading: false,
+              error: error instanceof Error ? error.message : 'AI 托管状态加载失败',
+            },
+          }));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [messageApi, selectedConversation?.chatType, selectedConversation?.id]);
+
+  const retryAIHosting = useCallback(
+    (conversationID: string) => {
+      setAIHostingByConversation((current) => ({
+        ...current,
+        [conversationID]: {
+          ...(current[conversationID] ?? { updating: false }),
+          loading: true,
+          error: '',
+        },
+      }));
+      void messageApi
+        .getAIHosting(conversationID)
+        .then((state) => {
+          setAIHostingByConversation((current) => ({
+            ...current,
+            [conversationID]: { state, loading: false, updating: false, error: '' },
+          }));
+        })
+        .catch((error) => {
+          setAIHostingByConversation((current) => ({
+            ...current,
+            [conversationID]: {
+              ...(current[conversationID] ?? { updating: false }),
+              loading: false,
+              error: error instanceof Error ? error.message : 'AI 托管状态加载失败',
+            },
+          }));
+        });
+    },
+    [messageApi],
+  );
+
+  const toggleAIHosting = useCallback(
+    (conversationID: string, enabled: boolean) => {
+      setAIHostingByConversation((current) => ({
+        ...current,
+        [conversationID]: {
+          ...(current[conversationID] ?? { loading: false, error: '' }),
+          updating: true,
+          error: '',
+        },
+      }));
+      void messageApi
+        .updateAIHosting(conversationID, { enabled })
+        .then((state) => {
+          setAIHostingByConversation((current) => ({
+            ...current,
+            [conversationID]: { state, loading: false, updating: false, error: '' },
+          }));
+          setStatus(enabled ? 'AI 托管已开启' : 'AI 托管已关闭');
+        })
+        .catch((error) => {
+          setAIHostingByConversation((current) => ({
+            ...current,
+            [conversationID]: {
+              ...(current[conversationID] ?? { loading: false }),
+              updating: false,
+              error: error instanceof Error ? error.message : 'AI 托管更新失败',
+            },
+          }));
+        });
+    },
+    [messageApi],
+  );
 
   function handleStartChat(profile: UserProfile) {
     const draftConversation = userProfileToDraftConversation(profile);
@@ -368,6 +483,9 @@ export function MessagesPage({
         onStatus={setStatus}
         status={status}
         sending={selectedConversationSending}
+        aiHosting={selectedAIHosting}
+        onToggleAIHosting={(enabled) => toggleAIHosting(selectedConversation.id, enabled)}
+        onRetryAIHosting={() => retryAIHosting(selectedConversation.id)}
       />
     );
   }
@@ -565,6 +683,9 @@ function ChatWindow({
   onStatus,
   status,
   sending,
+  aiHosting,
+  onToggleAIHosting,
+  onRetryAIHosting,
 }: {
   conversation: Conversation;
   onBack: () => void;
@@ -575,6 +696,9 @@ function ChatWindow({
   onStatus: (status: string) => void;
   status: string;
   sending: boolean;
+  aiHosting?: AIHostingPanelState;
+  onToggleAIHosting: (enabled: boolean) => void;
+  onRetryAIHosting: () => void;
 }) {
   const sortedMessages = useMemo(() => orderedChatMessages(conversation.messages), [conversation.messages]);
 
@@ -589,6 +713,9 @@ function ChatWindow({
           <h2>{conversation.title}</h2>
         </div>
       </header>
+      {conversationSupportsAIHosting(conversation) ? (
+        <AIHostingControl hosting={aiHosting} onToggle={onToggleAIHosting} onRetry={onRetryAIHosting} />
+      ) : null}
       <p className="inline-status" role="status">
         {status}
       </p>
@@ -627,6 +754,55 @@ function ChatWindow({
       </div>
 
       <SendMessageComposer onSend={onSend} onSendAttachment={onSendAttachment} sending={sending} />
+    </section>
+  );
+}
+
+function AIHostingControl({
+  hosting,
+  onToggle,
+  onRetry,
+}: {
+  hosting?: AIHostingPanelState;
+  onToggle: (enabled: boolean) => void;
+  onRetry: () => void;
+}) {
+  const state = hosting?.state;
+  const loading = hosting?.loading ?? false;
+  const updating = hosting?.updating ?? false;
+  const checked = Boolean(state?.enabled);
+  const available = state?.available ?? true;
+  const disabled = loading || updating || !available;
+  const helperText =
+    state?.unavailableReason ||
+    hosting?.error ||
+    (loading ? '正在加载 AI 托管状态' : checked ? '已开启，对方发来消息时自动代你回复' : '已关闭');
+
+  return (
+    <section className="ai-hosting-control" aria-label="AI 托管设置">
+      <label className="ai-hosting-toggle">
+        <span className="ai-hosting-label">
+          <Bot size={17} />
+          <span>AI 托管</span>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label="AI 托管"
+          checked={checked}
+          disabled={disabled}
+          onChange={(event) => onToggle(event.currentTarget.checked)}
+        />
+      </label>
+      <div className="ai-hosting-status-line">
+        <span className={hosting?.error || state?.unavailableReason ? 'ai-hosting-warning' : ''}>{helperText}</span>
+        {hosting?.error ? (
+          <Button className="ai-hosting-retry" variant="text" size="small" type="button" onClick={onRetry} aria-label="重试 AI 托管状态">
+            <RefreshCw size={14} />
+            <span>重试</span>
+          </Button>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -1634,6 +1810,10 @@ function draftPeerId(conversationId: string) {
 
 function conversationHasInFlightSend(conversation: Conversation) {
   return conversation.messages.some((message) => message.status === 'sending' && !hasAuthoritativeSeq(message));
+}
+
+function conversationSupportsAIHosting(conversation: Conversation) {
+  return conversation.chatType === 'single' && !conversation.id.startsWith('draft-single:') && conversation.id.startsWith('single:');
 }
 
 function conversationPreview(messages: ChatMessage[], fallback: string) {

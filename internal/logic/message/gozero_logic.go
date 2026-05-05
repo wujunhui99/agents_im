@@ -92,6 +92,73 @@ func (l *MarkConversationAsReadLogic) MarkConversationAsRead(req *types.MarkConv
 	}, nil
 }
 
+type GetConversationAIHostingLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewGetConversationAIHostingLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetConversationAIHostingLogic {
+	return &GetConversationAIHostingLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *GetConversationAIHostingLogic) GetConversationAIHosting(req *types.ConversationAIHostingReq) (*types.ConversationAIHostingResp, error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := l.svcCtx.AIHostingLogic.GetConversationAIHosting(l.ctx, business.GetConversationAIHostingRequest{
+		OwnerAccountID: userID,
+		ConversationID: req.ConversationID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &types.ConversationAIHostingResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data:    toConversationAIHostingData(result),
+	}, nil
+}
+
+type UpdateConversationAIHostingLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewUpdateConversationAIHostingLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateConversationAIHostingLogic {
+	return &UpdateConversationAIHostingLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *UpdateConversationAIHostingLogic) UpdateConversationAIHosting(req *types.UpdateConversationAIHostingReq) (*types.ConversationAIHostingResp, error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := l.svcCtx.AIHostingLogic.UpdateConversationAIHosting(l.ctx, business.UpdateConversationAIHostingRequest{
+		OwnerAccountID: userID,
+		ConversationID: req.ConversationID,
+		Enabled:        req.Enabled,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &types.ConversationAIHostingResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data:    toConversationAIHostingData(result),
+	}, nil
+}
+
 type PullMessagesLogic struct {
 	logx.Logger
 	ctx    context.Context
@@ -220,6 +287,19 @@ func toConversationSeqState(state business.ConversationSeqState) types.Conversat
 		UnreadCount:    state.UnreadCount,
 		MaxSeqTime:     state.MaxSeqTime,
 		LastMessage:    lastMessage,
+	}
+}
+
+func toConversationAIHostingData(state business.ConversationAIHostingResponse) types.ConversationAIHostingData {
+	return types.ConversationAIHostingData{
+		ConversationID:    state.ConversationID,
+		ChatType:          state.ChatType,
+		Enabled:           state.Enabled,
+		Available:         state.Available,
+		PeerEnabled:       state.PeerEnabled,
+		UnavailableReason: state.UnavailableReason,
+		MaxRecentMessages: int64(state.MaxRecentMessages),
+		SummaryEnabled:    state.SummaryEnabled,
 	}
 }
 
