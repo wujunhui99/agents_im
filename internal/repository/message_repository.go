@@ -71,6 +71,10 @@ type MessageRepository interface {
 	UserCanAccessMedia(ctx context.Context, userID string, mediaID string) (bool, error)
 }
 
+type UserScopedMessageReader interface {
+	GetMessagesForUser(ctx context.Context, userID string, conversationID string, fromSeq, toSeq int64, limit int, order string) ([]Message, bool, int64, error)
+}
+
 func SingleConversationID(userA string, userB string) string {
 	users := []string{userA, userB}
 	sort.Strings(users)

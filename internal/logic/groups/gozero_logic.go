@@ -66,11 +66,47 @@ func (l *CreateGroupLogic) CreateGroup(req *types.CreateGroupReq) (*types.GroupR
 		CreatorUserID: userID,
 		Name:          req.Name,
 		Description:   req.Description,
+		MemberUserIDs: req.MemberUserIDs,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return groupResp(group), nil
+}
+
+type ListGroupsLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewListGroupsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListGroupsLogic {
+	return &ListGroupsLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *ListGroupsLogic) ListGroups(_ *types.ListGroupsReq) (*types.ListGroupsResp, error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := l.svcCtx.GroupsLogic.ListGroups(l.ctx, business.ListGroupsRequest{UserID: userID})
+	if err != nil {
+		return nil, err
+	}
+	groups := make([]types.Group, 0, len(result.Groups))
+	for _, group := range result.Groups {
+		groups = append(groups, toGroup(group))
+	}
+	return &types.ListGroupsResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data:    types.ListGroupsData{Groups: groups},
+	}, nil
 }
 
 type GetGroupLogic struct {
@@ -179,14 +215,18 @@ func groupResp(group business.GroupInfo) *types.GroupResp {
 	return &types.GroupResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
-		Data: types.Group{
-			GroupID:       group.GroupID,
-			Name:          group.Name,
-			Description:   group.Description,
-			CreatorUserID: group.CreatorUserID,
-			CreatedAt:     group.CreatedAt,
-			UpdatedAt:     group.UpdatedAt,
-		},
+		Data:    toGroup(group),
+	}
+}
+
+func toGroup(group business.GroupInfo) types.Group {
+	return types.Group{
+		GroupID:       group.GroupID,
+		Name:          group.Name,
+		Description:   group.Description,
+		CreatorUserID: group.CreatorUserID,
+		CreatedAt:     group.CreatedAt,
+		UpdatedAt:     group.UpdatedAt,
 	}
 }
 
@@ -203,10 +243,14 @@ func memberResp(member business.MemberResponse) *types.MemberResp {
 
 func toGroupMember(member business.GroupMemberInfo) types.GroupMember {
 	return types.GroupMember{
-		GroupID:  member.GroupID,
-		UserID:   member.UserID,
-		State:    member.State,
-		JoinedAt: member.JoinedAt,
-		LeftAt:   member.LeftAt,
+		GroupID:       member.GroupID,
+		UserID:        member.UserID,
+		State:         member.State,
+		JoinedAt:      member.JoinedAt,
+		LeftAt:        member.LeftAt,
+		Identifier:    member.Identifier,
+		DisplayName:   member.DisplayName,
+		Name:          member.Name,
+		AvatarMediaID: member.AvatarMediaID,
 	}
 }

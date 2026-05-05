@@ -17,21 +17,28 @@ type Group {
 }
 
 type GroupMember {
-	GroupID  string `json:"group_id"`
-	UserID   string `json:"user_id"`
-	State    string `json:"state"`
-	JoinedAt string `json:"joined_at"`
-	LeftAt   string `json:"left_at"`
+	GroupID       string `json:"group_id"`
+	UserID        string `json:"user_id"`
+	State         string `json:"state"`
+	JoinedAt      string `json:"joined_at"`
+	LeftAt        string `json:"left_at"`
+	Identifier    string `json:"identifier,optional"`
+	DisplayName   string `json:"display_name,optional"`
+	Name          string `json:"name,optional"`
+	AvatarMediaID string `json:"avatar_media_id,optional"`
 }
 
 type CreateGroupReq {
-	Name        string `json:"name"`
-	Description string `json:"description,optional"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description,optional"`
+	MemberUserIDs []string `json:"member_user_ids,optional"`
 }
 
 type GetGroupReq {
 	GroupID string `path:"group_id"`
 }
+
+type ListGroupsReq {}
 
 type AddMemberReq {
 	GroupID string `path:"group_id"`
@@ -74,6 +81,16 @@ type ListMembersResp {
 	Data    ListMembersData `json:"data"`
 }
 
+type ListGroupsData {
+	Groups []Group `json:"groups"`
+}
+
+type ListGroupsResp {
+	Code    string         `json:"code"`
+	Message string         `json:"message"`
+	Data    ListGroupsData `json:"data"`
+}
+
 @server (
 	jwt:   Auth
 	group: groups
@@ -81,6 +98,9 @@ type ListMembersResp {
 service groups-api {
 	@handler createGroup
 	post /groups (CreateGroupReq) returns (GroupResp)
+
+	@handler listGroups
+	get /groups (ListGroupsReq) returns (ListGroupsResp)
 
 	@handler addMember
 	post /groups/:group_id/members (AddMemberReq) returns (MemberResp)
