@@ -122,6 +122,36 @@ Classifications:
 
 Artifacts default to `/tmp/agents-im-image-message-e2e/<timestamp>/`. The harness redacts bearer tokens, JWT-like values, cookies, passwords, and presigned URL query strings from console output and artifacts.
 
+## Group chat V1 regression
+
+`group_chat_regression.mjs` covers the group chat V1 loop through real APIs and WebSocket paths: create a group with selected members, send a group message over WebSocket, verify an online member receives live push, verify an offline/missed-push member recovers through history, verify non-member send is denied, and verify over-200-member creation is rejected.
+
+Production:
+
+```bash
+AGENTS_IM_E2E_TARGET=production \
+AGENTS_IM_E2E_BASE_URL=https://agenticim.xyz \
+node tests/e2e/group_chat_regression.mjs
+```
+
+Local:
+
+```bash
+AGENTS_IM_E2E_TARGET=local \
+AGENTS_IM_E2E_BASE_URL=http://127.0.0.1:5173 \
+node tests/e2e/group_chat_regression.mjs
+```
+
+Classifications:
+
+- `group-chat-success`
+- `group-chat-history-success`
+- `group-chat-permission-denied`
+- `group-chat-max-members-rejected`
+- `setup-or-harness-failed`
+
+Artifacts default to `/tmp/agents-im-group-chat-e2e/<timestamp>/`.
+
 ## Auth register-login regression
 
 `auth_register_login_regression.mjs` is an API-only regression harness for the auth credential persistence path. It creates a fresh unique account through the real `/auth/register`, then logs in through the real `/auth/login` with the exact same identifier/password.
