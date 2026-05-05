@@ -1691,6 +1691,14 @@ rg -q "ValidateMessageMedia" internal/logic/medialogic.go internal/logic/message
 rg -q "media_objects" db/migrations/001_init_postgres.sql docs/product-specs/message-chain.md docs/product-specs/frontend-backend-contract.md
 rg -q "PATCH /me/avatar" docs/product-specs/frontend-backend-contract.md
 rg -q "POST /media/uploads" docs/product-specs/frontend-backend-contract.md
+if rg -q 'OBJECT_STORAGE_EXTERNAL_ENDPOINT="?((127\.[0-9.]+|localhost|0\.0\.0\.0|\[?::1\]?)(:[0-9]+)?)"?' scripts/bootstrap-server.sh deploy/k8s/secrets.example.yaml; then
+  echo "production object storage external endpoint must not be browser-local loopback" >&2
+  exit 1
+fi
+if ! rg -q 'AGENTS_IM_ENV: "production"' deploy/k8s/configmap.yaml; then
+  echo "production k8s config must enable production environment validation" >&2
+  exit 1
+fi
 rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go internal/auth/repository/postgres.go
 rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
 rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
