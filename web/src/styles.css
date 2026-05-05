@@ -413,6 +413,14 @@ button.md-list-item:hover,
   font-size: 25px;
 }
 
+.avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 .avatar-green,
 .action-green {
   color: var(--md-sys-color-on-primary-container);
@@ -771,8 +779,39 @@ button.md-list-item:hover,
     var(--md-sys-color-surface);
 }
 
+.profile-avatar-stack {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.avatar-upload-control {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--md-shape-corner-full);
+  padding: 0 10px;
+  color: var(--md-sys-color-primary);
+  background: color-mix(in srgb, var(--md-sys-color-primary-container), white 18%);
+  font-size: var(--md-type-label-medium);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.avatar-upload-control.is-disabled {
+  opacity: 0.64;
+  cursor: default;
+}
+
 .profile-main strong {
   font-size: 21px;
+}
+
+.profile-avatar-status {
+  margin-top: 4px;
+  color: var(--md-sys-color-primary);
+  font-size: var(--md-type-body-small);
 }
 
 .profile-edit-button {
@@ -887,6 +926,20 @@ button.md-list-item:hover,
 .chat-back-button {
   width: 40px;
   height: 40px;
+}
+
+.chat-header-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.chat-header-title .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--md-shape-corner-small);
 }
 
 .chat-header h2 {

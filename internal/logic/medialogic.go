@@ -26,8 +26,9 @@ const (
 	MediaMaxImageBytes  = 15 * 1024 * 1024
 	MediaMaxFileBytes   = 20 * 1024 * 1024
 
-	MediaUploadURLTTL   = 15 * time.Minute
-	MediaDownloadURLTTL = 10 * time.Minute
+	MediaUploadURLTTL         = 15 * time.Minute
+	MediaDownloadURLTTL       = 10 * time.Minute
+	MediaAvatarDownloadURLTTL = 24 * time.Hour
 )
 
 var sha256HexPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -235,19 +236,55 @@ func (l *MediaLogic) ValidateAvatarMedia(ctx context.Context, ownerUserID string
 	if err != nil {
 		return MediaObject{}, err
 	}
-	if media.Purpose != model.MediaPurposeAvatar {
-		return MediaObject{}, apperror.InvalidArgument("avatar media purpose is invalid")
-	}
-	if media.Status != model.MediaStatusReady {
-		return MediaObject{}, apperror.InvalidArgument("avatar media is not ready")
-	}
-	if !isAllowedImageContentType(media.ContentType) {
-		return MediaObject{}, apperror.InvalidArgument("avatar media content_type must be an allowed image type")
-	}
-	if media.SizeBytes > MediaMaxAvatarBytes {
-		return MediaObject{}, apperror.InvalidArgument("avatar media exceeds size limit")
+	if err := validateAvatarMediaObject(media); err != nil {
+		return MediaObject{}, err
 	}
 	return toMediaObject(media), nil
+}
+
+func (l *MediaLogic) GetAvatarDisplayURL(ctx context.Context, mediaID string) (GetMediaDownloadURLResponse, error) {
+	if l.repo == nil {
+		return GetMediaDownloadURLResponse{}, apperror.Internal("media repository is not configured")
+	}
+	mediaID, err := normalizeMediaIDComponent(mediaID, "media_id")
+	if err != nil {
+		return GetMediaDownloadURLResponse{}, err
+	}
+	media, err := l.repo.GetMediaObject(ctx, mediaID)
+	if err != nil {
+		return GetMediaDownloadURLResponse{}, err
+	}
+	if media.Status == model.MediaStatusDeleted {
+		return GetMediaDownloadURLResponse{}, apperror.NotFound("media object not found")
+	}
+	if err := validateAvatarMediaObject(media); err != nil {
+		return GetMediaDownloadURLResponse{}, err
+	}
+	if l.store == nil {
+		return GetMediaDownloadURLResponse{}, apperror.Internal("object store is not configured")
+	}
+	expiresAt := l.now().UTC().Add(MediaAvatarDownloadURLTTL)
+	downloadURL, err := l.store.PresignGet(ctx, media.ObjectKey, MediaAvatarDownloadURLTTL)
+	if err != nil {
+		return GetMediaDownloadURLResponse{}, err
+	}
+	return GetMediaDownloadURLResponse{MediaID: media.MediaID, DownloadURL: downloadURL, ExpiresAt: expiresAt.UnixMilli()}, nil
+}
+
+func validateAvatarMediaObject(media model.MediaObject) error {
+	if media.Purpose != model.MediaPurposeAvatar {
+		return apperror.InvalidArgument("avatar media purpose is invalid")
+	}
+	if media.Status != model.MediaStatusReady {
+		return apperror.InvalidArgument("avatar media is not ready")
+	}
+	if !isAllowedAvatarContentType(media.ContentType) {
+		return apperror.InvalidArgument("avatar media content_type must be jpeg, png, or webp")
+	}
+	if media.SizeBytes > MediaMaxAvatarBytes {
+		return apperror.InvalidArgument("avatar media exceeds size limit")
+	}
+	return nil
 }
 
 func (l *MediaLogic) ValidateMessageMedia(ctx context.Context, ownerUserID string, contentType string, content string) error {
@@ -367,8 +404,8 @@ func normalizeUploadIntent(req CreateMediaUploadIntentRequest) (model.MediaPurpo
 func validatePurposeContent(purpose model.MediaPurpose, contentType string, sizeBytes int64) error {
 	switch purpose {
 	case model.MediaPurposeAvatar:
-		if !isAllowedImageContentType(contentType) {
-			return apperror.InvalidArgument("avatar contentType must be an allowed image type")
+		if !isAllowedAvatarContentType(contentType) {
+			return apperror.InvalidArgument("avatar contentType must be jpeg, png, or webp")
 		}
 		if sizeBytes > MediaMaxAvatarBytes {
 			return apperror.InvalidArgument("avatar sizeBytes must be 5 MiB or less")
@@ -461,6 +498,15 @@ func normalizeContentType(value string) string {
 func isAllowedImageContentType(contentType string) bool {
 	switch normalizeContentType(contentType) {
 	case "image/jpeg", "image/png", "image/webp", "image/gif":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedAvatarContentType(contentType string) bool {
+	switch normalizeContentType(contentType) {
+	case "image/jpeg", "image/png", "image/webp":
 		return true
 	default:
 		return false

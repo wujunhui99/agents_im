@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
 import type { UserProfile, UserProfilePatch } from '../api/user';
 import { ActionRow } from '../components/ui/ActionRow';
@@ -19,17 +19,49 @@ type ProfileDraft = {
 type MePageProps = {
   profile: UserProfile;
   onUpdateProfile: (patch: UserProfilePatch) => Promise<void>;
+  onUploadAvatar: (file: File) => Promise<UserProfile>;
+  onAvatarUpdated?: (profile: UserProfile) => void;
 };
 
-export function MePage({ profile, onUpdateProfile }: MePageProps) {
+export function MePage({ profile, onUpdateProfile, onUploadAvatar, onAvatarUpdated }: MePageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileDraft>(() => createDraft(profile));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [avatarStatus, setAvatarStatus] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarURL, setAvatarURL] = useState(profile.avatar_url ?? '');
+  const visibleProfile = { ...profile, avatar_url: avatarURL };
 
   useEffect(() => {
     setDraft(createDraft(profile));
   }, [profile]);
+
+  useEffect(() => {
+    setAvatarURL(profile.avatar_url ?? '');
+  }, [profile.avatar_url]);
+
+  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file || isUploadingAvatar) {
+      return;
+    }
+
+    setAvatarStatus('正在上传头像');
+    setIsUploadingAvatar(true);
+    try {
+      const updatedProfile = await onUploadAvatar(file);
+      setAvatarURL(updatedProfile.avatar_url ?? '');
+      onAvatarUpdated?.(updatedProfile);
+      setAvatarStatus('头像已更新');
+    } catch (caughtError) {
+      const detail = caughtError instanceof Error ? caughtError.message : '';
+      setAvatarStatus(detail ? `头像上传失败：${detail}` : '头像上传失败，请稍后重试');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,12 +92,37 @@ export function MePage({ profile, onUpdateProfile }: MePageProps) {
   return (
     <div className="page-stack me-page">
       <Card className="profile-card" variant="elevated">
-        <Avatar label={profileInitial(profile)} color="green" size="large" />
+        <div className="profile-avatar-stack">
+          <Avatar
+            label={profileInitial(visibleProfile)}
+            color="green"
+            size="large"
+            src={visibleProfile.avatar_url}
+            alt={`${profileDisplayName(visibleProfile)} 头像`}
+            onImageError={() => setAvatarStatus('头像加载失败，已显示默认头像')}
+          />
+          <label className={`avatar-upload-control${isUploadingAvatar ? ' is-disabled' : ''}`}>
+            <span>{isUploadingAvatar ? '上传中' : '更换头像'}</span>
+            <input
+              className="sr-only"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              aria-label="上传头像"
+              disabled={isUploadingAvatar}
+              onChange={handleAvatarChange}
+            />
+          </label>
+        </div>
         <div className="profile-main">
-          <strong>{profileDisplayName(profile)}</strong>
-          <p>账号：{profile.identifier}</p>
-          <p>账号类型：{accountTypeLabel(profile.account_type)}</p>
-          <p>地区：{profile.region}</p>
+          <strong>{profileDisplayName(visibleProfile)}</strong>
+          <p>账号：{visibleProfile.identifier}</p>
+          <p>账号类型：{accountTypeLabel(visibleProfile.account_type)}</p>
+          <p>地区：{visibleProfile.region}</p>
+          {avatarStatus ? (
+            <p className="profile-avatar-status" role="status">
+              {avatarStatus}
+            </p>
+          ) : null}
         </div>
         <Button variant="tonal" size="small" className="profile-edit-button" aria-label="编辑个人资料" onClick={() => setIsEditing(true)}>
           <span>编辑资料</span>

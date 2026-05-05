@@ -38,11 +38,19 @@ func (l *ListFriendRequestsLogic) ListFriendRequests(_ *types.ListFriendRequests
 
 	incoming := make([]types.Friendship, 0, len(result.Incoming))
 	for _, friendship := range result.Incoming {
-		incoming = append(incoming, toFriendship(friendship))
+		view, err := toFriendship(l.ctx, l.svcCtx, friendship)
+		if err != nil {
+			return nil, err
+		}
+		incoming = append(incoming, view)
 	}
 	outgoing := make([]types.Friendship, 0, len(result.Outgoing))
 	for _, friendship := range result.Outgoing {
-		outgoing = append(outgoing, toFriendship(friendship))
+		view, err := toFriendship(l.ctx, l.svcCtx, friendship)
+		if err != nil {
+			return nil, err
+		}
+		outgoing = append(outgoing, view)
 	}
 
 	return &types.ListFriendRequestsResp{
@@ -81,11 +89,15 @@ func (l *AcceptFriendRequestLogic) AcceptFriendRequest(req *types.FriendPathReq)
 	if err != nil {
 		return nil, err
 	}
+	friendship, err := toFriendship(l.ctx, l.svcCtx, result.Friendship)
+	if err != nil {
+		return nil, err
+	}
 	return &types.FriendRequestDecisionResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.FriendRequestDecisionData{
-			Friendship: toFriendship(result.Friendship),
+			Friendship: friendship,
 			Updated:    result.Updated,
 		},
 	}, nil
@@ -117,11 +129,15 @@ func (l *RejectFriendRequestLogic) RejectFriendRequest(req *types.FriendPathReq)
 	if err != nil {
 		return nil, err
 	}
+	friendship, err := toFriendship(l.ctx, l.svcCtx, result.Friendship)
+	if err != nil {
+		return nil, err
+	}
 	return &types.FriendRequestDecisionResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.FriendRequestDecisionData{
-			Friendship: toFriendship(result.Friendship),
+			Friendship: friendship,
 			Updated:    result.Updated,
 		},
 	}, nil

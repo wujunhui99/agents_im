@@ -514,6 +514,7 @@ describe('WeChat-inspired app shell', () => {
       identifierExists: vi.fn(async () => ({ identifier: initialProfile.identifier, exists: true })),
       getPublicProfileByIdentifier: vi.fn(async () => initialProfile),
       patchCurrentUser,
+      patchCurrentUserAvatar: vi.fn(async () => initialProfile),
     };
 
     render(<App initialUser={initialProfile} userApi={userApi} />);
