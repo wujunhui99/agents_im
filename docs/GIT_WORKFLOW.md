@@ -85,6 +85,47 @@ git push -u origin develop
 - 普通产品需求默认一个全栈 Issue 完成，不拆成前端/后端/测试微任务；只有 Research、过大需求、低耦合独立能力或系统级 E2E 才拆分。
 - PR merge 不等于 Done；需要 Hermes 验收、必要 CI/CD 和生产 smoke/E2E 后才能关闭 Issue。
 
+
+## Codex commit 前验证门禁
+
+Codex Dev Mode 在提交 commit 前必须按改动范围运行验证，并把命令、结果、branch、commit、PR 和 blocker 写回 Issue/PR。`codex exec` 退出 0 只表示 worker 完成，不等于 Hermes 验收通过。
+
+最低门禁：
+
+```bash
+gofmt -w $(find . -name "*.go" -print)
+git diff --check
+go test ./...
+bash scripts/verify-static.sh
+```
+
+如果改动 `web/`，还必须运行：
+
+```bash
+npm --prefix web test -- --run
+npm --prefix web run build
+```
+
+如果改动数据库 schema、`db/migrations/*.sql`、repository SQL、或 PostgreSQL integration tests，必须运行 PostgreSQL integration：
+
+```bash
+AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
+```
+
+脚本读取 `DATABASE_URL` 或 `AGENTS_IM_POSTGRES_DSN`，只允许专用本机/测试 PostgreSQL；integration test 可能 truncate 测试表。无法运行某项验证时，必须报告 blocker，不能假装通过。
+
+## 数据库 change_log 门禁
+
+只有数据库 schema/data migration 行为变化时才需要新增 change log；纯应用代码、前端、普通文档不需要。
+
+要求：
+
+- 新增或更新 `db/change_log/*.sql`，且不能只提交 `template.sql`。
+- `.sql` 是实际执行数据库改动的事实源，必须能用 `psql -v ON_ERROR_STOP=1 -f <file>.sql` 执行。
+- 建议配对 `.md` 说明目的、影响表/字段、是否破坏性、apply 顺序、rollback/恢复和验证命令。
+- SQL 不得包含 secret、DSN、密码、token、server 连接信息。
+- `scripts/verify-static.sh` 会在检测到 `db/migrations/`、`db/schema/`、`internal/repository/postgres_*.go` 或 PG integration test 改动时，要求存在非模板 `db/change_log/*.sql`。
+
 ## CI Checks
 
 CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从 `main` 发布。GitHub Actions workflow 位于 `.github/workflows/ci.yml`，PR/MR 合入 `develop` 前必须通过默认 backend verification。当前 CI checks 包括：
@@ -118,13 +159,14 @@ docker compose config
 npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./.ai-context/*" -not -path "./docs/references/*" -print)
 ```
 
-如需本地复现 PostgreSQL integration job，先启动或准备 PostgreSQL，再运行：
+如需本地复现 PostgreSQL integration job，先启动或准备专用本机/测试 PostgreSQL，再运行：
 
 ```bash
-export DATABASE_URL=postgres://agents_im:***@localhost:5432/agents_im?sslmode=disable
-bash scripts/migrate-postgres.sh --host-psql
-go test -tags=integration ./tests
+export DATABASE_URL='postgres://agents_im:[REDACTED]@localhost:5432/agents_im_test?sslmode=disable'
+AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 ```
+
+`verify-postgres-local.sh` 会先执行 `bash scripts/migrate-postgres.sh --host-psql`，再执行 `go test -tags=integration ./tests -count=1`。
 
 ## CD / Deployment
 
