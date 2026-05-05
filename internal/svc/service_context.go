@@ -1,6 +1,8 @@
 package svc
 
 import (
+	"github.com/wujunhui99/agents_im/internal/agentim"
+	einoruntime "github.com/wujunhui99/agents_im/internal/agentruntime/eino"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
@@ -16,6 +18,7 @@ type ServiceContext struct {
 	FriendsLogic     *logic.FriendsLogic
 	GroupsLogic      *logic.GroupsLogic
 	MessageLogic     *logic.MessageLogic
+	AIHostingLogic   *logic.ConversationAIHostingLogic
 	MediaLogic       *logic.MediaLogic
 	AgentLogic       *logic.AgentLogic
 	AgentAuditLogic  *logic.AgentAuditLogic
@@ -26,6 +29,7 @@ type ServiceContext struct {
 	ObjectStore      objectstorage.ObjectStore
 	AgentRepo        repository.AgentRepository
 	AgentHostingRepo repository.AgentConversationHostingRepository
+	AIHostingRepo    repository.ConversationAIHostingRepository
 	OutboxRepo       repository.OutboxRepository
 	AgentAuditRepo   repository.AgentAuditRepository
 }
@@ -42,20 +46,25 @@ func NewServiceContextWithAuth(repo repository.Repository, auth config.JWTAuthCo
 	mediaLogic := logic.NewMediaLogic(mediaRepo, objectStore, config.DefaultObjectStorageConfig().Bucket)
 	mediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(messageRepo))
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
+	agentHostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
 	return &ServiceContext{
-		Auth:            normalizeAuthConfig(auth),
-		AccountLogic:    userLogic,
-		UserLogic:       userLogic,
-		FriendsLogic:    logic.NewFriendsLogic(repo, userLogic),
-		MessageLogic:    logic.NewMessageLogicWithMediaValidator(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil, mediaLogic),
-		MediaLogic:      mediaLogic,
-		AgentAuditLogic: logic.NewAgentAuditLogic(agentAuditRepo),
-		Repo:            repo,
-		MessageRepo:     messageRepo,
-		MediaRepo:       mediaRepo,
-		ObjectStore:     objectStore,
-		OutboxRepo:      outboxRepositoryFromMessageRepo(messageRepo),
-		AgentAuditRepo:  agentAuditRepo,
+		Auth:             normalizeAuthConfig(auth),
+		AccountLogic:     userLogic,
+		UserLogic:        userLogic,
+		FriendsLogic:     logic.NewFriendsLogic(repo, userLogic),
+		MessageLogic:     logic.NewMessageLogicWithMediaValidator(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil, mediaLogic),
+		AIHostingLogic:   logic.NewConversationAIHostingLogic(aiHostingRepo),
+		MediaLogic:       mediaLogic,
+		AgentAuditLogic:  logic.NewAgentAuditLogic(agentAuditRepo),
+		Repo:             repo,
+		MessageRepo:      messageRepo,
+		MediaRepo:        mediaRepo,
+		ObjectStore:      objectStore,
+		OutboxRepo:       outboxRepositoryFromMessageRepo(messageRepo),
+		AgentHostingRepo: agentHostingRepo,
+		AIHostingRepo:    aiHostingRepo,
+		AgentAuditRepo:   agentAuditRepo,
 	}
 }
 
@@ -79,13 +88,21 @@ func NewMessageServiceContextWithAuth(repo repository.MessageRepository, userExi
 	mediaRepo := repository.NewMemoryMediaRepository()
 	mediaLogic := logic.NewMediaLogic(mediaRepo, nil, config.DefaultObjectStorageConfig().Bucket)
 	mediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(repo))
+	agentHostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
+	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{
-		Auth:         normalizeAuthConfig(auth),
-		MessageLogic: logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
-		MessageRepo:  repo,
-		MediaLogic:   mediaLogic,
-		MediaRepo:    mediaRepo,
-		OutboxRepo:   outboxRepositoryFromMessageRepo(repo),
+		Auth:             normalizeAuthConfig(auth),
+		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
+		AIHostingLogic:   logic.NewConversationAIHostingLogic(aiHostingRepo),
+		MessageRepo:      repo,
+		MediaLogic:       mediaLogic,
+		MediaRepo:        mediaRepo,
+		AgentHostingRepo: agentHostingRepo,
+		AIHostingRepo:    aiHostingRepo,
+		OutboxRepo:       outboxRepositoryFromMessageRepo(repo),
+		AgentAuditLogic:  logic.NewAgentAuditLogic(agentAuditRepo),
+		AgentAuditRepo:   agentAuditRepo,
 	}
 }
 
@@ -108,13 +125,21 @@ func NewUserServiceContextWithMedia(repo repository.Repository, mediaRepo reposi
 func NewMessageServiceContextWithMedia(repo repository.MessageRepository, mediaRepo repository.MediaRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
 	mediaLogic := logic.NewMediaLogic(mediaRepo, nil, config.DefaultObjectStorageConfig().Bucket)
 	mediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(repo))
+	agentHostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
+	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{
-		Auth:         normalizeAuthConfig(auth),
-		MessageLogic: logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
-		MessageRepo:  repo,
-		MediaLogic:   mediaLogic,
-		MediaRepo:    mediaRepo,
-		OutboxRepo:   outboxRepositoryFromMessageRepo(repo),
+		Auth:             normalizeAuthConfig(auth),
+		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
+		AIHostingLogic:   logic.NewConversationAIHostingLogic(aiHostingRepo),
+		MessageRepo:      repo,
+		MediaLogic:       mediaLogic,
+		MediaRepo:        mediaRepo,
+		AgentHostingRepo: agentHostingRepo,
+		AIHostingRepo:    aiHostingRepo,
+		OutboxRepo:       outboxRepositoryFromMessageRepo(repo),
+		AgentAuditLogic:  logic.NewAgentAuditLogic(agentAuditRepo),
+		AgentAuditRepo:   agentAuditRepo,
 	}
 }
 
@@ -149,6 +174,61 @@ func NewAgentConversationHostingServiceContext(repo repository.AgentConversation
 	return &ServiceContext{
 		AgentHostingRepo: repo,
 	}
+}
+
+func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSeekConfig) error {
+	if ctx == nil {
+		return nil
+	}
+	if ctx.MessageLogic == nil {
+		return nil
+	}
+	if ctx.MessageRepo == nil {
+		return nil
+	}
+	if ctx.AgentHostingRepo == nil {
+		ctx.AgentHostingRepo = repository.NewMemoryAgentConversationHostingRepository()
+	}
+	if ctx.AIHostingRepo == nil {
+		ctx.AIHostingRepo = repository.NewMemoryConversationAIHostingRepository()
+	}
+	if ctx.AIHostingLogic == nil {
+		ctx.AIHostingLogic = logic.NewConversationAIHostingLogic(ctx.AIHostingRepo)
+	}
+	if ctx.AgentAuditRepo == nil {
+		ctx.AgentAuditRepo = repository.NewMemoryAgentAuditRepository()
+	}
+	if ctx.AgentAuditLogic == nil {
+		ctx.AgentAuditLogic = logic.NewAgentAuditLogic(ctx.AgentAuditRepo)
+	}
+	writer, err := agentim.NewMessageServiceResponseWriter(ctx.MessageLogic)
+	if err != nil {
+		return err
+	}
+	orchestrator, err := agentim.NewAgentRunOrchestrator(agentim.AgentRunOrchestratorConfig{
+		Runtime: einoruntime.NewDeepSeekRuntime(deepSeek),
+		RequestBuilder: agentim.NewConversationAIHostingRuntimeRequestBuilder(agentim.ConversationAIHostingRuntimeRequestBuilderConfig{
+			MessageRepository: ctx.MessageRepo,
+			HostingRepository: ctx.AIHostingRepo,
+			DeepSeek:          deepSeek,
+			MaxRecentMessages: 30,
+		}),
+		Audit:  ctx.AgentAuditLogic,
+		Writer: writer,
+	})
+	if err != nil {
+		return err
+	}
+	hosting, err := agentim.NewConversationHostingService(agentim.ConversationHostingConfig{
+		Repository:          ctx.AgentHostingRepo,
+		AIHostingRepository: ctx.AIHostingRepo,
+		Runner:              orchestrator,
+	})
+	if err != nil {
+		return err
+	}
+	ctx.MessageLogic.SetMessageCreatedHook(hosting)
+	return nil
 }
 
 func normalizeAuthConfig(auth config.JWTAuthConfig) config.JWTAuthConfig {

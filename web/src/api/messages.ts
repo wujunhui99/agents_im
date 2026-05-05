@@ -80,11 +80,28 @@ export type MarkReadResponse = {
   hasReadSeq?: number;
 };
 
+export type AIHostingState = {
+  conversationId: string;
+  chatType: ChatType;
+  enabled: boolean;
+  available: boolean;
+  peerEnabled: boolean;
+  unavailableReason?: string;
+  maxRecentMessages: number;
+  summaryEnabled: boolean;
+};
+
+export type UpdateAIHostingRequest = {
+  enabled: boolean;
+};
+
 export type MessageApi = {
   sendMessage: (request: SendMessageRequest) => Promise<SendMessageResponse>;
   getConversationSeqs: (conversationIds: string[]) => Promise<ConversationSeqsResponse>;
   pullMessages: (conversationId: string, request: PullMessagesRequest) => Promise<PullMessagesResponse>;
   markRead: (conversationId: string, request: MarkReadRequest) => Promise<MarkReadResponse>;
+  getAIHosting: (conversationId: string) => Promise<AIHostingState>;
+  updateAIHosting: (conversationId: string, request: UpdateAIHostingRequest) => Promise<AIHostingState>;
 };
 
 export function createMessageApi(api: ApiClient = createApiClient()): MessageApi {
@@ -110,6 +127,12 @@ export function createMessageApi(api: ApiClient = createApiClient()): MessageApi
     markRead(conversationId, request) {
       return api.post<MarkReadResponse>(`/conversations/${encodeURIComponent(conversationId)}/read`, request);
     },
+    getAIHosting(conversationId) {
+      return api.get<AIHostingState>(`/conversations/${encodeURIComponent(conversationId)}/ai-hosting`);
+    },
+    updateAIHosting(conversationId, request) {
+      return api.put<AIHostingState>(`/conversations/${encodeURIComponent(conversationId)}/ai-hosting`, request);
+    },
   };
 }
 
@@ -129,4 +152,12 @@ export function pullMessages(conversationId: string, request: PullMessagesReques
 
 export function markRead(conversationId: string, request: MarkReadRequest) {
   return defaultMessageApi.markRead(conversationId, request);
+}
+
+export function getAIHosting(conversationId: string) {
+  return defaultMessageApi.getAIHosting(conversationId);
+}
+
+export function updateAIHosting(conversationId: string, request: UpdateAIHostingRequest) {
+  return defaultMessageApi.updateAIHosting(conversationId, request);
 }
