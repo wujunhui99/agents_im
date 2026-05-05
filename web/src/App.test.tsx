@@ -1281,6 +1281,21 @@ describe('WeChat-inspired app shell', () => {
           code: 'OK',
           message: 'ok',
           data: {
+            conversationId: 'single:1001:2002',
+            chatType: 'single',
+            enabled: false,
+            available: true,
+            peerEnabled: false,
+            maxRecentMessages: 30,
+            summaryEnabled: false,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
             message: {
               serverMsgId: 'srv-2',
               clientMsgId: 'web-client-2',

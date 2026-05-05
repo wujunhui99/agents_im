@@ -80,6 +80,32 @@ type ConversationSeqsResp struct {
 	Data    ConversationSeqsData `json:"data"`
 }
 
+type ConversationAIHostingReq struct {
+	ConversationID string `path:"conversation_id"`
+}
+
+type UpdateConversationAIHostingReq struct {
+	ConversationID string `path:"conversation_id"`
+	Enabled        bool   `json:"enabled"`
+}
+
+type ConversationAIHostingData struct {
+	ConversationID    string `json:"conversationId"`
+	ChatType          string `json:"chatType"`
+	Enabled           bool   `json:"enabled"`
+	Available         bool   `json:"available"`
+	PeerEnabled       bool   `json:"peerEnabled"`
+	UnavailableReason string `json:"unavailableReason,optional"`
+	MaxRecentMessages int64  `json:"maxRecentMessages"`
+	SummaryEnabled    bool   `json:"summaryEnabled"`
+}
+
+type ConversationAIHostingResp struct {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    ConversationAIHostingData `json:"data"`
+}
+
 type CreateGroupReq struct {
 	Name          string   `json:"name"`
 	Description   string   `json:"description,optional"`

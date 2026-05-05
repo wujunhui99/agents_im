@@ -125,6 +125,17 @@ func NewAgentConversationHostingRepositoryForStorage(driver string, dataSource s
 	return NewPostgresAgentConversationHostingRepository(appconfig.ResolveDataSource(dataSource))
 }
 
+func NewConversationAIHostingRepositoryForStorage(driver string, dataSource string) (ConversationAIHostingRepository, error) {
+	storageDriver, err := repositoryStorageDriver(driver)
+	if err != nil {
+		return nil, err
+	}
+	if storageDriver == appconfig.StorageDriverMemory {
+		return NewMemoryConversationAIHostingRepository(), nil
+	}
+	return NewPostgresConversationAIHostingRepository(appconfig.ResolveDataSource(dataSource))
+}
+
 func repositoryStorageDriver(driver string) (string, error) {
 	storageDriver := appconfig.ResolveStorageDriver(driver)
 	switch storageDriver {
