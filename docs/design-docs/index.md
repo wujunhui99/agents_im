@@ -38,6 +38,7 @@
 - [agent-runtime-eino.md](./agent-runtime-eino.md)：Agent Runtime 本地接口、Eino 适配边界和 fail-first 请求/结果校验
 - [agent-conversation-hosting.md](./agent-conversation-hosting.md)：Agent 会话托管、message_origin、AI 写回 Message Service 和防循环幂等设计
 - [ai-reply-v1.md](./ai-reply-v1.md)：会话级 AI 回复 V1：默认关闭、手动 suggest-only 草稿、bounded context 与 summary 预留
+- [email-verification-mail-service.md](./email-verification-mail-service.md)：注册邮箱验证码发信方案调研、DNS/SMTP 部署清单与 Auth 侧验证码约束
 
 - [backend-mvp-contract.md](./backend-mvp-contract.md)：前端开工前后端 MVP 接口契约、WebSocket 命令和投递语义
 ## 状态说明
