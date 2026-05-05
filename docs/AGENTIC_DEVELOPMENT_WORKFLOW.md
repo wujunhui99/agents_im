@@ -185,7 +185,8 @@ Dev Mode must:
 - create a branch named like `feature/issue-<number>-<short-name>` or `fix/issue-<number>-<short-name>`;
 - implement the complete full-stack product loop unless the issue explicitly scopes otherwise;
 - add focused regression tests before or with the fix;
-- run tests and static checks;
+- run tests and static checks before commit, using the Codex commit 前验证门禁 in `docs/GIT_WORKFLOW.md`;
+- for DB/schema/repository SQL changes, add executable `db/change_log/*.sql` and run PostgreSQL integration when a test DSN is available;
 - open a PR with `Closes #<issue-number>`;
 - comment the execution result on the issue;
 - set `Status = Dev Done`, `Branch`, `PR`, and clear/set `Codex Run ID` according to the result.
