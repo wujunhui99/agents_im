@@ -307,13 +307,14 @@ func (r *MemoryMessageRepository) GetMessagesForUser(_ context.Context, userID s
 		return nil, false, 0, err
 	}
 
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	conversation, exists := r.conversations[conversationID]
 	if !exists {
 		return nil, false, 0, apperror.NotFound("conversation not found")
 	}
+	r.repairDirectConversationStateLocked(userID, conversationID)
 	visibleStartSeq, ok := r.visibleStartSeqLocked(userID, conversationID)
 	if !ok {
 		return nil, false, 0, apperror.NotFound("conversation not found")
@@ -328,17 +329,27 @@ func (r *MemoryMessageRepository) GetMessagesForUser(_ context.Context, userID s
 }
 
 func (r *MemoryMessageRepository) GetConversationSeqStates(_ context.Context, userID string, conversationIDs []string) ([]ConversationSeqState, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	ids := conversationIDs
 	if len(ids) == 0 {
-		ids = make([]string, 0, len(r.conversations))
+		seen := make(map[string]struct{})
 		prefix := userID + "\x00"
 		for key := range r.visibleStartSeqs {
 			if strings.HasPrefix(key, prefix) {
-				ids = append(ids, strings.TrimPrefix(key, prefix))
+				conversationID := strings.TrimPrefix(key, prefix)
+				seen[conversationID] = struct{}{}
 			}
+		}
+		for conversationID := range r.conversations {
+			if r.repairDirectConversationStateLocked(userID, conversationID) {
+				seen[conversationID] = struct{}{}
+			}
+		}
+		ids = make([]string, 0, len(seen))
+		for conversationID := range seen {
+			ids = append(ids, conversationID)
 		}
 		sort.Strings(ids)
 	}
@@ -349,6 +360,7 @@ func (r *MemoryMessageRepository) GetConversationSeqStates(_ context.Context, us
 		if !exists {
 			return nil, apperror.NotFound("conversation not found")
 		}
+		r.repairDirectConversationStateLocked(userID, conversationID)
 		visibleStartSeq, ok := r.visibleStartSeqLocked(userID, conversationID)
 		if !ok {
 			return nil, apperror.NotFound("conversation not found")
@@ -371,6 +383,7 @@ func (r *MemoryMessageRepository) SetUserHasReadSeqMax(_ context.Context, userID
 	if !exists {
 		return ConversationSeqState{}, false, apperror.NotFound("conversation not found")
 	}
+	r.repairDirectConversationStateLocked(userID, conversationID)
 	visibleStartSeq, ok := r.visibleStartSeqLocked(userID, conversationID)
 	if !ok {
 		return ConversationSeqState{}, false, apperror.NotFound("conversation not found")
@@ -496,6 +509,38 @@ func (r *MemoryMessageRepository) ensureVisibleStartSeqLocked(userID, conversati
 func (r *MemoryMessageRepository) visibleStartSeqLocked(userID, conversationID string) (int64, bool) {
 	seq, ok := r.visibleStartSeqs[userConversationStateKey(userID, conversationID)]
 	return seq, ok
+}
+
+func (r *MemoryMessageRepository) repairDirectConversationStateLocked(userID, conversationID string) bool {
+	conversation, exists := r.conversations[conversationID]
+	if !exists || conversation.chatType != ChatTypeSingle {
+		return false
+	}
+	userA, userB, ok := directConversationParticipants(conversationID)
+	if !ok || (userID != userA && userID != userB) {
+		return false
+	}
+
+	key := userConversationStateKey(userID, conversationID)
+	if visibleStartSeq, exists := r.visibleStartSeqs[key]; !exists || visibleStartSeq != 0 {
+		r.visibleStartSeqs[key] = 0
+		if !exists {
+			r.readStates[key] = 0
+		}
+	}
+	return true
+}
+
+func directConversationParticipants(conversationID string) (string, string, bool) {
+	const prefix = "single:"
+	if !strings.HasPrefix(conversationID, prefix) {
+		return "", "", false
+	}
+	parts := strings.Split(conversationID, ":")
+	if len(parts) != 3 || strings.TrimSpace(parts[1]) == "" || strings.TrimSpace(parts[2]) == "" {
+		return "", "", false
+	}
+	return parts[1], parts[2], true
 }
 
 func (r *MemoryMessageRepository) messagesInRangeLocked(conversation *memoryConversation, fromSeq, toSeq int64, limit int, order string) ([]Message, bool, int64, error) {
