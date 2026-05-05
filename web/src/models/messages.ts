@@ -12,6 +12,7 @@ export type ChatMessage = {
   serverMsgId?: string;
   seq?: number;
   senderId: string;
+  senderDisplayName?: string;
   receiverId?: string;
   groupId?: string;
   chatType: ChatType;
@@ -42,5 +43,6 @@ export type Conversation = {
   chatType: ChatType;
   receiverId?: string;
   groupId?: string;
+  groupMemberDisplayNames?: Record<string, string>;
   messages: ChatMessage[];
 };
