@@ -335,7 +335,7 @@ select exists (
   from user_conversation_states s
   join messages m on m.conversation_id = s.conversation_id
   where s.account_id = $1
-    and m.seq <= s.visible_start_seq
+    and m.seq > s.visible_start_seq
     and m.content_type in ($3, $4)
     and m.content ->> 'mediaId' = $2
 )
