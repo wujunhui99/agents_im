@@ -37,6 +37,7 @@ export type ApiClient = {
   request<T>(path: string, options?: ApiRequestOptions): Promise<T>;
   get<T>(path: string, options?: Omit<ApiRequestOptions, 'method' | 'body'>): Promise<T>;
   post<T>(path: string, body?: unknown, options?: Omit<ApiRequestOptions, 'method' | 'body'>): Promise<T>;
+  put<T>(path: string, body?: unknown, options?: Omit<ApiRequestOptions, 'method' | 'body'>): Promise<T>;
   patch<T>(path: string, body?: unknown, options?: Omit<ApiRequestOptions, 'method' | 'body'>): Promise<T>;
   delete<T>(path: string, options?: Omit<ApiRequestOptions, 'method' | 'body'>): Promise<T>;
 };
@@ -89,6 +90,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     request,
     get: (path, requestOptions) => request(path, { ...requestOptions, method: 'GET' }),
     post: (path, body, requestOptions) => request(path, { ...requestOptions, method: 'POST', body }),
+    put: (path, body, requestOptions) => request(path, { ...requestOptions, method: 'PUT', body }),
     patch: (path, body, requestOptions) => request(path, { ...requestOptions, method: 'PATCH', body }),
     delete: (path, requestOptions) => request(path, { ...requestOptions, method: 'DELETE' }),
   };

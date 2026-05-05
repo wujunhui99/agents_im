@@ -37,6 +37,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("build media repository: %v", err)
 	}
+	agentHostingRepo, err := repository.NewAgentConversationHostingRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent hosting repository: %v", err)
+	}
+	aiHostingRepo, err := repository.NewConversationAIHostingRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build AI hosting repository: %v", err)
+	}
+	agentAuditRepo, err := repository.NewAgentAuditRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent audit repository: %v", err)
+	}
 	groupsLogic := logic.NewGroupsLogic(groupsRepo, nil)
 	serviceContext := svc.NewMessageServiceContextWithMedia(
 		messageRepo,
@@ -45,6 +57,14 @@ func main() {
 		groupsLogic,
 		cfg.Auth,
 	)
+	serviceContext.AgentHostingRepo = agentHostingRepo
+	serviceContext.AIHostingRepo = aiHostingRepo
+	serviceContext.AIHostingLogic = logic.NewConversationAIHostingLogic(aiHostingRepo)
+	serviceContext.AgentAuditRepo = agentAuditRepo
+	serviceContext.AgentAuditLogic = logic.NewAgentAuditLogic(agentAuditRepo)
+	if err := svc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek); err != nil {
+		log.Fatalf("configure AI conversation hosting: %v", err)
+	}
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
 		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 		if err != nil {
