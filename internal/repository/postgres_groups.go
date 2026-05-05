@@ -47,38 +47,62 @@ func NewPostgresGroupsRepositoryFromConn(conn sqlx.SqlConn) *PostgresGroupsRepos
 	return &PostgresGroupsRepository{conn: conn}
 }
 
-func (r *PostgresGroupsRepository) CreateGroup(ctx context.Context, group model.Group, creatorUserID string) (model.Group, model.GroupMember, error) {
+func (r *PostgresGroupsRepository) CreateGroup(ctx context.Context, group model.Group, creatorUserID string, memberUserIDs []string) (model.Group, []model.GroupMember, error) {
 	var storedGroup model.Group
-	var storedMember model.GroupMember
+	var storedMembers []model.GroupMember
 	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		row, err := insertGroup(ctx, session, group, creatorUserID)
 		if err != nil {
 			return err
 		}
 
-		memberRow, err := insertGroupMember(ctx, session, row.GroupID, creatorUserID)
-		if err != nil {
+		seen := make(map[string]struct{}, len(memberUserIDs)+1)
+		addMember := func(userID string) error {
+			userID = strings.TrimSpace(userID)
+			if userID == "" {
+				return nil
+			}
+			if _, ok := seen[userID]; ok {
+				return nil
+			}
+			seen[userID] = struct{}{}
+			role := groupMemberRoleDBMember
+			if userID == creatorUserID {
+				role = groupMemberRoleDBOwner
+			}
+			memberRow, err := insertGroupMemberWithRole(ctx, session, row.GroupID, userID, role)
+			if err != nil {
+				return err
+			}
+			storedMembers = append(storedMembers, memberRow.member())
+			return nil
+		}
+		if err := addMember(creatorUserID); err != nil {
 			return err
+		}
+		for _, userID := range memberUserIDs {
+			if err := addMember(userID); err != nil {
+				return err
+			}
 		}
 
 		storedGroup = row.group()
-		storedMember = memberRow.member()
 		return nil
 	})
 	if err != nil {
 		if isPostgresUniqueViolation(err) {
-			return model.Group{}, model.GroupMember{}, apperror.AlreadyExists("group already exists")
+			return model.Group{}, nil, apperror.AlreadyExists("group already exists")
 		}
 		if isPostgresCheckViolation(err) {
-			return model.Group{}, model.GroupMember{}, apperror.InvalidArgument("invalid group")
+			return model.Group{}, nil, apperror.InvalidArgument("invalid group")
 		}
 		if isPostgresForeignKeyViolation(err) {
-			return model.Group{}, model.GroupMember{}, apperror.NotFound("creator account not found")
+			return model.Group{}, nil, apperror.NotFound("creator account not found")
 		}
-		return model.Group{}, model.GroupMember{}, err
+		return model.Group{}, nil, err
 	}
 
-	return storedGroup.Clone(), storedMember.Clone(), nil
+	return storedGroup.Clone(), cloneGroupMembers(storedMembers), nil
 }
 
 func (r *PostgresGroupsRepository) GetGroup(ctx context.Context, groupID string) (model.Group, error) {
@@ -90,6 +114,25 @@ func (r *PostgresGroupsRepository) GetGroup(ctx context.Context, groupID string)
 		return model.Group{}, err
 	}
 	return row.group(), nil
+}
+
+func (r *PostgresGroupsRepository) ListGroupsForUser(ctx context.Context, userID string) ([]model.Group, error) {
+	var rows []postgresGroupRow
+	if err := r.conn.QueryRowsCtx(ctx, &rows, `
+select g.group_id, g.name, g.description, g.creator_account_id, g.created_at, g.updated_at
+from groups g
+join group_members gm on gm.group_id = g.group_id
+where gm.account_id = $1 and gm.status = $2
+order by g.updated_at desc, g.group_id asc
+`, userID, memberStateToDB(model.MemberStateActive)); err != nil {
+		return nil, err
+	}
+
+	groups := make([]model.Group, 0, len(rows))
+	for _, row := range rows {
+		groups = append(groups, row.group())
+	}
+	return groups, nil
 }
 
 func (r *PostgresGroupsRepository) AddMember(ctx context.Context, groupID string, userID string) (model.GroupMember, bool, error) {
@@ -193,12 +236,16 @@ returning group_id, name, description, creator_account_id, created_at, updated_a
 }
 
 func insertGroupMember(ctx context.Context, session sqlx.Session, groupID string, userID string) (postgresGroupMemberRow, error) {
+	return insertGroupMemberWithRole(ctx, session, groupID, userID, groupMemberRoleDBOwner)
+}
+
+func insertGroupMemberWithRole(ctx context.Context, session sqlx.Session, groupID string, userID string, role int16) (postgresGroupMemberRow, error) {
 	var row postgresGroupMemberRow
 	err := session.QueryRowCtx(ctx, &row, `
 insert into group_members (group_id, account_id, role, status)
 values ($1, $2, $3, $4)
 returning group_id, account_id, role, status, join_time, left_at
-`, groupID, userID, groupMemberRoleDBOwner, memberStateToDB(model.MemberStateActive))
+`, groupID, userID, role, memberStateToDB(model.MemberStateActive))
 	return row, err
 }
 
@@ -262,4 +309,12 @@ func (r postgresGroupMemberRow) member() model.GroupMember {
 		member.LeftAt = r.LeftAt.Time.UTC()
 	}
 	return member
+}
+
+func cloneGroupMembers(members []model.GroupMember) []model.GroupMember {
+	cloned := make([]model.GroupMember, 0, len(members))
+	for _, member := range members {
+		cloned = append(cloned, member.Clone())
+	}
+	return cloned
 }

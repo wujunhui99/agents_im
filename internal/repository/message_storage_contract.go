@@ -115,6 +115,13 @@ func MessageStorageGroupConversationID(groupID string) string {
 }
 
 func MessageStorageUnreadCount(maxSeq int64, hasReadSeq int64) int64 {
+	return MessageStorageUnreadCountFromVisibleStart(maxSeq, hasReadSeq, 0)
+}
+
+func MessageStorageUnreadCountFromVisibleStart(maxSeq int64, hasReadSeq int64, visibleStartSeq int64) int64 {
+	if hasReadSeq < visibleStartSeq {
+		hasReadSeq = visibleStartSeq
+	}
 	if maxSeq <= hasReadSeq {
 		return 0
 	}

@@ -211,6 +211,9 @@ func (l *MessageLogic) PullMessages(ctx context.Context, req PullMessagesRequest
 	if err != nil {
 		return PullMessagesResponse{}, err
 	}
+	if err := l.ensureConversationReadAccess(ctx, userID, conversationID); err != nil {
+		return PullMessagesResponse{}, err
+	}
 	fromSeq, toSeq, limit, order, err := normalizePullRange(req.FromSeq, req.ToSeq, req.Limit, req.Order)
 	if err != nil {
 		return PullMessagesResponse{}, err
@@ -224,6 +227,14 @@ func (l *MessageLogic) PullMessages(ctx context.Context, req PullMessagesRequest
 		if toSeq == 0 || toSeq > states[0].MaxSeq {
 			toSeq = states[0].MaxSeq
 		}
+	}
+
+	if reader, ok := l.repo.(repository.UserScopedMessageReader); ok {
+		messages, isEnd, nextSeq, err := reader.GetMessagesForUser(ctx, userID, conversationID, fromSeq, toSeq, limit, order)
+		if err != nil {
+			return PullMessagesResponse{}, err
+		}
+		return PullMessagesResponse{Messages: messages, IsEnd: isEnd, NextSeq: nextSeq}, nil
 	}
 
 	messages, isEnd, nextSeq, err := l.repo.GetMessages(ctx, conversationID, fromSeq, toSeq, limit, order)
@@ -249,12 +260,21 @@ func (l *MessageLogic) GetConversationSeqs(ctx context.Context, req GetConversat
 		if err != nil {
 			return GetConversationSeqsResponse{}, err
 		}
+		if err := l.ensureConversationReadAccess(ctx, userID, normalized); err != nil {
+			return GetConversationSeqsResponse{}, err
+		}
 		conversationIDs = append(conversationIDs, normalized)
 	}
 
 	states, err := l.repo.GetConversationSeqStates(ctx, userID, conversationIDs)
 	if err != nil {
 		return GetConversationSeqsResponse{}, err
+	}
+	if len(conversationIDs) == 0 {
+		states, err = l.filterReadableConversationStates(ctx, userID, states)
+		if err != nil {
+			return GetConversationSeqsResponse{}, err
+		}
 	}
 	return GetConversationSeqsResponse{States: states}, nil
 }
@@ -270,6 +290,9 @@ func (l *MessageLogic) MarkConversationAsRead(ctx context.Context, req MarkConve
 	}
 	conversationID, err := normalizeConversationID(req.ConversationID)
 	if err != nil {
+		return MarkConversationAsReadResponse{}, err
+	}
+	if err := l.ensureConversationReadAccess(ctx, userID, conversationID); err != nil {
 		return MarkConversationAsReadResponse{}, err
 	}
 	if req.HasReadSeq < 0 {
@@ -468,6 +491,47 @@ func (l *MessageLogic) resolveGroupParticipants(ctx context.Context, groupID str
 		return nil, apperror.Forbidden("sender is not a group member")
 	}
 	return participantIDs, nil
+}
+
+func (l *MessageLogic) ensureConversationReadAccess(ctx context.Context, userID string, conversationID string) error {
+	groupID, ok := groupIDFromConversationID(conversationID)
+	if !ok {
+		return nil
+	}
+	if l.groups == nil {
+		return apperror.Internal("group membership validator is not configured")
+	}
+	_, err := l.groups.ListMembers(ctx, ListMembersRequest{
+		GroupID:         groupID,
+		RequesterUserID: userID,
+	})
+	return err
+}
+
+func (l *MessageLogic) filterReadableConversationStates(ctx context.Context, userID string, states []ConversationSeqState) ([]ConversationSeqState, error) {
+	filtered := make([]ConversationSeqState, 0, len(states))
+	for _, state := range states {
+		err := l.ensureConversationReadAccess(ctx, userID, state.ConversationID)
+		if err == nil {
+			filtered = append(filtered, state)
+			continue
+		}
+		code := apperror.From(err).Code
+		if code == apperror.CodeForbidden || code == apperror.CodeNotFound {
+			continue
+		}
+		return nil, err
+	}
+	return filtered, nil
+}
+
+func groupIDFromConversationID(conversationID string) (string, bool) {
+	const prefix = "group:"
+	if !strings.HasPrefix(conversationID, prefix) {
+		return "", false
+	}
+	groupID := strings.TrimPrefix(conversationID, prefix)
+	return strings.TrimSpace(groupID), strings.TrimSpace(groupID) != ""
 }
 
 func normalizeMessageRequiredID(value string, field string) (string, error) {

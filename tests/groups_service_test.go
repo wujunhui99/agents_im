@@ -93,6 +93,77 @@ func TestGroupsLogicCreateJoinRepeatLeaveAndList(t *testing.T) {
 	}
 }
 
+func TestGroupsLogicCreateWithSelectedMembersListGroupsDisplayNamesAndMax(t *testing.T) {
+	ctx := context.Background()
+	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
+	creator := mustCreateUserWithName(t, userLogic, "group_v1_creator", "群主 Alice")
+	bob := mustCreateUserWithName(t, userLogic, "group_v1_bob", "Bob Lin")
+	carol := mustCreateUserWithName(t, userLogic, "group_v1_carol", "Carol Wu")
+	outsider := mustCreateUserWithName(t, userLogic, "group_v1_outsider", "旁观者")
+	groupsLogic := logic.NewGroupsLogic(
+		repository.NewMemoryGroupsRepository(),
+		logic.NewUserLogicExistenceChecker(userLogic),
+	)
+
+	group, err := groupsLogic.CreateGroup(ctx, logic.CreateGroupRequest{
+		CreatorUserID: creator.UserID,
+		Name:          "群聊 V1",
+		Description:   "selected members",
+		MemberUserIDs: []string{bob.UserID, carol.UserID, bob.UserID, creator.UserID},
+	})
+	if err != nil {
+		t.Fatalf("create group with selected members: %v", err)
+	}
+
+	members, err := groupsLogic.ListMembers(ctx, logic.ListMembersRequest{
+		GroupID:         group.GroupID,
+		RequesterUserID: creator.UserID,
+	})
+	if err != nil {
+		t.Fatalf("list selected members: %v", err)
+	}
+	if len(members.Members) != 3 {
+		t.Fatalf("deduped active members = %+v, want creator + bob + carol", members.Members)
+	}
+	displayNames := map[string]string{}
+	for _, member := range members.Members {
+		displayNames[member.UserID] = member.DisplayName
+	}
+	if displayNames[creator.UserID] != "群主 Alice" || displayNames[bob.UserID] != "Bob Lin" || displayNames[carol.UserID] != "Carol Wu" {
+		t.Fatalf("member display names = %+v", displayNames)
+	}
+
+	for _, user := range []logic.UserProfile{creator, bob, carol} {
+		listed, err := groupsLogic.ListGroups(ctx, logic.ListGroupsRequest{UserID: user.UserID})
+		if err != nil {
+			t.Fatalf("list groups for %s: %v", user.Identifier, err)
+		}
+		if len(listed.Groups) != 1 || listed.Groups[0].GroupID != group.GroupID || listed.Groups[0].Name != "群聊 V1" {
+			t.Fatalf("list groups for %s = %+v", user.Identifier, listed.Groups)
+		}
+	}
+	outsiderGroups, err := groupsLogic.ListGroups(ctx, logic.ListGroupsRequest{UserID: outsider.UserID})
+	if err != nil {
+		t.Fatalf("list groups for outsider: %v", err)
+	}
+	if len(outsiderGroups.Groups) != 0 {
+		t.Fatalf("outsider groups = %+v, want empty", outsiderGroups.Groups)
+	}
+
+	tooMany := make([]string, 200)
+	for i := range tooMany {
+		tooMany[i] = "usr_missing_over_limit_" + string(rune('a'+i%26)) + string(rune('a'+(i/26)%26))
+	}
+	_, err = groupsLogic.CreateGroup(ctx, logic.CreateGroupRequest{
+		CreatorUserID: creator.UserID,
+		Name:          "too many",
+		MemberUserIDs: tooMany,
+	})
+	if err == nil || apperror.From(err).Code != apperror.CodeInvalidArgument {
+		t.Fatalf("over max group create error = %v, want INVALID_ARGUMENT", err)
+	}
+}
+
 func TestGroupsLogicOwnerCannotLeaveWhenOnlyActiveMember(t *testing.T) {
 	ctx := context.Background()
 	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
@@ -330,7 +401,13 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 func mustCreateUser(t *testing.T, userLogic *logic.UserLogic, identifier string) logic.UserProfile {
 	t.Helper()
 
-	user, err := userLogic.CreateUser(context.Background(), logic.CreateUserRequest{Identifier: identifier})
+	return mustCreateUserWithName(t, userLogic, identifier, "")
+}
+
+func mustCreateUserWithName(t *testing.T, userLogic *logic.UserLogic, identifier string, displayName string) logic.UserProfile {
+	t.Helper()
+
+	user, err := userLogic.CreateUser(context.Background(), logic.CreateUserRequest{Identifier: identifier, DisplayName: displayName})
 	if err != nil {
 		t.Fatalf("create user %q: %v", identifier, err)
 	}

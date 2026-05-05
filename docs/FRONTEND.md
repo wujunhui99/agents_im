@@ -15,7 +15,7 @@
 前端第一阶段参考微信主框架，完成四个一级页面：
 
 1. **消息**：会话列表、未读数、最近消息预览；登录和恢复会话后默认通过 `GET /conversations/seqs`、`GET /conversations/:conversation_id/messages` 拉真实后端消息，不依赖先发送新消息，并通过 `POST /messages` 发送。无会话时支持通过 identifier 搜索用户并发起单聊。
-2. **联系人**：新的朋友、群聊、标签、公众号入口；进入联系人页后自动调用 `GET /friends` 拉真实好友列表，`刷新好友` 仅作为失败后的手动重试；支持 identifier 搜索用户、添加好友动作，均走真实 `user/friends` REST adapter。点击好友发起聊天前会先通过公开资料 API 重新获取好友资料，失败时显示错误，不用好友列表缓存伪造成功打开。`群聊 / 标签 / 公众号` 入口在第一阶段明确标记为 `暂未开放`。
+2. **联系人**：新的朋友、群聊、标签、公众号入口；进入联系人页后自动调用 `GET /friends` 拉真实好友列表，`刷新好友` 仅作为失败后的手动重试；支持 identifier 搜索用户、添加好友动作，均走真实 `user/friends` REST adapter。群聊入口调用 `GET /groups` 列出本人 active 群聊，并可从已接受好友中选择成员调用 `POST /groups` 创建群聊。`标签 / 公众号` 入口在第一阶段明确标记为 `暂未开放`。
 3. **发现**：朋友圈、扫一扫、小程序等发现入口为明确的 `MVP 占位`；不会伪造真实扫码/内容生态能力。
 4. **我的**：个人资料卡、用户详情、服务、收藏、朋友圈、设置入口；支持编辑 `display_name`、`gender`、`birth_date`、`region` 等可变资料字段，并支持退出登录。
 
@@ -39,6 +39,7 @@
 - “发起聊天”使用 `UserApi.getPublicProfileByIdentifier -> GET /users/:identifier` 搜索真实公开资料。选择搜索结果后只创建本地 `draft-single:{user_id}` 空会话，直到用户发送第一条消息才调用 `messageApi.sendMessage -> POST /messages` 并用服务端返回的 `conversationId` 替换本地 draft id。
 - 发送消息先追加本地 `sending` UI 状态，但最终状态必须来自 `messageApi.sendMessage -> POST /messages` 的真实返回；失败会显示错误，不静默兜底为成功。
 - 从发起聊天搜索结果创建的会话标题优先使用 `display_name / name / identifier`，并显示 profile 的 `account_type` 标签。从消息 API 直接加载的历史会话目前只包含内部 account id；前端不会伪造 `/users/id/{user_id}`，因此在后端提供按 user_id 查询公开资料的前端契约前，历史会话标题显示为 `未知联系人`，不能显示内部 ID。
+- 群聊会话使用 `GET /groups/:group_id` 和 `GET /groups/:group_id/members` 水合群名称和成员显示名；非本人群消息展示成员 `display_name / name / identifier`，没有可读资料时显示 `群成员`，不展示内部 account id。
 - 聊天窗口展示已确认消息时按服务端 `conversationId + seq` 排序，不按 `sendTime`、fetch 数组顺序或 WebSocket 到达顺序排序；重复消息按 `serverMsgId` / `clientMsgId` 去重。
 - 本地 optimistic 消息在服务端确认后必须用相同 `clientMsgId` 替换为 canonical server message，并保留 `serverMsgId`、`seq` 等服务端字段；没有 `seq` 的本地 pending 消息排在已确认消息之后。
 - 打开有未读的会话并展示到带 `seq` 的消息后，前端调用 `messageApi.markRead -> POST /conversations/:conversation_id/read` 推进 `hasReadSeq`，成功后立即清除已读范围内的本地未读标记；失败必须显示错误状态，不伪造成功。
@@ -126,6 +127,6 @@ make status
 ## REST Adapter 约定
 
 - `web/src/api/contacts.ts`：`listFriends` -> `GET /friends`，`addFriend` -> `POST /friends`，`deleteFriend` -> `DELETE /friends/:user_id`。
-- `web/src/api/groups.ts`：`getGroup` -> `GET /groups/:group_id`，`createGroup` -> `POST /groups`，`joinGroup` -> `POST /groups/:group_id/members`，`leaveGroup` -> `DELETE /groups/:group_id/members/me`，`listMembers` -> `GET /groups/:group_id/members`。
+- `web/src/api/groups.ts`：`listGroups` -> `GET /groups`，`getGroup` -> `GET /groups/:group_id`，`createGroup` -> `POST /groups`（支持 `member_user_ids`），`joinGroup` -> `POST /groups/:group_id/members`，`leaveGroup` -> `DELETE /groups/:group_id/members/me`，`listMembers` -> `GET /groups/:group_id/members`。
 - `web/src/api/messages.ts`：`sendMessage` -> `POST /messages`，`pullMessages` -> `GET /conversations/:conversation_id/messages`，`getConversationSeqs` -> `GET /conversations/seqs`，`markRead` -> `POST /conversations/:conversation_id/read`。
 - Adapter 接受可注入 `fetcher` 和 bearer token；示例 token 只能使用 `***` 或测试 fixture 值。

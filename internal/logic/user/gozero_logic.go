@@ -96,7 +96,7 @@ func (l *GetMeLogic) GetMe(req *types.GetMeReq) (*types.UserResp, error) {
 	if err != nil {
 		return nil, err
 	}
-	return userResp(profile), nil
+	return userRespWithAvatar(l.ctx, l.svcCtx, profile)
 }
 
 type GetUserByIdentifierLogic struct {
@@ -120,7 +120,7 @@ func (l *GetUserByIdentifierLogic) GetUserByIdentifier(req *types.GetUserByIdent
 	if err != nil {
 		return nil, err
 	}
-	return userResp(profile), nil
+	return userRespWithAvatar(l.ctx, l.svcCtx, profile)
 }
 
 type UpdateMeLogic struct {
@@ -157,7 +157,7 @@ func (l *UpdateMeLogic) UpdateMe(req *types.UpdateMeReq) (*types.UserResp, error
 	if err != nil {
 		return nil, err
 	}
-	return userResp(profile), nil
+	return userRespWithAvatar(l.ctx, l.svcCtx, profile)
 }
 
 type UpdateMeAvatarLogic struct {
@@ -193,7 +193,7 @@ func (l *UpdateMeAvatarLogic) UpdateMeAvatar(req *types.UpdateMeAvatarReq) (*typ
 	if err != nil {
 		return nil, err
 	}
-	return userResp(profile), nil
+	return userRespWithAvatar(l.ctx, l.svcCtx, profile)
 }
 
 func optionalString(value string) *string {
@@ -204,21 +204,50 @@ func optionalString(value string) *string {
 }
 
 func userResp(profile business.UserProfile) *types.UserResp {
+	return userRespWithAvatarFields(profile, "", 0)
+}
+
+func userRespWithAvatar(ctx context.Context, svcCtx *svc.ServiceContext, profile business.UserProfile) (*types.UserResp, error) {
+	avatarURL, avatarURLExpiresAt, err := resolveAvatarDisplay(ctx, svcCtx, profile.AvatarMediaID)
+	if err != nil {
+		return nil, err
+	}
+	return userRespWithAvatarFields(profile, avatarURL, avatarURLExpiresAt), nil
+}
+
+func userRespWithAvatarFields(profile business.UserProfile, avatarURL string, avatarURLExpiresAt int64) *types.UserResp {
 	return &types.UserResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.User{
-			UserID:        profile.UserID,
-			Identifier:    profile.Identifier,
-			DisplayName:   profile.DisplayName,
-			Name:          profile.Name,
-			Gender:        profile.Gender,
-			BirthDate:     profile.BirthDate,
-			Region:        profile.Region,
-			AccountType:   profile.AccountType,
-			AvatarMediaID: profile.AvatarMediaID,
-			CreatedAt:     profile.CreatedAt,
-			UpdatedAt:     profile.UpdatedAt,
+			UserID:             profile.UserID,
+			Identifier:         profile.Identifier,
+			DisplayName:        profile.DisplayName,
+			Name:               profile.Name,
+			Gender:             profile.Gender,
+			BirthDate:          profile.BirthDate,
+			Region:             profile.Region,
+			AccountType:        profile.AccountType,
+			AvatarMediaID:      profile.AvatarMediaID,
+			AvatarURL:          avatarURL,
+			AvatarURLExpiresAt: avatarURLExpiresAt,
+			CreatedAt:          profile.CreatedAt,
+			UpdatedAt:          profile.UpdatedAt,
 		},
 	}
+}
+
+func resolveAvatarDisplay(ctx context.Context, svcCtx *svc.ServiceContext, avatarMediaID string) (string, int64, error) {
+	avatarMediaID = strings.TrimSpace(avatarMediaID)
+	if avatarMediaID == "" {
+		return "", 0, nil
+	}
+	if svcCtx == nil || svcCtx.MediaLogic == nil {
+		return "", 0, apperror.Internal("media logic is not configured")
+	}
+	display, err := svcCtx.MediaLogic.GetAvatarDisplayURL(ctx, avatarMediaID)
+	if err != nil {
+		return "", 0, err
+	}
+	return display.DownloadURL, display.ExpiresAt, nil
 }

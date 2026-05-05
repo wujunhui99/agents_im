@@ -141,12 +141,12 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 		t.Fatalf("reciprocal friendship missing: %+v", bobFriends)
 	}
 
-	group, creator, err := groups.CreateGroup(ctx, model.Group{Name: "PG Group"}, alice.UserID)
+	group, creatorMembers, err := groups.CreateGroup(ctx, model.Group{Name: "PG Group"}, alice.UserID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if creator.UserID != alice.UserID {
-		t.Fatalf("creator member mismatch: %+v", creator)
+	if len(creatorMembers) != 1 || creatorMembers[0].UserID != alice.UserID {
+		t.Fatalf("creator member mismatch: %+v", creatorMembers)
 	}
 	member, alreadyMember, err := groups.AddMember(ctx, group.GroupID, bob.UserID)
 	if err != nil {
