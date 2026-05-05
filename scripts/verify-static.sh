@@ -278,6 +278,9 @@ shell_scripts=(
   "scripts/migrate-postgres.sh"
   "scripts/dev-up.sh"
   "scripts/dev-demo-data.sh"
+  "scripts/deploy-k3s.sh"
+  "scripts/bootstrap-server.sh"
+  "scripts/test-deploy-k3s.sh"
   "scripts/verify-static.sh"
 )
 
