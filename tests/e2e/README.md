@@ -191,3 +191,32 @@ Classifications:
 The script also accepts `AGENTS_IM_E2E_API_BASE_URL`, `AGENTS_IM_E2E_OUTPUT_DIR`, and `AGENTS_IM_E2E_REQUEST_TIMEOUT_MS`. Artifacts default to `/tmp/agents-im-auth-register-login-e2e/<timestamp>/`.
 
 Do not commit generated evidence, screenshots, secrets, real passwords, JWTs, cookies, or account credentials.
+
+## Avatar upload and visibility regression
+
+`avatar_upload_visibility_regression.mjs` is an API-level harness for Issue #4. It creates two fresh users, verifies invalid GIF avatar intent is rejected, establishes friendship, uploads a 1x1 PNG through the real media intent -> presigned PUT -> complete-upload -> `/me/avatar` flow, sends a direct message, and verifies the accepted contact receives avatar display data from `/friends`.
+
+Production:
+
+```bash
+AGENTS_IM_E2E_TARGET=production \
+AGENTS_IM_E2E_BASE_URL=https://agenticim.xyz \
+node tests/e2e/avatar_upload_visibility_regression.mjs
+```
+
+Local:
+
+```bash
+AGENTS_IM_E2E_TARGET=local \
+AGENTS_IM_E2E_BASE_URL=http://127.0.0.1:5173 \
+node tests/e2e/avatar_upload_visibility_regression.mjs
+```
+
+Classifications:
+
+- `avatar-validation-failed`
+- `avatar-upload-success`
+- `avatar-visibility-success`
+- `setup-or-harness-failed`
+
+The script redacts tokens, presigned URLs, signatures, download URLs, avatar URLs, object keys, generated account IDs, and media/message IDs from artifacts. Artifacts default to `/tmp/agents-im-avatar-upload-e2e/<timestamp>/`.

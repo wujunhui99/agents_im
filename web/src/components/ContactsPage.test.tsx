@@ -14,12 +14,16 @@ const bobProfile: UserProfile = {
   gender: '',
   birth_date: '',
   region: '',
+  avatar_media_id: 'med_bob_avatar',
+  avatar_url: 'https://storage.test/avatar/bob.png',
+  avatar_url_expires_at: 1777550400000,
 };
 
 function createUserApi(profile: UserProfile = bobProfile): UserApi {
   return {
     getCurrentUser: vi.fn(async () => profile),
     patchCurrentUser: vi.fn(async (patch: UserProfilePatch) => ({ ...profile, ...patch })),
+    patchCurrentUserAvatar: vi.fn(async () => profile),
     identifierExists: vi.fn(async (identifier) => ({ identifier, exists: true })),
     getPublicProfileByIdentifier: vi.fn(async () => profile),
   };
@@ -92,6 +96,9 @@ function createContactsApiWithFriend(): ContactsApi {
           identifier: 'bob_002',
           display_name: 'Cached Bob',
           name: 'Cached Bob',
+          avatar_media_id: bobProfile.avatar_media_id,
+          avatar_url: bobProfile.avatar_url,
+          avatar_url_expires_at: bobProfile.avatar_url_expires_at,
         },
       },
     ],
@@ -181,6 +188,16 @@ describe('ContactsPage', () => {
     expect(within(row).getByText('bob_002')).toBeInTheDocument();
     expect(within(row).getByText('Agent')).toBeInTheDocument();
     expect(screen.queryByText('2002')).not.toBeInTheDocument();
+  });
+
+  it('renders the accepted contact avatar image when the friend profile provides one', async () => {
+    const contactsApi = createContactsApiWithFriend();
+
+    render(<ContactsPage userApi={createUserApi()} contactsApi={contactsApi} onStartChat={vi.fn()} />);
+
+    const row = await screen.findByRole('button', { name: '和 bob_002 聊天' });
+    expect(within(row).getByRole('img', { name: 'Cached Bob 头像' })).toHaveAttribute('src', bobProfile.avatar_url);
+    expect(within(row).queryByText('CB')).not.toBeInTheDocument();
   });
 
   it('opens a friend chat using a fallback profile when only friend id is available', async () => {

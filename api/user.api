@@ -17,6 +17,8 @@ type User {
 	Region      string `json:"region"`
 	AccountType string `json:"account_type"`
 	AvatarMediaID string `json:"avatar_media_id"`
+	AvatarURL string `json:"avatar_url,optional"`
+	AvatarURLExpiresAt int64 `json:"avatar_url_expires_at,optional"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }

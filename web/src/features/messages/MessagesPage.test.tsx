@@ -23,6 +23,9 @@ const bobProfile: UserProfile = {
   gender: '',
   birth_date: '',
   region: '',
+  avatar_media_id: 'med_bob_avatar',
+  avatar_url: 'https://storage.test/avatar/bob.png',
+  avatar_url_expires_at: 1777550400000,
 };
 
 function serverMessage(overrides: Partial<ServerMessage> & Pick<ServerMessage, 'seq' | 'content'>): ServerMessage {
@@ -95,6 +98,7 @@ function createUserApi(profile: UserProfile = bobProfile): UserApi {
   return {
     getCurrentUser: vi.fn(async () => profile),
     patchCurrentUser: vi.fn(async (patch: UserProfilePatch) => ({ ...profile, ...patch })),
+    patchCurrentUserAvatar: vi.fn(async () => profile),
     identifierExists: vi.fn(async (identifier) => ({ identifier, exists: true })),
     getPublicProfileByIdentifier: vi.fn(async () => profile),
   };
@@ -138,7 +142,9 @@ function createGroupsApi(overrides?: Partial<GroupsApi>): GroupsApi {
       display_name: 'Bob Lin',
       name: 'Bob Lin',
       identifier: 'bob_002',
-      avatar_media_id: '',
+      avatar_media_id: bobProfile.avatar_media_id,
+      avatar_url: bobProfile.avatar_url,
+      avatar_url_expires_at: bobProfile.avatar_url_expires_at,
       state: 'active',
       joined_at: '2026-05-05T12:00:00Z',
       left_at: '',
@@ -164,6 +170,24 @@ function groupServerMessage(overrides: Partial<ServerMessage> & Pick<ServerMessa
     chatType: 'group',
     ...overrides,
   });
+}
+
+function createContactsApiWithAcceptedPeerAvatar(): ContactsApi {
+  const api = createContactsApi();
+  api.listFriends = vi.fn(async () => ({
+    friends: [
+      {
+        user_id: currentUserId,
+        friend_id: peerUserId,
+        status: 'accepted',
+        is_friend: true,
+        created_at: '2026-04-29T12:00:00Z',
+        updated_at: '2026-04-29T12:00:00Z',
+        friend: bobProfile,
+      },
+    ],
+  }));
+  return api;
 }
 
 type TestMediaApi = MediaApi & {
@@ -567,6 +591,27 @@ describe('MessagesPage real API mode', () => {
 
     expect(await screen.findByRole('heading', { name: '未知联系人' })).toBeInTheDocument();
     expect(screen.queryByText(peerUserId)).not.toBeInTheDocument();
+  });
+
+  it('renders the accepted peer avatar in the direct conversation list and header', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: '来自 Bob 的历史消息' })]);
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        contactsApi={createContactsApiWithAcceptedPeerAvatar()}
+      />,
+    );
+
+    const row = await screen.findByRole('button', { name: /Bob Lin/ });
+    expect(within(row).getByRole('img', { name: 'Bob Lin 头像' })).toHaveAttribute('src', bobProfile.avatar_url);
+
+    await user.click(row);
+
+    const header = await screen.findByRole('banner', { name: 'Bob Lin 聊天头部' });
+    expect(within(header).getByRole('img', { name: 'Bob Lin 头像' })).toHaveAttribute('src', bobProfile.avatar_url);
   });
 
   it('shows start-chat profile labels without exposing the internal profile id', async () => {
