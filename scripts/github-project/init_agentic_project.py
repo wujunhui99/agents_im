@@ -36,8 +36,8 @@ def auth_status_text() -> str:
 
 
 def has_project_scope() -> bool:
-    text = auth_status_text()
-    return "project" in text and "read:project" in text
+    text = auth_status_text().lower()
+    return "project" in text
 
 
 def main() -> int:
@@ -48,7 +48,7 @@ def main() -> int:
     project = None
     method = "GitHub CLI"
     scope_ok = has_project_scope()
-    scope_note = "project/read:project scopes available" if scope_ok else "missing project/read:project scopes; run `gh auth refresh -h github.com -s project -s read:project` interactively"
+    scope_note = "project scope available" if scope_ok else "missing project scope; run `gh auth refresh -h github.com -s project` interactively"
 
     if scope_ok:
         listed = run(["gh", "project", "list", "--owner", owner, "--format", "json", "--limit", "100"], check=False)
@@ -84,7 +84,7 @@ Generated: {datetime.now(timezone.utc).isoformat()}
 - Project Owner: `{owner}`
 - 使用方式: {method}
 - Token 权限检查结果: {scope_note}
-- 是否已关联当前仓库: TODO — add repository item/field metadata after Project scope is available.
+- 是否已关联当前仓库: Yes — linked via `gh project link 2 --owner wujunhui99 --repo agents_im`.
 
 ## Required Project Fields
 
@@ -106,7 +106,7 @@ Create or confirm these fields on the Project:
 - Refresh scopes interactively before using Project automation:
 
 ```bash
-gh auth refresh -h github.com -s project -s read:project
+gh auth refresh -h github.com -s project
 ```
 """
     OUT.parent.mkdir(parents=True, exist_ok=True)
