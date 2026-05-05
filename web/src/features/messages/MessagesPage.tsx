@@ -1,7 +1,9 @@
-import { ChevronLeft, FileText, Image as ImageIcon, MessageCircle, Search, SendHorizontal } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { ChevronLeft, Download, FileText, Image as ImageIcon, MessageCircle, RefreshCw, Search, SendHorizontal, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { ContactsApi, Friendship } from '../../api/contacts';
 import { createContactsApi } from '../../api/contacts';
+import type { Group, GroupMember, GroupsApi } from '../../api/groups';
+import { createGroupsApi } from '../../api/groups';
 import type { MediaApi } from '../../api/media';
 import { createMediaApi, uploadMediaBytes } from '../../api/media';
 import type { ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
@@ -20,20 +22,24 @@ import { MessageBubble } from '../../components/ui/MessageBubble';
 import { SearchBox } from '../../components/ui/SearchBox';
 import { TextField } from '../../components/ui/TextField';
 import type { ChatMessage, Conversation, MessageContentType, MessageStatus } from '../../models/messages';
-import { UNKNOWN_CONTACT_LABEL, accountTypeLabel, avatarText, profileDisplayName, profileIdentifier } from '../../utils/profileDisplay';
+import { UNKNOWN_CONTACT_LABEL, accountTypeLabel, avatarText, firstNonEmpty, profileDisplayName, profileIdentifier } from '../../utils/profileDisplay';
 
 type MessagesPageProps = {
   currentUserId: string;
   messageApi?: MessageApi;
   mediaApi?: MediaApi;
+  downloadMedia?: MediaDownloadHandler;
   contactsApi?: ContactsApi;
+  groupsApi?: GroupsApi;
   userApi?: UserApi;
   webSocketUrl?: string;
   webSocketToken?: string;
   webSocketFactory?: WebSocketFactory;
   startChatSignal?: number;
   pendingChatProfile?: UserProfile | null;
+  pendingGroup?: Group | null;
   onPendingChatConsumed?: () => void;
+  onPendingGroupConsumed?: () => void;
 };
 
 type AttachmentKind = 'image' | 'file';
@@ -45,10 +51,20 @@ type ImageDimensions = {
   width: number;
   height: number;
 };
+type MediaDownloadHandler = (downloadUrl: string, filename: string) => void;
+type ImageMessagePayload = {
+  mediaId?: string;
+  filename?: string;
+  width?: number;
+  height?: number;
+  sizeBytes?: number;
+  contentType?: string;
+};
 
 const IMAGE_MAX_BYTES = 15 * 1024 * 1024;
 const FILE_MAX_BYTES = 20 * 1024 * 1024;
 const FALLBACK_CONTENT_TYPE = 'application/octet-stream';
+const allowedImageMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 const statusLabels: Record<Exclude<MessageStatus, 'sent'>, string> = {
   sending: '发送中',
@@ -59,18 +75,23 @@ export function MessagesPage({
   currentUserId,
   messageApi: messageApiProp,
   mediaApi: mediaApiProp,
+  downloadMedia = defaultDownloadMedia,
   contactsApi: contactsApiProp,
+  groupsApi: groupsApiProp,
   userApi: userApiProp,
   webSocketUrl = '/ws',
   webSocketToken,
   webSocketFactory,
   startChatSignal = 0,
   pendingChatProfile = null,
+  pendingGroup = null,
   onPendingChatConsumed,
+  onPendingGroupConsumed,
 }: MessagesPageProps) {
   const messageApi = useMemo(() => messageApiProp ?? createMessageApi(), [messageApiProp]);
   const mediaApi = useMemo(() => mediaApiProp ?? createMediaApi(), [mediaApiProp]);
   const contactsApi = useMemo(() => contactsApiProp ?? createContactsApi(), [contactsApiProp]);
+  const groupsApi = useMemo(() => groupsApiProp ?? createGroupsApi(), [groupsApiProp]);
   const userApi = useMemo(() => userApiProp ?? createUserApi(), [userApiProp]);
   const [items, setItems] = useState<Conversation[]>([]);
   const [status, setStatus] = useState('正在加载会话');
@@ -90,7 +111,7 @@ export function MessagesPage({
       try {
         const response = await messageApi.getConversationSeqs([]);
         const states = response.states ?? response.conversations ?? response.seqs ?? [];
-        const conversations = await Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi)));
+        const conversations = await Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi, groupsApi)));
         const needsFriendProfiles = conversations.some(
           (conversation) => conversation.chatType === 'single' && conversation.receiverId && conversation.title === UNKNOWN_CONTACT_LABEL,
         );
@@ -110,7 +131,7 @@ export function MessagesPage({
     return () => {
       cancelled = true;
     };
-  }, [currentUserId, messageApi, contactsApi]);
+  }, [currentUserId, messageApi, contactsApi, groupsApi]);
 
   useEffect(() => {
     if (!webSocketUrl || (!webSocketToken && !webSocketFactory) || (!webSocketFactory && !canUseNativeWebSocket())) {
@@ -152,6 +173,14 @@ export function MessagesPage({
     handleStartChat(pendingChatProfile);
     onPendingChatConsumed?.();
   }, [pendingChatProfile, onPendingChatConsumed]);
+
+  useEffect(() => {
+    if (!pendingGroup) {
+      return;
+    }
+    void handleOpenGroup(pendingGroup);
+    onPendingGroupConsumed?.();
+  }, [pendingGroup, onPendingGroupConsumed]);
 
   useEffect(() => {
     if (!selectedConversationId?.startsWith('draft-single:')) {
@@ -214,6 +243,21 @@ export function MessagesPage({
     setStatus(`已打开 ${draftConversation.title} 的聊天`);
   }
 
+  async function handleOpenGroup(group: Group) {
+    const draftConversation = groupToConversation(group);
+    setItems((current) => upsertStartedConversation(current, undefined, draftConversation));
+    setSelectedConversationId(draftConversation.id);
+    setShowStartChat(false);
+    setStatus(`已打开 ${group.name} 的聊天`);
+    try {
+      const members = await groupsApi.listMembers(group.group_id);
+      const memberDisplayNames = groupMemberDisplayNameMap(members.members ?? []);
+      setItems((current) => hydrateGroupConversationMembers(current, group, memberDisplayNames));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '加载群成员失败');
+    }
+  }
+
   function handleSend(content: string) {
     if (!selectedConversation) {
       return;
@@ -233,7 +277,7 @@ export function MessagesPage({
         setSelectedConversationId(sentMessage.conversationId);
       })
       .catch((error) => {
-        setStatus(error instanceof Error ? error.message : '发送消息失败');
+        setStatus(sendErrorMessage(error, selectedConversation.chatType));
         setItems((current) =>
           updateMessage(current, selectedConversation.id, pendingMessage.id, {
             ...pendingMessage,
@@ -249,6 +293,11 @@ export function MessagesPage({
     }
     if (conversationHasInFlightSend(selectedConversation) || uploadingConversationId === selectedConversation.id) {
       setStatus('上一条消息发送中');
+      return;
+    }
+
+    if (kind === 'image' && !isAllowedMessageImageType(file.type)) {
+      setStatus('请选择 JPG、PNG、WebP 或 GIF 图片');
       return;
     }
 
@@ -280,7 +329,7 @@ export function MessagesPage({
       const mediaId = completed.media?.mediaId ?? uploadIntent.mediaId;
       const content =
         kind === 'image'
-          ? JSON.stringify({ mediaId, filename, ...(dimensions ?? {}) })
+          ? JSON.stringify({ mediaId, filename, sizeBytes: file.size, contentType, ...(dimensions ?? {}) })
           : JSON.stringify({ mediaId, filename, sizeBytes: file.size, contentType });
 
       const nextPendingMessage = createPendingMessage(conversationAtStart, { contentType: kind, content }, currentUserId);
@@ -314,6 +363,9 @@ export function MessagesPage({
         onBack={() => setSelectedConversationId(null)}
         onSend={handleSend}
         onSendAttachment={handleSendAttachment}
+        mediaApi={mediaApi}
+        downloadMedia={downloadMedia}
+        onStatus={setStatus}
         status={status}
         sending={selectedConversationSending}
       />
@@ -375,7 +427,7 @@ function ConversationList({
             <ListItem
               className="conversation-row conversation-button"
               onClick={() => onSelect(item.id)}
-              leading={<Avatar label={item.avatar} color={item.color} />}
+              leading={<Avatar label={item.avatar} color={item.color} src={item.avatarUrl} alt={`${item.title} 头像`} />}
               headline={
                 <span className="row-title-line">
                   <span>{item.title}</span>
@@ -471,7 +523,14 @@ function StartChatPanel({
       {result ? (
         <ListItem
           className="search-result"
-          leading={<Avatar label={avatarText(profileDisplayName(result))} color="blue" />}
+          leading={
+            <Avatar
+              label={avatarText(profileDisplayName(result))}
+              color="blue"
+              src={result.avatar_url}
+              alt={`${profileDisplayName(result)} 头像`}
+            />
+          }
           headline={profileDisplayName(result)}
           supportingText={
             <span className="friend-supporting-lines">
@@ -501,6 +560,9 @@ function ChatWindow({
   onBack,
   onSend,
   onSendAttachment,
+  mediaApi,
+  downloadMedia,
+  onStatus,
   status,
   sending,
 }: {
@@ -508,6 +570,9 @@ function ChatWindow({
   onBack: () => void;
   onSend: (content: string) => void;
   onSendAttachment: (file: File, kind: AttachmentKind) => void;
+  mediaApi: MediaApi;
+  downloadMedia: MediaDownloadHandler;
+  onStatus: (status: string) => void;
   status: string;
   sending: boolean;
 }) {
@@ -515,11 +580,14 @@ function ChatWindow({
 
   return (
     <section className="chat-window" aria-label={`${conversation.title} 聊天窗口`}>
-      <header className="chat-header">
+      <header className="chat-header" role="banner" aria-label={`${conversation.title} 聊天头部`}>
         <Button variant="icon" className="chat-back-button" aria-label="返回消息列表" onClick={onBack}>
           <ChevronLeft size={24} />
         </Button>
-        <h2>{conversation.title}</h2>
+        <div className="chat-header-title">
+          <Avatar label={conversation.avatar} color={conversation.color} src={conversation.avatarUrl} alt={`${conversation.title} 头像`} />
+          <h2>{conversation.title}</h2>
+        </div>
       </header>
       <p className="inline-status" role="status">
         {status}
@@ -532,14 +600,27 @@ function ChatWindow({
             aria-label={messageAriaLabel(message)}
           >
             <div className="message-body">
-{message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
+              {conversation.chatType === 'group' && message.direction === 'incoming' ? (
+                <span className="message-sender-name">{message.senderDisplayName ?? '群成员'}</span>
+              ) : null}
+              {message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
               {message.messageOrigin === 'system' ? <span className="message-origin-badge message-origin-system">系统</span> : null}
-              <MessageBubble
-                direction={message.direction}
-                status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
-              >
-                {renderMessageContent(message)}
-              </MessageBubble>
+              {message.contentType === 'image' ? (
+                <ImageMessageBubble
+                  message={message}
+                  mediaApi={mediaApi}
+                  downloadMedia={downloadMedia}
+                  onStatus={onStatus}
+                  status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
+                />
+              ) : (
+                <MessageBubble
+                  direction={message.direction}
+                  status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
+                >
+                  {renderMessageContent(message)}
+                </MessageBubble>
+              )}
             </div>
           </article>
         ))}
@@ -565,6 +646,207 @@ function renderOutgoingMessageStatus(message: ChatMessage, hasReadSeq: number | 
   }
 
   return <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>;
+}
+
+function ImageMessageBubble({
+  message,
+  mediaApi,
+  downloadMedia,
+  onStatus,
+  status,
+}: {
+  message: ChatMessage;
+  mediaApi: MediaApi;
+  downloadMedia: MediaDownloadHandler;
+  onStatus: (status: string) => void;
+  status: ReactNode;
+}) {
+  const payload = useMemo(() => parseImageMessagePayload(message.content), [message.content]);
+  const mediaId = payload.mediaId;
+  const filename = imageMessageFilename(payload);
+  const label = imageDisplayLabel(payload);
+  const [imageUrl, setImageUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!mediaId) {
+      setImageUrl('');
+      setLoadError('图片信息缺失，无法加载');
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoading(true);
+    setLoadError('');
+    mediaApi
+      .getDownloadURL(mediaId)
+      .then((result) => {
+        if (!cancelled) {
+          setImageUrl(result.downloadUrl);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const message = '图片加载失败，请稍后重试';
+          setLoadError(message);
+          onStatus(message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaApi, mediaId, onStatus]);
+
+  async function retryLoad() {
+    if (!mediaId || loading) {
+      return;
+    }
+    setLoading(true);
+    setLoadError('');
+    try {
+      const result = await mediaApi.getDownloadURL(mediaId);
+      setImageUrl(result.downloadUrl);
+    } catch {
+      const message = '图片加载失败，请稍后重试';
+      setLoadError(message);
+      onStatus(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDownload() {
+    if (!mediaId) {
+      const message = '图片信息缺失，无法下载';
+      setDownloadError(message);
+      onStatus(message);
+      return;
+    }
+    setDownloading(true);
+    setDownloadError('');
+    try {
+      const result = await mediaApi.getDownloadURL(mediaId);
+      downloadMedia(result.downloadUrl, filename);
+      onStatus('已获取图片下载链接');
+    } catch {
+      const message = '下载图片失败，请稍后重试';
+      setDownloadError(message);
+      onStatus(message);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <>
+      <div className={`image-message-card image-message-card-${message.direction}`}>
+        <div className="image-message-frame">
+          {imageUrl ? (
+            <button className="image-preview-button" type="button" aria-label={`预览${label}`} onClick={() => setPreviewOpen(true)}>
+              <img src={imageUrl} alt={label} />
+            </button>
+          ) : (
+            <button
+              className="image-preview-button image-preview-placeholder"
+              type="button"
+              aria-label={loadError ? `重新加载${label}` : label}
+              onClick={retryLoad}
+              disabled={!mediaId || loading}
+            >
+              <ImageIcon size={22} />
+              <span>{loading ? '正在加载图片' : loadError || '图片信息缺失，无法加载'}</span>
+              {loadError ? <RefreshCw size={14} /> : null}
+            </button>
+          )}
+        </div>
+        <div className="image-message-actions">
+          <span className="image-message-filename">{filename}</span>
+          <Button
+            variant="icon"
+            size="small"
+            className="image-download-button"
+            type="button"
+            aria-label={`下载${label}`}
+            onClick={handleDownload}
+            disabled={downloading}
+          >
+            <Download size={16} />
+          </Button>
+          {status ? <span className="image-message-status">{status}</span> : null}
+        </div>
+        {downloadError ? (
+          <p className="image-message-error" role="alert">
+            {downloadError}
+          </p>
+        ) : null}
+      </div>
+      {previewOpen ? (
+        <ImagePreviewDialog
+          imageUrl={imageUrl}
+          label={label}
+          filename={filename}
+          onClose={() => setPreviewOpen(false)}
+          onDownload={handleDownload}
+          downloading={downloading}
+          error={downloadError || loadError}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ImagePreviewDialog({
+  imageUrl,
+  label,
+  filename,
+  onClose,
+  onDownload,
+  downloading,
+  error,
+}: {
+  imageUrl: string;
+  label: string;
+  filename: string;
+  onClose: () => void;
+  onDownload: () => void;
+  downloading: boolean;
+  error: string;
+}) {
+  return (
+    <div className="image-preview-overlay" role="dialog" aria-modal="true" aria-label="图片预览">
+      <div className="image-preview-toolbar">
+        <span>{filename}</span>
+        <div className="image-preview-actions">
+          <Button variant="icon" type="button" aria-label={`下载${label}`} onClick={onDownload} disabled={downloading}>
+            <Download size={18} />
+          </Button>
+          <Button variant="icon" type="button" aria-label="关闭预览" onClick={onClose}>
+            <X size={20} />
+          </Button>
+        </div>
+      </div>
+      <div className="image-preview-content">
+        {imageUrl ? <img src={imageUrl} alt={`预览${label}`} /> : <p>{error || '图片加载中'}</p>}
+      </div>
+      {error ? (
+        <p className="image-preview-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function SendMessageComposer({
@@ -640,9 +922,23 @@ function SendMessageComposer({
   );
 }
 
-async function loadConversation(state: ConversationSeqState, currentUserId: string, messageApi: MessageApi): Promise<Conversation> {
+async function loadConversation(
+  state: ConversationSeqState,
+  currentUserId: string,
+  messageApi: MessageApi,
+  groupsApi: GroupsApi,
+): Promise<Conversation> {
   const pulled = await messageApi.pullMessages(state.conversationId, { fromSeq: 1, limit: 50, order: 'asc' });
-  return conversationStateToView(state, currentUserId, pulled.messages);
+  const conversation = conversationStateToView(state, currentUserId, pulled.messages);
+  if (conversation.chatType !== 'group' || !conversation.groupId) {
+    return conversation;
+  }
+  try {
+    const [group, members] = await Promise.all([groupsApi.getGroup(conversation.groupId), groupsApi.listMembers(conversation.groupId)]);
+    return applyGroupMetadata(conversation, group, members.members ?? []);
+  } catch {
+    return conversation;
+  }
 }
 
 function userProfileToDraftConversation(profile: UserProfile): Conversation {
@@ -652,6 +948,7 @@ function userProfileToDraftConversation(profile: UserProfile): Conversation {
     id: draftConversationId(profile.user_id),
     title,
     avatar: avatarText(title),
+    avatarUrl: profile.avatar_url,
     preview: '暂无消息',
     time: '',
     unread: 0,
@@ -660,6 +957,23 @@ function userProfileToDraftConversation(profile: UserProfile): Conversation {
     color: 'blue',
     chatType: 'single',
     receiverId: profile.user_id,
+    messages: [],
+  };
+}
+
+function groupToConversation(group: Group): Conversation {
+  return {
+    id: groupConversationId(group.group_id),
+    title: group.name,
+    avatar: avatarText(group.name),
+    preview: '暂无消息',
+    time: '',
+    unread: 0,
+    maxSeq: 0,
+    hasReadSeq: 0,
+    color: 'green',
+    chatType: 'group',
+    groupId: group.group_id,
     messages: [],
   };
 }
@@ -699,8 +1013,54 @@ function hydrateConversationTitles(conversations: Conversation[], friendProfiles
       ...conversation,
       title,
       avatar: avatarText(title),
+      avatarUrl: profile.avatar_url,
     };
   });
+}
+
+function hydrateGroupConversationMembers(conversations: Conversation[], group: Group, memberDisplayNames: Record<string, string>) {
+  return conversations.map((conversation) => {
+    if (conversation.chatType !== 'group' || conversation.groupId !== group.group_id) {
+      return conversation;
+    }
+    return applyGroupMetadata(conversation, group, memberDisplayNames);
+  });
+}
+
+function applyGroupMetadata(conversation: Conversation, group: Group, members: GroupMember[] | Record<string, string>): Conversation {
+  const memberDisplayNames = Array.isArray(members) ? groupMemberDisplayNameMap(members) : members;
+  const title = group.name || conversation.title || '群聊';
+  return {
+    ...conversation,
+    title,
+    avatar: avatarText(title),
+    groupId: group.group_id,
+    groupMemberDisplayNames: memberDisplayNames,
+    messages: conversation.messages.map((message) => attachGroupSenderDisplayName(message, memberDisplayNames)),
+  };
+}
+
+function groupMemberDisplayNameMap(members: GroupMember[]) {
+  return members.reduce<Record<string, string>>((names, member) => {
+    if (member.user_id) {
+      names[member.user_id] = groupMemberDisplayName(member);
+    }
+    return names;
+  }, {});
+}
+
+function groupMemberDisplayName(member: GroupMember) {
+  return firstNonEmpty(member.display_name, member.name, member.identifier) ?? '群成员';
+}
+
+function attachGroupSenderDisplayName(message: ChatMessage, memberDisplayNames: Record<string, string> | undefined) {
+  if (message.chatType !== 'group' || message.direction !== 'incoming') {
+    return message;
+  }
+  return {
+    ...message,
+    senderDisplayName: memberDisplayNames?.[message.senderId] ?? message.senderDisplayName ?? '群成员',
+  };
 }
 
 async function loadAcceptedFriendProfileMap(contactsApi: ContactsApi) {
@@ -732,6 +1092,7 @@ function upsertStartedConversation(conversations: Conversation[], existingConver
             ...conversation,
             title: draftConversation.title,
             avatar: draftConversation.avatar,
+            avatarUrl: draftConversation.avatarUrl,
             receiverId: draftConversation.receiverId,
           }
         : conversation,
@@ -758,6 +1119,7 @@ function conversationStateToView(state: ConversationSeqState, currentUserId: str
     id: state.conversationId,
     title,
     avatar: avatarText(title),
+    avatarUrl: undefined,
     preview: lastMessage ? messageDisplayText(lastMessage) : '暂无消息',
     previewOrigin: lastMessage?.messageOrigin,
     time: state.maxSeqTime ? '刚刚' : '',
@@ -819,17 +1181,18 @@ function upsertLiveServerMessage(conversations: Conversation[], message: ChatMes
       return conversation;
     }
     matched = true;
-    const nextMessages = upsertCanonicalMessage(conversation.messages, message.id, message);
+    const nextMessage = attachGroupSenderDisplayName(message, conversation.groupMemberDisplayNames);
+    const nextMessages = upsertCanonicalMessage(conversation.messages, nextMessage.id, nextMessage);
     return {
       ...conversation,
-      id: message.conversationId,
-      preview: conversationPreview(nextMessages, messageDisplayText(message)),
-      previewOrigin: message.messageOrigin,
+      id: nextMessage.conversationId,
+      preview: conversationPreview(nextMessages, messageDisplayText(nextMessage)),
+      previewOrigin: nextMessage.messageOrigin,
       time: '刚刚',
-      unread: message.direction === 'incoming' ? conversation.unread + 1 : conversation.unread,
-      maxSeq: nextConversationMaxSeq(conversation, message),
-      receiverId: liveMessagePeerTarget(message) ?? conversation.receiverId,
-      groupId: message.groupId ?? conversation.groupId,
+      unread: nextMessage.direction === 'incoming' ? conversation.unread + 1 : conversation.unread,
+      maxSeq: nextConversationMaxSeq(conversation, nextMessage),
+      receiverId: liveMessagePeerTarget(nextMessage) ?? conversation.receiverId,
+      groupId: nextMessage.groupId ?? conversation.groupId,
       messages: nextMessages,
     };
   });
@@ -848,6 +1211,7 @@ function liveMessageToConversation(message: ChatMessage): Conversation {
     id: message.conversationId,
     title,
     avatar: avatarText(title),
+    avatarUrl: undefined,
     preview: messageDisplayText(message),
     previewOrigin: message.messageOrigin,
     time: '刚刚',
@@ -960,6 +1324,14 @@ function sendMessageWithApi(messageApi: MessageApi, message: ChatMessage): Promi
   return messageApi.sendMessage(request).then((response) => serverMessageToChatMessage(response.message, message.senderId));
 }
 
+function sendErrorMessage(error: unknown, chatType: Conversation['chatType']) {
+  const message = error instanceof Error ? error.message : '';
+  if (chatType === 'group' && /group member|群|forbidden|permission/i.test(message)) {
+    return '没有群聊权限，无法发送消息';
+  }
+  return message || '发送消息失败';
+}
+
 function serverLastMessage(message: ServerMessage | undefined, currentUserId: string) {
   return message ? serverMessageToChatMessage(message, currentUserId) : undefined;
 }
@@ -979,6 +1351,8 @@ function webSocketEventToServerMessage(event: WebSocketServerEvent): ServerMessa
   if (!serverMsgId || !conversationId || !senderId || !chatType || !contentType || content === undefined || seq === undefined) {
     return null;
   }
+  const parsedChatType = chatType === 'group' ? 'group' : 'single';
+  const groupId = stringField(data, 'groupId', 'group_id') ?? (parsedChatType === 'group' ? conversationId.replace(/^group:/, '') : undefined);
 
   return {
     serverMsgId,
@@ -987,8 +1361,8 @@ function webSocketEventToServerMessage(event: WebSocketServerEvent): ServerMessa
     seq,
     senderId,
     receiverId: stringField(data, 'receiverId', 'receiver_id'),
-    groupId: stringField(data, 'groupId', 'group_id'),
-    chatType: chatType === 'group' ? 'group' : 'single',
+    groupId,
+    chatType: parsedChatType,
     contentType: parseMessageContentType(contentType),
     content,
     messageOrigin: messageOriginField(data),
@@ -1113,9 +1487,7 @@ function renderMessageContent(message: ChatMessage) {
 
 function messageDisplayText(message: ChatMessage) {
   if (message.contentType === 'image') {
-    const payload = parseContentObject(message.content);
-    const filename = payload ? stringField(payload, 'filename') : undefined;
-    return filename ? `图片 ${filename}` : '图片消息';
+    return imageDisplayLabel(parseImageMessagePayload(message.content));
   }
 
   if (message.contentType === 'file') {
@@ -1136,9 +1508,48 @@ function parseContentObject(content: string) {
   }
 }
 
+function parseImageMessagePayload(content: string): ImageMessagePayload {
+  const payload = parseContentObject(content);
+  if (!payload) {
+    return {};
+  }
+
+  return {
+    mediaId: stringField(payload, 'mediaId'),
+    filename: stringField(payload, 'filename'),
+    width: numberField(payload, 'width'),
+    height: numberField(payload, 'height'),
+    sizeBytes: numberField(payload, 'sizeBytes'),
+    contentType: stringField(payload, 'contentType'),
+  };
+}
+
+function imageMessageFilename(payload: ImageMessagePayload) {
+  return payload.filename?.trim() || '图片消息';
+}
+
+function imageDisplayLabel(payload: ImageMessagePayload) {
+  const filename = payload.filename?.trim();
+  return filename ? `图片 ${filename}` : '图片消息';
+}
+
 function uploadFilename(file: File, kind: AttachmentKind) {
   const fallback = kind === 'image' ? 'image' : 'file';
   return file.name.trim() || fallback;
+}
+
+function isAllowedMessageImageType(contentType: string) {
+  return allowedImageMimeTypes.has(contentType.toLowerCase().trim());
+}
+
+function defaultDownloadMedia(downloadUrl: string, filename: string) {
+  const anchor = document.createElement('a');
+  anchor.href = downloadUrl;
+  anchor.download = filename;
+  anchor.rel = 'noopener';
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 async function readImageDimensions(file: File): Promise<ImageDimensions | undefined> {
@@ -1211,6 +1622,10 @@ function requiredField(value: string | undefined, fieldName: string) {
 
 function draftConversationId(userId: string) {
   return `draft-single:${userId}`;
+}
+
+function groupConversationId(groupId: string) {
+  return `group:${groupId}`;
 }
 
 function draftPeerId(conversationId: string) {
@@ -1401,7 +1816,13 @@ function shouldPreserveMissingCurrentConversation(conversation: Conversation) {
 }
 
 function mergeConversation(current: Conversation, loaded: Conversation): Conversation {
-  const messages = canonicalChatMessages([...current.messages, ...loaded.messages]);
+  const groupMemberDisplayNames =
+    current.chatType === 'group' || loaded.chatType === 'group'
+      ? { ...(loaded.groupMemberDisplayNames ?? {}), ...(current.groupMemberDisplayNames ?? {}) }
+      : undefined;
+  const messages = canonicalChatMessages([...current.messages, ...loaded.messages]).map((message) =>
+    attachGroupSenderDisplayName(message, groupMemberDisplayNames),
+  );
   const orderedMessages = orderedChatMessages(messages);
   const lastMessage = orderedMessages[orderedMessages.length - 1];
   const title = shouldKeepCurrentTitle(current, loaded) ? current.title : loaded.title;
@@ -1413,12 +1834,14 @@ function mergeConversation(current: Conversation, loaded: Conversation): Convers
     ...loaded,
     title,
     avatar: title === current.title ? current.avatar : loaded.avatar,
-    preview: lastMessage?.content ?? loaded.preview,
+    preview: lastMessage ? messageDisplayText(lastMessage) : loaded.preview,
+    avatarUrl: title === current.title ? current.avatarUrl : loaded.avatarUrl,
     previewOrigin: lastMessage?.messageOrigin ?? loaded.previewOrigin,
     time: lastMessage ? '刚刚' : loaded.time,
     unread,
     maxSeq,
     hasReadSeq,
+    groupMemberDisplayNames,
     messages,
   };
 }

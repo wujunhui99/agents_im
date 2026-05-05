@@ -14,7 +14,10 @@ const CLASSIFICATION = {
   LIVE_PUSH_SUCCESS: 'live-push-success',
   FRAME_WITHOUT_UI: 'ws-frame-received-ui-not-displayed',
   STILL_FAILS: 'live-push-still-fails',
+<<<<<<< HEAD
+=======
   WS_HANDSHAKE_FAILED: 'ws-business-handshake-failed',
+>>>>>>> feature/issue-1-image-message-preview-download
   SETUP_FAILED: 'setup-or-harness-failed',
 };
 
@@ -95,7 +98,11 @@ async function main() {
     await waitForCondition(
       () => websocketHandshakeStatuses(wsEvents).includes(101),
       config.handshakeTimeoutMs,
+<<<<<<< HEAD
+      'B WebSocket did not observe a 101 Switching Protocols handshake',
+=======
       'B business WebSocket (/ws) did not observe a 101 Switching Protocols handshake',
+>>>>>>> feature/issue-1-image-message-preview-download
     );
     recordStep(observations, 'load-b-frontend', 'completed', {
       handshakeStatuses: websocketHandshakeStatuses(wsEvents),
@@ -715,15 +722,25 @@ async function takeScreenshot(page, config, observations, filename) {
 
 function summarizeRun({ wsEvents, sendStartedAt, uniqueText, uiContainsMessage, historyContainsMessage, sendHttpStatus }) {
   const handshakeStatuses = websocketHandshakeStatuses(wsEvents);
+<<<<<<< HEAD
+  const incomingFrames = wsEvents.filter((event) => event.event === 'webSocketFrameReceived');
+=======
   const businessWsEvents = businessWebSocketEvents(wsEvents);
   const incomingFrames = businessWsEvents.filter((event) => event.event === 'webSocketFrameReceived');
+>>>>>>> feature/issue-1-image-message-preview-download
   const incomingFramesAfterSend = incomingFrames.filter((event) => Number(event.epochMs ?? 0) >= sendStartedAt);
   const messageReceivedFramesAfterSend = incomingFramesAfterSend.filter((event) => websocketFrameType(event) === 'message_received');
   const matchedIncomingFramesAfterSend = incomingFramesAfterSend.filter((event) => frameContainsText(event, uniqueText));
   const matchedMessageReceivedFramesAfterSend = messageReceivedFramesAfterSend.filter((event) => frameContainsText(event, uniqueText));
+<<<<<<< HEAD
+  const closeEvents = wsEvents.filter((event) => event.event === 'webSocketClosed');
+  const loadingFailures = wsEvents.filter((event) => event.event === 'loadingFailed');
+  const frameErrors = wsEvents.filter((event) => event.event === 'webSocketFrameError');
+=======
   const closeEvents = businessWsEvents.filter((event) => event.event === 'webSocketClosed');
   const loadingFailures = businessWsEvents.filter((event) => event.event === 'loadingFailed');
   const frameErrors = businessWsEvents.filter((event) => event.event === 'webSocketFrameError');
+>>>>>>> feature/issue-1-image-message-preview-download
 
   return {
     bWebSocketHandshakeStatuses: handshakeStatuses,
@@ -782,19 +799,31 @@ function classify(summary) {
   }
 
   return {
+<<<<<<< HEAD
+    classification: CLASSIFICATION.SETUP_FAILED,
+    reason:
+      'Run did not meet a stable live-push regression classification. Check setup, handshake, send status, history pull, and captured browser events.',
+=======
     classification: CLASSIFICATION.WS_HANDSHAKE_FAILED,
     reason:
       'B business WebSocket (/ws) did not reach 101. Check gateway origin/query-token auth and Vite /ws proxy configuration.',
+>>>>>>> feature/issue-1-image-message-preview-download
   };
 }
 
 function websocketHandshakeStatuses(wsEvents) {
+<<<<<<< HEAD
+  return wsEvents
+=======
   return businessWebSocketEvents(wsEvents)
+>>>>>>> feature/issue-1-image-message-preview-download
     .filter((event) => event.event === 'webSocketHandshakeResponseReceived')
     .map((event) => Number(event.status))
     .filter((status) => Number.isFinite(status));
 }
 
+<<<<<<< HEAD
+=======
 function businessWebSocketEvents(wsEvents) {
   const businessRequestIds = new Set(
     wsEvents
@@ -816,6 +845,7 @@ function isBusinessWebSocketUrl(value) {
   }
 }
 
+>>>>>>> feature/issue-1-image-message-preview-download
 function websocketFrameType(event) {
   const parsed = event.parsed;
   if (parsed && typeof parsed.type === 'string') {

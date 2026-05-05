@@ -15,6 +15,7 @@ export default defineConfig({
       '/conversations': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
       '/me': { target: httpTarget('USER_API_PORT', 8080), changeOrigin: true },
       '/users': { target: httpTarget('USER_API_PORT', 8080), changeOrigin: true },
+      '/media': { target: httpTarget('USER_API_PORT', 8080), changeOrigin: true },
       '/friends': { target: httpTarget('FRIENDS_API_PORT', 8082), changeOrigin: true },
       '/groups': { target: httpTarget('GROUPS_API_PORT', 8085), changeOrigin: true },
       '/ws': { target: wsTarget('GATEWAY_WS_PORT', 8084), ws: true, changeOrigin: true },

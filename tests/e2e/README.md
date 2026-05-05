@@ -20,7 +20,13 @@ When default backend ports are occupied by another worktree, start the local bac
 
 ## WebSocket live-push regression
 
-`ws_live_push_regression.mjs` covers the case where B WebSocket reaches `101`, A sends B a unique message with `200 OK`, B can pull the message from history, but B receives no matching `message_received` frame and the no-refresh UI does not update.
+`ws_live_push_regression.mjs` is a reusable browser E2E harness for the WebSocket live-push regression:
+
+```text
+B WebSocket reaches 101, A sends B a unique message with 200 OK, B can pull the message from history, but B receives no matching message_received frame and the no-refresh UI does not update.
+```
+
+The script creates fresh QA accounts, establishes friendship, loads the real frontend with the real session storage key (`agents_im.auth.v1`), captures B-side browser/CDP WebSocket evidence, sends a unique A->B text message through `/messages`, pulls B history using `single:<lowerUserID>:<higherUserID>`, and writes redacted artifacts.
 
 Production:
 
@@ -50,7 +56,7 @@ NODE_PATH=/tmp/ws-e2e-run/node_modules \
 node tests/e2e/ws_live_push_regression.mjs
 ```
 
-Artifacts default to `/tmp/agents-im-ws-live-push-e2e/<timestamp>/` and can be overridden with `AGENTS_IM_E2E_OUTPUT_DIR`.
+Artifacts default to `/tmp/agents-im-ws-live-push-e2e/<timestamp>/` and can be overridden with `AGENTS_IM_E2E_OUTPUT_DIR`. The artifact set includes `report.txt`, `observations.redacted.json`, `ws-events.redacted.json`, `console.redacted.json`, and screenshots when available.
 
 ## Bidirectional no-refresh send regression
 
@@ -84,6 +90,67 @@ Classifications:
 - `setup-or-harness-failed`
 
 Artifacts default to `/tmp/agents-im-ws-bidirectional-send-e2e/<timestamp>/`.
+
+## Image message preview/download regression
+
+`image_message_regression.mjs` covers the full image-message loop. The harness creates fresh QA accounts, establishes friendship, seeds a conversation, opens A and B browser sessions, verifies unsupported and oversized image validation before upload, sends a real image through the UI upload flow, checks A's sent bubble, checks B's no-refresh live bubble, reloads B to verify history replay, opens/closes preview, and verifies the receiver can fetch the authorized media download URL and the presigned object bytes.
+
+Production:
+
+```bash
+AGENTS_IM_E2E_TARGET=production \
+AGENTS_IM_E2E_BASE_URL=https://agenticim.xyz \
+NODE_PATH=/tmp/ws-e2e-run/node_modules \
+node tests/e2e/image_message_regression.mjs
+```
+
+Local:
+
+```bash
+AGENTS_IM_E2E_TARGET=local \
+AGENTS_IM_E2E_BASE_URL=http://127.0.0.1:5173 \
+NODE_PATH=/tmp/ws-e2e-run/node_modules \
+node tests/e2e/image_message_regression.mjs
+```
+
+Classifications:
+
+- `image-message-success`
+- `image-upload-validation-failed`
+- `image-preview-download-failed`
+- `setup-or-harness-failed`
+
+Artifacts default to `/tmp/agents-im-image-message-e2e/<timestamp>/`. The harness redacts bearer tokens, JWT-like values, cookies, passwords, and presigned URL query strings from console output and artifacts.
+
+## Group chat V1 regression
+
+`group_chat_regression.mjs` covers the group chat V1 loop through real APIs and WebSocket paths: create a group with selected members, send a group message over WebSocket, verify an online member receives live push, verify an offline/missed-push member recovers through history, verify non-member send is denied, and verify over-200-member creation is rejected.
+
+Production:
+
+```bash
+AGENTS_IM_E2E_TARGET=production \
+AGENTS_IM_E2E_BASE_URL=https://agenticim.xyz \
+node tests/e2e/group_chat_regression.mjs
+```
+
+Local:
+
+```bash
+AGENTS_IM_E2E_TARGET=local \
+AGENTS_IM_E2E_BASE_URL=http://127.0.0.1:5173 \
+node tests/e2e/group_chat_regression.mjs
+```
+
+Classifications:
+
+- `group-chat-success`
+- `group-chat-history-success`
+- `group-chat-permission-denied`
+- `group-chat-max-members-rejected`
+- `setup-or-harness-failed`
+
+Artifacts default to `/tmp/agents-im-group-chat-e2e/<timestamp>/`.
 
 ## Auth register-login regression
 
@@ -124,3 +191,32 @@ Classifications:
 The script also accepts `AGENTS_IM_E2E_API_BASE_URL`, `AGENTS_IM_E2E_OUTPUT_DIR`, and `AGENTS_IM_E2E_REQUEST_TIMEOUT_MS`. Artifacts default to `/tmp/agents-im-auth-register-login-e2e/<timestamp>/`.
 
 Do not commit generated evidence, screenshots, secrets, real passwords, JWTs, cookies, or account credentials.
+
+## Avatar upload and visibility regression
+
+`avatar_upload_visibility_regression.mjs` is an API-level harness for Issue #4. It creates two fresh users, verifies invalid GIF avatar intent is rejected, establishes friendship, uploads a 1x1 PNG through the real media intent -> presigned PUT -> complete-upload -> `/me/avatar` flow, sends a direct message, and verifies the accepted contact receives avatar display data from `/friends`.
+
+Production:
+
+```bash
+AGENTS_IM_E2E_TARGET=production \
+AGENTS_IM_E2E_BASE_URL=https://agenticim.xyz \
+node tests/e2e/avatar_upload_visibility_regression.mjs
+```
+
+Local:
+
+```bash
+AGENTS_IM_E2E_TARGET=local \
+AGENTS_IM_E2E_BASE_URL=http://127.0.0.1:5173 \
+node tests/e2e/avatar_upload_visibility_regression.mjs
+```
+
+Classifications:
+
+- `avatar-validation-failed`
+- `avatar-upload-success`
+- `avatar-visibility-success`
+- `setup-or-harness-failed`
+
+The script redacts tokens, presigned URLs, signatures, download URLs, avatar URLs, object keys, generated account IDs, and media/message IDs from artifacts. Artifacts default to `/tmp/agents-im-avatar-upload-e2e/<timestamp>/`.

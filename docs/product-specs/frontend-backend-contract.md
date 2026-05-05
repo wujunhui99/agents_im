@@ -118,6 +118,8 @@ Authorization: Bearer <access_token>
     "region": "Shanghai",
     "account_type": "user",
     "avatar_media_id": "med_000001",
+    "avatar_url": "https://storage.example.com/[REDACTED]",
+    "avatar_url_expires_at": 1777550400000,
     "created_at": "2026-04-29T12:00:00Z",
     "updated_at": "2026-04-29T12:00:00Z"
   }
@@ -158,6 +160,7 @@ Content-Type: application/json
 ```
 
 The media object must belong to the current user, have `purpose=avatar`, `status=ready`, an allowed image MIME type, and be no larger than 5 MiB.
+Successful protected profile responses include `avatar_url` and `avatar_url_expires_at` when `avatar_media_id` is set and ready. The URL is a short-lived authorized display URL; clients must not show or log object keys, credentials, signatures, or permanent private storage URLs.
 
 ### Identifier Exists
 
@@ -251,7 +254,7 @@ Authorization: Bearer <access_token>
 
 ## Groups
 
-The group creator is automatically an active member. Groups are open join in MVP.
+The group creator is automatically an active member. Group chat V1 supports up to 200 active members total, including the creator.
 Group detail and member-list reads require a bearer token and only active members can read them. Adding a different user requires the group creator/owner.
 `creator_user_id`, `operator_user_id`, and member `user_id` are account id aliases.
 
@@ -266,7 +269,34 @@ Content-Type: application/json
 ```json
 {
   "name": "Frontend Demo",
-  "description": "MVP smoke room"
+  "description": "MVP smoke room",
+  "member_user_ids": ["2002", "2003"]
+}
+```
+
+The backend deduplicates the creator and duplicate `member_user_ids`. More than 200 total active members returns `INVALID_ARGUMENT`.
+
+### List Groups
+
+```http
+GET /groups
+Authorization: Bearer <access_token>
+```
+
+Response data:
+
+```json
+{
+  "groups": [
+    {
+      "group_id": "grp_000001",
+      "name": "Frontend Demo",
+      "description": "MVP smoke room",
+      "creator_user_id": "1001",
+      "created_at": "2026-05-05T12:00:00Z",
+      "updated_at": "2026-05-05T12:00:00Z"
+    }
+  ]
 }
 ```
 
@@ -308,9 +338,7 @@ GET /groups/grp_000001/members
 Authorization: Bearer <access_token>
 ```
 
-### Current Gap
-
-A dedicated `GET /groups` or `ListGroups` endpoint is not present in this worktree. For the local demo, keep group IDs from create/join responses or known fixture data and call `GET /groups/:group_id/members`.
+Member rows include human-readable profile fields when available: `identifier`, `display_name`, `name`, and `avatar_media_id`. Frontend UI must prefer those fields over raw internal account IDs.
 
 ## Media REST
 
@@ -355,7 +383,7 @@ Clients must upload the bytes to `uploadUrl` with the declared `Content-Type`. O
 
 Supported purposes and limits:
 
-- `avatar`: image JPEG/PNG/WebP/GIF, max 5 MiB.
+- `avatar`: static image JPEG/PNG/WebP, max 5 MiB. GIF avatars are rejected in V1 to avoid animated avatars.
 - `message_image`: image JPEG/PNG/WebP/GIF, max 15 MiB. `POST /media/uploads` creates upload intents for images that can later be sent as message attachments.
 - `message_file`: allowed document/archive/plain/octet-stream MIME types, max 20 MiB. `POST /media/uploads` creates upload intents for files that can later be sent as message attachments. HTML and SVG are not allowed in phase 1.
 
@@ -389,7 +417,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-Phase 1 requires owner access for download URLs. Conversation-participant access for received message attachments remains a phase 2 integration point.
+Download URLs require the requester to be the media owner or a conversation participant who can see a message attachment referencing the media. Non-message media remains owner-only.
 
 ## Messages REST
 

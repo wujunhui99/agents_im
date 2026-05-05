@@ -34,6 +34,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("build media repository: %v", err)
 	}
+	messageRepo, err := repository.NewMessageRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build message repository: %v", err)
+	}
 	objectStore, err := objectstorage.NewStore(cfg.ObjectStorage)
 	if err != nil {
 		log.Fatalf("build object store: %v", err)
@@ -42,6 +46,7 @@ func main() {
 		log.Fatalf("ensure object storage bucket: %v", err)
 	}
 	serviceContext := svc.NewUserServiceContextWithMedia(repo, mediaRepo, objectStore, cfg.ObjectStorage.Bucket, cfg.Auth)
+	svc.ConfigureMediaAttachmentAccess(serviceContext, messageRepo)
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
 		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 		if err != nil {

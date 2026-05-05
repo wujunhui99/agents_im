@@ -12,6 +12,7 @@ export type ChatMessage = {
   serverMsgId?: string;
   seq?: number;
   senderId: string;
+  senderDisplayName?: string;
   receiverId?: string;
   groupId?: string;
   chatType: ChatType;
@@ -32,6 +33,7 @@ export type Conversation = {
   id: string;
   title: string;
   avatar: string;
+  avatarUrl?: string;
   preview: string;
   previewOrigin?: MessageOrigin;
   time: string;
@@ -42,5 +44,6 @@ export type Conversation = {
   chatType: ChatType;
   receiverId?: string;
   groupId?: string;
+  groupMemberDisplayNames?: Record<string, string>;
   messages: ChatMessage[];
 };

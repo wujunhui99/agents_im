@@ -15,11 +15,18 @@ export type GroupMember = {
   state: string;
   joined_at: string;
   left_at: string;
+  identifier?: string;
+  display_name?: string;
+  name?: string;
+  avatar_media_id?: string;
+  avatar_url?: string;
+  avatar_url_expires_at?: number;
 };
 
 export type CreateGroupRequest = {
   name: string;
   description?: string;
+  member_user_ids?: string[];
 };
 
 export type MemberData = {
@@ -32,7 +39,12 @@ export type ListMembersData = {
   members: GroupMember[];
 };
 
+export type ListGroupsData = {
+  groups: Group[];
+};
+
 export type GroupsApi = {
+  listGroups: () => Promise<ListGroupsData>;
   getGroup: (groupId: string) => Promise<Group>;
   createGroup: (request: CreateGroupRequest) => Promise<Group>;
   joinGroup: (groupId: string, userId?: string) => Promise<MemberData>;
@@ -42,6 +54,9 @@ export type GroupsApi = {
 
 export function createGroupsApi(api: ApiClient = createApiClient()): GroupsApi {
   return {
+    listGroups() {
+      return api.get<ListGroupsData>('/groups');
+    },
     getGroup(groupId: string) {
       return api.get<Group>(`/groups/${encodeURIComponent(groupId)}`);
     },

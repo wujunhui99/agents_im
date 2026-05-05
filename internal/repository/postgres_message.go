@@ -47,12 +47,13 @@ type postgresConversationLockRow struct {
 }
 
 type postgresConversationStateRow struct {
-	ConversationID string       `db:"conversation_id"`
-	MaxSeq         int64        `db:"max_seq"`
-	HasReadSeq     int64        `db:"has_read_seq"`
-	MaxSeqTime     sql.NullTime `db:"max_seq_time"`
-	LastMessageID  string       `db:"last_message_id"`
-	UpdatedAt      time.Time    `db:"updated_at"`
+	ConversationID  string       `db:"conversation_id"`
+	MaxSeq          int64        `db:"max_seq"`
+	HasReadSeq      int64        `db:"has_read_seq"`
+	VisibleStartSeq int64        `db:"visible_start_seq"`
+	MaxSeqTime      sql.NullTime `db:"max_seq_time"`
+	LastMessageID   string       `db:"last_message_id"`
+	UpdatedAt       time.Time    `db:"updated_at"`
 }
 
 func NewPostgresMessageRepository(dataSource string) (*PostgresMessageRepository, error) {
@@ -104,7 +105,7 @@ func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		if err := upsertVisibleConversationStates(ctx, session, input, conversationID, nextSeq); err != nil {
+		if err := upsertVisibleConversationStates(ctx, session, input, conversationID, thread.MaxSeq); err != nil {
 			return err
 		}
 		if err := upsertSenderReadState(ctx, session, input.SenderID, conversationID, nextSeq); err != nil {
@@ -158,6 +159,10 @@ select max_seq from conversation_threads where conversation_id = $1
 		return nil, false, 0, err
 	}
 
+	return r.getMessagesInRange(ctx, conversationID, fromSeq, toSeq, maxSeq, limit, order)
+}
+
+func (r *PostgresMessageRepository) getMessagesInRange(ctx context.Context, conversationID string, fromSeq, toSeq int64, maxSeq int64, limit int, order string) ([]Message, bool, int64, error) {
 	if toSeq <= 0 || toSeq > maxSeq {
 		toSeq = maxSeq
 	}
@@ -202,6 +207,38 @@ limit $4
 	return messages, isEnd, nextSeq, nil
 }
 
+func (r *PostgresMessageRepository) GetMessagesForUser(ctx context.Context, userID string, conversationID string, fromSeq, toSeq int64, limit int, order string) ([]Message, bool, int64, error) {
+	var err error
+	fromSeq, toSeq, limit, order, err = normalizeMessagePullRange(fromSeq, toSeq, limit, order)
+	if err != nil {
+		return nil, false, 0, err
+	}
+
+	var state struct {
+		MaxSeq          int64 `db:"max_seq"`
+		VisibleStartSeq int64 `db:"visible_start_seq"`
+	}
+	if err := r.conn.QueryRowCtx(ctx, &state, `
+select t.max_seq, s.visible_start_seq
+from conversation_threads t
+join user_conversation_states s on s.conversation_id = t.conversation_id
+where s.account_id = $1 and t.conversation_id = $2
+`, userID, conversationID); err != nil {
+		if isNotFound(err) {
+			return nil, false, 0, apperror.NotFound("conversation not found")
+		}
+		return nil, false, 0, err
+	}
+
+	if fromSeq <= state.VisibleStartSeq {
+		fromSeq = state.VisibleStartSeq + 1
+	}
+	if toSeq <= 0 || toSeq > state.MaxSeq {
+		toSeq = state.MaxSeq
+	}
+	return r.getMessagesInRange(ctx, conversationID, fromSeq, toSeq, state.MaxSeq, limit, order)
+}
+
 func (r *PostgresMessageRepository) GetConversationSeqStates(ctx context.Context, userID string, conversationIDs []string) ([]ConversationSeqState, error) {
 	ids := conversationIDs
 	if len(ids) == 0 {
@@ -238,25 +275,30 @@ func (r *PostgresMessageRepository) SetUserHasReadSeqMax(ctx context.Context, us
 	updated := false
 	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		var stateRow struct {
-			HasReadSeq     int64 `db:"last_read_seq"`
-			LastVisibleSeq int64 `db:"visible_start_seq"`
+			HasReadSeq      int64 `db:"last_read_seq"`
+			MaxSeq          int64 `db:"max_seq"`
+			VisibleStartSeq int64 `db:"visible_start_seq"`
 		}
 		if err := session.QueryRowCtx(ctx, &stateRow, `
-select last_read_seq, visible_start_seq
-from user_conversation_states
-where account_id = $1 and conversation_id = $2
+select s.last_read_seq, s.visible_start_seq, t.max_seq
+from user_conversation_states s
+join conversation_threads t on t.conversation_id = s.conversation_id
+where s.account_id = $1 and s.conversation_id = $2
 for update
 `, userID, conversationID); err != nil {
 			return err
 		}
-		if seq > stateRow.LastVisibleSeq {
+		if seq > stateRow.MaxSeq {
 			return apperror.InvalidArgument("has_read_seq cannot exceed max_seq")
+		}
+		if seq < stateRow.VisibleStartSeq {
+			seq = stateRow.VisibleStartSeq
 		}
 
 		updated = seq > stateRow.HasReadSeq
 		if _, err := session.ExecCtx(ctx, `
 update user_conversation_states
-set last_read_seq = greatest(last_read_seq, $3),
+set last_read_seq = greatest(last_read_seq, $3, visible_start_seq),
     updated_at = now()
 where account_id = $1 and conversation_id = $2
 `, userID, conversationID, seq); err != nil {
@@ -277,6 +319,30 @@ where account_id = $1 and conversation_id = $2
 		return ConversationSeqState{}, false, err
 	}
 	return state.Clone(), updated, nil
+}
+
+func (r *PostgresMessageRepository) UserCanAccessMedia(ctx context.Context, userID string, mediaID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	mediaID = strings.TrimSpace(mediaID)
+	if userID == "" || mediaID == "" {
+		return false, nil
+	}
+
+	var allowed bool
+	if err := r.conn.QueryRowCtx(ctx, &allowed, `
+select exists (
+  select 1
+  from user_conversation_states s
+  join messages m on m.conversation_id = s.conversation_id
+  where s.account_id = $1
+    and m.seq <= s.visible_start_seq
+    and m.content_type in ($3, $4)
+    and m.content ->> 'mediaId' = $2
+)
+`, userID, mediaID, MessageContentTypeImage, MessageContentTypeFile); err != nil {
+		return false, err
+	}
+	return allowed, nil
 }
 
 func upsertAndLockConversation(ctx context.Context, session sqlx.Session, conversationID string, input CreateMessageInput) (postgresConversationLockRow, error) {
@@ -370,15 +436,18 @@ func messageContentJSON(input CreateMessageInput) ([]byte, error) {
 	return raw, nil
 }
 
-func upsertVisibleConversationStates(ctx context.Context, session sqlx.Session, input CreateMessageInput, conversationID string, seq int64) error {
+func upsertVisibleConversationStates(ctx context.Context, session sqlx.Session, input CreateMessageInput, conversationID string, previousMaxSeq int64) error {
+	visibleStartSeq := int64(0)
+	if input.ChatType == ChatTypeGroup {
+		visibleStartSeq = previousMaxSeq
+	}
 	for _, userID := range visibleUserIDs(input) {
 		if _, err := session.ExecCtx(ctx, `
-insert into user_conversation_states (account_id, conversation_id, visible_start_seq)
-values ($1, $2, $3)
+insert into user_conversation_states (account_id, conversation_id, last_read_seq, visible_start_seq)
+values ($1, $2, $3, $3)
 on conflict (account_id, conversation_id) do update
-set visible_start_seq = greatest(user_conversation_states.visible_start_seq, excluded.visible_start_seq),
-    updated_at = now()
-`, userID, conversationID, seq); err != nil {
+set updated_at = now()
+`, userID, conversationID, visibleStartSeq); err != nil {
 			return err
 		}
 	}
@@ -388,10 +457,9 @@ set visible_start_seq = greatest(user_conversation_states.visible_start_seq, exc
 func upsertSenderReadState(ctx context.Context, session sqlx.Session, senderID string, conversationID string, seq int64) error {
 	_, err := session.ExecCtx(ctx, `
 insert into user_conversation_states (account_id, conversation_id, last_read_seq, visible_start_seq)
-values ($1, $2, $3, $3)
+values ($1, $2, $3, 0)
 on conflict (account_id, conversation_id) do update
 set last_read_seq = greatest(user_conversation_states.last_read_seq, excluded.last_read_seq),
-    visible_start_seq = greatest(user_conversation_states.visible_start_seq, excluded.visible_start_seq),
     updated_at = now()
 `, senderID, conversationID, seq)
 	return err
@@ -413,14 +481,15 @@ func queryConversationSeqState(ctx context.Context, session sqlx.Session, userID
 	var row postgresConversationStateRow
 	if err := session.QueryRowCtx(ctx, &row, `
 select t.conversation_id,
-	       s.visible_start_seq as max_seq,
+	       t.max_seq,
 	       s.last_read_seq as has_read_seq,
-	       m.client_send_time as max_seq_time,
-	       coalesce(m.message_id, '') as last_message_id,
+	       s.visible_start_seq,
+	       lm.client_send_time as max_seq_time,
+	       case when t.max_seq > s.visible_start_seq then coalesce(t.last_message_id, '') else '' end as last_message_id,
 	       s.updated_at
 from conversation_threads t
 join user_conversation_states s on s.conversation_id = t.conversation_id
-left join messages m on m.conversation_id = t.conversation_id and m.seq = s.visible_start_seq
+left join messages lm on lm.message_id = t.last_message_id
 where s.account_id = $1 and t.conversation_id = $2
 `, userID, conversationID); err != nil {
 		return ConversationSeqState{}, err
@@ -430,7 +499,7 @@ where s.account_id = $1 and t.conversation_id = $2
 		ConversationID: row.ConversationID,
 		MaxSeq:         row.MaxSeq,
 		HasReadSeq:     row.HasReadSeq,
-		UnreadCount:    MessageStorageUnreadCount(row.MaxSeq, row.HasReadSeq),
+		UnreadCount:    MessageStorageUnreadCountFromVisibleStart(row.MaxSeq, row.HasReadSeq, row.VisibleStartSeq),
 	}
 	if row.MaxSeqTime.Valid {
 		state.MaxSeqTime = row.MaxSeqTime.Time.UTC().UnixMilli()

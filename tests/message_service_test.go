@@ -423,8 +423,18 @@ func TestMessageGroupSendRequiresActiveMembership(t *testing.T) {
 		UserID:          outsider.UserID,
 		ConversationIDs: []string{sent.Message.ConversationID},
 	})
-	if err == nil || apperror.From(err).Code != apperror.CodeNotFound {
-		t.Fatalf("outsider seq query error = %v, want NOT_FOUND", err)
+	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("outsider seq query error = %v, want FORBIDDEN", err)
+	}
+	_, err = messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
+		UserID:         outsider.UserID,
+		ConversationID: sent.Message.ConversationID,
+		FromSeq:        1,
+		Limit:          10,
+		Order:          repository.MessageStorageOrderAsc,
+	})
+	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("outsider pull error = %v, want FORBIDDEN", err)
 	}
 
 	if _, err := groupsLogic.LeaveGroup(ctx, logic.LeaveGroupRequest{
@@ -436,6 +446,14 @@ func TestMessageGroupSendRequiresActiveMembership(t *testing.T) {
 	_, err = messageLogic.SendMessage(ctx, testGroupSendRequest(member.UserID, group.GroupID, "client-group-left", "left"))
 	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
 		t.Fatalf("left member group send error = %v, want FORBIDDEN", err)
+	}
+	_, err = messageLogic.MarkConversationAsRead(ctx, logic.MarkConversationAsReadRequest{
+		UserID:         member.UserID,
+		ConversationID: sent.Message.ConversationID,
+		HasReadSeq:     sent.Message.Seq,
+	})
+	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("left member mark read error = %v, want FORBIDDEN", err)
 	}
 }
 

@@ -4,6 +4,7 @@ import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
 import { createApiClient } from './api/client';
 import { createContactsApi, type ContactsApi } from './api/contacts';
+import { createGroupsApi, type Group, type GroupsApi } from './api/groups';
 import { createMediaApi, type MediaApi } from './api/media';
 import { createMessageApi, type MessageApi } from './api/messages';
 import { createUserApi, type UserApi, type UserProfile, type UserProfilePatch } from './api/user';
@@ -16,6 +17,7 @@ import { TopBar } from './components/ui/TopBar';
 import { MessagesPage } from './features/messages/MessagesPage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { MePage } from './pages/MePage';
+import { uploadAvatarForProfile } from './utils/avatarUpload';
 
 type TabKey = 'messages' | 'contacts' | 'discover' | 'me';
 
@@ -60,6 +62,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
   const [startChatSignal, setStartChatSignal] = useState(0);
   const [pendingChatProfile, setPendingChatProfile] = useState<UserProfile | null>(null);
+  const [pendingGroup, setPendingGroup] = useState<Group | null>(null);
   const activeLabel = useMemo(() => tabs.find((tab) => tab.key === activeTab)?.label ?? '消息', [activeTab]);
   const { session, logout } = useAuth();
   const effectiveUserApi = useMemo(
@@ -82,14 +85,30 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
   const messageApi = useMemo(() => createMessageApi(authedApiClient), [authedApiClient]);
   const mediaApi = useMemo(() => createMediaApi(authedApiClient), [authedApiClient]);
   const contactsApi = useMemo(() => createContactsApi(authedApiClient), [authedApiClient]);
+  const groupsApi = useMemo(() => createGroupsApi(authedApiClient), [authedApiClient]);
 
   async function updateProfile(patch: UserProfilePatch) {
     const updatedUser = await effectiveUserApi.patchCurrentUser(patch);
     setCurrentUser(updatedUser);
   }
 
+  async function uploadAvatar(file: File) {
+    const updatedUser = await uploadAvatarForProfile({
+      file,
+      mediaApi,
+      userApi: effectiveUserApi,
+    });
+    setCurrentUser(updatedUser);
+    return updatedUser;
+  }
+
   function openChatFromContact(profile: UserProfile) {
     setPendingChatProfile({ ...profile });
+    switchTab('messages');
+  }
+
+  function openGroupFromContact(group: Group) {
+    setPendingGroup({ ...group });
     switchTab('messages');
   }
 
@@ -99,6 +118,16 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
         return current;
       }
       window.setTimeout(() => setPendingChatProfile(null), 0);
+      return current;
+    });
+  }
+
+  function clearPendingGroup() {
+    setPendingGroup((current) => {
+      if (!current) {
+        return current;
+      }
+      window.setTimeout(() => setPendingGroup(null), 0);
       return current;
     });
   }
@@ -144,13 +173,18 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
                   logout,
                   effectiveUserApi,
                   contactsApi,
+                  groupsApi,
                   messageApi,
                   mediaApi,
+                  uploadAvatar,
                   webSocketToken ?? session?.token,
                   startChatSignal,
                   pendingChatProfile,
+                  pendingGroup,
                   clearPendingChatProfile,
+                  clearPendingGroup,
                   openChatFromContact,
+                  openGroupFromContact,
                 )}
               </section>
             );
@@ -326,13 +360,18 @@ function renderPage(
   onLogout: () => void,
   userApi: UserApi,
   contactsApi: ContactsApi,
+  groupsApi: GroupsApi,
   messageApi: MessageApi,
   mediaApi: MediaApi,
+  onUploadAvatar: (file: File) => Promise<UserProfile>,
   webSocketToken: string | undefined,
   startChatSignal: number,
   pendingChatProfile: UserProfile | null,
+  pendingGroup: Group | null,
   onPendingChatConsumed: () => void,
+  onPendingGroupConsumed: () => void,
   onOpenChatFromContact: (profile: UserProfile) => void,
+  onOpenGroupFromContact: (group: Group) => void,
 ) {
   if (tab === 'messages') {
     return (
@@ -342,16 +381,27 @@ function renderPage(
         messageApi={messageApi}
         mediaApi={mediaApi}
         contactsApi={contactsApi}
+        groupsApi={groupsApi}
         webSocketToken={webSocketToken}
         startChatSignal={startChatSignal}
         pendingChatProfile={pendingChatProfile}
+        pendingGroup={pendingGroup}
         onPendingChatConsumed={onPendingChatConsumed}
+        onPendingGroupConsumed={onPendingGroupConsumed}
       />
     );
   }
 
   if (tab === 'contacts') {
-    return <ContactsPage userApi={userApi} contactsApi={contactsApi} onStartChat={onOpenChatFromContact} />;
+    return (
+      <ContactsPage
+        userApi={userApi}
+        contactsApi={contactsApi}
+        groupsApi={groupsApi}
+        onStartChat={onOpenChatFromContact}
+        onOpenGroup={onOpenGroupFromContact}
+      />
+    );
   }
 
   if (tab === 'discover') {
@@ -360,7 +410,7 @@ function renderPage(
 
   return (
     <>
-      <MePage profile={currentUser} onUpdateProfile={onUpdateProfile} />
+      <MePage profile={currentUser} onUpdateProfile={onUpdateProfile} onUploadAvatar={onUploadAvatar} />
       <Button variant="tonal" className="logout-button" onClick={onLogout}>
         退出登录
       </Button>

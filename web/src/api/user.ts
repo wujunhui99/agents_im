@@ -10,6 +10,8 @@ export type UserProfile = {
   region: string;
   account_type?: 'user' | 'agent' | 'admin';
   avatar_media_id?: string;
+  avatar_url?: string;
+  avatar_url_expires_at?: number;
   created_at?: string;
   updated_at?: string;
 };
@@ -24,6 +26,7 @@ export type IdentifierExistsResponse = {
 export type UserApi = {
   getCurrentUser: () => Promise<UserProfile>;
   patchCurrentUser: (patch: UserProfilePatch) => Promise<UserProfile>;
+  patchCurrentUserAvatar: (mediaId: string) => Promise<UserProfile>;
   identifierExists: (identifier: string) => Promise<IdentifierExistsResponse>;
   getPublicProfileByIdentifier: (identifier: string) => Promise<UserProfile>;
 };
@@ -49,6 +52,9 @@ export function createUserApi(api: ApiClient = createApiClient()): UserApi {
     },
     patchCurrentUser(input) {
       return api.patch<UserProfile>('/me', toUserProfilePatch(input as Record<string, unknown>));
+    },
+    patchCurrentUserAvatar(mediaId) {
+      return api.patch<UserProfile>('/me/avatar', { mediaId });
     },
     identifierExists(identifier) {
       const params = new URLSearchParams({ identifier });
