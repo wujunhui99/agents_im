@@ -1,9 +1,10 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Compass, Contact, MessageCircle, ShieldCheck, UserRound } from 'lucide-react';
 import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
 import { createApiClient } from './api/client';
 import { createContactsApi, type ContactsApi } from './api/contacts';
+import { createMediaApi, type MediaApi } from './api/media';
 import { createMessageApi, type MessageApi } from './api/messages';
 import { createUserApi, type UserApi, type UserProfile, type UserProfilePatch } from './api/user';
 import ContactsPage from './components/ContactsPage';
@@ -55,6 +56,7 @@ type AuthenticatedAppProps = AppProps & {
 
 function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: AuthenticatedAppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
+  const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(() => new Set(['messages']));
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
   const [startChatSignal, setStartChatSignal] = useState(0);
   const [pendingChatProfile, setPendingChatProfile] = useState<UserProfile | null>(null);
@@ -78,6 +80,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
     [session?.token],
   );
   const messageApi = useMemo(() => createMessageApi(authedApiClient), [authedApiClient]);
+  const mediaApi = useMemo(() => createMediaApi(authedApiClient), [authedApiClient]);
   const contactsApi = useMemo(() => createContactsApi(authedApiClient), [authedApiClient]);
 
   async function updateProfile(patch: UserProfilePatch) {
@@ -87,7 +90,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
 
   function openChatFromContact(profile: UserProfile) {
     setPendingChatProfile({ ...profile });
-    setActiveTab('messages');
+    switchTab('messages');
   }
 
   function clearPendingChatProfile() {
@@ -100,6 +103,16 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
     });
   }
 
+  function switchTab(nextTab: TabKey) {
+    setActiveTab(nextTab);
+    setMountedTabs((current) => {
+      if (current.has(nextTab)) {
+        return current;
+      }
+      return new Set(current).add(nextTab);
+    });
+  }
+
   return (
     <main className="app-shell" aria-label="Agents IM Material 3-inspired 微信式主框架">
       <section className="phone-frame">
@@ -109,23 +122,42 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
         />
 
         <section className="content-area">
-          {renderPage(
-            activeTab,
-            currentUser,
-            updateProfile,
-            logout,
-            effectiveUserApi,
-            contactsApi,
-            messageApi,
-            webSocketToken ?? session?.token,
-            startChatSignal,
-            pendingChatProfile,
-            clearPendingChatProfile,
-            openChatFromContact,
-          )}
+          {tabs.map((tab) => {
+            const isActive = tab.key === activeTab;
+            if (!isActive && !mountedTabs.has(tab.key)) {
+              return null;
+            }
+
+            return (
+              <section
+                className="tab-panel"
+                role="tabpanel"
+                aria-label={tab.label}
+                aria-hidden={isActive ? undefined : true}
+                hidden={!isActive}
+                key={tab.key}
+              >
+                {renderPage(
+                  tab.key,
+                  currentUser,
+                  updateProfile,
+                  logout,
+                  effectiveUserApi,
+                  contactsApi,
+                  messageApi,
+                  mediaApi,
+                  webSocketToken ?? session?.token,
+                  startChatSignal,
+                  pendingChatProfile,
+                  clearPendingChatProfile,
+                  openChatFromContact,
+                )}
+              </section>
+            );
+          })}
         </section>
 
-        <TabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+        <TabBar tabs={tabs} activeTab={activeTab} onChange={switchTab} />
       </section>
     </main>
   );
@@ -133,12 +165,15 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
 
 function AuthPage() {
   const { login, register } = useAuth();
+  const loginUserApi = useMemo(() => createUserApi(createApiClient()), []);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [identifier, setIdentifier] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [identifierCheckMessage, setIdentifierCheckMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const identifierCheckRequest = useRef(0);
   const isRegister = mode === 'register';
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -167,8 +202,42 @@ function AuthPage() {
   }
 
   function switchMode(nextMode: 'login' | 'register') {
+    identifierCheckRequest.current += 1;
     setMode(nextMode);
     setError('');
+    setIdentifierCheckMessage('');
+  }
+
+  function handleIdentifierChange(event: ChangeEvent<HTMLInputElement>) {
+    identifierCheckRequest.current += 1;
+    setIdentifier(event.target.value);
+    setIdentifierCheckMessage('');
+  }
+
+  async function checkLoginIdentifierExists() {
+    if (isRegister) {
+      return;
+    }
+    const query = identifier.trim();
+    identifierCheckRequest.current += 1;
+    const requestID = identifierCheckRequest.current;
+    setIdentifierCheckMessage('');
+    if (!query) {
+      return;
+    }
+
+    try {
+      const result = await loginUserApi.identifierExists(query);
+      if (identifierCheckRequest.current !== requestID) {
+        return;
+      }
+      setIdentifierCheckMessage(result.exists ? '' : '账号不存在，请检查后再输入密码');
+    } catch {
+      if (identifierCheckRequest.current !== requestID) {
+        return;
+      }
+      setIdentifierCheckMessage('暂时无法确认账号是否存在，请稍后重试');
+    }
   }
 
   return (
@@ -187,7 +256,7 @@ function AuthPage() {
             id="auth-identifier"
             label="账号"
             value={identifier}
-            onChange={(event) => setIdentifier(event.target.value)}
+            onChange={handleIdentifierChange}
             autoComplete="username"
             required
             fieldClassName="auth-field"
@@ -210,11 +279,18 @@ function AuthPage() {
             label="密码"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            onFocus={checkLoginIdentifierExists}
             type="password"
             autoComplete={isRegister ? 'new-password' : 'current-password'}
             required
             fieldClassName="auth-field"
           />
+
+          {!isRegister && identifierCheckMessage ? (
+            <p className="auth-error" role="alert">
+              {identifierCheckMessage}
+            </p>
+          ) : null}
 
           {error ? (
             <p className="auth-error" role="alert">
@@ -251,6 +327,7 @@ function renderPage(
   userApi: UserApi,
   contactsApi: ContactsApi,
   messageApi: MessageApi,
+  mediaApi: MediaApi,
   webSocketToken: string | undefined,
   startChatSignal: number,
   pendingChatProfile: UserProfile | null,
@@ -263,6 +340,7 @@ function renderPage(
         currentUserId={currentUser.user_id}
         userApi={userApi}
         messageApi={messageApi}
+        mediaApi={mediaApi}
         contactsApi={contactsApi}
         webSocketToken={webSocketToken}
         startChatSignal={startChatSignal}

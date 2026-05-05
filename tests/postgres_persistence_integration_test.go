@@ -106,8 +106,7 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 		Identifier:   alice.Identifier,
 		UserID:       alice.UserID,
 		PasswordHash: "hash-for-integration",
-		Salt:         "salt-for-integration",
-		HashVersion:  "v1",
+		HashVersion:  authmodel.PasswordHashVersionBcrypt,
 	})
 	if err != nil {
 		t.Fatal(err)

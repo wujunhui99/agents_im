@@ -278,6 +278,9 @@ shell_scripts=(
   "scripts/migrate-postgres.sh"
   "scripts/dev-up.sh"
   "scripts/dev-demo-data.sh"
+  "scripts/deploy-k3s.sh"
+  "scripts/bootstrap-server.sh"
+  "scripts/test-deploy-k3s.sh"
   "scripts/verify-static.sh"
 )
 
@@ -319,6 +322,12 @@ done
 rg -qF '@import "./styles/tokens.css";' web/src/styles.css
 rg -qF "createApiClient" web/src/App.tsx web/src/api/client.ts
 rg -qF "POST /messages" docs/FRONTEND.md docs/product-specs/frontend-backend-contract.md
+messages_proxy_line="$(rg -n "'/messages':" web/vite.config.ts | head -n1 | cut -d: -f1)"
+me_proxy_line="$(rg -n "'/me':" web/vite.config.ts | head -n1 | cut -d: -f1)"
+if [[ -z "${messages_proxy_line}" || -z "${me_proxy_line}" || "${messages_proxy_line}" -ge "${me_proxy_line}" ]]; then
+  echo "Vite /messages proxy must be declared before /me; Vite proxy matching is prefix-based" >&2
+  exit 1
+fi
 
 if rg -n "(@material/web|@mui/)" web/package.json web/package-lock.json web/src; then
   echo "frontend must not introduce Material Web or MUI heavy dependencies" >&2
@@ -1291,6 +1300,7 @@ object_storage_env_patterns=(
   "OBJECT_STORAGE_BUCKET"
   "OBJECT_STORAGE_REGION"
   "OBJECT_STORAGE_USE_SSL"
+  "OBJECT_STORAGE_EXTERNAL_USE_SSL"
   "OBJECT_STORAGE_ACCESS_KEY_ID"
   "OBJECT_STORAGE_SECRET_ACCESS_KEY"
 )
@@ -1452,6 +1462,14 @@ if ! grep -q 'AllowQueryToken: true' deploy/k8s/etc/gateway-ws.yaml; then
 fi
 if grep -A2 '^Dispatcher:' deploy/k8s/etc/message-transfer.yaml | grep -q 'Driver: noop'; then
   echo "production message-transfer must not use noop dispatcher" >&2
+  exit 1
+fi
+if grep -q '^DryRun: true' deploy/k8s/etc/message-transfer.yaml; then
+  echo "production message-transfer must not run in dry-run mode" >&2
+  exit 1
+fi
+if ! grep -A4 '^Consumer:' deploy/k8s/etc/message-transfer.yaml | grep -q 'Driver: outbox'; then
+  echo "production message-transfer must consume message_outbox for V1 live push" >&2
   exit 1
 fi
 if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/message-transfer.yaml | grep -q 'Driver: gateway'; then
@@ -1676,6 +1694,14 @@ rg -q "ValidateMessageMedia" internal/logic/medialogic.go internal/logic/message
 rg -q "media_objects" db/migrations/001_init_postgres.sql docs/product-specs/message-chain.md docs/product-specs/frontend-backend-contract.md
 rg -q "PATCH /me/avatar" docs/product-specs/frontend-backend-contract.md
 rg -q "POST /media/uploads" docs/product-specs/frontend-backend-contract.md
+if rg -q 'OBJECT_STORAGE_EXTERNAL_ENDPOINT="?((127\.[0-9.]+|localhost|0\.0\.0\.0|\[?::1\]?)(:[0-9]+)?)"?' scripts/bootstrap-server.sh deploy/k8s/secrets.example.yaml; then
+  echo "production object storage external endpoint must not be browser-local loopback" >&2
+  exit 1
+fi
+if ! rg -q 'AGENTS_IM_ENV: "production"' deploy/k8s/configmap.yaml; then
+  echo "production k8s config must enable production environment validation" >&2
+  exit 1
+fi
 rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go internal/auth/repository/postgres.go
 rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
 rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go

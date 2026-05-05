@@ -8,10 +8,19 @@ describe('Vite local backend proxy', () => {
     expect(proxy['/auth']).toMatchObject({ target: 'http://127.0.0.1:8081' });
     expect(proxy['/me']).toMatchObject({ target: 'http://127.0.0.1:8080' });
     expect(proxy['/users']).toMatchObject({ target: 'http://127.0.0.1:8080' });
+    expect(proxy['/media']).toMatchObject({ target: 'http://127.0.0.1:8080' });
     expect(proxy['/friends']).toMatchObject({ target: 'http://127.0.0.1:8082' });
     expect(proxy['/messages']).toMatchObject({ target: 'http://127.0.0.1:8083' });
     expect(proxy['/conversations']).toMatchObject({ target: 'http://127.0.0.1:8083' });
     expect(proxy['/groups']).toMatchObject({ target: 'http://127.0.0.1:8085' });
     expect(proxy['/ws']).toMatchObject({ target: 'ws://127.0.0.1:8084', ws: true });
+  });
+
+  it('routes /messages before the shorter /me prefix', () => {
+    const proxyPrefixes = Object.keys(viteConfig.server?.proxy ?? {});
+
+    expect(proxyPrefixes.indexOf('/messages')).toBeGreaterThanOrEqual(0);
+    expect(proxyPrefixes.indexOf('/me')).toBeGreaterThanOrEqual(0);
+    expect(proxyPrefixes.indexOf('/messages')).toBeLessThan(proxyPrefixes.indexOf('/me'));
   });
 });

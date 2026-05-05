@@ -4,6 +4,7 @@ metadata:
   name: agents-im-config
   namespace: agents-im
 data:
+  AGENTS_IM_ENV: "production"
   REDIS_ADDR: "127.0.0.1:6379"
   REDIS_DB: "0"
   KAFKA_BROKERS: "127.0.0.1:19092"

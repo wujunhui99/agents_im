@@ -47,16 +47,24 @@ export type MessageWebSocketClientOptions = {
   token?: string;
   tokenQueryFallback?: boolean;
   webSocketFactory?: WebSocketFactory;
+  heartbeatIntervalMs?: number;
+  heartbeatAckTimeoutMs?: number;
+  requestIdFactory?: () => string;
   onOpen?: (event: Event) => void;
   onAck?: (ack: WebSocketAck) => void;
   onEvent?: (event: WebSocketServerEvent) => void;
   onError?: (event: Event) => void;
   onClose?: (event: CloseEvent) => void;
+  onHeartbeatTimeout?: (requestId: string) => void;
   onMalformedMessage?: (data: string) => void;
 };
 
 export class MessageWebSocketClient {
   private socket: WebSocketLike | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private heartbeatAckTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingHeartbeatRequestId: string | null = null;
+  private heartbeatSequence = 0;
 
   constructor(private readonly options: MessageWebSocketClientOptions) {}
 
@@ -66,9 +74,15 @@ export class MessageWebSocketClient {
     }
 
     const socket = this.getFactory()(this.buildUrl());
-    socket.onopen = (event) => this.options.onOpen?.(event);
+    socket.onopen = (event) => {
+      this.startHeartbeat();
+      this.options.onOpen?.(event);
+    };
     socket.onerror = (event) => this.options.onError?.(event);
-    socket.onclose = (event) => this.options.onClose?.(event);
+    socket.onclose = (event) => {
+      this.stopHeartbeat();
+      this.options.onClose?.(event);
+    };
     socket.onmessage = (event) => this.handleMessage(event.data);
     this.socket = socket;
   }
@@ -82,6 +96,7 @@ export class MessageWebSocketClient {
   }
 
   close(code?: number, reason?: string) {
+    this.stopHeartbeat();
     this.socket?.close(code, reason);
     this.socket = null;
   }
@@ -115,7 +130,9 @@ export class MessageWebSocketClient {
     }
 
     if (isAckEnvelope(parsed)) {
-      this.options.onAck?.(normalizeAck(parsed));
+      const ack = normalizeAck(parsed);
+      this.handleAck(ack);
+      this.options.onAck?.(ack);
       return;
     }
 
@@ -125,6 +142,78 @@ export class MessageWebSocketClient {
         data: parsed.data,
       });
     }
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    const intervalMs = this.options.heartbeatIntervalMs ?? 30000;
+    if (intervalMs <= 0) {
+      return;
+    }
+    this.heartbeatTimer = setInterval(() => this.sendHeartbeat(), intervalMs);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer !== null) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    this.clearHeartbeatAckTimer();
+    this.pendingHeartbeatRequestId = null;
+  }
+
+  private sendHeartbeat() {
+    if (!this.socket || this.socket.readyState !== 1) {
+      return;
+    }
+    if (this.pendingHeartbeatRequestId) {
+      this.handleHeartbeatTimeout(this.pendingHeartbeatRequestId);
+      return;
+    }
+
+    const requestId = this.nextHeartbeatRequestId();
+    this.pendingHeartbeatRequestId = requestId;
+    this.socket.send(
+      JSON.stringify({
+        requestId,
+        command: 'heartbeat',
+        payload: {},
+      }),
+    );
+    this.heartbeatAckTimer = setTimeout(() => {
+      if (this.pendingHeartbeatRequestId === requestId) {
+        this.handleHeartbeatTimeout(requestId);
+      }
+    }, this.options.heartbeatAckTimeoutMs ?? 10000);
+  }
+
+  private handleAck(ack: WebSocketAck) {
+    if (ack.type !== 'heartbeat' || ack.requestId !== this.pendingHeartbeatRequestId) {
+      return;
+    }
+    this.pendingHeartbeatRequestId = null;
+    this.clearHeartbeatAckTimer();
+  }
+
+  private handleHeartbeatTimeout(requestId: string) {
+    this.options.onHeartbeatTimeout?.(requestId);
+    this.stopHeartbeat();
+    this.socket?.close(4000, 'heartbeat ack timeout');
+  }
+
+  private clearHeartbeatAckTimer() {
+    if (this.heartbeatAckTimer !== null) {
+      clearTimeout(this.heartbeatAckTimer);
+      this.heartbeatAckTimer = null;
+    }
+  }
+
+  private nextHeartbeatRequestId() {
+    if (this.options.requestIdFactory) {
+      return this.options.requestIdFactory();
+    }
+    this.heartbeatSequence += 1;
+    return `heartbeat-${Date.now()}-${this.heartbeatSequence}`;
   }
 }
 

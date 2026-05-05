@@ -658,6 +658,44 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: agents-im-minio-proxy
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agents-im-minio-proxy
+  template:
+    metadata:
+      labels:
+        app: agents-im-minio-proxy
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: socat
+          image: alpine/socat:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - tcp-listen:19000,fork,reuseaddr,bind=0.0.0.0
+            - tcp-connect:127.0.0.1:9000
+          ports:
+            - name: http
+              containerPort: 19000
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: web
   namespace: agents-im
 spec:

@@ -1,0 +1,51 @@
+name: E2E Regression
+description: Create a system-level regression task after one or more features land
+title: "[E2E]: "
+labels: ["type:e2e", "agent:spec"]
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: Background
+      description: Which shipped or in-flight features need end-to-end coverage?
+    validations:
+      required: true
+  - type: textarea
+    id: scenarios
+    attributes:
+      label: Scenarios
+      description: User-visible flows that must be covered.
+      placeholder: |
+        - Text message live push
+        - Image message send/preview/download/history
+        - Refresh/reconnect sync
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Issues or PRs that should land before this E2E task.
+      placeholder: |
+        Blocked by:
+        - #...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Checklist required before this E2E issue is accepted.
+      placeholder: |
+        - [ ] Production/local-capable E2E harness exists.
+        - [ ] Harness classifies setup failures separately from product regressions.
+        - [ ] Secrets/tokens are redacted from artifacts.
+    validations:
+      required: true
+  - type: textarea
+    id: test_plan
+    attributes:
+      label: Test Plan
+      description: Commands, environments, and expected results.
+    validations:
+      required: true

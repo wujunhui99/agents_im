@@ -68,6 +68,7 @@ type MessageRepository interface {
 	GetMessages(ctx context.Context, conversationID string, fromSeq, toSeq int64, limit int, order string) ([]Message, bool, int64, error)
 	GetConversationSeqStates(ctx context.Context, userID string, conversationIDs []string) ([]ConversationSeqState, error)
 	SetUserHasReadSeqMax(ctx context.Context, userID, conversationID string, seq int64) (ConversationSeqState, bool, error)
+	UserCanAccessMedia(ctx context.Context, userID string, mediaID string) (bool, error)
 }
 
 func SingleConversationID(userA string, userB string) string {

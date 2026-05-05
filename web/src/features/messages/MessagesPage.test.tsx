@@ -1,8 +1,9 @@
 import { render, screen, waitFor, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { MessagesPage } from './MessagesPage';
 import type { ContactsApi } from '../../api/contacts';
+import type { CompleteMediaUploadResponse, CreateMediaUploadRequest, CreateMediaUploadResponse, MediaApi } from '../../api/media';
 import type { MessageApi, SendMessageRequest, SendMessageResponse, ServerMessage } from '../../api/messages';
 import type { WebSocketFactory, WebSocketLike } from '../../api/websocketClient';
 import type { UserApi, UserProfile, UserProfilePatch } from '../../api/user';
@@ -43,6 +44,7 @@ function serverMessage(overrides: Partial<ServerMessage> & Pick<ServerMessage, '
 function createMessageApi(
   messages: ServerMessage[] = [serverMessage({ seq: 1, content: '真实后端会话消息' })],
   sendMessage?: MessageApi['sendMessage'],
+  options: { hasReadSeq?: number; unreadCount?: number } = {},
 ): MessageApi {
   const send =
     sendMessage ??
@@ -73,8 +75,8 @@ function createMessageApi(
               {
                 conversationId,
                 maxSeq: messages.length,
-                hasReadSeq: 0,
-                unreadCount: messages.length,
+                hasReadSeq: options.hasReadSeq ?? 0,
+                unreadCount: options.unreadCount ?? messages.length,
                 maxSeqTime: messages[messages.length - 1]?.sendTime,
                 lastMessage: messages[messages.length - 1],
               },
@@ -104,6 +106,50 @@ function createContactsApi(): ContactsApi {
     acceptFriendRequest: vi.fn(),
     rejectFriendRequest: vi.fn(),
   };
+}
+
+type TestMediaApi = MediaApi & {
+  createUploadIntent: Mock<(request: CreateMediaUploadRequest) => Promise<CreateMediaUploadResponse>>;
+  completeUpload: Mock<(mediaId: string) => Promise<CompleteMediaUploadResponse>>;
+  getDownloadURL: Mock<(mediaId: string) => Promise<{ mediaId: string; downloadUrl: string; expiresAt: number }>>;
+};
+
+function createMediaApi(overrides?: Partial<TestMediaApi>): TestMediaApi {
+  const mediaApi: TestMediaApi = {
+    createUploadIntent: vi.fn(async (request: CreateMediaUploadRequest): Promise<CreateMediaUploadResponse> => ({
+      mediaId: request.purpose === 'message_image' ? 'med_image_1' : 'med_file_1',
+      objectKey: `objects/${request.filename}`,
+      uploadUrl: `https://storage.test/upload/${request.filename}`,
+      expiresAt: 1777465000000,
+    })),
+    completeUpload: vi.fn(async (mediaId: string): Promise<CompleteMediaUploadResponse> => ({
+      media: {
+        mediaId,
+        ownerUserId: currentUserId,
+        bucket: 'agents-im-media',
+        objectKey: `objects/${mediaId}`,
+        sha256: '',
+        contentType: mediaId === 'med_image_1' ? 'image/jpeg' : 'application/pdf',
+        sizeBytes: 1024,
+        originalFilename: mediaId === 'med_image_1' ? 'cat.jpg' : 'report.pdf',
+        purpose: mediaId === 'med_image_1' ? 'message_image' : 'message_file',
+        status: 'ready',
+        createdAt: '2026-05-04T12:00:00Z',
+        updatedAt: '2026-05-04T12:00:00Z',
+      },
+    })),
+    getDownloadURL: vi.fn(async (mediaId: string) => ({
+      mediaId,
+      downloadUrl: `https://media.test/download/${mediaId}`,
+      expiresAt: 1777465000000,
+    })),
+  };
+
+  return { ...mediaApi, ...overrides };
+}
+
+function sizedFile(name: string, type: string, sizeBytes: number) {
+  return new File([new Uint8Array(sizeBytes)], name, { type });
 }
 
 class FakeWebSocket implements WebSocketLike {
@@ -184,6 +230,10 @@ function expectTextOrder(container: HTMLElement, labels: string[]) {
   }
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('MessagesPage real API mode', () => {
   it('receives live websocket message_received events without requiring a manual refresh', async () => {
     const user = userEvent.setup();
@@ -213,6 +263,92 @@ describe('MessagesPage real API mode', () => {
     await user.click(row);
     expect(await screen.findByText('live hello from Bob')).toBeInTheDocument();
     expect(messageApi.getConversationSeqs).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders JSON text payloads from live websocket message_received events as plain text', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([]);
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        contactsApi={createContactsApi()}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_live_json_text', seq: 1, content: '{"text":"1"}' }));
+    });
+
+    const row = await screen.findByRole('button', { name: /未知联系人/ });
+    expect(within(row).getByText('1', { selector: 'p' })).toBeInTheDocument();
+    expect(within(row).queryByText('{"text":"1"}')).not.toBeInTheDocument();
+
+    await user.click(row);
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    expect(within(log).getByText('1')).toBeInTheDocument();
+    expect(within(log).queryByText('{"text":"1"}')).not.toBeInTheDocument();
+  });
+
+  it('keeps the peer as the send target after an incoming live message in an open single chat', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({
+      deduplicated: false,
+      message: serverMessage({
+        serverMsgId: 'srv_reverse_reply',
+        clientMsgId: request.clientMsgId,
+        seq: 3,
+        senderId: currentUserId,
+        receiverId: request.chatType === 'single' ? request.receiverId : undefined,
+        groupId: request.chatType === 'group' ? request.groupId : undefined,
+        chatType: request.chatType,
+        content: request.content,
+        sendTime: 1777464500000,
+        createdAt: 1777464500000,
+      }),
+    }));
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed existing conversation' })], sendMessage);
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        contactsApi={createContactsApi()}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_live_before_reply', seq: 2, content: 'live message before reply' }));
+    });
+    expect(await screen.findByText('live message before reply')).toBeInTheDocument();
+
+    await user.type(screen.getByRole('textbox', { name: '输入消息' }), 'reply from same open chat');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        receiverId: peerUserId,
+        chatType: 'single',
+        contentType: 'text',
+        content: 'reply from same open chat',
+      }),
+    );
+    expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ receiverId: currentUserId }));
   });
 
   it('uses an unknown label instead of an internal id when conversation profiles are unavailable', async () => {
@@ -296,7 +432,7 @@ describe('MessagesPage real API mode', () => {
     expect(await screen.findByRole('heading', { name: 'Bob Lin' })).toBeInTheDocument();
     await user.type(screen.getByRole('textbox', { name: '输入消息' }), 'fresh outgoing');
     await user.click(screen.getByRole('button', { name: '发送' }));
-    await waitFor(() => expect(screen.getByText('已发送')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('发送成功')).toHaveTextContent('✔'));
 
     seqs.resolve({
       conversations: [
@@ -312,7 +448,7 @@ describe('MessagesPage real API mode', () => {
     });
 
     await waitFor(() => expect(messageApi.pullMessages).toHaveBeenCalledWith(conversationId, expect.anything()));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('已加载 1 个会话'));
+    await waitFor(() => expect(screen.getByRole('article', { name: '收到的消息：stale server preview' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: '返回消息列表' }));
 
     const row = await screen.findByRole('button', { name: /Bob Lin|未知联系人/ });
@@ -357,7 +493,348 @@ describe('MessagesPage real API mode', () => {
       }),
     );
     const log = screen.getByRole('log', { name: '聊天消息' });
-    expect(within(log).getByText('已发送')).toBeInTheDocument();
+    const outgoingMessage = within(log).getByRole('article', { name: '我发送的消息：你好 Bob' });
+    const sentStatus = within(outgoingMessage).getByLabelText('发送成功');
+    expect(sentStatus.textContent).toBe('✔');
+    expect(within(outgoingMessage).queryByText('已发送')).not.toBeInTheDocument();
+  });
+
+  it('blocks oversized images locally before upload or send', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn<MessageApi['sendMessage']>();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before image upload' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const uploadFetch = vi.fn();
+    vi.stubGlobal('fetch', uploadFetch);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+
+    await user.upload(screen.getByLabelText('发送图片'), sizedFile('huge.jpg', 'image/jpeg', 15 * 1024 * 1024 + 1));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('图片不能超过 15 MiB');
+    expect(mediaApi.createUploadIntent).not.toHaveBeenCalled();
+    expect(mediaApi.completeUpload).not.toHaveBeenCalled();
+    expect(uploadFetch).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('blocks unsupported image MIME locally before upload or send', async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    const sendMessage = vi.fn<MessageApi['sendMessage']>();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before invalid image upload' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const uploadFetch = vi.fn();
+    vi.stubGlobal('fetch', uploadFetch);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+
+    await user.upload(screen.getByLabelText('发送图片'), sizedFile('notes.txt', 'text/plain', 512));
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('请选择 JPG、PNG、WebP 或 GIF 图片'));
+    expect(mediaApi.createUploadIntent).not.toHaveBeenCalled();
+    expect(mediaApi.completeUpload).not.toHaveBeenCalled();
+    expect(uploadFetch).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('blocks oversized files locally before upload or send', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn<MessageApi['sendMessage']>();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before file upload' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const uploadFetch = vi.fn();
+    vi.stubGlobal('fetch', uploadFetch);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+
+    await user.upload(screen.getByLabelText('发送文件'), sizedFile('huge.pdf', 'application/pdf', 20 * 1024 * 1024 + 1));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('文件不能超过 20 MiB');
+    expect(mediaApi.createUploadIntent).not.toHaveBeenCalled();
+    expect(mediaApi.completeUpload).not.toHaveBeenCalled();
+    expect(uploadFetch).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('uploads a valid image before sending an image message with media metadata', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn<MessageApi['sendMessage']>(async (request) => ({
+      deduplicated: false,
+      message: serverMessage({
+        serverMsgId: 'srv_image_2',
+        clientMsgId: request.clientMsgId,
+        seq: 2,
+        senderId: currentUserId,
+        receiverId: request.chatType === 'single' ? request.receiverId : undefined,
+        groupId: request.chatType === 'group' ? request.groupId : undefined,
+        chatType: request.chatType,
+        contentType: request.contentType,
+        content: request.content,
+        sendTime: 1777464500000,
+        createdAt: 1777464500000,
+      }),
+    }));
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before image upload' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const uploadFetch = vi.fn(async () => new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', uploadFetch);
+    const image = sizedFile('cat.jpg', 'image/jpeg', 1024);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    await user.upload(screen.getByLabelText('发送图片'), image);
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(mediaApi.createUploadIntent).toHaveBeenCalledWith({
+      purpose: 'message_image',
+      filename: 'cat.jpg',
+      contentType: 'image/jpeg',
+      sizeBytes: image.size,
+    });
+    expect(uploadFetch).toHaveBeenCalledWith(
+      'https://storage.test/upload/cat.jpg',
+      expect.objectContaining({
+        method: 'PUT',
+        body: image,
+        headers: { 'Content-Type': 'image/jpeg' },
+      }),
+    );
+    expect(mediaApi.completeUpload).toHaveBeenCalledWith('med_image_1');
+    expect(mediaApi.createUploadIntent.mock.invocationCallOrder[0]).toBeLessThan(uploadFetch.mock.invocationCallOrder[0]);
+    expect(uploadFetch.mock.invocationCallOrder[0]).toBeLessThan(mediaApi.completeUpload.mock.invocationCallOrder[0]);
+    expect(mediaApi.completeUpload.mock.invocationCallOrder[0]).toBeLessThan(sendMessage.mock.invocationCallOrder[0]);
+
+    const request = sendMessage.mock.calls[0][0];
+    expect(request).toEqual(
+      expect.objectContaining({
+        receiverId: peerUserId,
+        chatType: 'single',
+        contentType: 'image',
+      }),
+    );
+    expect(JSON.parse(request.content)).toMatchObject({ mediaId: 'med_image_1' });
+    expect(await screen.findByRole('img', { name: '图片 cat.jpg' })).toHaveAttribute('src', 'https://media.test/download/med_image_1');
+  });
+
+  it('uploads a valid file before sending a file message with media metadata', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn<MessageApi['sendMessage']>(async (request) => ({
+      deduplicated: false,
+      message: serverMessage({
+        serverMsgId: 'srv_file_2',
+        clientMsgId: request.clientMsgId,
+        seq: 2,
+        senderId: currentUserId,
+        receiverId: request.chatType === 'single' ? request.receiverId : undefined,
+        groupId: request.chatType === 'group' ? request.groupId : undefined,
+        chatType: request.chatType,
+        contentType: request.contentType,
+        content: request.content,
+        sendTime: 1777464500000,
+        createdAt: 1777464500000,
+      }),
+    }));
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before file upload' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const uploadFetch = vi.fn(async () => new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', uploadFetch);
+    const file = sizedFile('report.pdf', 'application/pdf', 4096);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    await user.upload(screen.getByLabelText('发送文件'), file);
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(mediaApi.createUploadIntent).toHaveBeenCalledWith({
+      purpose: 'message_file',
+      filename: 'report.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: file.size,
+    });
+    expect(uploadFetch).toHaveBeenCalledWith(
+      'https://storage.test/upload/report.pdf',
+      expect.objectContaining({
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': 'application/pdf' },
+      }),
+    );
+    expect(mediaApi.completeUpload).toHaveBeenCalledWith('med_file_1');
+
+    const request = sendMessage.mock.calls[0][0];
+    expect(request).toEqual(
+      expect.objectContaining({
+        receiverId: peerUserId,
+        chatType: 'single',
+        contentType: 'file',
+      }),
+    );
+    expect(JSON.parse(request.content)).toEqual({
+      mediaId: 'med_file_1',
+      filename: 'report.pdf',
+      sizeBytes: file.size,
+      contentType: 'application/pdf',
+    });
+    expect(screen.getByText('文件 report.pdf')).toBeInTheDocument();
+  });
+
+  it('renders image history messages as image bubbles instead of raw JSON text', async () => {
+    const user = userEvent.setup();
+    const mediaApi = createMediaApi();
+    const imageContent = JSON.stringify({ mediaId: 'med_history_image', filename: 'cat.jpg', width: 640, height: 480 });
+    const messageApi = createMessageApi([serverMessage({ seq: 1, contentType: 'image', content: imageContent })]);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /图片 cat.jpg/ }));
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+
+    expect(await within(log).findByRole('img', { name: '图片 cat.jpg' })).toHaveAttribute(
+      'src',
+      'https://media.test/download/med_history_image',
+    );
+    expect(within(log).queryByText(imageContent)).not.toBeInTheDocument();
+    expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_history_image');
+  });
+
+  it('renders live websocket image messages as image bubbles without refresh', async () => {
+    const user = userEvent.setup();
+    const mediaApi = createMediaApi();
+    const messageApi = createMessageApi([]);
+    const { sockets, factory } = createFakeWebSocketFactory();
+    const imageContent = JSON.stringify({ mediaId: 'med_live_image', filename: 'live.jpg' });
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        mediaApi={mediaApi}
+        contactsApi={createContactsApi()}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_live_image', seq: 1, contentType: 'image', content: imageContent }));
+    });
+
+    await user.click(await screen.findByRole('button', { name: /图片 live.jpg/ }));
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    expect(await within(log).findByRole('img', { name: '图片 live.jpg' })).toHaveAttribute(
+      'src',
+      'https://media.test/download/med_live_image',
+    );
+  });
+
+  it('opens and closes image preview from the image bubble', async () => {
+    const user = userEvent.setup();
+    const imageContent = JSON.stringify({ mediaId: 'med_preview_image', filename: 'preview.jpg' });
+    const mediaApi = createMediaApi();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, contentType: 'image', content: imageContent })]);
+
+    render(
+      <MessagesPage currentUserId={currentUserId} messageApi={messageApi} mediaApi={mediaApi} contactsApi={createContactsApi()} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /图片 preview.jpg/ }));
+    await user.click(await screen.findByRole('button', { name: '预览图片 preview.jpg' }));
+
+    const dialog = await screen.findByRole('dialog', { name: '图片预览' });
+    expect(within(dialog).getByRole('img', { name: '预览图片 preview.jpg' })).toHaveAttribute(
+      'src',
+      'https://media.test/download/med_preview_image',
+    );
+
+    await user.click(within(dialog).getByRole('button', { name: '关闭预览' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '图片预览' })).not.toBeInTheDocument());
+  });
+
+  it('downloads an image through authorized media URL and an injected download handler', async () => {
+    const user = userEvent.setup();
+    const imageContent = JSON.stringify({ mediaId: 'med_download_image', filename: 'download.jpg' });
+    const mediaApi = createMediaApi();
+    const downloadMedia = vi.fn();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, contentType: 'image', content: imageContent })]);
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        mediaApi={mediaApi}
+        contactsApi={createContactsApi()}
+        downloadMedia={downloadMedia}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /图片 download.jpg/ }));
+    await user.click(await screen.findByRole('button', { name: '下载图片 download.jpg' }));
+
+    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_download_image'));
+    expect(downloadMedia).toHaveBeenCalledWith('https://media.test/download/med_download_image', 'download.jpg');
+  });
+
+  it('renders a double checkmark when an outgoing sent message is covered by the read threshold', async () => {
+    const messageApi = createMessageApi(
+      [
+        serverMessage({
+          seq: 1,
+          content: 'outgoing covered by read seq',
+          senderId: currentUserId,
+          receiverId: peerUserId,
+        }),
+      ],
+      undefined,
+      { hasReadSeq: 1, unreadCount: 0 },
+    );
+
+    const log = await openSeededConversation(messageApi);
+    const outgoingMessage = within(log).getByRole('article', { name: '我发送的消息：outgoing covered by read seq' });
+    const readStatus = within(outgoingMessage).getByLabelText('对方已读');
+
+    expect(readStatus.textContent).toBe('✔✔');
+  });
+
+  it('keeps pending and failed outgoing message states understandable', async () => {
+    const user = userEvent.setup();
+    const sendDeferred = deferred<SendMessageResponse>();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before failed send' })], () => sendDeferred.promise);
+    const log = await openSeededConversation(messageApi);
+
+    await user.type(screen.getByRole('textbox', { name: '输入消息' }), 'message that will fail');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+
+    expect(within(log).getByText('发送中')).toBeInTheDocument();
+    sendDeferred.reject(new Error('send failed'));
+
+    await waitFor(() => expect(within(log).getByText('发送失败')).toBeInTheDocument());
+  });
+
+  it('does not render outgoing checkmarks for incoming messages', async () => {
+    const log = await openSeededConversation(createMessageApi([serverMessage({ seq: 1, content: 'incoming without checkmarks' })]));
+    const incomingMessage = within(log).getByRole('article', { name: '收到的消息：incoming without checkmarks' });
+
+    expect(within(incomingMessage).queryByLabelText('发送成功')).not.toBeInTheDocument();
+    expect(within(incomingMessage).queryByLabelText('对方已读')).not.toBeInTheDocument();
+    expect(within(incomingMessage).queryByText('✔')).not.toBeInTheDocument();
   });
 
   it('exposes a useful start-chat action when there are no conversations', async () => {
@@ -403,7 +880,7 @@ describe('MessagesPage real API mode', () => {
         content: '第一条消息',
       }),
     );
-    expect(await screen.findByText('已发送')).toBeInTheDocument();
+    expect(await screen.findByLabelText('发送成功')).toHaveTextContent('✔');
     expect(screen.getByRole('heading', { name: 'Bob Lin' })).toBeInTheDocument();
   });
 
@@ -462,7 +939,7 @@ describe('MessagesPage real API mode', () => {
       }),
     });
 
-    await waitFor(() => expect(within(log).getByText('已发送')).toBeInTheDocument());
+    await waitFor(() => expect(within(log).getByLabelText('发送成功')).toHaveTextContent('✔'));
     expect(within(log).queryByText('发送中')).not.toBeInTheDocument();
     expect(within(log).getAllByText('pending becomes seq two')).toHaveLength(1);
     expectTextOrder(log, ['seq one', 'pending becomes seq two']);
@@ -521,7 +998,7 @@ describe('MessagesPage real API mode', () => {
       }),
     });
 
-    await waitFor(() => expect(within(log).getAllByText('已发送')).toHaveLength(2));
+    await waitFor(() => expect(within(log).getAllByLabelText('发送成功')).toHaveLength(2));
     expectTextOrder(log, ['seq one', 'first outgoing', 'second outgoing']);
   });
 });

@@ -49,7 +49,7 @@ insert into media_objects (
   media_id, owner_account_id, bucket, object_key, original_filename, content_type,
   size_bytes, purpose, status, metadata
 )
-values ($1, $2, $3, $4, $5, $6, $7, $8, $9, jsonb_build_object('sha256', $10, 'width', $11, 'height', $12))
+values ($1, $2, $3, $4, $5, $6, $7, $8::smallint, $9::smallint, jsonb_build_object('sha256', $10::text, 'width', $11::integer, 'height', $12::integer))
 returning media_id, owner_account_id, bucket, object_key, original_filename, content_type,
           size_bytes, purpose, status, created_at, updated_at
 `, media.MediaID, media.OwnerUserID, media.Bucket, media.ObjectKey, media.OriginalFilename,

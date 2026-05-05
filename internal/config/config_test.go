@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -215,6 +216,129 @@ func TestValidateDeepSeekConfigRejectsPlaceholderAPIKey(t *testing.T) {
 	}
 }
 
+func TestResolveObjectStorageConfigAllowsExternalHTTPSWithInternalHTTP(t *testing.T) {
+	t.Setenv("OBJECT_STORAGE_USE_SSL", "")
+	t.Setenv("AGENTS_IM_OBJECT_STORAGE_USE_SSL", "")
+	t.Setenv("OBJECT_STORAGE_EXTERNAL_USE_SSL", "")
+	t.Setenv("AGENTS_IM_OBJECT_STORAGE_EXTERNAL_USE_SSL", "")
+
+	externalUseSSL := true
+	cfg, err := ResolveObjectStorageConfig(ObjectStorageConfig{
+		Driver:           ObjectStorageDriverMinIO,
+		Endpoint:         "127.0.0.1:9000",
+		ExternalEndpoint: "storage.example.com",
+		Bucket:           "agents-im-media",
+		Region:           "us-east-1",
+		UseSSL:           false,
+		ExternalUseSSL:   &externalUseSSL,
+		AccessKeyID:      "unit-test-access-key",
+		SecretAccessKey:  "unit-test-secret-key",
+	}, StorageDriverPostgres)
+	if err != nil {
+		t.Fatalf("resolve object storage config: %v", err)
+	}
+	if cfg.UseSSL {
+		t.Fatal("internal object storage UseSSL should remain false")
+	}
+	if cfg.ExternalUseSSL == nil || !*cfg.ExternalUseSSL {
+		t.Fatalf("external presign UseSSL = %v, want true", cfg.ExternalUseSSL)
+	}
+}
+
+func TestResolveObjectStorageConfigDefaultsExternalEndpointToHTTPSWhenSplitFromInternal(t *testing.T) {
+	t.Setenv("OBJECT_STORAGE_USE_SSL", "")
+	t.Setenv("AGENTS_IM_OBJECT_STORAGE_USE_SSL", "")
+	t.Setenv("OBJECT_STORAGE_EXTERNAL_USE_SSL", "")
+	t.Setenv("AGENTS_IM_OBJECT_STORAGE_EXTERNAL_USE_SSL", "")
+
+	cfg, err := ResolveObjectStorageConfig(ObjectStorageConfig{
+		Driver:           ObjectStorageDriverMinIO,
+		Endpoint:         "127.0.0.1:9000",
+		ExternalEndpoint: "storage.example.com",
+		Bucket:           "agents-im-media",
+		Region:           "us-east-1",
+		UseSSL:           false,
+		AccessKeyID:      "unit-test-access-key",
+		SecretAccessKey:  "unit-test-secret-key",
+	}, StorageDriverPostgres)
+	if err != nil {
+		t.Fatalf("resolve object storage config: %v", err)
+	}
+	if cfg.UseSSL {
+		t.Fatal("internal object storage UseSSL should remain false")
+	}
+	if cfg.ExternalUseSSL == nil || !*cfg.ExternalUseSSL {
+		t.Fatalf("split external object storage endpoint should default ExternalUseSSL to true, got %v", cfg.ExternalUseSSL)
+	}
+}
+
+func TestLoadAPIConfigResolvesObjectStorageExternalUseSSLFromEnv(t *testing.T) {
+	t.Setenv("OBJECT_STORAGE_USE_SSL", "false")
+	t.Setenv("OBJECT_STORAGE_EXTERNAL_USE_SSL", "true")
+
+	configPath := filepath.Join(t.TempDir(), "user-api.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: user-api
+StorageDriver: postgres
+ObjectStorage:
+  Driver: minio
+  Endpoint: 127.0.0.1:9000
+  ExternalEndpoint: storage.example.com
+  Bucket: agents-im-media
+  Region: us-east-1
+  UseSSL: ${OBJECT_STORAGE_USE_SSL}
+  ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
+  AccessKeyID: unit-test-access-key
+  SecretAccessKey: unit-test-secret-key
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if cfg.ObjectStorage.UseSSL {
+		t.Fatal("internal object storage UseSSL should resolve false from env")
+	}
+	if cfg.ObjectStorage.ExternalUseSSL == nil || !*cfg.ObjectStorage.ExternalUseSSL {
+		t.Fatalf("external object storage UseSSL = %v, want true", cfg.ObjectStorage.ExternalUseSSL)
+	}
+}
+
+func TestLoadAPIConfigRejectsLoopbackObjectStorageExternalEndpointInProduction(t *testing.T) {
+	t.Setenv("AGENTS_IM_ENV", "production")
+	t.Setenv("OBJECT_STORAGE_USE_SSL", "")
+	t.Setenv("OBJECT_STORAGE_EXTERNAL_USE_SSL", "")
+
+	configPath := filepath.Join(t.TempDir(), "user-api.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: user-api
+StorageDriver: postgres
+ObjectStorage:
+  Driver: minio
+  Endpoint: 127.0.0.1:9000
+  ExternalEndpoint: 127.0.0.1:9000
+  Bucket: agents-im-media
+  Region: us-east-1
+  UseSSL: false
+  AccessKeyID: unit-test-access-key
+  SecretAccessKey: unit-test-secret-key
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = LoadAPIConfig(configPath)
+	if err == nil {
+		t.Fatal("expected production config with loopback object storage external endpoint to fail")
+	}
+	if !strings.Contains(err.Error(), "object storage external endpoint") || !strings.Contains(err.Error(), "loopback") {
+		t.Fatalf("expected loopback external endpoint error, got %v", err)
+	}
+}
+
 func TestResolveRedisAndPresenceConfigFromEnv(t *testing.T) {
 	t.Setenv("REDIS_ADDR", "127.0.0.1:6390")
 	t.Setenv("REDIS_PASSWORD", "env-dev-only")
@@ -341,5 +465,15 @@ Kafka:
 	}
 	if cfg.Kafka.MessageEventsTopic != "message.events.test" || cfg.Kafka.ConsumerGroup != "message-transfer-test" {
 		t.Fatalf("kafka config mismatch: %+v", cfg.Kafka)
+	}
+}
+
+func TestResolveMessageTransferConsumerDriverSupportsOutbox(t *testing.T) {
+	t.Setenv("MESSAGE_TRANSFER_CONSUMER_DRIVER", "")
+
+	for _, value := range []string{"outbox", "postgres_outbox", "postgres-outbox"} {
+		if got := ResolveTransferConsumerDriver(value); got != TransferConsumerOutbox {
+			t.Fatalf("ResolveTransferConsumerDriver(%q) = %q, want %q", value, got, TransferConsumerOutbox)
+		}
 	}
 }

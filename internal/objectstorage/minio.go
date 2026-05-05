@@ -19,6 +19,7 @@ type Config struct {
 	Bucket           string
 	Region           string
 	UseSSL           bool
+	ExternalUseSSL   *bool
 	AccessKeyID      string
 	SecretAccessKey  string
 }
@@ -57,10 +58,14 @@ func NewMinIOStore(cfg Config) (*MinIOStore, error) {
 	}
 
 	presignClient := client
-	if externalEndpoint := strings.TrimSpace(cfg.ExternalEndpoint); externalEndpoint != "" && externalEndpoint != endpoint {
+	externalUseSSL := cfg.UseSSL
+	if cfg.ExternalUseSSL != nil {
+		externalUseSSL = *cfg.ExternalUseSSL
+	}
+	if externalEndpoint := strings.TrimSpace(cfg.ExternalEndpoint); externalEndpoint != "" && (externalEndpoint != endpoint || externalUseSSL != cfg.UseSSL) {
 		presignClient, err = minio.New(externalEndpoint, &minio.Options{
 			Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-			Secure: cfg.UseSSL,
+			Secure: externalUseSSL,
 			Region: strings.TrimSpace(cfg.Region),
 		})
 		if err != nil {

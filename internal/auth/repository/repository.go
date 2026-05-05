@@ -2,11 +2,43 @@ package repository
 
 import (
 	"context"
+	"strings"
 
+	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/auth/model"
+	"github.com/wujunhui99/agents_im/internal/auth/token"
 )
 
 type CredentialRepository interface {
+	ActiveSessionRepository
 	Create(ctx context.Context, credential model.Credential) (model.Credential, error)
 	GetByIdentifier(ctx context.Context, identifier string) (model.Credential, error)
+}
+
+type ActiveSessionRepository interface {
+	SetActiveSession(ctx context.Context, session model.ActiveSession) error
+	GetActiveSession(ctx context.Context, userID string) (model.ActiveSession, error)
+}
+
+func ValidateActiveSession(ctx context.Context, repo ActiveSessionRepository, claims token.Claims) error {
+	if repo == nil {
+		return apperror.Internal("active session repository is required")
+	}
+	userID := strings.TrimSpace(claims.UserID)
+	sessionID := strings.TrimSpace(claims.SessionID)
+	if userID == "" || sessionID == "" {
+		return apperror.Unauthenticated("token session is not active")
+	}
+
+	active, err := repo.GetActiveSession(ctx, userID)
+	if err != nil {
+		if apperror.From(err).Code == apperror.CodeNotFound {
+			return apperror.Unauthenticated("token session is not active")
+		}
+		return err
+	}
+	if strings.TrimSpace(active.SessionID) != sessionID {
+		return apperror.Unauthenticated("token session is not active")
+	}
+	return nil
 }

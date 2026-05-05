@@ -356,8 +356,10 @@ Clients must upload the bytes to `uploadUrl` with the declared `Content-Type`. O
 Supported purposes and limits:
 
 - `avatar`: image JPEG/PNG/WebP/GIF, max 5 MiB.
-- `message_image`: image JPEG/PNG/WebP/GIF, max 10 MiB.
-- `message_file`: allowed document/archive/plain/octet-stream MIME types, max 100 MiB. HTML and SVG are not allowed in phase 1.
+- `message_image`: image JPEG/PNG/WebP/GIF, max 15 MiB. `POST /media/uploads` creates upload intents for images that can later be sent as message attachments.
+- `message_file`: allowed document/archive/plain/octet-stream MIME types, max 20 MiB. `POST /media/uploads` creates upload intents for files that can later be sent as message attachments. HTML and SVG are not allowed in phase 1.
+
+The frontend should check file size before requesting an upload intent so users get immediate feedback, but backend validation in `POST /media/uploads`, upload completion, and message send remains the source of truth.
 
 ### Complete Upload
 
@@ -387,7 +389,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-Phase 1 requires owner access for download URLs. Conversation-participant access for received message attachments remains a phase 2 integration point.
+Download URLs require the requester to be the media owner or a conversation participant who can see a message attachment referencing the media. Non-message media remains owner-only.
 
 ## Messages REST
 
@@ -431,6 +433,16 @@ Image message after media upload is completed:
 }
 ```
 
+The `content` value is a JSON string with this image shape:
+
+```json
+{
+  "mediaId": "med_000001",
+  "width": 1080,
+  "height": 720
+}
+```
+
 File message after media upload is completed:
 
 ```json
@@ -443,7 +455,18 @@ File message after media upload is completed:
 }
 ```
 
-For image/file messages, `mediaId` must reference a ready media object owned by the sender. The message service rejects missing, not-ready, wrong-purpose, wrong-owner, or metadata-mismatched media.
+The `content` value is a JSON string with this file shape:
+
+```json
+{
+  "mediaId": "med_000002",
+  "filename": "report.pdf",
+  "sizeBytes": 123456,
+  "contentType": "application/pdf"
+}
+```
+
+For image/file messages, `mediaId` must reference a ready media object owned by the sender. Image media must have `purpose=message_image`, an allowed image MIME type, and size <= 15 MiB. File media must have `purpose=message_file`, allowed file MIME type, size <= 20 MiB, and the message `filename`, `sizeBytes`, and `contentType` metadata must match the media record. The message service rejects missing, not-ready, wrong-purpose, wrong-owner, over-limit, or metadata-mismatched media.
 
 Group chat:
 

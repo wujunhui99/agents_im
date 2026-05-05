@@ -73,6 +73,18 @@ git push -u origin develop
 7. 创建 PR/MR：`feature/* -> develop`。
 8. CI 通过后，将 feature 分支合并到 `develop`。
 
+## Agentic GitHub Project / Issues 工作流
+
+产品功能、复杂 Bug、重构、Research、E2E/Regression 任务必须以 GitHub Issue / Project 作为需求和调度的单一事实源。详细规则见 [`docs/AGENTIC_DEVELOPMENT_WORKFLOW.md`](./AGENTIC_DEVELOPMENT_WORKFLOW.md)。
+
+核心门禁：
+
+- 用户描述产品需求后，默认先进入 Codex Spec Mode / Hermes Spec Writer，创建或更新 Issue，不直接启动 Codex Dev Mode 写代码。
+- `Spec Ready` 只表示规格草稿完成；Hermes 检查 Spec Gate 后才能设置 `Ready for Dev`。
+- Codex Dev Mode 只能执行 `Ready for Dev` Issue，并必须读取 Issue body、验收标准、测试计划和依赖。
+- 普通产品需求默认一个全栈 Issue 完成，不拆成前端/后端/测试微任务；只有 Research、过大需求、低耦合独立能力或系统级 E2E 才拆分。
+- PR merge 不等于 Done；需要 Hermes 验收、必要 CI/CD 和生产 smoke/E2E 后才能关闭 Issue。
+
 ## CI Checks
 
 CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从 `main` 发布。GitHub Actions workflow 位于 `.github/workflows/ci.yml`，PR/MR 合入 `develop` 前必须通过默认 backend verification。当前 CI checks 包括：

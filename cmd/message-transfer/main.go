@@ -84,6 +84,17 @@ func buildConsumer(cfg config.MessageTransferConfig) (transfer.EventConsumer, er
 			Topic:   cfg.Consumer.Topic,
 			GroupID: cfg.Consumer.Group,
 		})
+	case config.TransferConsumerOutbox:
+		repo, err := repository.NewOutboxRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+		if err != nil {
+			return nil, err
+		}
+		return transfer.NewOutboxEventConsumer(transfer.OutboxEventConsumerConfig{
+			Repository:   repo,
+			WorkerID:     cfg.WorkerID,
+			BatchLimit:   100,
+			LockDuration: 30 * time.Second,
+		})
 	default:
 		return transfer.NewInMemoryConsumer(), nil
 	}

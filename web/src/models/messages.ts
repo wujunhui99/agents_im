@@ -1,5 +1,5 @@
 export type ChatType = 'single' | 'group';
-export type MessageContentType = 'text';
+export type MessageContentType = 'text' | 'image' | 'file';
 export type MessageStatus = 'sending' | 'sent' | 'failed';
 export type MessageDirection = 'incoming' | 'outgoing';
 export type ConversationAccent = 'green' | 'blue' | 'purple' | 'orange' | 'gray';
