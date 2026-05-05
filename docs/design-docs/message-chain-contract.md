@@ -579,7 +579,7 @@ Emitted after `has_read_seq` advances.
 
 Media metadata is stored in PostgreSQL `media_objects`; object bytes live in MinIO/S3-compatible storage. Message send does not trust client-provided object keys or URLs. For image/file messages it validates only a `mediaId` reference and requires the media record to be ready and owned by the sender before persisting the message.
 
-Phase 1 download URL authorization for `/media/:media_id/download-url` is owner-only. When frontend media messaging is wired end to end, message attachment reads must add conversation-participant authorization before participants can fetch media they did not upload.
+Download URL authorization for `/media/:media_id/download-url` is owner-only for non-message media. Image/file message attachments also allow conversation participants who can see the message containing the referenced `mediaId`.
 
 ## Storage contract
 

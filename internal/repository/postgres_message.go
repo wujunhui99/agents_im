@@ -279,6 +279,30 @@ where account_id = $1 and conversation_id = $2
 	return state.Clone(), updated, nil
 }
 
+func (r *PostgresMessageRepository) UserCanAccessMedia(ctx context.Context, userID string, mediaID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	mediaID = strings.TrimSpace(mediaID)
+	if userID == "" || mediaID == "" {
+		return false, nil
+	}
+
+	var allowed bool
+	if err := r.conn.QueryRowCtx(ctx, &allowed, `
+select exists (
+  select 1
+  from user_conversation_states s
+  join messages m on m.conversation_id = s.conversation_id
+  where s.account_id = $1
+    and m.seq <= s.visible_start_seq
+    and m.content_type in ($3, $4)
+    and m.content ->> 'mediaId' = $2
+)
+`, userID, mediaID, MessageContentTypeImage, MessageContentTypeFile); err != nil {
+		return false, err
+	}
+	return allowed, nil
+}
+
 func upsertAndLockConversation(ctx context.Context, session sqlx.Session, conversationID string, input CreateMessageInput) (postgresConversationLockRow, error) {
 	conversationType, err := conversationTypeValue(input.ChatType)
 	if err != nil {

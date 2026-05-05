@@ -40,6 +40,7 @@ func NewServiceContextWithAuth(repo repository.Repository, auth config.JWTAuthCo
 	mediaRepo := repository.NewMemoryMediaRepository()
 	objectStore := objectstorage.NewMemoryStore()
 	mediaLogic := logic.NewMediaLogic(mediaRepo, objectStore, config.DefaultObjectStorageConfig().Bucket)
+	mediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(messageRepo))
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{
 		Auth:            normalizeAuthConfig(auth),
@@ -77,6 +78,7 @@ func NewMessageServiceContext(repo repository.MessageRepository, userExists logi
 func NewMessageServiceContextWithAuth(repo repository.MessageRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
 	mediaRepo := repository.NewMemoryMediaRepository()
 	mediaLogic := logic.NewMediaLogic(mediaRepo, nil, config.DefaultObjectStorageConfig().Bucket)
+	mediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(repo))
 	return &ServiceContext{
 		Auth:         normalizeAuthConfig(auth),
 		MessageLogic: logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
@@ -96,6 +98,7 @@ func NewUserServiceContextWithMedia(repo repository.Repository, mediaRepo reposi
 		ctx.ObjectStore = objectStore
 	}
 	ctx.MediaLogic = logic.NewMediaLogic(ctx.MediaRepo, ctx.ObjectStore, bucket)
+	ConfigureMediaAttachmentAccess(ctx, ctx.MessageRepo)
 	if ctx.MessageLogic != nil {
 		ctx.MessageLogic = ctx.MessageLogic.WithMediaValidator(ctx.MediaLogic)
 	}
@@ -104,6 +107,7 @@ func NewUserServiceContextWithMedia(repo repository.Repository, mediaRepo reposi
 
 func NewMessageServiceContextWithMedia(repo repository.MessageRepository, mediaRepo repository.MediaRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
 	mediaLogic := logic.NewMediaLogic(mediaRepo, nil, config.DefaultObjectStorageConfig().Bucket)
+	mediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(repo))
 	return &ServiceContext{
 		Auth:         normalizeAuthConfig(auth),
 		MessageLogic: logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
@@ -112,6 +116,14 @@ func NewMessageServiceContextWithMedia(repo repository.MessageRepository, mediaR
 		MediaRepo:    mediaRepo,
 		OutboxRepo:   outboxRepositoryFromMessageRepo(repo),
 	}
+}
+
+func ConfigureMediaAttachmentAccess(ctx *ServiceContext, messageRepo repository.MessageRepository) {
+	if ctx == nil || ctx.MediaLogic == nil || messageRepo == nil {
+		return
+	}
+	ctx.MessageRepo = messageRepo
+	ctx.MediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(messageRepo))
 }
 
 func NewAgentServiceContext(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker) *ServiceContext {

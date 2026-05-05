@@ -85,6 +85,37 @@ Classifications:
 
 Artifacts default to `/tmp/agents-im-ws-bidirectional-send-e2e/<timestamp>/`.
 
+## Image message preview/download regression
+
+`image_message_regression.mjs` covers the full image-message loop. The harness creates fresh QA accounts, establishes friendship, seeds a conversation, opens A and B browser sessions, verifies unsupported and oversized image validation before upload, sends a real image through the UI upload flow, checks A's sent bubble, checks B's no-refresh live bubble, reloads B to verify history replay, opens/closes preview, and verifies the receiver can fetch the authorized media download URL and the presigned object bytes.
+
+Production:
+
+```bash
+AGENTS_IM_E2E_TARGET=production \
+AGENTS_IM_E2E_BASE_URL=https://agenticim.xyz \
+NODE_PATH=/tmp/ws-e2e-run/node_modules \
+node tests/e2e/image_message_regression.mjs
+```
+
+Local:
+
+```bash
+AGENTS_IM_E2E_TARGET=local \
+AGENTS_IM_E2E_BASE_URL=http://127.0.0.1:5173 \
+NODE_PATH=/tmp/ws-e2e-run/node_modules \
+node tests/e2e/image_message_regression.mjs
+```
+
+Classifications:
+
+- `image-message-success`
+- `image-upload-validation-failed`
+- `image-preview-download-failed`
+- `setup-or-harness-failed`
+
+Artifacts default to `/tmp/agents-im-image-message-e2e/<timestamp>/`. The harness redacts bearer tokens, JWT-like values, cookies, passwords, and presigned URL query strings from console output and artifacts.
+
 ## Auth register-login regression
 
 `auth_register_login_regression.mjs` is an API-only regression harness for the auth credential persistence path. It creates a fresh unique account through the real `/auth/register`, then logs in through the real `/auth/login` with the exact same identifier/password.

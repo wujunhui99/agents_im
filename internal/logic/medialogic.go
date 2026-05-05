@@ -33,11 +33,12 @@ const (
 var sha256HexPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type MediaLogic struct {
-	repo   repository.MediaRepository
-	store  objectstorage.ObjectStore
-	bucket string
-	now    func() time.Time
-	newID  func() (string, error)
+	repo             repository.MediaRepository
+	store            objectstorage.ObjectStore
+	bucket           string
+	attachmentAccess MediaAttachmentAccessChecker
+	now              func() time.Time
+	newID            func() (string, error)
 }
 
 type CreateMediaUploadIntentRequest struct {
@@ -68,8 +69,9 @@ type CompleteMediaUploadResponse struct {
 }
 
 type GetMediaDownloadURLRequest struct {
-	OwnerUserID string `json:"ownerUserId"`
-	MediaID     string `json:"mediaId"`
+	OwnerUserID     string `json:"ownerUserId"`
+	RequesterUserID string `json:"requesterUserId,omitempty"`
+	MediaID         string `json:"mediaId"`
 }
 
 type GetMediaDownloadURLResponse struct {
@@ -108,6 +110,14 @@ type messageFileContent struct {
 	ContentType string `json:"contentType"`
 }
 
+type MediaAttachmentAccessChecker interface {
+	UserCanAccessMedia(ctx context.Context, userID string, mediaID string) (bool, error)
+}
+
+type messageMediaAccessChecker struct {
+	repo repository.MessageRepository
+}
+
 func NewMediaLogic(repo repository.MediaRepository, store objectstorage.ObjectStore, bucket string) *MediaLogic {
 	return &MediaLogic{
 		repo:   repo,
@@ -116,6 +126,24 @@ func NewMediaLogic(repo repository.MediaRepository, store objectstorage.ObjectSt
 		now:    time.Now,
 		newID:  newMediaID,
 	}
+}
+
+func (l *MediaLogic) WithAttachmentAccessChecker(checker MediaAttachmentAccessChecker) *MediaLogic {
+	if l != nil {
+		l.attachmentAccess = checker
+	}
+	return l
+}
+
+func NewMessageMediaAccessChecker(repo repository.MessageRepository) MediaAttachmentAccessChecker {
+	return messageMediaAccessChecker{repo: repo}
+}
+
+func (c messageMediaAccessChecker) UserCanAccessMedia(ctx context.Context, userID string, mediaID string) (bool, error) {
+	if c.repo == nil {
+		return false, nil
+	}
+	return c.repo.UserCanAccessMedia(ctx, userID, mediaID)
 }
 
 func (l *MediaLogic) CreateUploadIntent(ctx context.Context, req CreateMediaUploadIntentRequest) (CreateMediaUploadIntentResponse, error) {
@@ -212,9 +240,30 @@ func (l *MediaLogic) CompleteUpload(ctx context.Context, req CompleteMediaUpload
 }
 
 func (l *MediaLogic) GetDownloadURL(ctx context.Context, req GetMediaDownloadURLRequest) (GetMediaDownloadURLResponse, error) {
-	media, err := l.mediaForOwner(ctx, req.OwnerUserID, req.MediaID)
+	requesterUserID := strings.TrimSpace(req.RequesterUserID)
+	if requesterUserID == "" {
+		requesterUserID = req.OwnerUserID
+	}
+	requesterUserID, err := normalizeMediaIDComponent(requesterUserID, "owner_user_id")
 	if err != nil {
 		return GetMediaDownloadURLResponse{}, err
+	}
+	mediaID, err := normalizeMediaIDComponent(req.MediaID, "media_id")
+	if err != nil {
+		return GetMediaDownloadURLResponse{}, err
+	}
+	media, err := l.mediaByID(ctx, mediaID)
+	if err != nil {
+		return GetMediaDownloadURLResponse{}, err
+	}
+	if media.OwnerUserID != requesterUserID {
+		allowed, err := l.canAccessMessageAttachment(ctx, requesterUserID, media)
+		if err != nil {
+			return GetMediaDownloadURLResponse{}, err
+		}
+		if !allowed {
+			return GetMediaDownloadURLResponse{}, apperror.Forbidden("media object is not accessible by requester")
+		}
 	}
 	if media.Status != model.MediaStatusReady {
 		return GetMediaDownloadURLResponse{}, apperror.InvalidArgument("media object is not ready")
@@ -314,9 +363,6 @@ func (l *MediaLogic) ValidateMessageMedia(ctx context.Context, ownerUserID strin
 }
 
 func (l *MediaLogic) mediaForOwner(ctx context.Context, ownerUserID string, mediaID string) (model.MediaObject, error) {
-	if l.repo == nil {
-		return model.MediaObject{}, apperror.Internal("media repository is not configured")
-	}
 	ownerUserID, err := normalizeMediaIDComponent(ownerUserID, "owner_user_id")
 	if err != nil {
 		return model.MediaObject{}, err
@@ -325,7 +371,7 @@ func (l *MediaLogic) mediaForOwner(ctx context.Context, ownerUserID string, medi
 	if err != nil {
 		return model.MediaObject{}, err
 	}
-	media, err := l.repo.GetMediaObject(ctx, mediaID)
+	media, err := l.mediaByID(ctx, mediaID)
 	if err != nil {
 		return model.MediaObject{}, err
 	}
@@ -336,6 +382,30 @@ func (l *MediaLogic) mediaForOwner(ctx context.Context, ownerUserID string, medi
 		return model.MediaObject{}, apperror.NotFound("media object not found")
 	}
 	return media, nil
+}
+
+func (l *MediaLogic) mediaByID(ctx context.Context, mediaID string) (model.MediaObject, error) {
+	if l.repo == nil {
+		return model.MediaObject{}, apperror.Internal("media repository is not configured")
+	}
+	media, err := l.repo.GetMediaObject(ctx, mediaID)
+	if err != nil {
+		return model.MediaObject{}, err
+	}
+	if media.Status == model.MediaStatusDeleted {
+		return model.MediaObject{}, apperror.NotFound("media object not found")
+	}
+	return media, nil
+}
+
+func (l *MediaLogic) canAccessMessageAttachment(ctx context.Context, requesterUserID string, media model.MediaObject) (bool, error) {
+	if media.Purpose != model.MediaPurposeMessageImage && media.Purpose != model.MediaPurposeMessageFile {
+		return false, nil
+	}
+	if l.attachmentAccess == nil {
+		return false, nil
+	}
+	return l.attachmentAccess.UserCanAccessMedia(ctx, requesterUserID, media.MediaID)
 }
 
 func normalizeUploadIntent(req CreateMediaUploadIntentRequest) (model.MediaPurpose, string, string, string, error) {
