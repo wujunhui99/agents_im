@@ -17,6 +17,7 @@ import { TopBar } from './components/ui/TopBar';
 import { MessagesPage } from './features/messages/MessagesPage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { MePage } from './pages/MePage';
+import { uploadAvatarForProfile } from './utils/avatarUpload';
 
 type TabKey = 'messages' | 'contacts' | 'discover' | 'me';
 
@@ -89,6 +90,16 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
   async function updateProfile(patch: UserProfilePatch) {
     const updatedUser = await effectiveUserApi.patchCurrentUser(patch);
     setCurrentUser(updatedUser);
+  }
+
+  async function uploadAvatar(file: File) {
+    const updatedUser = await uploadAvatarForProfile({
+      file,
+      mediaApi,
+      userApi: effectiveUserApi,
+    });
+    setCurrentUser(updatedUser);
+    return updatedUser;
   }
 
   function openChatFromContact(profile: UserProfile) {
@@ -165,6 +176,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
                   groupsApi,
                   messageApi,
                   mediaApi,
+                  uploadAvatar,
                   webSocketToken ?? session?.token,
                   startChatSignal,
                   pendingChatProfile,
@@ -351,6 +363,7 @@ function renderPage(
   groupsApi: GroupsApi,
   messageApi: MessageApi,
   mediaApi: MediaApi,
+  onUploadAvatar: (file: File) => Promise<UserProfile>,
   webSocketToken: string | undefined,
   startChatSignal: number,
   pendingChatProfile: UserProfile | null,
@@ -397,7 +410,7 @@ function renderPage(
 
   return (
     <>
-      <MePage profile={currentUser} onUpdateProfile={onUpdateProfile} />
+      <MePage profile={currentUser} onUpdateProfile={onUpdateProfile} onUploadAvatar={onUploadAvatar} />
       <Button variant="tonal" className="logout-button" onClick={onLogout}>
         退出登录
       </Button>

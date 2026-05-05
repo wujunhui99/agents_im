@@ -133,17 +133,19 @@ type FriendPathReq struct {
 }
 
 type FriendProfile struct {
-	UserID        string `json:"user_id"`
-	Identifier    string `json:"identifier"`
-	DisplayName   string `json:"display_name"`
-	Name          string `json:"name"`
-	Gender        string `json:"gender"`
-	BirthDate     string `json:"birth_date"`
-	Region        string `json:"region"`
-	AccountType   string `json:"account_type"`
-	AvatarMediaID string `json:"avatar_media_id"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	UserID             string `json:"user_id"`
+	Identifier         string `json:"identifier"`
+	DisplayName        string `json:"display_name"`
+	Name               string `json:"name"`
+	Gender             string `json:"gender"`
+	BirthDate          string `json:"birth_date"`
+	Region             string `json:"region"`
+	AccountType        string `json:"account_type"`
+	AvatarMediaID      string `json:"avatar_media_id"`
+	AvatarURL          string `json:"avatar_url,omitempty"`
+	AvatarURLExpiresAt int64  `json:"avatar_url_expires_at,omitempty"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
 }
 
 type Friendship struct {
@@ -494,17 +496,19 @@ type UpdateAgentStatusReq struct {
 }
 
 type User struct {
-	UserID        string `json:"user_id"`
-	Identifier    string `json:"identifier"`
-	DisplayName   string `json:"display_name"`
-	Name          string `json:"name"`
-	Gender        string `json:"gender"`
-	BirthDate     string `json:"birth_date"`
-	Region        string `json:"region"`
-	AccountType   string `json:"account_type"`
-	AvatarMediaID string `json:"avatar_media_id"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	UserID             string `json:"user_id"`
+	Identifier         string `json:"identifier"`
+	DisplayName        string `json:"display_name"`
+	Name               string `json:"name"`
+	Gender             string `json:"gender"`
+	BirthDate          string `json:"birth_date"`
+	Region             string `json:"region"`
+	AccountType        string `json:"account_type"`
+	AvatarMediaID      string `json:"avatar_media_id"`
+	AvatarURL          string `json:"avatar_url,omitempty"`
+	AvatarURLExpiresAt int64  `json:"avatar_url_expires_at,omitempty"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
 }
 
 type UserResp struct {

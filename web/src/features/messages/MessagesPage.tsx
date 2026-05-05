@@ -427,7 +427,7 @@ function ConversationList({
             <ListItem
               className="conversation-row conversation-button"
               onClick={() => onSelect(item.id)}
-              leading={<Avatar label={item.avatar} color={item.color} />}
+              leading={<Avatar label={item.avatar} color={item.color} src={item.avatarUrl} alt={`${item.title} 头像`} />}
               headline={
                 <span className="row-title-line">
                   <span>{item.title}</span>
@@ -523,7 +523,14 @@ function StartChatPanel({
       {result ? (
         <ListItem
           className="search-result"
-          leading={<Avatar label={avatarText(profileDisplayName(result))} color="blue" />}
+          leading={
+            <Avatar
+              label={avatarText(profileDisplayName(result))}
+              color="blue"
+              src={result.avatar_url}
+              alt={`${profileDisplayName(result)} 头像`}
+            />
+          }
           headline={profileDisplayName(result)}
           supportingText={
             <span className="friend-supporting-lines">
@@ -573,11 +580,14 @@ function ChatWindow({
 
   return (
     <section className="chat-window" aria-label={`${conversation.title} 聊天窗口`}>
-      <header className="chat-header">
+      <header className="chat-header" role="banner" aria-label={`${conversation.title} 聊天头部`}>
         <Button variant="icon" className="chat-back-button" aria-label="返回消息列表" onClick={onBack}>
           <ChevronLeft size={24} />
         </Button>
-        <h2>{conversation.title}</h2>
+        <div className="chat-header-title">
+          <Avatar label={conversation.avatar} color={conversation.color} src={conversation.avatarUrl} alt={`${conversation.title} 头像`} />
+          <h2>{conversation.title}</h2>
+        </div>
       </header>
       <p className="inline-status" role="status">
         {status}
@@ -938,6 +948,7 @@ function userProfileToDraftConversation(profile: UserProfile): Conversation {
     id: draftConversationId(profile.user_id),
     title,
     avatar: avatarText(title),
+    avatarUrl: profile.avatar_url,
     preview: '暂无消息',
     time: '',
     unread: 0,
@@ -1002,6 +1013,7 @@ function hydrateConversationTitles(conversations: Conversation[], friendProfiles
       ...conversation,
       title,
       avatar: avatarText(title),
+      avatarUrl: profile.avatar_url,
     };
   });
 }
@@ -1080,6 +1092,7 @@ function upsertStartedConversation(conversations: Conversation[], existingConver
             ...conversation,
             title: draftConversation.title,
             avatar: draftConversation.avatar,
+            avatarUrl: draftConversation.avatarUrl,
             receiverId: draftConversation.receiverId,
           }
         : conversation,
@@ -1106,6 +1119,7 @@ function conversationStateToView(state: ConversationSeqState, currentUserId: str
     id: state.conversationId,
     title,
     avatar: avatarText(title),
+    avatarUrl: undefined,
     preview: lastMessage ? messageDisplayText(lastMessage) : '暂无消息',
     previewOrigin: lastMessage?.messageOrigin,
     time: state.maxSeqTime ? '刚刚' : '',
@@ -1197,6 +1211,7 @@ function liveMessageToConversation(message: ChatMessage): Conversation {
     id: message.conversationId,
     title,
     avatar: avatarText(title),
+    avatarUrl: undefined,
     preview: messageDisplayText(message),
     previewOrigin: message.messageOrigin,
     time: '刚刚',
@@ -1820,6 +1835,7 @@ function mergeConversation(current: Conversation, loaded: Conversation): Convers
     title,
     avatar: title === current.title ? current.avatar : loaded.avatar,
     preview: lastMessage ? messageDisplayText(lastMessage) : loaded.preview,
+    avatarUrl: title === current.title ? current.avatarUrl : loaded.avatarUrl,
     previewOrigin: lastMessage?.messageOrigin ?? loaded.previewOrigin,
     time: lastMessage ? '刚刚' : loaded.time,
     unread,

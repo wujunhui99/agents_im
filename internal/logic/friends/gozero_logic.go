@@ -2,6 +2,7 @@ package friends
 
 import (
 	"context"
+	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
@@ -38,11 +39,15 @@ func (l *AddFriendLogic) AddFriend(req *types.AddFriendReq) (*types.AddFriendRes
 	if err != nil {
 		return nil, err
 	}
+	friendship, err := toFriendship(l.ctx, l.svcCtx, result.Friendship)
+	if err != nil {
+		return nil, err
+	}
 	return &types.AddFriendResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.AddFriendData{
-			Friendship: toFriendship(result.Friendship),
+			Friendship: friendship,
 			Created:    result.Created,
 		},
 	}, nil
@@ -75,11 +80,15 @@ func (l *DeleteFriendLogic) DeleteFriend(req *types.FriendPathReq) (*types.Delet
 	if err != nil {
 		return nil, err
 	}
+	friendship, err := toFriendship(l.ctx, l.svcCtx, result.Friendship)
+	if err != nil {
+		return nil, err
+	}
 	return &types.DeleteFriendResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.DeleteFriendData{
-			Friendship: toFriendship(result.Friendship),
+			Friendship: friendship,
 			Deleted:    result.Deleted,
 		},
 	}, nil
@@ -112,11 +121,15 @@ func (l *GetFriendshipLogic) GetFriendship(req *types.FriendPathReq) (*types.Fri
 	if err != nil {
 		return nil, err
 	}
+	friendship, err := toFriendship(l.ctx, l.svcCtx, result.Friendship)
+	if err != nil {
+		return nil, err
+	}
 	return &types.FriendshipResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.FriendshipData{
-			Friendship: toFriendship(result.Friendship),
+			Friendship: friendship,
 		},
 	}, nil
 }
@@ -148,7 +161,11 @@ func (l *ListFriendsLogic) ListFriends(req *types.ListFriendsReq) (*types.ListFr
 
 	friends := make([]types.Friendship, 0, len(result.Friends))
 	for _, friendship := range result.Friends {
-		friends = append(friends, toFriendship(friendship))
+		view, err := toFriendship(l.ctx, l.svcCtx, friendship)
+		if err != nil {
+			return nil, err
+		}
+		friends = append(friends, view)
 	}
 	return &types.ListFriendsResp{
 		Code:    string(apperror.CodeOK),
@@ -157,7 +174,7 @@ func (l *ListFriendsLogic) ListFriends(req *types.ListFriendsReq) (*types.ListFr
 	}, nil
 }
 
-func toFriendship(friendship business.FriendshipView) types.Friendship {
+func toFriendship(ctx context.Context, svcCtx *svc.ServiceContext, friendship business.FriendshipView) (types.Friendship, error) {
 	view := types.Friendship{
 		UserID:    friendship.UserID,
 		FriendID:  friendship.FriendID,
@@ -167,23 +184,48 @@ func toFriendship(friendship business.FriendshipView) types.Friendship {
 		UpdatedAt: friendship.UpdatedAt,
 	}
 	if friendship.Friend != nil {
-		view.Friend = toFriendProfile(*friendship.Friend)
+		profile, err := toFriendProfile(ctx, svcCtx, *friendship.Friend)
+		if err != nil {
+			return types.Friendship{}, err
+		}
+		view.Friend = profile
 	}
-	return view
+	return view, nil
 }
 
-func toFriendProfile(profile business.UserProfile) types.FriendProfile {
-	return types.FriendProfile{
-		UserID:        profile.UserID,
-		Identifier:    profile.Identifier,
-		DisplayName:   profile.DisplayName,
-		Name:          profile.Name,
-		Gender:        profile.Gender,
-		BirthDate:     profile.BirthDate,
-		Region:        profile.Region,
-		AccountType:   profile.AccountType,
-		AvatarMediaID: profile.AvatarMediaID,
-		CreatedAt:     profile.CreatedAt,
-		UpdatedAt:     profile.UpdatedAt,
+func toFriendProfile(ctx context.Context, svcCtx *svc.ServiceContext, profile business.UserProfile) (types.FriendProfile, error) {
+	avatarURL, avatarURLExpiresAt, err := resolveFriendAvatarDisplay(ctx, svcCtx, profile.AvatarMediaID)
+	if err != nil {
+		return types.FriendProfile{}, err
 	}
+	return types.FriendProfile{
+		UserID:             profile.UserID,
+		Identifier:         profile.Identifier,
+		DisplayName:        profile.DisplayName,
+		Name:               profile.Name,
+		Gender:             profile.Gender,
+		BirthDate:          profile.BirthDate,
+		Region:             profile.Region,
+		AccountType:        profile.AccountType,
+		AvatarMediaID:      profile.AvatarMediaID,
+		AvatarURL:          avatarURL,
+		AvatarURLExpiresAt: avatarURLExpiresAt,
+		CreatedAt:          profile.CreatedAt,
+		UpdatedAt:          profile.UpdatedAt,
+	}, nil
+}
+
+func resolveFriendAvatarDisplay(ctx context.Context, svcCtx *svc.ServiceContext, avatarMediaID string) (string, int64, error) {
+	avatarMediaID = strings.TrimSpace(avatarMediaID)
+	if avatarMediaID == "" {
+		return "", 0, nil
+	}
+	if svcCtx == nil || svcCtx.MediaLogic == nil {
+		return "", 0, apperror.Internal("media logic is not configured")
+	}
+	display, err := svcCtx.MediaLogic.GetAvatarDisplayURL(ctx, avatarMediaID)
+	if err != nil {
+		return "", 0, err
+	}
+	return display.DownloadURL, display.ExpiresAt, nil
 }
