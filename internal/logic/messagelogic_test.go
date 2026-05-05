@@ -306,7 +306,7 @@ func TestMessageLogicPullBoundsAndParticipantAccess(t *testing.T) {
 		UserID:          "usr_pull_outsider",
 		ConversationIDs: []string{conversationID},
 	})
-	assertLogicAppCode(t, err, apperror.CodeNotFound)
+	assertLogicAppCode(t, err, apperror.CodeForbidden)
 
 	_, err = messageLogic.PullMessages(ctx, PullMessagesRequest{
 		UserID:         "usr_pull_outsider",
@@ -314,14 +314,14 @@ func TestMessageLogicPullBoundsAndParticipantAccess(t *testing.T) {
 		Limit:          10,
 		Order:          "asc",
 	})
-	assertLogicAppCode(t, err, apperror.CodeNotFound)
+	assertLogicAppCode(t, err, apperror.CodeForbidden)
 
 	_, err = messageLogic.MarkConversationAsRead(ctx, MarkConversationAsReadRequest{
 		UserID:         "usr_pull_outsider",
 		ConversationID: conversationID,
 		HasReadSeq:     1,
 	})
-	assertLogicAppCode(t, err, apperror.CodeNotFound)
+	assertLogicAppCode(t, err, apperror.CodeForbidden)
 }
 
 type testGroupMemberLister struct {

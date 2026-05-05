@@ -332,6 +332,114 @@ func runMessageRepositoryContract(t *testing.T, newRepo func(t *testing.T) Messa
 		assertAppErrorCode(t, err, apperror.CodeNotFound)
 	})
 
+	t.Run("legacy direct conversation missing user states is repaired for participants only", func(t *testing.T) {
+		repo := newRepo(t)
+		ctx := context.Background()
+		conversation := createContractMessages(t, ctx, repo, 2)
+		removeRepositoryConversationStateForTest(t, repo, ctx, conversation.UserA, conversation.ID)
+		removeRepositoryConversationStateForTest(t, repo, ctx, conversation.UserB, conversation.ID)
+
+		for _, userID := range []string{conversation.UserA, conversation.UserB} {
+			states, err := repo.GetConversationSeqStates(ctx, userID, []string{conversation.ID})
+			if err != nil {
+				t.Fatalf("participant %s explicit seq repair: %v", userID, err)
+			}
+			if len(states) != 1 || states[0].MaxSeq != 2 || states[0].HasReadSeq != 0 || states[0].UnreadCount != 2 {
+				t.Fatalf("participant %s repaired state = %+v, want max=2 read=0 unread=2", userID, states)
+			}
+
+			messages, isEnd, nextSeq, err := userScopedReaderForTest(t, repo).GetMessagesForUser(ctx, userID, conversation.ID, 1, 0, 50, MessageStorageOrderAsc)
+			if err != nil {
+				t.Fatalf("participant %s repaired pull: %v", userID, err)
+			}
+			assertMessageSeqs(t, messages, []int64{1, 2})
+			if !isEnd || nextSeq != 3 {
+				t.Fatalf("participant %s pull cursor isEnd=%v nextSeq=%d, want true/3", userID, isEnd, nextSeq)
+			}
+		}
+
+		setRepositoryVisibleStartSeqForTest(t, repo, ctx, conversation.UserB, conversation.ID, 2)
+		messages, _, _, err := userScopedReaderForTest(t, repo).GetMessagesForUser(ctx, conversation.UserB, conversation.ID, 1, 0, 50, MessageStorageOrderAsc)
+		if err != nil {
+			t.Fatalf("participant wrong visible_start_seq repair pull: %v", err)
+		}
+		assertMessageSeqs(t, messages, []int64{1, 2})
+
+		removeRepositoryConversationStateForTest(t, repo, ctx, conversation.UserA, conversation.ID)
+		states, err := repo.GetConversationSeqStates(ctx, conversation.UserA, nil)
+		if err != nil {
+			t.Fatalf("empty seq listing should repair legacy direct state: %v", err)
+		}
+		if len(states) != 1 || states[0].ConversationID != conversation.ID || states[0].MaxSeq != 2 {
+			t.Fatalf("empty seq listing states = %+v, want repaired direct conversation", states)
+		}
+
+		_, err = repo.GetConversationSeqStates(ctx, conversation.Outsider, []string{conversation.ID})
+		assertAppErrorCode(t, err, apperror.CodeNotFound)
+		_, _, _, err = userScopedReaderForTest(t, repo).GetMessagesForUser(ctx, conversation.Outsider, conversation.ID, 1, 0, 50, MessageStorageOrderAsc)
+		assertAppErrorCode(t, err, apperror.CodeNotFound)
+		outsiderStates, err := repo.GetConversationSeqStates(ctx, conversation.Outsider, nil)
+		if err != nil {
+			t.Fatalf("outsider empty seq listing: %v", err)
+		}
+		if len(outsiderStates) != 0 {
+			t.Fatalf("outsider states = %+v, want empty", outsiderStates)
+		}
+	})
+
+	t.Run("group new member keeps join visibility boundary", func(t *testing.T) {
+		repo := newRepo(t)
+		ctx := context.Background()
+		prefix := messageContractPrefix()
+		groupID := prefix + "_group"
+		oldMember := prefix + "_old"
+		newMember := prefix + "_new"
+
+		first, deduplicated, err := repo.CreateMessageIdempotent(ctx, CreateMessageInput{
+			SenderID:           oldMember,
+			GroupID:            groupID,
+			ChatType:           ChatTypeGroup,
+			ClientMsgID:        prefix + "_group_client_1",
+			ContentType:        ContentTypeText,
+			Content:            "before join",
+			ParticipantUserIDs: []string{oldMember},
+		})
+		if err != nil {
+			t.Fatalf("first group send: %v", err)
+		}
+		if deduplicated || first.Seq != 1 {
+			t.Fatalf("first group message=%+v deduplicated=%v, want seq 1 without dedupe", first, deduplicated)
+		}
+
+		second, deduplicated, err := repo.CreateMessageIdempotent(ctx, CreateMessageInput{
+			SenderID:           oldMember,
+			GroupID:            groupID,
+			ChatType:           ChatTypeGroup,
+			ClientMsgID:        prefix + "_group_client_2",
+			ContentType:        ContentTypeText,
+			Content:            "after join",
+			ParticipantUserIDs: []string{oldMember, newMember},
+		})
+		if err != nil {
+			t.Fatalf("second group send: %v", err)
+		}
+		if deduplicated || second.Seq != 2 {
+			t.Fatalf("second group message=%+v deduplicated=%v, want seq 2 without dedupe", second, deduplicated)
+		}
+
+		newMemberMessages, _, _, err := userScopedReaderForTest(t, repo).GetMessagesForUser(ctx, newMember, first.ConversationID, 1, 0, 50, MessageStorageOrderAsc)
+		if err != nil {
+			t.Fatalf("new member pull: %v", err)
+		}
+		assertMessageSeqs(t, newMemberMessages, []int64{2})
+
+		oldMemberMessages, _, _, err := userScopedReaderForTest(t, repo).GetMessagesForUser(ctx, oldMember, first.ConversationID, 1, 0, 50, MessageStorageOrderAsc)
+		if err != nil {
+			t.Fatalf("old member pull: %v", err)
+		}
+		assertMessageSeqs(t, oldMemberMessages, []int64{1, 2})
+	})
+
 	t.Run("create input rejects unsafe ids and upper bounds", func(t *testing.T) {
 		repo := newRepo(t)
 		ctx := context.Background()
@@ -482,6 +590,58 @@ func setRepositoryNow(repo MessageRepository, now time.Time) {
 		r.now = func() time.Time { return now }
 	case *PostgresMessageRepository:
 		r.now = func() time.Time { return now }
+	}
+}
+
+func userScopedReaderForTest(t *testing.T, repo MessageRepository) UserScopedMessageReader {
+	t.Helper()
+
+	reader, ok := repo.(UserScopedMessageReader)
+	if !ok {
+		t.Fatalf("repository %T does not implement UserScopedMessageReader", repo)
+	}
+	return reader
+}
+
+func removeRepositoryConversationStateForTest(t *testing.T, repo MessageRepository, ctx context.Context, userID string, conversationID string) {
+	t.Helper()
+
+	switch r := repo.(type) {
+	case *MemoryMessageRepository:
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		delete(r.visibleStartSeqs, userConversationStateKey(userID, conversationID))
+		delete(r.readStates, userConversationStateKey(userID, conversationID))
+	case *PostgresMessageRepository:
+		if _, err := r.conn.ExecCtx(ctx, `
+delete from user_conversation_states
+where account_id = $1 and conversation_id = $2
+`, userID, conversationID); err != nil {
+			t.Fatalf("delete postgres conversation state: %v", err)
+		}
+	default:
+		t.Fatalf("unsupported repository type %T", repo)
+	}
+}
+
+func setRepositoryVisibleStartSeqForTest(t *testing.T, repo MessageRepository, ctx context.Context, userID string, conversationID string, seq int64) {
+	t.Helper()
+
+	switch r := repo.(type) {
+	case *MemoryMessageRepository:
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		r.visibleStartSeqs[userConversationStateKey(userID, conversationID)] = seq
+	case *PostgresMessageRepository:
+		if _, err := r.conn.ExecCtx(ctx, `
+update user_conversation_states
+set visible_start_seq = $3
+where account_id = $1 and conversation_id = $2
+`, userID, conversationID, seq); err != nil {
+			t.Fatalf("update postgres visible_start_seq: %v", err)
+		}
+	default:
+		t.Fatalf("unsupported repository type %T", repo)
 	}
 }
 
