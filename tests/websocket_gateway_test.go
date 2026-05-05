@@ -314,13 +314,16 @@ func TestWebSocketGatewaySendAndPullMessages(t *testing.T) {
 }
 
 func TestWebSocketGatewaySendMessagePushesToOnlineReceiver(t *testing.T) {
-	server, cleanup := newGatewayWSTestServer(t)
+	app, server, cleanup := newGatewayWSAppTestServer(t)
 	defer cleanup()
 
 	senderConn := dialGatewayWS(t, server.URL, "usr_ws_live_sender")
 	defer senderConn.Close()
 	receiverConn := dialGatewayWS(t, server.URL, "usr_ws_live_receiver")
 	defer receiverConn.Close()
+	waitFor(t, func() bool {
+		return app.Connections().UserCount("usr_ws_live_receiver") == 1
+	}, "receiver websocket registered before live-push send")
 
 	sent := sendWSMessage(t, senderConn, "req-live-send", "usr_ws_live_receiver", "client-live-1", "live hello")
 	push := readWSPushEvent(t, receiverConn)
