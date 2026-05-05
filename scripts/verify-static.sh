@@ -238,6 +238,10 @@ required_files=(
   ".env.example"
   "db/migrations/001_init_postgres.sql"
   "scripts/migrate-postgres.sh"
+  "scripts/verify-postgres-local.sh"
+  "db/change_log/README.md"
+  "db/change_log/template.sql"
+  "db/change_log/template.md"
   "scripts/dev-up.sh"
   "scripts/dev-demo-data.sh"
   "tests/postgres_persistence_integration_test.go"
@@ -276,6 +280,7 @@ done
 
 shell_scripts=(
   "scripts/migrate-postgres.sh"
+  "scripts/verify-postgres-local.sh"
   "scripts/dev-up.sh"
   "scripts/dev-demo-data.sh"
   "scripts/deploy-k3s.sh"
@@ -362,11 +367,58 @@ ci_doc_patterns=(
   "bash scripts/verify-static.sh"
   "docker compose config"
   "markdown-link-check"
+  "Codex commit 前验证门禁"
+  "db/change_log/*.sql"
+  "scripts/verify-postgres-local.sh"
 )
 
 for pattern in "${ci_doc_patterns[@]}"; do
   rg -qF "$pattern" docs/exec-plans/active/ci-pipeline.md docs/GIT_WORKFLOW.md
 done
+
+
+change_log_required_paths=(
+  'db/migrations/'
+  'db/schema/'
+)
+
+changed_files="$(git diff --name-only --diff-filter=ACMRTUXB HEAD -- || true)"
+staged_files="$(git diff --cached --name-only --diff-filter=ACMRTUXB -- || true)"
+untracked_files="$(git ls-files --others --exclude-standard || true)"
+all_changed_files="${changed_files}"$'\n'"${staged_files}"$'\n'"${untracked_files}"
+
+requires_change_log=0
+while IFS= read -r changed_file; do
+  [[ -z "${changed_file}" ]] && continue
+  for prefix in "${change_log_required_paths[@]}"; do
+    if [[ "${changed_file}" == "${prefix}"* ]]; then
+      requires_change_log=1
+    fi
+  done
+  if [[ "${changed_file}" =~ ^internal/repository/postgres_.*\.go$ || "${changed_file}" == "tests/postgres_persistence_integration_test.go" ]]; then
+    requires_change_log=1
+  fi
+done <<< "${all_changed_files}"
+
+if [[ "${requires_change_log}" == "1" ]]; then
+  non_template_change_log_count=0
+  for sql_file in db/change_log/*.sql; do
+    [[ -e "${sql_file}" ]] || continue
+    [[ "${sql_file}" == "db/change_log/template.sql" ]] && continue
+    if git ls-files --error-unmatch "${sql_file}" >/dev/null 2>&1 || git diff --name-only --diff-filter=ACMRTUXB HEAD -- | grep -qxF "${sql_file}" || git diff --cached --name-only --diff-filter=ACMRTUXB -- | grep -qxF "${sql_file}" || git ls-files --others --exclude-standard -- "${sql_file}" | grep -qxF "${sql_file}"; then
+      non_template_change_log_count=$((non_template_change_log_count + 1))
+    fi
+  done
+  if [[ "${non_template_change_log_count}" -eq 0 ]]; then
+    echo "database/schema changes require a non-template db/change_log/*.sql file" >&2
+    exit 1
+  fi
+fi
+
+if find db/change_log -maxdepth 1 -type f -name '*.sql' -print0 | xargs -0 -r rg -n "(postgres://|mysql://|password=|passwd=|token=|secret=|AKIA|BEGIN RSA PRIVATE KEY|BEGIN OPENSSH PRIVATE KEY)"; then
+  echo "db/change_log SQL must not contain secrets, DSNs, tokens, or private keys" >&2
+  exit 1
+fi
 
 removed_compat_paths=(
   "internal/handler/handler.go"
