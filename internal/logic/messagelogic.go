@@ -494,6 +494,14 @@ func (l *MessageLogic) resolveGroupParticipants(ctx context.Context, groupID str
 }
 
 func (l *MessageLogic) ensureConversationReadAccess(ctx context.Context, userID string, conversationID string) error {
+	userA, userB, ok := singleConversationParticipants(conversationID)
+	if ok {
+		if userID != userA && userID != userB {
+			return apperror.Forbidden("caller is not a conversation participant")
+		}
+		return nil
+	}
+
 	groupID, ok := groupIDFromConversationID(conversationID)
 	if !ok {
 		return nil
@@ -523,6 +531,23 @@ func (l *MessageLogic) filterReadableConversationStates(ctx context.Context, use
 		return nil, err
 	}
 	return filtered, nil
+}
+
+func singleConversationParticipants(conversationID string) (string, string, bool) {
+	const prefix = "single:"
+	if !strings.HasPrefix(conversationID, prefix) {
+		return "", "", false
+	}
+	parts := strings.Split(conversationID, ":")
+	if len(parts) != 3 {
+		return "", "", false
+	}
+	userA := strings.TrimSpace(parts[1])
+	userB := strings.TrimSpace(parts[2])
+	if userA == "" || userB == "" {
+		return "", "", false
+	}
+	return userA, userB, true
 }
 
 func groupIDFromConversationID(conversationID string) (string, bool) {

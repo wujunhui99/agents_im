@@ -24,6 +24,8 @@
 - feature 原则：`feature/* -> develop -> main`；紧急生产 hotfix 可从 `main -> fix/* -> main`。
 - Codex 是否允许 commit/push 必须由任务说明明确；未明确时不要 push。
 - Controller 必须复核 Codex 的 diff、测试和分支状态，不能只信自述。
+- Codex commit 前验证门禁：按改动范围运行 gofmt、git diff --check、go test ./...、scripts/verify-static.sh；web 改动加前端测试/build；DB/repository SQL 改动加 PostgreSQL integration。
+- 数据库 schema/data 变更必须新增 `db/change_log/*.sql`；`.md` 只作说明，SQL 是事实源。
 
 ## 快速导航
 
@@ -39,6 +41,7 @@
 - 前端约定：[`docs/FRONTEND.md`](./docs/FRONTEND.md)
 - 产品判断：[`docs/PRODUCT_SENSE.md`](./docs/PRODUCT_SENSE.md)
 - 执行计划规范：[`docs/PLANS.md`](./docs/PLANS.md)
+- 外层 workspace 文档迁移记录：[`docs/workspace-migration/outer-project-docs-migration-2026-05-05.md`](./docs/workspace-migration/outer-project-docs-migration-2026-05-05.md)
 
 ## 按任务读取
 
@@ -160,6 +163,8 @@ npm --prefix web run test:run -- --reporter=dot
 npm --prefix web run build
 bash scripts/verify-static.sh
 git diff --check
+# DB/repository SQL changes only, against a disposable local/test DB:
+AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 ```
 
-如果 Docker 不可用，不要声称已完成 Docker/PostgreSQL 集成验证。
+如果 Docker 不可用，不要声称已完成 Docker/PostgreSQL 集成验证；DB/repository SQL 改动可用 `DATABASE_URL`/`AGENTS_IM_POSTGRES_DSN` + `scripts/verify-postgres-local.sh` 做本机 PostgreSQL integration。

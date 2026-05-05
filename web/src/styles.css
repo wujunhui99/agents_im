@@ -89,8 +89,29 @@ time {
 
 .content-area {
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 12px 0 18px;
+}
+
+.content-area > .chat-window,
+.content-area > .tab-panel,
+.content-area > .tab-panel > .chat-window {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.content-area > .tab-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.content-area > .page-stack,
+.content-area > .tab-panel > .page-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .tab-panel {
@@ -961,14 +982,20 @@ button.md-list-item:hover,
 }
 
 .chat-window {
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  isolation: isolate;
   background: var(--md-sys-color-surface-container);
 }
 
 .chat-header {
   min-height: 52px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
@@ -1012,7 +1039,9 @@ button.md-list-item:hover,
   display: flex;
   flex-direction: column;
   gap: var(--md-space-3);
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 14px 14px 18px;
 }
 
@@ -1294,6 +1323,9 @@ button.md-list-item:hover,
 
 .message-composer {
   min-height: 64px;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: var(--md-space-2);
