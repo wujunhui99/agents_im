@@ -228,7 +228,6 @@ export function MessagesPage({
       .then((response) => {
         const confirmedReadSeq = response.hasReadSeq ?? visibleMaxSeq;
         setItems((current) => markConversationRead(current, selectedConversation.id, confirmedReadSeq));
-        setStatus(`已读到 ${confirmedReadSeq}`);
       })
       .catch((error) => {
         setStatus(error instanceof Error ? error.message : '标记已读失败');
