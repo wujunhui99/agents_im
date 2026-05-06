@@ -70,7 +70,7 @@ quote_sql_literal() {
 
 migration_is_legacy_applied() {
   local applied_checksum="$1"
-  [[ "${applied_checksum}" == fixture-legacy-checksum-* ]]
+  [[ "${applied_checksum}" == fixture-legacy-checksum-* || "${applied_checksum}" == legacy-adopted-* ]]
 }
 
 if [[ "${HOST_PSQL}" -eq 1 ]]; then
@@ -109,7 +109,9 @@ for migration in "${migrations[@]}"; do
   if [[ -n "${applied_checksum}" ]]; then
     if [[ "${applied_checksum}" != "${checksum}" ]]; then
       if migration_is_legacy_applied "${applied_checksum}"; then
-        echo "migration ${version}: applying because legacy database recorded a pre-ledger checksum"
+        echo "migration ${version}: legacy-adopted; trusting previously applied SQL and updating checksum"
+        psql_exec -c "update schema_migrations set checksum = ${checksum_sql}, applied_at = now() where version = ${version_sql};"
+        continue
       else
         cat >&2 <<MSG
 migration checksum mismatch for ${version}
