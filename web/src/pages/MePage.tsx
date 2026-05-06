@@ -204,7 +204,6 @@ export function MePage({ profile, onUpdateProfile, onUploadAvatar, onAvatarUpdat
       </ListCard>
       <ListCard>
         <ActionRow label="收藏" helper="重要消息和 Agent 输出" accent="orange" />
-        <ActionRow label="朋友圈" helper="我的动态" accent="blue" />
         <ActionRow label="设置" helper="账号、安全、通知" accent="gray" trailingIcon={Settings} />
       </ListCard>
     </div>
