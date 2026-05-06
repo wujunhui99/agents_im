@@ -292,12 +292,21 @@ func receiverIDs(message repository.Message, visibleUserIDs []string) []string {
 	if message.ChatType == repository.ChatTypeSingle && message.ReceiverID != "" {
 		ids = append(ids, message.ReceiverID)
 	}
+	includeSender := shouldDeliverMessageToSender(message)
+	if includeSender {
+		ids = append(ids, message.SenderID)
+	}
 	for _, userID := range visibleUserIDs {
-		if userID != "" && userID != message.SenderID {
+		if userID != "" && (includeSender || userID != message.SenderID) {
 			ids = append(ids, userID)
 		}
 	}
 	return uniqueSorted(ids)
+}
+
+func shouldDeliverMessageToSender(message repository.Message) bool {
+	return strings.ToLower(strings.TrimSpace(message.ChatType)) == repository.ChatTypeSingle &&
+		strings.ToLower(strings.TrimSpace(message.MessageOrigin)) == repository.MessageOriginAI
 }
 
 func uniqueSorted(values []string) []string {
