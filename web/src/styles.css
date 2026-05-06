@@ -118,6 +118,10 @@ time {
   min-height: 100%;
 }
 
+.tab-panel[hidden] {
+  display: none !important;
+}
+
 .page-stack {
   display: flex;
   flex-direction: column;
