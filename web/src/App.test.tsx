@@ -273,6 +273,19 @@ describe('WeChat-inspired app shell', () => {
     expect(screen.getAllByText(/alice_001/).length).toBeGreaterThan(0);
   });
 
+  it('hides inactive kept-alive tab panels so previous page content cannot remain visible', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+    expect(screen.getByRole('heading', { name: '联系人' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /我的/i }));
+    expect(screen.getByRole('heading', { name: '我的' })).toBeInTheDocument();
+
+    expect(stylesCss).toMatch(/\.tab-panel\[hidden\]\s*{[\s\S]*display:\s*none\s*!important/);
+  });
+
   it('keeps the loaded contacts tab state when switching away and back without refetching friends or requests', async () => {
     const user = userEvent.setup();
     const blockedRefetch = pendingResponse();
