@@ -222,8 +222,13 @@ func TestWebSocketGatewayPresenceKeepsOnlyLatestConnection(t *testing.T) {
 
 	connA := dialGatewayWS(t, server.URL, "usr_ws_presence_multi")
 	defer connA.Close()
+	waitFor(t, func() bool {
+		return app.Connections().UserCount("usr_ws_presence_multi") == 1
+	}, "initial websocket connection registered")
+
 	connB := dialGatewayWS(t, server.URL, "usr_ws_presence_multi")
 	defer connB.Close()
+	syncGatewayWSConnection(t, connB, "req-presence-multi-ready")
 
 	waitFor(t, func() bool {
 		connections, err := store.ListUserConnections(context.Background(), "usr_ws_presence_multi")
@@ -516,8 +521,13 @@ func TestWebSocketGatewayPushDeliversToLatestUserConnectionOnly(t *testing.T) {
 
 	connA := dialGatewayWS(t, server.URL, "usr_ws_push")
 	defer connA.Close()
+	waitFor(t, func() bool {
+		return app.Connections().UserCount("usr_ws_push") == 1
+	}, "initial websocket connection registered")
+
 	connB := dialGatewayWS(t, server.URL, "usr_ws_push")
 	defer connB.Close()
+	syncGatewayWSConnection(t, connB, "req-push-latest-ready")
 	waitFor(t, func() bool {
 		return app.Connections().UserCount("usr_ws_push") == 1
 	}, "latest websocket connection registered")
@@ -810,6 +820,20 @@ func readWSPushEvent(t *testing.T, conn *websocket.Conn) delivery.Event {
 		t.Fatalf("read websocket push event: %v", err)
 	}
 	return event
+}
+
+func syncGatewayWSConnection(t *testing.T, conn *websocket.Conn, requestID string) {
+	t.Helper()
+
+	writeCommand(t, conn, map[string]interface{}{
+		"request_id": requestID,
+		"type":       gatewayws.CommandHeartbeat,
+		"payload":    map[string]interface{}{},
+	})
+	resp := readWSResponse(t, conn)
+	if resp.frontendRequestID() != requestID || resp.commandName() != gatewayws.CommandHeartbeat || resp.Status != gateway.AckStatusOK {
+		t.Fatalf("unexpected websocket sync heartbeat response: %+v", resp)
+	}
 }
 
 func setReadDeadline(t *testing.T, conn *websocket.Conn) {
