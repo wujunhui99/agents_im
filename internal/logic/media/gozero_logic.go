@@ -134,6 +134,27 @@ func (l *GetDownloadURLLogic) GetDownloadURL(req *types.GetMediaDownloadURLReq) 
 	}, nil
 }
 
+type GetAvatarLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewGetAvatarLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetAvatarLogic {
+	return &GetAvatarLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *GetAvatarLogic) GetAvatar(req *types.GetMediaDownloadURLReq) (business.GetMediaDownloadURLResponse, error) {
+	if l.svcCtx.MediaLogic == nil {
+		return business.GetMediaDownloadURLResponse{}, apperror.Internal("media logic is not configured")
+	}
+	return l.svcCtx.MediaLogic.GetAvatarDisplayURL(l.ctx, req.MediaID)
+}
+
 func toMediaObject(media business.MediaObject) types.MediaObject {
 	return types.MediaObject{
 		MediaID:          media.MediaID,

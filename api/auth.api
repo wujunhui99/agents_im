@@ -8,10 +8,18 @@ info (
 )
 
 type AuthData {
-	UserID     string `json:"user_id"`
-	Identifier string `json:"identifier"`
-	Token      string `json:"token"`
-	ExpiresAt  string `json:"expires_at"`
+	UserID        string `json:"user_id"`
+	Identifier    string `json:"identifier"`
+	DisplayName   string `json:"display_name,optional"`
+	Name          string `json:"name,optional"`
+	Gender        string `json:"gender,optional"`
+	BirthDate     string `json:"birth_date,optional"`
+	Region        string `json:"region,optional"`
+	AccountType   string `json:"account_type,optional"`
+	AvatarMediaID string `json:"avatar_media_id,optional"`
+	AvatarURL     string `json:"avatar_url,optional"`
+	Token         string `json:"token"`
+	ExpiresAt     string `json:"expires_at"`
 }
 
 type RegisterReq {

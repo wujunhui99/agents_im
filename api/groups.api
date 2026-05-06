@@ -26,6 +26,7 @@ type GroupMember {
 	DisplayName   string `json:"display_name,optional"`
 	Name          string `json:"name,optional"`
 	AvatarMediaID string `json:"avatar_media_id,optional"`
+	AvatarURL     string `json:"avatar_url,optional"`
 }
 
 type CreateGroupReq {

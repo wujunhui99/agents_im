@@ -72,6 +72,7 @@ type GroupMemberInfo struct {
 	DisplayName   string `json:"display_name,omitempty"`
 	Name          string `json:"name,omitempty"`
 	AvatarMediaID string `json:"avatar_media_id,omitempty"`
+	AvatarURL     string `json:"avatar_url,omitempty"`
 }
 
 type CreateGroupRequest struct {
@@ -484,6 +485,7 @@ func (l *GroupsLogic) hydrateGroupMemberInfo(ctx context.Context, member model.G
 	info.DisplayName = humanReadableUserName(profile)
 	info.Name = profile.Name
 	info.AvatarMediaID = profile.AvatarMediaID
+	info.AvatarURL = profile.AvatarURL
 	return info, nil
 }
 
