@@ -251,6 +251,7 @@ func TestWebSocketLaterConnectionReplacesExistingUserConnection(t *testing.T) {
 		t.Fatalf("first websocket dial: status=%v err=%v", responseStatus(firstResp), err)
 	}
 	defer first.Close()
+	firstID := waitForSingleUserConnectionID(t, app, userID)
 
 	second, secondResp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), authHeader(t, userID))
 	if err != nil {
@@ -258,10 +259,10 @@ func TestWebSocketLaterConnectionReplacesExistingUserConnection(t *testing.T) {
 	}
 	defer second.Close()
 
-	if !waitForCondition(2*time.Second, func() bool {
-		return app.Connections().UserCount(userID) == 1
-	}) {
-		t.Fatalf("user connection count = %d, want 1 after later connection replaces older connection", app.Connections().UserCount(userID))
+	syncTestWebSocket(t, second, "req-single-ws-replacement-ready")
+	secondID := waitForSingleUserConnectionID(t, app, userID)
+	if secondID == firstID {
+		t.Fatalf("active connection id = %q, want later connection to replace older connection", secondID)
 	}
 
 	if err := first.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
@@ -562,6 +563,29 @@ func readTestResponse(t *testing.T, conn *websocket.Conn) responseFrame {
 		t.Fatalf("read websocket test response: %v", err)
 	}
 	return resp
+}
+
+func syncTestWebSocket(t *testing.T, conn *websocket.Conn, requestID string) {
+	t.Helper()
+
+	writeTestCommand(t, conn, requestID)
+	resp := readTestResponse(t, conn)
+	if resp.RequestID != requestID || resp.Type != CommandHeartbeat || resp.Status != gateway.AckStatusOK {
+		t.Fatalf("unexpected websocket sync heartbeat response: %+v", resp)
+	}
+}
+
+func waitForSingleUserConnectionID(t *testing.T, app *Server, userID string) string {
+	t.Helper()
+
+	var ids []string
+	if !waitForCondition(2*time.Second, func() bool {
+		ids = app.Connections().UserConnectionIDs(userID)
+		return len(ids) == 1
+	}) {
+		t.Fatalf("user connection ids = %+v, want exactly one connection for %s", ids, userID)
+	}
+	return ids[0]
 }
 
 type presenceStateResponse struct {
