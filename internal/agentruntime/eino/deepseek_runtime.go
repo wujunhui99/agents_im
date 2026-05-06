@@ -85,14 +85,43 @@ func runtimeMessages(req agentruntime.RunRequest) []*schema.Message {
 		if text == "" {
 			continue
 		}
+		if isCurrentTriggerMessage(req, message) {
+			continue
+		}
 		if message.SenderType == agentruntime.SenderTypeAgent {
 			messages = append(messages, schema.AssistantMessage(text, nil))
 			continue
 		}
 		messages = append(messages, schema.UserMessage(text))
 	}
-	if len(messages) == 1 {
-		messages = append(messages, schema.UserMessage(req.PromptText))
+	if current := runtimeCurrentTaskMessage(req); current != "" {
+		messages = append(messages, schema.UserMessage(current))
 	}
 	return messages
+}
+
+func isCurrentTriggerMessage(req agentruntime.RunRequest, message agentruntime.ConversationMessage) bool {
+	triggerMessageID := strings.TrimSpace(req.TriggerMessageID)
+	if triggerMessageID != "" && strings.TrimSpace(message.ServerMsgID) == triggerMessageID {
+		return true
+	}
+	if req.TriggerSeq <= 0 || message.Seq != req.TriggerSeq {
+		return false
+	}
+	text := strings.TrimSpace(message.Text)
+	if source := strings.TrimSpace(req.SourceMessageText); source != "" && text == source {
+		return true
+	}
+	return text != "" && text == strings.TrimSpace(req.PromptText)
+}
+
+func runtimeCurrentTaskMessage(req agentruntime.RunRequest) string {
+	promptText := strings.TrimSpace(req.PromptText)
+	if promptText == "" {
+		return ""
+	}
+	return strings.TrimSpace(`当前需要回复的对方消息：
+` + promptText + `
+
+请直接生成要发送给对方的回复。如果这条消息提出明确问题、请求或任务，直接回答或完成；只有缺少必要信息导致无法完成时才简短询问澄清。不要只回复“可以”“好的”“你说说”等泛泛确认。`)
 }
