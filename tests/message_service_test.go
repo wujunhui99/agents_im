@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -359,6 +361,61 @@ func TestMessageOriginAndAgentMetadataPersistAcrossPullAndOutbox(t *testing.T) {
 		aiPayload.Message.AgentAccountID != "agent_1" ||
 		aiPayload.Message.TriggerServerMsgID != human.Message.ServerMsgID {
 		t.Fatalf("outbox payload missing ai metadata: %+v", aiPayload.Message)
+	}
+}
+
+func TestAIDirectMessageVisibleToOwnerAndReceiverAndFanoutIncludesBoth(t *testing.T) {
+	repo := repository.NewMemoryMessageRepository()
+	messageLogic := logic.NewMessageLogic(repo)
+	ctx := context.Background()
+
+	trigger, err := messageLogic.SendMessage(ctx, testSendRequest("usr_b", "usr_a", "client-ai-visible-trigger", "please reply"))
+	if err != nil {
+		t.Fatalf("send trigger: %v", err)
+	}
+	ai, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
+		SenderID:           "usr_a",
+		ReceiverID:         "usr_b",
+		ChatType:           logic.MessageChatTypeSingle,
+		ClientMsgID:        "client-ai-visible-response",
+		ContentType:        logic.MessageContentTypeText,
+		Content:            "AI response on behalf of usr_a",
+		MessageOrigin:      logic.MessageOriginAI,
+		AgentAccountID:     "usr_a",
+		TriggerServerMsgID: trigger.Message.ServerMsgID,
+		AgentRunID:         "run_owner_visibility",
+	})
+	if err != nil {
+		t.Fatalf("send ai response: %v", err)
+	}
+
+	recipientUserIDs := append([]string(nil), ai.RecipientUserIDs...)
+	sort.Strings(recipientUserIDs)
+	if !reflect.DeepEqual(recipientUserIDs, []string{"usr_a", "usr_b"}) {
+		t.Fatalf("ai live fanout recipients = %+v, want owner and receiver", recipientUserIDs)
+	}
+
+	for _, userID := range []string{"usr_a", "usr_b"} {
+		pulled, err := messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
+			UserID:         userID,
+			ConversationID: trigger.Message.ConversationID,
+			FromSeq:        ai.Message.Seq,
+			ToSeq:          ai.Message.Seq,
+			Limit:          10,
+			Order:          "asc",
+		})
+		if err != nil {
+			t.Fatalf("pull messages for %s: %v", userID, err)
+		}
+		if len(pulled.Messages) != 1 || pulled.Messages[0].ServerMsgID != ai.Message.ServerMsgID {
+			t.Fatalf("user %s cannot see ai response in history: %+v", userID, pulled.Messages)
+		}
+		if pulled.Messages[0].MessageOrigin != logic.MessageOriginAI ||
+			pulled.Messages[0].AgentAccountID != "usr_a" ||
+			pulled.Messages[0].TriggerServerMsgID != trigger.Message.ServerMsgID ||
+			pulled.Messages[0].AgentRunID != "run_owner_visibility" {
+			t.Fatalf("user %s pulled ai metadata mismatch: %+v", userID, pulled.Messages[0])
+		}
 	}
 }
 
