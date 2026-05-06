@@ -101,10 +101,18 @@ func authResp(result business.AuthResponse) *types.AuthResp {
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.AuthData{
-			UserID:     result.UserID,
-			Identifier: result.Identifier,
-			Token:      result.Token,
-			ExpiresAt:  result.ExpiresAt,
+			UserID:        result.UserID,
+			Identifier:    result.Identifier,
+			DisplayName:   result.DisplayName,
+			Name:          result.Name,
+			Gender:        result.Gender,
+			BirthDate:     result.BirthDate,
+			Region:        result.Region,
+			AccountType:   result.AccountType,
+			AvatarMediaID: result.AvatarMediaID,
+			AvatarURL:     result.AvatarURL,
+			Token:         result.Token,
+			ExpiresAt:     result.ExpiresAt,
 		},
 	}
 }

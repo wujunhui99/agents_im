@@ -22,7 +22,7 @@ type AccountRepository interface {
 	ExistsByIdentifier(ctx context.Context, identifier string) (bool, error)
 	GetByID(ctx context.Context, accountID string) (model.User, error)
 	UpdateProfile(ctx context.Context, accountID string, patch AccountProfilePatch) (model.User, error)
-	UpdateAvatar(ctx context.Context, accountID string, avatarMediaID string) (model.User, error)
+	UpdateAvatar(ctx context.Context, accountID string, avatarMediaID string, avatarURL string) (model.User, error)
 }
 
 // UserRepository is the V0 transport compatibility name. It points at account

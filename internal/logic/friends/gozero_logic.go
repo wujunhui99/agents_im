@@ -2,7 +2,6 @@ package friends
 
 import (
 	"context"
-	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
@@ -194,38 +193,18 @@ func toFriendship(ctx context.Context, svcCtx *svc.ServiceContext, friendship bu
 }
 
 func toFriendProfile(ctx context.Context, svcCtx *svc.ServiceContext, profile business.UserProfile) (types.FriendProfile, error) {
-	avatarURL, avatarURLExpiresAt, err := resolveFriendAvatarDisplay(ctx, svcCtx, profile.AvatarMediaID)
-	if err != nil {
-		return types.FriendProfile{}, err
-	}
 	return types.FriendProfile{
-		UserID:             profile.UserID,
-		Identifier:         profile.Identifier,
-		DisplayName:        profile.DisplayName,
-		Name:               profile.Name,
-		Gender:             profile.Gender,
-		BirthDate:          profile.BirthDate,
-		Region:             profile.Region,
-		AccountType:        profile.AccountType,
-		AvatarMediaID:      profile.AvatarMediaID,
-		AvatarURL:          avatarURL,
-		AvatarURLExpiresAt: avatarURLExpiresAt,
-		CreatedAt:          profile.CreatedAt,
-		UpdatedAt:          profile.UpdatedAt,
+		UserID:        profile.UserID,
+		Identifier:    profile.Identifier,
+		DisplayName:   profile.DisplayName,
+		Name:          profile.Name,
+		Gender:        profile.Gender,
+		BirthDate:     profile.BirthDate,
+		Region:        profile.Region,
+		AccountType:   profile.AccountType,
+		AvatarMediaID: profile.AvatarMediaID,
+		AvatarURL:     profile.AvatarURL,
+		CreatedAt:     profile.CreatedAt,
+		UpdatedAt:     profile.UpdatedAt,
 	}, nil
-}
-
-func resolveFriendAvatarDisplay(ctx context.Context, svcCtx *svc.ServiceContext, avatarMediaID string) (string, int64, error) {
-	avatarMediaID = strings.TrimSpace(avatarMediaID)
-	if avatarMediaID == "" {
-		return "", 0, nil
-	}
-	if svcCtx == nil || svcCtx.MediaLogic == nil {
-		return "", 0, apperror.Internal("media logic is not configured")
-	}
-	display, err := svcCtx.MediaLogic.GetAvatarDisplayURL(ctx, avatarMediaID)
-	if err != nil {
-		return "", 0, err
-	}
-	return display.DownloadURL, display.ExpiresAt, nil
 }

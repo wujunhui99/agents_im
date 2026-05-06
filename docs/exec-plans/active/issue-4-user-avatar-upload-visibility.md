@@ -80,3 +80,9 @@ If Docker/PostgreSQL/Playwright or object storage are unavailable, only unit/con
 - `node tests/e2e/avatar_upload_visibility_redaction_check.mjs`
 
 未执行 live production/local E2E，因为本任务未启动真实 API、对象存储和浏览器会话；已提交可复用 API-level regression harness。
+
+## 2026-05-06 回归修正记录
+
+原实现只持久化 `profiles.avatar_media_id`，并在 `/me`、`/users/:identifier`、`/friends` 读取时动态生成短期 `avatar_url`。刷新或重新登录时，前端会先从 Auth session 构造当前用户，不强制等待 `/me` hydration；同时 Auth session 未保存头像字段，导致头像对象仍存在但 UI 初始化为 avatar-empty。
+
+修正方向：新增 `profiles.avatar_url`，因为头像 URL 是资料展示数据，和 `display_name`、`region`、`avatar_media_id` 同属 Profile 边界，Account 继续只保存身份标识和账号类型。`profiles.avatar_url` 保存 `/media/avatars/{media_id}` 这种稳定应用 URL/reference，不保存图片 bytes、原始私有 object key、对象存储凭据或 presigned query。`/media/avatars/:media_id` 在图片请求时验证 avatar media 并重定向到新的短期对象存储展示 URL。

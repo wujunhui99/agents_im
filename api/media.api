@@ -90,4 +90,7 @@ service media-api {
 
 	@handler getDownloadURL
 	get /media/:media_id/download-url (GetMediaDownloadURLReq) returns (GetMediaDownloadURLResp)
+
+	@handler getAvatar
+	get /media/avatars/:media_id (GetMediaDownloadURLReq)
 }

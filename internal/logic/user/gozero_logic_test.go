@@ -51,11 +51,24 @@ func TestUpdateMeAvatarSetsCurrentUsersReadyAvatarAndReturnsDisplayURL(t *testin
 	if resp.Data.AvatarMediaID != aliceAvatar.MediaID {
 		t.Fatalf("avatar_media_id = %q, want %q", resp.Data.AvatarMediaID, aliceAvatar.MediaID)
 	}
-	if resp.Data.AvatarURL == "" || resp.Data.AvatarURLExpiresAt == 0 {
-		t.Fatalf("avatar display fields missing from response: %+v", resp.Data)
+	expectedAvatarURL := "/media/avatars/" + aliceAvatar.MediaID
+	if resp.Data.AvatarURL != expectedAvatarURL {
+		t.Fatalf("avatar_url = %q, want %q", resp.Data.AvatarURL, expectedAvatarURL)
 	}
-	if strings.Contains(resp.Data.AvatarURL, "secret") {
-		t.Fatalf("avatar URL should not expose signed private material: %q", resp.Data.AvatarURL)
+	if resp.Data.AvatarURLExpiresAt != 0 {
+		t.Fatalf("avatar_url_expires_at = %d, want durable URL without persisted expiry", resp.Data.AvatarURLExpiresAt)
+	}
+	if strings.Contains(resp.Data.AvatarURL, "expiresAt") || strings.Contains(resp.Data.AvatarURL, "?") {
+		t.Fatalf("avatar URL should not persist signed or expiring material: %q", resp.Data.AvatarURL)
+	}
+
+	getMe := NewGetMeLogic(context.WithValue(ctx, ctxuser.UserIDClaim, alice.UserID), svcCtx)
+	me, err := getMe.GetMe(&types.GetMeReq{})
+	if err != nil {
+		t.Fatalf("get me after avatar update: %v", err)
+	}
+	if me.Data.AvatarURL != expectedAvatarURL {
+		t.Fatalf("get me avatar_url = %q, want persisted %q", me.Data.AvatarURL, expectedAvatarURL)
 	}
 
 	_, err = logic.UpdateMeAvatar(&types.UpdateMeAvatarReq{MediaID: bobAvatar.MediaID})
