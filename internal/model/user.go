@@ -33,6 +33,7 @@ type Profile struct {
 	BirthDate     string
 	Region        string
 	AvatarMediaID string
+	AvatarURL     string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -52,6 +53,7 @@ type User struct {
 	Region        string
 	AccountType   AccountType
 	AvatarMediaID string
+	AvatarURL     string
 	CreatedAt     time.Time // V0 compatibility alias for ProfileCreatedAt.
 	UpdatedAt     time.Time // V0 compatibility alias for ProfileUpdatedAt.
 
@@ -105,6 +107,7 @@ func NewAccountProfile(account Account, profile Profile) User {
 		Region:           profile.Region,
 		AccountType:      account.AccountType,
 		AvatarMediaID:    profile.AvatarMediaID,
+		AvatarURL:        profile.AvatarURL,
 		CreatedAt:        profile.CreatedAt,
 		UpdatedAt:        profile.UpdatedAt,
 		AccountCreatedAt: account.CreatedAt,
@@ -137,6 +140,7 @@ func (u User) ToProfile() Profile {
 		BirthDate:     u.BirthDate,
 		Region:        u.Region,
 		AvatarMediaID: u.AvatarMediaID,
+		AvatarURL:     u.AvatarURL,
 		CreatedAt:     u.ProfileCreatedAt,
 		UpdatedAt:     u.ProfileUpdatedAt,
 	}

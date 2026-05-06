@@ -21,21 +21,24 @@ type CreateUserRequest struct {
 }
 
 type UserProfile struct {
-	UserID      string
-	Identifier  string
-	DisplayName string
-	Name        string
-	Gender      string
-	BirthDate   string
-	Region      string
-	AccountType string
-	CreatedAt   string
-	UpdatedAt   string
+	UserID        string
+	Identifier    string
+	DisplayName   string
+	Name          string
+	Gender        string
+	BirthDate     string
+	Region        string
+	AccountType   string
+	AvatarMediaID string
+	AvatarURL     string
+	CreatedAt     string
+	UpdatedAt     string
 }
 
 type UserClient interface {
 	ExistsByIdentifier(ctx context.Context, identifier string) (ExistsResult, error)
 	CreateUser(ctx context.Context, req CreateUserRequest) (UserProfile, error)
+	GetUserByID(ctx context.Context, userID string) (UserProfile, error)
 }
 
 type LogicClient struct {
@@ -78,15 +81,41 @@ func (c *LogicClient) CreateUser(ctx context.Context, req CreateUserRequest) (Us
 	}
 
 	return UserProfile{
-		UserID:      profile.UserID,
-		Identifier:  profile.Identifier,
-		DisplayName: profile.DisplayName,
-		Name:        profile.Name,
-		Gender:      profile.Gender,
-		BirthDate:   profile.BirthDate,
-		Region:      profile.Region,
-		AccountType: profile.AccountType,
-		CreatedAt:   profile.CreatedAt,
-		UpdatedAt:   profile.UpdatedAt,
+		UserID:        profile.UserID,
+		Identifier:    profile.Identifier,
+		DisplayName:   profile.DisplayName,
+		Name:          profile.Name,
+		Gender:        profile.Gender,
+		BirthDate:     profile.BirthDate,
+		Region:        profile.Region,
+		AccountType:   profile.AccountType,
+		AvatarMediaID: profile.AvatarMediaID,
+		AvatarURL:     profile.AvatarURL,
+		CreatedAt:     profile.CreatedAt,
+		UpdatedAt:     profile.UpdatedAt,
+	}, nil
+}
+
+func (c *LogicClient) GetUserByID(ctx context.Context, userID string) (UserProfile, error) {
+	profile, err := c.logic.GetUserByID(ctx, userlogic.GetUserByIDRequest{
+		UserID: userID,
+	})
+	if err != nil {
+		return UserProfile{}, err
+	}
+
+	return UserProfile{
+		UserID:        profile.UserID,
+		Identifier:    profile.Identifier,
+		DisplayName:   profile.DisplayName,
+		Name:          profile.Name,
+		Gender:        profile.Gender,
+		BirthDate:     profile.BirthDate,
+		Region:        profile.Region,
+		AccountType:   profile.AccountType,
+		AvatarMediaID: profile.AvatarMediaID,
+		AvatarURL:     profile.AvatarURL,
+		CreatedAt:     profile.CreatedAt,
+		UpdatedAt:     profile.UpdatedAt,
 	}, nil
 }

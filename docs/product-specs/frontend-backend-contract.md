@@ -60,6 +60,14 @@ Success:
   "data": {
     "user_id": "1001",
     "identifier": "alice_001",
+    "display_name": "Alice",
+    "name": "Alice",
+    "gender": "female",
+    "birth_date": "1996-05-02",
+    "region": "Shanghai",
+    "account_type": "user",
+    "avatar_media_id": "med_000001",
+    "avatar_url": "/media/avatars/med_000001",
     "token": "[REDACTED]",
     "expires_at": "2026-04-30T12:00:00Z"
   }
@@ -118,8 +126,7 @@ Authorization: Bearer <access_token>
     "region": "Shanghai",
     "account_type": "user",
     "avatar_media_id": "med_000001",
-    "avatar_url": "https://storage.example.com/[REDACTED]",
-    "avatar_url_expires_at": 1777550400000,
+    "avatar_url": "/media/avatars/med_000001",
     "created_at": "2026-04-29T12:00:00Z",
     "updated_at": "2026-04-29T12:00:00Z"
   }
@@ -160,7 +167,15 @@ Content-Type: application/json
 ```
 
 The media object must belong to the current user, have `purpose=avatar`, `status=ready`, an allowed image MIME type, and be no larger than 5 MiB.
-Successful protected profile responses include `avatar_url` and `avatar_url_expires_at` when `avatar_media_id` is set and ready. The URL is a short-lived authorized display URL; clients must not show or log object keys, credentials, signatures, or permanent private storage URLs.
+Successful protected profile responses include durable `avatar_url` when `avatar_media_id` is set and ready. The stored URL is a stable same-origin application reference such as `/media/avatars/med_000001`; it is not a raw private object key, image bytes, credentials, signatures, or an expiring presigned object-storage URL. Legacy `avatar_url_expires_at` may be absent or `0` for durable avatar URLs.
+
+### Avatar Image URL
+
+```http
+GET /media/avatars/med_000001
+```
+
+This stable image URL is suitable for `<img src>` and survives refresh/relogin because it is persisted in `profiles.avatar_url` and copied into auth/session profile data. The endpoint validates that the media object is a ready static JPEG/PNG/WebP avatar within the avatar size limit, then redirects to a fresh object-storage display URL. Clients must keep storing/rendering the stable `/media/avatars/:media_id` URL and must not persist the redirect target.
 
 ### Identifier Exists
 

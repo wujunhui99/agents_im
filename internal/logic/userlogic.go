@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"time"
 
@@ -42,6 +43,7 @@ type UserProfile struct {
 	Region        string `json:"region"`
 	AccountType   string `json:"account_type"`
 	AvatarMediaID string `json:"avatar_media_id"`
+	AvatarURL     string `json:"avatar_url"`
 	CreatedAt     string `json:"created_at"`
 	UpdatedAt     string `json:"updated_at"`
 }
@@ -263,11 +265,19 @@ func (l *UserLogic) UpdateUserAvatar(ctx context.Context, req UpdateUserAvatarRe
 		return UserProfile{}, apperror.InvalidArgument("media_id is required")
 	}
 
-	user, err := l.repo.UpdateAvatar(ctx, userID, mediaID)
+	user, err := l.repo.UpdateAvatar(ctx, userID, mediaID, DurableAvatarURL(mediaID))
 	if err != nil {
 		return UserProfile{}, err
 	}
 	return toProfile(user), nil
+}
+
+func DurableAvatarURL(mediaID string) string {
+	mediaID = strings.TrimSpace(mediaID)
+	if mediaID == "" {
+		return ""
+	}
+	return "/media/avatars/" + url.PathEscape(mediaID)
 }
 
 func NormalizeIdentifier(identifier string) (string, error) {
@@ -364,6 +374,7 @@ func toProfile(user model.User) UserProfile {
 		Region:        user.Region,
 		AccountType:   string(user.AccountType),
 		AvatarMediaID: user.AvatarMediaID,
+		AvatarURL:     user.AvatarURL,
 		CreatedAt:     formatTime(user.CreatedAt),
 		UpdatedAt:     formatTime(user.UpdatedAt),
 	}

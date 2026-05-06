@@ -4,9 +4,13 @@ export type AuthUser = {
   userId: string;
   identifier: string;
   displayName: string;
+  name?: string;
   gender?: string;
   birth_date?: string;
   region?: string;
+  accountType?: 'user' | 'agent' | 'admin';
+  avatarMediaId?: string;
+  avatarUrl?: string;
 };
 
 export type AuthSession = {
@@ -35,9 +39,13 @@ export function readStoredSession(storage: Storage = localStorage): AuthSession 
         userId: parsed.user.userId,
         identifier: parsed.user.identifier,
         displayName: parsed.user.displayName || parsed.user.identifier,
+        name: parsed.user.name,
         gender: parsed.user.gender,
         birth_date: parsed.user.birth_date,
         region: parsed.user.region,
+        accountType: parsed.user.accountType,
+        avatarMediaId: parsed.user.avatarMediaId,
+        avatarUrl: parsed.user.avatarUrl,
       },
     };
   } catch {

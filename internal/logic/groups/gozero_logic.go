@@ -252,5 +252,6 @@ func toGroupMember(member business.GroupMemberInfo) types.GroupMember {
 		DisplayName:   member.DisplayName,
 		Name:          member.Name,
 		AvatarMediaID: member.AvatarMediaID,
+		AvatarURL:     member.AvatarURL,
 	}
 }

@@ -69,6 +69,7 @@ func (r *MemoryRepository) Create(_ context.Context, user model.User) (model.Use
 		BirthDate:     user.BirthDate,
 		Region:        user.Region,
 		AvatarMediaID: user.AvatarMediaID,
+		AvatarURL:     user.AvatarURL,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -142,7 +143,7 @@ func (r *MemoryRepository) UpdateProfile(_ context.Context, userID string, patch
 	return user.Clone(), nil
 }
 
-func (r *MemoryRepository) UpdateAvatar(_ context.Context, userID string, avatarMediaID string) (model.User, error) {
+func (r *MemoryRepository) UpdateAvatar(_ context.Context, userID string, avatarMediaID string, avatarURL string) (model.User, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -152,6 +153,7 @@ func (r *MemoryRepository) UpdateAvatar(_ context.Context, userID string, avatar
 	}
 
 	user.AvatarMediaID = strings.TrimSpace(avatarMediaID)
+	user.AvatarURL = strings.TrimSpace(avatarURL)
 	user.ProfileUpdatedAt = r.now().UTC()
 	user.UpdatedAt = user.ProfileUpdatedAt
 	r.byID[user.AccountID] = user.Clone()
