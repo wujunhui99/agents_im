@@ -88,6 +88,7 @@ time {
 }
 
 .content-area {
+  position: relative;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -115,7 +116,20 @@ time {
 }
 
 .tab-panel {
+  position: relative;
   min-height: 100%;
+}
+
+.tab-panel[data-active="false"],
+.tab-panel[aria-hidden="true"] {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  max-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  contain: layout paint style;
 }
 
 .tab-panel[hidden] {
@@ -1325,6 +1339,93 @@ button.md-list-item:hover,
 .image-message-error {
   margin: 0;
   padding: 2px 6px 4px;
+  color: var(--md-sys-color-error);
+  font-size: var(--md-type-body-small);
+}
+
+.file-message-card {
+  width: min(292px, 78vw);
+  padding: 10px;
+  border-radius: var(--md-shape-corner-large);
+  background: var(--md-sys-color-surface);
+  box-shadow: var(--md-elevation-level1);
+}
+
+.file-message-card-outgoing {
+  background: var(--md-sys-color-primary-container);
+}
+
+.message-origin-ai .file-message-card {
+  border: 1px solid rgba(15, 118, 110, 0.22);
+}
+
+.file-message-content {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--md-space-2);
+}
+
+.file-message-icon {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--md-shape-corner-medium);
+  color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.file-message-card-outgoing .file-message-icon {
+  background: color-mix(in srgb, var(--md-sys-color-primary), transparent 86%);
+}
+
+.file-message-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.file-message-title,
+.file-message-metadata {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-message-title {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-type-body-medium);
+  font-weight: 700;
+}
+
+.file-message-metadata {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-type-body-small);
+}
+
+.file-message-actions {
+  min-width: 34px;
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+}
+
+.file-download-button {
+  width: 32px;
+  height: 32px;
+}
+
+.file-message-status {
+  min-height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.file-message-error {
+  margin: 6px 0 0;
   color: var(--md-sys-color-error);
   font-size: var(--md-type-body-small);
 }

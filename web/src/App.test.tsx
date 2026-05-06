@@ -79,6 +79,27 @@ function countFetchCalls(mock: { mock: { calls: unknown[][] } }, path: string, m
   ).length;
 }
 
+function installAppStyles(extraCss = '') {
+  const style = document.createElement('style');
+  style.dataset.testStyle = 'app-shell';
+  style.textContent = `${stylesCss}\n${extraCss}`;
+  document.head.append(style);
+  return style;
+}
+
+function removeInstalledStyles() {
+  document.head.querySelectorAll('style[data-test-style="app-shell"]').forEach((style) => style.remove());
+}
+
+function getTabPanel(label: string) {
+  const panel = screen
+    .getAllByRole('tabpanel', { hidden: true })
+    .find((candidate) => candidate.getAttribute('aria-label') === label);
+
+  expect(panel).toBeDefined();
+  return panel as HTMLElement;
+}
+
 describe('Auth flow', () => {
   const fetchMock = vi.fn();
 
@@ -91,10 +112,12 @@ describe('Auth flow', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     localStorage.clear();
+    removeInstalledStyles();
   });
 
   it('shows a WeChat-style login page before authentication and saves the login token', async () => {
     const user = userEvent.setup();
+    fetchMock.mockResolvedValue(emptySeqsResponse());
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ code: 'OK', message: 'ok', data: { exists: true, identifier: 'alice_001' } }))
       .mockResolvedValueOnce(
@@ -105,6 +128,8 @@ describe('Auth flow', () => {
             user_id: '1001',
             identifier: 'alice_001',
             display_name: 'Alice Chen',
+            avatar_media_id: 'med_avatar_1',
+            avatar_url: '/media/avatars/med_avatar_1',
             token: 'login-token',
             expires_at: '2026-04-30T12:00:00Z',
           },
@@ -136,8 +161,16 @@ describe('Auth flow', () => {
     );
     expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toMatchObject({
       token: 'login-token',
-      user: { identifier: 'alice_001', displayName: 'Alice Chen' },
+      user: {
+        identifier: 'alice_001',
+        displayName: 'Alice Chen',
+        avatarMediaId: 'med_avatar_1',
+        avatarUrl: '/media/avatars/med_avatar_1',
+      },
     });
+
+    await user.click(screen.getByRole('tab', { name: /我的/i }));
+    expect(await screen.findByRole('img', { name: 'Alice Chen 头像' })).toHaveAttribute('src', '/media/avatars/med_avatar_1');
   });
 
   it('checks whether the login identifier exists when the password field receives focus', async () => {
@@ -234,6 +267,7 @@ describe('WeChat-inspired app shell', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     localStorage.clear();
+    removeInstalledStyles();
   });
 
   it('renders the four primary tabs', async () => {
@@ -275,6 +309,11 @@ describe('WeChat-inspired app shell', () => {
 
   it('hides inactive kept-alive tab panels so previous page content cannot remain visible', async () => {
     const user = userEvent.setup();
+    installAppStyles(`
+      .tab-panel[hidden] {
+        display: flex !important;
+      }
+    `);
     render(<App />);
 
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
@@ -283,7 +322,31 @@ describe('WeChat-inspired app shell', () => {
     await user.click(screen.getByRole('tab', { name: /我的/i }));
     expect(screen.getByRole('heading', { name: '我的' })).toBeInTheDocument();
 
+    const messagesPanel = getTabPanel('消息');
+    const contactsPanel = getTabPanel('联系人');
+    const mePanel = getTabPanel('我的');
+    const inactivePanels = [messagesPanel, contactsPanel];
+
+    expect(mePanel).toHaveAttribute('data-active', 'true');
+    expect(mePanel).not.toHaveAttribute('hidden');
+    expect(mePanel).not.toHaveAttribute('aria-hidden');
+    expect(mePanel).not.toHaveAttribute('inert');
+    expect(getComputedStyle(mePanel).visibility).toBe('visible');
+    expect(within(mePanel).getAllByText(/alice_001/).length).toBeGreaterThan(0);
+
+    for (const panel of inactivePanels) {
+      expect(panel).toHaveAttribute('data-active', 'false');
+      expect(panel).toHaveAttribute('hidden');
+      expect(panel).toHaveAttribute('aria-hidden', 'true');
+      expect(panel).toHaveAttribute('inert');
+      expect(getComputedStyle(panel).position).toBe('absolute');
+      expect(getComputedStyle(panel).visibility).toBe('hidden');
+      expect(getComputedStyle(panel).pointerEvents).toBe('none');
+      expect(getComputedStyle(panel).overflow).toBe('hidden');
+    }
     expect(stylesCss).toMatch(/\.tab-panel\[hidden\]\s*{[\s\S]*display:\s*none\s*!important/);
+    expect(stylesCss).toMatch(/\.tab-panel\[data-active="false"\][\s\S]*visibility:\s*hidden/);
+    expect(stylesCss).toMatch(/\.tab-panel\[data-active="false"\][\s\S]*pointer-events:\s*none/);
   });
 
   it('keeps the loaded contacts tab state when switching away and back without refetching friends or requests', async () => {
@@ -558,6 +621,87 @@ describe('WeChat-inspired app shell', () => {
     });
     expect((await screen.findAllByText('Alice Chen')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Hangzhou').length).toBeGreaterThan(0);
+  });
+
+  it('keeps an uploaded avatar visible after remounting from the persisted session', async () => {
+    const user = userEvent.setup();
+    const uploadedProfile: UserProfile = {
+      ...initialProfile,
+      display_name: 'Alice Chen',
+      name: 'Alice Chen',
+      avatar_media_id: 'med_avatar_2',
+      avatar_url: '/media/avatars/med_avatar_2',
+    };
+    const patchCurrentUserAvatar = vi.fn(async () => uploadedProfile);
+    const userApi = {
+      getCurrentUser: vi.fn(async () => uploadedProfile),
+      identifierExists: vi.fn(async () => ({ identifier: uploadedProfile.identifier, exists: true })),
+      getPublicProfileByIdentifier: vi.fn(async () => uploadedProfile),
+      patchCurrentUser: vi.fn(async () => uploadedProfile),
+      patchCurrentUserAvatar,
+    };
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      const method = fetchMethod(init);
+      if (path === '/media/uploads' && method === 'POST') {
+        return jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            mediaId: 'med_avatar_2',
+            objectKey: 'users/1001/media/med_avatar_2/avatar.jpg',
+            uploadUrl: 'https://storage.test/upload/avatar',
+            expiresAt: 1777550400000,
+          },
+        });
+      }
+      if (path === 'https://storage.test/upload/avatar' && method === 'PUT') {
+        return new Response(null, { status: 200 });
+      }
+      if (path === '/media/uploads/med_avatar_2/complete' && method === 'POST') {
+        return jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: {
+            media: {
+              mediaId: 'med_avatar_2',
+              ownerUserId: '1001',
+              bucket: 'agents-im-media',
+              objectKey: 'users/1001/media/med_avatar_2/avatar.jpg',
+              sha256: '',
+              contentType: 'image/jpeg',
+              sizeBytes: 1024,
+              originalFilename: 'avatar.jpg',
+              purpose: 'avatar',
+              status: 'ready',
+              createdAt: '2026-05-06T10:00:00Z',
+              updatedAt: '2026-05-06T10:00:00Z',
+            },
+          },
+        });
+      }
+      return emptySeqsResponse();
+    });
+
+    const firstRender = render(<App userApi={userApi} />);
+    await user.click(screen.getByRole('tab', { name: /我的/i }));
+
+    await user.upload(screen.getByLabelText('上传头像'), new File([new Uint8Array(1024)], 'avatar.jpg', { type: 'image/jpeg' }));
+
+    await waitFor(() => expect(patchCurrentUserAvatar).toHaveBeenCalledWith('med_avatar_2'));
+    expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toMatchObject({
+      user: {
+        avatarMediaId: 'med_avatar_2',
+        avatarUrl: '/media/avatars/med_avatar_2',
+      },
+    });
+
+    firstRender.unmount();
+    render(<App userApi={userApi} />);
+
+    await user.click(screen.getByRole('tab', { name: /我的/i }));
+    expect(await screen.findByRole('img', { name: 'Alice Chen 头像' })).toHaveAttribute('src', '/media/avatars/med_avatar_2');
   });
 
   it('searches users by unique identifier and sends add-friend through real APIs', async () => {

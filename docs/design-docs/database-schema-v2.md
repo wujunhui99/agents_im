@@ -188,6 +188,7 @@ gender smallint not null default 0
 birth_date date null
 region text not null default ''
 avatar_media_id text not null default ''
+avatar_url text not null default ''
 created_at timestamptz not null default now()
 updated_at timestamptz not null default now()
 ```
@@ -198,6 +199,8 @@ Decisions:
 - Keep `account_id` as primary key to preserve 1:1 relationship by convention.
 - `gender` becomes `smallint`.
 - Do not store age. Store `birth_date`; calculate age dynamically if needed.
+- Store durable `avatar_url` on `profiles`, not `accounts`, because avatar is profile-owned display data beside `display_name`, `region`, and `avatar_media_id`; account identity remains limited to stable identifiers and account type.
+- `avatar_url` stores a stable application URL/reference such as `/media/avatars/{media_id}`. It must not store image bytes, object-storage credentials, raw private object keys, or expiring presigned URLs.
 - Do not use DB CHECK for `birth_date <= current_date`.
 - Do not use DB CHECK for gender enum or blank names.
 

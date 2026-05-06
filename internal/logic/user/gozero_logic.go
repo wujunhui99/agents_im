@@ -204,50 +204,30 @@ func optionalString(value string) *string {
 }
 
 func userResp(profile business.UserProfile) *types.UserResp {
-	return userRespWithAvatarFields(profile, "", 0)
+	return userRespWithAvatarFields(profile)
 }
 
 func userRespWithAvatar(ctx context.Context, svcCtx *svc.ServiceContext, profile business.UserProfile) (*types.UserResp, error) {
-	avatarURL, avatarURLExpiresAt, err := resolveAvatarDisplay(ctx, svcCtx, profile.AvatarMediaID)
-	if err != nil {
-		return nil, err
-	}
-	return userRespWithAvatarFields(profile, avatarURL, avatarURLExpiresAt), nil
+	return userRespWithAvatarFields(profile), nil
 }
 
-func userRespWithAvatarFields(profile business.UserProfile, avatarURL string, avatarURLExpiresAt int64) *types.UserResp {
+func userRespWithAvatarFields(profile business.UserProfile) *types.UserResp {
 	return &types.UserResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.User{
-			UserID:             profile.UserID,
-			Identifier:         profile.Identifier,
-			DisplayName:        profile.DisplayName,
-			Name:               profile.Name,
-			Gender:             profile.Gender,
-			BirthDate:          profile.BirthDate,
-			Region:             profile.Region,
-			AccountType:        profile.AccountType,
-			AvatarMediaID:      profile.AvatarMediaID,
-			AvatarURL:          avatarURL,
-			AvatarURLExpiresAt: avatarURLExpiresAt,
-			CreatedAt:          profile.CreatedAt,
-			UpdatedAt:          profile.UpdatedAt,
+			UserID:        profile.UserID,
+			Identifier:    profile.Identifier,
+			DisplayName:   profile.DisplayName,
+			Name:          profile.Name,
+			Gender:        profile.Gender,
+			BirthDate:     profile.BirthDate,
+			Region:        profile.Region,
+			AccountType:   profile.AccountType,
+			AvatarMediaID: profile.AvatarMediaID,
+			AvatarURL:     profile.AvatarURL,
+			CreatedAt:     profile.CreatedAt,
+			UpdatedAt:     profile.UpdatedAt,
 		},
 	}
-}
-
-func resolveAvatarDisplay(ctx context.Context, svcCtx *svc.ServiceContext, avatarMediaID string) (string, int64, error) {
-	avatarMediaID = strings.TrimSpace(avatarMediaID)
-	if avatarMediaID == "" {
-		return "", 0, nil
-	}
-	if svcCtx == nil || svcCtx.MediaLogic == nil {
-		return "", 0, apperror.Internal("media logic is not configured")
-	}
-	display, err := svcCtx.MediaLogic.GetAvatarDisplayURL(ctx, avatarMediaID)
-	if err != nil {
-		return "", 0, err
-	}
-	return display.DownloadURL, display.ExpiresAt, nil
 }

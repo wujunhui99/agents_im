@@ -60,8 +60,12 @@ func TestListFriendsIncludesAcceptedContactAvatarDisplayURL(t *testing.T) {
 	if friend.AvatarMediaID != bobAvatar.MediaID {
 		t.Fatalf("friend avatar_media_id = %q, want %q", friend.AvatarMediaID, bobAvatar.MediaID)
 	}
-	if friend.AvatarURL == "" || friend.AvatarURLExpiresAt == 0 {
-		t.Fatalf("friend avatar display fields missing: %+v", friend)
+	expectedAvatarURL := "/media/avatars/" + bobAvatar.MediaID
+	if friend.AvatarURL != expectedAvatarURL {
+		t.Fatalf("friend avatar_url = %q, want %q", friend.AvatarURL, expectedAvatarURL)
+	}
+	if friend.AvatarURLExpiresAt != 0 {
+		t.Fatalf("friend avatar_url_expires_at = %d, want durable URL without persisted expiry", friend.AvatarURLExpiresAt)
 	}
 }
 
