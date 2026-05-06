@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { ApiError, createApiClient } from '../api/client';
-import { clearStoredSession, readStoredSession, writeStoredSession, type AuthSession } from './session';
+import { clearStoredSession, readStoredSession, writeStoredSession, type AuthSession, type AuthUser } from './session';
 
 type AuthResponse = {
   user_id: string;
@@ -10,6 +10,9 @@ type AuthResponse = {
   gender?: string;
   birth_date?: string;
   region?: string;
+  account_type?: 'user' | 'agent' | 'admin';
+  avatar_media_id?: string;
+  avatar_url?: string;
   token: string;
   expires_at?: string;
 };
@@ -27,6 +30,7 @@ type AuthContextValue = {
   session: AuthSession | null;
   login(input: LoginInput): Promise<AuthSession>;
   register(input: RegisterInput): Promise<AuthSession>;
+  updateSessionUser(input: Partial<AuthUser>): void;
   logout(): void;
 };
 
@@ -69,6 +73,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }
 
+  function updateSessionUser(input: Partial<AuthUser>) {
+    setSession((current) => {
+      if (!current) {
+        return current;
+      }
+      const nextSession = {
+        ...current,
+        user: {
+          ...current.user,
+          ...input,
+          displayName: input.displayName || current.user.displayName,
+        },
+      };
+      writeStoredSession(nextSession);
+      return nextSession;
+    });
+  }
+
   function persistSession(nextSession: AuthSession) {
     writeStoredSession(nextSession);
     setSession(nextSession);
@@ -80,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       login,
       register,
+      updateSessionUser,
       logout,
     }),
     [session],
@@ -114,9 +137,13 @@ function toSession(response: AuthResponse, displayNameFallback?: string): AuthSe
       userId: response.user_id,
       identifier: response.identifier,
       displayName: response.display_name || response.name || displayNameFallback || response.identifier,
+      name: response.name,
       gender: response.gender,
       birth_date: response.birth_date,
       region: response.region,
+      accountType: response.account_type,
+      avatarMediaId: response.avatar_media_id,
+      avatarUrl: response.avatar_url,
     },
   };
 }

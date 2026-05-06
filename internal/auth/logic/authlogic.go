@@ -51,10 +51,18 @@ type ValidateTokenRequest struct {
 }
 
 type AuthResponse struct {
-	UserID     string `json:"user_id"`
-	Identifier string `json:"identifier"`
-	Token      string `json:"token"`
-	ExpiresAt  string `json:"expires_at"`
+	UserID        string `json:"user_id"`
+	Identifier    string `json:"identifier"`
+	DisplayName   string `json:"display_name"`
+	Name          string `json:"name"`
+	Gender        string `json:"gender"`
+	BirthDate     string `json:"birth_date"`
+	Region        string `json:"region"`
+	AccountType   string `json:"account_type"`
+	AvatarMediaID string `json:"avatar_media_id"`
+	AvatarURL     string `json:"avatar_url"`
+	Token         string `json:"token"`
+	ExpiresAt     string `json:"expires_at"`
 }
 
 type ValidateTokenResponse struct {
@@ -94,18 +102,17 @@ func (l *AuthLogic) Register(ctx context.Context, req RegisterRequest) (AuthResp
 		return AuthResponse{}, apperror.Internal("password hash failed")
 	}
 
-	credential, err := l.repo.Create(ctx, model.Credential{
+	if _, err := l.repo.Create(ctx, model.Credential{
 		Identifier:   profile.Identifier,
 		UserID:       profile.UserID,
 		PasswordHash: hash,
 		Salt:         salt,
 		HashVersion:  version,
-	})
-	if err != nil {
+	}); err != nil {
 		return AuthResponse{}, err
 	}
 
-	return l.issueToken(ctx, credential.UserID, credential.Identifier)
+	return l.issueToken(ctx, profile)
 }
 
 func (l *AuthLogic) Login(ctx context.Context, req LoginRequest) (AuthResponse, error) {
@@ -125,7 +132,12 @@ func (l *AuthLogic) Login(ctx context.Context, req LoginRequest) (AuthResponse, 
 		return AuthResponse{}, apperror.Unauthenticated("invalid identifier or password")
 	}
 
-	return l.issueToken(ctx, credential.UserID, credential.Identifier)
+	profile, err := l.users.GetUserByID(ctx, credential.UserID)
+	if err != nil {
+		return AuthResponse{}, err
+	}
+
+	return l.issueToken(ctx, profile)
 }
 
 func (l *AuthLogic) ValidateToken(ctx context.Context, req ValidateTokenRequest) (ValidateTokenResponse, error) {
@@ -149,8 +161,8 @@ func (l *AuthLogic) ParseToken(_ context.Context, req ValidateTokenRequest) (Val
 	return toValidateTokenResponse(claims), nil
 }
 
-func (l *AuthLogic) issueToken(ctx context.Context, userID string, identifier string) (AuthResponse, error) {
-	rawToken, claims, err := l.tokens.Issue(userID, identifier)
+func (l *AuthLogic) issueToken(ctx context.Context, profile useradapter.UserProfile) (AuthResponse, error) {
+	rawToken, claims, err := l.tokens.Issue(profile.UserID, profile.Identifier)
 	if err != nil {
 		return AuthResponse{}, err
 	}
@@ -164,10 +176,18 @@ func (l *AuthLogic) issueToken(ctx context.Context, userID string, identifier st
 	}
 
 	return AuthResponse{
-		UserID:     claims.UserID,
-		Identifier: claims.Identifier,
-		Token:      rawToken,
-		ExpiresAt:  formatTime(claims.ExpiresAt),
+		UserID:        claims.UserID,
+		Identifier:    claims.Identifier,
+		DisplayName:   profile.DisplayName,
+		Name:          profile.Name,
+		Gender:        profile.Gender,
+		BirthDate:     profile.BirthDate,
+		Region:        profile.Region,
+		AccountType:   profile.AccountType,
+		AvatarMediaID: profile.AvatarMediaID,
+		AvatarURL:     profile.AvatarURL,
+		Token:         rawToken,
+		ExpiresAt:     formatTime(claims.ExpiresAt),
 	}, nil
 }
 

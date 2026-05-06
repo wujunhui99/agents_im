@@ -24,6 +24,7 @@ type postgresAccountProfileRow struct {
 	BirthDate        string    `db:"birth_date"`
 	Region           string    `db:"region"`
 	AvatarMediaID    string    `db:"avatar_media_id"`
+	AvatarURL        string    `db:"avatar_url"`
 	ProfileCreatedAt time.Time `db:"profile_created_at"`
 	ProfileUpdatedAt time.Time `db:"profile_updated_at"`
 }
@@ -64,9 +65,9 @@ values ($1, $2, $3)
 		}
 
 		if _, err := session.ExecCtx(ctx, `
-insert into profiles (account_id, display_name, name, gender, birth_date, region, avatar_media_id)
-values ($1, $2, $3, $4, nullif($5, '')::date, $6, $7)
-`, accountID, user.DisplayName, user.Name, genderToDB(user.Gender), user.BirthDate, user.Region, strings.TrimSpace(user.AvatarMediaID)); err != nil {
+insert into profiles (account_id, display_name, name, gender, birth_date, region, avatar_media_id, avatar_url)
+values ($1, $2, $3, $4, nullif($5, '')::date, $6, $7, $8)
+`, accountID, user.DisplayName, user.Name, genderToDB(user.Gender), user.BirthDate, user.Region, strings.TrimSpace(user.AvatarMediaID), strings.TrimSpace(user.AvatarURL)); err != nil {
 			return err
 		}
 
@@ -91,7 +92,7 @@ func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier str
 select
   a.account_id, a.identifier, a.account_type,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
-  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
 from accounts a
 join profiles p on p.account_id = a.account_id
@@ -130,7 +131,7 @@ const accountProfileByIDQuery = `
 select
   a.account_id, a.identifier, a.account_type,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
-  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
 from accounts a
 join profiles p on p.account_id = a.account_id
@@ -184,14 +185,14 @@ returning account_id
 	return r.GetByID(ctx, accountID)
 }
 
-func (r *PostgresRepository) UpdateAvatar(ctx context.Context, userID string, avatarMediaID string) (model.User, error) {
+func (r *PostgresRepository) UpdateAvatar(ctx context.Context, userID string, avatarMediaID string, avatarURL string) (model.User, error) {
 	var accountID string
 	if err := r.conn.QueryRowCtx(ctx, &accountID, `
 update profiles
-set avatar_media_id = $2, updated_at = now()
+set avatar_media_id = $2, avatar_url = $3, updated_at = now()
 where account_id = $1
 returning account_id
-`, userID, strings.TrimSpace(avatarMediaID)); err != nil {
+`, userID, strings.TrimSpace(avatarMediaID), strings.TrimSpace(avatarURL)); err != nil {
 		if isNotFound(err) {
 			return model.User{}, apperror.NotFound("account not found")
 		}
@@ -469,6 +470,7 @@ func (r postgresAccountProfileRow) user() model.User {
 			BirthDate:     r.BirthDate,
 			Region:        r.Region,
 			AvatarMediaID: r.AvatarMediaID,
+			AvatarURL:     r.AvatarURL,
 			CreatedAt:     r.ProfileCreatedAt,
 			UpdatedAt:     r.ProfileUpdatedAt,
 		},

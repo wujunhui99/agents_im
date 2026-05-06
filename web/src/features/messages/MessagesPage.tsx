@@ -66,6 +66,12 @@ type ImageMessagePayload = {
   sizeBytes?: number;
   contentType?: string;
 };
+type FileMessagePayload = {
+  mediaId?: string;
+  filename?: string;
+  sizeBytes?: number;
+  contentType?: string;
+};
 
 const IMAGE_MAX_BYTES = 15 * 1024 * 1024;
 const FILE_MAX_BYTES = 20 * 1024 * 1024;
@@ -739,6 +745,14 @@ function ChatWindow({
                   onStatus={onStatus}
                   status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
                 />
+              ) : message.contentType === 'file' ? (
+                <FileMessageBubble
+                  message={message}
+                  mediaApi={mediaApi}
+                  downloadMedia={downloadMedia}
+                  onStatus={onStatus}
+                  status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
+                />
               ) : (
                 <MessageBubble
                   direction={message.direction}
@@ -821,6 +835,83 @@ function renderOutgoingMessageStatus(message: ChatMessage, hasReadSeq: number | 
   }
 
   return <span className={`message-status message-status-${message.status}`}>{statusLabels[message.status]}</span>;
+}
+
+function FileMessageBubble({
+  message,
+  mediaApi,
+  downloadMedia,
+  onStatus,
+  status,
+}: {
+  message: ChatMessage;
+  mediaApi: MediaApi;
+  downloadMedia: MediaDownloadHandler;
+  onStatus: (status: string) => void;
+  status: ReactNode;
+}) {
+  const payload = useMemo(() => parseFileMessagePayload(message.content), [message.content]);
+  const mediaId = payload.mediaId;
+  const filename = fileMessageFilename(payload);
+  const label = fileDisplayLabel(payload);
+  const metadata = fileMessageMetadata(payload);
+  const [downloadError, setDownloadError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    if (!mediaId) {
+      const message = '文件信息缺失，无法下载';
+      setDownloadError(message);
+      onStatus(message);
+      return;
+    }
+    setDownloading(true);
+    setDownloadError('');
+    try {
+      const result = await mediaApi.getDownloadURL(mediaId);
+      downloadMedia(result.downloadUrl, filename);
+      onStatus('已获取文件下载链接');
+    } catch {
+      const message = '下载文件失败，请稍后重试';
+      setDownloadError(message);
+      onStatus(message);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div className={`file-message-card file-message-card-${message.direction}`}>
+      <div className="file-message-content">
+        <span className="file-message-icon" aria-hidden="true">
+          <FileText size={22} />
+        </span>
+        <span className="file-message-main">
+          <span className="file-message-title">{label}</span>
+          {metadata ? <span className="file-message-metadata">{metadata}</span> : null}
+        </span>
+        <span className="file-message-actions">
+          <Button
+            variant="icon"
+            size="small"
+            className="file-download-button"
+            type="button"
+            aria-label={`下载${label}`}
+            onClick={handleDownload}
+            disabled={downloading}
+          >
+            <Download size={16} />
+          </Button>
+          {status ? <span className="file-message-status">{status}</span> : null}
+        </span>
+      </div>
+      {downloadError ? (
+        <p className="file-message-error" role="alert">
+          {downloadError}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function ImageMessageBubble({
@@ -1666,9 +1757,7 @@ function messageDisplayText(message: ChatMessage) {
   }
 
   if (message.contentType === 'file') {
-    const payload = parseContentObject(message.content);
-    const filename = payload ? stringField(payload, 'filename') : undefined;
-    return filename ? `文件 ${filename}` : '文件消息';
+    return fileDisplayLabel(parseFileMessagePayload(message.content));
   }
 
   return message.content;
@@ -1699,6 +1788,20 @@ function parseImageMessagePayload(content: string): ImageMessagePayload {
   };
 }
 
+function parseFileMessagePayload(content: string): FileMessagePayload {
+  const payload = parseContentObject(content);
+  if (!payload) {
+    return {};
+  }
+
+  return {
+    mediaId: stringField(payload, 'mediaId'),
+    filename: stringField(payload, 'filename'),
+    sizeBytes: numberField(payload, 'sizeBytes'),
+    contentType: stringField(payload, 'contentType'),
+  };
+}
+
 function imageMessageFilename(payload: ImageMessagePayload) {
   return payload.filename?.trim() || '图片消息';
 }
@@ -1706,6 +1809,36 @@ function imageMessageFilename(payload: ImageMessagePayload) {
 function imageDisplayLabel(payload: ImageMessagePayload) {
   const filename = payload.filename?.trim();
   return filename ? `图片 ${filename}` : '图片消息';
+}
+
+function fileMessageFilename(payload: FileMessagePayload) {
+  return payload.filename?.trim() || '文件消息';
+}
+
+function fileDisplayLabel(payload: FileMessagePayload) {
+  const filename = payload.filename?.trim();
+  return filename ? `文件 ${filename}` : '文件消息';
+}
+
+function fileMessageMetadata(payload: FileMessagePayload) {
+  return [formatFileSize(payload.sizeBytes), payload.contentType?.trim()].filter(Boolean).join(' / ');
+}
+
+function formatFileSize(sizeBytes: number | undefined) {
+  if (sizeBytes === undefined || sizeBytes < 0) {
+    return undefined;
+  }
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+  if (sizeBytes < 1024 * 1024) {
+    return `${formatFileSizeNumber(sizeBytes / 1024)} KiB`;
+  }
+  return `${formatFileSizeNumber(sizeBytes / (1024 * 1024))} MiB`;
+}
+
+function formatFileSizeNumber(value: number) {
+  return Number.isInteger(value) || value >= 10 ? value.toFixed(0) : value.toFixed(1);
 }
 
 function uploadFilename(file: File, kind: AttachmentKind) {

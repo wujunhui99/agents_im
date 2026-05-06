@@ -45,10 +45,18 @@ type AddMemberReq struct {
 }
 
 type AuthData struct {
-	UserID     string `json:"user_id"`
-	Identifier string `json:"identifier"`
-	Token      string `json:"token"`
-	ExpiresAt  string `json:"expires_at"`
+	UserID        string `json:"user_id"`
+	Identifier    string `json:"identifier"`
+	DisplayName   string `json:"display_name,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Gender        string `json:"gender,omitempty"`
+	BirthDate     string `json:"birth_date,omitempty"`
+	Region        string `json:"region,omitempty"`
+	AccountType   string `json:"account_type,omitempty"`
+	AvatarMediaID string `json:"avatar_media_id,omitempty"`
+	AvatarURL     string `json:"avatar_url,omitempty"`
+	Token         string `json:"token"`
+	ExpiresAt     string `json:"expires_at"`
 }
 
 type AuthResp struct {
@@ -223,6 +231,7 @@ type GroupMember struct {
 	DisplayName   string `json:"display_name,optional"`
 	Name          string `json:"name,optional"`
 	AvatarMediaID string `json:"avatar_media_id,optional"`
+	AvatarURL     string `json:"avatar_url,omitempty"`
 }
 
 type GroupResp struct {

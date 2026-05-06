@@ -182,6 +182,14 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 }
 
 func addMediaRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodGet,
+			Path:    "/media/avatars/:media_id",
+			Handler: mediahandler.GetAvatarHandler(serverCtx),
+		},
+	})
+
 	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,

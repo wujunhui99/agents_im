@@ -64,7 +64,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
   const [pendingChatProfile, setPendingChatProfile] = useState<UserProfile | null>(null);
   const [pendingGroup, setPendingGroup] = useState<Group | null>(null);
   const activeLabel = useMemo(() => tabs.find((tab) => tab.key === activeTab)?.label ?? '消息', [activeTab]);
-  const { session, logout } = useAuth();
+  const { session, logout, updateSessionUser } = useAuth();
   const effectiveUserApi = useMemo(
     () =>
       userApi ??
@@ -90,6 +90,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
   async function updateProfile(patch: UserProfilePatch) {
     const updatedUser = await effectiveUserApi.patchCurrentUser(patch);
     setCurrentUser(updatedUser);
+    updateSessionUser(authUserFromProfile(updatedUser));
   }
 
   async function uploadAvatar(file: File) {
@@ -99,6 +100,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
       userApi: effectiveUserApi,
     });
     setCurrentUser(updatedUser);
+    updateSessionUser(authUserFromProfile(updatedUser));
     return updatedUser;
   }
 
@@ -159,10 +161,12 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
 
             return (
               <section
-                className="tab-panel"
+                className={`tab-panel ${isActive ? 'tab-panel-active' : 'tab-panel-inactive'}`}
+                data-active={isActive ? 'true' : 'false'}
                 role="tabpanel"
                 aria-label={tab.label}
                 aria-hidden={isActive ? undefined : true}
+                inert={isActive ? undefined : true}
                 hidden={!isActive}
                 key={tab.key}
               >
@@ -423,10 +427,28 @@ function userProfileFromAuth(user: AuthUser): UserProfile {
     user_id: user.userId,
     identifier: user.identifier,
     display_name: user.displayName,
-    name: user.displayName,
+    name: user.name ?? user.displayName,
     gender: user.gender ?? '',
     birth_date: user.birth_date ?? '',
     region: user.region ?? '',
+    account_type: user.accountType,
+    avatar_media_id: user.avatarMediaId,
+    avatar_url: user.avatarUrl,
+  };
+}
+
+function authUserFromProfile(profile: UserProfile): AuthUser {
+  return {
+    userId: profile.user_id,
+    identifier: profile.identifier,
+    displayName: profile.display_name || profile.name || profile.identifier,
+    name: profile.name,
+    gender: profile.gender,
+    birth_date: profile.birth_date,
+    region: profile.region,
+    accountType: profile.account_type,
+    avatarMediaId: profile.avatar_media_id,
+    avatarUrl: profile.avatar_url,
   };
 }
 

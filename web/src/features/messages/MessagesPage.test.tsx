@@ -380,7 +380,7 @@ describe('MessagesPage real API mode', () => {
     messageApi.getAIHosting = vi.fn(async () => aiState);
     messageApi.updateAIHosting = vi.fn();
 
-    const { unmount } = render(
+    render(
       <MessagesPage currentUserId={currentUserId} messageApi={messageApi} contactsApi={createContactsApiWithAcceptedPeerAvatar()} />,
     );
 
@@ -1082,6 +1082,55 @@ describe('MessagesPage real API mode', () => {
     expect(screen.getByText('文件 report.pdf')).toBeInTheDocument();
   });
 
+  it('downloads an outgoing file message after upload through authorized media URL', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn<MessageApi['sendMessage']>(async (request) => ({
+      deduplicated: false,
+      message: serverMessage({
+        serverMsgId: 'srv_download_file_2',
+        clientMsgId: request.clientMsgId,
+        seq: 2,
+        senderId: currentUserId,
+        receiverId: request.chatType === 'single' ? request.receiverId : undefined,
+        groupId: request.chatType === 'group' ? request.groupId : undefined,
+        chatType: request.chatType,
+        contentType: request.contentType,
+        content: request.content,
+        sendTime: 1777464500000,
+        createdAt: 1777464500000,
+      }),
+    }));
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'seed before file download' })], sendMessage);
+    const mediaApi = createMediaApi();
+    const downloadMedia = vi.fn();
+    const uploadFetch = vi.fn(async () => new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', uploadFetch);
+    const file = sizedFile('report.pdf', 'application/pdf', 4096);
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        mediaApi={mediaApi}
+        contactsApi={createContactsApi()}
+        downloadMedia={downloadMedia}
+      />,
+    );
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    await user.upload(screen.getByLabelText('发送文件'), file);
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    const downloadButton = await within(log).findByRole('button', { name: '下载文件 report.pdf' });
+    expect(mediaApi.getDownloadURL).not.toHaveBeenCalled();
+
+    await user.click(downloadButton);
+
+    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_file_1'));
+    expect(downloadMedia).toHaveBeenCalledWith('https://media.test/download/med_file_1', 'report.pdf');
+    expect(screen.getByRole('status')).toHaveTextContent('已获取文件下载链接');
+  });
+
   it('renders image history messages as image bubbles instead of raw JSON text', async () => {
     const user = userEvent.setup();
     const mediaApi = createMediaApi();
@@ -1181,6 +1230,111 @@ describe('MessagesPage real API mode', () => {
 
     await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_download_image'));
     expect(downloadMedia).toHaveBeenCalledWith('https://media.test/download/med_download_image', 'download.jpg');
+  });
+
+  it('downloads an incoming historical file message through authorized media URL and an injected download handler', async () => {
+    const user = userEvent.setup();
+    const fileContent = JSON.stringify({
+      mediaId: 'med_history_file',
+      filename: 'history.pdf',
+      sizeBytes: 4096,
+      contentType: 'application/pdf',
+    });
+    const mediaApi = createMediaApi();
+    const downloadMedia = vi.fn();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, contentType: 'file', content: fileContent })]);
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        mediaApi={mediaApi}
+        contactsApi={createContactsApi()}
+        downloadMedia={downloadMedia}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /文件 history.pdf/ }));
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    expect(within(log).getByText('文件 history.pdf')).toBeInTheDocument();
+    expect(within(log).queryByText(fileContent)).not.toBeInTheDocument();
+
+    await user.click(within(log).getByRole('button', { name: '下载文件 history.pdf' }));
+
+    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_history_file'));
+    expect(downloadMedia).toHaveBeenCalledWith('https://media.test/download/med_history_file', 'history.pdf');
+    expect(screen.getByRole('status')).toHaveTextContent('已获取文件下载链接');
+  });
+
+  it('renders live websocket file messages with a working download button without refresh', async () => {
+    const user = userEvent.setup();
+    const mediaApi = createMediaApi();
+    const downloadMedia = vi.fn();
+    const messageApi = createMessageApi([]);
+    const { sockets, factory } = createFakeWebSocketFactory();
+    const fileContent = JSON.stringify({
+      mediaId: 'med_live_file',
+      filename: 'live.pdf',
+      sizeBytes: 8192,
+      contentType: 'application/pdf',
+    });
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        mediaApi={mediaApi}
+        contactsApi={createContactsApi()}
+        downloadMedia={downloadMedia}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_live_file', seq: 1, contentType: 'file', content: fileContent }));
+    });
+
+    await user.click(await screen.findByRole('button', { name: /文件 live.pdf/ }));
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    await user.click(await within(log).findByRole('button', { name: '下载文件 live.pdf' }));
+
+    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_live_file'));
+    expect(downloadMedia).toHaveBeenCalledWith('https://media.test/download/med_live_file', 'live.pdf');
+  });
+
+  it('shows an error for file messages missing mediaId and does not request a download URL', async () => {
+    const user = userEvent.setup();
+    const fileContent = JSON.stringify({
+      filename: 'missing-media.pdf',
+      sizeBytes: 512,
+      contentType: 'application/pdf',
+    });
+    const mediaApi = createMediaApi();
+    const downloadMedia = vi.fn();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, contentType: 'file', content: fileContent })]);
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        mediaApi={mediaApi}
+        contactsApi={createContactsApi()}
+        downloadMedia={downloadMedia}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /文件 missing-media.pdf/ }));
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    await user.click(await within(log).findByRole('button', { name: '下载文件 missing-media.pdf' }));
+
+    expect(await within(log).findByRole('alert')).toHaveTextContent('文件信息缺失，无法下载');
+    expect(screen.getByRole('status')).toHaveTextContent('文件信息缺失，无法下载');
+    expect(mediaApi.getDownloadURL).not.toHaveBeenCalled();
+    expect(downloadMedia).not.toHaveBeenCalled();
   });
 
   it('renders a double checkmark when an outgoing sent message is covered by the read threshold', async () => {
