@@ -30,6 +30,15 @@ describe('MePage', () => {
     expect(within(details).getByText('用户')).toBeInTheDocument();
   });
 
+  it('keeps Me-scoped menu entries and excludes moments', () => {
+    render(<MePage profile={profile} onUpdateProfile={vi.fn()} onUploadAvatar={vi.fn()} />);
+
+    expect(screen.getByText('服务')).toBeInTheDocument();
+    expect(screen.getByText('收藏')).toBeInTheDocument();
+    expect(screen.getByText('设置')).toBeInTheDocument();
+    expect(screen.queryByText('朋友圈')).not.toBeInTheDocument();
+  });
+
   it('renders the current avatar image and uploads a selected replacement', async () => {
     const user = userEvent.setup();
     const updatedProfile = {
