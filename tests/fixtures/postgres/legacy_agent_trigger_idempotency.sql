@@ -49,9 +49,9 @@ insert into agent_trigger_idempotency (
 -- Mark early migrations as applied to model an existing live DB and force the
 -- migrator to exercise the compatibility migration instead of replaying 003.
 insert into schema_migrations (version, checksum) values
-  ('001_init_postgres.sql', 'fixture-legacy-checksum-001'),
-  ('002_agent_audit_log.sql', 'fixture-legacy-checksum-002'),
-  ('002_agent_management.sql', 'fixture-legacy-checksum-002-management'),
-  ('003_agent_conversation_hosting.sql', 'fixture-legacy-checksum-003'),
-  ('004_agent_message_sender.sql', 'fixture-legacy-checksum-004'),
-  ('005_conversation_ai_hosting_settings.sql', 'fixture-legacy-checksum-005');
+  ('001_init_postgres.sql', 'legacy-adopted-001'),
+  ('002_agent_audit_log.sql', 'legacy-adopted-002'),
+  ('002_agent_management.sql', 'legacy-adopted-002-management'),
+  ('003_agent_conversation_hosting.sql', 'legacy-adopted-003'),
+  ('004_backfill_direct_conversation_states.sql', 'legacy-adopted-004'),
+  ('005_conversation_ai_hosting_settings.sql', 'legacy-adopted-005');
