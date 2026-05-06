@@ -287,6 +287,10 @@ describe('WeChat-inspired app shell', () => {
     expect(stylesCss).toMatch(/@media \(min-width: 900px\)[\s\S]*\.content-area\s*{[\s\S]*max-width:\s*none/);
   });
 
+  it('keeps stacked page cards at their intrinsic height inside the scrollable mobile viewport', () => {
+    expect(stylesCss).toMatch(/\.page-stack\s*>\s*\.md-card\s*{[\s\S]*flex-shrink:\s*0/);
+  });
+
   it('defaults to the real messages page and switches pages from the bottom navigation', async () => {
     const user = userEvent.setup();
     render(<App />);

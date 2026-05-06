@@ -142,6 +142,10 @@ time {
   gap: var(--md-space-3);
 }
 
+.page-stack > .md-card {
+  flex-shrink: 0;
+}
+
 .md-card {
   background: var(--md-sys-color-surface);
   border: 1px solid rgba(113, 122, 117, 0.18);
