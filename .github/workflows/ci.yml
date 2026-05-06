@@ -135,7 +135,23 @@ jobs:
       - name: Run PostgreSQL migrations
         run: bash scripts/migrate-postgres.sh --host-psql
 
+      - name: Verify PostgreSQL migrations are repeatable
+        run: bash scripts/verify-postgres-migrations.sh
+
+      - name: Verify old PostgreSQL schema upgrade
+        run: bash scripts/verify-postgres-old-schema-upgrade.sh
+
+      - name: Reset PostgreSQL schema after old-schema fixture
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          drop schema public cascade;
+          create schema public;
+          SQL
+          bash scripts/migrate-postgres.sh --host-psql
+
       - name: Run PostgreSQL integration tests
+        env:
+          AGENTS_IM_SKIP_TEST_MIGRATIONS: "1"
         run: |
           export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
           go test -tags=integration ./tests

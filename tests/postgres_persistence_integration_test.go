@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -471,21 +472,17 @@ func migrateAndCleanPostgres(t *testing.T, ctx context.Context, dsn string) {
 	}
 	defer db.Close()
 
-	root := findRepoRoot(t)
-	migrations, err := filepath.Glob(filepath.Join(root, "db", "migrations", "*.sql"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sort.Strings(migrations)
-	for _, migrationPath := range migrations {
-		migration, err := os.ReadFile(migrationPath)
+	if os.Getenv("AGENTS_IM_SKIP_TEST_MIGRATIONS") != "1" {
+		root := findRepoRoot(t)
+		cmd := exec.CommandContext(ctx, "bash", "scripts/migrate-postgres.sh", "--host-psql")
+		cmd.Dir = root
+		cmd.Env = append(os.Environ(), "DATABASE_URL="+dsn)
+		output, err := cmd.CombinedOutput()
 		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := db.ExecContext(ctx, string(migration)); err != nil {
-			t.Fatal(err)
+			t.Fatalf("run PostgreSQL migrations: %v\n%s", err, output)
 		}
 	}
+
 	if _, err := db.ExecContext(ctx, `
 truncate table
   agent_python_execs,
