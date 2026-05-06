@@ -1,7 +1,8 @@
 -- Fixture for upgrading old live databases where agent_trigger_idempotency
--- already exists with the pre-contract trigger_message_id column. This models
--- the deployment failure where 003 was replayed and attempted to index the
--- newer trigger_server_msg_id column before the old table shape was repaired.
+-- already exists with the pre-contract trigger_message_id column. Migration
+-- 003 is intentionally left pending so the upgrade check exercises the deploy
+-- failure where 003 indexes trigger_server_msg_id before the old table shape is
+-- repaired.
 
 create table if not exists schema_migrations (
   version text primary key,
@@ -46,12 +47,11 @@ insert into agent_trigger_idempotency (
   2
 );
 
--- Mark early migrations as applied to model an existing live DB and force the
--- migrator to exercise the compatibility migration instead of replaying 003.
+-- Mark surrounding migrations as applied to keep this fixture focused on the
+-- legacy table shape while leaving 003_agent_conversation_hosting.sql pending.
 insert into schema_migrations (version, checksum) values
   ('001_init_postgres.sql', 'legacy-adopted-001'),
   ('002_agent_audit_log.sql', 'legacy-adopted-002'),
   ('002_agent_management.sql', 'legacy-adopted-002-management'),
-  ('003_agent_conversation_hosting.sql', 'legacy-adopted-003'),
   ('004_backfill_direct_conversation_states.sql', 'legacy-adopted-004'),
   ('005_conversation_ai_hosting_settings.sql', 'legacy-adopted-005');

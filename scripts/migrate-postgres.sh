@@ -69,7 +69,13 @@ quote_sql_literal() {
 }
 
 migration_is_legacy_applied() {
-  local applied_checksum="$1"
+  local version="$1"
+  local applied_checksum="$2"
+  case "${version}:${applied_checksum}" in
+    "003_agent_conversation_hosting.sql:8b3bc3d0eebeeca6c03f03a7a5591d37cb752533d6fae7396fc01b11dbdda396")
+      return 0
+      ;;
+  esac
   [[ "${applied_checksum}" == fixture-legacy-checksum-* || "${applied_checksum}" == legacy-adopted-* ]]
 }
 
@@ -108,7 +114,7 @@ for migration in "${migrations[@]}"; do
   applied_checksum="$(psql_exec -Atc "select checksum from schema_migrations where version = ${version_sql};")"
   if [[ -n "${applied_checksum}" ]]; then
     if [[ "${applied_checksum}" != "${checksum}" ]]; then
-      if migration_is_legacy_applied "${applied_checksum}"; then
+      if migration_is_legacy_applied "${version}" "${applied_checksum}"; then
         echo "migration ${version}: legacy-adopted; trusting previously applied SQL and updating checksum"
         psql_exec -c "update schema_migrations set checksum = ${checksum_sql}, applied_at = now() where version = ${version_sql};"
         continue
