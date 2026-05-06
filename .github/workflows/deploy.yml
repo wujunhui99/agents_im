@@ -198,3 +198,31 @@ jobs:
 
           ssh "${ssh_opts[@]}" "${remote}" \
             "cd /opt/agents-im/repo && IMAGE_REGISTRY='${IMAGE_NAMESPACE}' IMAGE_TAG='${IMAGE_TAG}' GHCR_USERNAME='${GHCR_USERNAME}' GHCR_TOKEN='${GHCR_TOKEN}' SKIP_SET_IMAGE='${SKIP_SET_IMAGE}' SKIP_MIDDLEWARE='${SKIP_MIDDLEWARE}' SKIP_MIGRATIONS='${SKIP_MIGRATIONS}' IMAGE_SERVICES='${IMAGE_SERVICES}' ROLLOUT_SERVICES='${ROLLOUT_SERVICES}' RESTART_SERVICES='${RESTART_SERVICES}' RESTART_ROLLOUT='${RESTART_ROLLOUT}' MIDDLEWARE_DIR=/opt/agents-im/middleware ./scripts/deploy-k3s.sh"
+
+  notify:
+    name: Telegram notification
+    runs-on: ubuntu-latest
+    needs:
+      - detect-changes
+      - build-backend
+      - build-web
+      - deploy
+    if: always()
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Notify Telegram
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
+          ACTIONS_NOTIFY_STATUS: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || needs.deploy.result == 'skipped' && 'skipped' || 'success' }}
+          ACTIONS_NOTIFY_DETAILS: |-
+            detect-changes=${{ needs.detect-changes.result }}
+            build-backend=${{ needs.build-backend.result }}
+            build-web=${{ needs.build-web.result }}
+            deploy=${{ needs.deploy.result }}
+        run: bash scripts/notify-telegram-actions.sh
