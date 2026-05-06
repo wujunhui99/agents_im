@@ -62,6 +62,62 @@ func TestPublisherPublishesMessageCreatedOutboxEvent(t *testing.T) {
 	}
 }
 
+func TestPublisherIncludesAISenderInSingleChatReceiverIDs(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemoryMessageRepository()
+	trigger := createTestMessage(t, repo, "client-ai-trigger", "please reply")
+	message, deduplicated, err := repo.CreateMessageIdempotent(ctx, repository.CreateMessageInput{
+		SenderID:           "usr_a",
+		ReceiverID:         "usr_b",
+		ChatType:           repository.ChatTypeSingle,
+		ClientMsgID:        "client-ai-response",
+		ContentType:        repository.ContentTypeText,
+		Content:            "AI response",
+		MessageOrigin:      repository.MessageOriginAI,
+		AgentAccountID:     "usr_a",
+		TriggerServerMsgID: trigger.ServerMsgID,
+		AgentRunID:         "run_visibility",
+		ParticipantUserIDs: []string{"usr_a", "usr_b"},
+	})
+	if err != nil {
+		t.Fatalf("create ai message: %v", err)
+	}
+	if deduplicated {
+		t.Fatal("ai message should not be deduplicated")
+	}
+
+	events, err := repo.PollPending(ctx, "publisher-ai-sender", 10, time.Minute)
+	if err != nil {
+		t.Fatalf("poll outbox: %v", err)
+	}
+	var aiEvent repository.OutboxEvent
+	for _, event := range events {
+		if event.ServerMsgID == message.ServerMsgID {
+			aiEvent = event
+			break
+		}
+	}
+	if aiEvent.EventID == "" {
+		t.Fatalf("ai outbox event not found: %+v", events)
+	}
+
+	accepted, err := MessageEventFromOutbox(aiEvent)
+	if err != nil {
+		t.Fatalf("message event from outbox: %v", err)
+	}
+	if len(accepted.Payload.ReceiverIDs) != 2 ||
+		accepted.Payload.ReceiverIDs[0] != "usr_a" ||
+		accepted.Payload.ReceiverIDs[1] != "usr_b" {
+		t.Fatalf("ai receiver ids = %+v, want owner and receiver", accepted.Payload.ReceiverIDs)
+	}
+	if accepted.Payload.MessageOrigin != repository.MessageOriginAI ||
+		accepted.Payload.AgentAccountID != "usr_a" ||
+		accepted.Payload.TriggerServerMsgID != trigger.ServerMsgID ||
+		accepted.Payload.AgentRunID != "run_visibility" {
+		t.Fatalf("ai metadata mismatch: %+v", accepted.Payload)
+	}
+}
+
 func TestPublisherMarksPublishErrorRetryable(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemoryMessageRepository()

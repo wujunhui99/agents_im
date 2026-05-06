@@ -54,6 +54,68 @@ func TestOutboxEventConsumerReceivesMessageAcceptedEnvelope(t *testing.T) {
 	}
 }
 
+func TestOutboxEventConsumerIncludesAISenderAndReceiver(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemoryMessageRepository()
+	trigger, _, err := repo.CreateMessageIdempotent(ctx, repository.CreateMessageInput{
+		SenderID:           "bob",
+		ReceiverID:         "alice",
+		ChatType:           repository.ChatTypeSingle,
+		ClientMsgID:        "client-ai-trigger",
+		ContentType:        repository.ContentTypeText,
+		Content:            "please reply",
+		ParticipantUserIDs: []string{"alice", "bob"},
+	})
+	if err != nil {
+		t.Fatalf("create trigger message: %v", err)
+	}
+	message, _, err := repo.CreateMessageIdempotent(ctx, repository.CreateMessageInput{
+		SenderID:           "alice",
+		ReceiverID:         "bob",
+		ChatType:           repository.ChatTypeSingle,
+		ClientMsgID:        "client-ai-response",
+		ContentType:        repository.ContentTypeText,
+		Content:            "AI response",
+		MessageOrigin:      repository.MessageOriginAI,
+		AgentAccountID:     "alice",
+		TriggerServerMsgID: trigger.ServerMsgID,
+		AgentRunID:         "run_outbox_consumer_visibility",
+		ParticipantUserIDs: []string{"alice", "bob"},
+	})
+	if err != nil {
+		t.Fatalf("create ai message: %v", err)
+	}
+
+	consumer, err := NewOutboxEventConsumer(OutboxEventConsumerConfig{
+		Repository: repo,
+		WorkerID:   "transfer-ai-test",
+	})
+	if err != nil {
+		t.Fatalf("new outbox consumer: %v", err)
+	}
+
+	var envelope Envelope
+	for {
+		next, err := consumer.Receive(ctx)
+		if err != nil {
+			t.Fatalf("receive: %v", err)
+		}
+		if next.Event.ServerMsgID == message.ServerMsgID {
+			envelope = next
+			break
+		}
+	}
+	if len(envelope.Event.ReceiverIDs) != 2 || envelope.Event.ReceiverIDs[0] != "alice" || envelope.Event.ReceiverIDs[1] != "bob" {
+		t.Fatalf("receiver ids = %v, want owner and receiver", envelope.Event.ReceiverIDs)
+	}
+	if envelope.Event.MessageOrigin != repository.MessageOriginAI ||
+		envelope.Event.AgentAccountID != "alice" ||
+		envelope.Event.TriggerServerMsgID != trigger.ServerMsgID ||
+		envelope.Event.AgentRunID != "run_outbox_consumer_visibility" {
+		t.Fatalf("ai metadata mismatch: %+v", envelope.Event)
+	}
+}
+
 func TestOutboxEventConsumerMarksPublishedAndRetry(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemoryMessageRepository()
