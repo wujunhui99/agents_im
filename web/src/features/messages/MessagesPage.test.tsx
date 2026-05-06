@@ -1204,6 +1204,20 @@ describe('MessagesPage real API mode', () => {
     expect(readStatus.textContent).toBe('✔✔');
   });
 
+  it('keeps read receipts as checkmarks without rendering residual read-to text', async () => {
+    const messageApi = createMessageApi(
+      [serverMessage({ seq: 1, content: 'incoming read sync trigger' })],
+      undefined,
+      { hasReadSeq: 0, unreadCount: 1 },
+    );
+
+    await openSeededConversation(messageApi);
+
+    await waitFor(() => expect(messageApi.markRead).toHaveBeenCalledWith(conversationId, { hasReadSeq: 1 }));
+    expect(screen.queryByText(/已读到\s*1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已读到/)).not.toBeInTheDocument();
+  });
+
   it('keeps pending and failed outgoing message states understandable', async () => {
     const user = userEvent.setup();
     const sendDeferred = deferred<SendMessageResponse>();
