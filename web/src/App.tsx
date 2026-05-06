@@ -159,10 +159,12 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
 
             return (
               <section
-                className="tab-panel"
+                className={`tab-panel ${isActive ? 'tab-panel-active' : 'tab-panel-inactive'}`}
+                data-active={isActive ? 'true' : 'false'}
                 role="tabpanel"
                 aria-label={tab.label}
                 aria-hidden={isActive ? undefined : true}
+                inert={isActive ? undefined : true}
                 hidden={!isActive}
                 key={tab.key}
               >

@@ -79,6 +79,27 @@ function countFetchCalls(mock: { mock: { calls: unknown[][] } }, path: string, m
   ).length;
 }
 
+function installAppStyles(extraCss = '') {
+  const style = document.createElement('style');
+  style.dataset.testStyle = 'app-shell';
+  style.textContent = `${stylesCss}\n${extraCss}`;
+  document.head.append(style);
+  return style;
+}
+
+function removeInstalledStyles() {
+  document.head.querySelectorAll('style[data-test-style="app-shell"]').forEach((style) => style.remove());
+}
+
+function getTabPanel(label: string) {
+  const panel = screen
+    .getAllByRole('tabpanel', { hidden: true })
+    .find((candidate) => candidate.getAttribute('aria-label') === label);
+
+  expect(panel).toBeDefined();
+  return panel as HTMLElement;
+}
+
 describe('Auth flow', () => {
   const fetchMock = vi.fn();
 
@@ -91,6 +112,7 @@ describe('Auth flow', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     localStorage.clear();
+    removeInstalledStyles();
   });
 
   it('shows a WeChat-style login page before authentication and saves the login token', async () => {
@@ -234,6 +256,7 @@ describe('WeChat-inspired app shell', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     localStorage.clear();
+    removeInstalledStyles();
   });
 
   it('renders the four primary tabs', async () => {
@@ -275,6 +298,11 @@ describe('WeChat-inspired app shell', () => {
 
   it('hides inactive kept-alive tab panels so previous page content cannot remain visible', async () => {
     const user = userEvent.setup();
+    installAppStyles(`
+      .tab-panel[hidden] {
+        display: flex !important;
+      }
+    `);
     render(<App />);
 
     await user.click(screen.getByRole('tab', { name: /联系人/i }));
@@ -283,7 +311,31 @@ describe('WeChat-inspired app shell', () => {
     await user.click(screen.getByRole('tab', { name: /我的/i }));
     expect(screen.getByRole('heading', { name: '我的' })).toBeInTheDocument();
 
+    const messagesPanel = getTabPanel('消息');
+    const contactsPanel = getTabPanel('联系人');
+    const mePanel = getTabPanel('我的');
+    const inactivePanels = [messagesPanel, contactsPanel];
+
+    expect(mePanel).toHaveAttribute('data-active', 'true');
+    expect(mePanel).not.toHaveAttribute('hidden');
+    expect(mePanel).not.toHaveAttribute('aria-hidden');
+    expect(mePanel).not.toHaveAttribute('inert');
+    expect(getComputedStyle(mePanel).visibility).toBe('visible');
+    expect(within(mePanel).getAllByText(/alice_001/).length).toBeGreaterThan(0);
+
+    for (const panel of inactivePanels) {
+      expect(panel).toHaveAttribute('data-active', 'false');
+      expect(panel).toHaveAttribute('hidden');
+      expect(panel).toHaveAttribute('aria-hidden', 'true');
+      expect(panel).toHaveAttribute('inert');
+      expect(getComputedStyle(panel).position).toBe('absolute');
+      expect(getComputedStyle(panel).visibility).toBe('hidden');
+      expect(getComputedStyle(panel).pointerEvents).toBe('none');
+      expect(getComputedStyle(panel).overflow).toBe('hidden');
+    }
     expect(stylesCss).toMatch(/\.tab-panel\[hidden\]\s*{[\s\S]*display:\s*none\s*!important/);
+    expect(stylesCss).toMatch(/\.tab-panel\[data-active="false"\][\s\S]*visibility:\s*hidden/);
+    expect(stylesCss).toMatch(/\.tab-panel\[data-active="false"\][\s\S]*pointer-events:\s*none/);
   });
 
   it('keeps the loaded contacts tab state when switching away and back without refetching friends or requests', async () => {

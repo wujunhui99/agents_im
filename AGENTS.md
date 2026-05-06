@@ -23,7 +23,9 @@
 - 用户偏好：Hermes/Helios 做 planner/architect/reviewer/integrator，编码测试尽量委派 Codex。
 - feature 原则：`feature/* -> develop -> main`；紧急生产 hotfix 可从 `main -> fix/* -> main`。
 - Codex 是否允许 commit/push 必须由任务说明明确；未明确时不要 push。
+- Codex 解决 GitHub Issue 后必须在对应 Issue 评论一次：功能说明实现方式，Bug 说明根因/修复方式，并附测试摘要。
 - Controller 必须复核 Codex 的 diff、测试和分支状态，不能只信自述。
+- Hermes 对 Codex 完成态做轻量检查；合并到 `develop` 前做中等强度检查，并在 Issue 评论验证结果后再关闭。
 - Codex commit 前验证门禁：按改动范围运行 gofmt、git diff --check、go test ./...、scripts/verify-static.sh；web 改动加前端测试/build；DB/repository SQL 改动加 PostgreSQL integration。
 - 数据库 schema/data 变更必须新增 `db/change_log/*.sql`；`.md` 只作说明，SQL 是事实源。
 
