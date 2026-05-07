@@ -319,6 +319,18 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function localTimestamp(year: number, month: number, day: number, hour: number, minute: number) {
+  return new Date(year, month - 1, day, hour, minute, 0, 0).getTime();
+}
+
+function expectedLocalDate(timestamp: number) {
+  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(timestamp));
+}
+
+function expectedLocalTime(timestamp: number) {
+  return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(timestamp));
+}
+
 async function openSeededConversation(messageApi: MessageApi) {
   render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
   await userEvent.click(await screen.findByRole('button', { name: /未知联系人/ }));
@@ -1356,6 +1368,78 @@ describe('MessagesPage real API mode', () => {
     const readStatus = within(outgoingMessage).getByLabelText('对方已读');
 
     expect(readStatus.textContent).toBe('✔✔');
+  });
+
+  it('renders one centered date separator for messages from the same local day', async () => {
+    const sameDay = localTimestamp(2026, 4, 29, 9, 12);
+    const laterSameDay = localTimestamp(2026, 4, 29, 21, 35);
+    const dateLabel = expectedLocalDate(sameDay);
+    const log = await openSeededConversation(
+      createMessageApi([
+        serverMessage({ seq: 1, content: 'same-day first', sendTime: sameDay, createdAt: sameDay }),
+        serverMessage({ seq: 2, content: 'same-day second', sendTime: laterSameDay, createdAt: laterSameDay }),
+      ]),
+    );
+
+    const separators = within(log).getAllByRole('separator', { name: dateLabel });
+    expect(separators).toHaveLength(1);
+    expect(separators[0]).toHaveClass('message-date-separator');
+    expectTextOrder(log, [dateLabel, 'same-day first', 'same-day second']);
+  });
+
+  it('renders centered date separators above the first message of each local day', async () => {
+    const firstDay = localTimestamp(2026, 4, 28, 22, 10);
+    const secondDay = localTimestamp(2026, 4, 29, 8, 5);
+    const firstDayLabel = expectedLocalDate(firstDay);
+    const secondDayLabel = expectedLocalDate(secondDay);
+    const log = await openSeededConversation(
+      createMessageApi([
+        serverMessage({ seq: 1, content: 'previous local day', sendTime: firstDay, createdAt: firstDay }),
+        serverMessage({ seq: 2, content: 'next local day', sendTime: secondDay, createdAt: secondDay }),
+      ]),
+    );
+
+    expect(within(log).getByRole('separator', { name: firstDayLabel })).toHaveClass('message-date-separator');
+    expect(within(log).getByRole('separator', { name: secondDayLabel })).toHaveClass('message-date-separator');
+    expectTextOrder(log, [firstDayLabel, 'previous local day', secondDayLabel, 'next local day']);
+  });
+
+  it('renders outgoing message metadata as local time with a compact success checkmark', async () => {
+    const sentAt = localTimestamp(2026, 4, 29, 20, 5);
+    const log = await openSeededConversation(
+      createMessageApi(
+        [
+          serverMessage({
+            seq: 1,
+            content: 'outgoing with compact metadata',
+            senderId: currentUserId,
+            receiverId: peerUserId,
+            sendTime: sentAt,
+            createdAt: sentAt,
+          }),
+        ],
+        undefined,
+        { hasReadSeq: 0, unreadCount: 0 },
+      ),
+    );
+
+    const outgoingMessage = within(log).getByRole('article', { name: '我发送的消息：outgoing with compact metadata' });
+    expect(within(outgoingMessage).getByText(expectedLocalTime(sentAt))).toBeInTheDocument();
+    expect(within(outgoingMessage).getByLabelText('发送成功')).toHaveTextContent('✔');
+    expect(within(outgoingMessage).queryByText('已发送')).not.toBeInTheDocument();
+  });
+
+  it('renders incoming message metadata as local time without outgoing checkmarks', async () => {
+    const receivedAt = localTimestamp(2026, 4, 29, 8, 3);
+    const log = await openSeededConversation(
+      createMessageApi([serverMessage({ seq: 1, content: 'incoming with time only', sendTime: receivedAt, createdAt: receivedAt })]),
+    );
+    const incomingMessage = within(log).getByRole('article', { name: '收到的消息：incoming with time only' });
+
+    expect(within(incomingMessage).getByText(expectedLocalTime(receivedAt))).toBeInTheDocument();
+    expect(within(incomingMessage).queryByLabelText('发送成功')).not.toBeInTheDocument();
+    expect(within(incomingMessage).queryByLabelText('对方已读')).not.toBeInTheDocument();
+    expect(within(incomingMessage).queryByText('✔')).not.toBeInTheDocument();
   });
 
   it('keeps read receipts as checkmarks without rendering residual read-to text', async () => {
