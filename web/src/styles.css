@@ -1132,6 +1132,24 @@ button.md-list-item:hover,
   padding: 14px 14px 18px;
 }
 
+.message-date-separator {
+  align-self: center;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.message-date-separator span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--md-sys-color-on-surface-variant);
+  background: color-mix(in srgb, var(--md-sys-color-surface-container-high), transparent 8%);
+  box-shadow: var(--md-elevation-level1);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
 .message-row {
   display: flex;
 }
@@ -1195,10 +1213,10 @@ button.md-list-item:hover,
   overflow-wrap: anywhere;
 }
 
-.md-message-bubble-outgoing .md-message-bubble-text-with-status {
-  min-width: 58px;
-  padding-right: 52px;
-  padding-bottom: 14px;
+.md-message-bubble-text-with-status {
+  min-width: 96px;
+  padding-right: 92px;
+  padding-bottom: 16px;
 }
 
 .md-message-bubble-outgoing p {
@@ -1206,14 +1224,11 @@ button.md-list-item:hover,
   background: var(--md-sys-color-primary-container);
 }
 
-.md-message-bubble-status {
-  display: inline-flex;
-}
-
-.md-message-bubble-outgoing .md-message-bubble-status {
+.md-message-bubble-metadata {
   position: absolute;
   right: 10px;
   bottom: 6px;
+  display: inline-flex;
   align-items: center;
 }
 
@@ -1224,6 +1239,20 @@ button.md-list-item:hover,
 .message-status {
   color: var(--md-sys-color-on-surface-variant);
   font-size: 11px;
+  line-height: 1.2;
+}
+
+.message-metadata {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.message-time {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
 
