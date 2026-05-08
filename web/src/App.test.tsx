@@ -1552,7 +1552,7 @@ describe('WeChat-inspired app shell', () => {
 
     await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
     expect(await screen.findByText('hello alice')).toBeInTheDocument();
-    expect(await screen.findByText('AI/Agent')).toBeInTheDocument();
+    expect(await screen.findByText('AI Agent')).toBeInTheDocument();
 
     await user.type(screen.getByRole('textbox', { name: '输入消息' }), '这是测试消息');
     await user.click(screen.getByRole('button', { name: '发送' }));

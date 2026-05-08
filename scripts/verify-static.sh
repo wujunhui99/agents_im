@@ -778,7 +778,7 @@ done
 agent_conversation_hosting_test_patterns=(
   "TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates"
   "SetMessageCreatedHook"
-  "AI/Agent"
+  "AI Agent"
   "messageOrigin: 'ai'"
   "deterministic-test"
 )
