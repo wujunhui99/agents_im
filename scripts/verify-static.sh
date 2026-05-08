@@ -97,6 +97,13 @@ required_files=(
   "internal/handler/media/complete_upload_handler.go"
   "internal/handler/media/get_download_url_handler.go"
   "internal/handler/user/update_me_avatar_handler.go"
+  "internal/servicecontext/common/auth.go"
+  "internal/servicecontext/user/service_context.go"
+  "internal/servicecontext/friends/service_context.go"
+  "internal/servicecontext/groups/service_context.go"
+  "internal/servicecontext/message/service_context.go"
+  "internal/servicecontext/agent/service_context.go"
+  "internal/servicecontext/gateway/service_context.go"
   "internal/health/health.go"
   "internal/health/health_test.go"
   "internal/observability/metrics.go"
@@ -171,6 +178,7 @@ required_files=(
   "docs/product-specs/frontend-sync-contract.md"
   "docs/product-specs/read-receipts.md"
   "docs/design-docs/user-service-go-zero.md"
+  "docs/design-docs/rest-service-context-boundaries.md"
   "docs/design-docs/account-service-terminology.md"
   "docs/design-docs/auth-service-go-zero.md"
   "docs/design-docs/friends-service-go-zero.md"
@@ -442,6 +450,18 @@ done
 
 if [[ -d internal/rpc || -d internal/auth/rpc ]]; then
   echo "old rpc compatibility directory still exists" >&2
+  exit 1
+fi
+
+if [[ -d internal/svc ]]; then
+  echo "legacy root internal/svc package must not exist; use focused internal/servicecontext/<service> packages" >&2
+  exit 1
+fi
+
+root_svc_import_files="$(rg -l '"github.com/wujunhui99/agents_im/internal/svc"' cmd internal/handler internal/logic internal/gateway tests --glob '*.go' || true)"
+if [[ -n "${root_svc_import_files}" ]]; then
+  echo "core REST, gateway, and tests must not import legacy root internal/svc:" >&2
+  echo "${root_svc_import_files}" >&2
   exit 1
 fi
 
@@ -1685,7 +1705,7 @@ account_code_patterns=(
 )
 
 for pattern in "${account_code_patterns[@]}"; do
-  rg -qF "$pattern" internal/model/user.go internal/repository/repository.go internal/repository/memory.go internal/repository/postgres_user_friends.go internal/logic/userlogic.go internal/svc/service_context.go internal/handler/gozero_routes.go
+  rg -qF "$pattern" internal/model/user.go internal/repository/repository.go internal/repository/memory.go internal/repository/postgres_user_friends.go internal/logic/userlogic.go internal/servicecontext/user/service_context.go internal/handler/gozero_routes.go
 done
 
 account_storage_patterns=(
@@ -1888,7 +1908,7 @@ fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
-  internal/model internal/logic internal/handler internal/rpcgen/user internal/svc; then
+  internal/model internal/logic internal/handler internal/rpcgen/user internal/servicecontext; then
   echo "forbidden auth secret field found in service source" >&2
   exit 1
 fi

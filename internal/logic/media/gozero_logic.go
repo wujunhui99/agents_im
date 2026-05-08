@@ -6,7 +6,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -14,10 +14,10 @@ import (
 type CreateUploadIntentLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewCreateUploadIntentLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CreateUploadIntentLogic {
+func NewCreateUploadIntentLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *CreateUploadIntentLogic {
 	return &CreateUploadIntentLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -61,10 +61,10 @@ func (l *CreateUploadIntentLogic) CreateUploadIntent(req *types.CreateMediaUploa
 type CompleteUploadLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewCompleteUploadLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CompleteUploadLogic {
+func NewCompleteUploadLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *CompleteUploadLogic {
 	return &CompleteUploadLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -97,10 +97,10 @@ func (l *CompleteUploadLogic) CompleteUpload(req *types.CompleteMediaUploadReq) 
 type GetDownloadURLLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewGetDownloadURLLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetDownloadURLLogic {
+func NewGetDownloadURLLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *GetDownloadURLLogic {
 	return &GetDownloadURLLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -137,10 +137,10 @@ func (l *GetDownloadURLLogic) GetDownloadURL(req *types.GetMediaDownloadURLReq) 
 type GetAvatarLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewGetAvatarLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetAvatarLogic {
+func NewGetAvatarLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *GetAvatarLogic {
 	return &GetAvatarLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,

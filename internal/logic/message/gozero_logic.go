@@ -7,7 +7,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -15,10 +15,10 @@ import (
 type GetConversationSeqsLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *messagesvc.ServiceContext
 }
 
-func NewGetConversationSeqsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetConversationSeqsLogic {
+func NewGetConversationSeqsLogic(ctx context.Context, svcCtx *messagesvc.ServiceContext) *GetConversationSeqsLogic {
 	return &GetConversationSeqsLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -54,10 +54,10 @@ func (l *GetConversationSeqsLogic) GetConversationSeqs(req *types.ConversationSe
 type MarkConversationAsReadLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *messagesvc.ServiceContext
 }
 
-func NewMarkConversationAsReadLogic(ctx context.Context, svcCtx *svc.ServiceContext) *MarkConversationAsReadLogic {
+func NewMarkConversationAsReadLogic(ctx context.Context, svcCtx *messagesvc.ServiceContext) *MarkConversationAsReadLogic {
 	return &MarkConversationAsReadLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -95,10 +95,10 @@ func (l *MarkConversationAsReadLogic) MarkConversationAsRead(req *types.MarkConv
 type GetConversationAIHostingLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *messagesvc.ServiceContext
 }
 
-func NewGetConversationAIHostingLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetConversationAIHostingLogic {
+func NewGetConversationAIHostingLogic(ctx context.Context, svcCtx *messagesvc.ServiceContext) *GetConversationAIHostingLogic {
 	return &GetConversationAIHostingLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -128,10 +128,10 @@ func (l *GetConversationAIHostingLogic) GetConversationAIHosting(req *types.Conv
 type UpdateConversationAIHostingLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *messagesvc.ServiceContext
 }
 
-func NewUpdateConversationAIHostingLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateConversationAIHostingLogic {
+func NewUpdateConversationAIHostingLogic(ctx context.Context, svcCtx *messagesvc.ServiceContext) *UpdateConversationAIHostingLogic {
 	return &UpdateConversationAIHostingLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -162,10 +162,10 @@ func (l *UpdateConversationAIHostingLogic) UpdateConversationAIHosting(req *type
 type PullMessagesLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *messagesvc.ServiceContext
 }
 
-func NewPullMessagesLogic(ctx context.Context, svcCtx *svc.ServiceContext) *PullMessagesLogic {
+func NewPullMessagesLogic(ctx context.Context, svcCtx *messagesvc.ServiceContext) *PullMessagesLogic {
 	return &PullMessagesLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -209,10 +209,10 @@ func (l *PullMessagesLogic) PullMessages(req *types.PullMessagesReq) (*types.Pul
 type SendMessageLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *messagesvc.ServiceContext
 }
 
-func NewSendMessageLogic(ctx context.Context, svcCtx *svc.ServiceContext) *SendMessageLogic {
+func NewSendMessageLogic(ctx context.Context, svcCtx *messagesvc.ServiceContext) *SendMessageLogic {
 	return &SendMessageLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,

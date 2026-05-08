@@ -10,7 +10,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 )
 
 func TestGroupsLogicCreateJoinRepeatLeaveAndList(t *testing.T) {
@@ -250,7 +250,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	creator := mustCreateUser(t, userLogic, "creator_003")
 	member := mustCreateUser(t, userLogic, "member_003")
 	outsider := mustCreateUser(t, userLogic, "outsider_003")
-	serviceContext := svc.NewGroupsServiceContextWithAuth(
+	serviceContext := groupssvc.NewServiceContextWithAuth(
 		repository.NewMemoryGroupsRepository(),
 		logic.NewUserLogicExistenceChecker(userLogic),
 		testJWTAuthConfig(),

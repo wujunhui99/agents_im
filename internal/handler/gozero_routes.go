@@ -7,6 +7,7 @@ import (
 
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
+	"github.com/wujunhui99/agents_im/internal/config"
 	agenthandler "github.com/wujunhui99/agents_im/internal/handler/agent"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
@@ -15,31 +16,21 @@ import (
 	userhandler "github.com/wujunhui99/agents_im/internal/handler/user"
 	"github.com/wujunhui99/agents_im/internal/health"
 	"github.com/wujunhui99/agents_im/internal/observability"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
+	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
+	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func RegisterGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
-	registerGoZeroObservabilityHandlers(server, "agents-im-api", func(*http.Request) []health.Check {
-		return []health.Check{
-			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
-			componentCheck("account_logic", serverCtx != nil && serverCtx.AccountLogic != nil, "configured"),
-			componentCheck("user_logic", serverCtx != nil && serverCtx.UserLogic != nil, "configured"),
-			componentCheck("friends_logic", serverCtx != nil && serverCtx.FriendsLogic != nil, "configured"),
-			componentCheck("message_logic", serverCtx != nil && serverCtx.MessageLogic != nil, "configured"),
-			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
-			componentCheck("message_repository", serverCtx != nil && serverCtx.MessageRepo != nil, "configured"),
-			componentCheck("media_logic", serverCtx != nil && serverCtx.MediaLogic != nil, "configured"),
-		}
-	})
-	addUserRoutes(server, serverCtx)
-	addMediaRoutes(server, serverCtx)
-	addFriendsRoutes(server, serverCtx)
-	addMessageRoutes(server, serverCtx)
+type authRouteContext interface {
+	AuthConfig() config.JWTAuthConfig
+	ActiveSessionRepository() authrepo.ActiveSessionRepository
 }
 
-func RegisterUserGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
+func RegisterUserGoZeroHandlers(server *rest.Server, serverCtx *usersvc.ServiceContext) {
 	registerGoZeroObservabilityHandlers(server, "user-api", func(*http.Request) []health.Check {
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
@@ -53,19 +44,18 @@ func RegisterUserGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceConte
 	addMediaRoutes(server, serverCtx)
 }
 
-func RegisterFriendsGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
+func RegisterFriendsGoZeroHandlers(server *rest.Server, serverCtx *friendssvc.ServiceContext) {
 	registerGoZeroObservabilityHandlers(server, "friends-api", func(*http.Request) []health.Check {
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
 			componentCheck("friends_logic", serverCtx != nil && serverCtx.FriendsLogic != nil, "configured"),
 			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
-			componentCheck("media_logic", serverCtx != nil && serverCtx.MediaLogic != nil, "configured"),
 		}
 	})
 	addFriendsRoutes(server, serverCtx)
 }
 
-func RegisterGroupsGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
+func RegisterGroupsGoZeroHandlers(server *rest.Server, serverCtx *groupssvc.ServiceContext) {
 	registerGoZeroObservabilityHandlers(server, "groups-api", func(*http.Request) []health.Check {
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
@@ -76,7 +66,7 @@ func RegisterGroupsGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceCon
 	addGroupsRoutes(server, serverCtx)
 }
 
-func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
+func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *messagesvc.ServiceContext) {
 	registerGoZeroObservabilityHandlers(server, "message-api", func(*http.Request) []health.Check {
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
@@ -90,7 +80,7 @@ func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceCo
 	addMessageRoutes(server, serverCtx)
 }
 
-func RegisterAgentGoZeroHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
+func RegisterAgentGoZeroHandlers(server *rest.Server, serverCtx *agentsvc.ServiceContext) {
 	registerGoZeroObservabilityHandlers(server, "agent-api", func(*http.Request) []health.Check {
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
@@ -128,7 +118,7 @@ func componentCheck(name string, ok bool, readyMessage string) health.Check {
 	return health.ComponentCheck(name, false, "missing")
 }
 
-func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+func addUserRoutes(server *rest.Server, serverCtx *usersvc.ServiceContext) {
 	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodGet,
@@ -181,7 +171,7 @@ func addUserRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 	})
 }
 
-func addMediaRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+func addMediaRoutes(server *rest.Server, serverCtx *usersvc.ServiceContext) {
 	server.AddRoutes([]rest.Route{
 		{
 			Method:  http.MethodGet,
@@ -209,7 +199,7 @@ func addMediaRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 	}), jwtOption(serverCtx))
 }
 
-func addFriendsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+func addFriendsRoutes(server *rest.Server, serverCtx *friendssvc.ServiceContext) {
 	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,
@@ -249,7 +239,7 @@ func addFriendsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 	}), jwtOption(serverCtx))
 }
 
-func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+func addGroupsRoutes(server *rest.Server, serverCtx *groupssvc.ServiceContext) {
 	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,
@@ -284,7 +274,7 @@ func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 	}), jwtOption(serverCtx))
 }
 
-func addMessageRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+func addMessageRoutes(server *rest.Server, serverCtx *messagesvc.ServiceContext) {
 	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,
@@ -319,7 +309,7 @@ func addMessageRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 	}), jwtOption(serverCtx))
 }
 
-func addAgentRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
+func addAgentRoutes(server *rest.Server, serverCtx *agentsvc.ServiceContext) {
 	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
 		{
 			Method:  http.MethodPost,
@@ -354,19 +344,20 @@ func addAgentRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 	}), jwtOption(serverCtx))
 }
 
-func jwtOption(serverCtx *svc.ServiceContext) rest.RouteOption {
-	return rest.WithJwt(serverCtx.Auth.AccessSecret)
+func jwtOption(serverCtx authRouteContext) rest.RouteOption {
+	return rest.WithJwt(serverCtx.AuthConfig().AccessSecret)
 }
 
-func authenticatedRoutes(serverCtx *svc.ServiceContext, routes []rest.Route) []rest.Route {
-	if serverCtx == nil || serverCtx.AuthSessions == nil {
+func authenticatedRoutes(serverCtx authRouteContext, routes []rest.Route) []rest.Route {
+	if serverCtx == nil || serverCtx.ActiveSessionRepository() == nil {
 		return routes
 	}
 	return rest.WithMiddleware(activeSessionMiddleware(serverCtx), routes...)
 }
 
-func activeSessionMiddleware(serverCtx *svc.ServiceContext) rest.Middleware {
-	auth := serverCtx.Auth
+func activeSessionMiddleware(serverCtx authRouteContext) rest.Middleware {
+	auth := serverCtx.AuthConfig()
+	activeSessions := serverCtx.ActiveSessionRepository()
 	tokenManager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -375,7 +366,7 @@ func activeSessionMiddleware(serverCtx *svc.ServiceContext) rest.Middleware {
 				httpx.ErrorCtx(r.Context(), w, err)
 				return
 			}
-			if err := authrepo.ValidateActiveSession(r.Context(), serverCtx.AuthSessions, claims); err != nil {
+			if err := authrepo.ValidateActiveSession(r.Context(), activeSessions, claims); err != nil {
 				httpx.ErrorCtx(r.Context(), w, err)
 				return
 			}

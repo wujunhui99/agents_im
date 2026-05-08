@@ -6,7 +6,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -14,10 +14,10 @@ import (
 type AddFriendLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *friendssvc.ServiceContext
 }
 
-func NewAddFriendLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddFriendLogic {
+func NewAddFriendLogic(ctx context.Context, svcCtx *friendssvc.ServiceContext) *AddFriendLogic {
 	return &AddFriendLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -55,10 +55,10 @@ func (l *AddFriendLogic) AddFriend(req *types.AddFriendReq) (*types.AddFriendRes
 type DeleteFriendLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *friendssvc.ServiceContext
 }
 
-func NewDeleteFriendLogic(ctx context.Context, svcCtx *svc.ServiceContext) *DeleteFriendLogic {
+func NewDeleteFriendLogic(ctx context.Context, svcCtx *friendssvc.ServiceContext) *DeleteFriendLogic {
 	return &DeleteFriendLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -96,10 +96,10 @@ func (l *DeleteFriendLogic) DeleteFriend(req *types.FriendPathReq) (*types.Delet
 type GetFriendshipLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *friendssvc.ServiceContext
 }
 
-func NewGetFriendshipLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetFriendshipLogic {
+func NewGetFriendshipLogic(ctx context.Context, svcCtx *friendssvc.ServiceContext) *GetFriendshipLogic {
 	return &GetFriendshipLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -136,10 +136,10 @@ func (l *GetFriendshipLogic) GetFriendship(req *types.FriendPathReq) (*types.Fri
 type ListFriendsLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *friendssvc.ServiceContext
 }
 
-func NewListFriendsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListFriendsLogic {
+func NewListFriendsLogic(ctx context.Context, svcCtx *friendssvc.ServiceContext) *ListFriendsLogic {
 	return &ListFriendsLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -173,7 +173,7 @@ func (l *ListFriendsLogic) ListFriends(req *types.ListFriendsReq) (*types.ListFr
 	}, nil
 }
 
-func toFriendship(ctx context.Context, svcCtx *svc.ServiceContext, friendship business.FriendshipView) (types.Friendship, error) {
+func toFriendship(ctx context.Context, svcCtx *friendssvc.ServiceContext, friendship business.FriendshipView) (types.Friendship, error) {
 	view := types.Friendship{
 		UserID:    friendship.UserID,
 		FriendID:  friendship.FriendID,
@@ -192,7 +192,7 @@ func toFriendship(ctx context.Context, svcCtx *svc.ServiceContext, friendship bu
 	return view, nil
 }
 
-func toFriendProfile(ctx context.Context, svcCtx *svc.ServiceContext, profile business.UserProfile) (types.FriendProfile, error) {
+func toFriendProfile(ctx context.Context, svcCtx *friendssvc.ServiceContext, profile business.UserProfile) (types.FriendProfile, error) {
 	return types.FriendProfile{
 		UserID:        profile.UserID,
 		Identifier:    profile.Identifier,

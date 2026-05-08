@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/wujunhui99/agents_im/internal/logic/message"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func GetConversationSeqsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func GetConversationSeqsHandler(svcCtx *messagesvc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.ConversationSeqsReq
 		if err := httpx.Parse(r, &req); err != nil {

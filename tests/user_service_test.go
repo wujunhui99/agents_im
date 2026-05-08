@@ -12,7 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 )
 
 func TestUserLogicCreateDuplicateExistsAndUpdate(t *testing.T) {
@@ -65,7 +65,7 @@ func TestUserLogicCreateDuplicateExistsAndUpdate(t *testing.T) {
 }
 
 func TestUserHTTPHandlers(t *testing.T) {
-	serviceContext := svc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
+	serviceContext := usersvc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
 	mux := newUserGoZeroRouter(t, serviceContext)
 
 	createBody := `{"identifier":"bob_001","display_name":"Bob","gender":"male","birth_date":"1998-05-02","region":"Beijing"}`
@@ -173,7 +173,7 @@ func TestUserHTTPHandlers(t *testing.T) {
 }
 
 func TestPatchRejectsImmutableFields(t *testing.T) {
-	serviceContext := svc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
+	serviceContext := usersvc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
 	mux := newUserGoZeroRouter(t, serviceContext)
 
 	createResp := httptest.NewRecorder()

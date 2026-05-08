@@ -13,7 +13,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
@@ -27,7 +27,7 @@ func TestGroupsReadRoutesRequireJWTAndMembership(t *testing.T) {
 	member := mustCreateRouteTestUser(t, userLogic, "route_member")
 	outsider := mustCreateRouteTestUser(t, userLogic, "route_outsider")
 
-	serviceContext := svc.NewGroupsServiceContextWithAuth(
+	serviceContext := groupssvc.NewServiceContextWithAuth(
 		repository.NewMemoryGroupsRepository(),
 		logic.NewUserLogicExistenceChecker(userLogic),
 		auth,
@@ -85,7 +85,7 @@ func TestGroupsAddMemberRouteRequiresOwnerForOtherUsers(t *testing.T) {
 	member := mustCreateRouteTestUser(t, userLogic, "route_add_member")
 	invitee := mustCreateRouteTestUser(t, userLogic, "route_add_invitee")
 
-	serviceContext := svc.NewGroupsServiceContextWithAuth(
+	serviceContext := groupssvc.NewServiceContextWithAuth(
 		repository.NewMemoryGroupsRepository(),
 		logic.NewUserLogicExistenceChecker(userLogic),
 		auth,
@@ -125,7 +125,7 @@ func TestGroupsAddMemberRouteRequiresOwnerForOtherUsers(t *testing.T) {
 	}
 }
 
-func newRouteTestGroupsRouter(t *testing.T, serviceContext *svc.ServiceContext) http.Handler {
+func newRouteTestGroupsRouter(t *testing.T, serviceContext *groupssvc.ServiceContext) http.Handler {
 	t.Helper()
 
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)

@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/wujunhui99/agents_im/internal/logic/message"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func PullMessagesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func PullMessagesHandler(svcCtx *messagesvc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.PullMessagesReq
 		if err := httpx.Parse(r, &req); err != nil {

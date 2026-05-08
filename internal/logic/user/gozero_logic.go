@@ -7,7 +7,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -15,10 +15,10 @@ import (
 type CreateUserLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewCreateUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CreateUserLogic {
+func NewCreateUserLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *CreateUserLogic {
 	return &CreateUserLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -44,10 +44,10 @@ func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) (*types.UserResp,
 type ExistsUserLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewExistsUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ExistsUserLogic {
+func NewExistsUserLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *ExistsUserLogic {
 	return &ExistsUserLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -75,10 +75,10 @@ func (l *ExistsUserLogic) ExistsUser(req *types.ExistsReq) (*types.ExistsResp, e
 type GetMeLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewGetMeLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetMeLogic {
+func NewGetMeLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *GetMeLogic {
 	return &GetMeLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -102,10 +102,10 @@ func (l *GetMeLogic) GetMe(req *types.GetMeReq) (*types.UserResp, error) {
 type GetUserByIdentifierLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewGetUserByIdentifierLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetUserByIdentifierLogic {
+func NewGetUserByIdentifierLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *GetUserByIdentifierLogic {
 	return &GetUserByIdentifierLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -126,10 +126,10 @@ func (l *GetUserByIdentifierLogic) GetUserByIdentifier(req *types.GetUserByIdent
 type UpdateMeLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewUpdateMeLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateMeLogic {
+func NewUpdateMeLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *UpdateMeLogic {
 	return &UpdateMeLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -163,10 +163,10 @@ func (l *UpdateMeLogic) UpdateMe(req *types.UpdateMeReq) (*types.UserResp, error
 type UpdateMeAvatarLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *usersvc.ServiceContext
 }
 
-func NewUpdateMeAvatarLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateMeAvatarLogic {
+func NewUpdateMeAvatarLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *UpdateMeAvatarLogic {
 	return &UpdateMeAvatarLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -207,7 +207,7 @@ func userResp(profile business.UserProfile) *types.UserResp {
 	return userRespWithAvatarFields(profile)
 }
 
-func userRespWithAvatar(ctx context.Context, svcCtx *svc.ServiceContext, profile business.UserProfile) (*types.UserResp, error) {
+func userRespWithAvatar(ctx context.Context, svcCtx *usersvc.ServiceContext, profile business.UserProfile) (*types.UserResp, error) {
 	return userRespWithAvatarFields(profile), nil
 }
 
