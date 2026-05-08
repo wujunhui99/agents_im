@@ -559,7 +559,7 @@ function ConversationList({
               }
               supportingText={
                 <>
-                  {item.previewOrigin === 'ai' ? <span className="conversation-origin-badge">AI/Agent</span> : null}
+                  {item.previewOrigin === 'ai' ? <span className="conversation-origin-badge">AI Agent</span> : null}
                   {item.previewOrigin === 'system' ? <span className="conversation-origin-badge conversation-origin-system">系统</span> : null}
                   {item.preview}
                 </>
@@ -735,7 +735,7 @@ function ChatWindow({
               {conversation.chatType === 'group' && message.direction === 'incoming' ? (
                 <span className="message-sender-name">{message.senderDisplayName ?? '群成员'}</span>
               ) : null}
-              {message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
+              {message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI Agent</span> : null}
               {message.messageOrigin === 'system' ? <span className="message-origin-badge message-origin-system">系统</span> : null}
               {message.contentType === 'image' ? (
                 <ImageMessageBubble
