@@ -19,7 +19,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
 	userrepo "github.com/wujunhui99/agents_im/internal/repository"
-	rootsvc "github.com/wujunhui99/agents_im/internal/svc"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 )
 
 func TestAuthLogicRegisterLoginAndValidateToken(t *testing.T) {
@@ -278,7 +278,7 @@ func TestAuthIssuedBearerTokenAccessesMe(t *testing.T) {
 		token.NewHMACTokenManager(authConfig.AccessSecret, time.Duration(authConfig.AccessExpire)*time.Second),
 	)
 	authMux := newAuthGoZeroRouter(t, authServiceContext)
-	userMux := newUserGoZeroRouter(t, rootsvc.NewServiceContextWithAuth(repo, authConfig))
+	userMux := newUserGoZeroRouter(t, usersvc.NewServiceContextWithAuth(repo, authConfig))
 
 	registerResp := httptest.NewRecorder()
 	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"bearer_me","password":"correct-password","display_name":"Bearer User"}`)
@@ -317,7 +317,7 @@ func TestProtectedRoutesRejectInactiveSessionToken(t *testing.T) {
 		authlogic.NewPasswordHasher(),
 		token.NewHMACTokenManager(authConfig.AccessSecret, time.Duration(authConfig.AccessExpire)*time.Second),
 	)
-	userServiceContext := rootsvc.NewServiceContextWithAuth(accountRepo, authConfig)
+	userServiceContext := usersvc.NewServiceContextWithAuth(accountRepo, authConfig)
 	userServiceContext.AuthSessions = credentialRepo
 	userMux := newUserGoZeroRouter(t, userServiceContext)
 

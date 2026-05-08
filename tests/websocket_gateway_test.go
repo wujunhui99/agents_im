@@ -18,7 +18,8 @@ import (
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
 	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 )
 
 type wsResponse struct {
@@ -740,12 +741,13 @@ func newGatewayWSApp(t *testing.T, opts ...gatewayws.ServerOption) *gatewayws.Se
 func newGatewayWSAppWithPresence(t *testing.T, store presence.PresenceStore, opts ...gatewayws.ServerOption) *gatewayws.Server {
 	t.Helper()
 
-	serviceContext := svc.NewMessageServiceContextWithAuth(
+	messageContext := messagesvc.NewServiceContextWithAuth(
 		repository.NewMemoryMessageRepository(),
 		nil,
 		nil,
 		testJWTAuthConfig(),
 	)
+	serviceContext := gatewaysvc.NewServiceContext(messageContext.MessageLogic, testJWTAuthConfig())
 	serverOpts := []gatewayws.ServerOption{
 		gatewayws.WithPresenceStore(store),
 		gatewayws.WithPresenceTTL(time.Minute),

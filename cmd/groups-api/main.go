@@ -11,7 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
@@ -34,7 +34,7 @@ func main() {
 		log.Fatalf("build groups repository: %v", err)
 	}
 	userLogic := logic.NewUserLogic(userRepo)
-	serviceContext := svc.NewGroupsServiceContextWithAuth(
+	serviceContext := groupssvc.NewServiceContextWithAuth(
 		groupsRepo,
 		logic.NewUserLogicExistenceChecker(userLogic),
 		cfg.Auth,

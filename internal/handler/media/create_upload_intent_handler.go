@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	medialogic "github.com/wujunhui99/agents_im/internal/logic/media"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func CreateUploadIntentHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func CreateUploadIntentHandler(svcCtx *usersvc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.CreateMediaUploadReq
 		if err := httpx.Parse(r, &req); err != nil {
