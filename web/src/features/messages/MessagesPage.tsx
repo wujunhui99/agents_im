@@ -1,5 +1,5 @@
 import { Bot, ChevronLeft, Download, FileText, Image as ImageIcon, MessageCircle, RefreshCw, Search, SendHorizontal, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { ContactsApi, Friendship } from '../../api/contacts';
 import { createContactsApi } from '../../api/contacts';
 import type { Group, GroupMember, GroupsApi } from '../../api/groups';
@@ -725,49 +725,55 @@ function ChatWindow({
         {status}
       </p>
       <div className="message-thread" role="log" aria-label="聊天消息" data-testid="message-thread-scroll-region">
-        {sortedMessages.map((message) => (
-          <article
-            className={`message-row message-${message.direction} message-origin-${message.messageOrigin}`}
-            key={message.id}
-            aria-label={messageAriaLabel(message)}
-          >
-            <div className="message-body">
-              {conversation.chatType === 'group' && message.direction === 'incoming' ? (
-                <span className="message-sender-name">{message.senderDisplayName ?? '群成员'}</span>
-              ) : null}
-              {message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
-              {message.messageOrigin === 'system' ? <span className="message-origin-badge message-origin-system">系统</span> : null}
-              {message.contentType === 'image' ? (
-                <ImageMessageBubble
-                  message={message}
-                  mediaApi={mediaApi}
-                  downloadMedia={downloadMedia}
-                  onStatus={onStatus}
-                  status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
-                />
-              ) : message.contentType === 'file' ? (
-                <FileMessageBubble
-                  message={message}
-                  mediaApi={mediaApi}
-                  downloadMedia={downloadMedia}
-                  onStatus={onStatus}
-                  status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
-                />
-              ) : (
-                <MessageBubble
-                  direction={message.direction}
-                  status={message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, conversation.hasReadSeq) : null}
-                >
-                  {renderMessageContent(message)}
-                </MessageBubble>
-              )}
-            </div>
-          </article>
+        {sortedMessages.map((message, index) => (
+          <Fragment key={message.id}>
+            {shouldRenderDateSeparator(message, sortedMessages[index - 1]) ? <MessageDateSeparator timestamp={message.sendTime} /> : null}
+            <article className={`message-row message-${message.direction} message-origin-${message.messageOrigin}`} aria-label={messageAriaLabel(message)}>
+              <div className="message-body">
+                {conversation.chatType === 'group' && message.direction === 'incoming' ? (
+                  <span className="message-sender-name">{message.senderDisplayName ?? '群成员'}</span>
+                ) : null}
+                {message.messageOrigin === 'ai' ? <span className="message-origin-badge">AI/Agent</span> : null}
+                {message.messageOrigin === 'system' ? <span className="message-origin-badge message-origin-system">系统</span> : null}
+                {message.contentType === 'image' ? (
+                  <ImageMessageBubble
+                    message={message}
+                    mediaApi={mediaApi}
+                    downloadMedia={downloadMedia}
+                    onStatus={onStatus}
+                    metadata={renderMessageMetadata(message, conversation.hasReadSeq)}
+                  />
+                ) : message.contentType === 'file' ? (
+                  <FileMessageBubble
+                    message={message}
+                    mediaApi={mediaApi}
+                    downloadMedia={downloadMedia}
+                    onStatus={onStatus}
+                    metadata={renderMessageMetadata(message, conversation.hasReadSeq)}
+                  />
+                ) : (
+                  <MessageBubble direction={message.direction} metadata={renderMessageMetadata(message, conversation.hasReadSeq)}>
+                    {renderMessageContent(message)}
+                  </MessageBubble>
+                )}
+              </div>
+            </article>
+          </Fragment>
         ))}
       </div>
 
       <SendMessageComposer onSend={onSend} onSendAttachment={onSendAttachment} sending={sending} />
     </section>
+  );
+}
+
+function MessageDateSeparator({ timestamp }: { timestamp: number }) {
+  const label = formatMessageDate(timestamp);
+
+  return (
+    <div className="message-date-separator" role="separator" aria-label={label}>
+      <span>{label}</span>
+    </div>
   );
 }
 
@@ -820,6 +826,17 @@ function AIHostingControl({
   );
 }
 
+function renderMessageMetadata(message: ChatMessage, hasReadSeq: number | undefined) {
+  return (
+    <span className="message-metadata">
+      <time className="message-time" dateTime={new Date(message.sendTime).toISOString()}>
+        {formatMessageTime(message.sendTime)}
+      </time>
+      {message.direction === 'outgoing' ? renderOutgoingMessageStatus(message, hasReadSeq) : null}
+    </span>
+  );
+}
+
 function renderOutgoingMessageStatus(message: ChatMessage, hasReadSeq: number | undefined) {
   if (message.status === 'sent') {
     const read = message.seq !== undefined && message.seq <= (hasReadSeq ?? 0);
@@ -842,19 +859,19 @@ function FileMessageBubble({
   mediaApi,
   downloadMedia,
   onStatus,
-  status,
+  metadata,
 }: {
   message: ChatMessage;
   mediaApi: MediaApi;
   downloadMedia: MediaDownloadHandler;
   onStatus: (status: string) => void;
-  status: ReactNode;
+  metadata: ReactNode;
 }) {
   const payload = useMemo(() => parseFileMessagePayload(message.content), [message.content]);
   const mediaId = payload.mediaId;
   const filename = fileMessageFilename(payload);
   const label = fileDisplayLabel(payload);
-  const metadata = fileMessageMetadata(payload);
+  const fileMetadata = fileMessageMetadata(payload);
   const [downloadError, setDownloadError] = useState('');
   const [downloading, setDownloading] = useState(false);
 
@@ -888,7 +905,7 @@ function FileMessageBubble({
         </span>
         <span className="file-message-main">
           <span className="file-message-title">{label}</span>
-          {metadata ? <span className="file-message-metadata">{metadata}</span> : null}
+          {fileMetadata ? <span className="file-message-metadata">{fileMetadata}</span> : null}
         </span>
         <span className="file-message-actions">
           <Button
@@ -902,7 +919,7 @@ function FileMessageBubble({
           >
             <Download size={16} />
           </Button>
-          {status ? <span className="file-message-status">{status}</span> : null}
+          <span className="file-message-status">{metadata}</span>
         </span>
       </div>
       {downloadError ? (
@@ -919,13 +936,13 @@ function ImageMessageBubble({
   mediaApi,
   downloadMedia,
   onStatus,
-  status,
+  metadata,
 }: {
   message: ChatMessage;
   mediaApi: MediaApi;
   downloadMedia: MediaDownloadHandler;
   onStatus: (status: string) => void;
-  status: ReactNode;
+  metadata: ReactNode;
 }) {
   const payload = useMemo(() => parseImageMessagePayload(message.content), [message.content]);
   const mediaId = payload.mediaId;
@@ -1050,7 +1067,7 @@ function ImageMessageBubble({
           >
             <Download size={16} />
           </Button>
-          {status ? <span className="image-message-status">{status}</span> : null}
+          <span className="image-message-status">{metadata}</span>
         </div>
         {downloadError ? (
           <p className="image-message-error" role="alert">
@@ -1973,6 +1990,29 @@ function orderedChatMessages(messages: ChatMessage[]) {
   return canonicalMessageEntries(messages)
     .sort((left, right) => compareMessageEntries(left, right))
     .map((entry) => entry.message);
+}
+
+function shouldRenderDateSeparator(message: ChatMessage, previousMessage: ChatMessage | undefined) {
+  return !previousMessage || messageLocalDayKey(message.sendTime) !== messageLocalDayKey(previousMessage.sendTime);
+}
+
+function formatMessageTime(timestamp: number) {
+  const date = new Date(timestamp);
+  return `${padTwoDigits(date.getHours())}:${padTwoDigits(date.getMinutes())}`;
+}
+
+function formatMessageDate(timestamp: number) {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function messageLocalDayKey(timestamp: number) {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${padTwoDigits(date.getMonth() + 1)}-${padTwoDigits(date.getDate())}`;
+}
+
+function padTwoDigits(value: number) {
+  return value.toString().padStart(2, '0');
 }
 
 function canonicalChatMessages(messages: ChatMessage[]) {
