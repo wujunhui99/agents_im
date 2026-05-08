@@ -116,6 +116,28 @@ func (r *PostgresGroupsRepository) GetGroup(ctx context.Context, groupID string)
 	return row.group(), nil
 }
 
+func (r *PostgresGroupsRepository) UpdateGroup(ctx context.Context, group model.Group) (model.Group, error) {
+	var row postgresGroupRow
+	err := r.conn.QueryRowCtx(ctx, &row, `
+update groups
+set name = $2,
+    description = $3,
+    updated_at = now()
+where group_id = $1
+returning group_id, name, description, creator_account_id, created_at, updated_at
+`, group.GroupID, group.Name, group.Description)
+	if err != nil {
+		if isNotFound(err) {
+			return model.Group{}, apperror.NotFound("group not found")
+		}
+		if isPostgresCheckViolation(err) {
+			return model.Group{}, apperror.InvalidArgument("invalid group")
+		}
+		return model.Group{}, err
+	}
+	return row.group(), nil
+}
+
 func (r *PostgresGroupsRepository) ListGroupsForUser(ctx context.Context, userID string) ([]model.Group, error) {
 	var rows []postgresGroupRow
 	if err := r.conn.QueryRowsCtx(ctx, &rows, `
@@ -139,7 +161,8 @@ func (r *PostgresGroupsRepository) AddMember(ctx context.Context, groupID string
 	var member model.GroupMember
 	alreadyMember := false
 	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
-		if _, err := queryGroup(ctx, session, groupID); err != nil {
+		groupRow, err := queryGroup(ctx, session, groupID)
+		if err != nil {
 			return err
 		}
 
@@ -153,7 +176,11 @@ func (r *PostgresGroupsRepository) AddMember(ctx context.Context, groupID string
 			return err
 		}
 
-		row, err := upsertActiveGroupMember(ctx, session, groupID, userID)
+		role := groupMemberRoleDBMember
+		if groupRow.CreatorUserID == userID {
+			role = groupMemberRoleDBOwner
+		}
+		row, err := upsertActiveGroupMember(ctx, session, groupID, userID, role)
 		if err != nil {
 			return err
 		}
@@ -190,6 +217,10 @@ returning group_id, account_id, role, status, join_time, left_at
 		return model.GroupMember{}, err
 	}
 	return row.member(), nil
+}
+
+func (r *PostgresGroupsRepository) RemoveMember(ctx context.Context, groupID string, userID string) (model.GroupMember, error) {
+	return r.LeaveGroup(ctx, groupID, userID)
 }
 
 func (r *PostgresGroupsRepository) ListActiveMembers(ctx context.Context, groupID string) ([]model.GroupMember, error) {
@@ -274,16 +305,19 @@ where group_id = $1 and account_id = $2
 	return row, err
 }
 
-func upsertActiveGroupMember(ctx context.Context, session sqlx.Session, groupID string, userID string) (postgresGroupMemberRow, error) {
+func upsertActiveGroupMember(ctx context.Context, session sqlx.Session, groupID string, userID string, role int16) (postgresGroupMemberRow, error) {
 	var row postgresGroupMemberRow
 	err := session.QueryRowCtx(ctx, &row, `
 insert into group_members (group_id, account_id, role, status)
 values ($1, $2, $3, $4)
 on conflict (group_id, account_id) do update
-set status = excluded.status,
+set role = excluded.role,
+    status = excluded.status,
+    join_time = now(),
+    left_at = null,
     updated_at = now()
 returning group_id, account_id, role, status, join_time, left_at
-`, groupID, userID, groupMemberRoleDBMember, memberStateToDB(model.MemberStateActive))
+`, groupID, userID, role, memberStateToDB(model.MemberStateActive))
 	return row, err
 }
 
@@ -302,6 +336,7 @@ func (r postgresGroupMemberRow) member() model.GroupMember {
 	member := model.GroupMember{
 		GroupID:  r.GroupID,
 		UserID:   r.UserID,
+		Role:     memberRoleFromDB(r.Role),
 		State:    memberStateFromDB(r.Status),
 		JoinedAt: r.JoinedAt.UTC(),
 	}

@@ -1221,6 +1221,107 @@ describe('WeChat-inspired app shell', () => {
     expect(fetchMock).not.toHaveBeenCalledWith('/users/2002', expect.objectContaining({ method: 'GET' }));
   });
 
+  it('opens group management from a group chat started in Contacts', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockReset();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      const method = fetchMethod(init);
+
+      if (path === '/conversations/seqs?conversationIds=' && method === 'GET') {
+        return Promise.resolve(emptySeqsResponse());
+      }
+      if (path === '/friends' && method === 'GET') {
+        return Promise.resolve(jsonResponse({ code: 'OK', message: 'ok', data: { friends: [] } }));
+      }
+      if (path === '/friends/requests' && method === 'GET') {
+        return Promise.resolve(emptyFriendRequestsResponse());
+      }
+      if (path === '/groups' && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              groups: [
+                {
+                  group_id: 'grp_team',
+                  name: '项目群',
+                  description: '联系人入口',
+                  announcement: '联系人入口',
+                  avatar_media_id: '',
+                  avatar_url: '',
+                  creator_user_id: '1001',
+                  current_user_role: 'owner',
+                  created_at: '2026-05-05T12:00:00Z',
+                  updated_at: '2026-05-05T12:00:00Z',
+                },
+              ],
+            },
+          }),
+        );
+      }
+      if (path === '/groups/grp_team' && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              group_id: 'grp_team',
+              name: '项目群',
+              description: '联系人入口',
+              announcement: '联系人入口',
+              avatar_media_id: '',
+              avatar_url: '',
+              creator_user_id: '1001',
+              current_user_role: 'owner',
+              created_at: '2026-05-05T12:00:00Z',
+              updated_at: '2026-05-05T12:00:00Z',
+            },
+          }),
+        );
+      }
+      if (path === '/groups/grp_team/members' && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              group_id: 'grp_team',
+              members: [
+                {
+                  group_id: 'grp_team',
+                  user_id: '1001',
+                  role: 'owner',
+                  state: 'active',
+                  joined_at: '2026-05-05T12:00:00Z',
+                  left_at: '',
+                  identifier: 'alice_001',
+                  display_name: 'Alice Chen',
+                  name: 'Alice Chen',
+                },
+              ],
+            },
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${method} ${path}`));
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+    await user.click(await screen.findByRole('button', { name: '打开群聊' }));
+    await user.click(await screen.findByRole('button', { name: '打开群聊 项目群' }));
+
+    expect(await screen.findByRole('heading', { name: '项目群', level: 2 })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '打开群管理 项目群' }));
+
+    expect(await screen.findByRole('heading', { name: '群管理' })).toBeInTheDocument();
+    expect(screen.getByTestId('group-member-grid')).toHaveClass('group-member-grid');
+    expect(screen.getByText('联系人入口')).toBeInTheDocument();
+  });
+
   it('shows existing conversations immediately when opening the messages tab after navigation', async () => {
     const user = userEvent.setup();
     fetchMock.mockReset();

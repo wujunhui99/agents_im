@@ -8,17 +8,22 @@ info (
 )
 
 type Group {
-	GroupID       string `json:"group_id"`
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-	CreatorUserID string `json:"creator_user_id"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	GroupID         string `json:"group_id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	Announcement    string `json:"announcement"`
+	AvatarMediaID   string `json:"avatar_media_id,optional"`
+	AvatarURL       string `json:"avatar_url,optional"`
+	CreatorUserID   string `json:"creator_user_id"`
+	CurrentUserRole string `json:"current_user_role,optional"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
 }
 
 type GroupMember {
 	GroupID       string `json:"group_id"`
 	UserID        string `json:"user_id"`
+	Role          string `json:"role"`
 	State         string `json:"state"`
 	JoinedAt      string `json:"joined_at"`
 	LeftAt        string `json:"left_at"`
@@ -39,11 +44,23 @@ type GetGroupReq {
 	GroupID string `path:"group_id"`
 }
 
+type UpdateGroupReq {
+	GroupID      string `path:"group_id"`
+	Name         string `json:"name,optional"`
+	Description  string `json:"description,optional"`
+	Announcement string `json:"announcement,optional"`
+}
+
 type ListGroupsReq {}
 
 type AddMemberReq {
 	GroupID string `path:"group_id"`
 	UserID  string `json:"user_id,optional"`
+}
+
+type KickMemberReq {
+	GroupID string `path:"group_id"`
+	UserID  string `path:"user_id"`
 }
 
 type LeaveGroupReq {
@@ -112,6 +129,12 @@ service groups-api {
 	@handler getGroup
 	get /groups/:group_id (GetGroupReq) returns (GroupResp)
 
+	@handler updateGroup
+	patch /groups/:group_id (UpdateGroupReq) returns (GroupResp)
+
 	@handler listMembers
 	get /groups/:group_id/members (ListMembersReq) returns (ListMembersResp)
+
+	@handler kickMember
+	delete /groups/:group_id/members/:user_id (KickMemberReq) returns (MemberResp)
 }

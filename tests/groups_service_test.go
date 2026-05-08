@@ -249,6 +249,7 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
 	creator := mustCreateUser(t, userLogic, "creator_003")
 	member := mustCreateUser(t, userLogic, "member_003")
+	kickee := mustCreateUser(t, userLogic, "kickee_003")
 	outsider := mustCreateUser(t, userLogic, "outsider_003")
 	serviceContext := svc.NewGroupsServiceContextWithAuth(
 		repository.NewMemoryGroupsRepository(),
@@ -334,12 +335,57 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 		t.Fatalf("repeat add should report already_member: %+v", repeated.Data)
 	}
 
+	memberPatchResp := httptest.NewRecorder()
+	memberPatchReq := newJSONRequest(http.MethodPatch, "/groups/"+created.Data.GroupID, `{"name":"Member Rename"}`)
+	memberPatchReq.Header.Set("Authorization", memberBearer)
+	mux.ServeHTTP(memberPatchResp, memberPatchReq)
+	if memberPatchResp.Code != http.StatusForbidden {
+		t.Fatalf("member patch group status = %d, body = %s", memberPatchResp.Code, memberPatchResp.Body.String())
+	}
+
+	ownerPatchResp := httptest.NewRecorder()
+	ownerPatchReq := newJSONRequest(http.MethodPatch, "/groups/"+created.Data.GroupID, `{"name":"Team Chat Renamed","announcement":"new announcement"}`)
+	ownerPatchReq.Header.Set("Authorization", creatorBearer)
+	mux.ServeHTTP(ownerPatchResp, ownerPatchReq)
+	if ownerPatchResp.Code != http.StatusOK {
+		t.Fatalf("owner patch group status = %d, body = %s", ownerPatchResp.Code, ownerPatchResp.Body.String())
+	}
+	var updated envelope[logic.GroupInfo]
+	decodeEnvelope(t, ownerPatchResp.Body.Bytes(), &updated)
+	if updated.Data.Name != "Team Chat Renamed" || updated.Data.Announcement != "new announcement" || updated.Data.CurrentUserRole != model.MemberRoleOwner {
+		t.Fatalf("unexpected updated group: %+v", updated.Data)
+	}
+
 	forbiddenAddResp := httptest.NewRecorder()
 	forbiddenAddReq := newJSONRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", `{"user_id":"`+outsider.UserID+`"}`)
 	forbiddenAddReq.Header.Set("Authorization", memberBearer)
 	mux.ServeHTTP(forbiddenAddResp, forbiddenAddReq)
 	if forbiddenAddResp.Code != http.StatusForbidden {
 		t.Fatalf("non-owner add status = %d, body = %s", forbiddenAddResp.Code, forbiddenAddResp.Body.String())
+	}
+
+	addKickeeResp := httptest.NewRecorder()
+	addKickeeReq := newJSONRequest(http.MethodPost, "/groups/"+created.Data.GroupID+"/members", `{"user_id":"`+kickee.UserID+`"}`)
+	addKickeeReq.Header.Set("Authorization", creatorBearer)
+	mux.ServeHTTP(addKickeeResp, addKickeeReq)
+	if addKickeeResp.Code != http.StatusOK {
+		t.Fatalf("add kickee status = %d, body = %s", addKickeeResp.Code, addKickeeResp.Body.String())
+	}
+
+	memberKickResp := httptest.NewRecorder()
+	memberKickReq := httptest.NewRequest(http.MethodDelete, "/groups/"+created.Data.GroupID+"/members/"+kickee.UserID, nil)
+	memberKickReq.Header.Set("Authorization", memberBearer)
+	mux.ServeHTTP(memberKickResp, memberKickReq)
+	if memberKickResp.Code != http.StatusForbidden {
+		t.Fatalf("member kick status = %d, body = %s", memberKickResp.Code, memberKickResp.Body.String())
+	}
+
+	ownerKickResp := httptest.NewRecorder()
+	ownerKickReq := httptest.NewRequest(http.MethodDelete, "/groups/"+created.Data.GroupID+"/members/"+kickee.UserID, nil)
+	ownerKickReq.Header.Set("Authorization", creatorBearer)
+	mux.ServeHTTP(ownerKickResp, ownerKickReq)
+	if ownerKickResp.Code != http.StatusOK {
+		t.Fatalf("owner kick status = %d, body = %s", ownerKickResp.Code, ownerKickResp.Body.String())
 	}
 
 	listResp := httptest.NewRecorder()
@@ -353,6 +399,14 @@ func TestGroupsHTTPHandlers(t *testing.T) {
 	decodeEnvelope(t, listResp.Body.Bytes(), &listed)
 	if len(listed.Data.Members) != 2 {
 		t.Fatalf("unexpected member list: %+v", listed.Data.Members)
+	}
+	for _, listedMember := range listed.Data.Members {
+		if listedMember.UserID == kickee.UserID {
+			t.Fatalf("kicked member should not be active: %+v", listed.Data.Members)
+		}
+		if listedMember.UserID == creator.UserID && listedMember.Role != model.MemberRoleOwner {
+			t.Fatalf("creator role = %q, want owner", listedMember.Role)
+		}
 	}
 
 	outsiderListResp := httptest.NewRecorder()

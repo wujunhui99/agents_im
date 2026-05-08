@@ -1039,6 +1039,21 @@ button.md-list-item:hover,
   gap: 8px;
 }
 
+.chat-header-title-button {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--md-shape-corner-small);
+  padding: 4px 8px;
+  cursor: pointer;
+  color: inherit;
+  background: transparent;
+}
+
+.chat-header-title-button:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary), transparent 92%);
+}
+
 .chat-header-title .avatar {
   width: 36px;
   height: 36px;
@@ -1054,6 +1069,151 @@ button.md-list-item:hover,
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.group-management {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--md-sys-color-surface-container);
+}
+
+.group-management-header {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
+.group-management-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--md-space-3);
+  padding: 14px 16px;
+  background: var(--md-sys-color-surface);
+  border-bottom: 1px solid rgba(113, 122, 117, 0.14);
+}
+
+.group-management-summary-text {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.group-management-summary-text h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--md-sys-color-on-surface);
+  font-size: 18px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-management-summary-text span {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-type-body-small);
+}
+
+.group-management-form,
+.group-management-readonly {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--md-sys-color-surface);
+  border-bottom: 1px solid rgba(113, 122, 117, 0.14);
+}
+
+.group-management-form .compact-command {
+  justify-self: end;
+}
+
+.group-management-readonly div {
+  display: grid;
+  gap: 4px;
+}
+
+.group-management-readonly span {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-type-body-small);
+}
+
+.group-management-readonly p {
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-type-body-medium);
+  overflow-wrap: anywhere;
+}
+
+.group-management-members {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px 18px;
+}
+
+.group-management-members .panel-heading {
+  margin-bottom: 10px;
+}
+
+.group-management-members .panel-heading span {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-type-body-small);
+}
+
+.group-member-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 10px;
+}
+
+.group-member-card {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 5px;
+  padding: 8px 6px;
+  border: 1px solid rgba(113, 122, 117, 0.16);
+  border-radius: var(--md-shape-corner-small);
+  background: var(--md-sys-color-surface);
+}
+
+.group-member-card .avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--md-shape-corner-small);
+  font-size: 12px;
+}
+
+.group-member-name,
+.group-member-role {
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-member-name {
+  color: var(--md-sys-color-on-surface);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.group-member-role {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11px;
+}
+
+.group-member-kick-button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  color: var(--md-sys-color-error);
+  background: var(--md-sys-color-error-container);
 }
 
 .ai-hosting-control {
