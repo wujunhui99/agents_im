@@ -819,6 +819,8 @@ function MessageDateSeparator({ timestamp }: { timestamp: number }) {
     <div className="message-date-separator" role="separator" aria-label={label}>
       <span>{label}</span>
     </div>
+  );
+}
 
 function GroupManagementPanel({
   currentUserId,
