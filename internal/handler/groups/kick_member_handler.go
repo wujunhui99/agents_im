@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/wujunhui99/agents_im/internal/logic/groups"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func KickMemberHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func KickMemberHandler(svcCtx *groupssvc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.KickMemberReq
 		if err := httpx.Parse(r, &req); err != nil {

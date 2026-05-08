@@ -142,10 +142,10 @@ func (l *GetGroupLogic) GetGroup(req *types.GetGroupReq) (*types.GroupResp, erro
 type UpdateGroupLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *groupssvc.ServiceContext
 }
 
-func NewUpdateGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateGroupLogic {
+func NewUpdateGroupLogic(ctx context.Context, svcCtx *groupssvc.ServiceContext) *UpdateGroupLogic {
 	return &UpdateGroupLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -205,10 +205,10 @@ func (l *LeaveGroupLogic) LeaveGroup(req *types.LeaveGroupReq) (*types.MemberRes
 type KickMemberLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *groupssvc.ServiceContext
 }
 
-func NewKickMemberLogic(ctx context.Context, svcCtx *svc.ServiceContext) *KickMemberLogic {
+func NewKickMemberLogic(ctx context.Context, svcCtx *groupssvc.ServiceContext) *KickMemberLogic {
 	return &KickMemberLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
