@@ -19,6 +19,7 @@ const (
 
 	groupMemberRoleDBOwner    int16 = 1
 	groupMemberRoleDBMember   int16 = 2
+	groupMemberRoleDBAdmin    int16 = 3
 	groupMemberStatusDBActive int16 = 1
 	groupMemberStatusDBLeft   int16 = 2
 
@@ -119,6 +120,28 @@ func memberStateFromDB(v int16) string {
 		return model.MemberStateLeft
 	}
 	return model.MemberStateActive
+}
+
+func memberRoleToDB(role string) int16 {
+	switch role {
+	case model.MemberRoleOwner:
+		return groupMemberRoleDBOwner
+	case model.MemberRoleAdmin:
+		return groupMemberRoleDBAdmin
+	default:
+		return groupMemberRoleDBMember
+	}
+}
+
+func memberRoleFromDB(v int16) string {
+	switch v {
+	case groupMemberRoleDBOwner:
+		return model.MemberRoleOwner
+	case groupMemberRoleDBAdmin:
+		return model.MemberRoleAdmin
+	default:
+		return model.MemberRoleMember
+	}
 }
 
 func mediaPurposeToDB(p model.MediaPurpose) int16 {

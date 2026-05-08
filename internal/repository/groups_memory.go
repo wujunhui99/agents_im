@@ -56,6 +56,7 @@ func (r *MemoryGroupsRepository) CreateGroup(_ context.Context, group model.Grou
 		member := model.GroupMember{
 			GroupID:  group.GroupID,
 			UserID:   userID,
+			Role:     memberRoleForUser(group, userID),
 			State:    model.MemberStateActive,
 			JoinedAt: now,
 		}
@@ -80,6 +81,24 @@ func (r *MemoryGroupsRepository) GetGroup(_ context.Context, groupID string) (mo
 	}
 
 	return group.Clone(), nil
+}
+
+func (r *MemoryGroupsRepository) UpdateGroup(_ context.Context, group model.Group) (model.Group, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	stored, exists := r.groups[group.GroupID]
+	if !exists {
+		return model.Group{}, apperror.NotFound("group not found")
+	}
+
+	stored.Name = group.Name
+	stored.Description = group.Description
+	stored.AvatarMediaID = group.AvatarMediaID
+	stored.AvatarURL = group.AvatarURL
+	stored.UpdatedAt = r.now().UTC()
+	r.groups[group.GroupID] = stored.Clone()
+	return stored.Clone(), nil
 }
 
 func (r *MemoryGroupsRepository) ListGroupsForUser(_ context.Context, userID string) ([]model.Group, error) {
@@ -127,6 +146,7 @@ func (r *MemoryGroupsRepository) AddMember(_ context.Context, groupID string, us
 		}
 
 		now := r.now().UTC()
+		member.Role = memberRoleForUser(r.groups[groupID], userID)
 		member.State = model.MemberStateActive
 		member.JoinedAt = now
 		member.LeftAt = time.Time{}
@@ -137,6 +157,7 @@ func (r *MemoryGroupsRepository) AddMember(_ context.Context, groupID string, us
 	member := model.GroupMember{
 		GroupID:  groupID,
 		UserID:   userID,
+		Role:     memberRoleForUser(r.groups[groupID], userID),
 		State:    model.MemberStateActive,
 		JoinedAt: r.now().UTC(),
 	}
@@ -168,6 +189,30 @@ func (r *MemoryGroupsRepository) LeaveGroup(_ context.Context, groupID string, u
 	return member.Clone(), nil
 }
 
+func (r *MemoryGroupsRepository) RemoveMember(ctx context.Context, groupID string, userID string) (model.GroupMember, error) {
+	return r.LeaveGroup(ctx, groupID, userID)
+}
+
+func (r *MemoryGroupsRepository) SetMemberRole(_ context.Context, groupID string, userID string, role string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.groups[groupID]; !exists {
+		return apperror.NotFound("group not found")
+	}
+	groupMembers, exists := r.members[groupID]
+	if !exists {
+		return apperror.NotFound("member not found")
+	}
+	member, exists := groupMembers[userID]
+	if !exists || member.State != model.MemberStateActive {
+		return apperror.NotFound("member not found")
+	}
+	member.Role = normalizeStoredMemberRole(role)
+	groupMembers[userID] = member.Clone()
+	return nil
+}
+
 func (r *MemoryGroupsRepository) ListActiveMembers(_ context.Context, groupID string) ([]model.GroupMember, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -188,4 +233,20 @@ func (r *MemoryGroupsRepository) ListActiveMembers(_ context.Context, groupID st
 	})
 
 	return members, nil
+}
+
+func memberRoleForUser(group model.Group, userID string) string {
+	if group.CreatorUserID == userID {
+		return model.MemberRoleOwner
+	}
+	return model.MemberRoleMember
+}
+
+func normalizeStoredMemberRole(role string) string {
+	switch role {
+	case model.MemberRoleOwner, model.MemberRoleAdmin, model.MemberRoleMember:
+		return role
+	default:
+		return model.MemberRoleMember
+	}
 }

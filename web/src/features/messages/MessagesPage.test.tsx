@@ -140,7 +140,11 @@ function createGroupsApi(overrides?: Partial<GroupsApi>): GroupsApi {
     group_id: groupId,
     name: '项目群',
     description: '',
+    announcement: '',
+    avatar_media_id: '',
+    avatar_url: '',
     creator_user_id: currentUserId,
+    current_user_role: 'owner',
     created_at: '2026-05-05T12:00:00Z',
     updated_at: '2026-05-05T12:00:00Z',
   };
@@ -148,6 +152,7 @@ function createGroupsApi(overrides?: Partial<GroupsApi>): GroupsApi {
     {
       group_id: groupId,
       user_id: currentUserId,
+      role: 'owner',
       display_name: 'Alice Chen',
       name: 'Alice Chen',
       identifier: 'alice_001',
@@ -159,6 +164,7 @@ function createGroupsApi(overrides?: Partial<GroupsApi>): GroupsApi {
     {
       group_id: groupId,
       user_id: peerUserId,
+      role: 'member',
       display_name: 'Bob Lin',
       name: 'Bob Lin',
       identifier: 'bob_002',
@@ -177,6 +183,16 @@ function createGroupsApi(overrides?: Partial<GroupsApi>): GroupsApi {
     joinGroup: vi.fn(),
     leaveGroup: vi.fn(),
     listMembers: vi.fn(async () => ({ group_id: groupId, members })),
+    updateGroup: vi.fn(async (_groupID, request) => ({
+      ...group,
+      name: request.name ?? group.name,
+      description: request.announcement ?? request.description ?? group.description,
+      announcement: request.announcement ?? request.description ?? group.announcement,
+    })),
+    kickMember: vi.fn(async (_groupID, userID) => ({
+      member: { ...members.find((member) => member.user_id === userID)!, state: 'left', left_at: '2026-05-05T13:00:00Z' },
+      already_member: false,
+    })),
     ...overrides,
   };
 }
@@ -523,6 +539,281 @@ describe('MessagesPage real API mode', () => {
         }),
       ),
     );
+  });
+
+  it('opens group management from the group title with owner edit and kick controls in a member grid', async () => {
+    const user = userEvent.setup();
+    const groupMessage = groupServerMessage({ seq: 1, content: '大家好' });
+    const messageApi = createMessageApi([groupMessage]);
+    vi.mocked(messageApi.getConversationSeqs).mockResolvedValueOnce({
+      states: [
+        {
+          conversationId: groupConversationId,
+          maxSeq: 1,
+          hasReadSeq: 0,
+          unreadCount: 0,
+          maxSeqTime: groupMessage.sendTime,
+          lastMessage: groupMessage,
+        },
+      ],
+    });
+    vi.mocked(messageApi.pullMessages).mockResolvedValueOnce({ conversationId: groupConversationId, messages: [groupMessage] });
+
+    const group: Group = {
+      group_id: groupId,
+      name: '项目群',
+      description: 'Sprint notes',
+      announcement: 'Sprint notes',
+      avatar_media_id: '',
+      avatar_url: '',
+      creator_user_id: currentUserId,
+      current_user_role: 'owner',
+      created_at: '2026-05-05T12:00:00Z',
+      updated_at: '2026-05-05T12:00:00Z',
+    };
+    const owner: GroupMember = {
+      group_id: groupId,
+      user_id: currentUserId,
+      role: 'owner',
+      display_name: 'Alice Chen',
+      name: 'Alice Chen',
+      identifier: 'alice_001',
+      avatar_media_id: '',
+      state: 'active',
+      joined_at: '',
+      left_at: '',
+    };
+    const bob: GroupMember = {
+      group_id: groupId,
+      user_id: peerUserId,
+      role: 'member',
+      display_name: 'Bob Lin',
+      name: 'Bob Lin',
+      identifier: 'bob_002',
+      avatar_media_id: '',
+      state: 'active',
+      joined_at: '',
+      left_at: '',
+    };
+    const listMembers = vi
+      .fn<GroupsApi['listMembers']>()
+      .mockResolvedValueOnce({ group_id: groupId, members: [owner, bob] })
+      .mockResolvedValueOnce({ group_id: groupId, members: [owner, bob] })
+      .mockResolvedValueOnce({ group_id: groupId, members: [owner] });
+    const updateGroup = vi.fn<GroupsApi['updateGroup']>(async (_nextGroupID, request) => ({
+      ...group,
+      name: request.name ?? group.name,
+      description: request.announcement ?? group.description,
+      announcement: request.announcement ?? group.announcement,
+    }));
+    const kickMember = vi.fn<GroupsApi['kickMember']>(async () => ({
+      member: { ...bob, state: 'left', left_at: '2026-05-05T13:00:00Z' },
+      already_member: false,
+    }));
+    const groupsApi = createGroupsApi({
+      getGroup: vi.fn(async () => group),
+      listMembers,
+      updateGroup,
+      kickMember,
+    });
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} groupsApi={groupsApi} />);
+
+    await user.click(await screen.findByRole('button', { name: /项目群/ }));
+    await user.click(await screen.findByRole('button', { name: '打开群管理 项目群' }));
+
+    expect(await screen.findByRole('heading', { name: '群管理' })).toBeInTheDocument();
+    const memberGrid = await screen.findByTestId('group-member-grid');
+    expect(memberGrid).toHaveClass('group-member-grid');
+    expect(within(memberGrid).getAllByTestId('group-member-card')).toHaveLength(2);
+    expect(screen.getByLabelText('群名称')).toHaveValue('项目群');
+    expect(screen.getByLabelText('群公告')).toHaveValue('Sprint notes');
+    expect(screen.getByRole('button', { name: '踢出 Bob Lin' })).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('群名称'));
+    await user.type(screen.getByLabelText('群名称'), '项目群 2');
+    await user.clear(screen.getByLabelText('群公告'));
+    await user.type(screen.getByLabelText('群公告'), 'updated announcement');
+    await user.click(screen.getByRole('button', { name: '保存群信息' }));
+
+    await waitFor(() =>
+      expect(updateGroup).toHaveBeenCalledWith(groupId, { name: '项目群 2', announcement: 'updated announcement' }),
+    );
+    expect(await screen.findByDisplayValue('项目群 2')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '踢出 Bob Lin' }));
+    await waitFor(() => expect(kickMember).toHaveBeenCalledWith(groupId, peerUserId));
+    await waitFor(() => expect(within(screen.getByTestId('group-member-grid')).queryByText('Bob Lin')).not.toBeInTheDocument());
+  });
+
+  it('renders group management as read-only for a normal member', async () => {
+    const user = userEvent.setup();
+    const groupMessage = groupServerMessage({ seq: 1, content: 'member seed' });
+    const messageApi = createMessageApi([groupMessage]);
+    vi.mocked(messageApi.getConversationSeqs).mockResolvedValueOnce({
+      states: [{ conversationId: groupConversationId, maxSeq: 1, hasReadSeq: 0, unreadCount: 0, lastMessage: groupMessage }],
+    });
+    vi.mocked(messageApi.pullMessages).mockResolvedValueOnce({ conversationId: groupConversationId, messages: [groupMessage] });
+    const groupsApi = createGroupsApi({
+      getGroup: vi.fn(async () => ({
+        group_id: groupId,
+        name: '项目群',
+        description: 'read-only announcement',
+        announcement: 'read-only announcement',
+        avatar_media_id: '',
+        avatar_url: '',
+        creator_user_id: 'owner_999',
+        current_user_role: 'member',
+        created_at: '',
+        updated_at: '',
+      })),
+      listMembers: vi.fn(async () => ({
+        group_id: groupId,
+        members: [
+          {
+            group_id: groupId,
+            user_id: currentUserId,
+            role: 'member',
+            display_name: 'Alice Chen',
+            name: 'Alice Chen',
+            identifier: 'alice_001',
+            avatar_media_id: '',
+            state: 'active',
+            joined_at: '',
+            left_at: '',
+          },
+        ],
+      })),
+    });
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} groupsApi={groupsApi} />);
+
+    await user.click(await screen.findByRole('button', { name: /项目群/ }));
+    await user.click(await screen.findByRole('button', { name: '打开群管理 项目群' }));
+
+    expect(await screen.findByRole('heading', { name: '群管理' })).toBeInTheDocument();
+    expect(screen.getByText('read-only announcement')).toBeInTheDocument();
+    expect(screen.getByTestId('group-member-grid')).toHaveClass('group-member-grid');
+    expect(screen.queryByLabelText('群名称')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('群公告')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '保存群信息' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /踢出/ })).not.toBeInTheDocument();
+  });
+
+  it('shows admin management controls while keeping owner and admin members protected from admin kick', async () => {
+    const user = userEvent.setup();
+    const group: Group = {
+      group_id: groupId,
+      name: '管理员群',
+      description: 'admin announcement',
+      announcement: 'admin announcement',
+      avatar_media_id: '',
+      avatar_url: '',
+      creator_user_id: 'owner_999',
+      current_user_role: 'admin',
+      created_at: '',
+      updated_at: '',
+    };
+    const messageApi = createMessageApi([]);
+    const groupsApi = createGroupsApi({
+      getGroup: vi.fn(async () => group),
+      listMembers: vi.fn(async () => ({
+        group_id: groupId,
+        members: [
+          {
+            group_id: groupId,
+            user_id: 'owner_999',
+            role: 'owner',
+            display_name: 'Owner Wang',
+            name: 'Owner Wang',
+            identifier: 'owner_999',
+            avatar_media_id: '',
+            state: 'active',
+            joined_at: '',
+            left_at: '',
+          },
+          {
+            group_id: groupId,
+            user_id: currentUserId,
+            role: 'admin',
+            display_name: 'Alice Admin',
+            name: 'Alice Admin',
+            identifier: 'alice_001',
+            avatar_media_id: '',
+            state: 'active',
+            joined_at: '',
+            left_at: '',
+          },
+          {
+            group_id: groupId,
+            user_id: peerUserId,
+            role: 'member',
+            display_name: 'Bob Lin',
+            name: 'Bob Lin',
+            identifier: 'bob_002',
+            avatar_media_id: '',
+            state: 'active',
+            joined_at: '',
+            left_at: '',
+          },
+        ],
+      })),
+    });
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} groupsApi={groupsApi} pendingGroup={group} />);
+
+    expect(await screen.findByRole('heading', { name: '管理员群' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '打开群管理 管理员群' }));
+
+    expect(await screen.findByLabelText('群名称')).toHaveValue('管理员群');
+    expect(screen.getByLabelText('群公告')).toHaveValue('admin announcement');
+    expect(screen.getByRole('button', { name: '踢出 Bob Lin' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '踢出 Owner Wang' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '踢出 Alice Admin' })).not.toBeInTheDocument();
+  });
+
+  it('opens group management from a contacts-started pending group chat', async () => {
+    const user = userEvent.setup();
+    const group: Group = {
+      group_id: groupId,
+      name: '联系人群',
+      description: 'from contacts',
+      announcement: 'from contacts',
+      avatar_media_id: '',
+      avatar_url: '',
+      creator_user_id: currentUserId,
+      current_user_role: 'owner',
+      created_at: '',
+      updated_at: '',
+    };
+    const messageApi = createMessageApi([]);
+    const groupsApi = createGroupsApi({
+      getGroup: vi.fn(async () => group),
+      listMembers: vi.fn(async () => ({
+        group_id: groupId,
+        members: [
+          {
+            group_id: groupId,
+            user_id: currentUserId,
+            role: 'owner',
+            display_name: 'Alice Chen',
+            name: 'Alice Chen',
+            identifier: 'alice_001',
+            avatar_media_id: '',
+            state: 'active',
+            joined_at: '',
+            left_at: '',
+          },
+        ],
+      })),
+    });
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} groupsApi={groupsApi} pendingGroup={group} />);
+
+    expect(await screen.findByRole('heading', { name: '联系人群' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '打开群管理 联系人群' }));
+    expect(await screen.findByRole('heading', { name: '群管理' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('from contacts')).toBeInTheDocument();
   });
 
   it('shows a Chinese group permission error when group send is rejected', async () => {

@@ -139,6 +139,39 @@ func (l *GetGroupLogic) GetGroup(req *types.GetGroupReq) (*types.GroupResp, erro
 	return groupResp(group), nil
 }
 
+type UpdateGroupLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewUpdateGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateGroupLogic {
+	return &UpdateGroupLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *UpdateGroupLogic) UpdateGroup(req *types.UpdateGroupReq) (*types.GroupResp, error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := l.svcCtx.GroupsLogic.UpdateGroup(l.ctx, business.UpdateGroupRequest{
+		GroupID:        req.GroupID,
+		OperatorUserID: userID,
+		Name:           req.Name,
+		Description:    req.Description,
+		Announcement:   req.Announcement,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return groupResp(group), nil
+}
+
 type LeaveGroupLogic struct {
 	logx.Logger
 	ctx    context.Context
@@ -162,6 +195,37 @@ func (l *LeaveGroupLogic) LeaveGroup(req *types.LeaveGroupReq) (*types.MemberRes
 	result, err := l.svcCtx.GroupsLogic.LeaveGroup(l.ctx, business.LeaveGroupRequest{
 		GroupID: req.GroupID,
 		UserID:  userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return memberResp(result), nil
+}
+
+type KickMemberLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewKickMemberLogic(ctx context.Context, svcCtx *svc.ServiceContext) *KickMemberLogic {
+	return &KickMemberLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *KickMemberLogic) KickMember(req *types.KickMemberReq) (*types.MemberResp, error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := l.svcCtx.GroupsLogic.KickMember(l.ctx, business.KickMemberRequest{
+		GroupID:        req.GroupID,
+		OperatorUserID: userID,
+		UserID:         req.UserID,
 	})
 	if err != nil {
 		return nil, err
@@ -221,12 +285,16 @@ func groupResp(group business.GroupInfo) *types.GroupResp {
 
 func toGroup(group business.GroupInfo) types.Group {
 	return types.Group{
-		GroupID:       group.GroupID,
-		Name:          group.Name,
-		Description:   group.Description,
-		CreatorUserID: group.CreatorUserID,
-		CreatedAt:     group.CreatedAt,
-		UpdatedAt:     group.UpdatedAt,
+		GroupID:         group.GroupID,
+		Name:            group.Name,
+		Description:     group.Description,
+		Announcement:    group.Announcement,
+		AvatarMediaID:   group.AvatarMediaID,
+		AvatarURL:       group.AvatarURL,
+		CreatorUserID:   group.CreatorUserID,
+		CurrentUserRole: group.CurrentUserRole,
+		CreatedAt:       group.CreatedAt,
+		UpdatedAt:       group.UpdatedAt,
 	}
 }
 
@@ -245,6 +313,7 @@ func toGroupMember(member business.GroupMemberInfo) types.GroupMember {
 	return types.GroupMember{
 		GroupID:       member.GroupID,
 		UserID:        member.UserID,
+		Role:          member.Role,
 		State:         member.State,
 		JoinedAt:      member.JoinedAt,
 		LeftAt:        member.LeftAt,
