@@ -50,12 +50,13 @@ internal/handler/friends routes
 internal/logic/friendslogic.go
 internal/model/friendship.go
 internal/repository/friendship repository
+internal/servicecontext/friends
 internal/rpcgen/friends
 proto/friends.proto
 tests/friends_service_test.go
 ```
 
-当前 worktree 的 `internal/apperror`、`internal/response`、`internal/config`、`internal/svc` 作为服务内共享基础包复用。
+当前 worktree 的 `internal/apperror`、`internal/response`、`internal/config` 作为服务内共享基础包复用；REST 侧依赖通过 `internal/servicecontext/friends` 注入，RPC 侧继续使用 `internal/rpcgen/friends/internal/svc`。
 
 ## 数据模型
 

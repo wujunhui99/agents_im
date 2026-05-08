@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/wujunhui99/agents_im/internal/logic/groups"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func LeaveGroupHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func LeaveGroupHandler(svcCtx *groupssvc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.LeaveGroupReq
 		if err := httpx.Parse(r, &req); err != nil {

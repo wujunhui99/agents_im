@@ -12,7 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
@@ -45,8 +45,8 @@ func main() {
 	if err := objectStore.EnsureBucket(context.Background()); err != nil {
 		log.Fatalf("ensure object storage bucket: %v", err)
 	}
-	serviceContext := svc.NewUserServiceContextWithMedia(repo, mediaRepo, objectStore, cfg.ObjectStorage.Bucket, cfg.Auth)
-	svc.ConfigureMediaAttachmentAccess(serviceContext, messageRepo)
+	serviceContext := usersvc.NewServiceContextWithMedia(repo, mediaRepo, objectStore, cfg.ObjectStorage.Bucket, cfg.Auth)
+	serviceContext.ConfigureMediaAttachmentAccess(messageRepo)
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
 		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 		if err != nil {

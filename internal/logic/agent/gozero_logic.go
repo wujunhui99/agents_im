@@ -6,7 +6,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -14,10 +14,10 @@ import (
 type CreateAgentLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *agentsvc.ServiceContext
 }
 
-func NewCreateAgentLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CreateAgentLogic {
+func NewCreateAgentLogic(ctx context.Context, svcCtx *agentsvc.ServiceContext) *CreateAgentLogic {
 	return &CreateAgentLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -46,10 +46,10 @@ func (l *CreateAgentLogic) CreateAgent(req *types.CreateAgentReq) (*types.AgentR
 type GetAgentLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *agentsvc.ServiceContext
 }
 
-func NewGetAgentLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetAgentLogic {
+func NewGetAgentLogic(ctx context.Context, svcCtx *agentsvc.ServiceContext) *GetAgentLogic {
 	return &GetAgentLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -68,10 +68,10 @@ func (l *GetAgentLogic) GetAgent(req *types.AgentPathReq) (*types.AgentResp, err
 type ListAgentsLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *agentsvc.ServiceContext
 }
 
-func NewListAgentsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListAgentsLogic {
+func NewListAgentsLogic(ctx context.Context, svcCtx *agentsvc.ServiceContext) *ListAgentsLogic {
 	return &ListAgentsLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -105,10 +105,10 @@ func (l *ListAgentsLogic) ListAgents(req *types.ListAgentsReq) (*types.ListAgent
 type UpdateAgentLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *agentsvc.ServiceContext
 }
 
-func NewUpdateAgentLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateAgentLogic {
+func NewUpdateAgentLogic(ctx context.Context, svcCtx *agentsvc.ServiceContext) *UpdateAgentLogic {
 	return &UpdateAgentLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -131,10 +131,10 @@ func (l *UpdateAgentLogic) UpdateAgent(req *types.UpdateAgentReq) (*types.AgentR
 type UpdateAgentStatusLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *agentsvc.ServiceContext
 }
 
-func NewUpdateAgentStatusLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateAgentStatusLogic {
+func NewUpdateAgentStatusLogic(ctx context.Context, svcCtx *agentsvc.ServiceContext) *UpdateAgentStatusLogic {
 	return &UpdateAgentStatusLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -156,10 +156,10 @@ func (l *UpdateAgentStatusLogic) UpdateAgentStatus(req *types.UpdateAgentStatusR
 type DeleteAgentLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *agentsvc.ServiceContext
 }
 
-func NewDeleteAgentLogic(ctx context.Context, svcCtx *svc.ServiceContext) *DeleteAgentLogic {
+func NewDeleteAgentLogic(ctx context.Context, svcCtx *agentsvc.ServiceContext) *DeleteAgentLogic {
 	return &DeleteAgentLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,

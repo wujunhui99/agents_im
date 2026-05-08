@@ -6,7 +6,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -14,10 +14,10 @@ import (
 type AddMemberLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *groupssvc.ServiceContext
 }
 
-func NewAddMemberLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddMemberLogic {
+func NewAddMemberLogic(ctx context.Context, svcCtx *groupssvc.ServiceContext) *AddMemberLogic {
 	return &AddMemberLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -45,10 +45,10 @@ func (l *AddMemberLogic) AddMember(req *types.AddMemberReq) (*types.MemberResp, 
 type CreateGroupLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *groupssvc.ServiceContext
 }
 
-func NewCreateGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CreateGroupLogic {
+func NewCreateGroupLogic(ctx context.Context, svcCtx *groupssvc.ServiceContext) *CreateGroupLogic {
 	return &CreateGroupLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -77,10 +77,10 @@ func (l *CreateGroupLogic) CreateGroup(req *types.CreateGroupReq) (*types.GroupR
 type ListGroupsLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *groupssvc.ServiceContext
 }
 
-func NewListGroupsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListGroupsLogic {
+func NewListGroupsLogic(ctx context.Context, svcCtx *groupssvc.ServiceContext) *ListGroupsLogic {
 	return &ListGroupsLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -112,10 +112,10 @@ func (l *ListGroupsLogic) ListGroups(_ *types.ListGroupsReq) (*types.ListGroupsR
 type GetGroupLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *groupssvc.ServiceContext
 }
 
-func NewGetGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetGroupLogic {
+func NewGetGroupLogic(ctx context.Context, svcCtx *groupssvc.ServiceContext) *GetGroupLogic {
 	return &GetGroupLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -142,10 +142,10 @@ func (l *GetGroupLogic) GetGroup(req *types.GetGroupReq) (*types.GroupResp, erro
 type LeaveGroupLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *groupssvc.ServiceContext
 }
 
-func NewLeaveGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LeaveGroupLogic {
+func NewLeaveGroupLogic(ctx context.Context, svcCtx *groupssvc.ServiceContext) *LeaveGroupLogic {
 	return &LeaveGroupLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -172,10 +172,10 @@ func (l *LeaveGroupLogic) LeaveGroup(req *types.LeaveGroupReq) (*types.MemberRes
 type ListMembersLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *groupssvc.ServiceContext
 }
 
-func NewListMembersLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListMembersLogic {
+func NewListMembersLogic(ctx context.Context, svcCtx *groupssvc.ServiceContext) *ListMembersLogic {
 	return &ListMembersLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,

@@ -63,7 +63,7 @@
 - [`docs/design-docs/user-auth-friends-groups-boundaries.md`](./docs/design-docs/user-auth-friends-groups-boundaries.md)
 - [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)
 
-常见文件：`api/*.api`、`proto/**/*.proto`、`internal/handler/**`、`internal/logic/**`、`internal/svc/service_context.go`、`internal/types/types.go`。
+常见文件：`api/*.api`、`proto/**/*.proto`、`internal/handler/**`、`internal/logic/**`、`internal/servicecontext/<service>/service_context.go`、`internal/rpcgen/*/internal/svc/service_context.go`、`internal/types/types.go`。
 
 ### Frontend React/Vite
 

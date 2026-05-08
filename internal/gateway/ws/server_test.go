@@ -23,7 +23,8 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 )
 
 func TestWebSocketOriginPolicyAllowsSameOriginByDefault(t *testing.T) {
@@ -446,12 +447,13 @@ func newWSTestServer(t *testing.T, opts ...ServerOption) (*Server, *httptest.Ser
 	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND", "")
 	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST", "")
 
-	serviceContext := svc.NewMessageServiceContextWithAuth(
+	messageContext := messagesvc.NewServiceContextWithAuth(
 		repository.NewMemoryMessageRepository(),
 		nil,
 		nil,
 		testAuthConfig(),
 	)
+	serviceContext := gatewaysvc.NewServiceContext(messageContext.MessageLogic, testAuthConfig())
 	app := NewServer(serviceContext, opts...)
 	server := httptest.NewServer(app)
 	return app, server, server.Close
@@ -459,7 +461,8 @@ func newWSTestServer(t *testing.T, opts ...ServerOption) (*Server, *httptest.Ser
 
 func newCommandTestServer(groups logic.GroupMemberLister) (*Server, *recordingDeliveryDispatcher) {
 	recorder := &recordingDeliveryDispatcher{}
-	serviceContext := svc.NewMessageServiceContext(repository.NewMemoryMessageRepository(), nil, groups)
+	messageContext := messagesvc.NewServiceContext(repository.NewMemoryMessageRepository(), nil, groups)
+	serviceContext := gatewaysvc.NewServiceContext(messageContext.MessageLogic, config.DefaultJWTAuthConfig())
 	return NewServer(serviceContext, WithDeliveryDispatcher(recorder)), recorder
 }
 

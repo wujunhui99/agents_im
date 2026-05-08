@@ -11,7 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 )
 
 func TestFriendsLogicAddDuplicateDeleteAndList(t *testing.T) {
@@ -156,7 +156,7 @@ func TestFriendsLogicNeverAddedStatusIsNone(t *testing.T) {
 }
 
 func TestFriendsHTTPHandlers(t *testing.T) {
-	serviceContext := svc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
+	serviceContext := friendssvc.NewServiceContextWithAuth(repository.NewMemoryRepository(), testJWTAuthConfig())
 	mux := newFriendsGoZeroRouter(t, serviceContext)
 	ctx := context.Background()
 

@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/wujunhui99/agents_im/internal/logic/agent"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func UpdateAgentStatusHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func UpdateAgentStatusHandler(svcCtx *agentsvc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.UpdateAgentStatusReq
 		if err := httpx.Parse(r, &req); err != nil {
