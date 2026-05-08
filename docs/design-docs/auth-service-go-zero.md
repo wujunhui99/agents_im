@@ -48,19 +48,20 @@ cmd/auth-api/main.go
 cmd/auth-rpc/main.go
 etc/auth-api.yaml
 etc/auth-rpc.yaml
-internal/auth/handler
 internal/auth/logic
 internal/auth/model
 internal/auth/repository
-internal/auth/svc
 internal/auth/token
 internal/auth/useradapter
+internal/handler/auth
+internal/logic/auth
 internal/rpcgen/auth
+internal/servicecontext/auth
 proto/auth.proto
 tests/auth_service_test.go
 ```
 
-现有 `internal/logic`、`internal/repository`、`internal/handler` 继续归 Account Service compatibility transport 使用；auth 新代码放在 `internal/auth/...`，避免污染账号资料模型。
+Auth 的认证业务、模型、repository 仍放在 `internal/auth/...`。REST transport 与其它 go-zero API 一致：handler 位于 `internal/handler/auth`，REST adapter logic 位于 `internal/logic/auth`，运行时依赖注入位于 `internal/servicecontext/auth`。
 
 ## 数据模型
 
@@ -95,6 +96,10 @@ tests/auth_service_test.go
 - `internal/auth/useradapter.LogicClient` 包装 `internal/logic.UserLogic` / Account compatibility logic。
 - 它调用 `ExistsByIdentifier` 和 `CreateUser`，模拟后续 `user-rpc` client。
 - 后续替换时只需要新增 go-zero RPC client adapter，auth logic 保持不变。
+
+## RPC entry bridge
+
+`cmd/auth-rpc` 通过 `internal/rpcgen/auth/entry.Start` 启动 goctl 生成的 `internal/rpcgen/auth/internal/{config,server,svc}`。这是 Go `internal` 包可见性限制下的命令入口桥接：`cmd/auth-rpc` 不能直接 import `internal/rpcgen/auth/internal/*`。该 bridge 不承载业务依赖，业务 wiring 仍在 goctl service context seam 内。
 
 ## 密码哈希
 

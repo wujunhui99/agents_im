@@ -9,6 +9,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/config"
 	agenthandler "github.com/wujunhui99/agents_im/internal/handler/agent"
+	authhandler "github.com/wujunhui99/agents_im/internal/handler/auth"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
 	mediahandler "github.com/wujunhui99/agents_im/internal/handler/media"
@@ -17,6 +18,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/health"
 	"github.com/wujunhui99/agents_im/internal/observability"
 	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
+	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
@@ -28,6 +30,34 @@ import (
 type authRouteContext interface {
 	AuthConfig() config.JWTAuthConfig
 	ActiveSessionRepository() authrepo.ActiveSessionRepository
+}
+
+func RegisterAuthGoZeroHandlers(server *rest.Server, serverCtx *authsvc.ServiceContext) {
+	registerGoZeroObservabilityHandlers(server, "auth-api", func(*http.Request) []health.Check {
+		return []health.Check{
+			componentCheck("auth_logic", serverCtx != nil && serverCtx.AuthLogic != nil, "configured"),
+			componentCheck("auth_repository", serverCtx != nil && serverCtx.AuthRepo != nil, "configured"),
+			componentCheck("user_client", serverCtx != nil && serverCtx.Users != nil, "configured"),
+		}
+	})
+
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodPost,
+			Path:    "/auth/login",
+			Handler: authhandler.LoginHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/auth/register",
+			Handler: authhandler.RegisterHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/auth/validate",
+			Handler: authhandler.ValidateTokenHandler(serverCtx),
+		},
+	})
 }
 
 func RegisterUserGoZeroHandlers(server *rest.Server, serverCtx *usersvc.ServiceContext) {
@@ -146,7 +176,7 @@ func addUserRoutes(server *rest.Server, serverCtx *usersvc.ServiceContext) {
 		{
 			Method:  http.MethodPost,
 			Path:    "/accounts",
-			Handler: userhandler.CreateUserHandler(serverCtx),
+			Handler: userhandler.CreateAccountHandler(serverCtx),
 		},
 		{
 			Method:  http.MethodGet,
@@ -156,7 +186,7 @@ func addUserRoutes(server *rest.Server, serverCtx *usersvc.ServiceContext) {
 		{
 			Method:  http.MethodGet,
 			Path:    "/accounts/exists",
-			Handler: userhandler.ExistsUserHandler(serverCtx),
+			Handler: userhandler.ExistsAccountHandler(serverCtx),
 		},
 		{
 			Method:  http.MethodGet,
@@ -166,7 +196,7 @@ func addUserRoutes(server *rest.Server, serverCtx *usersvc.ServiceContext) {
 		{
 			Method:  http.MethodGet,
 			Path:    "/accounts/:identifier",
-			Handler: userhandler.GetUserByIdentifierHandler(serverCtx),
+			Handler: userhandler.GetAccountByIdentifierHandler(serverCtx),
 		},
 	})
 }

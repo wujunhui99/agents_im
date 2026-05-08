@@ -14,7 +14,7 @@ Add a focused group management screen reachable from group chats, backed by serv
 
 ## Files
 
-- Backend contract and adapters: `api/groups.api`, `internal/types/types.go`, `internal/handler/gozero_routes.go`, `internal/handler/groups/*`, `internal/logic/groups/gozero_logic.go`.
+- Backend contract and adapters: `api/groups.api`, `internal/types/types.go`, `internal/handler/gozero_routes.go`, `internal/handler/groups/*`, `internal/logic/groups/*_logic.go`.
 - Backend domain and persistence: `internal/model/group.go`, `internal/repository/groups_repository.go`, `internal/repository/groups_memory.go`, `internal/repository/postgres_groups.go`, `internal/logic/groupslogic.go`.
 - Backend tests: `internal/logic/groupslogic_acl_test.go`, `tests/groups_service_test.go`.
 - Frontend API/UI/tests: `web/src/api/groups.ts`, `web/src/models/messages.ts`, `web/src/features/messages/MessagesPage.tsx`, `web/src/features/messages/MessagesPage.test.tsx`, `web/src/App.test.tsx`, `web/src/styles.css`.
