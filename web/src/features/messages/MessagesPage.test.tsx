@@ -869,7 +869,7 @@ describe('MessagesPage real API mode', () => {
     render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
 
     expect(await screen.findByText('真实后端会话消息')).toBeInTheDocument();
-    expect(await screen.findByText('AI/Agent')).toBeInTheDocument();
+    expect(await screen.findByText('AI Agent')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /未知联系人/ }));
     await user.type(screen.getByRole('textbox', { name: '输入消息' }), '你好 Bob');
     await user.click(screen.getByRole('button', { name: '发送' }));
