@@ -39,17 +39,17 @@ func NewServiceContextWithMedia(repo repository.MessageRepository, mediaRepo rep
 	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{
-		AuthRuntime:     common.NewAuthRuntime(auth),
-		MessageLogic:    logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
-		AIHostingLogic:  logic.NewConversationAIHostingLogic(aiHostingRepo),
-		MediaLogic:      mediaLogic,
-		MessageRepo:     repo,
-		MediaRepo:       mediaRepo,
+		AuthRuntime:      common.NewAuthRuntime(auth),
+		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
+		AIHostingLogic:   logic.NewConversationAIHostingLogic(aiHostingRepo),
+		MediaLogic:       mediaLogic,
+		MessageRepo:      repo,
+		MediaRepo:        mediaRepo,
 		AgentHostingRepo: agentHostingRepo,
-		AIHostingRepo:   aiHostingRepo,
-		OutboxRepo:      outboxRepositoryFromMessageRepo(repo),
-		AgentAuditLogic: logic.NewAgentAuditLogic(agentAuditRepo),
-		AgentAuditRepo:  agentAuditRepo,
+		AIHostingRepo:    aiHostingRepo,
+		OutboxRepo:       outboxRepositoryFromMessageRepo(repo),
+		AgentAuditLogic:  logic.NewAgentAuditLogic(agentAuditRepo),
+		AgentAuditRepo:   agentAuditRepo,
 	}
 }
 
