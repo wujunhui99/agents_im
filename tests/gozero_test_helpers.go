@@ -7,14 +7,13 @@ import (
 	"testing"
 	"time"
 
-	authhandler "github.com/wujunhui99/agents_im/internal/auth/handler"
-	authsvc "github.com/wujunhui99/agents_im/internal/auth/svc"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/handler"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
 	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
+	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
@@ -62,7 +61,7 @@ func newAgentGoZeroRouter(t *testing.T, serviceContext *agentsvc.ServiceContext)
 func newAuthGoZeroRouter(t *testing.T, serviceContext *authsvc.ServiceContext) http.Handler {
 	t.Helper()
 	return newGoZeroRouter(t, func(server *rest.Server) {
-		authhandler.RegisterGoZeroHandlers(server, serviceContext)
+		handler.RegisterAuthGoZeroHandlers(server, serviceContext)
 	})
 }
 

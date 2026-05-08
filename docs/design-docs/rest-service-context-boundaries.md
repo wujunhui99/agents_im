@@ -14,6 +14,7 @@ REST/Gateway 运行时上下文位于：
 
 | 边界 | Context package | 主要依赖 |
 | --- | --- | --- |
+| auth-api | `internal/servicecontext/auth` | `AuthLogic`、credential repo、Account adapter |
 | user-api | `internal/servicecontext/user` | `UserLogic`、Account repo、头像/media 上传展示依赖 |
 | friends-api | `internal/servicecontext/friends` | `FriendsLogic`、Account lookup |
 | groups-api | `internal/servicecontext/groups` | `GroupsLogic`、Groups repo、Account existence checker |
@@ -22,7 +23,9 @@ REST/Gateway 运行时上下文位于：
 | gateway-ws | `internal/servicecontext/gateway` | JWT auth runtime、`MessageLogic` |
 | shared auth runtime | `internal/servicecontext/common` | JWT config、optional active-session repository |
 
-`internal/handler/**` 和 `internal/logic/*/gozero_logic.go` 只能 import 自己边界的 focused context，不能 import `github.com/wujunhui99/agents_im/internal/svc`。
+`internal/handler/**` 和 `internal/logic/<service>/*_logic.go` 只能 import 自己边界的 focused context，不能 import `github.com/wujunhui99/agents_im/internal/svc`。
+
+REST adapter logic 使用 goctl 风格的每 handler 一个 `*_logic.go` 文件；不再维护聚合 `gozero_logic.go` 文件。
 
 ## Media 边界说明
 
@@ -43,5 +46,9 @@ Message Service 只持有 message-send media validation 所需的 media reposito
 
 - 根级 `internal/svc` package 不存在；
 - `cmd`、`internal/handler`、`internal/logic`、`internal/gateway`、`tests` 不得 import `github.com/wujunhui99/agents_im/internal/svc`。
+- REST adapter logic 不得新增聚合 `gozero_logic.go`；
+- auth-api 不得回退到 `internal/auth/svc`，必须使用 `internal/servicecontext/auth`。
 
 goctl RPC 生成目录下的 `internal/rpcgen/*/internal/svc` 是服务本地 context，不属于被清理的根级聚合 context。
+
+`cmd/*-rpc` 保留 `internal/rpcgen/*/entry` 轻量启动桥接，因为 Go `internal` 可见性禁止 `cmd/*-rpc` 直接 import `internal/rpcgen/<service>/internal/{config,server,svc}`。这些 entry 文件只负责调用 goctl 生成的 config/server/svc，不承载业务 wiring。

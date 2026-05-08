@@ -80,17 +80,18 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/message.proto --go_ou
   - `internal/handler/friends`
   - `internal/handler/groups`
   - `internal/handler/message`
-  - `internal/auth/handler/auth`
+  - `internal/handler/auth`
 - 已迁移统一 generated types：`internal/types/types.go`。
 - 已新增 go-zero routes：
   - `internal/handler/gozero_routes.go`
-  - `internal/auth/handler/gozero_routes.go`
 - 已新增 route-level logic adapters：
-  - `internal/logic/user/gozero_logic.go`
-  - `internal/logic/friends/gozero_logic.go`
-  - `internal/logic/groups/gozero_logic.go`
-  - `internal/logic/message/gozero_logic.go`
-  - `internal/auth/logic/auth/gozero_logic.go`
+  - `internal/logic/user/*_logic.go`
+  - `internal/logic/friends/*_logic.go`
+  - `internal/logic/groups/*_logic.go`
+  - `internal/logic/message/*_logic.go`
+  - `internal/logic/media/*_logic.go`
+  - `internal/logic/agent/*_logic.go`
+  - `internal/logic/auth/*_logic.go`
 - 已新增正式 RPC generated pb packages：
   - `proto/userpb`
   - `proto/authpb`

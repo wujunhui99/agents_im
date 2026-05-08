@@ -14,11 +14,11 @@ import (
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
 	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	authsvc "github.com/wujunhui99/agents_im/internal/auth/svc"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
 	userrepo "github.com/wujunhui99/agents_im/internal/repository"
+	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 )
 

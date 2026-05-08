@@ -9,12 +9,12 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	authsvc "github.com/wujunhui99/agents_im/internal/auth/svc"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	"github.com/wujunhui99/agents_im/proto/userpb"
 )
 
