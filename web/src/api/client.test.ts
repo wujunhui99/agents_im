@@ -72,4 +72,60 @@ describe('REST API client', () => {
       status: 401,
     } satisfies Partial<ApiError>);
   });
+
+  it('notifies auth failure handlers for protected stale-session responses', async () => {
+    const onAuthFailure = vi.fn();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: 'UNAUTHENTICATED',
+          message: 'invalid or missing bearer token',
+          data: null,
+        },
+        { status: 401 },
+      ),
+    );
+
+    const client = createApiClient({
+      getToken: () => 'old-device-token',
+      onAuthFailure,
+    });
+
+    await expect(client.get('/me')).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+      status: 401,
+    });
+    expect(onAuthFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: 'old-device-token',
+        path: '/me',
+        error: expect.objectContaining({
+          code: 'UNAUTHENTICATED',
+          status: 401,
+        }),
+      }),
+    );
+  });
+
+  it('does not notify auth failure handlers for public login failures', async () => {
+    const onAuthFailure = vi.fn();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: 'UNAUTHENTICATED',
+          message: 'invalid identifier or password',
+          data: null,
+        },
+        { status: 401 },
+      ),
+    );
+
+    const client = createApiClient({ onAuthFailure });
+
+    await expect(client.post('/auth/login', { identifier: 'alice_001', password: 'wrong-password' }, { auth: false })).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+      status: 401,
+    });
+    expect(onAuthFailure).not.toHaveBeenCalled();
+  });
 });

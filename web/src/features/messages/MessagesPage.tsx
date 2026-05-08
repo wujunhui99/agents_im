@@ -35,6 +35,7 @@ type MessagesPageProps = {
   webSocketUrl?: string;
   webSocketToken?: string;
   webSocketFactory?: WebSocketFactory;
+  onAuthFailure?: (failure: unknown) => void;
   startChatSignal?: number;
   pendingChatProfile?: UserProfile | null;
   pendingGroup?: Group | null;
@@ -94,6 +95,7 @@ export function MessagesPage({
   webSocketUrl = '/ws',
   webSocketToken,
   webSocketFactory,
+  onAuthFailure,
   startChatSignal = 0,
   pendingChatProfile = null,
   pendingGroup = null,
@@ -156,6 +158,7 @@ export function MessagesPage({
       url: webSocketUrl,
       token: webSocketToken,
       webSocketFactory,
+      onAuthFailure,
       onEvent: (event) => {
         const message = webSocketEventToServerMessage(event);
         if (!message || !conversationBelongsToCurrentUser(message, currentUserId)) {
@@ -171,7 +174,7 @@ export function MessagesPage({
 
     client.connect();
     return () => client.close(1000, 'messages page unmounted');
-  }, [currentUserId, webSocketUrl, webSocketToken, webSocketFactory]);
+  }, [currentUserId, onAuthFailure, webSocketUrl, webSocketToken, webSocketFactory]);
 
   useEffect(() => {
     if (startChatSignal > 0) {

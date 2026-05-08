@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Compass, Contact, MessageCircle, ShieldCheck, UserRound } from 'lucide-react';
 import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
@@ -8,6 +8,7 @@ import { createGroupsApi, type Group, type GroupsApi } from './api/groups';
 import { createMediaApi, type MediaApi } from './api/media';
 import { createMessageApi, type MessageApi } from './api/messages';
 import { createUserApi, type UserApi, type UserProfile, type UserProfilePatch } from './api/user';
+import type { WebSocketFactory } from './api/websocketClient';
 import ContactsPage from './components/ContactsPage';
 import { Avatar } from './components/ui/Avatar';
 import { Button } from './components/ui/Button';
@@ -31,7 +32,9 @@ const tabs: TabDefinition<TabKey>[] = [
 type AppProps = {
   initialUser?: UserProfile;
   userApi?: UserApi;
+  webSocketUrl?: string;
   webSocketToken?: string;
+  webSocketFactory?: WebSocketFactory;
 };
 
 function App(props: AppProps) {
@@ -43,10 +46,10 @@ function App(props: AppProps) {
 }
 
 function AuthGate(props: AppProps) {
-  const { session } = useAuth();
+  const { authPrompt, session } = useAuth();
 
   if (!session) {
-    return <AuthPage />;
+    return <AuthPage prompt={authPrompt} />;
   }
 
   return <AuthenticatedApp {...props} authUser={session.user} />;
@@ -56,7 +59,7 @@ type AuthenticatedAppProps = AppProps & {
   authUser: AuthUser;
 };
 
-function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: AuthenticatedAppProps) {
+function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSocketToken, webSocketFactory }: AuthenticatedAppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
   const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(() => new Set(['messages']));
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
@@ -64,28 +67,34 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
   const [pendingChatProfile, setPendingChatProfile] = useState<UserProfile | null>(null);
   const [pendingGroup, setPendingGroup] = useState<Group | null>(null);
   const activeLabel = useMemo(() => tabs.find((tab) => tab.key === activeTab)?.label ?? '消息', [activeTab]);
-  const { session, logout, updateSessionUser } = useAuth();
+  const { handleAuthFailure, session, logout, updateSessionUser } = useAuth();
   const effectiveUserApi = useMemo(
     () =>
       userApi ??
       createUserApi(
         createApiClient({
           getToken: () => session?.token,
+          onAuthFailure: handleAuthFailure,
         }),
       ),
-    [session?.token, userApi],
+    [handleAuthFailure, session?.token, userApi],
   );
   const authedApiClient = useMemo(
     () =>
       createApiClient({
         getToken: () => session?.token,
+        onAuthFailure: handleAuthFailure,
       }),
-    [session?.token],
+    [handleAuthFailure, session?.token],
   );
   const messageApi = useMemo(() => createMessageApi(authedApiClient), [authedApiClient]);
   const mediaApi = useMemo(() => createMediaApi(authedApiClient), [authedApiClient]);
   const contactsApi = useMemo(() => createContactsApi(authedApiClient), [authedApiClient]);
   const groupsApi = useMemo(() => createGroupsApi(authedApiClient), [authedApiClient]);
+  const activeWebSocketToken = webSocketToken ?? session?.token;
+  const handleWebSocketAuthFailure = useCallback(() => {
+    handleAuthFailure({ token: activeWebSocketToken ?? null });
+  }, [activeWebSocketToken, handleAuthFailure]);
 
   async function updateProfile(patch: UserProfilePatch) {
     const updatedUser = await effectiveUserApi.patchCurrentUser(patch);
@@ -181,7 +190,10 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
                   messageApi,
                   mediaApi,
                   uploadAvatar,
-                  webSocketToken ?? session?.token,
+                  webSocketUrl,
+                  activeWebSocketToken,
+                  webSocketFactory,
+                  handleWebSocketAuthFailure,
                   startChatSignal,
                   pendingChatProfile,
                   pendingGroup,
@@ -201,7 +213,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketToken }: Au
   );
 }
 
-function AuthPage() {
+function AuthPage({ prompt = '' }: { prompt?: string }) {
   const { login, register } = useAuth();
   const loginUserApi = useMemo(() => createUserApi(createApiClient()), []);
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -330,6 +342,12 @@ function AuthPage() {
             </p>
           ) : null}
 
+          {prompt ? (
+            <p className="auth-error" role="alert">
+              {prompt}
+            </p>
+          ) : null}
+
           {error ? (
             <p className="auth-error" role="alert">
               {error}
@@ -368,7 +386,10 @@ function renderPage(
   messageApi: MessageApi,
   mediaApi: MediaApi,
   onUploadAvatar: (file: File) => Promise<UserProfile>,
+  webSocketUrl: string | undefined,
   webSocketToken: string | undefined,
+  webSocketFactory: WebSocketFactory | undefined,
+  onAuthFailure: (failure: unknown) => void,
   startChatSignal: number,
   pendingChatProfile: UserProfile | null,
   pendingGroup: Group | null,
@@ -386,7 +407,10 @@ function renderPage(
         mediaApi={mediaApi}
         contactsApi={contactsApi}
         groupsApi={groupsApi}
+        webSocketUrl={webSocketUrl}
         webSocketToken={webSocketToken}
+        webSocketFactory={webSocketFactory}
+        onAuthFailure={onAuthFailure}
         startChatSignal={startChatSignal}
         pendingChatProfile={pendingChatProfile}
         pendingGroup={pendingGroup}
