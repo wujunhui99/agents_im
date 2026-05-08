@@ -44,6 +44,11 @@ type AddMemberReq struct {
 	UserID  string `json:"user_id,optional"`
 }
 
+type KickMemberReq struct {
+	GroupID string `path:"group_id"`
+	UserID  string `path:"user_id"`
+}
+
 type AuthData struct {
 	UserID        string `json:"user_id"`
 	Identifier    string `json:"identifier"`
@@ -213,17 +218,22 @@ type GetUserByIdentifierReq struct {
 }
 
 type Group struct {
-	GroupID       string `json:"group_id"`
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-	CreatorUserID string `json:"creator_user_id"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	GroupID         string `json:"group_id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	Announcement    string `json:"announcement"`
+	AvatarMediaID   string `json:"avatar_media_id,omitempty"`
+	AvatarURL       string `json:"avatar_url,omitempty"`
+	CreatorUserID   string `json:"creator_user_id"`
+	CurrentUserRole string `json:"current_user_role,omitempty"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
 }
 
 type GroupMember struct {
 	GroupID       string `json:"group_id"`
 	UserID        string `json:"user_id"`
+	Role          string `json:"role"`
 	State         string `json:"state"`
 	JoinedAt      string `json:"joined_at"`
 	LeftAt        string `json:"left_at"`
@@ -517,6 +527,13 @@ type UpdateMeReq struct {
 	Gender      string `json:"gender,optional"`
 	BirthDate   string `json:"birth_date,optional"`
 	Region      string `json:"region,optional"`
+}
+
+type UpdateGroupReq struct {
+	GroupID      string `path:"group_id"`
+	Name         string `json:"name,optional"`
+	Description  string `json:"description,optional"`
+	Announcement string `json:"announcement,optional"`
 }
 
 type UpdateAgentReq struct {
