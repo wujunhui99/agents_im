@@ -8,6 +8,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 const (
@@ -186,8 +187,8 @@ func (l *MessageLogic) SendMessage(ctx context.Context, req SendMessageRequest) 
 			Deduplicated:     deduplicated,
 			RecipientUserIDs: append([]string(nil), recipientUserIDs...),
 		}); err != nil {
-			metricsStatus = "failed"
-			return SendMessageResponse{}, err
+			logx.WithContext(ctx).Errorf("message created hook failed after message accepted server_msg_id=%q conversation_id=%q seq=%d: %v",
+				message.ServerMsgID, message.ConversationID, message.Seq, err)
 		}
 	}
 

@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/zeromicro/go-zero/core/logx"
 )
+
+const defaultAsyncTriggerRunTimeout = 2 * time.Minute
 
 type AgentTriggerRunner interface {
 	Run(ctx context.Context, trigger AgentTrigger) (AgentRunOrchestratorResult, error)
@@ -65,7 +69,9 @@ type ConversationHostingConfig struct {
 	AIHostingRepository  repository.ConversationAIHostingRepository
 	Runner               AgentTriggerRunner
 	AgentAccountResolver AgentAccountResolver
+	ReadMarker           AgentTriggerReadMarker
 	TriggerPolicy        TriggerPolicy
+	RunTimeout           time.Duration
 }
 
 type ConversationHostingService struct {
@@ -73,7 +79,9 @@ type ConversationHostingService struct {
 	aiHostingRepo repository.ConversationAIHostingRepository
 	runner        AgentTriggerRunner
 	agentResolver AgentAccountResolver
+	readMarker    AgentTriggerReadMarker
 	policy        TriggerPolicy
+	runTimeout    time.Duration
 }
 
 type ConversationHostingMessageCreatedInput struct {
@@ -97,12 +105,18 @@ func NewConversationHostingService(config ConversationHostingConfig) (*Conversat
 	if config.Runner == nil {
 		return nil, apperror.Internal("agent trigger runner is not configured")
 	}
+	runTimeout := config.RunTimeout
+	if runTimeout <= 0 {
+		runTimeout = defaultAsyncTriggerRunTimeout
+	}
 	return &ConversationHostingService{
 		repo:          config.Repository,
 		aiHostingRepo: config.AIHostingRepository,
 		runner:        config.Runner,
 		agentResolver: config.AgentAccountResolver,
+		readMarker:    config.ReadMarker,
 		policy:        config.TriggerPolicy,
+		runTimeout:    runTimeout,
 	}, nil
 }
 
@@ -169,7 +183,7 @@ func (s *ConversationHostingService) HandleMessageCreated(ctx context.Context, i
 
 	result := ConversationHostingResult{}
 	for _, trigger := range triggers {
-		response, ran, err := s.runIdempotentTrigger(ctx, trigger)
+		ran, err := s.acceptAndScheduleTrigger(ctx, trigger)
 		if err != nil {
 			return result, err
 		}
@@ -177,8 +191,6 @@ func (s *ConversationHostingService) HandleMessageCreated(ctx context.Context, i
 			continue
 		}
 		result.Triggered = true
-		result.Response = response
-		result.Responses = append(result.Responses, response)
 	}
 	return result, nil
 }
@@ -228,7 +240,7 @@ func (s *ConversationHostingService) targetAgentAccountIDs(ctx context.Context, 
 	return uniqueNonEmptyIDs(targets), policy, nil
 }
 
-func (s *ConversationHostingService) runIdempotentTrigger(ctx context.Context, trigger AgentTrigger) (AgentResponseResult, bool, error) {
+func (s *ConversationHostingService) acceptAndScheduleTrigger(ctx context.Context, trigger AgentTrigger) (bool, error) {
 	started, err := s.repo.TryStartAgentTrigger(ctx, repository.AgentTriggerStartInput{
 		IdempotencyKey:     trigger.RequestID,
 		ConversationID:     trigger.ConversationID,
@@ -237,12 +249,55 @@ func (s *ConversationHostingService) runIdempotentTrigger(ctx context.Context, t
 		TriggerEventID:     trigger.EventID,
 	})
 	if err != nil {
-		return AgentResponseResult{}, false, err
+		return false, err
 	}
 	if !started {
-		return AgentResponseResult{}, false, nil
+		return false, nil
 	}
 
+	if err := s.markTriggerRead(ctx, trigger); err != nil {
+		finishErr := s.repo.FinishAgentTrigger(ctx, repository.AgentTriggerFinishInput{
+			IdempotencyKey: trigger.RequestID,
+			Status:         repository.AgentTriggerStatusFailed,
+			ErrorMessage:   err.Error(),
+		})
+		if finishErr != nil {
+			return true, errors.Join(err, fmt.Errorf("record failed agent trigger: %w", finishErr))
+		}
+		return true, err
+	}
+
+	s.runAcceptedTriggerAsync(trigger)
+	return true, nil
+}
+
+func (s *ConversationHostingService) markTriggerRead(ctx context.Context, trigger AgentTrigger) error {
+	if s.readMarker == nil || trigger.ConversationType != ConversationTypeSingle {
+		return nil
+	}
+	return s.readMarker.MarkTriggerRead(ctx, AgentTriggerReadMark{
+		AccountID:      trigger.AgentUserID,
+		ConversationID: trigger.ConversationID,
+		TriggerSeq:     trigger.TriggerSeq,
+	})
+}
+
+func (s *ConversationHostingService) runAcceptedTriggerAsync(trigger AgentTrigger) {
+	runTimeout := s.runTimeout
+	if runTimeout <= 0 {
+		runTimeout = defaultAsyncTriggerRunTimeout
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
+		defer cancel()
+		if _, err := s.runAcceptedTrigger(ctx, trigger); err != nil {
+			logx.Errorf("agent hosting async trigger failed request_id=%q conversation_id=%q agent_account_id=%q trigger_server_msg_id=%q: %v",
+				trigger.RequestID, trigger.ConversationID, trigger.AgentUserID, trigger.TriggerMessageID, err)
+		}
+	}()
+}
+
+func (s *ConversationHostingService) runAcceptedTrigger(ctx context.Context, trigger AgentTrigger) (AgentResponseResult, error) {
 	run, err := s.runner.Run(ctx, trigger)
 	if err != nil {
 		finishErr := s.repo.FinishAgentTrigger(ctx, repository.AgentTriggerFinishInput{
@@ -251,18 +306,18 @@ func (s *ConversationHostingService) runIdempotentTrigger(ctx context.Context, t
 			ErrorMessage:   err.Error(),
 		})
 		if finishErr != nil {
-			return AgentResponseResult{}, true, errors.Join(err, fmt.Errorf("record failed agent trigger: %w", finishErr))
+			return AgentResponseResult{}, errors.Join(err, fmt.Errorf("record failed agent trigger: %w", finishErr))
 		}
-		return AgentResponseResult{}, true, err
+		return AgentResponseResult{}, err
 	}
 	if err := s.repo.FinishAgentTrigger(ctx, repository.AgentTriggerFinishInput{
 		IdempotencyKey:      trigger.RequestID,
 		Status:              repository.AgentTriggerStatusSucceeded,
 		ResponseServerMsgID: run.Response.Message.ServerMsgID,
 	}); err != nil {
-		return AgentResponseResult{}, true, err
+		return AgentResponseResult{}, err
 	}
-	return run.Response, true, nil
+	return run.Response, nil
 }
 
 func senderTypeForMessage(message logic.Message) string {
