@@ -64,11 +64,52 @@ required_files=(
   "internal/logic/messagelogic.go"
   "internal/logic/medialogic_test.go"
   "internal/logic/message_media_test.go"
-  "internal/logic/user/gozero_logic.go"
-  "internal/logic/friends/gozero_logic.go"
-  "internal/logic/groups/gozero_logic.go"
-  "internal/logic/message/gozero_logic.go"
-  "internal/logic/media/gozero_logic.go"
+  "internal/logic/user/create_user_logic.go"
+  "internal/logic/user/create_account_logic.go"
+  "internal/logic/user/exists_user_logic.go"
+  "internal/logic/user/exists_account_logic.go"
+  "internal/logic/user/get_me_logic.go"
+  "internal/logic/user/get_user_by_identifier_logic.go"
+  "internal/logic/user/get_account_by_identifier_logic.go"
+  "internal/logic/user/update_me_logic.go"
+  "internal/logic/user/update_me_avatar_logic.go"
+  "internal/logic/user/convert.go"
+  "internal/logic/friends/add_friend_logic.go"
+  "internal/logic/friends/delete_friend_logic.go"
+  "internal/logic/friends/get_friendship_logic.go"
+  "internal/logic/friends/list_friends_logic.go"
+  "internal/logic/friends/list_friend_requests_logic.go"
+  "internal/logic/friends/accept_friend_request_logic.go"
+  "internal/logic/friends/reject_friend_request_logic.go"
+  "internal/logic/friends/convert.go"
+  "internal/logic/groups/create_group_logic.go"
+  "internal/logic/groups/list_groups_logic.go"
+  "internal/logic/groups/get_group_logic.go"
+  "internal/logic/groups/update_group_logic.go"
+  "internal/logic/groups/add_member_logic.go"
+  "internal/logic/groups/leave_group_logic.go"
+  "internal/logic/groups/kick_member_logic.go"
+  "internal/logic/groups/list_members_logic.go"
+  "internal/logic/groups/convert.go"
+  "internal/logic/message/send_message_logic.go"
+  "internal/logic/message/pull_messages_logic.go"
+  "internal/logic/message/get_conversation_seqs_logic.go"
+  "internal/logic/message/mark_conversation_as_read_logic.go"
+  "internal/logic/message/get_conversation_a_i_hosting_logic.go"
+  "internal/logic/message/update_conversation_a_i_hosting_logic.go"
+  "internal/logic/message/convert.go"
+  "internal/logic/media/create_upload_intent_logic.go"
+  "internal/logic/media/complete_upload_logic.go"
+  "internal/logic/media/get_download_u_r_l_logic.go"
+  "internal/logic/media/get_avatar_logic.go"
+  "internal/logic/media/convert.go"
+  "internal/logic/agent/create_agent_logic.go"
+  "internal/logic/agent/get_agent_logic.go"
+  "internal/logic/agent/list_agents_logic.go"
+  "internal/logic/agent/update_agent_logic.go"
+  "internal/logic/agent/update_agent_status_logic.go"
+  "internal/logic/agent/delete_agent_logic.go"
+  "internal/logic/agent/convert.go"
   "internal/logic/medialogic.go"
   "internal/model/friendship.go"
   "internal/model/group.go"
@@ -95,10 +136,17 @@ required_files=(
   "internal/handler/gozero_routes.go"
   "internal/handler/media/create_upload_intent_handler.go"
   "internal/handler/media/complete_upload_handler.go"
-  "internal/handler/media/get_download_url_handler.go"
-  "internal/handler/user/update_me_avatar_handler.go"
+  "internal/handler/media/get_download_u_r_l_handler.go"
+  "internal/handler/media/get_avatar_handler.go"
+  "internal/handler/message/get_conversation_a_i_hosting_handler.go"
+  "internal/handler/message/update_conversation_a_i_hosting_handler.go"
+  "internal/handler/user/create_account_handler.go"
+  "internal/handler/user/exists_account_handler.go"
+  "internal/handler/user/get_account_by_identifier_handler.go"
+ "internal/handler/user/update_me_avatar_handler.go"
   "internal/servicecontext/common/auth.go"
   "internal/servicecontext/user/service_context.go"
+  "internal/servicecontext/auth/service_context.go"
   "internal/servicecontext/friends/service_context.go"
   "internal/servicecontext/groups/service_context.go"
   "internal/servicecontext/message/service_context.go"
@@ -112,11 +160,15 @@ required_files=(
   "internal/observability/trace_test.go"
   "internal/types/types.go"
   "internal/auth/logic/authlogic.go"
-  "internal/auth/logic/auth/gozero_logic.go"
+  "internal/logic/auth/login_logic.go"
+  "internal/logic/auth/register_logic.go"
+  "internal/logic/auth/validate_token_logic.go"
+  "internal/logic/auth/convert.go"
   "internal/auth/repository/memory.go"
   "internal/auth/repository/postgres.go"
-  "internal/auth/handler/health_handler.go"
-  "internal/auth/handler/gozero_routes.go"
+  "internal/handler/auth/login_handler.go"
+  "internal/handler/auth/register_handler.go"
+  "internal/handler/auth/validate_token_handler.go"
   "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
   "internal/ctxuser/user.go"
@@ -455,6 +507,18 @@ fi
 
 if [[ -d internal/svc ]]; then
   echo "legacy root internal/svc package must not exist; use focused internal/servicecontext/<service> packages" >&2
+  exit 1
+fi
+
+aggregate_gozero_logic_files="$(find internal/logic internal/auth/logic -path '*/gozero_logic.go' -type f -print || true)"
+if [[ -n "${aggregate_gozero_logic_files}" ]]; then
+  echo "go-zero REST adapter logic must use goctl-style per-operation *_logic.go files, not aggregate gozero_logic.go files:" >&2
+  echo "${aggregate_gozero_logic_files}" >&2
+  exit 1
+fi
+
+if [[ -d internal/auth/svc ]]; then
+  echo "auth-api must use focused internal/servicecontext/auth, not the old internal/auth/svc compatibility context" >&2
   exit 1
 fi
 
@@ -864,6 +928,11 @@ rpc_entry_patterns=(
   "cmd/friends-rpc/main.go:internal/rpcgen/friends/entry"
   "cmd/groups-rpc/main.go:internal/rpcgen/groups/entry"
   "cmd/message-rpc/main.go:internal/rpcgen/message/entry"
+  "internal/rpcgen/user/entry/entry.go:Start bridges cmd/user-rpc"
+  "internal/rpcgen/auth/entry/entry.go:Start bridges cmd/auth-rpc"
+  "internal/rpcgen/friends/entry/entry.go:Start bridges cmd/friends-rpc"
+  "internal/rpcgen/groups/entry/entry.go:Start bridges cmd/groups-rpc"
+  "internal/rpcgen/message/entry/entry.go:Start bridges cmd/message-rpc"
 )
 
 for entry_spec in "${rpc_entry_patterns[@]}"; do
@@ -871,6 +940,11 @@ for entry_spec in "${rpc_entry_patterns[@]}"; do
   pattern="${entry_spec##*:}"
   rg -q "$pattern" "$file"
 done
+
+if rg -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic|auth/repository)"' internal/rpcgen/*/entry --glob '*.go'; then
+  echo "rpc entry bridges must not own business wiring; keep dependencies behind generated rpc service contexts" >&2
+  exit 1
+fi
 
 if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" internal/rpcgen/*/internal/logic; then
   echo "generated rpc logic still contains empty scaffold behavior" >&2
@@ -1583,8 +1657,8 @@ rg -q "type JWTAuthConfig" internal/config/config.go
 rg -q "AccessSecret" internal/config/config.go internal/rpcgen/auth/internal/config/config.go
 rg -q "AccessExpire" internal/config/config.go internal/rpcgen/auth/internal/config/config.go
 rg -q "user_id" internal/auth/token/token.go internal/ctxuser/user.go
-rg -q "ctxuser\\.UserID" internal/logic/user/gozero_logic.go internal/logic/friends/gozero_logic.go internal/logic/groups/gozero_logic.go internal/logic/message/gozero_logic.go internal/logic/media/gozero_logic.go
-rg -q "sender_id must match authenticated user" internal/logic/message/gozero_logic.go
+rg -q "ctxuser\\.UserID" internal/logic/user internal/logic/friends internal/logic/groups internal/logic/message internal/logic/media
+rg -q "sender_id must match authenticated user" internal/logic/message/send_message_logic.go
 
 jwt_test_patterns=(
   "assertLooksLikeJWT"
@@ -1880,7 +1954,7 @@ observability_wiring_patterns=(
 )
 
 for pattern in "${observability_wiring_patterns[@]}"; do
-  rg -q "$pattern" internal/handler/gozero_routes.go internal/auth/handler/gozero_routes.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
+  rg -q "$pattern" internal/handler/gozero_routes.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
 done
 
 observability_metric_hooks=(
