@@ -272,6 +272,9 @@ Authorization: Bearer <access_token>
 The group creator is automatically an active member. Group chat V1 supports up to 200 active members total, including the creator.
 Group detail and member-list reads require a bearer token and only active members can read them. Adding a different user requires the group creator/owner.
 `creator_user_id`, `operator_user_id`, and member `user_id` are account id aliases.
+Group management V1 treats `description` as the persisted group announcement and also exposes it as `announcement` for frontend display.
+`avatar_url` and `avatar_media_id` may be empty; clients should render the existing group avatar placeholder when no group avatar URL exists.
+Member `role` is `owner`, `admin`, or `member`; `current_user_role` is returned on detail reads when the requester is an active member.
 
 ### Create Group
 
@@ -307,7 +310,11 @@ Response data:
       "group_id": "grp_000001",
       "name": "Frontend Demo",
       "description": "MVP smoke room",
+      "announcement": "MVP smoke room",
+      "avatar_media_id": "",
+      "avatar_url": "",
       "creator_user_id": "1001",
+      "current_user_role": "owner",
       "created_at": "2026-05-05T12:00:00Z",
       "updated_at": "2026-05-05T12:00:00Z"
     }
@@ -321,6 +328,27 @@ Response data:
 GET /groups/grp_000001
 Authorization: Bearer <access_token>
 ```
+
+Response data includes the group fields shown in `List Groups`. Non-members receive `FORBIDDEN`.
+
+### Update Group
+
+Owner/admin only:
+
+```http
+PATCH /groups/grp_000001
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+```json
+{
+  "name": "Frontend Demo 2",
+  "announcement": "New announcement"
+}
+```
+
+Normal members and non-members receive `FORBIDDEN`. The response data is the updated group. In V1 `announcement` is persisted through the existing `description` field.
 
 ### Join Or Add Member
 
@@ -353,7 +381,18 @@ GET /groups/grp_000001/members
 Authorization: Bearer <access_token>
 ```
 
-Member rows include human-readable profile fields when available: `identifier`, `display_name`, `name`, and `avatar_media_id`. Frontend UI must prefer those fields over raw internal account IDs.
+Member rows include `role` plus human-readable profile fields when available: `identifier`, `display_name`, `name`, `avatar_media_id`, and `avatar_url`. Frontend UI must prefer those fields over raw internal account IDs.
+
+### Kick Member
+
+Owner/admin only:
+
+```http
+DELETE /groups/grp_000001/members/2002
+Authorization: Bearer <access_token>
+```
+
+The backend rejects normal members, non-members, kicking the owner, and admin attempts to kick another admin. A kicked member is marked inactive and no longer appears in `GET /groups/:group_id/members`.
 
 ## Media REST
 

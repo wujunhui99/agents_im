@@ -272,9 +272,19 @@ func addGroupsRoutes(server *rest.Server, serverCtx *svc.ServiceContext) {
 			Handler: groupshandler.LeaveGroupHandler(serverCtx),
 		},
 		{
+			Method:  http.MethodDelete,
+			Path:    "/groups/:group_id/members/:user_id",
+			Handler: groupshandler.KickMemberHandler(serverCtx),
+		},
+		{
 			Method:  http.MethodGet,
 			Path:    "/groups/:group_id",
 			Handler: groupshandler.GetGroupHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPatch,
+			Path:    "/groups/:group_id",
+			Handler: groupshandler.UpdateGroupHandler(serverCtx),
 		},
 		{
 			Method:  http.MethodGet,
