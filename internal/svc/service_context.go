@@ -223,6 +223,7 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 		Repository:          ctx.AgentHostingRepo,
 		AIHostingRepository: ctx.AIHostingRepo,
 		Runner:              orchestrator,
+		ReadMarker:          agentim.NewMessageRepositoryReadMarker(ctx.MessageRepo),
 	})
 	if err != nil {
 		return err
