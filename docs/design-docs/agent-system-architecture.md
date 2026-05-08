@@ -414,7 +414,7 @@ Client -> Gateway/Message API
 | `group_mention` | 群聊 @Agent | `conversation_type=group`，目标 Agent 在 `at_user_ids` 中。 |
 | `admin_manual_run` | 管理员手动触发 | 管理员传入 `request_id`、`admin_user_id`、`agent_user_id`、会话和 prompt 文本；不伪造用户消息。 |
 
-`message.created` 事件必须保留 `event_id`、`operation_id`、`trace_id`、`conversation_id`、`server_msg_id`、`seq`、`sender_id`、`sender_type`、`content_type` 和目标 Agent 列表。第一阶段由 `MessageLogic.MessageCreatedHook` 在持久化后同步传入 `ConversationHostingService`，event id 使用稳定的 `message.created:<server_msg_id>`；后续异步 consumer 必须保持同一 idempotency 语义。构造出的 Agent trigger 使用 `event_id + agent_user_id` 作为幂等请求基础。
+`message.created` 事件必须保留 `event_id`、`operation_id`、`trace_id`、`conversation_id`、`server_msg_id`、`seq`、`sender_id`、`sender_type`、`content_type` 和目标 Agent 列表。第一阶段由 `MessageLogic.MessageCreatedHook` 在持久化后传入 `ConversationHostingService`，event id 使用稳定的 `message.created:<server_msg_id>`；hook 只完成触发选择、幂等接受、托管 owner read seq 推进和后台执行调度，不同步等待 Agent runtime。后续独立异步 consumer 必须保持同一 idempotency 语义。构造出的 Agent trigger 使用 `event_id + agent_user_id` 作为幂等请求基础。
 
 ### Agent 响应写回
 
@@ -448,7 +448,7 @@ AgentTrigger
 - 幂等键应包含 `event_id` 或 `trigger_message_id + agent_id`。
 - Agent 响应元数据包含 `agent_run_id`、`trigger_message_id` 和 `allow_recursive_trigger`；只有全局/会话策略 `AllowAgentMessageRecursion=true` 且消息元数据 `allow_recursive_trigger=true` 时，Agent 发送的消息才能再次构造 Agent trigger。
 
-当前第一阶段实现新增 `agent_conversation_hosting` 与 `agent_trigger_idempotency` 仓储契约。托管配置以 `conversation_id -> agent_account_id` 表示是否 enabled；trigger idempotency key 使用 `event_id/server_msg_id + agent_account_id`，成功后重复事件不再执行，失败会记录为 `failed` 并允许后续显式重试。
+当前第一阶段实现新增 `agent_conversation_hosting` 与 `agent_trigger_idempotency` 仓储契约。托管配置以 `conversation_id -> agent_account_id` 表示是否 enabled；trigger idempotency key 使用 `event_id/server_msg_id + agent_account_id`，running/succeeded 重复事件不再执行，失败会记录为 `failed` 并允许后续显式重试。AI hosting V1 的后台执行仍在 message-api 进程内完成；幂等状态是持久的，但进程重启后的自动恢复 worker 属于后续可靠性增强。
 
 ## 权限模型
 

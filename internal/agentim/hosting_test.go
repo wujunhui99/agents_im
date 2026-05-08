@@ -71,19 +71,10 @@ func TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates
 	if err != nil {
 		t.Fatalf("send human trigger: %v", err)
 	}
+
+	pulled := waitForPulledMessageCount(t, messageLogic, "usr_1", human.Message.ConversationID, 2)
 	if runtimeCalls != 1 {
 		t.Fatalf("runtime calls = %d, want 1", runtimeCalls)
-	}
-
-	pulled, err := messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
-		UserID:         "usr_1",
-		ConversationID: human.Message.ConversationID,
-		FromSeq:        1,
-		Limit:          10,
-		Order:          "asc",
-	})
-	if err != nil {
-		t.Fatalf("pull hosted conversation: %v", err)
 	}
 	if len(pulled.Messages) != 2 {
 		t.Fatalf("got %d messages, want human + ai: %+v", len(pulled.Messages), pulled.Messages)

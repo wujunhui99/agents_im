@@ -13,7 +13,8 @@ Agent 回复必须作为普通 IM 消息进入 Message Service，复用 `server_
 - Conversation hosting 能表示某个 `conversation_id` 由哪个 `agent_account_id` 托管，且可启停。
 - Issue #3 AI Hosting V1 支持普通用户在双人单聊中开启“由 AI 代我回复”，设置作用域为 `owner_account_id + conversation_id`，默认关闭。
 - 同一个双人单聊最多只能有一方开启 AI 托管；一方开启后，另一方读取状态时必须看到不可用原因，更新开启时必须得到冲突错误。
-- `message.created` 事件进入 Agent hosting seam 后，通过 `AgentRunOrchestrator -> MessageServiceResponseWriter -> MessageLogic.SendMessage` 写回 AI 消息。
+- `message.created` 事件进入 Agent hosting seam 后，只在发送链路中完成触发选择、幂等接受、托管 owner read seq 推进和后台任务调度；AI 生成不阻塞原始人类消息 ACK。
+- 后台任务通过 `AgentRunOrchestrator -> MessageServiceResponseWriter -> MessageLogic.SendMessage` 写回 AI 消息。
 - 同一 trigger 使用 idempotency key 防重复回复。
 - AI 消息默认不再触发 AI，除非会话策略和消息元数据都显式允许递归。
 
@@ -91,7 +92,11 @@ MessageLogic.SendMessage accepts human message
 -> message_outbox records normal message.created event for AI message
 ```
 
-`internal/logic.MessageLogic` exposes a narrow `MessageCreatedHook`; the hook runs after message persistence and idempotency resolution, using a stable `message.created:<server_msg_id>` event id. `internal/agentim.ConversationHostingService` implements that hook, owns trigger selection and idempotency, and does not own message storage. `MessageServiceResponseWriter` is the only writeback path and depends on the narrow `MessageSender` interface compatible with `MessageLogic.SendMessage`.
+`internal/logic.MessageLogic` exposes a narrow `MessageCreatedHook`; the hook runs after message persistence and idempotency resolution, using a stable `message.created:<server_msg_id>` event id. `internal/agentim.ConversationHostingService` implements that hook, owns trigger selection and idempotency, and does not own message storage. The hook is fail-continue from the sender's perspective because the original message has already been accepted; hook failures are logged/recorded instead of turning a stored message into a failed send ACK.
+
+For direct-chat AI hosting, once a trigger is accepted by `agent_trigger_idempotency`, the service advances the hosted owner's read seq to the trigger seq through the existing Message Repository read-state seam. That mark-read happens before the async runtime call and is independent of LLM/provider success.
+
+`MessageServiceResponseWriter` is the only writeback path and depends on the narrow `MessageSender` interface compatible with `MessageLogic.SendMessage`. V1 async execution is process-local in `message-api`, guarded by the durable trigger idempotency row. A future durable Agent trigger worker can consume the same trigger/idempotency contract to recover queued/running work after process restart.
 
 ## 触发规则
 
@@ -142,7 +147,7 @@ Response data:
 ## 失败优先
 
 - 未配置 repository、runner、Message Service writer 或 runtime builder 时返回明确错误。
-- Runtime/build/audit/writeback 失败时返回错误，并把 trigger idempotency 状态记录为 `failed`。
+- Runtime/build/audit/writeback 失败时在后台记录错误，并把 trigger idempotency 状态记录为 `failed`；原始人类消息发送不会因此回滚或等待。
 - 缺少真实生产 provider 配置时 runtime 必须 fail closed；测试可注入 deterministic runtime。
 
 ## 验证方式
