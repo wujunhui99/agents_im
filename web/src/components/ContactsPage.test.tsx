@@ -135,8 +135,10 @@ function createGroupsApi(overrides?: Partial<GroupsApi>): GroupsApi {
     listGroups: vi.fn(async () => ({ groups: [] })),
     getGroup: vi.fn(async () => group),
     createGroup: vi.fn(async () => group),
+    updateGroup: vi.fn(async (_groupId, request) => ({ ...group, ...request })),
     joinGroup: vi.fn(),
     leaveGroup: vi.fn(),
+    kickMember: vi.fn(),
     listMembers: vi.fn(async () => ({ group_id: group.group_id, members: [] })),
     ...overrides,
   };
