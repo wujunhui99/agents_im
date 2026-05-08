@@ -1,9 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { vi } from 'vitest';
 import App from './App';
 import type { UserProfile, UserProfilePatch } from './api/user';
+import type { WebSocketFactory, WebSocketLike } from './api/websocketClient';
 import { AUTH_STORAGE_KEY, type AuthSession } from './auth/session';
 
 const stylesCss = readFileSync('src/styles.css', 'utf8');
@@ -57,6 +58,38 @@ function emptyFriendRequestsResponse() {
 
 function pendingResponse() {
   return new Promise<Response>(() => {});
+}
+
+class FakeWebSocket implements WebSocketLike {
+  readyState = 1;
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent<string>) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  sent: string[] = [];
+
+  send(data: string) {
+    this.sent.push(data);
+  }
+
+  close() {
+    this.readyState = 3;
+  }
+
+  emitClose(code: number, reason: string) {
+    this.readyState = 3;
+    this.onclose?.({ code, reason } as CloseEvent);
+  }
+}
+
+function createFakeWebSocketFactory() {
+  const sockets: FakeWebSocket[] = [];
+  const factory: WebSocketFactory = () => {
+    const socket = new FakeWebSocket();
+    sockets.push(socket);
+    return socket;
+  };
+  return { sockets, factory };
 }
 
 function fetchPath(input: RequestInfo | URL) {
@@ -249,6 +282,45 @@ describe('Auth flow', () => {
     await user.click(screen.getByRole('button', { name: '退出登录' }));
 
     expect(screen.getByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+  });
+
+  it('redirects a kicked session to login with a business prompt after a protected API auth failure', async () => {
+    storeSession({ token: 'old-device-token' });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: 'UNAUTHENTICATED',
+          message: 'invalid or missing bearer token',
+          data: null,
+        },
+        { status: 401 },
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('账号已在其他设备登录，请重新登录');
+    expect(screen.queryByText('invalid or missing bearer token')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /消息/i })).not.toBeInTheDocument();
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+  });
+
+  it('redirects a kicked session to login when the WebSocket is closed as session replaced', async () => {
+    storeSession({ token: 'old-device-token' });
+    fetchMock.mockResolvedValue(emptySeqsResponse());
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(<App webSocketToken="old-device-token" webSocketUrl="ws://127.0.0.1/ws" webSocketFactory={factory} />);
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].emitClose(4001, 'session replaced');
+    });
+
+    expect(await screen.findByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('账号已在其他设备登录，请重新登录');
     expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
   });
 });
