@@ -11,7 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
@@ -50,7 +50,7 @@ func main() {
 		log.Fatalf("build agent audit repository: %v", err)
 	}
 	groupsLogic := logic.NewGroupsLogic(groupsRepo, nil)
-	serviceContext := svc.NewMessageServiceContextWithMedia(
+	serviceContext := messagesvc.NewServiceContextWithMedia(
 		messageRepo,
 		mediaRepo,
 		nil,
@@ -62,7 +62,7 @@ func main() {
 	serviceContext.AIHostingLogic = logic.NewConversationAIHostingLogic(aiHostingRepo)
 	serviceContext.AgentAuditRepo = agentAuditRepo
 	serviceContext.AgentAuditLogic = logic.NewAgentAuditLogic(agentAuditRepo)
-	if err := svc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek); err != nil {
+	if err := messagesvc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek); err != nil {
 		log.Fatalf("configure AI conversation hosting: %v", err)
 	}
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {

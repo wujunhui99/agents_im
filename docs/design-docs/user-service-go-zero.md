@@ -70,9 +70,9 @@ internal/logic
 internal/model
 internal/repository
 internal/response
-internal/rpcgen/user
 internal/service
-internal/svc
+internal/servicecontext/user
+internal/rpcgen/user
 proto/user.proto
 tests/user_service_test.go
 ```

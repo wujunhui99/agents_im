@@ -6,7 +6,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -14,10 +14,10 @@ import (
 type ListFriendRequestsLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *friendssvc.ServiceContext
 }
 
-func NewListFriendRequestsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListFriendRequestsLogic {
+func NewListFriendRequestsLogic(ctx context.Context, svcCtx *friendssvc.ServiceContext) *ListFriendRequestsLogic {
 	return &ListFriendRequestsLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -66,10 +66,10 @@ func (l *ListFriendRequestsLogic) ListFriendRequests(_ *types.ListFriendRequests
 type AcceptFriendRequestLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *friendssvc.ServiceContext
 }
 
-func NewAcceptFriendRequestLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AcceptFriendRequestLogic {
+func NewAcceptFriendRequestLogic(ctx context.Context, svcCtx *friendssvc.ServiceContext) *AcceptFriendRequestLogic {
 	return &AcceptFriendRequestLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -106,10 +106,10 @@ func (l *AcceptFriendRequestLogic) AcceptFriendRequest(req *types.FriendPathReq)
 type RejectFriendRequestLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *svc.ServiceContext
+	svcCtx *friendssvc.ServiceContext
 }
 
-func NewRejectFriendRequestLogic(ctx context.Context, svcCtx *svc.ServiceContext) *RejectFriendRequestLogic {
+func NewRejectFriendRequestLogic(ctx context.Context, svcCtx *friendssvc.ServiceContext) *RejectFriendRequestLogic {
 	return &RejectFriendRequestLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,

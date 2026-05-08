@@ -50,7 +50,7 @@ The codebase now exposes account-named seams while preserving existing generated
 - `model.Account` owns account identity fields and `model.Profile` owns profile/avatar fields; `model.User` remains a flattened V0 aggregate alias for existing callers.
 - `repository.AccountRepository` is the account/profile repository contract; `UserRepository` remains a V0 alias.
 - `logic.AccountProfile` and account-named methods on `UserLogic` expose Account terminology for new callers.
-- `svc.ServiceContext.AccountLogic` points at the same implementation as `UserLogic`.
+- `internal/servicecontext/user.ServiceContext.AccountLogic` points at the same implementation as `UserLogic`.
 
 New application code should prefer Account naming when it is not constrained by public V0 JSON, goctl-generated symbols, or existing file paths.
 

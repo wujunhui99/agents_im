@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/wujunhui99/agents_im/internal/logic/message"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func SendMessageHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func SendMessageHandler(svcCtx *messagesvc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.SendMessageReq
 		if err := httpx.Parse(r, &req); err != nil {

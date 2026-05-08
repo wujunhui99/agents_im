@@ -11,7 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
@@ -34,7 +34,7 @@ func main() {
 		log.Fatalf("build agent repository: %v", err)
 	}
 	userLogic := logic.NewUserLogic(userRepo)
-	serviceContext := svc.NewAgentServiceContextWithAuth(
+	serviceContext := agentsvc.NewServiceContextWithAuth(
 		agentRepo,
 		logic.NewUserLogicAccountTypeChecker(userLogic),
 		cfg.Auth,

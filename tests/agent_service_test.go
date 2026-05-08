@@ -10,7 +10,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
 )
 
 func TestAgentLogicCreateRequiresAgentAccountType(t *testing.T) {
@@ -197,7 +197,7 @@ func TestAgentLogicUpdateListStatusAndArchive(t *testing.T) {
 }
 
 func TestAgentHTTPHandlers(t *testing.T) {
-	serviceContext := svc.NewAgentServiceContextWithAuth(
+	serviceContext := agentsvc.NewServiceContextWithAuth(
 		repository.NewMemoryAgentRepository(),
 		testAccountTypeChecker{accountTypes: map[string]string{
 			"usr_agent": logic.AccountTypeAgent,
