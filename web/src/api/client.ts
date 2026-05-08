@@ -8,6 +8,13 @@ export type ApiClientOptions = {
   baseUrl?: string;
   getToken?: () => string | null | undefined;
   fetchImpl?: typeof fetch;
+  onAuthFailure?: (context: ApiAuthFailureContext) => void;
+};
+
+export type ApiAuthFailureContext = {
+  error: ApiError;
+  token: string | null;
+  path: string;
 };
 
 export type ApiRequestOptions = {
@@ -51,7 +58,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     const headers = toHeaderRecord(requestOptions.headers);
     headers.Accept = headers.Accept ?? 'application/json';
 
-    const token = requestOptions.token ?? (requestOptions.auth === false ? null : options.getToken?.());
+    const authEnabled = requestOptions.auth !== false;
+    const token = requestOptions.token ?? (authEnabled ? options.getToken?.() ?? null : null);
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
@@ -72,15 +80,23 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       body,
       signal: requestOptions.signal,
     });
-    const envelope = await readEnvelope<T>(response);
+    let envelope: ApiEnvelope<T>;
+    try {
+      envelope = await readEnvelope<T>(response);
+    } catch (error) {
+      notifyAuthFailure(options, error, authEnabled, token, path);
+      throw error;
+    }
 
     if (!response.ok || envelope.code !== 'OK') {
-      throw new ApiError({
+      const error = new ApiError({
         code: envelope.code || 'HTTP_ERROR',
         message: envelope.message || response.statusText || 'Request failed',
         status: response.status,
         data: envelope.data,
       });
+      notifyAuthFailure(options, error, authEnabled, token, path);
+      throw error;
     }
 
     return envelope.data;
@@ -94,6 +110,51 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     patch: (path, body, requestOptions) => request(path, { ...requestOptions, method: 'PATCH', body }),
     delete: (path, requestOptions) => request(path, { ...requestOptions, method: 'DELETE' }),
   };
+}
+
+const authFailureCodes = new Set([
+  'UNAUTHENTICATED',
+  'UNAUTHORIZED',
+  'SESSION_INACTIVE',
+  'SESSION_INVALID',
+  'SESSION_REPLACED',
+  'SESSION_EXPIRED',
+  'TOKEN_INVALID',
+  'TOKEN_EXPIRED',
+]);
+
+export function isAuthFailureError(error: unknown): error is ApiError {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+
+  return error.status === 401 || authFailureCodes.has(error.code.toUpperCase()) || isAuthFailureMessage(error.message);
+}
+
+function notifyAuthFailure(
+  options: ApiClientOptions,
+  error: unknown,
+  authEnabled: boolean,
+  token: string | null,
+  path: string,
+) {
+  if (!authEnabled || !options.onAuthFailure || !isAuthFailureError(error)) {
+    return;
+  }
+
+  options.onAuthFailure({ error, token, path });
+}
+
+function isAuthFailureMessage(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('invalid or missing bearer token') ||
+    normalized.includes('token session is not active') ||
+    normalized.includes('session inactive') ||
+    normalized.includes('session invalid') ||
+    normalized.includes('session replaced') ||
+    normalized.includes('token expired')
+  );
 }
 
 function normalizeBaseUrl(baseUrl: string) {
