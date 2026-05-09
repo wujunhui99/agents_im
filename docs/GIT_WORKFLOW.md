@@ -130,17 +130,17 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 
 CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从 `main` 发布。GitHub Actions workflow 位于 `.github/workflows/ci.yml`，PR/MR 合入 `develop` 前必须通过默认 backend verification。当前 CI checks 包括：
 
+- `Detect changed areas` 先判断变更范围；docs-only / web-only 可跳过 backend 和 PostgreSQL integration，CI/workflow/scripts/backend/db 相关变更默认运行完整门禁。
 - `actions/checkout` 拉取仓库代码。
-- `actions/setup-go` 按 `go.mod` 配置 Go。
-- 安装 `goctl`、`protoc`、`protoc-gen-go`、`protoc-gen-go-grpc`。
-- `goctl api validate -api api/*.api` 验证 go-zero API 契约。
+- `actions/setup-go` 按 `go.mod` 配置 Go；Go module/build cache 由显式 `actions/cache/restore` / `actions/cache/save` 管理，详见 [`docs/references/github-actions-go-cache.md`](./references/github-actions-go-cache.md)。
+- `go mod download` 显式下载/校验 Go modules 并打印耗时。
 - `gofmt` check，发现未格式化 Go 文件即失败。
-- `go test ./...`，默认不设置 PostgreSQL DSN，确保普通测试不依赖真实 PG。
+- `go test -json` 运行过滤后的 Go package 列表，排除 `web/node_modules`，并输出耗时、cache size 和最慢 package 汇总；默认不设置 PostgreSQL DSN，确保普通测试不依赖真实 PG。
 - `bash scripts/verify-static.sh`，检查仓库关键文件、接口、文档和 CI workflow 约束。
 - `docker compose config`，验证 Compose 配置可解析。
 - Markdown link check，排除 `docs/references/` 和 `.ai-context/`，并忽略外部 HTTP/HTTPS 链接波动。
 
-CI 还包含独立 PostgreSQL integration job。该 job 使用 GitHub Actions `postgres:16-alpine` service，设置 `DATABASE_URL`，执行 `bash scripts/migrate-postgres.sh --host-psql` 后运行：
+CI 还包含独立 PostgreSQL integration job。该 job 使用 GitHub Actions `postgres:16-alpine` service，restore Go cache 但不保存 cache，设置 `DATABASE_URL`，执行 `bash scripts/migrate-postgres.sh --host-psql` 后运行：
 
 ```bash
 go test -tags=integration ./tests
@@ -150,9 +150,7 @@ go test -tags=integration ./tests
 
 ```bash
 export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
-goctl --version
-for f in api/*.api; do goctl api validate -api "$f"; done
-gofmt -w $(find . -name "*.go" -print)
+gofmt -l $(git ls-files '*.go')
 go test ./...
 bash scripts/verify-static.sh
 docker compose config
