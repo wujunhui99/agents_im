@@ -20,6 +20,7 @@ BACKEND_SERVICES = [
     "friends-rpc",
     "groups-rpc",
     "message-rpc",
+    "mail-rpc",
 ]
 
 ALL_IMAGE_SERVICES = [*BACKEND_SERVICES, "web"]
@@ -39,6 +40,7 @@ PROTO_DOMAINS = {
     "friends": "friendspb",
     "groups": "groupspb",
     "message": "messagepb",
+    "mail": "mailpb",
 }
 
 

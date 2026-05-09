@@ -24,6 +24,7 @@ configMapGenerator:
       - etc/friends-rpc.yaml
       - etc/groups-rpc.yaml
       - etc/message-rpc.yaml
+      - etc/mail-rpc.yaml
 generatorOptions:
   disableNameSuffixHash: true
 patches:

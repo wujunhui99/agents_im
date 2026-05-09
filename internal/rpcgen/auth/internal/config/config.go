@@ -8,6 +8,7 @@ import (
 type Config struct {
 	zrpc.RpcServerConf
 	TokenAuth     commonconfig.JWTAuthConfig
-	StorageDriver string `json:",default=memory,options=memory|postgres|postgresql"`
-	DataSource    string `json:",optional"`
+	StorageDriver string             `json:",default=memory,options=memory|postgres|postgresql"`
+	DataSource    string             `json:",optional"`
+	MailRPC       zrpc.RpcClientConf `json:",optional"`
 }

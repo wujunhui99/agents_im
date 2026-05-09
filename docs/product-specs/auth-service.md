@@ -69,6 +69,37 @@
 
 ## 第一阶段接口
 
+### `POST /auth/register/email-code`
+
+注册前请求邮箱验证码。Auth 生成 6 位数字验证码，只保存验证码哈希与过期/尝试元数据，并通过内部 `mail-rpc` 调用 `SendTemplateEmail` 发送模板邮件；Auth 不直接调用腾讯云 SES。
+
+请求：
+
+```json
+{
+  "email": "alice@example.com"
+}
+```
+
+响应：
+
+```json
+{
+  "code": "OK",
+  "message": "ok",
+  "data": {
+    "email": "alice@example.com",
+    "expire_minutes": 10
+  }
+}
+```
+
+失败语义：
+
+- 邮箱格式非法返回参数错误。
+- 发送过于频繁返回限流错误。
+- mail RPC 未配置或调用失败时显式失败，不假成功。
+
 ### `POST /auth/register`
 
 请求：
@@ -76,6 +107,8 @@
 ```json
 {
   "identifier": "alice_001",
+  "email": "alice@example.com",
+  "email_verification_code": "123456",
   "password": "example-password",
   "display_name": "Alice",
   "name": "Alice",
@@ -84,6 +117,8 @@
   "region": "Shanghai"
 }
 ```
+
+注册必须携带与 `email` 匹配的未过期、未使用验证码。验证码错误、过期、重复使用或尝试次数过多均拒绝注册。
 
 响应：
 

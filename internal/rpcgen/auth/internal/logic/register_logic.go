@@ -27,13 +27,15 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 
 func (l *RegisterLogic) Register(in *authpb.RegisterRequest) (*authpb.AuthResponse, error) {
 	result, err := l.svcCtx.AuthLogic.Register(l.ctx, business.RegisterRequest{
-		Identifier:  in.GetIdentifier(),
-		Password:    in.GetPassword(),
-		DisplayName: in.GetDisplayName(),
-		Name:        in.GetName(),
-		Gender:      in.GetGender(),
-		BirthDate:   in.GetBirthDate(),
-		Region:      in.GetRegion(),
+		Identifier:            in.GetIdentifier(),
+		Email:                 in.GetEmail(),
+		EmailVerificationCode: in.GetEmailVerificationCode(),
+		Password:              in.GetPassword(),
+		DisplayName:           in.GetDisplayName(),
+		Name:                  in.GetName(),
+		Gender:                in.GetGender(),
+		BirthDate:             in.GetBirthDate(),
+		Region:                in.GetRegion(),
 	})
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)

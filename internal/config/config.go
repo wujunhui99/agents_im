@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/zeromicro/go-zero/rest"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
 type APIConfig struct {
@@ -26,6 +27,7 @@ type APIConfig struct {
 	DeepSeek      DeepSeekConfig
 	GatewayWS     GatewayWSConfig
 	ObjectStorage ObjectStorageConfig
+	MailRPC       zrpc.RpcClientConf
 }
 
 type RPCConfig struct {
@@ -37,6 +39,7 @@ type RPCConfig struct {
 	Redis         RedisConfig
 	Presence      PresenceConfig
 	Kafka         KafkaConfig
+	MailRPC       zrpc.RpcClientConf
 }
 
 type JWTAuthConfig struct {
@@ -333,6 +336,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+	cfg.MailRPC, err = mailRPCConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
 
 	return cfg, nil
 }
@@ -375,6 +382,10 @@ func LoadRPCConfig(path string) (RPCConfig, error) {
 		return cfg, err
 	}
 	cfg.Kafka = kafkaConfigFromValues(values)
+	cfg.MailRPC, err = mailRPCConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
 
 	return cfg, nil
 }
@@ -882,6 +893,33 @@ func kafkaConfigFromValues(values map[string]string) KafkaConfig {
 		ConsumerGroup:      firstNonEmpty(values["Kafka.ConsumerGroup"], values["KafkaConsumerGroup"]),
 	}
 	return ResolveKafkaConfig(cfg)
+}
+
+func mailRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error) {
+	cfg := zrpc.RpcClientConf{
+		Target:    firstNonEmpty(values["MailRPC.Target"], values["MailRPCTarget"]),
+		Endpoints: brokerListFromValue(firstNonEmpty(values["MailRPC.Endpoints"], values["MailRPCEndpoints"])),
+	}
+	if value := firstNonEmpty(values["MailRPC.Timeout"], values["MailRPCTimeout"]); strings.TrimSpace(value) != "" {
+		timeout, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Timeout = timeout
+	}
+	return ResolveMailRPCConfig(cfg), nil
+}
+
+func ResolveMailRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
+	cfg.Target = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Target)), os.Getenv("AUTH_MAIL_RPC_TARGET"), os.Getenv("AGENTS_IM_MAIL_RPC_TARGET"), os.Getenv("MAIL_RPC_TARGET"))
+	if len(cfg.Endpoints) == 0 {
+		cfg.Endpoints = brokerListFromValue(firstNonEmpty(os.Getenv("AUTH_MAIL_RPC_ENDPOINTS"), os.Getenv("AGENTS_IM_MAIL_RPC_ENDPOINTS"), os.Getenv("MAIL_RPC_ENDPOINTS")))
+	}
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = 2000
+	}
+	cfg.NonBlock = true
+	return cfg
 }
 
 func deepSeekConfigFromValues(values map[string]string) DeepSeekConfig {

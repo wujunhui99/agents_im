@@ -23,18 +23,29 @@ type AuthData {
 }
 
 type RegisterReq {
-	Identifier  string `json:"identifier"`
-	Password    string `json:"password"`
-	DisplayName string `json:"display_name,optional"`
-	Name        string `json:"name,optional"`
-	Gender      string `json:"gender,optional"`
-	BirthDate   string `json:"birth_date,optional"`
-	Region      string `json:"region,optional"`
+	Identifier            string `json:"identifier"`
+	Email                 string `json:"email"`
+	EmailVerificationCode string `json:"email_verification_code"`
+	Password              string `json:"password"`
+	DisplayName           string `json:"display_name,optional"`
+	Name                  string `json:"name,optional"`
+	Gender                string `json:"gender,optional"`
+	BirthDate             string `json:"birth_date,optional"`
+	Region                string `json:"region,optional"`
 }
 
 type LoginReq {
 	Identifier string `json:"identifier"`
 	Password   string `json:"password"`
+}
+
+type RegistrationEmailCodeReq {
+	Email string `json:"email"`
+}
+
+type RegistrationEmailCodeData {
+	Email         string `json:"email"`
+	ExpireMinutes int    `json:"expire_minutes"`
 }
 
 type ValidateTokenReq {
@@ -54,6 +65,12 @@ type AuthResp {
 	Data    AuthData `json:"data"`
 }
 
+type RegistrationEmailCodeResp {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    RegistrationEmailCodeData `json:"data"`
+}
+
 type ValidateTokenResp {
 	Code    string            `json:"code"`
 	Message string            `json:"message"`
@@ -64,6 +81,9 @@ type ValidateTokenResp {
 	group: auth
 )
 service auth-api {
+	@handler requestRegistrationEmailCode
+	post /auth/register/email-code (RegistrationEmailCodeReq) returns (RegistrationEmailCodeResp)
+
 	@handler register
 	post /auth/register (RegisterReq) returns (AuthResp)
 

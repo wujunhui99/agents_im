@@ -44,6 +44,11 @@ func RegisterAuthGoZeroHandlers(server *rest.Server, serverCtx *authsvc.ServiceC
 	server.AddRoutes([]rest.Route{
 		{
 			Method:  http.MethodPost,
+			Path:    "/auth/register/email-code",
+			Handler: authhandler.RequestRegistrationEmailCodeHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPost,
 			Path:    "/auth/login",
 			Handler: authhandler.LoginHandler(serverCtx),
 		},
