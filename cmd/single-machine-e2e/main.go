@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
+	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
@@ -31,11 +32,22 @@ func main() {
 	userRepo := repository.NewMemoryRepository()
 	userLogic := logic.NewUserLogic(userRepo)
 	authRepository := authrepo.NewMemoryRepository()
-	authLogic := authlogic.NewAuthLogic(authRepository, useradapter.NewLogicClient(userLogic), nil, tokenManager)
+	authLogic := authlogic.NewAuthLogicWithOptions(authRepository, useradapter.NewLogicClient(userLogic), nil, tokenManager, authlogic.AuthOptions{
+		VerificationRepo:          authRepository,
+		Mailer:                    e2eRegistrationMailer{},
+		RegistrationCodeGenerator: func() (string, error) { return "123456", nil },
+		RegistrationSendCooldown:  time.Nanosecond,
+	})
 
-	alice, err := authLogic.Register(ctx, authlogic.RegisterRequest{Identifier: unique("alice"), Password: "password123", DisplayName: "Alice E2E"})
+	aliceEmail := unique("alice") + "@example.com"
+	_, err := authLogic.RequestRegistrationEmailCode(ctx, authlogic.RegistrationEmailCodeRequest{Email: aliceEmail})
+	must("request alice registration code", err)
+	alice, err := authLogic.Register(ctx, authlogic.RegisterRequest{Identifier: unique("alice"), Email: aliceEmail, EmailVerificationCode: "123456", Password: "password123", DisplayName: "Alice E2E"})
 	must("register alice", err)
-	bob, err := authLogic.Register(ctx, authlogic.RegisterRequest{Identifier: unique("bob"), Password: "password123", DisplayName: "Bob E2E"})
+	bobEmail := unique("bob") + "@example.com"
+	_, err = authLogic.RequestRegistrationEmailCode(ctx, authlogic.RegistrationEmailCodeRequest{Email: bobEmail})
+	must("request bob registration code", err)
+	bob, err := authLogic.Register(ctx, authlogic.RegisterRequest{Identifier: unique("bob"), Email: bobEmail, EmailVerificationCode: "123456", Password: "password123", DisplayName: "Bob E2E"})
 	must("register bob", err)
 
 	friendsLogic := logic.NewFriendsLogic(userRepo, userLogic)
@@ -108,6 +120,12 @@ func main() {
 
 func testAuth(secret string) config.JWTAuthConfig {
 	return config.JWTAuthConfig{AccessSecret: secret, AccessExpire: 86400}
+}
+
+type e2eRegistrationMailer struct{}
+
+func (e2eRegistrationMailer) SendTemplateEmail(context.Context, mailadapter.SendTemplateEmailRequest) error {
+	return nil
 }
 
 func unique(prefix string) string {

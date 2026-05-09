@@ -31,6 +31,7 @@ SERVICES=(
   friends-rpc
   groups-rpc
   message-rpc
+  mail-rpc
   web
 )
 

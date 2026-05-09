@@ -5,6 +5,7 @@ package auth.v1;
 option go_package = "github.com/wujunhui99/agents_im/proto/authpb";
 
 service AuthService {
+  rpc RequestRegistrationEmailCode(RegistrationEmailCodeRequest) returns (RegistrationEmailCodeResponse);
   rpc Register(RegisterRequest) returns (AuthResponse);
   rpc Login(LoginRequest) returns (AuthResponse);
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
@@ -19,11 +20,22 @@ message RegisterRequest {
   string gender = 5;
   string birth_date = 6;
   string region = 7;
+  string email = 8;
+  string email_verification_code = 9;
 }
 
 message LoginRequest {
   string identifier = 1;
   string password = 2;
+}
+
+message RegistrationEmailCodeRequest {
+  string email = 1;
+}
+
+message RegistrationEmailCodeResponse {
+  string email = 1;
+  int32 expire_minutes = 2;
 }
 
 message ValidateTokenRequest {

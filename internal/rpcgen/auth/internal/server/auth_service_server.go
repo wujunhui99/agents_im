@@ -23,6 +23,11 @@ func NewAuthServiceServer(svcCtx *svc.ServiceContext) *AuthServiceServer {
 	}
 }
 
+func (s *AuthServiceServer) RequestRegistrationEmailCode(ctx context.Context, in *authpb.RegistrationEmailCodeRequest) (*authpb.RegistrationEmailCodeResponse, error) {
+	l := logic.NewRequestRegistrationEmailCodeLogic(ctx, s.svcCtx)
+	return l.RequestRegistrationEmailCode(in)
+}
+
 func (s *AuthServiceServer) Register(ctx context.Context, in *authpb.RegisterRequest) (*authpb.AuthResponse, error) {
 	l := logic.NewRegisterLogic(ctx, s.svcCtx)
 	return l.Register(in)

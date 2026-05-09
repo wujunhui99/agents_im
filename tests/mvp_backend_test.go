@@ -24,16 +24,23 @@ func TestMVPBackendAuthProfileSmoke(t *testing.T) {
 	authConfig := testJWTAuthConfig()
 	userRepo := repository.NewMemoryRepository()
 	userLogic := logic.NewUserLogic(userRepo)
-	authServiceContext := authsvc.NewServiceContext(
-		authrepo.NewMemoryRepository(),
+	credentialRepo := authrepo.NewMemoryRepository()
+	authServiceContext := authsvc.NewServiceContextWithOptions(
+		credentialRepo,
 		useradapter.NewLogicClient(userLogic),
 		token.NewHMACTokenManager(authConfig.AccessSecret, time.Duration(authConfig.AccessExpire)*time.Second),
+		testAuthOptions(credentialRepo),
 	)
 	authMux := newAuthGoZeroRouter(t, authServiceContext)
 	userMux := newUserGoZeroRouter(t, usersvc.NewServiceContextWithAuth(userRepo, authConfig))
 
+	codeResp := performJSON(authMux, http.MethodPost, "/auth/register/email-code", `{"email":"mvp_alice@example.com"}`)
+	if codeResp.Code != http.StatusOK {
+		t.Fatalf("email code status = %d, body = %s", codeResp.Code, codeResp.Body.String())
+	}
+
 	registerResp := httptest.NewRecorder()
-	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"mvp_alice","password":"local-demo-password","display_name":"MVP Alice","gender":"female","birth_date":"1996-05-02","region":"Shanghai"}`)
+	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"mvp_alice","email":"mvp_alice@example.com","email_verification_code":"`+testRegistrationCode+`","password":"local-demo-password","display_name":"MVP Alice","gender":"female","birth_date":"1996-05-02","region":"Shanghai"}`)
 	authMux.ServeHTTP(registerResp, registerReq)
 	if registerResp.Code != http.StatusOK {
 		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())

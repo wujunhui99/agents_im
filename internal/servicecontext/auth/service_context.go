@@ -14,8 +14,12 @@ type ServiceContext struct {
 }
 
 func NewServiceContext(repo authrepo.CredentialRepository, users useradapter.UserClient, tokenManager token.Manager) *ServiceContext {
+	return NewServiceContextWithOptions(repo, users, tokenManager, authlogic.AuthOptions{})
+}
+
+func NewServiceContextWithOptions(repo authrepo.CredentialRepository, users useradapter.UserClient, tokenManager token.Manager, opts authlogic.AuthOptions) *ServiceContext {
 	return &ServiceContext{
-		AuthLogic: authlogic.NewAuthLogic(repo, users, authlogic.NewPasswordHasher(), tokenManager),
+		AuthLogic: authlogic.NewAuthLogicWithOptions(repo, users, authlogic.NewPasswordHasher(), tokenManager, opts),
 		AuthRepo:  repo,
 		Users:     users,
 	}
