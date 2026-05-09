@@ -46,6 +46,8 @@ if ! dry_run="$(
     GITHUB_SERVER_URL="https://github.com" \
     GITHUB_RUN_ID="1002" \
     ACTIONS_NOTIFY_STATUS="failure" \
+    ACTIONS_NOTIFY_DETAILS="backend=success" \
+    ACTIONS_NOTIFY_TIMING="Backend verification=success duration=4m18s" \
     bash "${ROOT_DIR}/scripts/notify-telegram-actions.sh" \
       2>&1
 )"; then
@@ -61,7 +63,11 @@ for expected in \
   "Ref: main" \
   "SHA: abcdef1" \
   "Actor: octocat" \
-  "Run: https://github.com/wujunhui99/agents_im/actions/runs/1002"; do
+  "Run: https://github.com/wujunhui99/agents_im/actions/runs/1002" \
+  "Jobs:" \
+  "backend=success" \
+  "Timing:" \
+  "Backend verification=success duration=4m18s"; do
   if ! grep -Fq "${expected}" <<<"${dry_run}"; then
     echo "dry-run output missing ${expected}" >&2
     printf '%s\n' "${dry_run}" >&2
