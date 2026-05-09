@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
@@ -138,5 +139,135 @@ func TestGroupsLogicAddMemberRequiresOwnerWhenAddingAnotherUser(t *testing.T) {
 	}
 	if added.AlreadyMember || added.Member.UserID != "invitee" {
 		t.Fatalf("unexpected owner add response: %+v", added)
+	}
+}
+
+func TestGroupsLogicUpdateRequiresOwnerOrAdmin(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemoryGroupsRepository()
+	groupsLogic := NewGroupsLogic(repo, staticUserExistenceChecker{
+		"creator": {},
+		"admin":   {},
+		"member":  {},
+	})
+
+	group, err := groupsLogic.CreateGroup(ctx, CreateGroupRequest{
+		CreatorUserID: "creator",
+		Name:          "Manageable Group",
+		Description:   "old announcement",
+		MemberUserIDs: []string{"admin", "member"},
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if err := repo.SetMemberRole(ctx, group.GroupID, "admin", model.MemberRoleAdmin); err != nil {
+		t.Fatalf("promote admin: %v", err)
+	}
+
+	if _, err := groupsLogic.UpdateGroup(ctx, UpdateGroupRequest{
+		GroupID:        group.GroupID,
+		OperatorUserID: "member",
+		Name:           "member rename",
+	}); err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("member update error = %v, want FORBIDDEN", err)
+	}
+
+	updatedByAdmin, err := groupsLogic.UpdateGroup(ctx, UpdateGroupRequest{
+		GroupID:        group.GroupID,
+		OperatorUserID: "admin",
+		Announcement:   "admin announcement",
+	})
+	if err != nil {
+		t.Fatalf("admin update announcement: %v", err)
+	}
+	if updatedByAdmin.Name != "Manageable Group" || updatedByAdmin.Announcement != "admin announcement" || updatedByAdmin.CurrentUserRole != model.MemberRoleAdmin {
+		t.Fatalf("unexpected admin update response: %+v", updatedByAdmin)
+	}
+
+	updatedByOwner, err := groupsLogic.UpdateGroup(ctx, UpdateGroupRequest{
+		GroupID:        group.GroupID,
+		OperatorUserID: "creator",
+		Name:           "Owner Renamed Group",
+	})
+	if err != nil {
+		t.Fatalf("owner update name: %v", err)
+	}
+	if updatedByOwner.Name != "Owner Renamed Group" || updatedByOwner.Announcement != "admin announcement" || updatedByOwner.CurrentUserRole != model.MemberRoleOwner {
+		t.Fatalf("unexpected owner update response: %+v", updatedByOwner)
+	}
+}
+
+func TestGroupsLogicKickMemberRoleConstraintsAndRemovesActiveMember(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemoryGroupsRepository()
+	groupsLogic := NewGroupsLogic(repo, staticUserExistenceChecker{
+		"creator": {},
+		"admin":   {},
+		"peer":    {},
+		"member":  {},
+		"target":  {},
+	})
+
+	group, err := groupsLogic.CreateGroup(ctx, CreateGroupRequest{
+		CreatorUserID: "creator",
+		Name:          "Kickable Group",
+		MemberUserIDs: []string{"admin", "peer", "member", "target"},
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if err := repo.SetMemberRole(ctx, group.GroupID, "admin", model.MemberRoleAdmin); err != nil {
+		t.Fatalf("promote admin: %v", err)
+	}
+	if err := repo.SetMemberRole(ctx, group.GroupID, "peer", model.MemberRoleAdmin); err != nil {
+		t.Fatalf("promote peer admin: %v", err)
+	}
+
+	if _, err := groupsLogic.KickMember(ctx, KickMemberRequest{
+		GroupID:        group.GroupID,
+		OperatorUserID: "member",
+		UserID:         "target",
+	}); err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("normal member kick error = %v, want FORBIDDEN", err)
+	}
+
+	if _, err := groupsLogic.KickMember(ctx, KickMemberRequest{
+		GroupID:        group.GroupID,
+		OperatorUserID: "admin",
+		UserID:         "creator",
+	}); err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("admin kick owner error = %v, want FORBIDDEN", err)
+	}
+	if _, err := groupsLogic.KickMember(ctx, KickMemberRequest{
+		GroupID:        group.GroupID,
+		OperatorUserID: "admin",
+		UserID:         "peer",
+	}); err == nil || apperror.From(err).Code != apperror.CodeForbidden {
+		t.Fatalf("admin kick admin error = %v, want FORBIDDEN", err)
+	}
+
+	kicked, err := groupsLogic.KickMember(ctx, KickMemberRequest{
+		GroupID:        group.GroupID,
+		OperatorUserID: "admin",
+		UserID:         "target",
+	})
+	if err != nil {
+		t.Fatalf("admin kick target: %v", err)
+	}
+	if kicked.Member.UserID != "target" || kicked.Member.State != model.MemberStateLeft {
+		t.Fatalf("unexpected kicked response: %+v", kicked)
+	}
+
+	members, err := groupsLogic.ListMembers(ctx, ListMembersRequest{
+		GroupID:         group.GroupID,
+		RequesterUserID: "creator",
+	})
+	if err != nil {
+		t.Fatalf("list after kick: %v", err)
+	}
+	for _, member := range members.Members {
+		if member.UserID == "target" {
+			t.Fatalf("kicked member still listed as active: %+v", members.Members)
+		}
 	}
 }

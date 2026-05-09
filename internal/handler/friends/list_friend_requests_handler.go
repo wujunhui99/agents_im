@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/wujunhui99/agents_im/internal/logic/friends"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func ListFriendRequestsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func ListFriendRequestsHandler(svcCtx *friendssvc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.ListFriendRequestsReq
 		if err := httpx.Parse(r, &req); err != nil {

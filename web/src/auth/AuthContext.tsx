@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiError, createApiClient } from '../api/client';
 import { clearStoredSession, readStoredSession, writeStoredSession, type AuthSession, type AuthUser } from './session';
 
@@ -28,16 +28,26 @@ type RegisterInput = LoginInput & {
 
 type AuthContextValue = {
   session: AuthSession | null;
+  authPrompt: string;
   login(input: LoginInput): Promise<AuthSession>;
   register(input: RegisterInput): Promise<AuthSession>;
   updateSessionUser(input: Partial<AuthUser>): void;
   logout(): void;
+  handleAuthFailure(input?: AuthFailureInput): void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+export const KICKED_SESSION_MESSAGE = '账号已在其他设备登录，请重新登录';
+
+type AuthFailureInput = {
+  token?: string | null;
+  message?: string;
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(() => readStoredSession());
+  const [authPrompt, setAuthPrompt] = useState('');
+  const sessionRef = useRef<AuthSession | null>(session);
   const api = useMemo(
     () =>
       createApiClient({
@@ -45,6 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     [session?.token],
   );
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   async function login(input: LoginInput) {
     const response = await api.post<AuthResponse>(
@@ -70,8 +84,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function logout() {
     clearStoredSession();
+    sessionRef.current = null;
+    setAuthPrompt('');
     setSession(null);
   }
+
+  const handleAuthFailure = useCallback((input: AuthFailureInput = {}) => {
+    const currentSession = sessionRef.current;
+    if (input.token && (!currentSession || input.token !== currentSession.token)) {
+      return;
+    }
+
+    clearStoredSession();
+    sessionRef.current = null;
+    setSession(null);
+    setAuthPrompt(input.message?.trim() || KICKED_SESSION_MESSAGE);
+  }, []);
 
   function updateSessionUser(input: Partial<AuthUser>) {
     setSession((current) => {
@@ -87,12 +115,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       };
       writeStoredSession(nextSession);
+      sessionRef.current = nextSession;
       return nextSession;
     });
   }
 
   function persistSession(nextSession: AuthSession) {
     writeStoredSession(nextSession);
+    sessionRef.current = nextSession;
+    setAuthPrompt('');
     setSession(nextSession);
     return nextSession;
   }
@@ -100,12 +131,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       session,
+      authPrompt,
       login,
       register,
       updateSessionUser,
       logout,
+      handleAuthFailure,
     }),
-    [session],
+    [authPrompt, handleAuthFailure, session],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -121,12 +154,26 @@ export function useAuth() {
 
 export function authErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
+    if (isRawTokenAuthMessage(error.message)) {
+      return KICKED_SESSION_MESSAGE;
+    }
     return error.message;
   }
   if (error instanceof Error) {
     return error.message;
   }
   return '请求失败，请稍后重试';
+}
+
+function isRawTokenAuthMessage(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('invalid or missing bearer token') ||
+    normalized.includes('token session is not active') ||
+    normalized.includes('session inactive') ||
+    normalized.includes('session invalid') ||
+    normalized.includes('session replaced')
+  );
 }
 
 function toSession(response: AuthResponse, displayNameFallback?: string): AuthSession {

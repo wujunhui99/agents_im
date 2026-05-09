@@ -54,17 +54,22 @@ func NewGroupsLogic(repo repository.GroupsRepository, userExists UserExistenceCh
 }
 
 type GroupInfo struct {
-	GroupID       string `json:"group_id"`
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-	CreatorUserID string `json:"creator_user_id"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	GroupID         string `json:"group_id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	Announcement    string `json:"announcement"`
+	AvatarMediaID   string `json:"avatar_media_id,omitempty"`
+	AvatarURL       string `json:"avatar_url,omitempty"`
+	CreatorUserID   string `json:"creator_user_id"`
+	CurrentUserRole string `json:"current_user_role,omitempty"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
 }
 
 type GroupMemberInfo struct {
 	GroupID       string `json:"group_id"`
 	UserID        string `json:"user_id"`
+	Role          string `json:"role"`
 	State         string `json:"state"`
 	JoinedAt      string `json:"joined_at"`
 	LeftAt        string `json:"left_at"`
@@ -88,6 +93,20 @@ type GetGroupRequest struct {
 }
 
 type AddMemberRequest struct {
+	GroupID        string `json:"group_id"`
+	OperatorUserID string `json:"operator_user_id"`
+	UserID         string `json:"user_id"`
+}
+
+type UpdateGroupRequest struct {
+	GroupID        string `json:"group_id"`
+	OperatorUserID string `json:"operator_user_id"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	Announcement   string `json:"announcement"`
+}
+
+type KickMemberRequest struct {
 	GroupID        string `json:"group_id"`
 	OperatorUserID string `json:"operator_user_id"`
 	UserID         string `json:"user_id"`
@@ -203,12 +222,64 @@ func (l *GroupsLogic) GetGroup(ctx context.Context, req GetGroupRequest) (GroupI
 		return GroupInfo{}, err
 	}
 	if requesterUserID != "" {
-		if err := l.ensureActiveMember(ctx, groupID, requesterUserID); err != nil {
+		member, err := l.activeMember(ctx, groupID, requesterUserID)
+		if err != nil {
 			return GroupInfo{}, err
 		}
+		return toGroupInfoWithRole(group, member.Role), nil
 	}
 
 	return toGroupInfo(group), nil
+}
+
+func (l *GroupsLogic) UpdateGroup(ctx context.Context, req UpdateGroupRequest) (GroupInfo, error) {
+	groupID, err := normalizeRequiredID(req.GroupID, "group_id")
+	if err != nil {
+		return GroupInfo{}, err
+	}
+	operatorUserID, err := normalizeRequiredID(req.OperatorUserID, "operator_user_id")
+	if err != nil {
+		return GroupInfo{}, err
+	}
+
+	group, err := l.repo.GetGroup(ctx, groupID)
+	if err != nil {
+		return GroupInfo{}, err
+	}
+	operator, err := l.ensureCanManageGroup(ctx, groupID, operatorUserID)
+	if err != nil {
+		return GroupInfo{}, err
+	}
+
+	name := group.Name
+	if strings.TrimSpace(req.Name) != "" {
+		name, err = normalizeGroupName(req.Name)
+		if err != nil {
+			return GroupInfo{}, err
+		}
+	}
+	description := group.Description
+	announcement := req.Announcement
+	if strings.TrimSpace(announcement) == "" {
+		announcement = req.Description
+	}
+	if strings.TrimSpace(announcement) != "" {
+		description, err = normalizeGroupDescription(announcement)
+		if err != nil {
+			return GroupInfo{}, err
+		}
+	}
+	if name == group.Name && description == group.Description {
+		return GroupInfo{}, apperror.InvalidArgument("name or announcement is required")
+	}
+
+	group.Name = name
+	group.Description = description
+	updated, err := l.repo.UpdateGroup(ctx, group)
+	if err != nil {
+		return GroupInfo{}, err
+	}
+	return toGroupInfoWithRole(updated, operator.Role), nil
 }
 
 func (l *GroupsLogic) AddMember(ctx context.Context, req AddMemberRequest) (MemberResponse, error) {
@@ -335,6 +406,52 @@ func (l *GroupsLogic) LeaveGroup(ctx context.Context, req LeaveGroupRequest) (Me
 	return MemberResponse{Member: memberInfo}, nil
 }
 
+func (l *GroupsLogic) KickMember(ctx context.Context, req KickMemberRequest) (MemberResponse, error) {
+	groupID, err := normalizeRequiredID(req.GroupID, "group_id")
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	operatorUserID, err := normalizeRequiredID(req.OperatorUserID, "operator_user_id")
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	userID, err := normalizeRequiredID(req.UserID, "user_id")
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	if operatorUserID == userID {
+		return MemberResponse{}, apperror.InvalidArgument("use leave group to remove yourself")
+	}
+
+	if _, err := l.repo.GetGroup(ctx, groupID); err != nil {
+		return MemberResponse{}, err
+	}
+	operator, err := l.ensureCanManageGroup(ctx, groupID, operatorUserID)
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	target, err := l.activeMember(ctx, groupID, userID)
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	if target.Role == model.MemberRoleOwner {
+		return MemberResponse{}, apperror.Forbidden("group owner cannot be kicked")
+	}
+	if operator.Role == model.MemberRoleAdmin && target.Role != model.MemberRoleMember {
+		return MemberResponse{}, apperror.Forbidden("group admin can only kick normal members")
+	}
+
+	member, err := l.repo.RemoveMember(ctx, groupID, userID)
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	memberInfo, err := l.hydrateGroupMemberInfo(ctx, member)
+	if err != nil {
+		return MemberResponse{}, err
+	}
+	return MemberResponse{Member: memberInfo}, nil
+}
+
 func (l *GroupsLogic) ListMembers(ctx context.Context, req ListMembersRequest) (ListMembersResponse, error) {
 	groupID, err := normalizeRequiredID(req.GroupID, "group_id")
 	if err != nil {
@@ -392,14 +509,33 @@ func (l *GroupsLogic) ensureUserExists(ctx context.Context, userID string) error
 }
 
 func (l *GroupsLogic) ensureActiveMember(ctx context.Context, groupID string, userID string) error {
+	_, err := l.activeMember(ctx, groupID, userID)
+	return err
+}
+
+func (l *GroupsLogic) activeMember(ctx context.Context, groupID string, userID string) (model.GroupMember, error) {
 	members, err := l.repo.ListActiveMembers(ctx, groupID)
 	if err != nil {
-		return err
+		return model.GroupMember{}, err
 	}
-	if !containsActiveMember(members, userID) {
-		return apperror.Forbidden("requester is not a group member")
+	for _, member := range members {
+		if member.UserID == userID && member.State == model.MemberStateActive {
+			member.Role = normalizeMemberRole(member.Role)
+			return member, nil
+		}
 	}
-	return nil
+	return model.GroupMember{}, apperror.Forbidden("requester is not a group member")
+}
+
+func (l *GroupsLogic) ensureCanManageGroup(ctx context.Context, groupID string, userID string) (model.GroupMember, error) {
+	member, err := l.activeMember(ctx, groupID, userID)
+	if err != nil {
+		return model.GroupMember{}, err
+	}
+	if member.Role != model.MemberRoleOwner && member.Role != model.MemberRoleAdmin {
+		return model.GroupMember{}, apperror.Forbidden("only group owner or admin can manage group")
+	}
+	return member, nil
 }
 
 func containsActiveMember(members []model.GroupMember, userID string) bool {
@@ -500,13 +636,25 @@ func humanReadableUserName(profile UserProfile) string {
 }
 
 func toGroupInfo(group model.Group) GroupInfo {
+	return toGroupInfoWithRole(group, "")
+}
+
+func toGroupInfoWithRole(group model.Group, currentUserRole string) GroupInfo {
+	role := ""
+	if currentUserRole != "" {
+		role = normalizeMemberRole(currentUserRole)
+	}
 	return GroupInfo{
-		GroupID:       group.GroupID,
-		Name:          group.Name,
-		Description:   group.Description,
-		CreatorUserID: group.CreatorUserID,
-		CreatedAt:     formatGroupTime(group.CreatedAt),
-		UpdatedAt:     formatGroupTime(group.UpdatedAt),
+		GroupID:         group.GroupID,
+		Name:            group.Name,
+		Description:     group.Description,
+		Announcement:    group.Description,
+		AvatarMediaID:   group.AvatarMediaID,
+		AvatarURL:       group.AvatarURL,
+		CreatorUserID:   group.CreatorUserID,
+		CurrentUserRole: role,
+		CreatedAt:       formatGroupTime(group.CreatedAt),
+		UpdatedAt:       formatGroupTime(group.UpdatedAt),
 	}
 }
 
@@ -514,9 +662,19 @@ func toGroupMemberInfo(member model.GroupMember) GroupMemberInfo {
 	return GroupMemberInfo{
 		GroupID:  member.GroupID,
 		UserID:   member.UserID,
+		Role:     normalizeMemberRole(member.Role),
 		State:    member.State,
 		JoinedAt: formatGroupTime(member.JoinedAt),
 		LeftAt:   formatGroupTime(member.LeftAt),
+	}
+}
+
+func normalizeMemberRole(role string) string {
+	switch role {
+	case model.MemberRoleOwner, model.MemberRoleAdmin, model.MemberRoleMember:
+		return role
+	default:
+		return model.MemberRoleMember
 	}
 }
 

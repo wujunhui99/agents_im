@@ -20,7 +20,8 @@ import (
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 )
 
 func main() {
@@ -49,13 +50,14 @@ func main() {
 		log.Fatalf("build presence store: %v", err)
 	}
 	groupsLogic := logic.NewGroupsLogic(groupsRepo, nil)
-	serviceContext := svc.NewMessageServiceContextWithMedia(
+	messageContext := messagesvc.NewServiceContextWithMedia(
 		messageRepo,
 		mediaRepo,
 		nil,
 		groupsLogic,
 		cfg.Auth,
 	)
+	serviceContext := gatewaysvc.NewServiceContext(messageContext.MessageLogic, cfg.Auth)
 	defer closePresenceStore(presenceStore)
 
 	wsServer := gatewayws.NewServer(

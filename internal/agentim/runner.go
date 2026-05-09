@@ -108,7 +108,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	runtimeReq, err := o.requestBuilder.BuildRuntimeRequest(ctx, normalized)
 	if err != nil {
 		finishedAt := now().UTC()
-		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, "runtime_request_error", err)
+		auditErr := o.recordFailedRun(ctx, normalized, "", startedAt, finishedAt, "runtime_request_error", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
@@ -117,7 +117,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	runtimeReq, err = normalizeRuntimeRequestForTrigger(runtimeReq, normalized)
 	if err != nil {
 		finishedAt := now().UTC()
-		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, "runtime_request_invalid", err)
+		auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_request_invalid", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
@@ -127,7 +127,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	runtimeResult, err := o.runtime.Run(ctx, runtimeReq)
 	finishedAt := now().UTC()
 	if err != nil {
-		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, "runtime_error", err)
+		auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_error", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
@@ -139,7 +139,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 		if strings.Contains(err.Error(), "final_text") {
 			code = "empty_final_text"
 		}
-		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, code, err)
+		auditErr := o.recordFailedRun(ctx, normalized, runtimeResult.RunID, startedAt, finishedAt, code, err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
@@ -148,7 +148,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	runtimeResult.FinalText = strings.TrimSpace(runtimeResult.FinalText)
 	if runtimeReq.RunID != "" && runtimeResult.RunID != runtimeReq.RunID {
 		err := apperror.Internal("runtime returned mismatched run_id")
-		auditErr := o.recordFailedRun(ctx, normalized, startedAt, finishedAt, "runtime_result_invalid", err)
+		auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_result_invalid", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
@@ -193,8 +193,9 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	}, nil
 }
 
-func (o *AgentRunOrchestrator) recordFailedRun(ctx context.Context, trigger AgentTrigger, startedAt time.Time, finishedAt time.Time, code string, cause error) error {
+func (o *AgentRunOrchestrator) recordFailedRun(ctx context.Context, trigger AgentTrigger, runID string, startedAt time.Time, finishedAt time.Time, code string, cause error) error {
 	_, err := o.audit.RecordAgentRun(ctx, agentaudit.CreateRunInput{
+		RunID:            runID,
 		AgentID:          trigger.AgentUserID,
 		ConversationID:   trigger.ConversationID,
 		TriggerMessageID: trigger.TriggerMessageID,

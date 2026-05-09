@@ -24,7 +24,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/presence"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
 )
 
 const CommandHeartbeat = gateway.CommandHeartbeat
@@ -110,7 +110,7 @@ type heartbeatData struct {
 	ServerTime   int64  `json:"server_time"`
 }
 
-func NewServer(serviceContext *svc.ServiceContext, opts ...ServerOption) *Server {
+func NewServer(serviceContext *gatewaysvc.ServiceContext, opts ...ServerOption) *Server {
 	auth := config.DefaultJWTAuthConfig()
 	var messageLogic *logic.MessageLogic
 	if serviceContext != nil {

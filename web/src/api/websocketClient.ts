@@ -42,6 +42,27 @@ export type WebSocketServerEvent = {
   data?: unknown;
 };
 
+export type WebSocketAuthFailure =
+  | {
+      source: 'close';
+      code: number;
+      reason: string;
+    }
+  | {
+      source: 'event';
+      type: string;
+      data?: unknown;
+    }
+  | {
+      source: 'ack';
+      code: string;
+      message: string;
+    }
+  | {
+      source: 'error';
+      message: string;
+    };
+
 export type MessageWebSocketClientOptions = {
   url: string;
   token?: string;
@@ -55,6 +76,7 @@ export type MessageWebSocketClientOptions = {
   onEvent?: (event: WebSocketServerEvent) => void;
   onError?: (event: Event) => void;
   onClose?: (event: CloseEvent) => void;
+  onAuthFailure?: (failure: WebSocketAuthFailure) => void;
   onHeartbeatTimeout?: (requestId: string) => void;
   onMalformedMessage?: (data: string) => void;
 };
@@ -78,9 +100,18 @@ export class MessageWebSocketClient {
       this.startHeartbeat();
       this.options.onOpen?.(event);
     };
-    socket.onerror = (event) => this.options.onError?.(event);
+    socket.onerror = (event) => {
+      const message = errorEventMessage(event);
+      if (message && isAuthFailureText(message)) {
+        this.options.onAuthFailure?.({ source: 'error', message });
+      }
+      this.options.onError?.(event);
+    };
     socket.onclose = (event) => {
       this.stopHeartbeat();
+      if (isAuthFailureClose(event)) {
+        this.options.onAuthFailure?.({ source: 'close', code: event.code, reason: event.reason });
+      }
       this.options.onClose?.(event);
     };
     socket.onmessage = (event) => this.handleMessage(event.data);
@@ -132,15 +163,27 @@ export class MessageWebSocketClient {
     if (isAckEnvelope(parsed)) {
       const ack = normalizeAck(parsed);
       this.handleAck(ack);
+      if (isAuthFailureAck(ack)) {
+        this.options.onAuthFailure?.({
+          source: 'ack',
+          code: ack.error?.code ?? '',
+          message: ack.error?.message ?? '',
+        });
+      }
       this.options.onAck?.(ack);
       return;
     }
 
     if (typeof parsed.type === 'string') {
-      this.options.onEvent?.({
+      const event = {
         type: parsed.type,
         data: parsed.data,
-      });
+      };
+      if (isAuthFailureServerEvent(event)) {
+        this.options.onAuthFailure?.({ source: 'event', type: event.type, data: event.data });
+        return;
+      }
+      this.options.onEvent?.(event);
     }
   }
 
@@ -275,4 +318,79 @@ function isErrorObject(value: unknown): value is { code: string; message: string
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+const authFailureCloseCodes = new Set([4001, 4002]);
+const authFailureAckCodes = new Set([
+  'UNAUTHENTICATED',
+  'UNAUTHORIZED',
+  'SESSION_INACTIVE',
+  'SESSION_INVALID',
+  'SESSION_REPLACED',
+  'SESSION_EXPIRED',
+  'TOKEN_INVALID',
+  'TOKEN_EXPIRED',
+]);
+const authFailureEventTypes = new Set([
+  'session_replaced',
+  'session_invalid',
+  'session_inactive',
+  'session_expired',
+  'session_logout',
+  'force_logout',
+  'logout',
+]);
+
+function isAuthFailureClose(event: CloseEvent) {
+  return authFailureCloseCodes.has(event.code) || isAuthFailureText(event.reason);
+}
+
+function isAuthFailureAck(ack: WebSocketAck) {
+  const code = ack.error?.code.toUpperCase() ?? '';
+  return authFailureAckCodes.has(code) || isAuthFailureText(ack.error?.message ?? '');
+}
+
+function isAuthFailureServerEvent(event: WebSocketServerEvent) {
+  const normalizedType = normalizeEventType(event.type);
+  return authFailureEventTypes.has(normalizedType) || isAuthFailureData(event.data);
+}
+
+function isAuthFailureData(data: unknown): boolean {
+  if (typeof data === 'string') {
+    return isAuthFailureText(data);
+  }
+  if (!isRecord(data)) {
+    return false;
+  }
+
+  return ['code', 'reason', 'message', 'type'].some((key) => {
+    const value = data[key];
+    return typeof value === 'string' && isAuthFailureText(value);
+  });
+}
+
+function isAuthFailureText(value: string) {
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes('unauthenticated') ||
+    normalized.includes('unauthorized') ||
+    normalized.includes('invalid or missing bearer token') ||
+    normalized.includes('token session is not active') ||
+    normalized.includes('session inactive') ||
+    normalized.includes('session invalid') ||
+    normalized.includes('session replaced') ||
+    normalized.includes('session expired') ||
+    normalized.includes('token expired')
+  );
+}
+
+function normalizeEventType(type: string) {
+  return type.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function errorEventMessage(event: Event) {
+  if ('message' in event && typeof event.message === 'string') {
+    return event.message;
+  }
+  return '';
 }

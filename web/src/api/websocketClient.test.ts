@@ -26,6 +26,12 @@ class FakeWebSocket implements WebSocketLike {
     this.closed = true;
   }
 
+  emitClose(code: number, reason: string) {
+    this.readyState = 3;
+    this.closed = true;
+    this.onclose?.({ code, reason } as CloseEvent);
+  }
+
   emitMessage(payload: unknown) {
     this.onmessage?.({ data: JSON.stringify(payload) } as MessageEvent<string>);
   }
@@ -105,6 +111,49 @@ describe('message WebSocket client', () => {
 
     client.close();
     expect(sockets[0].closed).toBe(true);
+  });
+
+  it('notifies auth failure handlers for session replacement close codes and events', () => {
+    const sockets: FakeWebSocket[] = [];
+    const authFailures: unknown[] = [];
+    const webSocketFactory: WebSocketFactory = (url) => {
+      const socket = new FakeWebSocket(url);
+      sockets.push(socket);
+      return socket;
+    };
+    const client = createMessageWebSocketClient({
+      url: 'ws://127.0.0.1:8084/ws',
+      token: '***',
+      webSocketFactory,
+      onAuthFailure: (failure) => authFailures.push(failure),
+    });
+
+    client.connect();
+    sockets[0].emitClose(4001, 'session replaced');
+
+    expect(authFailures).toEqual([
+      expect.objectContaining({
+        source: 'close',
+        code: 4001,
+        reason: 'session replaced',
+      }),
+    ]);
+
+    client.connect();
+    sockets[1].emitMessage({
+      type: 'session_replaced',
+      data: {
+        message: 'session replaced',
+      },
+    });
+
+    expect(authFailures).toEqual([
+      expect.objectContaining({ source: 'close', code: 4001 }),
+      expect.objectContaining({
+        source: 'event',
+        type: 'session_replaced',
+      }),
+    ]);
   });
 
   it('sends heartbeat commands and closes when heartbeat ACK is missed', () => {
