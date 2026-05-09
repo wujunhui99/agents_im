@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package mail.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/proto/mailpb";
+
+service MailService {
+  rpc SendTemplateEmail(SendTemplateEmailRequest) returns (SendTemplateEmailResponse);
+}
+
+message SendTemplateEmailRequest {
+  repeated string recipients = 1;
+  uint64 template_id = 2;
+  map<string, string> template_data = 3;
+  string subject = 4;
+  string from_email = 5;
+  string from_name = 6;
+  string idempotency_key = 7;
+}
+
+message SendTemplateEmailResponse {
+  string provider = 1;
+  string provider_request_id = 2;
+  string provider_message_id = 3;
+  string status = 4;
+  string error_code = 5;
+  string error_message = 6;
+}

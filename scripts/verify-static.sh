@@ -23,6 +23,7 @@ required_files=(
   "proto/friends.proto"
   "proto/groups.proto"
   "proto/message.proto"
+  "proto/mail.proto"
   "proto/userpb/user.pb.go"
   "proto/userpb/user_grpc.pb.go"
   "proto/authpb/auth.pb.go"
@@ -33,6 +34,8 @@ required_files=(
   "proto/groupspb/groups_grpc.pb.go"
   "proto/messagepb/message.pb.go"
   "proto/messagepb/message_grpc.pb.go"
+  "proto/mailpb/mail.pb.go"
+  "proto/mailpb/mail_grpc.pb.go"
   "internal/rpcgen/user/user.v1.go"
   "internal/rpcgen/user/internal/server/user_service_server.go"
   "internal/rpcgen/auth/auth.v1.go"
@@ -43,6 +46,8 @@ required_files=(
   "internal/rpcgen/groups/internal/server/groups_service_server.go"
   "internal/rpcgen/message/message.go"
   "internal/rpcgen/message/internal/server/message_service_server.go"
+  "internal/rpcgen/mail/mail.v1.go"
+  "internal/rpcgen/mail/internal/server/mail_service_server.go"
   "cmd/user-api/main.go"
   "cmd/user-rpc/main.go"
   "cmd/auth-api/main.go"
@@ -53,11 +58,16 @@ required_files=(
   "cmd/groups-rpc/main.go"
   "cmd/message-api/main.go"
   "cmd/message-rpc/main.go"
+  "cmd/mail-rpc/main.go"
   "cmd/gateway-ws/main.go"
   "cmd/message-transfer/main.go"
   "etc/gateway-ws.yaml"
   "etc/message-transfer.yaml"
   "etc/message-rpc.yaml"
+  "etc/mail-rpc.yaml"
+  "internal/mail/provider.go"
+  "internal/mail/config.go"
+  "internal/mail/tencent_ses.go"
   "internal/logic/userlogic.go"
   "internal/logic/friendslogic.go"
   "internal/logic/groupslogic.go"
@@ -792,6 +802,19 @@ for pattern in "${message_proto_patterns[@]}"; do
   rg -q "$pattern" proto/message.proto
 done
 
+mail_proto_patterns=(
+  "service MailService"
+  "rpc SendTemplateEmail"
+  "repeated string recipients"
+  "map<string, string> template_data"
+  "string provider_request_id"
+  "string provider_message_id"
+)
+
+for pattern in "${mail_proto_patterns[@]}"; do
+  rg -q "$pattern" proto/mail.proto
+done
+
 agent_conversation_hosting_contract_patterns=(
   "message_origin"
   "agent_account_id"
@@ -871,6 +894,7 @@ rpc_generated_dirs=(
   "internal/rpcgen/friends"
   "internal/rpcgen/groups"
   "internal/rpcgen/message"
+  "internal/rpcgen/mail"
 )
 
 for dir in "${rpc_generated_dirs[@]}"; do
@@ -886,6 +910,7 @@ rpc_generated_servers=(
   "internal/rpcgen/friends/internal/server/friends_service_server.go:FriendsServiceServer"
   "internal/rpcgen/groups/internal/server/groups_service_server.go:GroupsServiceServer"
   "internal/rpcgen/message/internal/server/message_service_server.go:MessageServiceServer"
+  "internal/rpcgen/mail/internal/server/mail_service_server.go:MailServiceServer"
 )
 
 for server_spec in "${rpc_generated_servers[@]}"; do
@@ -902,6 +927,7 @@ rpc_generated_entrypoints=(
   "internal/rpcgen/friends/friends.v1.go:RegisterFriendsServiceServer"
   "internal/rpcgen/groups/groups.v1.go:RegisterGroupsServiceServer"
   "internal/rpcgen/message/message.go:RegisterMessageServiceServer"
+  "internal/rpcgen/mail/mail.v1.go:RegisterMailServiceServer"
 )
 
 for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
@@ -923,11 +949,13 @@ rpc_entry_patterns=(
   "cmd/friends-rpc/main.go:internal/rpcgen/friends/entry"
   "cmd/groups-rpc/main.go:internal/rpcgen/groups/entry"
   "cmd/message-rpc/main.go:internal/rpcgen/message/entry"
+  "cmd/mail-rpc/main.go:internal/rpcgen/mail/entry"
   "internal/rpcgen/user/entry/entry.go:Start bridges cmd/user-rpc"
   "internal/rpcgen/auth/entry/entry.go:Start bridges cmd/auth-rpc"
   "internal/rpcgen/friends/entry/entry.go:Start bridges cmd/friends-rpc"
   "internal/rpcgen/groups/entry/entry.go:Start bridges cmd/groups-rpc"
   "internal/rpcgen/message/entry/entry.go:Start bridges cmd/message-rpc"
+  "internal/rpcgen/mail/entry/entry.go:Start bridges cmd/mail-rpc"
 )
 
 for entry_spec in "${rpc_entry_patterns[@]}"; do
@@ -952,6 +980,7 @@ rpc_logic_markers=(
   "internal/rpcgen/friends/internal/logic:FriendsLogic"
   "internal/rpcgen/groups/internal/logic:GroupsLogic"
   "internal/rpcgen/message/internal/logic:MessageLogic"
+  "internal/rpcgen/mail/internal/logic:MailProvider"
 )
 
 for logic_spec in "${rpc_logic_markers[@]}"; do
@@ -976,6 +1005,8 @@ rpc_generated_proto_files=(
   "proto/groupspb/groups_grpc.pb.go"
   "proto/messagepb/message.pb.go"
   "proto/messagepb/message_grpc.pb.go"
+  "proto/mailpb/mail.pb.go"
+  "proto/mailpb/mail_grpc.pb.go"
 )
 
 for file in "${rpc_generated_proto_files[@]}"; do
