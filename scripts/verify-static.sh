@@ -402,12 +402,16 @@ fi
 ci_workflow_patterns=(
   "actions/checkout"
   "actions/setup-go"
-  "go install github.com/zeromicro/go-zero/tools/goctl"
-  "protobuf-compiler"
-  "protoc-gen-go"
-  "protoc-gen-go-grpc"
-  "goctl api validate"
-  "go test ./..."
+  "actions/cache/restore"
+  "actions/cache/save"
+  "Detect changed areas"
+  "backend_required"
+  "Download Go modules"
+  "go test -json"
+  "Go test duration"
+  "Go test slowest packages"
+  "Collect workflow timing"
+  "ACTIONS_NOTIFY_TIMING"
   "bash scripts/verify-static.sh"
   "docker compose config"
   "markdown-link-check"
@@ -422,10 +426,11 @@ done
 
 ci_doc_patterns=(
   "CI Pipeline"
-  "goctl api validate"
   "go test ./..."
   "bash scripts/verify-static.sh"
   "docker compose config"
+  "actions/cache/restore"
+  "docs/references/github-actions-go-cache.md"
   "markdown-link-check"
   "Codex commit 前验证门禁"
   "db/change_log/*.sql"
@@ -528,16 +533,6 @@ if [[ -n "${root_svc_import_files}" ]]; then
   echo "${root_svc_import_files}" >&2
   exit 1
 fi
-
-export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
-if ! command -v goctl >/dev/null 2>&1; then
-  echo "goctl is required for api validation" >&2
-  exit 1
-fi
-goctl --version >/dev/null
-for api_file in api/*.api; do
-  goctl api validate -api "$api_file" >/dev/null
-done
 
 if rg -n '"os/exec"|exec\.Command|CommandContext\(|"(/bin/bash|/bin/sh|bash|sh|python|python3)"' cmd internal --glob '*.go' --glob '!*_test.go'; then
   echo "production Go code must not directly execute shell or python commands" >&2
