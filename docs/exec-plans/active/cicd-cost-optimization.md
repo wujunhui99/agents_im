@@ -1,17 +1,17 @@
 # CI cost optimization notes
 
-状态：Draft / Record-only
+状态：Partially implemented / Record-only
 
 ## 背景
 
-GitHub 提示当前仓库 GitHub Actions 免费分钟消耗过多。近期工作流中，Codex/Agent 常见开发路径会在同一变更上重复触发多次 CI：
+GitHub 提示当前仓库 GitHub Actions 免费分钟消耗过多。调整前，Codex/Agent 常见开发路径会在同一变更上重复触发多次 CI：
 
 1. feature 分支 push 触发一次 CI；
 2. feature 分支创建/更新 PR 到 `develop` 再触发一次 PR CI；
 3. PR 合并到 `develop` 后，`develop` push 再触发一次集成 CI；
 4. `develop` 合并到 `main` 后，`main` push 还会触发 CI 和部署。
 
-其中第 1 步对 Codex 开发过程中的每次中间 push 都会消耗 Actions 分钟，但真正的合并门禁仍然是 PR 到 `develop` 的 CI 以及合并后的 `develop` 集成 CI。
+其中第 1 步对 Codex 开发过程中的每次中间 push 都会消耗 Actions 分钟，但真正的合并门禁仍然是 PR 到 `develop` 的 CI 以及合并后的 `develop` 集成 CI。当前 workflow 已移除 feature 分支 push 触发，只保留 PR CI 与 `develop` / `main` push CI。
 
 ## 当前观察
 
@@ -27,12 +27,11 @@ on:
     branches:
       - develop
       - main
-      - "feature/**"
 ```
 
 这意味着：
 
-- `feature/**` push 会触发 CI；
+- `feature/**` push 不会直接触发 CI；
 - `pull_request` 到 `develop` / `main` 会触发 CI；
 - `develop` / `main` push 会触发 CI；
 - `fix/**`、`refactor/**` 等分支 push 当前不会直接触发 CI，除非开 PR。
@@ -41,17 +40,17 @@ on:
 
 ### 目标
 
-为了减少 GitHub Actions 免费分钟消耗，计划取消 feature 分支 push 触发 CI：
+为了减少 GitHub Actions 免费分钟消耗，已取消 feature 分支 push 触发 CI：
 
 - 保留 `pull_request` 到 `develop` 的 CI；
 - 保留 `pull_request` 到 `main` 的 CI；
 - 保留 `push` 到 `develop` 的 CI；
 - 保留 `push` 到 `main` 的 CI；
-- 去掉 `push.branches` 中的 `"feature/**"`。
+- `push.branches` 中不包含 `"feature/**"`。
 
 ### 预期变更
 
-将 `.github/workflows/ci.yml` 从：
+`.github/workflows/ci.yml` 已从：
 
 ```yaml
 push:
@@ -100,7 +99,7 @@ merge to develop -> CI
 
 ## 后续实施前检查
 
-实施前应检查：
+本项实施时应检查：
 
 - `.github/workflows/ci.yml` 当前 trigger 是否仍与本记录一致；
 - 是否存在其他 workflow 也对 `feature/**` push 触发，例如 deploy/notification；
@@ -211,7 +210,7 @@ Backend verification    Validate Docker Compose config                  30     0
 
 ### P0：去掉 feature push CI
 
-同意作为第一优先级实施。取消 `feature/**` 分支 push 触发 CI，只保留 PR 到 `develop` / `main`、push 到 `develop` / `main` 的 CI。
+已作为第一优先级实施。取消 `feature/**` 分支 push 触发 CI，只保留 PR 到 `develop` / `main`、push 到 `develop` / `main` 的 CI。
 
 原因：每次 feature 中间 push 都会消耗约一个完整 CI 的 runner 分钟，而真正的合并门禁仍由 PR CI 和 `develop` 集成 CI 提供。
 
