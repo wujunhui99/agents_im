@@ -1,9 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { vi } from 'vitest';
 import App from './App';
 import type { UserProfile, UserProfilePatch } from './api/user';
+import type { WebSocketFactory, WebSocketLike } from './api/websocketClient';
 import { AUTH_STORAGE_KEY, type AuthSession } from './auth/session';
 
 const stylesCss = readFileSync('src/styles.css', 'utf8');
@@ -57,6 +58,38 @@ function emptyFriendRequestsResponse() {
 
 function pendingResponse() {
   return new Promise<Response>(() => {});
+}
+
+class FakeWebSocket implements WebSocketLike {
+  readyState = 1;
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent<string>) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  sent: string[] = [];
+
+  send(data: string) {
+    this.sent.push(data);
+  }
+
+  close() {
+    this.readyState = 3;
+  }
+
+  emitClose(code: number, reason: string) {
+    this.readyState = 3;
+    this.onclose?.({ code, reason } as CloseEvent);
+  }
+}
+
+function createFakeWebSocketFactory() {
+  const sockets: FakeWebSocket[] = [];
+  const factory: WebSocketFactory = () => {
+    const socket = new FakeWebSocket();
+    sockets.push(socket);
+    return socket;
+  };
+  return { sockets, factory };
 }
 
 function fetchPath(input: RequestInfo | URL) {
@@ -249,6 +282,45 @@ describe('Auth flow', () => {
     await user.click(screen.getByRole('button', { name: '退出登录' }));
 
     expect(screen.getByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+  });
+
+  it('redirects a kicked session to login with a business prompt after a protected API auth failure', async () => {
+    storeSession({ token: 'old-device-token' });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: 'UNAUTHENTICATED',
+          message: 'invalid or missing bearer token',
+          data: null,
+        },
+        { status: 401 },
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('账号已在其他设备登录，请重新登录');
+    expect(screen.queryByText('invalid or missing bearer token')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /消息/i })).not.toBeInTheDocument();
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+  });
+
+  it('redirects a kicked session to login when the WebSocket is closed as session replaced', async () => {
+    storeSession({ token: 'old-device-token' });
+    fetchMock.mockResolvedValue(emptySeqsResponse());
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(<App webSocketToken="old-device-token" webSocketUrl="ws://127.0.0.1/ws" webSocketFactory={factory} />);
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].emitClose(4001, 'session replaced');
+    });
+
+    expect(await screen.findByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('账号已在其他设备登录，请重新登录');
     expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
   });
 });
@@ -1221,6 +1293,107 @@ describe('WeChat-inspired app shell', () => {
     expect(fetchMock).not.toHaveBeenCalledWith('/users/2002', expect.objectContaining({ method: 'GET' }));
   });
 
+  it('opens group management from a group chat started in Contacts', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockReset();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      const method = fetchMethod(init);
+
+      if (path === '/conversations/seqs?conversationIds=' && method === 'GET') {
+        return Promise.resolve(emptySeqsResponse());
+      }
+      if (path === '/friends' && method === 'GET') {
+        return Promise.resolve(jsonResponse({ code: 'OK', message: 'ok', data: { friends: [] } }));
+      }
+      if (path === '/friends/requests' && method === 'GET') {
+        return Promise.resolve(emptyFriendRequestsResponse());
+      }
+      if (path === '/groups' && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              groups: [
+                {
+                  group_id: 'grp_team',
+                  name: '项目群',
+                  description: '联系人入口',
+                  announcement: '联系人入口',
+                  avatar_media_id: '',
+                  avatar_url: '',
+                  creator_user_id: '1001',
+                  current_user_role: 'owner',
+                  created_at: '2026-05-05T12:00:00Z',
+                  updated_at: '2026-05-05T12:00:00Z',
+                },
+              ],
+            },
+          }),
+        );
+      }
+      if (path === '/groups/grp_team' && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              group_id: 'grp_team',
+              name: '项目群',
+              description: '联系人入口',
+              announcement: '联系人入口',
+              avatar_media_id: '',
+              avatar_url: '',
+              creator_user_id: '1001',
+              current_user_role: 'owner',
+              created_at: '2026-05-05T12:00:00Z',
+              updated_at: '2026-05-05T12:00:00Z',
+            },
+          }),
+        );
+      }
+      if (path === '/groups/grp_team/members' && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              group_id: 'grp_team',
+              members: [
+                {
+                  group_id: 'grp_team',
+                  user_id: '1001',
+                  role: 'owner',
+                  state: 'active',
+                  joined_at: '2026-05-05T12:00:00Z',
+                  left_at: '',
+                  identifier: 'alice_001',
+                  display_name: 'Alice Chen',
+                  name: 'Alice Chen',
+                },
+              ],
+            },
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${method} ${path}`));
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: /联系人/i }));
+    await user.click(await screen.findByRole('button', { name: '打开群聊' }));
+    await user.click(await screen.findByRole('button', { name: '打开群聊 项目群' }));
+
+    expect(await screen.findByRole('heading', { name: '项目群', level: 2 })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '打开群管理 项目群' }));
+
+    expect(await screen.findByRole('heading', { name: '群管理' })).toBeInTheDocument();
+    expect(screen.getByTestId('group-member-grid')).toHaveClass('group-member-grid');
+    expect(screen.getByText('联系人入口')).toBeInTheDocument();
+  });
+
   it('shows existing conversations immediately when opening the messages tab after navigation', async () => {
     const user = userEvent.setup();
     fetchMock.mockReset();
@@ -1480,7 +1653,7 @@ describe('WeChat-inspired app shell', () => {
 
     await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
     expect(await screen.findByText('hello alice')).toBeInTheDocument();
-    expect(await screen.findByText('AI/Agent')).toBeInTheDocument();
+    expect(await screen.findByText('AI Agent')).toBeInTheDocument();
 
     await user.type(screen.getByRole('textbox', { name: '输入消息' }), '这是测试消息');
     await user.click(screen.getByRole('button', { name: '发送' }));

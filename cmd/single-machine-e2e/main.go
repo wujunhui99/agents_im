@@ -20,7 +20,7 @@ import (
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
 )
 
 func main() {
@@ -60,7 +60,7 @@ func main() {
 	}
 
 	wsServer := gatewayws.NewServer(
-		svc.NewMessageServiceContextWithAuth(messageRepo, logic.NewUserLogicExistenceChecker(userLogic), nil, testAuth(authSecret)),
+		gatewaysvc.NewServiceContext(messageLogic, testAuth(authSecret)),
 		gatewayws.WithActiveSessionRepository(authRepository),
 	)
 	httpServer := httptest.NewServer(wsServer)

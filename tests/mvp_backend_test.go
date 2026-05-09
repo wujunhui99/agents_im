@@ -9,7 +9,6 @@ import (
 
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	authsvc "github.com/wujunhui99/agents_im/internal/auth/svc"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	"github.com/wujunhui99/agents_im/internal/gateway"
@@ -17,7 +16,8 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 )
 
 func TestMVPBackendAuthProfileSmoke(t *testing.T) {
@@ -30,7 +30,7 @@ func TestMVPBackendAuthProfileSmoke(t *testing.T) {
 		token.NewHMACTokenManager(authConfig.AccessSecret, time.Duration(authConfig.AccessExpire)*time.Second),
 	)
 	authMux := newAuthGoZeroRouter(t, authServiceContext)
-	userMux := newUserGoZeroRouter(t, svc.NewServiceContextWithAuth(userRepo, authConfig))
+	userMux := newUserGoZeroRouter(t, usersvc.NewServiceContextWithAuth(userRepo, authConfig))
 
 	registerResp := httptest.NewRecorder()
 	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"mvp_alice","password":"local-demo-password","display_name":"MVP Alice","gender":"female","birth_date":"1996-05-02","region":"Shanghai"}`)

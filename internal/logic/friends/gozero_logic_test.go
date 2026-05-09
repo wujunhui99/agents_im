@@ -4,13 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
-	"github.com/wujunhui99/agents_im/internal/objectstorage"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	"github.com/wujunhui99/agents_im/internal/types"
 )
 
@@ -18,8 +16,7 @@ func TestListFriendsIncludesAcceptedContactAvatarDisplayURL(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemoryRepository()
 	mediaRepo := repository.NewMemoryMediaRepository()
-	store := objectstorage.NewMemoryStore()
-	svcCtx := svc.NewUserServiceContextWithMedia(repo, mediaRepo, store, "agents-im-media", config.DefaultJWTAuthConfig())
+	svcCtx := friendssvc.NewServiceContext(repo)
 
 	alice, err := svcCtx.UserLogic.CreateUser(ctx, business.CreateUserRequest{
 		Identifier:  "alice_friend_avatar",

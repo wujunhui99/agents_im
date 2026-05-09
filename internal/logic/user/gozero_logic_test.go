@@ -12,7 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/objectstorage"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 	"github.com/wujunhui99/agents_im/internal/types"
 )
 
@@ -21,7 +21,7 @@ func TestUpdateMeAvatarSetsCurrentUsersReadyAvatarAndReturnsDisplayURL(t *testin
 	repo := repository.NewMemoryRepository()
 	mediaRepo := repository.NewMemoryMediaRepository()
 	store := objectstorage.NewMemoryStore()
-	svcCtx := svc.NewUserServiceContextWithMedia(repo, mediaRepo, store, "agents-im-media", config.DefaultJWTAuthConfig())
+	svcCtx := usersvc.NewServiceContextWithMedia(repo, mediaRepo, store, "agents-im-media", config.DefaultJWTAuthConfig())
 
 	alice, err := svcCtx.UserLogic.CreateUser(ctx, business.CreateUserRequest{
 		Identifier:  "alice_avatar",

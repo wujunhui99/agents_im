@@ -13,7 +13,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/svc"
+	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 )
 
 func TestMessageSingleChatSeqStartsAtOne(t *testing.T) {
@@ -515,7 +515,7 @@ func TestMessageGroupSendRequiresActiveMembership(t *testing.T) {
 }
 
 func TestMessageHTTPHandlersUseJWTUser(t *testing.T) {
-	serviceContext := svc.NewMessageServiceContextWithAuth(repository.NewMemoryMessageRepository(), nil, nil, testJWTAuthConfig())
+	serviceContext := messagesvc.NewServiceContextWithAuth(repository.NewMemoryMessageRepository(), nil, nil, testJWTAuthConfig())
 	mux := newMessageGoZeroRouter(t, serviceContext)
 
 	t.Run("rejects legacy X-User-Id header without bearer token", func(t *testing.T) {

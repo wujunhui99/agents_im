@@ -56,7 +56,7 @@ internal/model/group.go
 internal/repository/groups_repository.go
 internal/repository/groups_memory.go
 internal/rpcgen/groups
-internal/svc/service_context.go
+internal/servicecontext/groups/service_context.go
 proto/groups.proto
 tests/groups_service_test.go
 ```
