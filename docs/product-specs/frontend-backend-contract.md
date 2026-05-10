@@ -33,6 +33,32 @@ This document is the MVP frontend handoff for the Go backend. It describes the f
 
 ## Auth
 
+### Request Registration Email Code
+
+```http
+POST /auth/register/email-code
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "alice@example.com"
+}
+```
+
+Success:
+
+```json
+{
+  "code": "OK",
+  "message": "ok",
+  "data": {
+    "email": "alice@example.com",
+    "expire_minutes": 10
+  }
+}
+```
+
 ### Register
 
 ```http
@@ -43,6 +69,8 @@ Content-Type: application/json
 ```json
 {
   "identifier": "alice_001",
+  "email": "alice@example.com",
+  "email_verification_code": "123456",
   "password": "[REDACTED]",
   "display_name": "Alice",
   "gender": "female",
