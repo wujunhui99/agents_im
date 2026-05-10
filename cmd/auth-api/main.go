@@ -5,6 +5,8 @@ import (
 	"log"
 	"time"
 
+	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
+	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
@@ -36,11 +38,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("build auth repository: %v", err)
 	}
+	mailer, err := mailadapter.NewOptionalRPCClient(cfg.MailRPC)
+	if err != nil {
+		log.Fatalf("build mail rpc client: %v", err)
+	}
 	userLogic := userlogic.NewUserLogic(userRepo)
-	serviceContext := authsvc.NewServiceContext(
+	serviceContext := authsvc.NewServiceContextWithOptions(
 		credentialRepo,
 		useradapter.NewLogicClient(userLogic),
 		token.NewHMACTokenManager(cfg.Auth.AccessSecret, time.Duration(cfg.Auth.AccessExpire)*time.Second),
+		authlogic.AuthOptions{
+			VerificationRepo: credentialRepo,
+			Mailer:           mailer,
+		},
 	)
 	httpx.SetErrorHandler(response.GoZeroErrorHandler)
 	server := rest.MustNewServer(config.ToRestConf(cfg))

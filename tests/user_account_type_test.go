@@ -153,14 +153,21 @@ func TestPublicAccountCreateIgnoresAccountTypeAndDefaultsUser(t *testing.T) {
 
 func TestAuthRegisterCreatesUserAccountTypeByDefault(t *testing.T) {
 	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
-	serviceContext := authsvc.NewServiceContext(
-		authrepo.NewMemoryRepository(),
+	credentialRepo := authrepo.NewMemoryRepository()
+	serviceContext := authsvc.NewServiceContextWithOptions(
+		credentialRepo,
 		useradapter.NewLogicClient(userLogic),
 		token.NewHMACTokenManager("test-secret", 0),
+		testAuthOptions(credentialRepo),
 	)
 	mux := newAuthGoZeroRouter(t, serviceContext)
 
-	registerResp := performJSON(mux, "POST", "/auth/register", `{"identifier":"auth_agent_attempt","password":"correct-password","account_type":"admin"}`)
+	codeResp := performJSON(mux, "POST", "/auth/register/email-code", `{"email":"auth_agent_attempt@example.com"}`)
+	if codeResp.Code != 200 {
+		t.Fatalf("email code status = %d, body = %s", codeResp.Code, codeResp.Body.String())
+	}
+
+	registerResp := performJSON(mux, "POST", "/auth/register", `{"identifier":"auth_agent_attempt","email":"auth_agent_attempt@example.com","email_verification_code":"`+testRegistrationCode+`","password":"correct-password","account_type":"admin"}`)
 	if registerResp.Code != 200 {
 		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())
 	}
