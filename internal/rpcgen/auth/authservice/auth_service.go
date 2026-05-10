@@ -14,13 +14,16 @@ import (
 )
 
 type (
-	AuthResponse          = authpb.AuthResponse
-	LoginRequest          = authpb.LoginRequest
-	RegisterRequest       = authpb.RegisterRequest
-	ValidateTokenRequest  = authpb.ValidateTokenRequest
-	ValidateTokenResponse = authpb.ValidateTokenResponse
+	AuthResponse                  = authpb.AuthResponse
+	LoginRequest                  = authpb.LoginRequest
+	RegisterRequest               = authpb.RegisterRequest
+	RegistrationEmailCodeRequest  = authpb.RegistrationEmailCodeRequest
+	RegistrationEmailCodeResponse = authpb.RegistrationEmailCodeResponse
+	ValidateTokenRequest          = authpb.ValidateTokenRequest
+	ValidateTokenResponse         = authpb.ValidateTokenResponse
 
 	AuthService interface {
+		RequestRegistrationEmailCode(ctx context.Context, in *RegistrationEmailCodeRequest, opts ...grpc.CallOption) (*RegistrationEmailCodeResponse, error)
 		Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 		Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 		ValidateToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error)
@@ -36,6 +39,11 @@ func NewAuthService(cli zrpc.Client) AuthService {
 	return &defaultAuthService{
 		cli: cli,
 	}
+}
+
+func (m *defaultAuthService) RequestRegistrationEmailCode(ctx context.Context, in *RegistrationEmailCodeRequest, opts ...grpc.CallOption) (*RegistrationEmailCodeResponse, error) {
+	client := authpb.NewAuthServiceClient(m.cli.Conn())
+	return client.RequestRegistrationEmailCode(ctx, in, opts...)
 }
 
 func (m *defaultAuthService) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*AuthResponse, error) {

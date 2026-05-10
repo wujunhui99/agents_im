@@ -5,6 +5,7 @@ import (
 	"time"
 
 	business "github.com/wujunhui99/agents_im/internal/auth/logic"
+	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
@@ -29,10 +30,17 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		log.Fatalf("build auth repository: %v", err)
 	}
+	mailer, err := mailadapter.NewOptionalRPCClient(c.MailRPC)
+	if err != nil {
+		log.Fatalf("build mail rpc client: %v", err)
+	}
 	userLogic := userlogic.NewUserLogic(userRepo)
 	return &ServiceContext{
-		Config:    c,
-		AuthLogic: business.NewAuthLogic(authRepo, useradapter.NewLogicClient(userLogic), business.NewPasswordHasher(), token.NewHMACTokenManager(c.TokenAuth.AccessSecret, time.Duration(c.TokenAuth.AccessExpire)*time.Second)),
+		Config: c,
+		AuthLogic: business.NewAuthLogicWithOptions(authRepo, useradapter.NewLogicClient(userLogic), business.NewPasswordHasher(), token.NewHMACTokenManager(c.TokenAuth.AccessSecret, time.Duration(c.TokenAuth.AccessExpire)*time.Second), business.AuthOptions{
+			VerificationRepo: authRepo,
+			Mailer:           mailer,
+		}),
 		AuthRepo:  authRepo,
 		UserLogic: userLogic,
 	}

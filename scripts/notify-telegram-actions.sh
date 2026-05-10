@@ -18,6 +18,7 @@ actor="${GITHUB_ACTOR:-unknown}"
 server_url="${GITHUB_SERVER_URL:-https://github.com}"
 run_id="${GITHUB_RUN_ID:-}"
 details="${ACTIONS_NOTIFY_DETAILS:-}"
+timing="${ACTIONS_NOTIFY_TIMING:-}"
 
 if [[ -z "${ref_name}" ]]; then
   ref_name="${GITHUB_REF:-unknown}"
@@ -51,6 +52,10 @@ MSG
 
 if [[ -n "${details}" ]]; then
   message="${message}"$'\n\n'"Jobs:"$'\n'"${details}"
+fi
+
+if [[ -n "${timing}" ]]; then
+  message="${message}"$'\n\n'"Timing:"$'\n'"${timing}"
 fi
 
 dry_run="${ACTIONS_TELEGRAM_DRY_RUN:-}"

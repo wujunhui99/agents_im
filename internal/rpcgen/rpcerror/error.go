@@ -23,6 +23,8 @@ func ToStatus(err error) error {
 		return status.Error(codes.NotFound, appErr.Message)
 	case apperror.CodeAlreadyExists:
 		return status.Error(codes.AlreadyExists, appErr.Message)
+	case apperror.CodeRateLimited:
+		return status.Error(codes.ResourceExhausted, appErr.Message)
 	default:
 		return status.Error(codes.Internal, appErr.Message)
 	}

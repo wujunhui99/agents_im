@@ -50,6 +50,9 @@ Kafka:
   Brokers: redpanda:9092,localhost:19092
   MessageEventsTopic: message.events.test
   ConsumerGroup: message-transfer-test
+MailRPC:
+  Endpoints: 127.0.0.1:9095,mail-rpc:9095
+  Timeout: 5000
 `), 0o600)
 	if err != nil {
 		t.Fatal(err)
@@ -82,6 +85,12 @@ Kafka:
 	}
 	if cfg.Kafka.MessageEventsTopic != "message.events.test" || cfg.Kafka.ConsumerGroup != "message-transfer-test" {
 		t.Fatalf("kafka config mismatch: %+v", cfg.Kafka)
+	}
+	if len(cfg.MailRPC.Endpoints) != 2 || cfg.MailRPC.Endpoints[0] != "127.0.0.1:9095" || cfg.MailRPC.Endpoints[1] != "mail-rpc:9095" {
+		t.Fatalf("mail rpc endpoints mismatch: %+v", cfg.MailRPC.Endpoints)
+	}
+	if cfg.MailRPC.Timeout != 5000 {
+		t.Fatalf("mail rpc timeout = %d, want 5000", cfg.MailRPC.Timeout)
 	}
 }
 

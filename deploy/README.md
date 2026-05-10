@@ -42,7 +42,7 @@ Backend images are built for:
 
 - API services: `user-api`, `auth-api`, `friends-api`, `message-api`, `gateway-ws`, `groups-api`, `agent-api`
 - Worker: `message-transfer`
-- RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`
+- RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`, `mail-rpc`
 
 `deploy-k3s.sh` starts middleware Compose, runs PostgreSQL migrations from the server-side k3s secret `DATABASE_URL`, applies `deploy/k8s`, sets selected deployment images to the current commit SHA tag, restores all non-selected deployments to their pre-apply image tags, and waits for rollout status. Middleware Compose includes MinIO for private S3-compatible object storage; `user-api` reads `OBJECT_STORAGE_*` secret values and creates the configured bucket on startup. When `SKIP_SET_IMAGE=false` and `IMAGE_SERVICES` is empty, the script keeps the legacy full-deployment behavior by updating every known deployment image. When `IMAGE_SERVICES` is set, only those services are moved to `${IMAGE_TAG}`; non-selected images are captured before `kubectl apply -k` and re-applied afterward so manifest defaults such as `:latest` cannot regress existing backend/RPC pods during a web-only deploy.
 
@@ -64,7 +64,7 @@ The backend image list is stable and ordered:
 
 - API services: `user-api`, `auth-api`, `friends-api`, `message-api`, `gateway-ws`, `groups-api`, `agent-api`
 - Worker: `message-transfer`
-- RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`
+- RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`, `mail-rpc`
 
 ### Config-only deploy
 
@@ -119,6 +119,7 @@ RPC ports currently include:
 - `friends-rpc`: `9092`
 - `groups-rpc`: `9103` (`9093` is avoided because it is occupied by server SSH/systemd socket)
 - `message-rpc`: `9094`
+- `mail-rpc`: `9095`
 
 ## Object storage
 

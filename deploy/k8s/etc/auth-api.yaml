@@ -7,3 +7,6 @@ Auth:
   AccessExpire: 86400
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
+MailRPC:
+  Endpoints: mail-rpc:9095
+  Timeout: 5000

@@ -658,6 +658,55 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: mail-rpc
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mail-rpc
+  template:
+    metadata:
+      labels:
+        app: mail-rpc
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: mail-rpc
+          image: ghcr.io/wujunhui99/agents_im/mail-rpc:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/mail-rpc.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: grpc
+              containerPort: 9095
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: agents-im-minio-proxy
   namespace: agents-im
 spec:

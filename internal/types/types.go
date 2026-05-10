@@ -339,6 +339,21 @@ type LoginReq struct {
 	Password   string `json:"password"`
 }
 
+type RegistrationEmailCodeData struct {
+	Email         string `json:"email"`
+	ExpireMinutes int    `json:"expire_minutes"`
+}
+
+type RegistrationEmailCodeReq struct {
+	Email string `json:"email"`
+}
+
+type RegistrationEmailCodeResp struct {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    RegistrationEmailCodeData `json:"data"`
+}
+
 type MarkConversationAsReadData struct {
 	ConversationID string `json:"conversationId"`
 	HasReadSeq     int64  `json:"hasReadSeq"`
@@ -480,13 +495,15 @@ type PullMessagesResp struct {
 }
 
 type RegisterReq struct {
-	Identifier  string `json:"identifier"`
-	Password    string `json:"password"`
-	DisplayName string `json:"display_name,optional"`
-	Name        string `json:"name,optional"`
-	Gender      string `json:"gender,optional"`
-	BirthDate   string `json:"birth_date,optional"`
-	Region      string `json:"region,optional"`
+	Identifier            string `json:"identifier"`
+	Email                 string `json:"email"`
+	EmailVerificationCode string `json:"email_verification_code"`
+	Password              string `json:"password"`
+	DisplayName           string `json:"display_name,optional"`
+	Name                  string `json:"name,optional"`
+	Gender                string `json:"gender,optional"`
+	BirthDate             string `json:"birth_date,optional"`
+	Region                string `json:"region,optional"`
 }
 
 type SendMessageData struct {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
+	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
@@ -26,14 +27,17 @@ func TestAuthLogicRegisterLoginAndValidateToken(t *testing.T) {
 	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
 	authLogic := newAuthLogic(userLogic)
 	ctx := context.Background()
+	issueRegistrationCode(t, authLogic, "alice_001@example.com")
 
 	registered, err := authLogic.Register(ctx, authlogic.RegisterRequest{
-		Identifier:  "Alice_001",
-		Password:    "correct-password",
-		DisplayName: "Alice",
-		Gender:      "female",
-		BirthDate:   "1996-05-02",
-		Region:      "Shanghai",
+		Identifier:            "Alice_001",
+		Email:                 "alice_001@example.com",
+		EmailVerificationCode: testRegistrationCode,
+		Password:              "correct-password",
+		DisplayName:           "Alice",
+		Gender:                "female",
+		BirthDate:             "1996-05-02",
+		Region:                "Shanghai",
 	})
 	if err != nil {
 		t.Fatalf("register: %v", err)
@@ -58,8 +62,10 @@ func TestAuthLogicRegisterLoginAndValidateToken(t *testing.T) {
 	assertNoSecretFields(t, string(rawProfile))
 
 	_, err = authLogic.Register(ctx, authlogic.RegisterRequest{
-		Identifier: "ALICE_001",
-		Password:   "another-password",
+		Identifier:            "ALICE_001",
+		Email:                 "alice_duplicate@example.com",
+		EmailVerificationCode: testRegistrationCode,
+		Password:              "another-password",
 	})
 	if err == nil || apperror.From(err).Code != apperror.CodeAlreadyExists {
 		t.Fatalf("duplicate register error = %v, want ALREADY_EXISTS", err)
@@ -96,18 +102,23 @@ func TestAuthLogicRegisterLoginAndValidateToken(t *testing.T) {
 
 func TestAuthLogicRegisterThenLoginWithPersistentBcryptCredentialShape(t *testing.T) {
 	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
-	authLogic := authlogic.NewAuthLogic(
-		newPostgresShapeCredentialRepository(),
+	postgresRepo := newPostgresShapeCredentialRepository()
+	authLogic := authlogic.NewAuthLogicWithOptions(
+		postgresRepo,
 		useradapter.NewLogicClient(userLogic),
 		authlogic.NewPasswordHasher(),
 		token.NewHMACTokenManager("test-secret", time.Hour),
+		testAuthOptions(postgresRepo),
 	)
 	ctx := context.Background()
+	issueRegistrationCode(t, authLogic, "persisted_bcrypt_001@example.com")
 
 	registered, err := authLogic.Register(ctx, authlogic.RegisterRequest{
-		Identifier:  "Persisted_Bcrypt_001",
-		Password:    "correct-password",
-		DisplayName: "Persisted Bcrypt",
+		Identifier:            "Persisted_Bcrypt_001",
+		Email:                 "persisted_bcrypt_001@example.com",
+		EmailVerificationCode: testRegistrationCode,
+		Password:              "correct-password",
+		DisplayName:           "Persisted Bcrypt",
 	})
 	if err != nil {
 		t.Fatalf("register: %v", err)
@@ -130,19 +141,24 @@ func TestAuthLogicLoginReplacesActiveSession(t *testing.T) {
 	ctx := context.Background()
 	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
 	now := time.Date(2026, 5, 4, 9, 0, 0, 0, time.UTC)
-	authLogic := authlogic.NewAuthLogic(
-		authrepo.NewMemoryRepository(),
+	credentialRepo := authrepo.NewMemoryRepository()
+	authLogic := authlogic.NewAuthLogicWithOptions(
+		credentialRepo,
 		useradapter.NewLogicClient(userLogic),
 		authlogic.NewPasswordHasher(),
 		token.NewHMACTokenManagerWithClock("test-secret", time.Hour, func() time.Time {
 			return now
 		}),
+		testAuthOptions(credentialRepo),
 	)
+	issueRegistrationCode(t, authLogic, "single_device_001@example.com")
 
 	_, err := authLogic.Register(ctx, authlogic.RegisterRequest{
-		Identifier:  "Single_Device_001",
-		Password:    "correct-password",
-		DisplayName: "Single Device",
+		Identifier:            "Single_Device_001",
+		Email:                 "single_device_001@example.com",
+		EmailVerificationCode: testRegistrationCode,
+		Password:              "correct-password",
+		DisplayName:           "Single Device",
 	})
 	if err != nil {
 		t.Fatalf("register: %v", err)
@@ -206,15 +222,22 @@ func TestAuthTokenExpires(t *testing.T) {
 
 func TestAuthHTTPHandlers(t *testing.T) {
 	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
-	serviceContext := authsvc.NewServiceContext(
-		authrepo.NewMemoryRepository(),
+	credentialRepo := authrepo.NewMemoryRepository()
+	serviceContext := authsvc.NewServiceContextWithOptions(
+		credentialRepo,
 		useradapter.NewLogicClient(userLogic),
 		token.NewHMACTokenManager("test-secret", time.Hour),
+		testAuthOptions(credentialRepo),
 	)
 	mux := newAuthGoZeroRouter(t, serviceContext)
 
+	codeResp := performJSON(mux, http.MethodPost, "/auth/register/email-code", `{"email":"bob_001@example.com"}`)
+	if codeResp.Code != http.StatusOK {
+		t.Fatalf("email code status = %d, body = %s", codeResp.Code, codeResp.Body.String())
+	}
+
 	registerResp := httptest.NewRecorder()
-	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"bob_001","password":"correct-password","display_name":"Bob"}`)
+	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"bob_001","email":"bob_001@example.com","email_verification_code":"`+testRegistrationCode+`","password":"correct-password","display_name":"Bob"}`)
 	mux.ServeHTTP(registerResp, registerReq)
 	if registerResp.Code != http.StatusOK {
 		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())
@@ -229,7 +252,7 @@ func TestAuthHTTPHandlers(t *testing.T) {
 	assertLooksLikeJWT(t, registered.Data.Token)
 
 	duplicateResp := httptest.NewRecorder()
-	duplicateReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"BOB_001","password":"another-password"}`)
+	duplicateReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"BOB_001","email":"bob_duplicate@example.com","email_verification_code":"`+testRegistrationCode+`","password":"another-password"}`)
 	mux.ServeHTTP(duplicateResp, duplicateReq)
 	if duplicateResp.Code != http.StatusConflict {
 		t.Fatalf("duplicate status = %d, body = %s", duplicateResp.Code, duplicateResp.Body.String())
@@ -272,16 +295,23 @@ func TestAuthIssuedBearerTokenAccessesMe(t *testing.T) {
 	authConfig := testJWTAuthConfig()
 	repo := userrepo.NewMemoryRepository()
 	userLogic := userlogic.NewUserLogic(repo)
-	authServiceContext := authsvc.NewServiceContext(
-		authrepo.NewMemoryRepository(),
+	credentialRepo := authrepo.NewMemoryRepository()
+	authServiceContext := authsvc.NewServiceContextWithOptions(
+		credentialRepo,
 		useradapter.NewLogicClient(userLogic),
 		token.NewHMACTokenManager(authConfig.AccessSecret, time.Duration(authConfig.AccessExpire)*time.Second),
+		testAuthOptions(credentialRepo),
 	)
 	authMux := newAuthGoZeroRouter(t, authServiceContext)
 	userMux := newUserGoZeroRouter(t, usersvc.NewServiceContextWithAuth(repo, authConfig))
 
+	codeResp := performJSON(authMux, http.MethodPost, "/auth/register/email-code", `{"email":"bearer_me@example.com"}`)
+	if codeResp.Code != http.StatusOK {
+		t.Fatalf("email code status = %d, body = %s", codeResp.Code, codeResp.Body.String())
+	}
+
 	registerResp := httptest.NewRecorder()
-	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"bearer_me","password":"correct-password","display_name":"Bearer User"}`)
+	registerReq := newJSONRequest(http.MethodPost, "/auth/register", `{"identifier":"bearer_me","email":"bearer_me@example.com","email_verification_code":"`+testRegistrationCode+`","password":"correct-password","display_name":"Bearer User"}`)
 	authMux.ServeHTTP(registerResp, registerReq)
 	if registerResp.Code != http.StatusOK {
 		t.Fatalf("register status = %d", registerResp.Code)
@@ -311,20 +341,24 @@ func TestProtectedRoutesRejectInactiveSessionToken(t *testing.T) {
 	accountRepo := userrepo.NewMemoryRepository()
 	userLogic := userlogic.NewUserLogic(accountRepo)
 	credentialRepo := authrepo.NewMemoryRepository()
-	authLogic := authlogic.NewAuthLogic(
+	authLogic := authlogic.NewAuthLogicWithOptions(
 		credentialRepo,
 		useradapter.NewLogicClient(userLogic),
 		authlogic.NewPasswordHasher(),
 		token.NewHMACTokenManager(authConfig.AccessSecret, time.Duration(authConfig.AccessExpire)*time.Second),
+		testAuthOptions(credentialRepo),
 	)
 	userServiceContext := usersvc.NewServiceContextWithAuth(accountRepo, authConfig)
 	userServiceContext.AuthSessions = credentialRepo
 	userMux := newUserGoZeroRouter(t, userServiceContext)
+	issueRegistrationCode(t, authLogic, "protected_single_device@example.com")
 
 	_, err := authLogic.Register(context.Background(), authlogic.RegisterRequest{
-		Identifier:  "protected_single_device",
-		Password:    "correct-password",
-		DisplayName: "Protected Single Device",
+		Identifier:            "protected_single_device",
+		Email:                 "protected_single_device@example.com",
+		EmailVerificationCode: testRegistrationCode,
+		Password:              "correct-password",
+		DisplayName:           "Protected Single Device",
 	})
 	if err != nil {
 		t.Fatalf("register: %v", err)
@@ -362,36 +396,71 @@ func TestProtectedRoutesRejectInactiveSessionToken(t *testing.T) {
 }
 
 func newAuthLogic(userLogic *userlogic.UserLogic) *authlogic.AuthLogic {
-	return authlogic.NewAuthLogic(
-		authrepo.NewMemoryRepository(),
+	credentialRepo := authrepo.NewMemoryRepository()
+	return authlogic.NewAuthLogicWithOptions(
+		credentialRepo,
 		useradapter.NewLogicClient(userLogic),
 		authlogic.NewPasswordHasher(),
 		token.NewHMACTokenManager("test-secret", time.Hour),
+		testAuthOptions(credentialRepo),
 	)
+}
+
+const testRegistrationCode = "123456"
+
+type testRegistrationMailer struct {
+	requests []mailadapter.SendTemplateEmailRequest
+}
+
+func (m *testRegistrationMailer) SendTemplateEmail(_ context.Context, req mailadapter.SendTemplateEmailRequest) error {
+	m.requests = append(m.requests, req)
+	return nil
+}
+
+func testAuthOptions(repo authrepo.EmailVerificationRepository) authlogic.AuthOptions {
+	return authlogic.AuthOptions{
+		VerificationRepo:          repo,
+		Mailer:                    &testRegistrationMailer{},
+		RegistrationCodeGenerator: func() (string, error) { return testRegistrationCode, nil },
+		RegistrationSendCooldown:  time.Nanosecond,
+	}
+}
+
+func issueRegistrationCode(t *testing.T, authLogic *authlogic.AuthLogic, email string) {
+	t.Helper()
+	if _, err := authLogic.RequestRegistrationEmailCode(context.Background(), authlogic.RegistrationEmailCodeRequest{Email: email}); err != nil {
+		t.Fatalf("request registration code for %s: %v", email, err)
+	}
 }
 
 type postgresShapeCredentialRepository struct {
 	mu           sync.RWMutex
 	byIdentifier map[string]postgresShapeCredential
 	byUserID     map[string]string
+	byEmail      map[string]string
 	sessions     map[string]authmodel.ActiveSession
+	emailTokens  *authrepo.MemoryRepository
 	now          func() time.Time
 }
 
 type postgresShapeCredential struct {
-	Identifier   string
-	UserID       string
-	PasswordHash string
-	PasswordAlgo int16
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	Identifier      string
+	UserID          string
+	Email           string
+	EmailVerifiedAt time.Time
+	PasswordHash    string
+	PasswordAlgo    int16
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 func newPostgresShapeCredentialRepository() *postgresShapeCredentialRepository {
 	return &postgresShapeCredentialRepository{
 		byIdentifier: make(map[string]postgresShapeCredential),
 		byUserID:     make(map[string]string),
+		byEmail:      make(map[string]string),
 		sessions:     make(map[string]authmodel.ActiveSession),
+		emailTokens:  authrepo.NewMemoryRepository(),
 		now:          time.Now,
 	}
 }
@@ -406,18 +475,28 @@ func (r *postgresShapeCredentialRepository) Create(_ context.Context, credential
 	if _, exists := r.byUserID[credential.UserID]; exists {
 		return authmodel.Credential{}, apperror.AlreadyExists("auth credential already exists")
 	}
+	if credential.Email != "" {
+		if _, exists := r.byEmail[credential.Email]; exists {
+			return authmodel.Credential{}, apperror.AlreadyExists("auth email already exists")
+		}
+	}
 
 	now := r.now().UTC()
 	row := postgresShapeCredential{
-		Identifier:   credential.Identifier,
-		UserID:       credential.UserID,
-		PasswordHash: credential.PasswordHash,
-		PasswordAlgo: persistentPasswordAlgo(credential.HashVersion),
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		Identifier:      credential.Identifier,
+		UserID:          credential.UserID,
+		Email:           credential.Email,
+		EmailVerifiedAt: credential.EmailVerifiedAt,
+		PasswordHash:    credential.PasswordHash,
+		PasswordAlgo:    persistentPasswordAlgo(credential.HashVersion),
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	r.byIdentifier[row.Identifier] = row
 	r.byUserID[row.UserID] = row.Identifier
+	if row.Email != "" {
+		r.byEmail[row.Email] = row.Identifier
+	}
 	return row.credential(), nil
 }
 
@@ -430,6 +509,37 @@ func (r *postgresShapeCredentialRepository) GetByIdentifier(_ context.Context, i
 		return authmodel.Credential{}, apperror.NotFound("auth credential not found")
 	}
 	return row.credential(), nil
+}
+
+func (r *postgresShapeCredentialRepository) GetByEmail(_ context.Context, email string) (authmodel.Credential, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	identifier, exists := r.byEmail[email]
+	if !exists {
+		return authmodel.Credential{}, apperror.NotFound("auth credential not found")
+	}
+	row, exists := r.byIdentifier[identifier]
+	if !exists {
+		return authmodel.Credential{}, apperror.NotFound("auth credential not found")
+	}
+	return row.credential(), nil
+}
+
+func (r *postgresShapeCredentialRepository) CreateEmailVerification(ctx context.Context, token authmodel.EmailVerificationToken) (authmodel.EmailVerificationToken, error) {
+	return r.emailTokens.CreateEmailVerification(ctx, token)
+}
+
+func (r *postgresShapeCredentialRepository) LatestEmailVerification(ctx context.Context, purpose string, email string) (authmodel.EmailVerificationToken, error) {
+	return r.emailTokens.LatestEmailVerification(ctx, purpose, email)
+}
+
+func (r *postgresShapeCredentialRepository) IncrementEmailVerificationAttempts(ctx context.Context, id string, now time.Time) (authmodel.EmailVerificationToken, error) {
+	return r.emailTokens.IncrementEmailVerificationAttempts(ctx, id, now)
+}
+
+func (r *postgresShapeCredentialRepository) ConsumeEmailVerification(ctx context.Context, id string, now time.Time) (authmodel.EmailVerificationToken, error) {
+	return r.emailTokens.ConsumeEmailVerification(ctx, id, now)
 }
 
 func (r *postgresShapeCredentialRepository) SetActiveSession(_ context.Context, session authmodel.ActiveSession) error {
@@ -457,12 +567,14 @@ func (r *postgresShapeCredentialRepository) GetActiveSession(_ context.Context, 
 
 func (r postgresShapeCredential) credential() authmodel.Credential {
 	return authmodel.Credential{
-		Identifier:   r.Identifier,
-		UserID:       r.UserID,
-		PasswordHash: r.PasswordHash,
-		HashVersion:  persistentPasswordVersion(r.PasswordAlgo),
-		CreatedAt:    r.CreatedAt,
-		UpdatedAt:    r.UpdatedAt,
+		Identifier:      r.Identifier,
+		UserID:          r.UserID,
+		Email:           r.Email,
+		EmailVerifiedAt: r.EmailVerifiedAt,
+		PasswordHash:    r.PasswordHash,
+		HashVersion:     persistentPasswordVersion(r.PasswordAlgo),
+		CreatedAt:       r.CreatedAt,
+		UpdatedAt:       r.UpdatedAt,
 	}
 }
 
