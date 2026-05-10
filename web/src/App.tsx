@@ -214,27 +214,46 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
 }
 
 function AuthPage({ prompt = '' }: { prompt?: string }) {
-  const { login, register } = useAuth();
+  const { login, register, requestRegistrationEmailCode } = useAuth();
   const loginUserApi = useMemo(() => createUserApi(createApiClient()), []);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
+  const [emailVerificationCode, setEmailVerificationCode] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [emailCodeFeedback, setEmailCodeFeedback] = useState<{ kind: 'error' | 'success'; message: string } | null>(null);
+  const [sendingEmailCode, setSendingEmailCode] = useState(false);
   const [identifierCheckMessage, setIdentifierCheckMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const identifierCheckRequest = useRef(0);
   const isRegister = mode === 'register';
+  const canSubmitRegister =
+    identifier.trim() !== '' &&
+    email.trim() !== '' &&
+    emailVerificationCode.trim() !== '' &&
+    displayName.trim() !== '' &&
+    password !== '';
+  const isSubmitDisabled = submitting || (isRegister && !canSubmitRegister);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
+
+    if (isRegister && !canSubmitRegister) {
+      setError('请填写账号、邮箱、验证码、昵称和密码');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       if (isRegister) {
         await register({
           identifier: identifier.trim(),
+          email: email.trim(),
+          emailVerificationCode: emailVerificationCode.trim(),
           displayName: displayName.trim(),
           password,
         });
@@ -256,6 +275,8 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
     setMode(nextMode);
     setError('');
     setIdentifierCheckMessage('');
+    setEmailCodeFeedback(null);
+    setSendingEmailCode(false);
   }
 
   function handleIdentifierChange(event: ChangeEvent<HTMLInputElement>) {
@@ -290,6 +311,35 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
     }
   }
 
+  function handleEmailChange(event: ChangeEvent<HTMLInputElement>) {
+    setEmail(event.target.value);
+    setEmailVerificationCode('');
+    setEmailCodeFeedback(null);
+  }
+
+  async function handleSendRegistrationEmailCode() {
+    setError('');
+    setEmailCodeFeedback(null);
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setEmailCodeFeedback({ kind: 'error', message: '请输入邮箱后再发送验证码' });
+      return;
+    }
+
+    setSendingEmailCode(true);
+    try {
+      const result = await requestRegistrationEmailCode(trimmedEmail);
+      setEmailCodeFeedback({
+        kind: 'success',
+        message: `验证码已发送至 ${result.email}，${result.expire_minutes} 分钟内有效`,
+      });
+    } catch (caughtError) {
+      setEmailCodeFeedback({ kind: 'error', message: authErrorMessage(caughtError) });
+    } finally {
+      setSendingEmailCode(false);
+    }
+  }
+
   return (
     <main className="app-shell auth-app-shell" aria-label="Agents IM 认证">
       <section className="phone-frame auth-frame">
@@ -302,6 +352,51 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          {isRegister ? (
+            <>
+              <TextField
+                id="auth-email"
+                label="邮箱"
+                value={email}
+                onChange={handleEmailChange}
+                type="email"
+                autoComplete="email"
+                required
+                fieldClassName="auth-field"
+              />
+
+              <Button
+                className="auth-code-button"
+                type="button"
+                variant="tonal"
+                onClick={handleSendRegistrationEmailCode}
+                disabled={sendingEmailCode}
+              >
+                {sendingEmailCode ? '发送中' : '发送验证码'}
+              </Button>
+
+              {emailCodeFeedback ? (
+                <p
+                  className={emailCodeFeedback.kind === 'error' ? 'auth-error' : 'auth-success'}
+                  role={emailCodeFeedback.kind === 'error' ? 'alert' : 'status'}
+                >
+                  {emailCodeFeedback.message}
+                </p>
+              ) : null}
+
+              <TextField
+                id="auth-email-code"
+                label="验证码"
+                value={emailVerificationCode}
+                onChange={(event) => setEmailVerificationCode(event.target.value)}
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                required
+                fieldClassName="auth-field"
+              />
+            </>
+          ) : null}
+
           <TextField
             id="auth-identifier"
             label="账号"
@@ -354,7 +449,7 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
             </p>
           ) : null}
 
-          <Button className="auth-submit" type="submit" disabled={submitting}>
+          <Button className="auth-submit" type="submit" disabled={isSubmitDisabled}>
             {submitting ? '请稍候' : isRegister ? '注册并登录' : '登录'}
           </Button>
         </form>
