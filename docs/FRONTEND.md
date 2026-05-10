@@ -19,7 +19,7 @@
 3. **发现**：朋友圈、扫一扫、小程序等发现入口为明确的 `MVP 占位`；不会伪造真实扫码/内容生态能力。
 4. **我的**：个人资料卡、用户详情、服务、收藏、设置入口；支持编辑 `display_name`、`gender`、`birth_date`、`region` 等可变资料字段，并支持退出登录。朋友圈入口只保留在 `发现` 页。
 
-当前 `web/src/api/{user,contacts,groups,messages}.ts` 均基于统一 `createApiClient` 封装 REST contract，共享 envelope 解析、错误处理和 bearer token 注入。认证页调用真实 `/auth/login` 与 `/auth/register`；我的页通过 typed user API adapter 调用 `PATCH /me` 更新资料。
+当前 `web/src/api/{auth,user,contacts,groups,messages}.ts` 均基于统一 `createApiClient` 封装 REST contract，共享 envelope 解析、错误处理和 bearer token 注入。认证页调用真实 `/auth/login`、`/auth/register/email-code` 与 `/auth/register`；我的页通过 typed user API adapter 调用 `PATCH /me` 更新资料。
 
 ## Material 3-inspired 轻量设计系统
 
@@ -60,6 +60,7 @@ web/
   package.json
   src/
     api/
+      auth.ts            # 登录、注册邮箱验证码、注册 REST typed adapter
       client.ts          # typed REST API client，支持 envelope 解析与 Authorization header
       contacts.ts        # friends REST typed adapter
       groups.ts          # groups REST typed adapter
@@ -92,7 +93,7 @@ web/
 - 后端响应必须使用统一 envelope：`{ "code": "OK", "message": "ok", "data": {} }`。`code !== "OK"` 或 HTTP 非 2xx 时抛出 typed `ApiError`。
 - 受保护接口由 client 注入 `Authorization: Bearer *** token。
 - MVP 认证状态使用 React Context 和 localStorage。保存内容限于 access token 与当前用户展示信息；遇到损坏 session 会清理并回到登录页。
-- 未登录时显示登录/注册页；登录或注册成功后进入 `消息 / 联系人 / 发现 / 我的` 四 Tab。`我的` 页展示当前用户昵称、identifier、账号类型和地区，不展示内部 user/account ID，并提供退出登录。
+- 未登录时显示登录/注册页；注册页要求填写邮箱、发送验证码、填写验证码后再提交 `/auth/register`。登录或注册成功后进入 `消息 / 联系人 / 发现 / 我的` 四 Tab。`我的` 页展示当前用户昵称、identifier、账号类型和地区，不展示内部 user/account ID，并提供退出登录。
 
 ## 本地命令
 

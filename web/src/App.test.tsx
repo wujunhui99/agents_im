@@ -227,37 +227,72 @@ describe('Auth flow', () => {
 
   it('registers a new account and enters the four-tab shell', async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        code: 'OK',
-        message: 'ok',
-        data: {
-          user_id: '2002',
-          identifier: 'new_user',
-          token: 'register-token',
-          expires_at: '2026-04-30T12:00:00Z',
-        },
-      }),
-    );
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      const method = fetchMethod(init);
+      if (path === '/auth/register/email-code' && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: { email: 'new_user@example.com', expire_minutes: 10 },
+          }),
+        );
+      }
+      if (path === '/auth/register' && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              user_id: '2002',
+              identifier: 'new_user',
+              token: 'register-token',
+              expires_at: '2026-04-30T12:00:00Z',
+            },
+          }),
+        );
+      }
+      if (path === '/conversations/seqs?conversationIds=') {
+        return Promise.resolve(emptySeqsResponse());
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${path}`));
+    });
 
     render(<App />);
 
     await user.click(screen.getByRole('button', { name: '注册账号' }));
     expect(screen.getByRole('heading', { name: '注册 Agents IM' })).toBeInTheDocument();
+    expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
+    expect(screen.getByLabelText('验证码')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '发送验证码' })).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('账号'), 'new_user');
+    await user.type(screen.getByLabelText('邮箱'), 'new_user@example.com');
     await user.type(screen.getByLabelText('昵称'), 'New User');
     await user.type(screen.getByLabelText('密码'), 'test-password');
+    await user.click(screen.getByRole('button', { name: '发送验证码' }));
+    expect(await screen.findByText('验证码已发送至 new_user@example.com，10 分钟内有效')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('验证码'), '123456');
     await user.click(screen.getByRole('button', { name: '注册并登录' }));
 
     expect(await screen.findByRole('heading', { name: '消息' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /我的/i })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/auth/register/email-code',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ email: 'new_user@example.com' }),
+      }),
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       '/auth/register',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
           identifier: 'new_user',
+          email: 'new_user@example.com',
+          email_verification_code: '123456',
           password: 'test-password',
           display_name: 'New User',
         }),
@@ -267,6 +302,122 @@ describe('Auth flow', () => {
       token: 'register-token',
       user: { identifier: 'new_user', displayName: 'New User' },
     });
+  });
+
+  it('blocks registration submit until email and verification code are present', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: '注册账号' }));
+    const submitButton = screen.getByRole('button', { name: '注册并登录' });
+
+    expect(submitButton).toBeDisabled();
+
+    await user.type(screen.getByLabelText('账号'), 'new_user');
+    await user.type(screen.getByLabelText('昵称'), 'New User');
+    await user.type(screen.getByLabelText('密码'), 'test-password');
+
+    expect(submitButton).toBeDisabled();
+
+    await user.type(screen.getByLabelText('邮箱'), 'new_user@example.com');
+
+    expect(submitButton).toBeDisabled();
+
+    await user.type(screen.getByLabelText('验证码'), '123456');
+
+    expect(submitButton).toBeEnabled();
+  });
+
+  it('shows Chinese validation, loading, and success states when sending a registration email code', async () => {
+    const user = userEvent.setup();
+    let resolveEmailCodeRequest: ((response: Response) => void) | undefined;
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      const method = fetchMethod(init);
+      if (path === '/auth/register/email-code' && method === 'POST') {
+        return new Promise<Response>((resolve) => {
+          resolveEmailCodeRequest = resolve;
+        });
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${path}`));
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: '注册账号' }));
+    await user.click(screen.getByRole('button', { name: '发送验证码' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('请输入邮箱后再发送验证码');
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText('邮箱'), 'new_user@example.com');
+    await user.click(screen.getByRole('button', { name: '发送验证码' }));
+
+    expect(screen.getByRole('button', { name: '发送中' })).toBeDisabled();
+
+    act(() => {
+      resolveEmailCodeRequest?.(
+        jsonResponse({
+          code: 'OK',
+          message: 'ok',
+          data: { email: 'new_user@example.com', expire_minutes: 10 },
+        }),
+      );
+    });
+
+    expect(await screen.findByText('验证码已发送至 new_user@example.com，10 分钟内有效')).toBeInTheDocument();
+  });
+
+  it('shows Chinese errors for send-code and registration failures', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      const method = fetchMethod(init);
+      if (path === '/auth/register/email-code' && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse(
+            {
+              code: 'INVALID_ARGUMENT',
+              message: '邮箱格式不正确',
+              data: null,
+            },
+            { status: 400 },
+          ),
+        );
+      }
+      if (path === '/auth/register' && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse(
+            {
+              code: 'INVALID_ARGUMENT',
+              message: '验证码错误或已过期',
+              data: null,
+            },
+            { status: 400 },
+          ),
+        );
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${path}`));
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: '注册账号' }));
+    await user.type(screen.getByLabelText('邮箱'), 'bad-email');
+    await user.click(screen.getByRole('button', { name: '发送验证码' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('邮箱格式不正确');
+
+    await user.clear(screen.getByLabelText('邮箱'));
+    await user.type(screen.getByLabelText('邮箱'), 'new_user@example.com');
+    await user.type(screen.getByLabelText('账号'), 'new_user');
+    await user.type(screen.getByLabelText('昵称'), 'New User');
+    await user.type(screen.getByLabelText('密码'), 'test-password');
+    await user.type(screen.getByLabelText('验证码'), '999999');
+    await user.click(screen.getByRole('button', { name: '注册并登录' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('验证码错误或已过期');
   });
 
   it('logs out and returns to the login page', async () => {

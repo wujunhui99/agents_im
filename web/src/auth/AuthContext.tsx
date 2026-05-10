@@ -1,21 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createAuthApi, type AuthResponse, type RegistrationEmailCodeData } from '../api/auth';
 import { ApiError, createApiClient } from '../api/client';
 import { clearStoredSession, readStoredSession, writeStoredSession, type AuthSession, type AuthUser } from './session';
-
-type AuthResponse = {
-  user_id: string;
-  identifier: string;
-  display_name?: string;
-  name?: string;
-  gender?: string;
-  birth_date?: string;
-  region?: string;
-  account_type?: 'user' | 'agent' | 'admin';
-  avatar_media_id?: string;
-  avatar_url?: string;
-  token: string;
-  expires_at?: string;
-};
 
 type LoginInput = {
   identifier: string;
@@ -23,6 +9,8 @@ type LoginInput = {
 };
 
 type RegisterInput = LoginInput & {
+  email: string;
+  emailVerificationCode: string;
   displayName: string;
 };
 
@@ -31,6 +19,7 @@ type AuthContextValue = {
   authPrompt: string;
   login(input: LoginInput): Promise<AuthSession>;
   register(input: RegisterInput): Promise<AuthSession>;
+  requestRegistrationEmailCode(email: string): Promise<RegistrationEmailCodeData>;
   updateSessionUser(input: Partial<AuthUser>): void;
   logout(): void;
   handleAuthFailure(input?: AuthFailureInput): void;
@@ -50,9 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<AuthSession | null>(session);
   const api = useMemo(
     () =>
-      createApiClient({
-        getToken: () => session?.token,
-      }),
+      createAuthApi(
+        createApiClient({
+          getToken: () => session?.token,
+        }),
+      ),
     [session?.token],
   );
 
@@ -61,25 +52,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   async function login(input: LoginInput) {
-    const response = await api.post<AuthResponse>(
-      '/auth/login',
-      { identifier: input.identifier, password: input.password },
-      { auth: false },
-    );
+    const response = await api.login(input);
     return persistSession(toSession(response));
   }
 
   async function register(input: RegisterInput) {
-    const response = await api.post<AuthResponse>(
-      '/auth/register',
-      {
-        identifier: input.identifier,
-        password: input.password,
-        display_name: input.displayName,
-      },
-      { auth: false },
-    );
+    const response = await api.register(input);
     return persistSession(toSession(response, input.displayName));
+  }
+
+  async function requestRegistrationEmailCode(email: string) {
+    return api.requestRegistrationEmailCode(email);
   }
 
   function logout() {
@@ -134,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authPrompt,
       login,
       register,
+      requestRegistrationEmailCode,
       updateSessionUser,
       logout,
       handleAuthFailure,
