@@ -19,6 +19,10 @@ TokenAuth:
   AccessExpire: 3600
 StorageDriver: postgres
 DataSource: postgres://example.invalid/agents_im
+MailRPC:
+  Endpoints:
+    - 127.0.0.1:9095
+  Timeout: 5000
 `)
 	if err := os.WriteFile(configPath, content, 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -33,5 +37,8 @@ DataSource: postgres://example.invalid/agents_im
 	}
 	if cfg.StorageDriver != commonconfig.StorageDriverPostgres || cfg.DataSource == "" {
 		t.Fatalf("storage config mismatch: driver=%q dataSourceEmpty=%v", cfg.StorageDriver, cfg.DataSource == "")
+	}
+	if len(cfg.MailRPC.Endpoints) != 1 || cfg.MailRPC.Endpoints[0] != "127.0.0.1:9095" || cfg.MailRPC.Timeout != 5000 {
+		t.Fatalf("mail rpc config mismatch: %+v", cfg.MailRPC)
 	}
 }

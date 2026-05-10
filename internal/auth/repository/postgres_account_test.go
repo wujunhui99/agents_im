@@ -17,16 +17,18 @@ func TestPostgresCredentialCreateStoresSameAccountID(t *testing.T) {
 
 	now := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
 	accountID := "740000000000000003"
-	mock.ExpectQuery(`(?s)insert\s+into\s+auth_credentials\s+\(account_id,\s+password_hash,\s+password_algo\)`).
-		WithArgs(accountID, "hash", int16(1), "pg_alice").
+	mock.ExpectQuery(`(?s)insert\s+into\s+auth_credentials\s+\(account_id,\s+email_normalized,\s+email_verified_at,\s+password_hash,\s+password_algo\)`).
+		WithArgs(accountID, "", sqlmock.AnyArg(), "hash", int16(1), "pg_alice").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"account_id",
 			"identifier",
+			"email_normalized",
+			"email_verified_at",
 			"password_hash",
 			"password_algo",
 			"created_at",
 			"updated_at",
-		}).AddRow(accountID, "pg_alice", "hash", int16(1), now, now))
+		}).AddRow(accountID, "pg_alice", "", nil, "hash", int16(1), now, now))
 
 	got, err := repo.Create(context.Background(), model.Credential{
 		Identifier:   "pg_alice",
@@ -60,16 +62,18 @@ func TestPostgresCredentialGetMapsPasswordAlgoOneToBcrypt(t *testing.T) {
 
 	now := time.Date(2026, 5, 4, 10, 0, 0, 0, time.UTC)
 	accountID := "740000000000000004"
-	mock.ExpectQuery(`(?s)select\s+c\.account_id,\s+a\.identifier,\s+c\.password_hash,\s+c\.password_algo`).
+	mock.ExpectQuery(`(?s)select\s+c\.account_id,\s+a\.identifier,\s+c\.email_normalized,\s+c\.email_verified_at,\s+c\.password_hash,\s+c\.password_algo`).
 		WithArgs("pg_bcrypt").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"account_id",
 			"identifier",
+			"email_normalized",
+			"email_verified_at",
 			"password_hash",
 			"password_algo",
 			"created_at",
 			"updated_at",
-		}).AddRow(accountID, "pg_bcrypt", "$2a$10$abcdefghijklmnopqrstuuI3qFoq8ZIRl4p8Q5fCq3dLtWq8B0Qpu", int16(1), now, now))
+		}).AddRow(accountID, "pg_bcrypt", "", nil, "$2a$10$abcdefghijklmnopqrstuuI3qFoq8ZIRl4p8Q5fCq3dLtWq8B0Qpu", int16(1), now, now))
 
 	got, err := repo.GetByIdentifier(context.Background(), "pg_bcrypt")
 	if err != nil {

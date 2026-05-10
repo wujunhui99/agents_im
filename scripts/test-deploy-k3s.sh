@@ -34,6 +34,7 @@ case "${1:-}" in
         friends-rpc) echo 'ghcr.io/wujunhui99/agents_im/friends-rpc:stable-backend' ;;
         groups-rpc) echo 'ghcr.io/wujunhui99/agents_im/groups-rpc:stable-backend' ;;
         message-rpc) echo 'ghcr.io/wujunhui99/agents_im/message-rpc:stable-backend' ;;
+        mail-rpc) echo 'ghcr.io/wujunhui99/agents_im/mail-rpc:stable-backend' ;;
         web) echo 'ghcr.io/wujunhui99/agents_im/web:old-web' ;;
         *) echo "ghcr.io/wujunhui99/agents_im/${service}:stable-backend" ;;
       esac
