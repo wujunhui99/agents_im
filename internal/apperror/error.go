@@ -8,14 +8,15 @@ import (
 type Code string
 
 const (
-	CodeOK              Code = "OK"
-	CodeInvalidArgument Code = "INVALID_ARGUMENT"
-	CodeUnauthenticated Code = "UNAUTHENTICATED"
-	CodeForbidden       Code = "FORBIDDEN"
-	CodeNotFound        Code = "NOT_FOUND"
-	CodeAlreadyExists   Code = "ALREADY_EXISTS"
-	CodeRateLimited     Code = "RATE_LIMITED"
-	CodeInternal        Code = "INTERNAL"
+	CodeOK                 Code = "OK"
+	CodeInvalidArgument    Code = "INVALID_ARGUMENT"
+	CodeUnauthenticated    Code = "UNAUTHENTICATED"
+	CodeForbidden          Code = "FORBIDDEN"
+	CodeNotFound           Code = "NOT_FOUND"
+	CodeAlreadyExists      Code = "ALREADY_EXISTS"
+	CodeRateLimited        Code = "RATE_LIMITED"
+	CodeServiceUnavailable Code = "SERVICE_UNAVAILABLE"
+	CodeInternal           Code = "INTERNAL"
 )
 
 type Error struct {
@@ -55,6 +56,10 @@ func RateLimited(message string) *Error {
 	return New(CodeRateLimited, message)
 }
 
+func ServiceUnavailable(message string) *Error {
+	return New(CodeServiceUnavailable, message)
+}
+
 func Internal(message string) *Error {
 	return New(CodeInternal, message)
 }
@@ -91,6 +96,8 @@ func HTTPStatus(err error) int {
 		return http.StatusConflict
 	case CodeRateLimited:
 		return http.StatusTooManyRequests
+	case CodeServiceUnavailable:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}

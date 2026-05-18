@@ -291,6 +291,32 @@ func TestAuthHTTPHandlers(t *testing.T) {
 	}
 }
 
+func TestAuthEmailCodeHandlerReturnsServiceUnavailableWhenMailerMissing(t *testing.T) {
+	userLogic := userlogic.NewUserLogic(userrepo.NewMemoryRepository())
+	credentialRepo := authrepo.NewMemoryRepository()
+	serviceContext := authsvc.NewServiceContextWithOptions(
+		credentialRepo,
+		useradapter.NewLogicClient(userLogic),
+		token.NewHMACTokenManager("test-secret", time.Hour),
+		authlogic.AuthOptions{VerificationRepo: credentialRepo},
+	)
+	mux := newAuthGoZeroRouter(t, serviceContext)
+
+	resp := performJSON(mux, http.MethodPost, "/auth/register/email-code", `{"email":"missing_mailer@example.com"}`)
+	if resp.Code != http.StatusServiceUnavailable {
+		t.Fatalf("email code status = %d, want 503; body = %s", resp.Code, resp.Body.String())
+	}
+
+	var body envelope[any]
+	decodeEnvelope(t, resp.Body.Bytes(), &body)
+	if body.Code != string(apperror.CodeServiceUnavailable) {
+		t.Fatalf("email code response code = %q, want SERVICE_UNAVAILABLE", body.Code)
+	}
+	if strings.Contains(strings.ToLower(body.Message), "rpc client") {
+		t.Fatalf("email code response leaked implementation dependency: %q", body.Message)
+	}
+}
+
 func TestAuthIssuedBearerTokenAccessesMe(t *testing.T) {
 	authConfig := testJWTAuthConfig()
 	repo := userrepo.NewMemoryRepository()

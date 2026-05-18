@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestLoadAPIConfigResolvesRedisAndPresenceFromFile(t *testing.T) {
@@ -91,6 +93,113 @@ MailRPC:
 	}
 	if cfg.MailRPC.Timeout != 5000 {
 		t.Fatalf("mail rpc timeout = %d, want 5000", cfg.MailRPC.Timeout)
+	}
+}
+
+func TestLoadAPIConfigParsesMailRPCYAMLListEndpoints(t *testing.T) {
+	clearMailRPCEnv(t)
+
+	configPath := filepath.Join(t.TempDir(), "auth-api.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: auth-api
+Host: 127.0.0.1
+Port: 18081
+MailRPC:
+  Endpoints:
+    - 127.0.0.1:19095
+    - mail-rpc:9095
+  Timeout: 5000
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if len(cfg.MailRPC.Endpoints) != 2 {
+		t.Fatalf("mail rpc endpoint count = %d, want 2", len(cfg.MailRPC.Endpoints))
+	}
+	if cfg.MailRPC.Timeout != 5000 {
+		t.Fatalf("mail rpc timeout = %d, want 5000", cfg.MailRPC.Timeout)
+	}
+}
+
+func TestLoadRPCConfigParsesMailRPCYAMLListEndpoints(t *testing.T) {
+	clearMailRPCEnv(t)
+
+	configPath := filepath.Join(t.TempDir(), "auth-rpc.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: auth-rpc
+ListenOn: 127.0.0.1:19091
+MailRPC:
+  Endpoints:
+    - 127.0.0.1:19095
+    - mail-rpc:9095
+  Timeout: 5000
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadRPCConfig(configPath)
+	if err != nil {
+		t.Fatalf("load rpc config: %v", err)
+	}
+	if len(cfg.MailRPC.Endpoints) != 2 {
+		t.Fatalf("mail rpc endpoint count = %d, want 2", len(cfg.MailRPC.Endpoints))
+	}
+	if cfg.MailRPC.Timeout != 5000 {
+		t.Fatalf("mail rpc timeout = %d, want 5000", cfg.MailRPC.Timeout)
+	}
+}
+
+func TestAuthConfigExamplesUseMailRPCEndpointLists(t *testing.T) {
+	for _, path := range []string{
+		filepath.Join("..", "..", "etc", "auth-api.yaml"),
+		filepath.Join("..", "..", "etc", "auth-rpc.yaml"),
+		filepath.Join("..", "..", "deploy", "k8s", "etc", "auth-api.yaml"),
+		filepath.Join("..", "..", "deploy", "k8s", "etc", "auth-rpc.yaml"),
+	} {
+		t.Run(path, func(t *testing.T) {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read config: %v", err)
+			}
+			var data map[string]any
+			if err := yaml.Unmarshal(raw, &data); err != nil {
+				t.Fatalf("parse config: %v", err)
+			}
+			mailRPC, ok := data["MailRPC"].(map[string]any)
+			if !ok {
+				t.Fatalf("MailRPC section is required")
+			}
+			endpoints, ok := mailRPC["Endpoints"].([]any)
+			if !ok || len(endpoints) == 0 {
+				t.Fatalf("MailRPC.Endpoints must be a non-empty YAML list")
+			}
+			for i, endpoint := range endpoints {
+				value, ok := endpoint.(string)
+				if !ok || strings.TrimSpace(value) == "" {
+					t.Fatalf("MailRPC.Endpoints[%d] must be a non-empty string", i)
+				}
+			}
+		})
+	}
+}
+
+func clearMailRPCEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"AUTH_MAIL_RPC_TARGET",
+		"AGENTS_IM_MAIL_RPC_TARGET",
+		"MAIL_RPC_TARGET",
+		"AUTH_MAIL_RPC_ENDPOINTS",
+		"AGENTS_IM_MAIL_RPC_ENDPOINTS",
+		"MAIL_RPC_ENDPOINTS",
+	} {
+		t.Setenv(key, "")
 	}
 }
 

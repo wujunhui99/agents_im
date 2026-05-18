@@ -30,7 +30,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		log.Fatalf("build auth repository: %v", err)
 	}
-	mailer, err := mailadapter.NewOptionalRPCClient(c.MailRPC)
+	mailer, err := mailadapter.NewRequiredRPCClient(c.MailRPC)
 	if err != nil {
 		log.Fatalf("build mail rpc client: %v", err)
 	}
