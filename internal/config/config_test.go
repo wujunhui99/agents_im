@@ -126,6 +126,47 @@ DeepSeek:
 	}
 }
 
+func TestLoadAPIConfigResolvesLLMObservabilityLangfusePlaceholders(t *testing.T) {
+	t.Setenv("LLM_OBSERVABILITY_ENABLED", "true")
+	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuse")
+	t.Setenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+	t.Setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-unit-test")
+	t.Setenv("LANGFUSE_SECRET_KEY", "sk-lf-unit-test")
+	t.Setenv("LLM_OBSERVABILITY_CAPTURE_OUTPUT", "true")
+
+	configPath := filepath.Join(t.TempDir(), "message-api.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: message-api
+LLMObservability:
+  Enabled: ${LLM_OBSERVABILITY_ENABLED}
+  Backend: ${LLM_OBSERVABILITY_BACKEND}
+  CaptureOutput: ${LLM_OBSERVABILITY_CAPTURE_OUTPUT}
+  Langfuse:
+    Host: ${LANGFUSE_HOST}
+    PublicKey: ${LANGFUSE_PUBLIC_KEY}
+    SecretKey: ${LANGFUSE_SECRET_KEY}
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if !cfg.LLMObservability.Enabled || cfg.LLMObservability.Backend != LLMObservabilityBackendLangfuse {
+		t.Fatalf("llm observability config mismatch: %+v", cfg.LLMObservability)
+	}
+	if !cfg.LLMObservability.CaptureOutput {
+		t.Fatalf("capture output should resolve true: %+v", cfg.LLMObservability)
+	}
+	if cfg.LLMObservability.Langfuse.Host != "https://cloud.langfuse.com" ||
+		cfg.LLMObservability.Langfuse.PublicKey != "pk-lf-unit-test" ||
+		cfg.LLMObservability.Langfuse.SecretKey != "sk-lf-unit-test" {
+		t.Fatalf("langfuse config mismatch: %+v", cfg.LLMObservability.Langfuse)
+	}
+}
+
 func TestResolveGatewayWSConfigDefaultsAreProductionSafe(t *testing.T) {
 	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "")
 	t.Setenv("GATEWAY_WS_ALLOW_QUERY_TOKEN", "")

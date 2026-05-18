@@ -168,6 +168,13 @@ required_files=(
   "internal/observability/metrics_test.go"
   "internal/observability/trace.go"
   "internal/observability/trace_test.go"
+  "internal/llmobs/types.go"
+  "internal/llmobs/sink.go"
+  "internal/llmobs/sink_test.go"
+  "internal/llmobs/sanitize.go"
+  "internal/llmobs/eino.go"
+  "internal/agenteval/eval.go"
+  "internal/agenteval/python_go_test.go"
   "internal/types/types.go"
   "internal/auth/logic/authlogic.go"
   "internal/logic/auth/login_logic.go"
@@ -264,6 +271,7 @@ required_files=(
   "docs/exec-plans/active/backend-mvp-completion.md"
   "docs/design-docs/backend-mvp-contract.md"
   "docs/design-docs/observability-mvp.md"
+  "docs/design-docs/llm-observability.md"
   "docs/product-specs/backend-mvp.md"
   "docs/product-specs/frontend-backend-contract.md"
   "docs/DEVELOPMENT.md"
@@ -336,6 +344,8 @@ required_files=(
   "db/migrations/003_agent_conversation_hosting.sql"
   "internal/agentim/hosting.go"
   "internal/agentim/hosting_test.go"
+  "internal/agentim/llm_observability.go"
+  "internal/agentim/llm_observability_test.go"
   "internal/repository/agent_hosting_repository.go"
   "internal/repository/agent_hosting_memory.go"
   "internal/repository/postgres_agent_hosting.go"
@@ -2000,6 +2010,24 @@ rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
 rg -q "observability-mvp.md" ARCHITECTURE.md docs/design-docs/index.md
 rg -q "agents_im_message_sends_total" docs/design-docs/observability-mvp.md internal/observability/metrics.go
 rg -q "trace_id" docs/design-docs/observability-mvp.md internal/gateway/ws/server.go
+
+llm_observability_patterns=(
+  "RuntimeModeAIHostingAutoReply"
+  "NewEinoCallbackHandler"
+  "ErrLangfuseConfigMissing"
+  "ErrLangfuseExportNotImplemented"
+  "LLMObservability"
+  "LANGFUSE_PUBLIC_KEY"
+  "PythonGoPerformanceCaseID"
+  "ai_hosting.python_go_performance.v1"
+)
+
+for pattern in "${llm_observability_patterns[@]}"; do
+  rg -q "$pattern" internal/llmobs internal/agenteval internal/agentim internal/agentruntime/eino internal/config docs/design-docs/llm-observability.md .env.example
+done
+
+rg -q "llm-observability.md" ARCHITECTURE.md docs/design-docs/index.md
+rg -q "LLM_OBSERVABILITY_BACKEND=noop" .env.example
 
 if rg -n "RequestURI|RawQuery|DumpRequest|Authorization|password|token" internal/observability; then
   echo "observability helpers must not log or inspect secrets, auth headers, bodies, or query strings" >&2
