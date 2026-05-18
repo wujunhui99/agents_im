@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEven
 import { Compass, Contact, MessageCircle, ShieldCheck, UserRound } from 'lucide-react';
 import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
+import { createAdminApi } from './api/admin';
 import { createApiClient } from './api/client';
 import { createContactsApi, type ContactsApi } from './api/contacts';
 import { createGroupsApi, type Group, type GroupsApi } from './api/groups';
@@ -17,6 +18,7 @@ import { TextField } from './components/ui/TextField';
 import { TopBar } from './components/ui/TopBar';
 import { MessagesPage } from './features/messages/MessagesPage';
 import { DiscoverPage } from './pages/DiscoverPage';
+import { AdminConsole } from './pages/AdminConsole';
 import { MePage } from './pages/MePage';
 import { uploadAvatarForProfile } from './utils/avatarUpload';
 
@@ -91,6 +93,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
   const mediaApi = useMemo(() => createMediaApi(authedApiClient), [authedApiClient]);
   const contactsApi = useMemo(() => createContactsApi(authedApiClient), [authedApiClient]);
   const groupsApi = useMemo(() => createGroupsApi(authedApiClient), [authedApiClient]);
+  const adminApi = useMemo(() => createAdminApi(authedApiClient), [authedApiClient]);
   const activeWebSocketToken = webSocketToken ?? session?.token;
   const handleWebSocketAuthFailure = useCallback(() => {
     handleAuthFailure({ token: activeWebSocketToken ?? null });
@@ -153,6 +156,10 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
     });
   }
 
+  if (isAdminRoute()) {
+    return <AdminConsole adminApi={adminApi} />;
+  }
+
   return (
     <main className="app-shell" aria-label="Agents IM Material 3-inspired 微信式主框架">
       <section className="phone-frame">
@@ -211,6 +218,10 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
       </section>
     </main>
   );
+}
+
+function isAdminRoute() {
+  return window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
 }
 
 function AuthPage({ prompt = '' }: { prompt?: string }) {
