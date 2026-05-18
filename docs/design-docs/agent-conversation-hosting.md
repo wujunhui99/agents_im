@@ -1,6 +1,6 @@
 # Agent Conversation Hosting
 
-状态：Implemented / Issue #3 V1 extended
+状态：Implemented / Issue #3 V1 extended / Issue #76 Agent group chat V1
 
 ## 背景
 
@@ -103,7 +103,8 @@ For direct-chat AI hosting, once a trigger is accepted by `agent_trigger_idempot
 - Issue #3 direct-chat AI hosting：当 `conversation_ai_hosting_settings.enabled=true`，且触发消息是对端发送的 `human` 单聊消息时，目标 owner 为开启托管的一方。AI 回复必须通过 `MessageLogic.SendMessage` 写入，`message_origin=ai`，`sender_id/agent_account_id` 均为被托管 owner，`trigger_server_msg_id` 指向触发消息。
 - Hosted conversation：`agent_conversation_hosting.enabled=true` 时，目标 Agent 为配置的 `agent_account_id`。
 - Private Agent chat：hosting seam 可通过 `AgentAccountResolver` 校验 receiver 是 active Agent account。
-- Group trigger：第一阶段由 explicit `TargetAgentAccountIDs` 或 hosting config 提供目标 Agent；完整 @ 解析留给上游事件构造方。
+- Group trigger：Issue #76 V1 由 explicit `TargetAgentAccountIDs` 或上游 mention metadata 提供目标 Agent；完整自由文本 @ 解析留给上游事件构造方。普通群消息没有显式目标时不触发 Agent。
+- Group target authorization：目标 Agent 必须是该群 active 成员。Conversation hosting seam 通过 groups member lookup 校验 `requesting_user_id` 和目标 Agent 成员状态；非成员/未授权目标写入 `agent_trigger_idempotency.status=failed`，不调 runtime，也不写假 AI 回复。
 - AI-origin message：默认跳过。只有 `agent_conversation_hosting.allow_agent_message_recursion=true` 且消息 `allow_recursive_trigger=true` 时才允许递归。
 - System-origin message：不触发 Agent。
 - Issue #3 V1 不处理群聊；群聊读取/更新 AI 托管设置返回显式错误。

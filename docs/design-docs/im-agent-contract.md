@@ -570,6 +570,8 @@ GET /internal/agent/conversations/{conversation_id}/agents
 - 单聊 Agent 必须响应。
 - 群聊只有 @Agent 时响应。
 - 多 Agent 同时被 @ 时，分别触发对应 Agent，但需要共享同一个 `trace_id`。
+- 群聊 V1 的 @Agent 可以由上游 mention metadata 或 backend seam 的 `TargetAgentAccountIDs` 表达；IM-Agent seam 不做自由文本 @ 解析。
+- 群聊目标 Agent 必须是该群 active 成员；非成员或未授权目标必须记录为失败 trigger，不能进入 runtime，也不能写入假成功回复。
 - Agent 消息默认不触发新的 Agent run；只有运行策略允许递归，且 Agent 消息元数据 `allow_recursive_trigger=true` 时，才允许再次触发。
 
 ### Agent 触发 Go 契约
