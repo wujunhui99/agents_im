@@ -92,6 +92,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - 管理 MCP 工具和本地工具。MCP server 和工具元数据入库；本地工具只允许服务端白名单 `handler_key`，不得从数据库执行任意脚本。
 - 当前 Agent registry 基线已提供 prompt/tool/skill 元数据与 Agent 白名单绑定的 Go logic/repository 和 PostgreSQL schema；该基线不执行工具、不调用 LLM、不上传或读取 MinIO 二进制内容。
 - 当前 Agent runtime provider 基线已提供 CloudWeGo Eino + DeepSeek ChatModel adapter/config，读取 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`；缺少 API key 时构造模型必须失败，不提供 mock/fake response。
+- 当前 AI Hosting LLM observability 通过 `internal/llmobs` 和 Eino callback seam 发出 run/generation 事件；默认 noop/test sink 不联网，Langfuse 是目标后端但 live export 未实现时必须显式失败，设计见 [`docs/design-docs/llm-observability.md`](./docs/design-docs/llm-observability.md)。
 - 当前 Agent runtime 工具解析契约位于 `internal/agentruntime/tools`：运行时必须从 `AgentRegistryRepository` 读取 Agent 工具绑定并重新校验工具状态、管理员配置、MCP server 状态和安全 transport；该契约只产出 Eino 可适配的安全 metadata/adapter seam，不执行 MCP 网络调用，也不提供 shell、命令、本地进程、stdio MCP、Python 或文件系统写入工具。
 - Agent run、tool call、skill file read、Python exec 审计记录使用 append-only 审计表保存；摘要字段必须脱敏，Python 代码只保存 hash/大小摘要。
 - 第一版不提供 shell/命令行脚本执行能力；Python 执行必须通过受限沙箱、限时限资源、默认无网络，并记录审计。
@@ -122,6 +123,8 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - `trace_id`：跨服务链路追踪 ID
 
 Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trace/request ID 传播设计见 [`docs/design-docs/observability-mvp.md`](./docs/design-docs/observability-mvp.md)。当前实现不要求本地启动 Prometheus、Grafana 或 Jaeger。
+
+LLM observability is separate from system metrics/tracing. AI Hosting emits run/generation events through `internal/llmobs`, with Langfuse as the intended UI/backend sink and noop/test behavior by default. Design and privacy constraints are documented in [`docs/design-docs/llm-observability.md`](./docs/design-docs/llm-observability.md).
 
 ### Deployment / CI-CD
 

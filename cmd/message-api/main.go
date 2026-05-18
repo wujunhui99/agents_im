@@ -62,7 +62,7 @@ func main() {
 	serviceContext.AIHostingLogic = logic.NewConversationAIHostingLogic(aiHostingRepo)
 	serviceContext.AgentAuditRepo = agentAuditRepo
 	serviceContext.AgentAuditLogic = logic.NewAgentAuditLogic(agentAuditRepo)
-	if err := messagesvc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek); err != nil {
+	if err := messagesvc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek, cfg.LLMObservability); err != nil {
 		log.Fatalf("configure AI conversation hosting: %v", err)
 	}
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
