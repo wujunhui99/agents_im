@@ -11,6 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
+	adminsvc "github.com/wujunhui99/agents_im/internal/servicecontext/admin"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
@@ -28,6 +29,10 @@ func main() {
 	groupsRepo, err := repository.NewGroupsRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {
 		log.Fatalf("build groups repository: %v", err)
+	}
+	accountRepo, err := repository.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build account repository: %v", err)
 	}
 	messageRepo, err := repository.NewMessageRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {
@@ -65,12 +70,19 @@ func main() {
 	if err := messagesvc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek, cfg.LLMObservability); err != nil {
 		log.Fatalf("configure AI conversation hosting: %v", err)
 	}
+	adminContext := adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
+		Accounts:    accountRepo,
+		Friends:     accountRepo,
+		Messages:    messageRepo,
+		AgentAudits: agentAuditRepo,
+	}, cfg.Auth)
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
 		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 		if err != nil {
 			log.Fatalf("build auth repository: %v", err)
 		}
 		serviceContext.AuthSessions = authRepo
+		adminContext.AuthSessions = authRepo
 	} else {
 		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", config.ResolveStorageDriver(cfg.StorageDriver))
 	}
@@ -79,6 +91,7 @@ func main() {
 	defer server.Stop()
 	server.Use(observability.TraceMiddlewareFunc)
 	handler.RegisterMessageGoZeroHandlers(server, serviceContext)
+	handler.RegisterAdminGoZeroHandlers(server, adminContext)
 
 	log.Printf("%s listening on %s:%d", cfg.Name, cfg.Host, cfg.Port)
 	server.Start()

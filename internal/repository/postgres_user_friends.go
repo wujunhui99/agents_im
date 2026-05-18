@@ -115,6 +115,44 @@ select exists(select 1 from accounts where identifier = $1)
 	return exists, err
 }
 
+func (r *PostgresRepository) SearchAccounts(ctx context.Context, filter AccountSearchFilter) ([]model.User, error) {
+	limit := normalizeAdminLimit(filter.Limit, 20, 100)
+	query := strings.ToLower(strings.TrimSpace(filter.Query))
+	like := "%" + query + "%"
+	var rows []postgresAccountProfileRow
+	err := r.conn.QueryRowsCtx(ctx, &rows, `
+select
+  a.account_id, a.identifier, a.account_type,
+  a.created_at as account_created_at, a.updated_at as account_updated_at,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
+  p.created_at as profile_created_at, p.updated_at as profile_updated_at
+from accounts a
+join profiles p on p.account_id = a.account_id
+where $1 = ''
+   or lower(a.account_id) like $2
+   or lower(a.identifier) like $2
+   or lower(p.display_name) like $2
+   or lower(p.name) like $2
+order by a.created_at desc, a.account_id asc
+limit $3
+`, query, like, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]model.User, 0, len(rows))
+	for _, row := range rows {
+		users = append(users, row.user())
+	}
+	return users, nil
+}
+
+func (r *PostgresRepository) CountAccounts(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.conn.QueryRowCtx(ctx, &count, `select count(*) from accounts`)
+	return count, err
+}
+
 func (r *PostgresRepository) GetByID(ctx context.Context, userID string) (model.User, error) {
 	var row postgresAccountProfileRow
 	err := r.conn.QueryRowCtx(ctx, &row, accountProfileByIDQuery, userID)

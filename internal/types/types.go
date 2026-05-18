@@ -602,3 +602,245 @@ type ValidateTokenResp struct {
 	Message string            `json:"message"`
 	Data    ValidateTokenData `json:"data"`
 }
+
+type AdminDashboardReq struct {
+	Limit int64 `form:"limit,optional"`
+}
+
+type AdminConversationMessagesReq struct {
+	ConversationID string `path:"conversation_id"`
+	FromSeq        int64  `form:"fromSeq,optional"`
+	ToSeq          int64  `form:"toSeq,optional"`
+	Limit          int64  `form:"limit,optional"`
+	Order          string `form:"order,optional"`
+}
+
+type AdminUserSearchReq struct {
+	Query string `form:"query,optional"`
+	Limit int64  `form:"limit,optional"`
+}
+
+type AdminUserReq struct {
+	AccountID string `path:"account_id"`
+}
+
+type AdminLLMTraceListReq struct {
+	Status string `form:"status,optional"`
+	Limit  int64  `form:"limit,optional"`
+	Offset int64  `form:"offset,optional"`
+}
+
+type AdminLLMTraceReq struct {
+	TraceID string `path:"trace_id"`
+}
+
+type AdminDashboardTotals struct {
+	Users         int64 `json:"users"`
+	Conversations int64 `json:"conversations"`
+	Messages      int64 `json:"messages"`
+	AIRuns        int64 `json:"aiRuns"`
+	FailedAIRuns  int64 `json:"failedAiRuns"`
+}
+
+type AdminMessage struct {
+	ServerMsgID           string `json:"serverMsgId"`
+	ClientMsgID           string `json:"clientMsgId"`
+	ConversationID        string `json:"conversationId"`
+	Seq                   int64  `json:"seq"`
+	SenderID              string `json:"senderId"`
+	ReceiverID            string `json:"receiverId,omitempty"`
+	GroupID               string `json:"groupId,omitempty"`
+	ChatType              string `json:"chatType"`
+	ContentType           string `json:"contentType"`
+	Content               string `json:"content"`
+	MessageOrigin         string `json:"messageOrigin"`
+	AgentAccountID        string `json:"agentAccountId,omitempty"`
+	TriggerServerMsgID    string `json:"triggerServerMsgId,omitempty"`
+	AgentRunID            string `json:"agentRunId,omitempty"`
+	AllowRecursiveTrigger bool   `json:"allowRecursiveTrigger,omitempty"`
+	SendTime              int64  `json:"sendTime"`
+	CreatedAt             int64  `json:"createdAt"`
+}
+
+type AdminConversation struct {
+	ConversationID string        `json:"conversationId"`
+	MaxSeq         int64         `json:"maxSeq"`
+	HasReadSeq     int64         `json:"hasReadSeq,omitempty"`
+	UnreadCount    int64         `json:"unreadCount,omitempty"`
+	MaxSeqTime     int64         `json:"maxSeqTime,omitempty"`
+	LastMessage    *AdminMessage `json:"lastMessage,omitempty"`
+}
+
+type AdminUser struct {
+	UserID        string `json:"userId"`
+	AccountID     string `json:"accountId,omitempty"`
+	Identifier    string `json:"identifier"`
+	DisplayName   string `json:"displayName"`
+	Name          string `json:"name"`
+	Gender        string `json:"gender"`
+	BirthDate     string `json:"birthDate"`
+	Region        string `json:"region"`
+	AccountType   string `json:"accountType"`
+	AvatarMediaID string `json:"avatarMediaId,omitempty"`
+	AvatarURL     string `json:"avatarUrl,omitempty"`
+	CreatedAt     string `json:"createdAt"`
+	UpdatedAt     string `json:"updatedAt"`
+}
+
+type AdminFriend struct {
+	UserID    string     `json:"userId"`
+	FriendID  string     `json:"friendId"`
+	Status    string     `json:"status"`
+	IsFriend  bool       `json:"isFriend"`
+	Friend    *AdminUser `json:"friend,omitempty"`
+	CreatedAt string     `json:"createdAt"`
+	UpdatedAt string     `json:"updatedAt"`
+}
+
+type AdminLLMTrace struct {
+	TraceID           string `json:"traceId"`
+	RunID             string `json:"runId"`
+	AgentID           string `json:"agentId"`
+	ConversationID    string `json:"conversationId,omitempty"`
+	TriggerMessageID  string `json:"triggerMessageId,omitempty"`
+	ResponseMessageID string `json:"responseMessageId,omitempty"`
+	RequestingUserID  string `json:"requestingUserId,omitempty"`
+	Status            string `json:"status"`
+	Provider          string `json:"provider,omitempty"`
+	Model             string `json:"model,omitempty"`
+	PromptHash        string `json:"promptHash,omitempty"`
+	PromptVersion     string `json:"promptVersion,omitempty"`
+	LatencyMs         int64  `json:"latencyMs,omitempty"`
+	TotalTokens       int64  `json:"totalTokens,omitempty"`
+	ErrorCode         string `json:"errorCode,omitempty"`
+	ErrorMessage      string `json:"errorMessage,omitempty"`
+	StartedAt         string `json:"startedAt,omitempty"`
+	FinishedAt        string `json:"finishedAt,omitempty"`
+	CreatedAt         string `json:"createdAt,omitempty"`
+}
+
+type AdminAgentToolCall struct {
+	ToolCallID   string `json:"toolCallId"`
+	RunID        string `json:"runId"`
+	ToolName     string `json:"toolName"`
+	Status       string `json:"status"`
+	DurationMs   int64  `json:"durationMs,omitempty"`
+	ErrorCode    string `json:"errorCode,omitempty"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+	StartedAt    string `json:"startedAt,omitempty"`
+	FinishedAt   string `json:"finishedAt,omitempty"`
+	CreatedAt    string `json:"createdAt,omitempty"`
+}
+
+type AdminAgentFileRead struct {
+	FileReadID   string `json:"fileReadId"`
+	RunID        string `json:"runId"`
+	SkillID      string `json:"skillId,omitempty"`
+	FileID       string `json:"fileId,omitempty"`
+	Status       string `json:"status"`
+	ByteCount    int64  `json:"byteCount,omitempty"`
+	ErrorCode    string `json:"errorCode,omitempty"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+	StartedAt    string `json:"startedAt,omitempty"`
+	FinishedAt   string `json:"finishedAt,omitempty"`
+	CreatedAt    string `json:"createdAt,omitempty"`
+}
+
+type AdminAgentPythonExec struct {
+	PythonExecID string `json:"pythonExecId"`
+	RunID        string `json:"runId"`
+	Status       string `json:"status"`
+	ErrorCode    string `json:"errorCode,omitempty"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+	StartedAt    string `json:"startedAt,omitempty"`
+	FinishedAt   string `json:"finishedAt,omitempty"`
+	CreatedAt    string `json:"createdAt,omitempty"`
+}
+
+type AdminDashboardData struct {
+	Totals              AdminDashboardTotals `json:"totals"`
+	RecentTraces        []AdminLLMTrace      `json:"recentTraces"`
+	RecentConversations []AdminConversation  `json:"recentConversations"`
+}
+
+type AdminConversationMessagesData struct {
+	ConversationID string         `json:"conversationId"`
+	Messages       []AdminMessage `json:"messages"`
+	IsEnd          bool           `json:"isEnd"`
+	NextSeq        int64          `json:"nextSeq"`
+}
+
+type AdminUserSearchData struct {
+	Users []AdminUser `json:"users"`
+}
+
+type AdminUserDetailData struct {
+	User AdminUser `json:"user"`
+}
+
+type AdminUserFriendsData struct {
+	Friends []AdminFriend `json:"friends"`
+}
+
+type AdminUserConversationsData struct {
+	Conversations []AdminConversation `json:"conversations"`
+}
+
+type AdminLLMTraceListData struct {
+	Traces []AdminLLMTrace `json:"traces"`
+}
+
+type AdminLLMTraceDetailData struct {
+	Trace       AdminLLMTrace          `json:"trace"`
+	ToolCalls   []AdminAgentToolCall   `json:"toolCalls"`
+	FileReads   []AdminAgentFileRead   `json:"fileReads"`
+	PythonExecs []AdminAgentPythonExec `json:"pythonExecs"`
+}
+
+type AdminDashboardResp struct {
+	Code    string             `json:"code"`
+	Message string             `json:"message"`
+	Data    AdminDashboardData `json:"data"`
+}
+
+type AdminConversationMessagesResp struct {
+	Code    string                        `json:"code"`
+	Message string                        `json:"message"`
+	Data    AdminConversationMessagesData `json:"data"`
+}
+
+type AdminUserSearchResp struct {
+	Code    string              `json:"code"`
+	Message string              `json:"message"`
+	Data    AdminUserSearchData `json:"data"`
+}
+
+type AdminUserDetailResp struct {
+	Code    string              `json:"code"`
+	Message string              `json:"message"`
+	Data    AdminUserDetailData `json:"data"`
+}
+
+type AdminUserFriendsResp struct {
+	Code    string               `json:"code"`
+	Message string               `json:"message"`
+	Data    AdminUserFriendsData `json:"data"`
+}
+
+type AdminUserConversationsResp struct {
+	Code    string                     `json:"code"`
+	Message string                     `json:"message"`
+	Data    AdminUserConversationsData `json:"data"`
+}
+
+type AdminLLMTraceListResp struct {
+	Code    string                `json:"code"`
+	Message string                `json:"message"`
+	Data    AdminLLMTraceListData `json:"data"`
+}
+
+type AdminLLMTraceDetailResp struct {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    AdminLLMTraceDetailData `json:"data"`
+}
