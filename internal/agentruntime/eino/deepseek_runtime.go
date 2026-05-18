@@ -6,20 +6,40 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudwego/eino/callbacks"
+	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/schema"
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	llmdeepseek "github.com/wujunhui99/agents_im/internal/agentruntime/llm/deepseek"
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/idgen"
+	"github.com/wujunhui99/agents_im/internal/llmobs"
 )
 
 type DeepSeekRuntime struct {
-	cfg config.DeepSeekConfig
+	cfg        config.DeepSeekConfig
+	llmobsSink llmobs.Sink
+	llmobsCfg  llmobs.Config
 }
 
-func NewDeepSeekRuntime(cfg config.DeepSeekConfig) *DeepSeekRuntime {
-	return &DeepSeekRuntime{cfg: cfg}
+type DeepSeekRuntimeOption func(*DeepSeekRuntime)
+
+func WithLLMObservability(sink llmobs.Sink, cfg llmobs.Config) DeepSeekRuntimeOption {
+	return func(runtime *DeepSeekRuntime) {
+		runtime.llmobsSink = sink
+		runtime.llmobsCfg = cfg
+	}
+}
+
+func NewDeepSeekRuntime(cfg config.DeepSeekConfig, opts ...DeepSeekRuntimeOption) *DeepSeekRuntime {
+	runtime := &DeepSeekRuntime{cfg: cfg}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(runtime)
+		}
+	}
+	return runtime
 }
 
 func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
@@ -37,6 +57,13 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 	}
 
 	startedAt := time.Now().UTC()
+	if r.llmobsSink != nil {
+		ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{
+			Type:      "DeepSeek",
+			Name:      cfg.Model,
+			Component: components.ComponentOfChatModel,
+		}, llmobs.NewEinoCallbackHandler(r.llmobsSink, llmObsBaseEvent(normalized, cfg), r.llmobsCfg))
+	}
 	resp, err := cm.Generate(ctx, runtimeMessages(normalized))
 	finishedAt := time.Now().UTC()
 	if err != nil {
@@ -76,6 +103,45 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 		}
 	}
 	return result, nil
+}
+
+func llmObsBaseEvent(req agentruntime.RunRequest, cfg config.DeepSeekConfig) llmobs.Event {
+	runtimeMode := strings.TrimSpace(req.Metadata["runtime_mode"])
+	if runtimeMode == "" {
+		runtimeMode = strings.TrimSpace(req.TriggerType)
+	}
+	return llmobs.Event{
+		TraceID:              strings.TrimSpace(req.TraceID),
+		RequestID:            strings.TrimSpace(req.RequestID),
+		AgentRunID:           strings.TrimSpace(req.RunID),
+		ConversationID:       strings.TrimSpace(req.ConversationID),
+		TriggerServerMsgID:   strings.TrimSpace(req.TriggerMessageID),
+		HostedOwnerAccountID: strings.TrimSpace(req.AgentUserID),
+		SenderAccountID:      strings.TrimSpace(req.RequestingUserID),
+		AgentAccountID:       strings.TrimSpace(req.AgentUserID),
+		ModelProvider:        strings.TrimSpace(req.Agent.Model.Provider),
+		ModelName:            strings.TrimSpace(cfg.Model),
+		PromptVersion:        strings.TrimSpace(req.Agent.Prompt.Version),
+		PromptHash:           llmobs.PromptHash(req.Agent.Prompt.Content),
+		RuntimeMode:          runtimeMode,
+		Generation: llmobs.Generation{
+			BoundedRecentMessageCount: len(req.Conversation),
+			TriggerInContext:          llmObsTriggerInContext(req),
+		},
+	}
+}
+
+func llmObsTriggerInContext(req agentruntime.RunRequest) bool {
+	triggerMessageID := strings.TrimSpace(req.TriggerMessageID)
+	for _, message := range req.Conversation {
+		if triggerMessageID != "" && strings.TrimSpace(message.ServerMsgID) == triggerMessageID {
+			return true
+		}
+		if req.TriggerSeq > 0 && message.Seq == req.TriggerSeq {
+			return true
+		}
+	}
+	return false
 }
 
 func runtimeMessages(req agentruntime.RunRequest) []*schema.Message {
