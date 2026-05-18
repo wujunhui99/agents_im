@@ -114,7 +114,7 @@ insert into friendships (account_id, friend_account_id, status)
 select human.account_id, assistant.account_id, 2
 from accounts human
 cross join accounts assistant
-where human.account_type = 1
+where human.account_type::text in ('1', 'user')
   and assistant.identifier = 'agent_creator'
   and human.account_id <> assistant.account_id
 on conflict (account_id, friend_account_id) do update
@@ -125,7 +125,7 @@ insert into friendships (account_id, friend_account_id, status)
 select assistant.account_id, human.account_id, 2
 from accounts human
 cross join accounts assistant
-where human.account_type = 1
+where human.account_type::text in ('1', 'user')
   and assistant.identifier = 'agent_creator'
   and human.account_id <> assistant.account_id
 on conflict (account_id, friend_account_id) do update
