@@ -15,10 +15,25 @@ set identifier = 'agent_creator_legacy_' || account_id,
 where identifier = 'agent_father'
   and exists (select 1 from accounts where identifier = 'agent_creator');
 
-insert into accounts (account_id, identifier, account_type, display_name)
-select '900000000000000077', 'agent_creator', 2, 'AI 助手'
-where not exists (select 1 from accounts where identifier = 'agent_creator')
-on conflict (account_id) do nothing;
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_name = 'accounts'
+      and column_name = 'display_name'
+  ) then
+    insert into accounts (account_id, identifier, account_type, display_name)
+    select '900000000000000077', 'agent_creator', 2, 'AI 助手'
+    where not exists (select 1 from accounts where identifier = 'agent_creator')
+    on conflict (account_id) do nothing;
+  else
+    insert into accounts (account_id, identifier, account_type)
+    select '900000000000000077', 'agent_creator', 2
+    where not exists (select 1 from accounts where identifier = 'agent_creator')
+    on conflict (account_id) do nothing;
+  end if;
+end $$;
 
 do $$
 begin
