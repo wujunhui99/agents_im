@@ -14,6 +14,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
+	"github.com/wujunhui99/agents_im/internal/llmobs"
 )
 
 type RuntimeRequestBuilder interface {
@@ -38,6 +39,7 @@ type AgentRunOrchestrator struct {
 	requestBuilder RuntimeRequestBuilder
 	audit          AgentRunAuditRecorder
 	writer         ResponseWriter
+	llmobsSink     llmobs.Sink
 	now            func() time.Time
 }
 
@@ -47,11 +49,12 @@ type AgentRunOrchestratorResult struct {
 }
 
 type AgentRunOrchestratorConfig struct {
-	Runtime        agentruntime.Runtime
-	RequestBuilder RuntimeRequestBuilder
-	Audit          AgentRunAuditRecorder
-	Writer         ResponseWriter
-	Now            func() time.Time
+	Runtime              agentruntime.Runtime
+	RequestBuilder       RuntimeRequestBuilder
+	Audit                AgentRunAuditRecorder
+	Writer               ResponseWriter
+	LLMObservabilitySink llmobs.Sink
+	Now                  func() time.Time
 }
 
 func NewAgentRunOrchestrator(config AgentRunOrchestratorConfig) (*AgentRunOrchestrator, error) {
@@ -76,6 +79,7 @@ func NewAgentRunOrchestrator(config AgentRunOrchestratorConfig) (*AgentRunOrches
 		requestBuilder: config.RequestBuilder,
 		audit:          config.Audit,
 		writer:         config.Writer,
+		llmobsSink:     config.LLMObservabilitySink,
 		now:            now,
 	}, nil
 }
@@ -108,6 +112,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	runtimeReq, err := o.requestBuilder.BuildRuntimeRequest(ctx, normalized)
 	if err != nil {
 		finishedAt := now().UTC()
+		o.observeLLMRun(ctx, llmObsFailedFromTrigger(normalized, "", startedAt, finishedAt, "runtime_request_error", err))
 		auditErr := o.recordFailedRun(ctx, normalized, "", startedAt, finishedAt, "runtime_request_error", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
@@ -117,6 +122,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	runtimeReq, err = normalizeRuntimeRequestForTrigger(runtimeReq, normalized)
 	if err != nil {
 		finishedAt := now().UTC()
+		o.observeLLMRun(ctx, llmObsFailedFromRequest(normalized, runtimeReq, agentruntime.RunResult{}, startedAt, finishedAt, "runtime_request_invalid", err))
 		auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_request_invalid", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
@@ -124,9 +130,11 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 		return AgentRunOrchestratorResult{}, err
 	}
 
+	o.observeLLMRun(ctx, llmObsStartedFromRequest(normalized, runtimeReq, startedAt))
 	runtimeResult, err := o.runtime.Run(ctx, runtimeReq)
 	finishedAt := now().UTC()
 	if err != nil {
+		o.observeLLMRun(ctx, llmObsFailedFromRequest(normalized, runtimeReq, agentruntime.RunResult{}, startedAt, finishedAt, "runtime_error", err))
 		auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_error", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
@@ -139,6 +147,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 		if strings.Contains(err.Error(), "final_text") {
 			code = "empty_final_text"
 		}
+		o.observeLLMRun(ctx, llmObsFailedFromRequest(normalized, runtimeReq, runtimeResult, startedAt, finishedAt, code, err))
 		auditErr := o.recordFailedRun(ctx, normalized, runtimeResult.RunID, startedAt, finishedAt, code, err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
@@ -148,6 +157,7 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	runtimeResult.FinalText = strings.TrimSpace(runtimeResult.FinalText)
 	if runtimeReq.RunID != "" && runtimeResult.RunID != runtimeReq.RunID {
 		err := apperror.Internal("runtime returned mismatched run_id")
+		o.observeLLMRun(ctx, llmObsFailedFromRequest(normalized, runtimeReq, runtimeResult, startedAt, finishedAt, "runtime_result_invalid", err))
 		auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_result_invalid", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
@@ -184,13 +194,22 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	}
 	response, err := o.writer.WriteAgentResponse(ctx, responseReq)
 	if err != nil {
+		o.observeLLMRun(ctx, llmObsFailedFromRequest(normalized, runtimeReq, runtimeResult, startedAt, finishedAt, "response_write_error", err))
 		return AgentRunOrchestratorResult{}, fmt.Errorf("write agent response through message service: %w", err)
 	}
+	o.observeLLMRun(ctx, llmObsSucceededFromResult(normalized, runtimeReq, runtimeResult, response, startedAt, finishedAt))
 
 	return AgentRunOrchestratorResult{
 		AuditRun: auditRun,
 		Response: response,
 	}, nil
+}
+
+func (o *AgentRunOrchestrator) observeLLMRun(ctx context.Context, event llmobs.Event) {
+	if o == nil || o.llmobsSink == nil {
+		return
+	}
+	_, _ = o.llmobsSink.Observe(ctx, event)
 }
 
 func (o *AgentRunOrchestrator) recordFailedRun(ctx context.Context, trigger AgentTrigger, runID string, startedAt time.Time, finishedAt time.Time, code string, cause error) error {

@@ -15,19 +15,20 @@ import (
 )
 
 type APIConfig struct {
-	Name          string
-	Host          string
-	Port          int
-	Auth          JWTAuthConfig
-	StorageDriver string
-	DataSource    string
-	Redis         RedisConfig
-	Presence      PresenceConfig
-	Kafka         KafkaConfig
-	DeepSeek      DeepSeekConfig
-	GatewayWS     GatewayWSConfig
-	ObjectStorage ObjectStorageConfig
-	MailRPC       zrpc.RpcClientConf
+	Name             string
+	Host             string
+	Port             int
+	Auth             JWTAuthConfig
+	StorageDriver    string
+	DataSource       string
+	Redis            RedisConfig
+	Presence         PresenceConfig
+	Kafka            KafkaConfig
+	DeepSeek         DeepSeekConfig
+	LLMObservability LLMObservabilityConfig
+	GatewayWS        GatewayWSConfig
+	ObjectStorage    ObjectStorageConfig
+	MailRPC          zrpc.RpcClientConf
 }
 
 type RPCConfig struct {
@@ -80,6 +81,20 @@ type DeepSeekConfig struct {
 	Model   string
 }
 
+type LLMObservabilityConfig struct {
+	Enabled        bool
+	Backend        string
+	CaptureOutput  bool
+	MaxOutputBytes int
+	Langfuse       LangfuseObservabilityConfig
+}
+
+type LangfuseObservabilityConfig struct {
+	Host      string
+	PublicKey string
+	SecretKey string
+}
+
 type ObjectStorageConfig struct {
 	Driver           string
 	Endpoint         string
@@ -129,17 +144,21 @@ type ObservabilityHTTPConfig struct {
 }
 
 const (
-	StorageDriverMemory       = "memory"
-	StorageDriverPostgres     = "postgres"
-	ObjectStorageDriverMemory = "memory"
-	ObjectStorageDriverMinIO  = "minio"
-	PresenceDriverMemory      = "memory"
-	PresenceDriverRedis       = "redis"
-	TransferConsumerMemory    = "memory"
-	TransferConsumerKafka     = "kafka"
-	TransferConsumerOutbox    = "outbox"
-	TransferDispatcherNoop    = "noop"
-	TransferDispatcherGateway = "gateway"
+	StorageDriverMemory             = "memory"
+	StorageDriverPostgres           = "postgres"
+	ObjectStorageDriverMemory       = "memory"
+	ObjectStorageDriverMinIO        = "minio"
+	PresenceDriverMemory            = "memory"
+	PresenceDriverRedis             = "redis"
+	TransferConsumerMemory          = "memory"
+	TransferConsumerKafka           = "kafka"
+	TransferConsumerOutbox          = "outbox"
+	TransferDispatcherNoop          = "noop"
+	TransferDispatcherGateway       = "gateway"
+	LLMObservabilityBackendNoop     = "noop"
+	LLMObservabilityBackendMemory   = "memory"
+	LLMObservabilityBackendTest     = "test"
+	LLMObservabilityBackendLangfuse = "langfuse"
 )
 
 const (
@@ -172,17 +191,18 @@ var ErrObjectStorageExternalEndpointLoopback = errors.New("object storage extern
 
 func DefaultAPIConfig() APIConfig {
 	return APIConfig{
-		Name:          "user-api",
-		Host:          "0.0.0.0",
-		Port:          8080,
-		Auth:          DefaultJWTAuthConfig(),
-		StorageDriver: StorageDriverMemory,
-		Redis:         DefaultRedisConfig(),
-		Presence:      DefaultPresenceConfig(),
-		Kafka:         DefaultKafkaConfig(),
-		DeepSeek:      DefaultDeepSeekConfig(),
-		GatewayWS:     DefaultGatewayWSConfig(),
-		ObjectStorage: DefaultObjectStorageConfig(),
+		Name:             "user-api",
+		Host:             "0.0.0.0",
+		Port:             8080,
+		Auth:             DefaultJWTAuthConfig(),
+		StorageDriver:    StorageDriverMemory,
+		Redis:            DefaultRedisConfig(),
+		Presence:         DefaultPresenceConfig(),
+		Kafka:            DefaultKafkaConfig(),
+		DeepSeek:         DefaultDeepSeekConfig(),
+		LLMObservability: DefaultLLMObservabilityConfig(),
+		GatewayWS:        DefaultGatewayWSConfig(),
+		ObjectStorage:    DefaultObjectStorageConfig(),
 	}
 }
 
@@ -243,6 +263,14 @@ func DefaultDeepSeekConfig() DeepSeekConfig {
 	return DeepSeekConfig{
 		BaseURL: DefaultDeepSeekBaseURL,
 		Model:   DefaultDeepSeekModel,
+	}
+}
+
+func DefaultLLMObservabilityConfig() LLMObservabilityConfig {
+	return LLMObservabilityConfig{
+		Enabled:        false,
+		Backend:        LLMObservabilityBackendNoop,
+		MaxOutputBytes: 2048,
 	}
 }
 
@@ -332,6 +360,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 	}
 	cfg.Kafka = kafkaConfigFromValues(values)
 	cfg.DeepSeek = deepSeekConfigFromValues(values)
+	cfg.LLMObservability, err = llmObservabilityConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
 	cfg.ObjectStorage, err = objectStorageConfigFromValues(values, cfg.StorageDriver)
 	if err != nil {
 		return cfg, err
@@ -714,6 +746,51 @@ func ResolveDeepSeekConfig(cfg DeepSeekConfig) DeepSeekConfig {
 	return cfg
 }
 
+func ResolveLLMObservabilityConfig(cfg LLMObservabilityConfig) (LLMObservabilityConfig, error) {
+	enabled, err := resolveBool(cfg.Enabled, os.Getenv("LLM_OBSERVABILITY_ENABLED"), os.Getenv("LLM_OBS_ENABLED"), os.Getenv("AGENTS_IM_LLM_OBSERVABILITY_ENABLED"))
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Enabled = enabled
+	cfg.Backend = resolveLLMObservabilityBackend(cfg.Backend)
+	cfg.CaptureOutput, err = resolveBool(cfg.CaptureOutput, os.Getenv("LLM_OBSERVABILITY_CAPTURE_OUTPUT"), os.Getenv("LLM_OBS_CAPTURE_OUTPUT"))
+	if err != nil {
+		return cfg, err
+	}
+	maxOutputBytes, err := resolveInt(cfg.MaxOutputBytes, os.Getenv("LLM_OBSERVABILITY_MAX_OUTPUT_BYTES"), os.Getenv("LLM_OBS_MAX_OUTPUT_BYTES"))
+	if err != nil {
+		return cfg, err
+	}
+	if maxOutputBytes < 0 {
+		maxOutputBytes = 0
+	}
+	if maxOutputBytes == 0 {
+		maxOutputBytes = DefaultLLMObservabilityConfig().MaxOutputBytes
+	}
+	cfg.MaxOutputBytes = maxOutputBytes
+	cfg.Langfuse.Host = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Langfuse.Host)), os.Getenv("LANGFUSE_HOST"), os.Getenv("LANGFUSE_BASE_URL"))
+	cfg.Langfuse.PublicKey = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Langfuse.PublicKey)), os.Getenv("LANGFUSE_PUBLIC_KEY"))
+	cfg.Langfuse.SecretKey = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Langfuse.SecretKey)), os.Getenv("LANGFUSE_SECRET_KEY"))
+	return cfg, nil
+}
+
+func resolveLLMObservabilityBackend(value string) string {
+	value = strings.ToLower(strings.TrimSpace(os.ExpandEnv(value)))
+	if value == "" {
+		value = strings.ToLower(strings.TrimSpace(firstNonEmpty(os.Getenv("LLM_OBSERVABILITY_BACKEND"), os.Getenv("LLM_OBS_BACKEND"), os.Getenv("AGENTS_IM_LLM_OBSERVABILITY_BACKEND"))))
+	}
+	switch value {
+	case LLMObservabilityBackendLangfuse:
+		return LLMObservabilityBackendLangfuse
+	case LLMObservabilityBackendMemory:
+		return LLMObservabilityBackendMemory
+	case LLMObservabilityBackendTest:
+		return LLMObservabilityBackendTest
+	default:
+		return LLMObservabilityBackendNoop
+	}
+}
+
 func ResolveObjectStorageConfig(cfg ObjectStorageConfig, storageDriver string) (ObjectStorageConfig, error) {
 	driver := strings.ToLower(strings.TrimSpace(os.ExpandEnv(cfg.Driver)))
 	if driver == "" {
@@ -929,6 +1006,38 @@ func deepSeekConfigFromValues(values map[string]string) DeepSeekConfig {
 		Model:   firstNonEmpty(values["DeepSeek.Model"], values["DeepSeekModel"]),
 	}
 	return ResolveDeepSeekConfig(cfg)
+}
+
+func llmObservabilityConfigFromValues(values map[string]string) (LLMObservabilityConfig, error) {
+	cfg := DefaultLLMObservabilityConfig()
+	if value := firstNonEmpty(values["LLMObservability.Enabled"], values["LLMObs.Enabled"]); strings.TrimSpace(value) != "" {
+		enabled, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Enabled = enabled
+	}
+	cfg.Backend = firstNonEmpty(values["LLMObservability.Backend"], values["LLMObs.Backend"], cfg.Backend)
+	if value := firstNonEmpty(values["LLMObservability.CaptureOutput"], values["LLMObs.CaptureOutput"]); strings.TrimSpace(value) != "" {
+		captureOutput, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.CaptureOutput = captureOutput
+	}
+	if value := firstNonEmpty(values["LLMObservability.MaxOutputBytes"], values["LLMObs.MaxOutputBytes"]); strings.TrimSpace(value) != "" {
+		maxOutputBytes, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.MaxOutputBytes = maxOutputBytes
+	}
+	cfg.Langfuse = LangfuseObservabilityConfig{
+		Host:      firstNonEmpty(values["LLMObservability.Langfuse.Host"], values["LLMObs.Langfuse.Host"], values["Langfuse.Host"]),
+		PublicKey: firstNonEmpty(values["LLMObservability.Langfuse.PublicKey"], values["LLMObs.Langfuse.PublicKey"], values["Langfuse.PublicKey"]),
+		SecretKey: firstNonEmpty(values["LLMObservability.Langfuse.SecretKey"], values["LLMObs.Langfuse.SecretKey"], values["Langfuse.SecretKey"]),
+	}
+	return ResolveLLMObservabilityConfig(cfg)
 }
 
 func objectStorageConfigFromValues(values map[string]string, storageDriver string) (ObjectStorageConfig, error) {
