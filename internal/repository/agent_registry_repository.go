@@ -9,6 +9,7 @@ import (
 type AgentRegistryRepository interface {
 	CreatePrompt(ctx context.Context, prompt model.AgentPrompt) (model.AgentPrompt, error)
 	GetPrompt(ctx context.Context, promptID string) (model.AgentPrompt, error)
+	GetPromptByNameVersion(ctx context.Context, name string, version string) (model.AgentPrompt, error)
 	BindPrompt(ctx context.Context, binding model.AgentPromptBinding) (model.AgentPromptBinding, bool, error)
 
 	CreateMCPServer(ctx context.Context, server model.AgentMCPServer) (model.AgentMCPServer, error)
