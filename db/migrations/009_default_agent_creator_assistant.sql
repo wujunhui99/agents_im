@@ -15,8 +15,8 @@ set identifier = 'agent_creator_legacy_' || account_id,
 where identifier = 'agent_father'
   and exists (select 1 from accounts where identifier = 'agent_creator');
 
-insert into accounts (account_id, identifier, account_type)
-select '900000000000000077', 'agent_creator', 2
+insert into accounts (account_id, identifier, account_type, display_name)
+select '900000000000000077', 'agent_creator', 2, 'AI 助手'
 where not exists (select 1 from accounts where identifier = 'agent_creator')
 on conflict (account_id) do nothing;
 
