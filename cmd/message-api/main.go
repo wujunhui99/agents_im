@@ -70,12 +70,46 @@ func main() {
 	if err := messagesvc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek, cfg.LLMObservability); err != nil {
 		log.Fatalf("configure AI conversation hosting: %v", err)
 	}
-	adminContext := adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
-		Accounts:    accountRepo,
-		Friends:     accountRepo,
-		Messages:    messageRepo,
-		AgentAudits: agentAuditRepo,
-	}, cfg.Auth)
+	var adminContext *adminsvc.ServiceContext
+	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
+		postgresAccountRepo, ok := accountRepo.(*repository.PostgresRepository)
+		if !ok {
+			log.Fatalf("postgres account repository has unexpected type %T", accountRepo)
+		}
+		postgresMessageRepo, ok := messageRepo.(*repository.PostgresMessageRepository)
+		if !ok {
+			log.Fatalf("postgres message repository has unexpected type %T", messageRepo)
+		}
+		postgresAgentAuditRepo, ok := agentAuditRepo.(*repository.PostgresAgentAuditRepository)
+		if !ok {
+			log.Fatalf("postgres agent audit repository has unexpected type %T", agentAuditRepo)
+		}
+		adminContext = adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
+			Accounts:    postgresAccountRepo,
+			Friends:     postgresAccountRepo,
+			Messages:    postgresMessageRepo,
+			AgentAudits: postgresAgentAuditRepo,
+		}, cfg.Auth)
+	} else {
+		memoryAccountRepo, ok := accountRepo.(*repository.MemoryRepository)
+		if !ok {
+			log.Fatalf("memory account repository has unexpected type %T", accountRepo)
+		}
+		memoryMessageRepo, ok := messageRepo.(*repository.MemoryMessageRepository)
+		if !ok {
+			log.Fatalf("memory message repository has unexpected type %T", messageRepo)
+		}
+		memoryAgentAuditRepo, ok := agentAuditRepo.(*repository.MemoryAgentAuditRepository)
+		if !ok {
+			log.Fatalf("memory agent audit repository has unexpected type %T", agentAuditRepo)
+		}
+		adminContext = adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
+			Accounts:    memoryAccountRepo,
+			Friends:     memoryAccountRepo,
+			Messages:    memoryMessageRepo,
+			AgentAudits: memoryAgentAuditRepo,
+		}, cfg.Auth)
+	}
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
 		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 		if err != nil {
