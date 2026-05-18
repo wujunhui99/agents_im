@@ -7,5 +7,6 @@ Auth:
 StorageDriver: memory
 DataSource: ${DATABASE_URL}
 MailRPC:
-  Endpoints: 127.0.0.1:9095
+  Endpoints:
+    - 127.0.0.1:9095
   Timeout: 5000
