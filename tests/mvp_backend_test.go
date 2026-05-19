@@ -233,6 +233,7 @@ func TestMVPBackendWebSocketSendPullMarkReadSmoke(t *testing.T) {
 	defer senderConn.Close()
 	receiverConn := dialGatewayWS(t, server.URL, "usr_mvp_ws_receiver")
 	defer receiverConn.Close()
+	syncGatewayWSConnection(t, receiverConn, "mvp-ws-receiver-ready")
 
 	writeCommand(t, senderConn, map[string]interface{}{
 		"requestId": "mvp-ws-send",
