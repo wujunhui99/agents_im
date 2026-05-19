@@ -81,6 +81,10 @@ func (r *PostgresRepository) TryStartAgentTrigger(ctx context.Context, input Age
 	if err != nil {
 		return false, err
 	}
+	runningTTLMillis := input.RunningTTL.Milliseconds()
+	if runningTTLMillis < 1 {
+		runningTTLMillis = 1
+	}
 
 	var started bool
 	err = r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
@@ -113,9 +117,13 @@ set conversation_id = $2,
     response_server_msg_id = '',
     error_message = '',
     updated_at = now()
-where idempotency_key = $1 and status = $7
+where idempotency_key = $1
+  and (
+    status = $7
+    or (status = $8 and updated_at <= now() - ($9 * interval '1 millisecond'))
+  )
 `, input.IdempotencyKey, input.ConversationID, input.AgentAccountID, input.TriggerServerMsgID,
-			input.TriggerEventID, AgentTriggerStatusRunning, AgentTriggerStatusFailed)
+			input.TriggerEventID, AgentTriggerStatusRunning, AgentTriggerStatusFailed, AgentTriggerStatusRunning, runningTTLMillis)
 		if err != nil {
 			return err
 		}
