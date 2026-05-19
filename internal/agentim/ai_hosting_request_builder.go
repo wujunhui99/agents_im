@@ -8,6 +8,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/internal/llmobs"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
@@ -128,6 +129,7 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 		},
 		Conversation: conversation,
 		Metadata: map[string]string{
+			"runtime_mode":         llmobs.RuntimeModeAIHostingAutoReply,
 			"summary_used":         "false",
 			"summary_placeholder":  "true",
 			"recent_message_count": strconv.Itoa(len(conversation)),

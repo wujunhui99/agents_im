@@ -4,6 +4,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	einoruntime "github.com/wujunhui99/agents_im/internal/agentruntime/eino"
 	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/internal/llmobs"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
@@ -18,6 +19,7 @@ type ServiceContext struct {
 	MediaRepo        repository.MediaRepository
 	AgentHostingRepo repository.AgentConversationHostingRepository
 	AIHostingRepo    repository.ConversationAIHostingRepository
+	GroupMembers     logic.GroupMemberLister
 	OutboxRepo       repository.OutboxRepository
 	AgentAuditLogic  *logic.AgentAuditLogic
 	AgentAuditRepo   repository.AgentAuditRepository
@@ -47,13 +49,14 @@ func NewServiceContextWithMedia(repo repository.MessageRepository, mediaRepo rep
 		MediaRepo:        mediaRepo,
 		AgentHostingRepo: agentHostingRepo,
 		AIHostingRepo:    aiHostingRepo,
+		GroupMembers:     groups,
 		OutboxRepo:       outboxRepositoryFromMessageRepo(repo),
 		AgentAuditLogic:  logic.NewAgentAuditLogic(agentAuditRepo),
 		AgentAuditRepo:   agentAuditRepo,
 	}
 }
 
-func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSeekConfig) error {
+func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSeekConfig, obs config.LLMObservabilityConfig) error {
 	if ctx == nil || ctx.MessageLogic == nil || ctx.MessageRepo == nil {
 		return nil
 	}
@@ -76,16 +79,22 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 	if err != nil {
 		return err
 	}
+	llmObsConfig := llmObservabilityConfig(obs)
+	llmObsSink, err := llmobs.NewSink(llmObsConfig)
+	if err != nil {
+		return err
+	}
 	orchestrator, err := agentim.NewAgentRunOrchestrator(agentim.AgentRunOrchestratorConfig{
-		Runtime: einoruntime.NewDeepSeekRuntime(deepSeek),
+		Runtime: einoruntime.NewDeepSeekRuntime(deepSeek, einoruntime.WithLLMObservability(llmObsSink, llmObsConfig)),
 		RequestBuilder: agentim.NewConversationAIHostingRuntimeRequestBuilder(agentim.ConversationAIHostingRuntimeRequestBuilderConfig{
 			MessageRepository: ctx.MessageRepo,
 			HostingRepository: ctx.AIHostingRepo,
 			DeepSeek:          deepSeek,
 			MaxRecentMessages: 30,
 		}),
-		Audit:  ctx.AgentAuditLogic,
-		Writer: writer,
+		Audit:                ctx.AgentAuditLogic,
+		Writer:               writer,
+		LLMObservabilitySink: llmObsSink,
 	})
 	if err != nil {
 		return err
@@ -94,12 +103,27 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 		Repository:          ctx.AgentHostingRepo,
 		AIHostingRepository: ctx.AIHostingRepo,
 		Runner:              orchestrator,
+		GroupMembers:        ctx.GroupMembers,
 	})
 	if err != nil {
 		return err
 	}
 	ctx.MessageLogic.SetMessageCreatedHook(hosting)
 	return nil
+}
+
+func llmObservabilityConfig(obs config.LLMObservabilityConfig) llmobs.Config {
+	return llmobs.Config{
+		Enabled:        obs.Enabled,
+		Backend:        obs.Backend,
+		CaptureOutput:  obs.CaptureOutput,
+		MaxOutputBytes: obs.MaxOutputBytes,
+		Langfuse: llmobs.LangfuseConfig{
+			Host:      obs.Langfuse.Host,
+			PublicKey: obs.Langfuse.PublicKey,
+			SecretKey: obs.Langfuse.SecretKey,
+		},
+	}
 }
 
 func outboxRepositoryFromMessageRepo(repo repository.MessageRepository) repository.OutboxRepository {

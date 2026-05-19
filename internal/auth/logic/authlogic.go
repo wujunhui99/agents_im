@@ -210,7 +210,7 @@ func (l *AuthLogic) RequestRegistrationEmailCode(ctx context.Context, req Regist
 		return RegistrationEmailCodeResponse{}, apperror.Internal("email verification repository is required")
 	}
 	if l.mailer == nil {
-		return RegistrationEmailCodeResponse{}, apperror.Internal("mail rpc client is required")
+		return RegistrationEmailCodeResponse{}, apperror.ServiceUnavailable("mail service is not configured")
 	}
 	email, err := normalizeEmail(req.Email)
 	if err != nil {
@@ -255,7 +255,7 @@ func (l *AuthLogic) RequestRegistrationEmailCode(ctx context.Context, req Regist
 		IdempotencyKey: "auth-register-email-code-" + tokenID,
 	}); err != nil {
 		logx.WithContext(ctx).Errorf("send registration verification email failed: %v", err)
-		return RegistrationEmailCodeResponse{}, apperror.Internal("send registration verification email failed")
+		return RegistrationEmailCodeResponse{}, apperror.ServiceUnavailable("mail service is unavailable")
 	}
 
 	if _, err := l.verificationRepo.CreateEmailVerification(ctx, model.EmailVerificationToken{

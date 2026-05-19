@@ -69,6 +69,7 @@ type ConversationHostingConfig struct {
 	AIHostingRepository  repository.ConversationAIHostingRepository
 	Runner               AgentTriggerRunner
 	AgentAccountResolver AgentAccountResolver
+	GroupMembers         logic.GroupMemberLister
 	ReadMarker           AgentTriggerReadMarker
 	TriggerPolicy        TriggerPolicy
 	RunTimeout           time.Duration
@@ -79,6 +80,7 @@ type ConversationHostingService struct {
 	aiHostingRepo repository.ConversationAIHostingRepository
 	runner        AgentTriggerRunner
 	agentResolver AgentAccountResolver
+	groupMembers  logic.GroupMemberLister
 	readMarker    AgentTriggerReadMarker
 	policy        TriggerPolicy
 	runTimeout    time.Duration
@@ -114,6 +116,7 @@ func NewConversationHostingService(config ConversationHostingConfig) (*Conversat
 		aiHostingRepo: config.AIHostingRepository,
 		runner:        config.Runner,
 		agentResolver: config.AgentAccountResolver,
+		groupMembers:  config.GroupMembers,
 		readMarker:    config.ReadMarker,
 		policy:        config.TriggerPolicy,
 		runTimeout:    runTimeout,
@@ -241,6 +244,10 @@ func (s *ConversationHostingService) targetAgentAccountIDs(ctx context.Context, 
 }
 
 func (s *ConversationHostingService) acceptAndScheduleTrigger(ctx context.Context, trigger AgentTrigger) (bool, error) {
+	if err := s.validateTriggerAuthorization(ctx, trigger); err != nil {
+		return s.recordRejectedTrigger(ctx, trigger, err)
+	}
+
 	started, err := s.repo.TryStartAgentTrigger(ctx, repository.AgentTriggerStartInput{
 		IdempotencyKey:     trigger.RequestID,
 		ConversationID:     trigger.ConversationID,
@@ -269,6 +276,56 @@ func (s *ConversationHostingService) acceptAndScheduleTrigger(ctx context.Contex
 
 	s.runAcceptedTriggerAsync(trigger)
 	return true, nil
+}
+
+func (s *ConversationHostingService) validateTriggerAuthorization(ctx context.Context, trigger AgentTrigger) error {
+	if trigger.ConversationType != ConversationTypeGroup {
+		return nil
+	}
+	if s.groupMembers == nil {
+		return apperror.Internal("group membership validator is not configured")
+	}
+	groupID, err := groupConversationID(trigger.ConversationID)
+	if err != nil {
+		return err
+	}
+	members, err := s.groupMembers.ListMembers(ctx, logic.ListMembersRequest{
+		GroupID:         groupID,
+		RequesterUserID: trigger.RequestingUserID,
+	})
+	if err != nil {
+		return err
+	}
+	for _, member := range members.Members {
+		if strings.TrimSpace(member.UserID) == trigger.AgentUserID && (member.State == "" || member.State == "active") {
+			return nil
+		}
+	}
+	return apperror.Forbidden("target agent is not an active group member")
+}
+
+func (s *ConversationHostingService) recordRejectedTrigger(ctx context.Context, trigger AgentTrigger, cause error) (bool, error) {
+	started, err := s.repo.TryStartAgentTrigger(ctx, repository.AgentTriggerStartInput{
+		IdempotencyKey:     trigger.RequestID,
+		ConversationID:     trigger.ConversationID,
+		AgentAccountID:     trigger.AgentUserID,
+		TriggerServerMsgID: trigger.TriggerMessageID,
+		TriggerEventID:     trigger.EventID,
+	})
+	if err != nil {
+		return false, err
+	}
+	if !started {
+		return false, nil
+	}
+	if err := s.repo.FinishAgentTrigger(ctx, repository.AgentTriggerFinishInput{
+		IdempotencyKey: trigger.RequestID,
+		Status:         repository.AgentTriggerStatusFailed,
+		ErrorMessage:   cause.Error(),
+	}); err != nil {
+		return false, errors.Join(cause, fmt.Errorf("record rejected agent trigger: %w", err))
+	}
+	return false, nil
 }
 
 func (s *ConversationHostingService) markTriggerRead(ctx context.Context, trigger AgentTrigger) error {

@@ -25,6 +25,8 @@ func ToStatus(err error) error {
 		return status.Error(codes.AlreadyExists, appErr.Message)
 	case apperror.CodeRateLimited:
 		return status.Error(codes.ResourceExhausted, appErr.Message)
+	case apperror.CodeServiceUnavailable:
+		return status.Error(codes.Unavailable, appErr.Message)
 	default:
 		return status.Error(codes.Internal, appErr.Message)
 	}

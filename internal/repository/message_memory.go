@@ -371,6 +371,54 @@ func (r *MemoryMessageRepository) GetConversationSeqStates(_ context.Context, us
 	return states, nil
 }
 
+func (r *MemoryMessageRepository) CountMessages(_ context.Context) (int64, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var count int64
+	for _, conversation := range r.conversations {
+		count += int64(len(conversation.messages))
+	}
+	return count, nil
+}
+
+func (r *MemoryMessageRepository) CountConversations(_ context.Context) (int64, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return int64(len(r.conversations)), nil
+}
+
+func (r *MemoryMessageRepository) ListRecentConversationStates(_ context.Context, limit int) ([]ConversationSeqState, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	limit = normalizeAdminLimit(limit, 10, 100)
+	states := make([]ConversationSeqState, 0, len(r.conversations))
+	for _, conversation := range r.conversations {
+		state := ConversationSeqState{
+			ConversationID: conversation.conversationID,
+			MaxSeq:         conversation.maxSeq,
+			MaxSeqTime:     conversation.maxSeqTime,
+		}
+		if conversation.lastMessage != nil {
+			lastMessage := conversation.lastMessage.Clone()
+			state.LastMessage = &lastMessage
+		}
+		states = append(states, state.Clone())
+	}
+	sort.Slice(states, func(i int, j int) bool {
+		if states[i].MaxSeqTime == states[j].MaxSeqTime {
+			return states[i].ConversationID < states[j].ConversationID
+		}
+		return states[i].MaxSeqTime > states[j].MaxSeqTime
+	})
+	if len(states) > limit {
+		states = states[:limit]
+	}
+	return states, nil
+}
+
 func (r *MemoryMessageRepository) SetUserHasReadSeqMax(_ context.Context, userID, conversationID string, seq int64) (ConversationSeqState, bool, error) {
 	if seq < 0 {
 		return ConversationSeqState{}, false, apperror.InvalidArgument("has_read_seq must be greater than or equal to 0")

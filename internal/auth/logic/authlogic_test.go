@@ -105,8 +105,8 @@ func TestRegistrationEmailCodeRequestFailsClosedWhenMailUnavailable(t *testing.T
 	_, err := authLogic.RequestRegistrationEmailCode(ctx, RegistrationEmailCodeRequest{
 		Email: "bob@example.com",
 	})
-	if err == nil || apperror.From(err).Code != apperror.CodeInternal {
-		t.Fatalf("mail unavailable error = %v, want INTERNAL", err)
+	if err == nil || apperror.From(err).Code != apperror.CodeServiceUnavailable {
+		t.Fatalf("mail unavailable error = %v, want SERVICE_UNAVAILABLE", err)
 	}
 
 	_, err = authLogic.Register(ctx, RegisterRequest{
@@ -118,6 +118,34 @@ func TestRegistrationEmailCodeRequestFailsClosedWhenMailUnavailable(t *testing.T
 	})
 	if err == nil || apperror.From(err).Code != apperror.CodeInvalidArgument {
 		t.Fatalf("register after failed send error = %v, want INVALID_ARGUMENT", err)
+	}
+}
+
+func TestRegistrationEmailCodeRequestRequiresMailerAndDoesNotPersistToken(t *testing.T) {
+	ctx := context.Background()
+	repo := authrepo.NewMemoryRepository()
+	authLogic := NewAuthLogicWithOptions(
+		repo,
+		newAuthProfileClient(),
+		NewPasswordHasher(),
+		token.NewHMACTokenManager("unit-test-secret", time.Hour),
+		AuthOptions{
+			VerificationRepo:          repo,
+			RegistrationCodeGenerator: fixedRegistrationCode("135790"),
+			Clock:                     func() time.Time { return time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC) },
+		},
+	)
+
+	_, err := authLogic.RequestRegistrationEmailCode(ctx, RegistrationEmailCodeRequest{
+		Email: "missing-mailer@example.com",
+	})
+	if err == nil || apperror.From(err).Code != apperror.CodeServiceUnavailable {
+		t.Fatalf("missing mailer error = %v, want SERVICE_UNAVAILABLE", err)
+	}
+
+	_, err = repo.LatestEmailVerification(ctx, "register", "missing-mailer@example.com")
+	if err == nil || apperror.From(err).Code != apperror.CodeNotFound {
+		t.Fatalf("verification token after missing mailer = %v, want NOT_FOUND", err)
 	}
 }
 

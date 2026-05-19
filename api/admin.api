@@ -1,0 +1,280 @@
+syntax = "v1"
+
+info (
+	title:   "Admin API"
+	desc:    "Read-only operator console API served by message-api under /admin."
+	author:  "Codex"
+	version: "v0.1.0"
+)
+
+type AdminDashboardReq {
+	Limit int64 `form:"limit,optional"`
+}
+
+type AdminConversationMessagesReq {
+	ConversationID string `path:"conversation_id"`
+	FromSeq        int64  `form:"fromSeq,optional"`
+	ToSeq          int64  `form:"toSeq,optional"`
+	Limit          int64  `form:"limit,optional"`
+	Order          string `form:"order,optional"`
+}
+
+type AdminUserSearchReq {
+	Query string `form:"query,optional"`
+	Limit int64  `form:"limit,optional"`
+}
+
+type AdminUserReq {
+	AccountID string `path:"account_id"`
+}
+
+type AdminLLMTraceListReq {
+	Status string `form:"status,optional"`
+	Limit  int64  `form:"limit,optional"`
+	Offset int64  `form:"offset,optional"`
+}
+
+type AdminLLMTraceReq {
+	TraceID string `path:"trace_id"`
+}
+
+type AdminDashboardTotals {
+	Users         int64 `json:"users"`
+	Conversations int64 `json:"conversations"`
+	Messages      int64 `json:"messages"`
+	AIRuns        int64 `json:"aiRuns"`
+	FailedAIRuns  int64 `json:"failedAiRuns"`
+}
+
+type AdminMessage {
+	ServerMsgID           string `json:"serverMsgId"`
+	ClientMsgID           string `json:"clientMsgId"`
+	ConversationID        string `json:"conversationId"`
+	Seq                   int64  `json:"seq"`
+	SenderID              string `json:"senderId"`
+	ReceiverID            string `json:"receiverId,optional"`
+	GroupID               string `json:"groupId,optional"`
+	ChatType              string `json:"chatType"`
+	ContentType           string `json:"contentType"`
+	Content               string `json:"content"`
+	MessageOrigin         string `json:"messageOrigin"`
+	AgentAccountID        string `json:"agentAccountId,optional"`
+	TriggerServerMsgID    string `json:"triggerServerMsgId,optional"`
+	AgentRunID            string `json:"agentRunId,optional"`
+	AllowRecursiveTrigger bool   `json:"allowRecursiveTrigger,optional"`
+	SendTime              int64  `json:"sendTime"`
+	CreatedAt             int64  `json:"createdAt"`
+}
+
+type AdminConversation {
+	ConversationID string       `json:"conversationId"`
+	MaxSeq         int64        `json:"maxSeq"`
+	HasReadSeq     int64        `json:"hasReadSeq,optional"`
+	UnreadCount    int64        `json:"unreadCount,optional"`
+	MaxSeqTime     int64        `json:"maxSeqTime,optional"`
+	LastMessage    AdminMessage `json:"lastMessage,optional"`
+}
+
+type AdminUser {
+	UserID        string `json:"userId"`
+	AccountID     string `json:"accountId,optional"`
+	Identifier    string `json:"identifier"`
+	DisplayName   string `json:"displayName"`
+	Name          string `json:"name"`
+	Gender        string `json:"gender"`
+	BirthDate     string `json:"birthDate"`
+	Region        string `json:"region"`
+	AccountType   string `json:"accountType"`
+	AvatarMediaID string `json:"avatarMediaId,optional"`
+	AvatarURL     string `json:"avatarUrl,optional"`
+	CreatedAt     string `json:"createdAt"`
+	UpdatedAt     string `json:"updatedAt"`
+}
+
+type AdminFriend {
+	UserID    string    `json:"userId"`
+	FriendID  string    `json:"friendId"`
+	Status    string    `json:"status"`
+	IsFriend  bool      `json:"isFriend"`
+	Friend    AdminUser `json:"friend,optional"`
+	CreatedAt string    `json:"createdAt"`
+	UpdatedAt string    `json:"updatedAt"`
+}
+
+type AdminLLMTrace {
+	TraceID           string `json:"traceId"`
+	RunID             string `json:"runId"`
+	AgentID           string `json:"agentId"`
+	ConversationID    string `json:"conversationId,optional"`
+	TriggerMessageID  string `json:"triggerMessageId,optional"`
+	ResponseMessageID string `json:"responseMessageId,optional"`
+	RequestingUserID  string `json:"requestingUserId,optional"`
+	Status            string `json:"status"`
+	Provider          string `json:"provider,optional"`
+	Model             string `json:"model,optional"`
+	PromptHash        string `json:"promptHash,optional"`
+	PromptVersion     string `json:"promptVersion,optional"`
+	LatencyMs         int64  `json:"latencyMs,optional"`
+	TotalTokens       int64  `json:"totalTokens,optional"`
+	ErrorCode         string `json:"errorCode,optional"`
+	ErrorMessage      string `json:"errorMessage,optional"`
+	StartedAt         string `json:"startedAt,optional"`
+	FinishedAt        string `json:"finishedAt,optional"`
+	CreatedAt         string `json:"createdAt,optional"`
+}
+
+type AdminAgentToolCall {
+	ToolCallID   string `json:"toolCallId"`
+	RunID        string `json:"runId"`
+	ToolName     string `json:"toolName"`
+	Status       string `json:"status"`
+	DurationMs   int64  `json:"durationMs,optional"`
+	ErrorCode    string `json:"errorCode,optional"`
+	ErrorMessage string `json:"errorMessage,optional"`
+	StartedAt    string `json:"startedAt,optional"`
+	FinishedAt   string `json:"finishedAt,optional"`
+	CreatedAt    string `json:"createdAt,optional"`
+}
+
+type AdminAgentFileRead {
+	FileReadID   string `json:"fileReadId"`
+	RunID        string `json:"runId"`
+	SkillID      string `json:"skillId,optional"`
+	FileID       string `json:"fileId,optional"`
+	Status       string `json:"status"`
+	ByteCount    int64  `json:"byteCount,optional"`
+	ErrorCode    string `json:"errorCode,optional"`
+	ErrorMessage string `json:"errorMessage,optional"`
+	StartedAt    string `json:"startedAt,optional"`
+	FinishedAt   string `json:"finishedAt,optional"`
+	CreatedAt    string `json:"createdAt,optional"`
+}
+
+type AdminAgentPythonExec {
+	PythonExecID string `json:"pythonExecId"`
+	RunID        string `json:"runId"`
+	Status       string `json:"status"`
+	ErrorCode    string `json:"errorCode,optional"`
+	ErrorMessage string `json:"errorMessage,optional"`
+	StartedAt    string `json:"startedAt,optional"`
+	FinishedAt   string `json:"finishedAt,optional"`
+	CreatedAt    string `json:"createdAt,optional"`
+}
+
+type AdminDashboardData {
+	Totals              AdminDashboardTotals `json:"totals"`
+	RecentTraces        []AdminLLMTrace      `json:"recentTraces"`
+	RecentConversations []AdminConversation  `json:"recentConversations"`
+}
+
+type AdminConversationMessagesData {
+	ConversationID string         `json:"conversationId"`
+	Messages       []AdminMessage `json:"messages"`
+	IsEnd          bool           `json:"isEnd"`
+	NextSeq        int64          `json:"nextSeq"`
+}
+
+type AdminUserSearchData {
+	Users []AdminUser `json:"users"`
+}
+
+type AdminUserDetailData {
+	User AdminUser `json:"user"`
+}
+
+type AdminUserFriendsData {
+	Friends []AdminFriend `json:"friends"`
+}
+
+type AdminUserConversationsData {
+	Conversations []AdminConversation `json:"conversations"`
+}
+
+type AdminLLMTraceListData {
+	Traces []AdminLLMTrace `json:"traces"`
+}
+
+type AdminLLMTraceDetailData {
+	Trace       AdminLLMTrace        `json:"trace"`
+	ToolCalls   []AdminAgentToolCall `json:"toolCalls"`
+	FileReads   []AdminAgentFileRead `json:"fileReads"`
+	PythonExecs []AdminAgentPythonExec `json:"pythonExecs"`
+}
+
+type AdminDashboardResp {
+	Code    string             `json:"code"`
+	Message string             `json:"message"`
+	Data    AdminDashboardData `json:"data"`
+}
+
+type AdminConversationMessagesResp {
+	Code    string                        `json:"code"`
+	Message string                        `json:"message"`
+	Data    AdminConversationMessagesData `json:"data"`
+}
+
+type AdminUserSearchResp {
+	Code    string              `json:"code"`
+	Message string              `json:"message"`
+	Data    AdminUserSearchData `json:"data"`
+}
+
+type AdminUserDetailResp {
+	Code    string              `json:"code"`
+	Message string              `json:"message"`
+	Data    AdminUserDetailData `json:"data"`
+}
+
+type AdminUserFriendsResp {
+	Code    string               `json:"code"`
+	Message string               `json:"message"`
+	Data    AdminUserFriendsData `json:"data"`
+}
+
+type AdminUserConversationsResp {
+	Code    string                     `json:"code"`
+	Message string                     `json:"message"`
+	Data    AdminUserConversationsData `json:"data"`
+}
+
+type AdminLLMTraceListResp {
+	Code    string                `json:"code"`
+	Message string                `json:"message"`
+	Data    AdminLLMTraceListData `json:"data"`
+}
+
+type AdminLLMTraceDetailResp {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    AdminLLMTraceDetailData `json:"data"`
+}
+
+@server (
+	jwt:   Auth
+	group: admin
+)
+service admin-api {
+	@handler adminDashboard
+	get /admin/dashboard (AdminDashboardReq) returns (AdminDashboardResp)
+
+	@handler adminListLLMTraces
+	get /admin/llm-traces (AdminLLMTraceListReq) returns (AdminLLMTraceListResp)
+
+	@handler adminGetLLMTrace
+	get /admin/llm-traces/:trace_id (AdminLLMTraceReq) returns (AdminLLMTraceDetailResp)
+
+	@handler adminGetConversationMessages
+	get /admin/conversations/:conversation_id/messages (AdminConversationMessagesReq) returns (AdminConversationMessagesResp)
+
+	@handler adminSearchUsers
+	get /admin/users (AdminUserSearchReq) returns (AdminUserSearchResp)
+
+	@handler adminGetUser
+	get /admin/users/:account_id (AdminUserReq) returns (AdminUserDetailResp)
+
+	@handler adminGetUserFriends
+	get /admin/users/:account_id/friends (AdminUserReq) returns (AdminUserFriendsResp)
+
+	@handler adminGetUserConversations
+	get /admin/users/:account_id/conversations (AdminUserReq) returns (AdminUserConversationsResp)
+}

@@ -128,19 +128,17 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 
 ## CI Checks
 
-CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从 `main` 发布。GitHub Actions workflow 位于 `.github/workflows/ci.yml`，PR/MR 合入 `develop` 前必须通过默认 backend verification。当前 CI checks 包括：
+CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从 `main` 发布。当前仓库使用 Drone，pipeline 位于 `.drone.yml`；PR/MR 合入 `develop` 前必须通过默认 backend verification。当前 CI checks 包括：
 
-- `Detect changed areas` 先判断变更范围；docs-only / web-only 可跳过 backend 和 PostgreSQL integration，CI/workflow/scripts/backend/db 相关变更默认运行完整门禁。
-- `actions/checkout` 拉取仓库代码。
-- `actions/setup-go` 按 `go.mod` 配置 Go；Go module/build cache 由显式 `actions/cache/restore` / `actions/cache/save` 管理，详见 [`docs/references/github-actions-go-cache.md`](./references/github-actions-go-cache.md)。
-- `go mod download` 显式下载/校验 Go modules 并打印耗时。
+- `backend-verification` pipeline 安装固定版本 Go/go-zero/protobuf 工具。
+- `goctl api validate -api api/*.api` 验证 go-zero API spec。
 - `gofmt` check，发现未格式化 Go 文件即失败。
-- `go test -json` 运行过滤后的 Go package 列表，排除 `web/node_modules`，并输出耗时、cache size 和最慢 package 汇总；默认不设置 PostgreSQL DSN，确保普通测试不依赖真实 PG。
-- `bash scripts/verify-static.sh`，检查仓库关键文件、接口、文档和 CI workflow 约束。
+- `go test ./...` 运行普通 Go 测试；默认不设置 PostgreSQL DSN，确保普通测试不依赖真实 PG。
+- `bash scripts/verify-static.sh`，检查仓库关键文件、接口、文档和 Drone workflow 约束。
 - `docker compose config`，验证 Compose 配置可解析。
 - Markdown link check，排除 `docs/references/` 和 `.ai-context/`，并忽略外部 HTTP/HTTPS 链接波动。
 
-CI 还包含独立 PostgreSQL integration job。该 job 使用 GitHub Actions `postgres:16-alpine` service，restore Go cache 但不保存 cache，设置 `DATABASE_URL`，执行 `bash scripts/migrate-postgres.sh --host-psql` 后运行：
+CI 还包含独立 PostgreSQL integration pipeline。该 pipeline 使用 Drone `postgres:16-alpine` service，设置 `DATABASE_URL` 指向该隔离 service，执行 `bash scripts/migrate-postgres.sh --host-psql` 后运行：
 
 ```bash
 go test -tags=integration ./tests
@@ -168,29 +166,28 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 
 ## CD / Deployment
 
-生产发布由 `.github/workflows/deploy.yml` 负责。该 workflow 在 `main` 分支 push 后自动触发，也可通过 GitHub Actions `workflow_dispatch` 手动触发。所有 build/deploy job 都带有 `github.ref == 'refs/heads/main'` 防线；如果手动触发选择了非 `main` ref，workflow 只会 no-op，不会 SSH 到服务器。发布链路为：
+生产发布由 `.drone.yml` 中的 `deploy-main` pipeline 负责。该 pipeline 只在 `main` 分支 push 后自动触发。发布链路为：
 
-1. `detect-changes` job 先判断本次变更类型，并输出 `build_required`、`deploy_required`、`config_only`、`backend_services`、`web_required`、`image_services` 和 `rollout_services`：
-   - `workflow_dispatch` on `main`：完整构建和部署，保持手动发布语义。
-   - `workflow_dispatch` on non-`main`：no-op，禁止部署。
-   - `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh`、`.github/workflows/deploy.yml`：config-only deploy，不构建镜像。
+1. `detect changes` step 先判断本次变更类型，并输出 `build_required`、`deploy_required`、`config_only`、`backend_services`、`web_required`、`image_services` 和 `rollout_services`：
+   - `main` push：按变更范围选择性构建/部署。
+   - 非 `main` 分支：不进入 deploy pipeline。
+   - `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh`、`.drone.yml`、`scripts/ci/**`：config-only deploy，不构建镜像。
    - `docs/**`、`README.md`、其他 Markdown：不部署。
    - `web/**`：只构建和部署 `web`。
    - `cmd/<service>/**`、`api/<domain>.api`：只构建和部署对应服务。
    - `proto/**`、`go.mod`、`go.sum`、`Dockerfile`、`.dockerignore`、`internal/**`、`db/**`、`scripts/migrate-postgres.sh`：构建并部署全部后端服务；只有同时修改 web-owned 路径时才构建 `web`。
    - 其他非文档文件：fail-safe 为全部后端服务，避免漏构建。
-2. `build-backend` job 在 `backend_services` 非空时按动态服务矩阵构建并推送后端镜像到 GHCR，服务包括 `user-api`、`auth-api`、`friends-api`、`message-api`、`gateway-ws`、`groups-api`、`agent-api`、`message-transfer` 以及各 RPC 服务。
-3. `build-web` job 仅在 `web_required=true` 时构建并推送 web 镜像到 GHCR。
-4. `deploy` job 使用 `SERVER_*` secrets 通过 SSH 连接服务器，将仓库部署文件同步到 `/opt/agents-im/repo`，并以当前 commit SHA 作为 `IMAGE_TAG` 执行 `scripts/deploy-k3s.sh`。选择性发布会传入 `IMAGE_SERVICES`，只对已构建服务执行 `kubectl set image`，并只等待受影响服务 rollout。
+2. `build images` step 在 `image_services` 非空时构建并推送后端/web 镜像到 GHCR；后端镜像使用 Dockerfile `backend` target 和 `SERVICE=<service>` build arg。
+3. `deploy` step 使用 Drone `deploy_ssh_*` secrets 通过 SSH 连接服务器，将仓库部署文件同步到 `/opt/agents-im/repo`，并以当前 commit SHA 作为 `IMAGE_TAG` 执行 `scripts/deploy-k3s.sh`。选择性发布会传入 `IMAGE_SERVICES`，只对已构建服务执行 `kubectl set image`，并只等待受影响服务 rollout。
 
 生产拓扑采用混合单机部署：
 
 - k3s 管理应用工作负载：Go API、RPC、worker 和 web UI。
 - Docker Compose 管理中间件：PostgreSQL、Redis、Redpanda、MinIO。
 - `scripts/deploy-k3s.sh` 会启动服务器上的中间件 Compose、从 k3s `agents-im-secrets` 读取 `DATABASE_URL` 执行 PostgreSQL migration、刷新 GHCR pull secret，再 `kubectl apply -k deploy/k8s` 并等待 deployment rollout。选择性镜像发布会向脚本传入 `IMAGE_SERVICES=<services>`，脚本会先记录当前 deployment 镜像，apply manifests 后仅把已构建服务切到当前 SHA，并把未选择服务恢复到 apply 前镜像，避免 web-only deploy 把后端/RPC 回退到 manifest 里的 `:latest`。config-only deploy 会向脚本传入 `SKIP_SET_IMAGE=true`、`SKIP_MIDDLEWARE=true`、`SKIP_MIGRATIONS=true`、`RESTART_ROLLOUT=true`、`ROLLOUT_SERVICES=<services>` 和 `RESTART_SERVICES=<services>`，用于跳过镜像更新/中间件/迁移，只重启并等待受影响 deployment。
-- 首次服务器初始化使用 `scripts/bootstrap-server.sh`，它会写入 `/opt/agents-im/middleware/.env`，启动中间件，并创建 k3s `agents-im-secrets`。真实 secret 只应保存在服务器/k3s，不提交到 Git，也不打印到 Actions 日志。
+- 首次服务器初始化使用 `scripts/bootstrap-server.sh`，它会写入 `/opt/agents-im/middleware/.env`，启动中间件，并创建 k3s `agents-im-secrets`。真实 secret 只应保存在服务器/k3s 或 Drone secrets，不提交到 Git，也不打印到 CI 日志。
 
-发布 workflow 需要的 GitHub repository secrets 见 [`../deploy/README.md`](../deploy/README.md)。
+发布 workflow 需要的 Drone repository secrets 见 [`../deploy/README.md`](../deploy/README.md)。
 
 ## develop 集成流程
 
