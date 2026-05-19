@@ -76,7 +76,10 @@ class DeploySelection:
 
 
 def normalize_path(path: str) -> str:
-    return PurePosixPath(path).as_posix().lstrip("./")
+    normalized = PurePosixPath(path).as_posix()
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
 
 
 def is_doc_only(path: str) -> bool:
@@ -113,8 +116,16 @@ def classify_path(path: str, selection: DeploySelection) -> None:
     if is_doc_only(path):
         return
 
-    if path in {".github/workflows/deploy.yml", "scripts/deploy-k3s.sh", ".drone.yml"}:
-        # Preserve the prior config-only behavior for workflow/script changes.
+    if path in {
+        ".github/workflows/deploy.yml",
+        "scripts/deploy-k3s.sh",
+        ".drone.yml",
+        "scripts/ci/drone-deploy.sh",
+        "scripts/ci/drone-detect-deploy.sh",
+        "scripts/detect-deploy-changes.py",
+    }:
+        # CI/deploy orchestration changes should exercise deploy/runtime wiring
+        # without rebuilding every service image on each deploy-script fix.
         selection.add_rollout("groups-rpc")
         return
 
