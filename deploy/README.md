@@ -236,3 +236,9 @@ When `OBJECT_STORAGE_EXTERNAL_ENDPOINT` differs from the internal `OBJECT_STORAG
 ## Public entry
 
 The web service is exposed through k3s NodePort `30080`. Traefik Ingress also routes application paths internally.
+
+### 2026-05-19 Drone runtime note
+
+- Docker Hub authenticated pulls are configured on the deployment host Docker daemon to avoid anonymous pull limits during Drone Docker-runner deploy stages.
+- If changing this setup, verify `docker:29-cli`, `golang:1.25-alpine`, `node:22-alpine`, `nginx:1.29-alpine`, `alpine:3.22`, and `alpine/git:2.45.2` can be pulled without anonymous rate-limit errors.
+
