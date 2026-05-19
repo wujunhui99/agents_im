@@ -19,6 +19,7 @@ type ServiceContext struct {
 	MediaRepo        repository.MediaRepository
 	AgentHostingRepo repository.AgentConversationHostingRepository
 	AIHostingRepo    repository.ConversationAIHostingRepository
+	GroupMembers     logic.GroupMemberLister
 	OutboxRepo       repository.OutboxRepository
 	AgentAuditLogic  *logic.AgentAuditLogic
 	AgentAuditRepo   repository.AgentAuditRepository
@@ -48,6 +49,7 @@ func NewServiceContextWithMedia(repo repository.MessageRepository, mediaRepo rep
 		MediaRepo:        mediaRepo,
 		AgentHostingRepo: agentHostingRepo,
 		AIHostingRepo:    aiHostingRepo,
+		GroupMembers:     groups,
 		OutboxRepo:       outboxRepositoryFromMessageRepo(repo),
 		AgentAuditLogic:  logic.NewAgentAuditLogic(agentAuditRepo),
 		AgentAuditRepo:   agentAuditRepo,
@@ -101,6 +103,7 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 		Repository:          ctx.AgentHostingRepo,
 		AIHostingRepository: ctx.AIHostingRepo,
 		Runner:              orchestrator,
+		GroupMembers:        ctx.GroupMembers,
 	})
 	if err != nil {
 		return err
