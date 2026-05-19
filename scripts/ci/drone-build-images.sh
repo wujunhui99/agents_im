@@ -222,20 +222,16 @@ fi
 
 if [[ "${DRONE_IMAGE_BUILD_ONLY:-false}" == "true" ]]; then
   echo "DRONE_IMAGE_BUILD_ONLY=true; marking deploy_required=false after image-build measurement."
-  python3 - <<'PY'
-from pathlib import Path
-path = Path('.drone-deploy.env')
-text = path.read_text()
-lines = []
-seen = False
-for line in text.splitlines():
-    if line.startswith('deploy_required='):
-        lines.append('deploy_required=false')
-        seen = True
-    else:
-        lines.append(line)
-if not seen:
-    lines.append('deploy_required=false')
-path.write_text('\n'.join(lines) + '\n')
-PY
+  tmp_env="${work_dir}/drone-deploy.env"
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    if [[ "${line}" == deploy_required=* ]]; then
+      echo "deploy_required=false"
+    else
+      echo "${line}"
+    fi
+  done < .drone-deploy.env > "${tmp_env}"
+  if ! grep -q '^deploy_required=' "${tmp_env}"; then
+    echo "deploy_required=false" >> "${tmp_env}"
+  fi
+  mv "${tmp_env}" .drone-deploy.env
 fi
