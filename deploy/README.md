@@ -4,7 +4,7 @@ This project uses a hybrid single-server deployment:
 
 - k3s manages application workloads: all Go APIs/RPCs/workers and the web UI.
 - Docker Compose manages middleware: PostgreSQL, Redis, Redpanda, and MinIO.
-- GitHub Actions builds images, pushes them to GHCR, copies deployment files to the server, and runs `scripts/deploy-k3s.sh` remotely.
+- Drone builds images, pushes them to GHCR, copies deployment files to the server, and runs `scripts/deploy-k3s.sh` remotely.
 
 ## Server bootstrap
 
@@ -14,29 +14,56 @@ Run once on the server from the project root:
 DEEPSEEK_API_KEY='...' ./scripts/bootstrap-server.sh
 ```
 
-The bootstrap script writes middleware config to `/opt/agents-im/middleware/.env`, starts Docker middleware, installs `postgresql-client` if missing, and creates the k3s `agents-im-secrets` Secret. Real secrets are stored only on the server/k3s, not in GitHub.
+The bootstrap script writes middleware config to `/opt/agents-im/middleware/.env`, starts Docker middleware, installs `postgresql-client` if missing, and creates the k3s `agents-im-secrets` Secret. Real secrets are stored only on the server/k3s or in Drone repository secrets, not in Git.
 
-## GitHub Actions secrets
+## Drone repository secrets
+
+Drone is deployed at `https://drone.agenticim.xyz` and the `wujunhui99/agents_im` repository must be active in Drone. Secrets are configured at repository scope in Drone, not in Git.
 
 Required repository secrets:
 
-- `SERVER_HOST`
-- `SERVER_USER`
-- `SERVER_PORT`
-- `SERVER_SSH_KEY`
+- `ghcr_username`: GitHub username used for GHCR pushes and server-side pull-secret refresh.
+- `ghcr_token`: GitHub token with package push/pull permissions for GHCR.
+- `deploy_ssh_host`: production deploy SSH host value. Derive from the documented local SSH alias (`server-ssh-tls`) when available; do not paste the raw value in docs or chat.
+- `deploy_ssh_user`: production deploy SSH user value. Derive from the documented local SSH alias when available; do not paste the raw value in docs or chat.
+- `deploy_ssh_port`: production deploy SSH port value.
+- `deploy_ssh_key`: private key used by the deploy pipeline. Use only a key already authorized for deployment; never commit it or print it in logs.
 
-The workflow uses the built-in `GITHUB_TOKEN` to push images to GHCR and to refresh the server-side `ghcr-pull-secret` in k3s.
+Current operational status: these six secrets have been configured for `wujunhui99/agents_im` in Drone. Future agents should verify names only unless rotating credentials. If a secret must be rotated, update it in Drone and record only the secret name and rotation date, never the value.
+
+Drone uses `ghcr_token` to push images to GHCR and to refresh the server-side `ghcr-pull-secret` in k3s.
+
+
+## Drone CI migration
+
+Drone is deployed at `https://drone.agenticim.xyz` with GitHub OAuth and a Docker runner. The repository must be activated in the Drone UI by an authorized GitHub user before `.drone.yml` pipelines run.
+
+Required Drone repository secrets:
+
+- `ghcr_username`: GitHub username used for GHCR pushes and server-side pull-secret refresh.
+- `ghcr_token`: GitHub token with package push/pull permissions for GHCR.
+- `deploy_ssh_host`: production deploy SSH host value. Keep the raw value only in Drone secrets.
+- `deploy_ssh_user`: production deploy SSH user value. Keep the raw value only in Drone secrets.
+- `deploy_ssh_port`: production deploy SSH port value.
+- `deploy_ssh_key`: private key used by the deploy pipeline.
+
+The Drone pipelines intentionally preserve the deployment contract previously handled by GitHub Actions:
+
+1. `backend-verification` runs go-zero API validation, gofmt check, Go tests, static verification, Docker Compose config validation, and Markdown link checks.
+2. `postgres-integration` uses an isolated `postgres:16-alpine` service and never points at the production app database.
+3. `deploy-main` runs only on `main` pushes. It calls `scripts/detect-deploy-changes.py`, builds and pushes affected images to GHCR, then syncs the repo to `/opt/agents-im/repo` and invokes `scripts/deploy-k3s.sh` with the established deployment environment contract.
+
+GitHub Actions workflows have been removed because the account has no Actions quota and failed runs trigger noisy email notifications. Drone is now the CI/CD entrypoint. Rollback is still simple: restore `.github/workflows/ci.yml` and `.github/workflows/deploy.yml` from Git history if Drone is unavailable.
 
 ## Deployment workflow
 
-`.github/workflows/deploy.yml` runs on pushes to `main` and supports manual `workflow_dispatch`. Deployment jobs are guarded with `github.ref == 'refs/heads/main'`; if a manual dispatch is started from another branch, change detection emits a no-op result and no SSH/deploy step runs.
+`.drone.yml` runs CI on pull requests and selected pushes, and runs deployment only on pushes to `main`.
 
-The workflow has four jobs:
+The deploy pipeline has three steps:
 
-1. `detect-changes`: classifies changed files and emits `build_required`, `deploy_required`, `config_only`, `backend_services`, `web_required`, `image_services`, `rollout_services`, and restart service outputs.
-2. `build-backend`: builds only backend services listed in `backend_services` using the Dockerfile `backend` target and `SERVICE=<name>` build arg. It publishes each selected image to GHCR with both `${GITHUB_SHA}` and `latest` tags.
-3. `build-web`: builds the web UI image only when `web_required=true` and publishes `${GITHUB_SHA}` and `latest` tags.
-4. `deploy`: connects to the server over SSH using the `SERVER_*` secrets, syncs the repository files to `/opt/agents-im/repo`, then runs `scripts/deploy-k3s.sh` with `IMAGE_REGISTRY`, `IMAGE_TAG`, GHCR credentials, `IMAGE_SERVICES`, `ROLLOUT_SERVICES`, optional `RESTART_SERVICES`, and `MIDDLEWARE_DIR=/opt/agents-im/middleware`.
+1. `detect changes`: classifies changed files and emits `build_required`, `deploy_required`, `config_only`, `backend_services`, `web_required`, `image_services`, `rollout_services`, and restart service outputs.
+2. `build images`: builds only services listed in `image_services`; backend services use the Dockerfile `backend` target and `SERVICE=<name>` build arg, and web uses the Dockerfile `web` target. Each selected image is published to GHCR with both `${DRONE_COMMIT_SHA}` and `latest` tags.
+3. `deploy`: connects to the server over SSH using the `deploy_ssh_*` secrets, syncs the repository files to `/opt/agents-im/repo`, then runs `scripts/deploy-k3s.sh` with `IMAGE_REGISTRY`, `IMAGE_TAG`, GHCR credentials, `IMAGE_SERVICES`, `ROLLOUT_SERVICES`, optional `RESTART_SERVICES`, and `MIDDLEWARE_DIR=/opt/agents-im/middleware`.
 
 Backend images are built for:
 
@@ -72,10 +99,11 @@ For pushes that only change deployment configuration, `detect-changes` sets `con
 
 - `deploy/k8s/**`
 - `scripts/deploy-k3s.sh`
-- `.github/workflows/deploy.yml`
+- `.drone.yml`
+- `scripts/ci/**`
 - `etc/<service>.yaml`
 
-Markdown/doc-only changes do not deploy. Manual `workflow_dispatch` on `main` performs a full build and deploy; manual dispatch on a non-`main` ref no-ops before any deployment step.
+Markdown/doc-only changes do not deploy. There is no GitHub Actions `workflow_dispatch`; manual or replayed Drone runs should still respect the `main` branch deployment gate.
 
 In config-only mode, backend/web image build jobs are skipped and the deploy job runs `scripts/deploy-k3s.sh` with:
 
@@ -90,7 +118,29 @@ RESTART_ROLLOUT=true
 
 This keeps existing image tags, skips Docker Compose middleware startup and database migrations, applies the k3s manifests, then restarts and waits only for the selected deployment. ConfigMap changes do not reliably recreate Pods by themselves, so config-only deploy must use `RESTART_ROLLOUT=true` for affected services.
 
-### go-zero RPC config naming note
+## Drone operations runbook
+
+Use read-only checks first and keep raw server/secret values redacted.
+
+```bash
+# Runtime status from the server
+ssh server-ssh-tls 'kubectl -n drone get pods,svc,ingress'
+ssh server-ssh-tls 'kubectl -n drone logs deployment/drone-server --tail=100'
+ssh server-ssh-tls 'kubectl -n drone logs deployment/drone-runner-docker --tail=100'
+
+# Public entry check
+curl -I https://drone.agenticim.xyz/
+```
+
+Expected steady state:
+
+- `drone-server` pod is `Running`.
+- `drone-runner-docker` pod is `Running` and logs contain `successfully pinged the remote server` / `polling the remote server`.
+- Ingress host is `drone.agenticim.xyz` and TLS is issued by Let's Encrypt.
+
+Repository activation and secret verification should be done in the Drone UI or API. Only verify that the six required secret names exist; never print secret values in logs, issue comments, or handoffs.
+
+## go-zero RPC config naming note
 
 RPC config structs embed `zrpc.RpcServerConf`, which already contains a go-zero transport-level `Auth bool` option. A business field named exactly `Auth` conflicts with that embedded field through go-zero's anonymous-field config loader and can fail startup with `conflict key auth, pay attention to anonymous fields`.
 
