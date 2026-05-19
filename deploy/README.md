@@ -4,7 +4,7 @@ This project uses a hybrid single-server deployment:
 
 - k3s manages application workloads: all Go APIs/RPCs/workers and the web UI.
 - Docker Compose manages middleware: PostgreSQL, Redis, Redpanda, and MinIO.
-- GitHub Actions builds images, pushes them to GHCR, copies deployment files to the server, and runs `scripts/deploy-k3s.sh` remotely.
+- Drone builds images, pushes them to GHCR, copies deployment files to the server, and runs `scripts/deploy-k3s.sh` remotely.
 
 ## Server bootstrap
 
@@ -14,18 +14,20 @@ Run once on the server from the project root:
 DEEPSEEK_API_KEY='...' ./scripts/bootstrap-server.sh
 ```
 
-The bootstrap script writes middleware config to `/opt/agents-im/middleware/.env`, starts Docker middleware, installs `postgresql-client` if missing, and creates the k3s `agents-im-secrets` Secret. Real secrets are stored only on the server/k3s, not in GitHub.
+The bootstrap script writes middleware config to `/opt/agents-im/middleware/.env`, starts Docker middleware, installs `postgresql-client` if missing, and creates the k3s `agents-im-secrets` Secret. Real secrets are stored only on the server/k3s or in Drone repository secrets, not in Git.
 
-## GitHub Actions secrets
+## Drone repository secrets
 
 Required repository secrets:
 
-- `SERVER_HOST`
-- `SERVER_USER`
-- `SERVER_PORT`
-- `SERVER_SSH_KEY`
+- `ghcr_username`
+- `ghcr_token`
+- `deploy_ssh_host`
+- `deploy_ssh_user`
+- `deploy_ssh_port`
+- `deploy_ssh_key`
 
-The workflow uses the built-in `GITHUB_TOKEN` to push images to GHCR and to refresh the server-side `ghcr-pull-secret` in k3s.
+Drone uses `ghcr_token` to push images to GHCR and to refresh the server-side `ghcr-pull-secret` in k3s.
 
 
 ## Drone CI migration
@@ -41,24 +43,23 @@ Required Drone repository secrets:
 - `deploy_ssh_port`: production deploy SSH port value.
 - `deploy_ssh_key`: private key used by the deploy pipeline.
 
-The Drone pipelines intentionally preserve the former GitHub Actions contract:
+The Drone pipelines intentionally preserve the deployment contract previously handled by GitHub Actions:
 
 1. `backend-verification` runs go-zero API validation, gofmt check, Go tests, static verification, Docker Compose config validation, and Markdown link checks.
 2. `postgres-integration` uses an isolated `postgres:16-alpine` service and never points at the production app database.
-3. `deploy-main` runs only on `main` pushes. It calls `scripts/detect-deploy-changes.py`, builds and pushes affected images to GHCR, then syncs the repo to `/opt/agents-im/repo` and invokes `scripts/deploy-k3s.sh` with the same environment contract used by the GitHub Actions deployment.
+3. `deploy-main` runs only on `main` pushes. It calls `scripts/detect-deploy-changes.py`, builds and pushes affected images to GHCR, then syncs the repo to `/opt/agents-im/repo` and invokes `scripts/deploy-k3s.sh` with the established deployment environment contract.
 
-GitHub Actions workflows remain in place until Drone has proven parity on PR CI and at least one low-risk `main` deploy. After parity, archive or disable Actions in a separate change so rollback remains simple: reactivate Actions and remove/ignore `.drone.yml` if Drone is unavailable. Do not remove `.github/workflows/*` in the migration PR.
+GitHub Actions workflows have been removed because the account has no Actions quota and failed runs trigger noisy email notifications. Drone is now the CI/CD entrypoint. Rollback is still simple: restore `.github/workflows/ci.yml` and `.github/workflows/deploy.yml` from Git history if Drone is unavailable.
 
 ## Deployment workflow
 
-`.github/workflows/deploy.yml` runs on pushes to `main` and supports manual `workflow_dispatch`. Deployment jobs are guarded with `github.ref == 'refs/heads/main'`; if a manual dispatch is started from another branch, change detection emits a no-op result and no SSH/deploy step runs.
+`.drone.yml` runs CI on pull requests and selected pushes, and runs deployment only on pushes to `main`.
 
-The workflow has four jobs:
+The deploy pipeline has three steps:
 
-1. `detect-changes`: classifies changed files and emits `build_required`, `deploy_required`, `config_only`, `backend_services`, `web_required`, `image_services`, `rollout_services`, and restart service outputs.
-2. `build-backend`: builds only backend services listed in `backend_services` using the Dockerfile `backend` target and `SERVICE=<name>` build arg. It publishes each selected image to GHCR with both `${GITHUB_SHA}` and `latest` tags.
-3. `build-web`: builds the web UI image only when `web_required=true` and publishes `${GITHUB_SHA}` and `latest` tags.
-4. `deploy`: connects to the server over SSH using the `SERVER_*` secrets, syncs the repository files to `/opt/agents-im/repo`, then runs `scripts/deploy-k3s.sh` with `IMAGE_REGISTRY`, `IMAGE_TAG`, GHCR credentials, `IMAGE_SERVICES`, `ROLLOUT_SERVICES`, optional `RESTART_SERVICES`, and `MIDDLEWARE_DIR=/opt/agents-im/middleware`.
+1. `detect changes`: classifies changed files and emits `build_required`, `deploy_required`, `config_only`, `backend_services`, `web_required`, `image_services`, `rollout_services`, and restart service outputs.
+2. `build images`: builds only services listed in `image_services`; backend services use the Dockerfile `backend` target and `SERVICE=<name>` build arg, and web uses the Dockerfile `web` target. Each selected image is published to GHCR with both `${DRONE_COMMIT_SHA}` and `latest` tags.
+3. `deploy`: connects to the server over SSH using the `deploy_ssh_*` secrets, syncs the repository files to `/opt/agents-im/repo`, then runs `scripts/deploy-k3s.sh` with `IMAGE_REGISTRY`, `IMAGE_TAG`, GHCR credentials, `IMAGE_SERVICES`, `ROLLOUT_SERVICES`, optional `RESTART_SERVICES`, and `MIDDLEWARE_DIR=/opt/agents-im/middleware`.
 
 Backend images are built for:
 
