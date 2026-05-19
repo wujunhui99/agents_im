@@ -10,6 +10,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      '/admin/dashboard': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
+      '/admin/llm-traces': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
+      '/admin/conversations': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
+      '/admin/users': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
       '/auth': { target: httpTarget('AUTH_API_PORT', 8081), changeOrigin: true },
       '/messages': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
       '/conversations': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },

@@ -275,6 +275,59 @@ order by updated_at desc, conversation_id asc
 	return states, nil
 }
 
+func (r *PostgresMessageRepository) CountMessages(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.conn.QueryRowCtx(ctx, &count, `select count(*) from messages`)
+	return count, err
+}
+
+func (r *PostgresMessageRepository) CountConversations(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.conn.QueryRowCtx(ctx, &count, `select count(*) from conversation_threads`)
+	return count, err
+}
+
+func (r *PostgresMessageRepository) ListRecentConversationStates(ctx context.Context, limit int) ([]ConversationSeqState, error) {
+	limit = normalizeAdminLimit(limit, 10, 100)
+	var rows []postgresConversationStateRow
+	if err := r.conn.QueryRowsCtx(ctx, &rows, `
+select t.conversation_id,
+       t.max_seq,
+       0::bigint as has_read_seq,
+       0::bigint as visible_start_seq,
+       lm.client_send_time as max_seq_time,
+       coalesce(t.last_message_id, '') as last_message_id,
+       t.updated_at
+from conversation_threads t
+left join messages lm on lm.message_id = t.last_message_id
+order by coalesce(t.last_message_at, t.updated_at) desc, t.conversation_id asc
+limit $1
+`, limit); err != nil {
+		return nil, err
+	}
+
+	states := make([]ConversationSeqState, 0, len(rows))
+	for _, row := range rows {
+		state := ConversationSeqState{
+			ConversationID: row.ConversationID,
+			MaxSeq:         row.MaxSeq,
+		}
+		if row.MaxSeqTime.Valid {
+			state.MaxSeqTime = row.MaxSeqTime.Time.UTC().UnixMilli()
+		}
+		if row.LastMessageID != "" {
+			lastMessage, err := queryMessageByServerID(ctx, r.conn, row.LastMessageID)
+			if err != nil {
+				return nil, err
+			}
+			message := lastMessage.message()
+			state.LastMessage = &message
+		}
+		states = append(states, state.Clone())
+	}
+	return states, nil
+}
+
 func (r *PostgresMessageRepository) SetUserHasReadSeqMax(ctx context.Context, userID, conversationID string, seq int64) (ConversationSeqState, bool, error) {
 	if seq < 0 {
 		return ConversationSeqState{}, false, apperror.InvalidArgument("has_read_seq must be greater than or equal to 0")

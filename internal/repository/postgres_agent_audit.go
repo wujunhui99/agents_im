@@ -175,6 +175,79 @@ where run_id = $1
 	return row.agentRun()
 }
 
+func (r *PostgresAgentAuditRepository) ListAgentRuns(ctx context.Context, filter AgentRunFilter) ([]agentaudit.AgentRun, error) {
+	limit := normalizeAdminLimit(filter.Limit, 20, 100)
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	args := []any{}
+	where := ""
+	status := strings.TrimSpace(filter.Status)
+	if status != "" {
+		args = append(args, status)
+		where = "where status = $" + itoa(len(args))
+	}
+	args = append(args, limit, offset)
+	query := `
+select run_id, agent_id, conversation_id, trigger_message_id, requesting_user_id,
+       status, input_summary, output_summary, output_message_id,
+       error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
+from agent_runs
+` + where + `
+order by created_at desc, run_id asc
+limit $` + itoa(len(args)-1) + ` offset $` + itoa(len(args)) + `
+`
+	var rows []postgresAgentRunAuditRow
+	if err := r.conn.QueryRowsCtx(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+	runs := make([]agentaudit.AgentRun, 0, len(rows))
+	for _, row := range rows {
+		run, err := row.agentRun()
+		if err != nil {
+			return nil, err
+		}
+		runs = append(runs, run)
+	}
+	return runs, nil
+}
+
+func (r *PostgresAgentAuditRepository) GetAgentRunByTraceID(ctx context.Context, traceID string) (agentaudit.AgentRun, error) {
+	traceID = strings.TrimSpace(traceID)
+	if traceID == "" {
+		return agentaudit.AgentRun{}, apperror.InvalidArgument("trace_id is required")
+	}
+	var row postgresAgentRunAuditRow
+	err := r.conn.QueryRowCtx(ctx, &row, `
+select run_id, agent_id, conversation_id, trigger_message_id, requesting_user_id,
+       status, input_summary, output_summary, output_message_id,
+       error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
+from agent_runs
+where trace_id = $1
+order by created_at desc, run_id asc
+limit 1
+`, traceID)
+	if err != nil {
+		if isNotFound(err) {
+			return agentaudit.AgentRun{}, apperror.NotFound("agent run audit not found")
+		}
+		return agentaudit.AgentRun{}, err
+	}
+	return row.agentRun()
+}
+
+func (r *PostgresAgentAuditRepository) CountAgentRuns(ctx context.Context, status string) (int64, error) {
+	status = strings.TrimSpace(status)
+	var count int64
+	if status == "" {
+		err := r.conn.QueryRowCtx(ctx, &count, `select count(*) from agent_runs`)
+		return count, err
+	}
+	err := r.conn.QueryRowCtx(ctx, &count, `select count(*) from agent_runs where status = $1`, status)
+	return count, err
+}
+
 func (r *PostgresAgentAuditRepository) CreateAgentToolCall(ctx context.Context, input agentaudit.CreateToolCallInput) (agentaudit.AgentToolCall, error) {
 	normalized, err := agentaudit.NormalizeCreateToolCallInput(input)
 	if err != nil {
