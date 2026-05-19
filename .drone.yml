@@ -1,0 +1,121 @@
+---
+kind: pipeline
+name: backend-verification
+type: docker
+
+trigger:
+  event:
+    - pull_request
+    - push
+  branch:
+    - develop
+    - main
+    - feature/**
+
+steps:
+  - name: backend verification
+    image: golang:1.24-bookworm
+    commands:
+      - bash scripts/ci/drone-backend-verify.sh
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+
+volumes:
+  - name: docker_sock
+    host:
+      path: /var/run/docker.sock
+
+---
+kind: pipeline
+name: postgres-integration
+type: docker
+
+trigger:
+  event:
+    - pull_request
+    - push
+  branch:
+    - develop
+    - main
+    - feature/**
+
+services:
+  - name: postgres
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agents_im
+      POSTGRES_USER: agents_im
+      POSTGRES_PASSWORD: agents_im_dev_password
+
+steps:
+  - name: postgres integration
+    image: golang:1.24-bookworm
+    environment:
+      DATABASE_URL: postgres://agents_im:agents_im_dev_password@postgres:5432/agents_im?sslmode=disable
+    commands:
+      - bash scripts/ci/drone-postgres-integration.sh
+
+---
+kind: pipeline
+name: deploy-main
+type: docker
+
+depends_on:
+  - backend-verification
+  - postgres-integration
+
+trigger:
+  event:
+    - push
+  branch:
+    - main
+
+steps:
+  - name: detect changes
+    image: alpine/git:2.45.2
+    commands:
+      - apk add --no-cache bash python3
+      - bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
+
+  - name: build images
+    image: docker:27-cli
+    environment:
+      GHCR_USERNAME:
+        from_secret: ghcr_username
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+      IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
+    commands:
+      - sh -c 'if ! grep -q "^build_required=true$" .drone-deploy.env; then echo "No image build required."; exit 0; fi'
+      - apk add --no-cache bash
+      - bash scripts/ci/drone-build-images.sh
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+
+  - name: deploy
+    image: alpine:3.20
+    environment:
+      DEPLOY_SSH_HOST:
+        from_secret: deploy_ssh_host
+      DEPLOY_SSH_USER:
+        from_secret: deploy_ssh_user
+      DEPLOY_SSH_PORT:
+        from_secret: deploy_ssh_port
+      DEPLOY_SSH_KEY:
+        from_secret: deploy_ssh_key
+      GHCR_USERNAME:
+        from_secret: ghcr_username
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+      IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
+    commands:
+      - sh -c 'if ! grep -q "^deploy_required=true$" .drone-deploy.env; then echo "No deployment required."; exit 0; fi'
+      - apk add --no-cache bash openssh-client tar
+      - bash scripts/ci/drone-deploy.sh
+
+volumes:
+  - name: docker_sock
+    host:
+      path: /var/run/docker.sock
