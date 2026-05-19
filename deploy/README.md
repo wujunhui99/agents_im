@@ -27,6 +27,28 @@ Required repository secrets:
 
 The workflow uses the built-in `GITHUB_TOKEN` to push images to GHCR and to refresh the server-side `ghcr-pull-secret` in k3s.
 
+
+## Drone CI migration
+
+Drone is deployed at `https://drone.agenticim.xyz` with GitHub OAuth and a Docker runner. The repository must be activated in the Drone UI by an authorized GitHub user before `.drone.yml` pipelines run.
+
+Required Drone repository secrets:
+
+- `ghcr_username`: GitHub username used for GHCR pushes and server-side pull-secret refresh.
+- `ghcr_token`: GitHub token with package push/pull permissions for GHCR.
+- `deploy_ssh_host`: production deploy SSH host value. Keep the raw value only in Drone secrets.
+- `deploy_ssh_user`: production deploy SSH user value. Keep the raw value only in Drone secrets.
+- `deploy_ssh_port`: production deploy SSH port value.
+- `deploy_ssh_key`: private key used by the deploy pipeline.
+
+The Drone pipelines intentionally preserve the former GitHub Actions contract:
+
+1. `backend-verification` runs go-zero API validation, gofmt check, Go tests, static verification, Docker Compose config validation, and Markdown link checks.
+2. `postgres-integration` uses an isolated `postgres:16-alpine` service and never points at the production app database.
+3. `deploy-main` runs only on `main` pushes. It calls `scripts/detect-deploy-changes.py`, builds and pushes affected images to GHCR, then syncs the repo to `/opt/agents-im/repo` and invokes `scripts/deploy-k3s.sh` with the same environment contract used by the GitHub Actions deployment.
+
+GitHub Actions workflows remain in place until Drone has proven parity on PR CI and at least one low-risk `main` deploy. After parity, archive or disable Actions in a separate change so rollback remains simple: reactivate Actions and remove/ignore `.drone.yml` if Drone is unavailable. Do not remove `.github/workflows/*` in the migration PR.
+
 ## Deployment workflow
 
 `.github/workflows/deploy.yml` runs on pushes to `main` and supports manual `workflow_dispatch`. Deployment jobs are guarded with `github.ref == 'refs/heads/main'`; if a manual dispatch is started from another branch, change detection emits a no-op result and no SSH/deploy step runs.
