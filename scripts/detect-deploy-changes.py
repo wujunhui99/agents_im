@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from pathlib import PurePosixPath
 
 
@@ -184,6 +185,10 @@ def ordered(values: set[str], service_order: list[str]) -> list[str]:
     return [service for service in service_order if service in values]
 
 
+def shell_value(value: str) -> str:
+    return shlex.quote(value)
+
+
 def build_outputs(selection: DeploySelection) -> dict[str, str]:
     backend_services = ordered(selection.backend_services, BACKEND_SERVICES)
     image_services = ordered(selection.image_services, ALL_IMAGE_SERVICES)
@@ -201,12 +206,12 @@ def build_outputs(selection: DeploySelection) -> dict[str, str]:
         "build_required": str(build_required).lower(),
         "deploy_required": str(deploy_required).lower(),
         "config_only": str(config_only).lower(),
-        "backend_services": json.dumps(backend_services, separators=(",", ":")),
+        "backend_services": shell_value(json.dumps(backend_services, separators=(",", ":"))),
         "web_required": str("web" in image_services).lower(),
-        "image_services": json.dumps(image_services, separators=(",", ":")),
-        "image_services_space": " ".join(image_services),
-        "rollout_services": " ".join(rollout_services),
-        "restart_services": " ".join(restart_services),
+        "image_services": shell_value(json.dumps(image_services, separators=(",", ":"))),
+        "image_services_space": shell_value(" ".join(image_services)),
+        "rollout_services": shell_value(" ".join(rollout_services)),
+        "restart_services": shell_value(" ".join(restart_services)),
     }
 
 
