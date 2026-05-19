@@ -1,9 +1,13 @@
 package mailadapter
 
 import (
+	"errors"
+
 	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/mailservice"
 	"github.com/zeromicro/go-zero/zrpc"
 )
+
+var ErrRPCClientConfigRequired = errors.New("mail rpc client config is required")
 
 func NewOptionalRPCClient(conf zrpc.RpcClientConf) (Client, error) {
 	if !HasRPCClientConfig(conf) {
@@ -14,6 +18,13 @@ func NewOptionalRPCClient(conf zrpc.RpcClientConf) (Client, error) {
 		return nil, err
 	}
 	return NewRPCClient(mailservice.NewMailService(cli)), nil
+}
+
+func NewRequiredRPCClient(conf zrpc.RpcClientConf) (Client, error) {
+	if !HasRPCClientConfig(conf) {
+		return nil, ErrRPCClientConfigRequired
+	}
+	return NewOptionalRPCClient(conf)
 }
 
 func HasRPCClientConfig(conf zrpc.RpcClientConf) bool {

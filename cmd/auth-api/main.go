@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("build auth repository: %v", err)
 	}
-	mailer, err := mailadapter.NewOptionalRPCClient(cfg.MailRPC)
+	mailer, err := mailadapter.NewRequiredRPCClient(cfg.MailRPC)
 	if err != nil {
 		log.Fatalf("build mail rpc client: %v", err)
 	}
