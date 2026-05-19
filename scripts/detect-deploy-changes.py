@@ -120,6 +120,7 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         ".github/workflows/deploy.yml",
         "scripts/deploy-k3s.sh",
         ".drone.yml",
+        "scripts/ci/drone-build-images.sh",
         "scripts/ci/drone-deploy.sh",
         "scripts/ci/drone-detect-deploy.sh",
         "scripts/detect-deploy-changes.py",
@@ -236,6 +237,15 @@ def detect(event_name: str, ref: str, paths: list[str]) -> dict[str, str]:
         selection.add_all_backends()
         selection.add_web()
         return build_outputs(selection)
+
+    if ref == "refs/heads/devops" and any(
+        normalize_path(path) in {".drone.yml", "scripts/ci/drone-build-images.sh"}
+        for path in paths
+    ):
+        # CI/CD lab branch: changes to the image-build pipeline itself should
+        # force a warm-cache build measurement. Main keeps these paths as
+        # config-only deploy orchestration changes.
+        selection.add_all_backends()
 
     for raw_path in paths:
         classify_path(normalize_path(raw_path), selection)
