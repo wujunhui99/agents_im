@@ -23,7 +23,7 @@
 - 消息：Kafka-compatible Redpanda
 - Agent：CloudWeGo Eino、DeepSeek ChatModel adapter
 - 可观测性：Prometheus text metrics、trace/request id 基础
-- CI/CD：GitHub Actions、GHCR、k3s、Docker Compose
+- CI/CD：Drone、GHCR、k3s、Docker Compose
 
 ## 仓库结构
 
@@ -201,14 +201,15 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./cmd/single-machine-e2e
 
 ## CI/CD 与部署
 
-仓库包含两个长期 GitHub Actions 工作流：
+仓库使用 Drone 作为 CI/CD 入口：
 
-- `.github/workflows/ci.yml`：PR/MR 合入前的 backend verification，包括 go-zero API validate、Go 格式、`go test ./...`、静态约束、Compose 配置和 Markdown link check，并用独立 PostgreSQL service 跑 integration job。
-- `.github/workflows/deploy.yml`：`main` 分支 push 或手动触发后先由 `detect-changes` 判断变更类型和受影响镜像；手动触发选择非 `main` ref 时 no-op，不会部署。业务/镜像相关变更只构建受影响后端服务或 web 镜像，推送到 GHCR，再通过 SSH 把部署文件同步到服务器并运行 `scripts/deploy-k3s.sh`。纯 `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh` 或 deploy workflow 配置变更走 config-only deploy：跳过镜像构建、middleware 启动、数据库迁移和 `kubectl set image`，仅应用 manifests 并重启/等待受影响服务。
+- `.drone.yml` `backend-verification`：PR/MR 合入前的 backend verification，包括 go-zero API validate、Go 格式、`go test ./...`、静态约束、Compose 配置和 Markdown link check。
+- `.drone.yml` `postgres-integration`：使用独立 `postgres:16-alpine` service 跑 migration 与 integration tests，避免触碰生产数据库。
+- `.drone.yml` `deploy-main`：`main` 分支 push 后先由 `scripts/ci/drone-detect-deploy.sh` / `scripts/detect-deploy-changes.py` 判断变更类型和受影响镜像；业务/镜像相关变更只构建受影响后端服务或 web 镜像，推送到 GHCR，再通过 SSH 把部署文件同步到服务器并运行 `scripts/deploy-k3s.sh`。纯 `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh`、`.drone.yml` 或 `scripts/ci/**` 配置变更走 config-only deploy：跳过镜像构建、middleware 启动、数据库迁移和 `kubectl set image`，仅应用 manifests 并重启/等待受影响服务。
 
-当前生产部署采用混合单机模型：k3s 承载 Go API/RPC/worker 和 web UI，Docker Compose 承载 PostgreSQL、Redis、Redpanda、MinIO。首次部署服务器需先执行 `scripts/bootstrap-server.sh` 创建 `/opt/agents-im/middleware/.env`、启动中间件并创建 k3s `agents-im-secrets`；真实 secret 只保存在服务器/k3s，不提交到仓库，也不放进 GitHub Actions workflow 日志。
+当前生产部署采用混合单机模型：k3s 承载 Go API/RPC/worker 和 web UI，Docker Compose 承载 PostgreSQL、Redis、Redpanda、MinIO。首次部署服务器需先执行 `scripts/bootstrap-server.sh` 创建 `/opt/agents-im/middleware/.env`、启动中间件并创建 k3s `agents-im-secrets`；真实 secret 只保存在服务器/k3s 或 Drone secrets，不提交到仓库，也不放进 CI 日志。
 
-部署入口与必需 GitHub Secrets 见 [`deploy/README.md`](./deploy/README.md)。
+部署入口与必需 Drone Secrets 见 [`deploy/README.md`](./deploy/README.md)。
 
 ## Agent / DeepSeek 配置
 
