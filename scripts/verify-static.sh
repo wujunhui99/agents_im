@@ -8,7 +8,7 @@ required_files=(
   "api/groups.api"
   "api/message.api"
   "api/media.api"
-  ".github/workflows/ci.yml"
+  ".drone.yml"
   ".github/markdown-link-check.json"
   ".ai-context/zero-skills/SKILL.md"
   ".ai-context/zero-skills/references/goctl-commands.md"
@@ -419,29 +419,23 @@ if rg -n "(@material/web|@mui/)" web/package.json web/package-lock.json web/src;
   exit 1
 fi
 
-ci_workflow_patterns=(
-  "actions/checkout"
-  "actions/setup-go"
-  "actions/cache/restore"
-  "actions/cache/save"
-  "Detect changed areas"
-  "backend_required"
-  "Download Go modules"
-  "go test -json"
-  "Go test duration"
-  "Go test slowest packages"
-  "Collect workflow timing"
-  "ACTIONS_NOTIFY_TIMING"
-  "bash scripts/verify-static.sh"
-  "docker compose config"
-  "markdown-link-check"
+drone_workflow_patterns=(
+  "kind: pipeline"
+  "backend-verification"
+  "postgres-integration"
+  "deploy-main"
+  "bash scripts/ci/drone-backend-verify.sh"
+  "bash scripts/ci/drone-postgres-integration.sh"
+  "bash scripts/ci/drone-detect-deploy.sh"
+  "bash scripts/ci/drone-build-images.sh"
+  "bash scripts/ci/drone-deploy.sh"
+  "from_secret: ghcr_token"
   "postgres:16-alpine"
-  "scripts/migrate-postgres.sh --host-psql"
-  "go test -tags=integration ./tests"
+  "ghcr.io/wujunhui99/agents_im"
 )
 
-for pattern in "${ci_workflow_patterns[@]}"; do
-  rg -qF "$pattern" .github/workflows/ci.yml
+for pattern in "${drone_workflow_patterns[@]}"; do
+  rg -qF "$pattern" .drone.yml
 done
 
 ci_doc_patterns=(
@@ -449,8 +443,8 @@ ci_doc_patterns=(
   "go test ./..."
   "bash scripts/verify-static.sh"
   "docker compose config"
-  "actions/cache/restore"
-  "docs/references/github-actions-go-cache.md"
+  "Drone"
+  ".drone.yml"
   "markdown-link-check"
   "Codex commit 前验证门禁"
   "db/change_log/*.sql"
