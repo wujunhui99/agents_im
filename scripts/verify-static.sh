@@ -1079,6 +1079,67 @@ rg -q "TestWebSocketOriginPolicyUsesConfiguredExactOrigins" internal/gateway/ws/
 rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "websocket-gateway" docs/exec-plans/completed/websocket-gateway.md
 
+python3 - <<'PY'
+import sys
+import yaml
+
+with open("deploy/k8s/ingress.yaml", encoding="utf-8") as f:
+    ingress = yaml.safe_load(f) or {}
+
+tls_hosts = {
+    host
+    for tls in ingress.get("spec", {}).get("tls", []) or []
+    for host in tls.get("hosts", []) or []
+}
+for host in ("agenticim.xyz", "admin.agenticim.xyz"):
+    if host not in tls_hosts:
+        print(f"deploy/k8s/ingress.yaml: missing TLS host {host}", file=sys.stderr)
+        sys.exit(1)
+
+rules = {
+    rule.get("host"): rule
+    for rule in ingress.get("spec", {}).get("rules", []) or []
+}
+for host in ("agenticim.xyz", "admin.agenticim.xyz"):
+    if host not in rules:
+        print(f"deploy/k8s/ingress.yaml: missing ingress rule for {host}", file=sys.stderr)
+        sys.exit(1)
+
+
+def backend_for(host, path):
+    paths = rules[host].get("http", {}).get("paths", []) or []
+    for item in paths:
+        if item.get("path") == path:
+            service = item.get("backend", {}).get("service", {})
+            return service.get("name"), service.get("port", {}).get("number")
+    return None, None
+
+
+for path in (
+    "/admin/dashboard",
+    "/admin/llm-traces",
+    "/admin/conversations",
+    "/admin/users",
+):
+    name, port = backend_for("admin.agenticim.xyz", path)
+    if (name, port) != ("message-api", 8083):
+        print(
+            f"deploy/k8s/ingress.yaml: admin host {path} must route to message-api:8083",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+name, port = backend_for("admin.agenticim.xyz", "/")
+if (name, port) != ("web", 80):
+    print("deploy/k8s/ingress.yaml: admin host / must route to web:80", file=sys.stderr)
+    sys.exit(1)
+
+name, port = backend_for("agenticim.xyz", "/")
+if (name, port) != ("web", 80):
+    print("deploy/k8s/ingress.yaml: user host / must continue to route to web:80", file=sys.stderr)
+    sys.exit(1)
+PY
+
 websocket_reconnect_sync_patterns=(
   "requestId"
   "status"

@@ -346,6 +346,47 @@ describe('Auth flow', () => {
     window.history.pushState({}, '', '/');
   });
 
+  it('renders the isolated admin console at the admin domain root', async () => {
+    const propsWithLocation = { location: { hostname: 'admin.agenticim.xyz', pathname: '/' } };
+    storeSession({
+      user: {
+        userId: '9001',
+        identifier: 'admin_001',
+        displayName: 'Admin',
+        accountType: 'admin',
+      },
+    });
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        code: 'OK',
+        message: 'ok',
+        data: {
+          totals: {
+            users: 1,
+            conversations: 0,
+            messages: 0,
+            aiRuns: 0,
+            failedAiRuns: 0,
+          },
+          recentTraces: [],
+          recentConversations: [],
+        },
+      }),
+    );
+
+    render(<App {...propsWithLocation} />);
+
+    expect(await screen.findByRole('heading', { name: 'Admin Console' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /消息/i })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/admin/dashboard',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+      }),
+    );
+  });
+
   it('blocks registration submit until email and verification code are present', async () => {
     const user = userEvent.setup();
 

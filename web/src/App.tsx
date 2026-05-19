@@ -37,6 +37,7 @@ type AppProps = {
   webSocketUrl?: string;
   webSocketToken?: string;
   webSocketFactory?: WebSocketFactory;
+  location?: AppLocation;
 };
 
 function App(props: AppProps) {
@@ -61,7 +62,11 @@ type AuthenticatedAppProps = AppProps & {
   authUser: AuthUser;
 };
 
-function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSocketToken, webSocketFactory }: AuthenticatedAppProps) {
+type AppLocation = Pick<Location, 'hostname' | 'pathname'>;
+
+const adminConsoleHost = 'admin.agenticim.xyz';
+
+function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSocketToken, webSocketFactory, location }: AuthenticatedAppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
   const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(() => new Set(['messages']));
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
@@ -156,7 +161,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
     });
   }
 
-  if (isAdminRoute()) {
+  if (isAdminRoute(location)) {
     return <AdminConsole adminApi={adminApi} />;
   }
 
@@ -220,8 +225,12 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
   );
 }
 
-function isAdminRoute() {
-  return window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
+function isAdminRoute(location: AppLocation = window.location) {
+  return isAdminHost(location) || location.pathname === '/admin' || location.pathname.startsWith('/admin/');
+}
+
+function isAdminHost(location: AppLocation) {
+  return location.hostname === adminConsoleHost;
 }
 
 function AuthPage({ prompt = '' }: { prompt?: string }) {

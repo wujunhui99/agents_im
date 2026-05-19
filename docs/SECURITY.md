@@ -18,6 +18,7 @@
 - 生产部署 secret 只保存在服务器/k3s 或 Drone repository secrets 中；`deploy/middleware/.env.example` 与 `deploy/k8s/secrets.example.yaml` 只能保留占位示例。
 - Drone deploy pipeline 使用 `ghcr_token` 推送 GHCR 镜像和刷新服务器侧 `ghcr-pull-secret`，不得把真实 token 写入仓库或日志；文档和示例命令中必须用 `***` 或 `[REDACTED]` 占位。
 - 日志中不得记录明文 token、密码或敏感个人信息。
+- 管理后台入口域名是 `https://admin.agenticim.xyz/`；`https://agenticim.xyz/admin` 仅作为兼容路由保留。域名隔离只是操作入口边界，不是授权边界；所有 `/admin/...` 接口必须继续要求有效 JWT 且账号 `account_type=admin`，并保持只读，不允许用户变更、冒充登录或代发消息。
 
 ## 待设计
 

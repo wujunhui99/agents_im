@@ -204,3 +204,10 @@ When `OBJECT_STORAGE_EXTERNAL_ENDPOINT` differs from the internal `OBJECT_STORAG
 ## Public entry
 
 The web service is exposed through k3s NodePort `30080`. Traefik Ingress also routes application paths internally.
+
+Production has two public application hosts:
+
+- `https://agenticim.xyz/` serves the normal user IM app and keeps the existing `/admin` compatibility route guarded by backend admin authorization.
+- `https://admin.agenticim.xyz/` serves the same web SPA, but the React app renders the read-only Admin Console at `/` based on the hostname. The admin host ingress routes `/admin/dashboard`, `/admin/llm-traces`, `/admin/conversations`, and `/admin/users` to `message-api:8083`; `/` routes to `web:80`.
+
+Both hosts are declared in `deploy/k8s/ingress.yaml` TLS entries and use cert-manager through Traefik. `admin.agenticim.xyz` uses its own TLS secret (`admin-agenticim-xyz-tls`) so certificate issuance for the admin host can be inspected independently.
