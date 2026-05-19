@@ -75,7 +75,7 @@ steps:
       - bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
 
   - name: build images
-    image: docker:27-cli
+    image: docker.io/library/docker:29-cli
     environment:
       GHCR_USERNAME:
         from_secret: ghcr_username
