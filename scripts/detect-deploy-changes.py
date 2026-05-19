@@ -100,10 +100,19 @@ def add_config_rollout(selection: DeploySelection, service: str | None) -> None:
 
 
 def classify_path(path: str, selection: DeploySelection) -> None:
-    if not path or is_doc_only(path):
+    if not path:
         return
 
-    if path in {".github/workflows/deploy.yml", "scripts/deploy-k3s.sh"}:
+    if path == "deploy/README.md":
+        # Deployment runbook changes should exercise the config-only deploy path
+        # so CI/CD maintenance can validate Drone deploy credentials and rollout.
+        selection.add_rollout("groups-rpc")
+        return
+
+    if is_doc_only(path):
+        return
+
+    if path in {".github/workflows/deploy.yml", "scripts/deploy-k3s.sh", ".drone.yml"}:
         # Preserve the prior config-only behavior for workflow/script changes.
         selection.add_rollout("groups-rpc")
         return
