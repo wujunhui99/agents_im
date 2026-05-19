@@ -34,6 +34,9 @@ docker buildx inspect --bootstrap >/dev/null
 
 echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
+declare -a service_names=()
+declare -a service_durations=()
+
 for service in ${image_services_space:-}; do
   case "${service}" in
     web)
@@ -62,8 +65,22 @@ for service in ${image_services_space:-}; do
     --cache-to "type=registry,ref=${cache_ref},mode=max,image-manifest=true,oci-mediatypes=true" \
     --tag "${registry}/${service}:${commit_sha}" \
     --tag "${registry}/${service}:latest" \
+    --provenance=false \
     --push \
     .
   end_epoch="$(date +%s)"
-  echo "Built and pushed ${service} in $((end_epoch - start_epoch))s."
+  duration="$((end_epoch - start_epoch))"
+  service_names+=("${service}")
+  service_durations+=("${duration}")
+  echo "Built and pushed ${service} in ${duration}s."
 done
+
+if ((${#service_names[@]} > 0)); then
+  echo "Image build duration summary:"
+  total_duration=0
+  for idx in "${!service_names[@]}"; do
+    echo "  ${service_names[$idx]}: ${service_durations[$idx]}s"
+    total_duration="$((total_duration + service_durations[$idx]))"
+  done
+  echo "Total image build duration: ${total_duration}s"
+fi
