@@ -13,6 +13,14 @@
 - 多个 Agent 在同一群聊中协作处理任务。
 - Agent 调用工具后，将结果以消息形式返回会话。
 
+## 默认助手
+
+系统内置一个默认通用助手 Agent，稳定 identifier 为 `agent_creator`，资料展示名为 `AI 助手`。所有 `account_type=user` 的 human 用户都应拥有与 `agent_creator` 的 accepted 好友/contact 关系；`agent` 和 `admin` 账号不作为 human 用户自动回填。
+
+已有部署通过可重复执行的数据迁移/启动回填创建或修正 `agent_creator` 的 account/profile、Agent 配置、active system prompt 和 prompt binding，并为现有人类用户补齐双向 accepted friendship。历史 `agent_father` 只作为迁移兼容名出现；发现该 identifier 时必须迁移到 `agent_creator`，不能继续作为活跃默认助手命名。
+
+新注册或通过 Account Service 创建的 human 用户在账号创建成功后自动获得 `agent_creator` 好友关系。该能力使用真实 account/profile、friendship、Agent 和 prompt registry 数据路径，不允许前端生产路径硬编码 mock 联系人。
+
 ## 验收标准
 
 - Agent 能够接收会话消息并回复。
@@ -20,6 +28,7 @@
 - Agent 响应失败时，用户能收到可理解的失败说明或降级回复。
 - Agent 回复必须通过 Message Service 写回并显示为普通 IM 消息，`message_origin=ai`，前端聊天气泡明显显示 `AI/Agent` 标签。
 - 同一 trigger message 不能产生重复 Agent 回复；AI 消息默认不再次触发 AI。
+- 默认 `agent_creator` 助手使用通用 AI 助手 system prompt：回答准确、简洁、友好；可以解释概念、比较方案、整理信息、生成文本并提供编程/产品建议；不确定时说明不确定并给出可验证的下一步。
 
 ## Agent 群聊 V1
 

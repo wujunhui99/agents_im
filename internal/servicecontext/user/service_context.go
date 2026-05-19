@@ -10,13 +10,14 @@ import (
 
 type ServiceContext struct {
 	common.AuthRuntime
-	AccountLogic *logic.UserLogic
-	UserLogic    *logic.UserLogic
-	Repo         repository.Repository
-	MediaLogic   *logic.MediaLogic
-	MediaRepo    repository.MediaRepository
-	ObjectStore  objectstorage.ObjectStore
-	MessageRepo  repository.MessageRepository
+	AccountLogic     *logic.UserLogic
+	UserLogic        *logic.UserLogic
+	DefaultAssistant *logic.DefaultAssistantProvisioner
+	Repo             repository.Repository
+	MediaLogic       *logic.MediaLogic
+	MediaRepo        repository.MediaRepository
+	ObjectStore      objectstorage.ObjectStore
+	MessageRepo      repository.MessageRepository
 }
 
 func NewServiceContext(repo repository.Repository) *ServiceContext {
@@ -39,6 +40,20 @@ func NewServiceContextWithMedia(repo repository.Repository, mediaRepo repository
 	ctx.ObjectStore = objectStore
 	ctx.MediaLogic = logic.NewMediaLogic(mediaRepo, objectStore, bucket)
 	return ctx
+}
+
+func (ctx *ServiceContext) ConfigureDefaultAssistant(agentRepo repository.AgentRepository, registryRepo repository.AgentRegistryRepository) {
+	if ctx == nil || ctx.Repo == nil {
+		return
+	}
+	provisioner := logic.NewDefaultAssistantProvisioner(ctx.Repo, agentRepo, registryRepo)
+	ctx.DefaultAssistant = provisioner
+	if ctx.UserLogic != nil {
+		ctx.UserLogic.WithDefaultAssistantProvisioner(provisioner)
+	}
+	if ctx.AccountLogic != nil && ctx.AccountLogic != ctx.UserLogic {
+		ctx.AccountLogic.WithDefaultAssistantProvisioner(provisioner)
+	}
 }
 
 func (ctx *ServiceContext) ConfigureMediaAttachmentAccess(messageRepo repository.MessageRepository) {
