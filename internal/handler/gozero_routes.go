@@ -38,6 +38,7 @@ func RegisterAuthGoZeroHandlers(server *rest.Server, serverCtx *authsvc.ServiceC
 			componentCheck("auth_logic", serverCtx != nil && serverCtx.AuthLogic != nil, "configured"),
 			componentCheck("auth_repository", serverCtx != nil && serverCtx.AuthRepo != nil, "configured"),
 			componentCheck("user_client", serverCtx != nil && serverCtx.Users != nil, "configured"),
+			componentCheck("mail_rpc_client", serverCtx != nil && serverCtx.Mailer != nil, "configured"),
 		}
 	})
 

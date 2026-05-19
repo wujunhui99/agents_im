@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"net"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
+	"gopkg.in/yaml.v3"
 )
 
 type APIConfig struct {
@@ -1266,42 +1266,60 @@ func readFlatYAML(path string) (map[string]string, error) {
 		return values, nil
 	}
 
-	file, err := os.Open(path)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return values, err
 	}
-	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	section := ""
-	for scanner.Scan() {
-		rawLine := scanner.Text()
-		line := strings.TrimSpace(rawLine)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
-		if !strings.HasPrefix(rawLine, " ") && !strings.HasPrefix(rawLine, "\t") {
-			if value == "" {
-				section = key
-				continue
-			}
-			section = ""
-		}
-		if section != "" && (strings.HasPrefix(rawLine, " ") || strings.HasPrefix(rawLine, "\t")) {
-			key = section + "." + key
-		}
-		values[key] = value
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return values, err
+	}
+	if len(doc.Content) == 0 {
+		return values, nil
 	}
 
-	return values, scanner.Err()
+	flattenYAML(values, "", doc.Content[0])
+	return values, nil
+}
+
+func flattenYAML(values map[string]string, prefix string, node *yaml.Node) {
+	if node == nil {
+		return
+	}
+
+	switch node.Kind {
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			key := strings.TrimSpace(node.Content[i].Value)
+			if key == "" {
+				continue
+			}
+			next := key
+			if prefix != "" {
+				next = prefix + "." + key
+			}
+			flattenYAML(values, next, node.Content[i+1])
+		}
+	case yaml.SequenceNode:
+		items := make([]string, 0, len(node.Content))
+		for _, item := range node.Content {
+			if item.Kind != yaml.ScalarNode {
+				continue
+			}
+			value := strings.TrimSpace(item.Value)
+			if value != "" {
+				items = append(items, value)
+			}
+		}
+		if prefix != "" {
+			values[prefix] = strings.Join(items, ",")
+		}
+	case yaml.ScalarNode:
+		if prefix != "" {
+			values[prefix] = strings.TrimSpace(node.Value)
+		}
+	}
 }
 
 func firstNonEmpty(values ...string) string {

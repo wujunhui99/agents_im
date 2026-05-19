@@ -1663,6 +1663,32 @@ if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/message-transfer.yaml | grep -q 'Gat
   exit 1
 fi
 
+python3 - <<'PY'
+import sys
+import yaml
+
+for path in (
+    "deploy/k8s/etc/auth-api.yaml",
+    "deploy/k8s/etc/auth-rpc.yaml",
+    "etc/auth-api.yaml",
+    "etc/auth-rpc.yaml",
+):
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    mail_rpc = data.get("MailRPC")
+    if not isinstance(mail_rpc, dict):
+        print(f"{path}: MailRPC section is required", file=sys.stderr)
+        sys.exit(1)
+    endpoints = mail_rpc.get("Endpoints")
+    if not isinstance(endpoints, list) or not endpoints:
+        print(f"{path}: MailRPC.Endpoints must be a non-empty YAML list", file=sys.stderr)
+        sys.exit(1)
+    for index, endpoint in enumerate(endpoints):
+        if not isinstance(endpoint, str) or not endpoint.strip():
+            print(f"{path}: MailRPC.Endpoints[{index}] must be a non-empty string", file=sys.stderr)
+            sys.exit(1)
+PY
+
 jwt_api_files=(
   "api/user.api"
   "api/friends.api"
