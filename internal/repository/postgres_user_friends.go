@@ -165,6 +165,53 @@ func (r *PostgresRepository) GetByID(ctx context.Context, userID string) (model.
 	return row.user(), nil
 }
 
+func (r *PostgresRepository) ListByAccountType(ctx context.Context, accountType model.AccountType) ([]model.User, error) {
+	var rows []postgresAccountProfileRow
+	err := r.conn.QueryRowsCtx(ctx, &rows, `
+select
+  a.account_id, a.identifier, a.account_type,
+  a.created_at as account_created_at, a.updated_at as account_updated_at,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
+  p.created_at as profile_created_at, p.updated_at as profile_updated_at
+from accounts a
+join profiles p on p.account_id = a.account_id
+where a.account_type = $1
+order by a.account_id asc
+`, accountTypeToDB(accountType))
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]model.User, 0, len(rows))
+	for _, row := range rows {
+		users = append(users, row.user())
+	}
+	return users, nil
+}
+
+func (r *PostgresRepository) RenameIdentifier(ctx context.Context, fromIdentifier string, toIdentifier string) (model.User, error) {
+	fromIdentifier = strings.ToLower(strings.TrimSpace(fromIdentifier))
+	toIdentifier = strings.ToLower(strings.TrimSpace(toIdentifier))
+
+	var accountID string
+	err := r.conn.QueryRowCtx(ctx, &accountID, `
+update accounts
+set identifier = $2, updated_at = now()
+where identifier = $1
+returning account_id
+`, fromIdentifier, toIdentifier)
+	if err != nil {
+		if isNotFound(err) {
+			return model.User{}, apperror.NotFound("account not found")
+		}
+		if isPostgresUniqueViolation(err) {
+			return model.User{}, apperror.AlreadyExists("identifier already exists")
+		}
+		return model.User{}, err
+	}
+	return r.GetByID(ctx, accountID)
+}
+
 const accountProfileByIDQuery = `
 select
   a.account_id, a.identifier, a.account_type,
@@ -237,6 +284,40 @@ returning account_id
 		return model.User{}, err
 	}
 	return r.GetByID(ctx, accountID)
+}
+
+func (r *PostgresRepository) EnsureAcceptedFriendship(ctx context.Context, userID string, friendID string) error {
+	if strings.TrimSpace(userID) == strings.TrimSpace(friendID) {
+		return apperror.InvalidArgument("cannot add self as friend")
+	}
+
+	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+		var accountCount int64
+		if err := session.QueryRowCtx(ctx, &accountCount, `
+select count(*)
+from accounts
+where account_id in ($1, $2)
+`, userID, friendID); err != nil {
+			return err
+		}
+		if accountCount != 2 {
+			return apperror.NotFound("account not found")
+		}
+		if _, err := upsertFriendshipPreserveCreatedAt(ctx, session, userID, friendID, model.FriendshipStatusAccepted); err != nil {
+			return err
+		}
+		if _, err := upsertFriendshipPreserveCreatedAt(ctx, session, friendID, userID, model.FriendshipStatusAccepted); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		if isPostgresCheckViolation(err) {
+			return apperror.InvalidArgument("invalid friendship")
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *PostgresRepository) AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error) {
@@ -482,6 +563,21 @@ values ($1, $2, $3)
 on conflict (account_id, friend_account_id) do update
 set status = excluded.status,
     created_at = now(),
+    updated_at = now()
+returning account_id, friend_account_id, status, created_at, updated_at
+`, userID, friendID, friendshipStatusToDB(status)); err != nil {
+		return model.Friendship{}, err
+	}
+	return row.friendship(), nil
+}
+
+func upsertFriendshipPreserveCreatedAt(ctx context.Context, session sqlx.Session, userID string, friendID string, status string) (model.Friendship, error) {
+	var row postgresFriendshipRow
+	if err := session.QueryRowCtx(ctx, &row, `
+insert into friendships (account_id, friend_account_id, status)
+values ($1, $2, $3)
+on conflict (account_id, friend_account_id) do update
+set status = excluded.status,
     updated_at = now()
 returning account_id, friend_account_id, status, created_at, updated_at
 `, userID, friendID, friendshipStatusToDB(status)); err != nil {

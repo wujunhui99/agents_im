@@ -38,6 +38,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("build message repository: %v", err)
 	}
+	agentRepo, err := repository.NewAgentRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent repository: %v", err)
+	}
+	agentRegistryRepo, err := repository.NewAgentRegistryRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent registry repository: %v", err)
+	}
 	objectStore, err := objectstorage.NewStore(cfg.ObjectStorage)
 	if err != nil {
 		log.Fatalf("build object store: %v", err)
@@ -46,6 +54,10 @@ func main() {
 		log.Fatalf("ensure object storage bucket: %v", err)
 	}
 	serviceContext := usersvc.NewServiceContextWithMedia(repo, mediaRepo, objectStore, cfg.ObjectStorage.Bucket, cfg.Auth)
+	serviceContext.ConfigureDefaultAssistant(agentRepo, agentRegistryRepo)
+	if _, err := serviceContext.DefaultAssistant.Backfill(context.Background()); err != nil {
+		log.Fatalf("backfill default assistant: %v", err)
+	}
 	serviceContext.ConfigureMediaAttachmentAccess(messageRepo)
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
 		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)

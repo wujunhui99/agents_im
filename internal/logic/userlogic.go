@@ -19,11 +19,17 @@ const (
 )
 
 type UserLogic struct {
-	repo repository.UserRepository
+	repo             repository.UserRepository
+	defaultAssistant *DefaultAssistantProvisioner
 }
 
 func NewUserLogic(repo repository.UserRepository) *UserLogic {
 	return &UserLogic{repo: repo}
+}
+
+func (l *UserLogic) WithDefaultAssistantProvisioner(provisioner *DefaultAssistantProvisioner) *UserLogic {
+	l.defaultAssistant = provisioner
+	return l
 }
 
 type AccountLogic = UserLogic
@@ -138,6 +144,12 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 	})
 	if err != nil {
 		return UserProfile{}, err
+	}
+
+	if l.defaultAssistant != nil && user.AccountType == model.AccountTypeUser {
+		if err := l.defaultAssistant.EnsureForUser(ctx, user.AccountID); err != nil {
+			return UserProfile{}, err
+		}
 	}
 
 	return toProfile(user), nil
