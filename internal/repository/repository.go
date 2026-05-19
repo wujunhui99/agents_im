@@ -21,6 +21,8 @@ type AccountRepository interface {
 	GetByIdentifier(ctx context.Context, identifier string) (model.User, error)
 	ExistsByIdentifier(ctx context.Context, identifier string) (bool, error)
 	GetByID(ctx context.Context, accountID string) (model.User, error)
+	ListByAccountType(ctx context.Context, accountType model.AccountType) ([]model.User, error)
+	RenameIdentifier(ctx context.Context, fromIdentifier string, toIdentifier string) (model.User, error)
 	UpdateProfile(ctx context.Context, accountID string, patch AccountProfilePatch) (model.User, error)
 	UpdateAvatar(ctx context.Context, accountID string, avatarMediaID string, avatarURL string) (model.User, error)
 }
@@ -30,6 +32,7 @@ type AccountRepository interface {
 type UserRepository = AccountRepository
 
 type FriendshipRepository interface {
+	EnsureAcceptedFriendship(ctx context.Context, userID string, friendID string) error
 	AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
 	AcceptFriendRequest(ctx context.Context, userID string, requesterID string) (model.Friendship, bool, error)
 	RejectFriendRequest(ctx context.Context, userID string, requesterID string) (model.Friendship, bool, error)

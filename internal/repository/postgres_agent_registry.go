@@ -148,6 +148,22 @@ where prompt_id = $1
 	return row.prompt(), nil
 }
 
+func (r *PostgresRepository) GetPromptByNameVersion(ctx context.Context, name string, version string) (model.AgentPrompt, error) {
+	var row postgresAgentPromptRow
+	err := r.conn.QueryRowCtx(ctx, &row, `
+select prompt_id, name, description, content, variables_schema_json, version, status, created_by, created_at, updated_at
+from agent_prompts
+where name = $1 and version = $2
+`, name, version)
+	if err != nil {
+		if isNotFound(err) {
+			return model.AgentPrompt{}, apperror.NotFound("prompt not found")
+		}
+		return model.AgentPrompt{}, err
+	}
+	return row.prompt(), nil
+}
+
 func (r *PostgresRepository) BindPrompt(ctx context.Context, binding model.AgentPromptBinding) (model.AgentPromptBinding, bool, error) {
 	existing, err := queryAgentPromptBinding(ctx, r.conn, binding.AgentID, binding.PromptID)
 	if err == nil {
