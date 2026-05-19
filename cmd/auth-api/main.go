@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"time"
@@ -38,11 +39,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("build auth repository: %v", err)
 	}
+	agentRepo, err := userrepo.NewAgentRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent repository: %v", err)
+	}
+	agentRegistryRepo, err := userrepo.NewAgentRegistryRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent registry repository: %v", err)
+	}
 	mailer, err := mailadapter.NewRequiredRPCClient(cfg.MailRPC)
 	if err != nil {
 		log.Fatalf("build mail rpc client: %v", err)
 	}
 	userLogic := userlogic.NewUserLogic(userRepo)
+	defaultAssistant := userlogic.NewDefaultAssistantProvisioner(userRepo, agentRepo, agentRegistryRepo)
+	userLogic.WithDefaultAssistantProvisioner(defaultAssistant)
+	if _, err := defaultAssistant.Backfill(context.Background()); err != nil {
+		log.Fatalf("backfill default assistant: %v", err)
+	}
 	serviceContext := authsvc.NewServiceContextWithOptions(
 		credentialRepo,
 		useradapter.NewLogicClient(userLogic),

@@ -144,6 +144,46 @@ func (r *MemoryRepository) CountAccounts(_ context.Context) (int64, error) {
 	return int64(len(r.byID)), nil
 }
 
+func (r *MemoryRepository) ListByAccountType(_ context.Context, accountType model.AccountType) ([]model.User, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	users := make([]model.User, 0)
+	for _, user := range r.byID {
+		if user.AccountType == accountType {
+			users = append(users, user.Clone())
+		}
+	}
+	sort.Slice(users, func(i int, j int) bool {
+		return users[i].AccountID < users[j].AccountID
+	})
+	return users, nil
+}
+
+func (r *MemoryRepository) RenameIdentifier(_ context.Context, fromIdentifier string, toIdentifier string) (model.User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	fromIdentifier = strings.ToLower(strings.TrimSpace(fromIdentifier))
+	toIdentifier = strings.ToLower(strings.TrimSpace(toIdentifier))
+	accountID, exists := r.identifierID[fromIdentifier]
+	if !exists {
+		return model.User{}, apperror.NotFound("account not found")
+	}
+	if existingID, targetExists := r.identifierID[toIdentifier]; targetExists && existingID != accountID {
+		return model.User{}, apperror.AlreadyExists("identifier already exists")
+	}
+
+	user := r.byID[accountID]
+	delete(r.identifierID, fromIdentifier)
+	user.Identifier = toIdentifier
+	now := r.now().UTC()
+	user.AccountUpdatedAt = now
+	r.identifierID[toIdentifier] = accountID
+	r.byID[accountID] = user.Clone()
+	return user.Clone(), nil
+}
+
 func (r *MemoryRepository) UpdateProfile(_ context.Context, userID string, patch ProfilePatch) (model.User, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -190,6 +230,26 @@ func (r *MemoryRepository) UpdateAvatar(_ context.Context, userID string, avatar
 	user.UpdatedAt = user.ProfileUpdatedAt
 	r.byID[user.AccountID] = user.Clone()
 	return user.Clone(), nil
+}
+
+func (r *MemoryRepository) EnsureAcceptedFriendship(_ context.Context, userID string, friendID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if userID == friendID {
+		return apperror.InvalidArgument("cannot add self as friend")
+	}
+	if _, exists := r.byID[userID]; !exists {
+		return apperror.NotFound("user not found")
+	}
+	if _, exists := r.byID[friendID]; !exists {
+		return apperror.NotFound("friend not found")
+	}
+
+	now := r.now().UTC()
+	r.friendships[friendshipKey(userID, friendID)] = acceptedFriendshipRow(r.friendships[friendshipKey(userID, friendID)], userID, friendID, now)
+	r.friendships[friendshipKey(friendID, userID)] = acceptedFriendshipRow(r.friendships[friendshipKey(friendID, userID)], friendID, userID, now)
+	return nil
 }
 
 func (r *MemoryRepository) AddFriend(_ context.Context, userID string, friendID string) (model.Friendship, bool, error) {
@@ -428,4 +488,15 @@ func accountMatchesQuery(user model.User, query string) bool {
 		strings.Contains(strings.ToLower(user.Identifier), query) ||
 		strings.Contains(strings.ToLower(user.DisplayName), query) ||
 		strings.Contains(strings.ToLower(user.Name), query)
+}
+
+func acceptedFriendshipRow(existing model.Friendship, userID string, friendID string, now time.Time) model.Friendship {
+	if existing.CreatedAt.IsZero() {
+		existing.CreatedAt = now
+	}
+	existing.UserID = userID
+	existing.FriendID = friendID
+	existing.Status = model.FriendshipStatusAccepted
+	existing.UpdatedAt = now
+	return existing.Clone()
 }
