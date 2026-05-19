@@ -114,7 +114,6 @@ steps:
       - chmod +x /usr/local/bin/kubectl
       - mkdir -p /etc/rancher/k3s
       - cp /host/etc/rancher/k3s/k3s.yaml /etc/rancher/k3s/k3s.yaml
-      - sed -i 's#https://127.0.0.1:6443#https://host.docker.internal:6443#g; s#https://localhost:6443#https://host.docker.internal:6443#g' /etc/rancher/k3s/k3s.yaml
       - bash scripts/ci/drone-deploy.sh
     extra_hosts:
       - host.docker.internal:host-gateway
