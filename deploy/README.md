@@ -140,6 +140,38 @@ Expected steady state:
 
 Repository activation and secret verification should be done in the Drone UI or API. Only verify that the six required secret names exist; never print secret values in logs, issue comments, or handoffs.
 
+### Drone troubleshooting notes
+
+GitHub commit status only reports coarse descriptions such as `Build encountered an error`; when Drone fails, inspect Drone runner/server evidence before assuming the application tests failed.
+
+For the May 2026 migration incident, the useful evidence sources were:
+
+```bash
+# Runner/server logs from the documented SSH alias; redact secrets before sharing.
+ssh server-ssh-tls 'kubectl -n drone logs deployment/drone-runner-docker --tail=300'
+ssh server-ssh-tls 'kubectl -n drone logs deployment/drone-server --tail=300'
+
+# If the Drone UI/API requires login, copy the server SQLite DB and inspect build/stage/step state.
+ssh server-ssh-tls '
+  pod=$(kubectl -n drone get pod -l app=drone-server -o jsonpath="{.items[0].metadata.name}")
+  kubectl -n drone cp "$pod:/data/database.sqlite" /tmp/drone.sqlite >/dev/null
+  docker run --rm -v /tmp/drone.sqlite:/db.sqlite:ro alpine:3.20 sh -c '\''apk add --no-cache sqlite >/dev/null; \
+    sqlite3 -header -column /db.sqlite "select build_id, build_number, build_event, build_status, build_error, substr(build_after,1,12) as sha, build_started, build_finished from builds order by build_id desc limit 10;"; \
+    echo ===stages===; \
+    sqlite3 -header -column /db.sqlite "select stage_id, stage_build_id, stage_name, stage_status, stage_error, stage_exit_code, stage_started, stage_stopped from stages order by stage_id desc limit 20;"; \
+    echo ===steps===; \
+    sqlite3 -header -column /db.sqlite "select step_id, step_stage_id, step_name, step_status, step_error, step_exit_code, step_started, step_stopped from steps order by step_id desc limit 30;"'\''
+'
+```
+
+Known Drone failure signatures and fixes:
+
+- `linter: untrusted repositories cannot mount host volumes`: Drone Docker runner rejects host-volume mounts unless the repository is trusted. Keep `/var/run/docker.sock` only in jobs that truly need Docker daemon access, such as `deploy-main` image builds on trusted `main` deploys. `backend-verification` must not mount the host Docker socket because it only needs `docker compose config`, which uses the Compose plugin without talking to a daemon.
+- `E: Unable to locate package docker-compose-plugin` in `golang:*-bookworm`: install Docker CLI/Compose from Docker's official Debian apt repository, not the default Debian sources.
+- `ModuleNotFoundError: No module named 'yaml'`: `scripts/verify-static.sh` imports Python `yaml`; install `python3-yaml` in the backend verification image before running static verification.
+
+If a build remains `pending` while older builds are `running`, check Docker runner capacity and current `drone-*` containers on the server. A single Docker runner with capacity 2 can leave newer push/PR builds queued until the older pair finishes.
+
 ## go-zero RPC config naming note
 
 RPC config structs embed `zrpc.RpcServerConf`, which already contains a go-zero transport-level `Auth bool` option. A business field named exactly `Auth` conflicts with that embedded field through go-zero's anonymous-field config loader and can fail startup with `conflict key auth, pay attention to anonymous fields`.
