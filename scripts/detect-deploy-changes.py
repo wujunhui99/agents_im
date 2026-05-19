@@ -229,7 +229,7 @@ def build_outputs(selection: DeploySelection) -> dict[str, str]:
 def detect(event_name: str, ref: str, paths: list[str]) -> dict[str, str]:
     selection = DeploySelection()
 
-    if ref != "refs/heads/main":
+    if ref not in {"refs/heads/main", "refs/heads/develop-cicd-speed"}:
         return build_outputs(selection)
 
     if event_name == "workflow_dispatch":
