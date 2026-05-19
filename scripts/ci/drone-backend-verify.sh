@@ -67,14 +67,5 @@ run_timeout_step "go test ./..." 10m go test ./... -timeout=10m
 run_timeout_step "verify static" 5m bash scripts/verify-static.sh
 run_timeout_step "docker compose config" 3m docker compose config
 
-mapfile -t md_files < <(
-  find . -name "*.md" \
-    -not -path "./.git/*" \
-    -not -path "./.ai-context/*" \
-    -not -path "./docs/references/*" \
-    -print
-)
-if ((${#md_files[@]} > 0)); then
-  echo "[backend-verify] markdown files=${#md_files[@]}"
-  run_timeout_step "markdown link check" 5m npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json "${md_files[@]}"
-fi
+# Markdown link checking is intentionally excluded from backend verification.
+# Docs are human-facing and external links can make deploy-critical CI flaky.
