@@ -109,7 +109,7 @@ steps:
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
     commands:
       - sh -c 'if ! grep -q "^deploy_required=true$" .drone-deploy.env; then echo "No deployment required."; exit 0; fi'
-      - apk add --no-cache bash openssh-client tar curl
+      - apk add --no-cache bash openssh-client tar curl docker-cli docker-cli-compose postgresql-client
       - curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl
       - chmod +x /usr/local/bin/kubectl
       - mkdir -p /etc/rancher/k3s
