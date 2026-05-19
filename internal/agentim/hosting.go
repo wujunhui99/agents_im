@@ -254,6 +254,7 @@ func (s *ConversationHostingService) acceptAndScheduleTrigger(ctx context.Contex
 		AgentAccountID:     trigger.AgentUserID,
 		TriggerServerMsgID: trigger.TriggerMessageID,
 		TriggerEventID:     trigger.EventID,
+		RunningTTL:         s.triggerRunningTTL(),
 	})
 	if err != nil {
 		return false, err
@@ -311,6 +312,7 @@ func (s *ConversationHostingService) recordRejectedTrigger(ctx context.Context, 
 		AgentAccountID:     trigger.AgentUserID,
 		TriggerServerMsgID: trigger.TriggerMessageID,
 		TriggerEventID:     trigger.EventID,
+		RunningTTL:         s.triggerRunningTTL(),
 	})
 	if err != nil {
 		return false, err
@@ -352,6 +354,21 @@ func (s *ConversationHostingService) runAcceptedTriggerAsync(trigger AgentTrigge
 				trigger.RequestID, trigger.ConversationID, trigger.AgentUserID, trigger.TriggerMessageID, err)
 		}
 	}()
+}
+
+func (s *ConversationHostingService) triggerRunningTTL() time.Duration {
+	ttl := repository.DefaultAgentTriggerRunningTTL
+	if s == nil {
+		return ttl
+	}
+	runTimeout := s.runTimeout
+	if runTimeout <= 0 {
+		runTimeout = defaultAsyncTriggerRunTimeout
+	}
+	if withGrace := runTimeout + time.Minute; withGrace > ttl {
+		return withGrace
+	}
+	return ttl
 }
 
 func (s *ConversationHostingService) runAcceptedTrigger(ctx context.Context, trigger AgentTrigger) (AgentResponseResult, error) {
