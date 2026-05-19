@@ -112,6 +112,38 @@ func (r *MemoryRepository) GetByID(_ context.Context, userID string) (model.User
 	return user.Clone(), nil
 }
 
+func (r *MemoryRepository) SearchAccounts(_ context.Context, filter AccountSearchFilter) ([]model.User, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	limit := normalizeAdminLimit(filter.Limit, 20, 100)
+	query := strings.ToLower(strings.TrimSpace(filter.Query))
+	users := make([]model.User, 0)
+	for _, user := range r.byID {
+		if query != "" && !accountMatchesQuery(user, query) {
+			continue
+		}
+		users = append(users, user.Clone())
+	}
+	sort.Slice(users, func(i int, j int) bool {
+		if users[i].AccountCreatedAt.Equal(users[j].AccountCreatedAt) {
+			return users[i].UserID < users[j].UserID
+		}
+		return users[i].AccountCreatedAt.After(users[j].AccountCreatedAt)
+	})
+	if len(users) > limit {
+		users = users[:limit]
+	}
+	return users, nil
+}
+
+func (r *MemoryRepository) CountAccounts(_ context.Context) (int64, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return int64(len(r.byID)), nil
+}
+
 func (r *MemoryRepository) UpdateProfile(_ context.Context, userID string, patch ProfilePatch) (model.User, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -378,4 +410,22 @@ func (r *MemoryRepository) GetFriendship(_ context.Context, userID string, frien
 
 func friendshipKey(userID string, friendID string) string {
 	return userID + "\x00" + friendID
+}
+
+func normalizeAdminLimit(value int, fallback int, max int) int {
+	if value <= 0 {
+		value = fallback
+	}
+	if value > max {
+		value = max
+	}
+	return value
+}
+
+func accountMatchesQuery(user model.User, query string) bool {
+	return strings.Contains(strings.ToLower(user.UserID), query) ||
+		strings.Contains(strings.ToLower(user.AccountID), query) ||
+		strings.Contains(strings.ToLower(user.Identifier), query) ||
+		strings.Contains(strings.ToLower(user.DisplayName), query) ||
+		strings.Contains(strings.ToLower(user.Name), query)
 }

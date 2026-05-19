@@ -57,6 +57,34 @@ spec:
                 name: message-api
                 port:
                   number: 8083
+          - path: /admin/dashboard
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
+          - path: /admin/llm-traces
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
+          - path: /admin/conversations
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
+          - path: /admin/users
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
           - path: /groups
             pathType: Prefix
             backend:

@@ -90,6 +90,81 @@ func (r *MemoryAgentAuditRepository) GetAgentRun(_ context.Context, runID string
 	return run.Clone(), nil
 }
 
+func (r *MemoryAgentAuditRepository) ListAgentRuns(_ context.Context, filter AgentRunFilter) ([]agentaudit.AgentRun, error) {
+	limit := normalizeAdminLimit(filter.Limit, 20, 100)
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	status := strings.TrimSpace(filter.Status)
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	runs := make([]agentaudit.AgentRun, 0, len(r.runs))
+	for _, run := range r.runs {
+		if status != "" && string(run.Status) != status {
+			continue
+		}
+		runs = append(runs, run.Clone())
+	}
+	sort.Slice(runs, func(i int, j int) bool {
+		if runs[i].CreatedAt.Equal(runs[j].CreatedAt) {
+			return runs[i].RunID < runs[j].RunID
+		}
+		return runs[i].CreatedAt.After(runs[j].CreatedAt)
+	})
+	if offset >= len(runs) {
+		return []agentaudit.AgentRun{}, nil
+	}
+	runs = runs[offset:]
+	if len(runs) > limit {
+		runs = runs[:limit]
+	}
+	return runs, nil
+}
+
+func (r *MemoryAgentAuditRepository) GetAgentRunByTraceID(_ context.Context, traceID string) (agentaudit.AgentRun, error) {
+	traceID = strings.TrimSpace(traceID)
+	if traceID == "" {
+		return agentaudit.AgentRun{}, apperror.InvalidArgument("trace_id is required")
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var matches []agentaudit.AgentRun
+	for _, run := range r.runs {
+		if run.TraceID == traceID {
+			matches = append(matches, run.Clone())
+		}
+	}
+	if len(matches) == 0 {
+		return agentaudit.AgentRun{}, apperror.NotFound("agent run audit not found")
+	}
+	sort.Slice(matches, func(i int, j int) bool {
+		if matches[i].CreatedAt.Equal(matches[j].CreatedAt) {
+			return matches[i].RunID < matches[j].RunID
+		}
+		return matches[i].CreatedAt.After(matches[j].CreatedAt)
+	})
+	return matches[0].Clone(), nil
+}
+
+func (r *MemoryAgentAuditRepository) CountAgentRuns(_ context.Context, status string) (int64, error) {
+	status = strings.TrimSpace(status)
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var count int64
+	for _, run := range r.runs {
+		if status == "" || string(run.Status) == status {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (r *MemoryAgentAuditRepository) CreateAgentToolCall(_ context.Context, input agentaudit.CreateToolCallInput) (agentaudit.AgentToolCall, error) {
 	normalized, err := agentaudit.NormalizeCreateToolCallInput(input)
 	if err != nil {

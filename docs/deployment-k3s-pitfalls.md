@@ -103,6 +103,18 @@ Config-only changes can still affect runtime because ConfigMaps/Secrets and depl
 - inspect logs if readiness does not become green;
 - verify the deployed images did not unintentionally change.
 
+## Pitfall: MailRPC endpoint lists must stay list-shaped
+
+`auth-api` owns `POST /auth/register/email-code` and builds its Mail RPC client from `MailRPC.Endpoints`. The endpoint value must be a YAML list in both local examples and k3s configs:
+
+```yaml
+MailRPC:
+  Endpoints:
+    - <mail-rpc-service-endpoint>
+```
+
+Do not use scalar syntax such as `Endpoints: <mail-rpc-service-endpoint>`. The static verification gate rejects scalar `MailRPC.Endpoints` in auth configs so the email-code path does not boot without a configured mail client.
+
 ## Pitfall: hostNetwork concentrates failures on one node
 
 Most backend deployments use `hostNetwork: true`. This makes port conflicts and node-level networking issues more likely than in ordinary pod networking.
