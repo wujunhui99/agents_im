@@ -109,10 +109,29 @@ steps:
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
     commands:
       - sh -c 'if ! grep -q "^deploy_required=true$" .drone-deploy.env; then echo "No deployment required."; exit 0; fi'
-      - apk add --no-cache bash openssh-client tar
+      - apk add --no-cache bash openssh-client tar curl
+      - curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl
+      - chmod +x /usr/local/bin/kubectl
+      - mkdir -p /etc/rancher/k3s
+      - cp /host/etc/rancher/k3s/k3s.yaml /etc/rancher/k3s/k3s.yaml
+      - sed -i 's#https://127.0.0.1:6443#https://host.docker.internal:6443#g; s#https://localhost:6443#https://host.docker.internal:6443#g' /etc/rancher/k3s/k3s.yaml
       - bash scripts/ci/drone-deploy.sh
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - name: host_opt_agents_im
+        path: /opt/agents-im
+      - name: host_k3s_config
+        path: /host/etc/rancher/k3s
+        read_only: true
 
 volumes:
   - name: docker_sock
     host:
       path: /var/run/docker.sock
+  - name: host_opt_agents_im
+    host:
+      path: /opt/agents-im
+  - name: host_k3s_config
+    host:
+      path: /etc/rancher/k3s
