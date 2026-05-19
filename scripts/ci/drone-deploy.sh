@@ -8,14 +8,51 @@ if [[ "${deploy_required}" != "true" ]]; then
   exit 0
 fi
 
-: "${DEPLOY_SSH_HOST:?DEPLOY_SSH_HOST Drone secret is required}"
-: "${DEPLOY_SSH_USER:?DEPLOY_SSH_USER Drone secret is required}"
-: "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY Drone secret is required}"
 : "${GHCR_USERNAME:?GHCR_USERNAME Drone secret is required}"
 : "${GHCR_TOKEN:?GHCR_TOKEN Drone secret is required}"
 : "${DRONE_COMMIT_SHA:?DRONE_COMMIT_SHA is required}"
 
 registry="${IMAGE_REGISTRY:-ghcr.io/wujunhui99/agents_im}"
+
+if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
+  echo "Running deployment locally inside the Drone runner host."
+  tar \
+    --exclude='.git' \
+    --exclude='.dev' \
+    --exclude='web/node_modules' \
+    --exclude='web/dist' \
+    -czf - . | tar -xzf - -C /opt/agents-im/repo
+
+  restart_rollout=false
+  if [[ -n "${restart_services}" ]]; then
+    restart_rollout=true
+  fi
+
+  skip_set_image=true
+  if [[ "${build_required}" == "true" ]]; then
+    skip_set_image=false
+  fi
+
+  cd /opt/agents-im/repo
+  IMAGE_REGISTRY="${registry}" \
+    IMAGE_TAG="${DRONE_COMMIT_SHA}" \
+    GHCR_USERNAME="${GHCR_USERNAME}" \
+    GHCR_TOKEN="${GHCR_TOKEN}" \
+    SKIP_SET_IMAGE="${skip_set_image}" \
+    SKIP_MIDDLEWARE="${config_only}" \
+    SKIP_MIGRATIONS="${config_only}" \
+    IMAGE_SERVICES="${image_services_space}" \
+    ROLLOUT_SERVICES="${rollout_services}" \
+    RESTART_SERVICES="${restart_services}" \
+    RESTART_ROLLOUT="${restart_rollout}" \
+    MIDDLEWARE_DIR=/opt/agents-im/middleware \
+    ./scripts/deploy-k3s.sh
+  exit 0
+fi
+
+: "${DEPLOY_SSH_HOST:?DEPLOY_SSH_HOST Drone secret is required}"
+: "${DEPLOY_SSH_USER:?DEPLOY_SSH_USER Drone secret is required}"
+: "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY Drone secret is required}"
 port="${DEPLOY_SSH_PORT:-22}"
 remote="${DEPLOY_SSH_USER}@${DEPLOY_SSH_HOST}"
 key_file="$(mktemp)"
