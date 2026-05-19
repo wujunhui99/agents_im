@@ -219,3 +219,23 @@ if ((${#completed_services[@]} > 0)); then
   echo "Total per-service image build duration: ${total_duration}s"
   echo "Total image build wall-clock duration: ${wall_duration}s"
 fi
+
+if [[ "${DRONE_IMAGE_BUILD_ONLY:-false}" == "true" ]]; then
+  echo "DRONE_IMAGE_BUILD_ONLY=true; marking deploy_required=false after image-build measurement."
+  python3 - <<'PY'
+from pathlib import Path
+path = Path('.drone-deploy.env')
+text = path.read_text()
+lines = []
+seen = False
+for line in text.splitlines():
+    if line.startswith('deploy_required='):
+        lines.append('deploy_required=false')
+        seen = True
+    else:
+        lines.append(line)
+if not seen:
+    lines.append('deploy_required=false')
+path.write_text('\n'.join(lines) + '\n')
+PY
+fi
