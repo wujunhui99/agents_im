@@ -114,11 +114,8 @@ steps:
       - chmod +x /usr/local/bin/kubectl
       - mkdir -p /etc/rancher/k3s
       - cp /host/etc/rancher/k3s/k3s.yaml /etc/rancher/k3s/k3s.yaml
-      - |
-        current_context="$(kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config current-context)"
-        cluster="$(kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config view -o jsonpath="{.contexts[?(@.name=='${current_context}')].context.cluster}")"
-        kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config set-cluster "${cluster}" --server=https://host.docker.internal:6443 --insecure-skip-tls-verify=true
-        kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config unset "clusters.${cluster}.certificate-authority-data" || true
+      - kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config set-cluster default --server=https://host.docker.internal:6443 --insecure-skip-tls-verify=true
+      - kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config unset clusters.default.certificate-authority-data || true
       - bash scripts/ci/drone-deploy.sh
     extra_hosts:
       - host.docker.internal:host-gateway
