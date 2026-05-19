@@ -155,6 +155,44 @@ MailRPC:
 	}
 }
 
+func TestProductionAuthConfigsLoadMailRPCClientEndpoints(t *testing.T) {
+	clearMailRPCEnv(t)
+
+	for _, path := range []string{
+		filepath.Join("..", "..", "deploy", "k8s", "etc", "auth-api.yaml"),
+		filepath.Join("..", "..", "deploy", "k8s", "etc", "auth-rpc.yaml"),
+	} {
+		t.Run(path, func(t *testing.T) {
+			apiCfg, apiErr := LoadAPIConfig(path)
+			rpcCfg, rpcErr := LoadRPCConfig(path)
+			var endpoints []string
+			var timeout int64
+			switch {
+			case apiErr == nil && strings.Contains(filepath.Base(path), "api"):
+				endpoints = apiCfg.MailRPC.Endpoints
+				timeout = apiCfg.MailRPC.Timeout
+			case rpcErr == nil && strings.Contains(filepath.Base(path), "rpc"):
+				endpoints = rpcCfg.MailRPC.Endpoints
+				timeout = rpcCfg.MailRPC.Timeout
+			case apiErr != nil:
+				t.Fatalf("load api config: %v", apiErr)
+			case rpcErr != nil:
+				t.Fatalf("load rpc config: %v", rpcErr)
+			}
+
+			if len(endpoints) == 0 {
+				t.Fatalf("%s produced empty MailRPC.Endpoints; production auth would return mail rpc client is required", path)
+			}
+			if endpoints[0] != "mail-rpc:9095" {
+				t.Fatalf("first mail rpc endpoint = %q, want mail-rpc:9095", endpoints[0])
+			}
+			if timeout != 5000 {
+				t.Fatalf("mail rpc timeout = %d, want 5000", timeout)
+			}
+		})
+	}
+}
+
 func TestAuthConfigExamplesUseMailRPCEndpointLists(t *testing.T) {
 	for _, path := range []string{
 		filepath.Join("..", "..", "etc", "auth-api.yaml"),
