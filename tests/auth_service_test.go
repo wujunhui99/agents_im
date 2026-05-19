@@ -18,6 +18,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/model"
 	userrepo "github.com/wujunhui99/agents_im/internal/repository"
 	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
@@ -135,6 +136,52 @@ func TestAuthLogicRegisterThenLoginWithPersistentBcryptCredentialShape(t *testin
 		t.Fatalf("login user mismatch: registered=%+v loggedIn=%+v", registered, loggedIn)
 	}
 	assertLooksLikeJWT(t, loggedIn.Token)
+}
+
+func TestAuthLogicRegisterCreatesAcceptedDefaultAssistantFriend(t *testing.T) {
+	ctx := context.Background()
+	accountRepo := userrepo.NewMemoryRepository()
+	agentRepo := userrepo.NewMemoryAgentRepository()
+	registryRepo := userrepo.NewMemoryAgentRegistryRepository()
+	userLogic := userlogic.NewUserLogic(accountRepo).WithDefaultAssistantProvisioner(
+		userlogic.NewDefaultAssistantProvisioner(accountRepo, agentRepo, registryRepo),
+	)
+	credentialRepo := authrepo.NewMemoryRepository()
+	authLogic := authlogic.NewAuthLogicWithOptions(
+		credentialRepo,
+		useradapter.NewLogicClient(userLogic),
+		authlogic.NewPasswordHasher(),
+		token.NewHMACTokenManager("test-secret", time.Hour),
+		testAuthOptions(credentialRepo),
+	)
+	issueRegistrationCode(t, authLogic, "default_friend_registration@example.com")
+
+	registered, err := authLogic.Register(ctx, authlogic.RegisterRequest{
+		Identifier:            "default_friend_registration",
+		Email:                 "default_friend_registration@example.com",
+		EmailVerificationCode: testRegistrationCode,
+		Password:              "correct-password",
+		DisplayName:           "Default Friend Registration",
+	})
+	if err != nil {
+		t.Fatalf("register with default assistant provisioning: %v", err)
+	}
+	assistant, err := accountRepo.GetByIdentifier(ctx, userlogic.DefaultAssistantIdentifier)
+	if err != nil {
+		t.Fatalf("get default assistant account: %v", err)
+	}
+	for _, pair := range [][2]string{
+		{registered.UserID, assistant.UserID},
+		{assistant.UserID, registered.UserID},
+	} {
+		friendship, err := accountRepo.GetFriendship(ctx, pair[0], pair[1])
+		if err != nil {
+			t.Fatalf("get friendship %s -> %s: %v", pair[0], pair[1], err)
+		}
+		if friendship.Status != model.FriendshipStatusAccepted {
+			t.Fatalf("friendship %s -> %s status = %q, want accepted", pair[0], pair[1], friendship.Status)
+		}
+	}
 }
 
 func TestAuthLogicLoginReplacesActiveSession(t *testing.T) {

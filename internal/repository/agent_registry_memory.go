@@ -71,6 +71,18 @@ func (r *MemoryAgentRegistryRepository) GetPrompt(_ context.Context, promptID st
 	return prompt.Clone(), nil
 }
 
+func (r *MemoryAgentRegistryRepository) GetPromptByNameVersion(_ context.Context, name string, version string) (model.AgentPrompt, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, prompt := range r.prompts {
+		if prompt.Name == name && prompt.Version == version {
+			return prompt.Clone(), nil
+		}
+	}
+	return model.AgentPrompt{}, apperror.NotFound("prompt not found")
+}
+
 func (r *MemoryAgentRegistryRepository) BindPrompt(_ context.Context, binding model.AgentPromptBinding) (model.AgentPromptBinding, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
