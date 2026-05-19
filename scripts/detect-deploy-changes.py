@@ -240,7 +240,18 @@ def detect(event_name: str, ref: str, paths: list[str]) -> dict[str, str]:
     for raw_path in paths:
         classify_path(normalize_path(raw_path), selection)
 
-    return build_outputs(selection)
+    outputs = build_outputs(selection)
+    if ref == "refs/heads/devops":
+        # The devops branch is a CI/CD performance lab. It should exercise image
+        # build selection and cache timing without touching production runtime.
+        if outputs["build_required"] == "true":
+            outputs["deploy_required"] = "true"
+        else:
+            outputs["deploy_required"] = "false"
+        outputs["config_only"] = "false"
+        outputs["rollout_services"] = shell_value("")
+        outputs["restart_services"] = shell_value("")
+    return outputs
 
 
 def main() -> None:
