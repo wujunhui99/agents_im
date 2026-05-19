@@ -16,6 +16,7 @@ registry="${IMAGE_REGISTRY:-ghcr.io/wujunhui99/agents_im}"
 
 if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
   echo "Running deployment locally inside the Drone runner host."
+  mkdir -p /opt/agents-im/repo
   tar \
     --exclude='.git' \
     --exclude='.dev' \
