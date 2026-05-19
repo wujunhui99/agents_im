@@ -2,6 +2,8 @@
 set -euo pipefail
 
 export PATH=/tmp/go/bin:"${HOME}/go/bin:${PATH}"
+export GOPROXY="${GOPROXY:-https://goproxy.cn,https://proxy.golang.org,direct}"
+export GONOSUMDB="${GONOSUMDB:-}"
 
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update
