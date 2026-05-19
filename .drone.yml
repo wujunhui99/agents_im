@@ -119,6 +119,8 @@ steps:
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
       - name: host_opt_agents_im
         path: /opt/agents-im
       - name: host_k3s_config
