@@ -5,7 +5,7 @@ export PATH=/tmp/go/bin:"${HOME}/go/bin:${PATH}"
 
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl protobuf-compiler ripgrep python3-yaml
+  DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl protobuf-compiler ripgrep python3-yaml nodejs npm
 else
   echo "apt-get is required by the Drone backend verification image" >&2
   exit 1
