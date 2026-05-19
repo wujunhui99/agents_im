@@ -252,6 +252,7 @@ func (l *AuthLogic) RequestRegistrationEmailCode(ctx context.Context, req Regist
 			"code":           code,
 			"expire_minutes": fmt.Sprintf("%d", expireMinutes),
 		},
+		Subject:        "AgenticIM 注册验证码",
 		IdempotencyKey: "auth-register-email-code-" + tokenID,
 	}); err != nil {
 		logx.WithContext(ctx).Errorf("send registration verification email failed: %v", err)
