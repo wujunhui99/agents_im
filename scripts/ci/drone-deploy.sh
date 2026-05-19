@@ -39,6 +39,7 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
     IMAGE_TAG="${DRONE_COMMIT_SHA}" \
     GHCR_USERNAME="${GHCR_USERNAME}" \
     GHCR_TOKEN="${GHCR_TOKEN}" \
+    KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}" \
     SKIP_SET_IMAGE="${skip_set_image}" \
     SKIP_MIDDLEWARE="${config_only}" \
     SKIP_MIGRATIONS="${config_only}" \
