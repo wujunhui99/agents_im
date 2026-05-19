@@ -105,6 +105,7 @@ steps:
         from_secret: ghcr_username
       GHCR_TOKEN:
         from_secret: ghcr_token
+      DRONE_DEPLOY_LOCAL: "1"
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
     commands:
       - sh -c 'if ! grep -q "^deploy_required=true$" .drone-deploy.env; then echo "No deployment required."; exit 0; fi'
