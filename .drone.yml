@@ -10,6 +10,7 @@ trigger:
   branch:
     - develop
     - main
+    - devops
     - feature/**
     - fix/**
     - ci/**
@@ -32,6 +33,7 @@ trigger:
   branch:
     - develop
     - main
+    - devops
     - feature/**
     - fix/**
     - ci/**
