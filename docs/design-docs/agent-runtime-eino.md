@@ -6,7 +6,7 @@ Status: Accepted
 
 The Agent System V0 branches are adding Agent profile, prompt, tool, skill, audit, Python executor, and Agent-IM contracts in parallel. The runtime branch needs a stable Go boundary that later Eino and DeepSeek adapters can implement without leaking Eino concrete types into business logic.
 
-The core runtime package is a pure contract. It does not import CloudWeGo Eino packages, does not call an LLM provider, does not execute tools or Python, and does not write IM messages.
+The core runtime package is a pure contract. It does not import CloudWeGo Eino packages, does not call an LLM provider, does not execute tools or Python, and does not write IM messages. Tool adapters live in `internal/agentruntime/tools` and must be injected explicitly by future runtime wiring.
 
 ## Goals
 
@@ -20,7 +20,7 @@ The core runtime package is a pure contract. It does not import CloudWeGo Eino p
 
 - No Eino adapter implementation in this branch.
 - No real DeepSeek/OpenAI-compatible client.
-- No tool execution, Python execution, shell execution, or OS process startup.
+- No Eino adapter tool loop, real Python execution, shell execution, or OS process startup.
 - No Agent response write-back inside `internal/agentruntime` and no direct message repository/table writes.
 - No audit repository implementation changes.
 
@@ -123,6 +123,7 @@ When the Eino adapter is implemented later:
 - Default `go test ./...` must not require `DEEPSEEK_API_KEY` or network.
 - Tool execution must use registry-approved refs and audit wrappers.
 - Production Go code must not directly call shell, `os/exec`, or unsandboxed Python.
+- `python.execute` must use the explicit local adapter plus an injected `pythonexec.Executor`; default wiring remains disabled until an independent sandbox executor service exists. See [`python-executor-sandbox.md`](./python-executor-sandbox.md).
 
 ## Verification
 
