@@ -178,7 +178,8 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
    - `proto/**`、`go.mod`、`go.sum`、`Dockerfile`、`.dockerignore`、`internal/**`、`db/**`、`scripts/migrate-postgres.sh`：构建并部署全部后端服务；只有同时修改 web-owned 路径时才构建 `web`。
    - 其他非文档文件：fail-safe 为全部后端服务，避免漏构建。
 2. `build images` step 在 `image_services` 非空时构建并推送后端/web 镜像到 GHCR；后端镜像使用 Dockerfile `backend` target 和 `SERVICE=<service>` build arg。
-3. `deploy` step 使用 Drone `deploy_ssh_*` secrets 通过 SSH 连接服务器，将仓库部署文件同步到 `/opt/agents-im/repo`，并以当前 commit SHA 作为 `IMAGE_TAG` 执行 `scripts/deploy-k3s.sh`。选择性发布会传入 `IMAGE_SERVICES`，只对已构建服务执行 `kubectl set image`，并只等待受影响服务 rollout。
+3. `build deploy image` step 在需要真实部署时构建/刷新 `ghcr.io/wujunhui99/agents_im/ci-deploy:latest`，该镜像预装 bash、SSH client、Docker CLI/Compose、PostgreSQL client 和 kubectl，避免每次 deploy step 现场 `apk add` 与下载 kubectl。
+4. `deploy` step 使用预构建的 `ci-deploy` 镜像、Drone `deploy_ssh_*` secrets 和 runner-local k3s/docker 挂载，将仓库部署文件同步到 `/opt/agents-im/repo`，并以当前 commit SHA 作为 `IMAGE_TAG` 执行 `scripts/deploy-k3s.sh`。选择性发布会传入 `IMAGE_SERVICES`，只对已构建服务执行 `kubectl set image`，并只等待受影响服务 rollout。
 
 生产拓扑采用混合单机部署：
 

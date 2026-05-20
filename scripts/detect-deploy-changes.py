@@ -121,6 +121,8 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         "scripts/deploy-k3s.sh",
         ".drone.yml",
         "scripts/ci/drone-build-images.sh",
+        "scripts/ci/build-deploy-image.sh",
+        "deploy/ci/Dockerfile.deploy",
         "scripts/ci/drone-deploy.sh",
         "scripts/ci/drone-detect-deploy.sh",
         "scripts/detect-deploy-changes.py",
@@ -129,7 +131,12 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         # without rebuilding every service image on each deploy-script fix.
         # The devops branch has a narrower image-build measurement override in
         # detect(); on main, CI script changes should stay config-only.
-        if path in {"scripts/ci/drone-build-images.sh", "scripts/detect-deploy-changes.py"}:
+        if path in {
+            "scripts/ci/drone-build-images.sh",
+            "scripts/ci/build-deploy-image.sh",
+            "deploy/ci/Dockerfile.deploy",
+            "scripts/detect-deploy-changes.py",
+        }:
             return
         selection.add_rollout("groups-rpc")
         return
@@ -247,6 +254,8 @@ def detect(event_name: str, ref: str, paths: list[str]) -> dict[str, str]:
         in {
             ".drone.yml",
             "scripts/ci/drone-build-images.sh",
+            "scripts/ci/build-deploy-image.sh",
+            "deploy/ci/Dockerfile.deploy",
             "scripts/detect-deploy-changes.py",
         }
         for path in paths
