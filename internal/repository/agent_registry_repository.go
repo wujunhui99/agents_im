@@ -16,6 +16,7 @@ type AgentRegistryRepository interface {
 	GetMCPServer(ctx context.Context, serverID string) (model.AgentMCPServer, error)
 
 	RegisterTool(ctx context.Context, tool model.AgentTool) (model.AgentTool, error)
+	UpsertToolByName(ctx context.Context, tool model.AgentTool) (model.AgentTool, error)
 	GetTool(ctx context.Context, toolID string) (model.AgentTool, error)
 	BindTool(ctx context.Context, binding model.AgentToolBinding) (model.AgentToolBinding, bool, error)
 	GetToolBinding(ctx context.Context, agentID string, toolID string) (model.AgentToolBinding, error)

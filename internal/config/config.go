@@ -28,6 +28,7 @@ type APIConfig struct {
 	LLMObservability LLMObservabilityConfig
 	GatewayWS        GatewayWSConfig
 	ObjectStorage    ObjectStorageConfig
+	PythonExecutor   PythonExecutorConfig
 	MailRPC          zrpc.RpcClientConf
 }
 
@@ -107,6 +108,23 @@ type ObjectStorageConfig struct {
 	SecretAccessKey  string
 }
 
+type PythonExecutorConfig struct {
+	Backend               string
+	DefaultTimeoutSeconds int
+	MaxTimeoutSeconds     int
+	DefaultMemoryMiB      int
+	MaxMemoryMiB          int
+	MaxOutputBytes        int64
+	K8S                   PythonExecutorK8SConfig
+}
+
+type PythonExecutorK8SConfig struct {
+	Namespace          string
+	Image              string
+	ServiceAccountName string
+	RuntimeClassName   string
+}
+
 type MessageTransferConfig struct {
 	Name          string
 	WorkerID      string
@@ -159,6 +177,8 @@ const (
 	LLMObservabilityBackendMemory   = "memory"
 	LLMObservabilityBackendTest     = "test"
 	LLMObservabilityBackendLangfuse = "langfuse"
+	PythonExecutorBackendDisabled   = "disabled"
+	PythonExecutorBackendK8S        = "k8s"
 )
 
 const (
@@ -181,6 +201,10 @@ const (
 	defaultTransferMaxAttempts         = 5
 	defaultTransferObservabilityHost   = "0.0.0.0"
 	defaultTransferObservabilityPort   = 8085
+	defaultPythonExecutorTimeout       = 10
+	defaultPythonExecutorMaxTimeout    = 30
+	defaultPythonExecutorMemoryMiB     = 256
+	defaultPythonExecutorMaxOutput     = 64 * 1024
 	DefaultDeepSeekBaseURL             = "https://api.deepseek.com"
 	DefaultDeepSeekModel               = "deepseek-v4-pro"
 )
@@ -203,6 +227,7 @@ func DefaultAPIConfig() APIConfig {
 		LLMObservability: DefaultLLMObservabilityConfig(),
 		GatewayWS:        DefaultGatewayWSConfig(),
 		ObjectStorage:    DefaultObjectStorageConfig(),
+		PythonExecutor:   DefaultPythonExecutorConfig(),
 	}
 }
 
@@ -279,6 +304,17 @@ func DefaultObjectStorageConfig() ObjectStorageConfig {
 		Driver: ObjectStorageDriverMemory,
 		Bucket: defaultObjectStorageBucket,
 		Region: defaultObjectStorageRegion,
+	}
+}
+
+func DefaultPythonExecutorConfig() PythonExecutorConfig {
+	return PythonExecutorConfig{
+		Backend:               PythonExecutorBackendDisabled,
+		DefaultTimeoutSeconds: defaultPythonExecutorTimeout,
+		MaxTimeoutSeconds:     defaultPythonExecutorMaxTimeout,
+		DefaultMemoryMiB:      defaultPythonExecutorMemoryMiB,
+		MaxMemoryMiB:          defaultPythonExecutorMemoryMiB,
+		MaxOutputBytes:        defaultPythonExecutorMaxOutput,
 	}
 }
 
@@ -365,6 +401,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		return cfg, err
 	}
 	cfg.ObjectStorage, err = objectStorageConfigFromValues(values, cfg.StorageDriver)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.PythonExecutor, err = pythonExecutorConfigFromValues(values)
 	if err != nil {
 		return cfg, err
 	}
@@ -774,6 +814,109 @@ func ResolveLLMObservabilityConfig(cfg LLMObservabilityConfig) (LLMObservability
 	return cfg, nil
 }
 
+func ResolvePythonExecutorConfig(cfg PythonExecutorConfig) (PythonExecutorConfig, error) {
+	defaults := DefaultPythonExecutorConfig()
+	backend := strings.ToLower(strings.TrimSpace(os.ExpandEnv(cfg.Backend)))
+	if backend == "" {
+		backend = strings.ToLower(strings.TrimSpace(firstNonEmpty(os.Getenv("PYTHON_EXECUTOR_BACKEND"), os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_BACKEND"))))
+	}
+	if backend == "" {
+		backend = PythonExecutorBackendDisabled
+	}
+	switch backend {
+	case PythonExecutorBackendDisabled, PythonExecutorBackendK8S:
+		cfg.Backend = backend
+	default:
+		return cfg, fmt.Errorf("unsupported python executor backend %q; use %q or %q", backend, PythonExecutorBackendDisabled, PythonExecutorBackendK8S)
+	}
+
+	cfg.K8S.Namespace = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(cfg.K8S.Namespace)),
+		os.Getenv("PYTHON_EXECUTOR_K8S_NAMESPACE"),
+		os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_K8S_NAMESPACE"),
+	)
+	cfg.K8S.Image = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(cfg.K8S.Image)),
+		os.Getenv("PYTHON_EXECUTOR_K8S_IMAGE"),
+		os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_K8S_IMAGE"),
+	)
+	cfg.K8S.ServiceAccountName = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(cfg.K8S.ServiceAccountName)),
+		os.Getenv("PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME"),
+		os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME"),
+	)
+	cfg.K8S.RuntimeClassName = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(cfg.K8S.RuntimeClassName)),
+		os.Getenv("PYTHON_EXECUTOR_K8S_RUNTIME_CLASS_NAME"),
+		os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_K8S_RUNTIME_CLASS_NAME"),
+	)
+
+	defaultTimeout, err := resolveInt(cfg.DefaultTimeoutSeconds, os.Getenv("PYTHON_EXECUTOR_DEFAULT_TIMEOUT_SECONDS"), os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_DEFAULT_TIMEOUT_SECONDS"))
+	if err != nil {
+		return cfg, err
+	}
+	if defaultTimeout <= 0 {
+		defaultTimeout = defaults.DefaultTimeoutSeconds
+	}
+	cfg.DefaultTimeoutSeconds = defaultTimeout
+
+	maxTimeout, err := resolveInt(cfg.MaxTimeoutSeconds, os.Getenv("PYTHON_EXECUTOR_MAX_TIMEOUT_SECONDS"), os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_MAX_TIMEOUT_SECONDS"))
+	if err != nil {
+		return cfg, err
+	}
+	if maxTimeout <= 0 {
+		maxTimeout = defaults.MaxTimeoutSeconds
+	}
+	if maxTimeout < cfg.DefaultTimeoutSeconds {
+		return cfg, fmt.Errorf("python executor max timeout must be greater than or equal to default timeout")
+	}
+	cfg.MaxTimeoutSeconds = maxTimeout
+
+	defaultMemoryMiB, err := resolveInt(cfg.DefaultMemoryMiB, os.Getenv("PYTHON_EXECUTOR_DEFAULT_MEMORY_MIB"), os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_DEFAULT_MEMORY_MIB"))
+	if err != nil {
+		return cfg, err
+	}
+	if defaultMemoryMiB <= 0 {
+		defaultMemoryMiB = defaults.DefaultMemoryMiB
+	}
+	cfg.DefaultMemoryMiB = defaultMemoryMiB
+
+	maxMemoryMiB, err := resolveInt(cfg.MaxMemoryMiB, os.Getenv("PYTHON_EXECUTOR_MAX_MEMORY_MIB"), os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_MAX_MEMORY_MIB"))
+	if err != nil {
+		return cfg, err
+	}
+	if maxMemoryMiB <= 0 {
+		maxMemoryMiB = cfg.DefaultMemoryMiB
+	}
+	if maxMemoryMiB < cfg.DefaultMemoryMiB {
+		return cfg, fmt.Errorf("python executor max memory must be greater than or equal to default memory")
+	}
+	cfg.MaxMemoryMiB = maxMemoryMiB
+
+	maxOutputBytes, err := resolveInt64(cfg.MaxOutputBytes, os.Getenv("PYTHON_EXECUTOR_MAX_OUTPUT_BYTES"), os.Getenv("AGENTS_IM_PYTHON_EXECUTOR_MAX_OUTPUT_BYTES"))
+	if err != nil {
+		return cfg, err
+	}
+	if maxOutputBytes <= 0 {
+		maxOutputBytes = defaults.MaxOutputBytes
+	}
+	cfg.MaxOutputBytes = maxOutputBytes
+
+	if cfg.Backend == PythonExecutorBackendK8S {
+		missing := make([]string, 0, 2)
+		if strings.TrimSpace(cfg.K8S.Namespace) == "" {
+			missing = append(missing, "namespace")
+		}
+		if strings.TrimSpace(cfg.K8S.Image) == "" {
+			missing = append(missing, "image")
+		}
+		if len(missing) > 0 {
+			return cfg, fmt.Errorf("python executor k8s backend requires %s", strings.Join(missing, " and "))
+		}
+	}
+	return cfg, nil
+}
+
 func resolveLLMObservabilityBackend(value string) string {
 	value = strings.ToLower(strings.TrimSpace(os.ExpandEnv(value)))
 	if value == "" {
@@ -1038,6 +1181,64 @@ func llmObservabilityConfigFromValues(values map[string]string) (LLMObservabilit
 		SecretKey: firstNonEmpty(values["LLMObservability.Langfuse.SecretKey"], values["LLMObs.Langfuse.SecretKey"], values["Langfuse.SecretKey"]),
 	}
 	return ResolveLLMObservabilityConfig(cfg)
+}
+
+func pythonExecutorConfigFromValues(values map[string]string) (PythonExecutorConfig, error) {
+	cfg := PythonExecutorConfig{
+		Backend: firstNonEmpty(values["PythonExecutor.Backend"], values["PythonExecutorBackend"]),
+		K8S: PythonExecutorK8SConfig{
+			Namespace:          firstNonEmpty(values["PythonExecutor.K8S.Namespace"], values["PythonExecutorK8S.Namespace"], values["PythonExecutorK8SNamespace"]),
+			Image:              firstNonEmpty(values["PythonExecutor.K8S.Image"], values["PythonExecutorK8S.Image"], values["PythonExecutorK8SImage"]),
+			ServiceAccountName: firstNonEmpty(values["PythonExecutor.K8S.ServiceAccountName"], values["PythonExecutorK8S.ServiceAccountName"], values["PythonExecutorK8SServiceAccountName"]),
+			RuntimeClassName:   firstNonEmpty(values["PythonExecutor.K8S.RuntimeClassName"], values["PythonExecutorK8S.RuntimeClassName"], values["PythonExecutorK8SRuntimeClassName"]),
+		},
+	}
+	if value := firstNonEmpty(values["PythonExecutor.DefaultTimeoutSeconds"], values["PythonExecutorDefaultTimeoutSeconds"]); strings.TrimSpace(value) != "" {
+		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
+			seconds, err := strconv.Atoi(expanded)
+			if err != nil {
+				return cfg, err
+			}
+			cfg.DefaultTimeoutSeconds = seconds
+		}
+	}
+	if value := firstNonEmpty(values["PythonExecutor.MaxTimeoutSeconds"], values["PythonExecutorMaxTimeoutSeconds"]); strings.TrimSpace(value) != "" {
+		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
+			seconds, err := strconv.Atoi(expanded)
+			if err != nil {
+				return cfg, err
+			}
+			cfg.MaxTimeoutSeconds = seconds
+		}
+	}
+	if value := firstNonEmpty(values["PythonExecutor.DefaultMemoryMiB"], values["PythonExecutorDefaultMemoryMiB"]); strings.TrimSpace(value) != "" {
+		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
+			memoryMiB, err := strconv.Atoi(expanded)
+			if err != nil {
+				return cfg, err
+			}
+			cfg.DefaultMemoryMiB = memoryMiB
+		}
+	}
+	if value := firstNonEmpty(values["PythonExecutor.MaxMemoryMiB"], values["PythonExecutorMaxMemoryMiB"]); strings.TrimSpace(value) != "" {
+		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
+			memoryMiB, err := strconv.Atoi(expanded)
+			if err != nil {
+				return cfg, err
+			}
+			cfg.MaxMemoryMiB = memoryMiB
+		}
+	}
+	if value := firstNonEmpty(values["PythonExecutor.MaxOutputBytes"], values["PythonExecutorMaxOutputBytes"]); strings.TrimSpace(value) != "" {
+		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
+			maxOutputBytes, err := strconv.ParseInt(expanded, 10, 64)
+			if err != nil {
+				return cfg, err
+			}
+			cfg.MaxOutputBytes = maxOutputBytes
+		}
+	}
+	return ResolvePythonExecutorConfig(cfg)
 }
 
 func objectStorageConfigFromValues(values map[string]string, storageDriver string) (ObjectStorageConfig, error) {
