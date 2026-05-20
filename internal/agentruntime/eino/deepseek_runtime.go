@@ -254,13 +254,15 @@ func executeRuntimeToolCall(
 	result.ToolName = resolved.Spec.Name
 
 	toolResult, err := resolved.Adapter.Invoke(ctx, runtimetools.ToolCall{
-		RunID:     runID,
-		AgentID:   req.Agent.AgentID,
-		ToolID:    resolved.Spec.ToolID,
-		ToolName:  resolved.Spec.Name,
-		InputJSON: json.RawMessage(strings.TrimSpace(call.Function.Arguments)),
-		TraceID:   req.TraceID,
-		RequestID: req.RequestID,
+		RunID:            runID,
+		AgentID:          req.Agent.AgentID,
+		RequestingUserID: req.RequestingUserID,
+		ConversationID:   req.ConversationID,
+		ToolID:           resolved.Spec.ToolID,
+		ToolName:         resolved.Spec.Name,
+		InputJSON:        json.RawMessage(strings.TrimSpace(call.Function.Arguments)),
+		TraceID:          req.TraceID,
+		RequestID:        req.RequestID,
 	})
 	result.DurationMs = time.Since(startedAt).Milliseconds()
 	if err != nil {
