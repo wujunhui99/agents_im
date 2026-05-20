@@ -24,6 +24,11 @@ steps:
       - name: ci_cache
         path: /cache
 
+volumes:
+  - name: ci_cache
+    host:
+      path: /var/cache/agents-im-ci
+
 ---
 kind: pipeline
 name: postgres-integration
@@ -59,6 +64,11 @@ steps:
     volumes:
       - name: ci_cache
         path: /cache
+
+volumes:
+  - name: ci_cache
+    host:
+      path: /var/cache/agents-im-ci
 
 ---
 kind: pipeline
@@ -133,9 +143,6 @@ steps:
         read_only: true
 
 volumes:
-  - name: ci_cache
-    host:
-      path: /var/cache/agents-im-ci
   - name: docker_sock
     host:
       path: /var/run/docker.sock
