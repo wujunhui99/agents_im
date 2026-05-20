@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 
+	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/handler"
@@ -34,10 +35,22 @@ func main() {
 		log.Fatalf("build agent repository: %v", err)
 	}
 	userLogic := logic.NewUserLogic(userRepo)
-	serviceContext := agentsvc.NewServiceContextWithAuth(
+	var pythonExecutorClient pythonexec.KubernetesSandboxClient
+	if cfg.PythonExecutor.Backend == config.PythonExecutorBackendK8S {
+		pythonExecutorClient, err = pythonexec.NewInClusterKubernetesSandboxClient()
+		if err != nil {
+			log.Fatalf("build python executor kubernetes client: %v", err)
+		}
+	}
+	pythonExecutor, err := pythonexec.NewExecutorFromConfig(cfg.PythonExecutor, pythonExecutorClient)
+	if err != nil {
+		log.Fatalf("build python executor: %v", err)
+	}
+	serviceContext := agentsvc.NewServiceContextWithAuthAndPythonExecutor(
 		agentRepo,
 		logic.NewUserLogicAccountTypeChecker(userLogic),
 		cfg.Auth,
+		pythonExecutor,
 	)
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
 		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
