@@ -218,9 +218,13 @@ describe('Auth flow', () => {
 
   it('checks whether the login identifier exists when the password field receives focus', async () => {
     const user = userEvent.setup();
+    setTestLocation('https://agenticim.xyz/');
     fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', message: 'ok', data: { exists: false, identifier: 'missing_001' } }));
 
     render(<App />);
+
+    expect(screen.getByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Admin Console' })).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('账号'), 'missing_001');
     await user.click(screen.getByLabelText('密码'));
@@ -233,6 +237,64 @@ describe('Auth flow', () => {
       }),
     );
     expect(fetchMock).not.toHaveBeenCalledWith('/auth/login', expect.anything());
+  });
+
+  it('keeps login available when the identifier exists check receives non-JSON HTML', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      const method = fetchMethod(init);
+      if (path === '/users/exists?identifier=test' && method === 'GET') {
+        return Promise.resolve(
+          new Response('<!doctype html><html><body>SPA shell</body></html>', {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          }),
+        );
+      }
+      if (path === '/auth/login' && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              user_id: '1001',
+              identifier: 'test',
+              display_name: 'Test User',
+              token: 'login-token',
+              expires_at: '2026-04-30T12:00:00Z',
+            },
+          }),
+        );
+      }
+      if (path === '/conversations/seqs?conversationIds=' && method === 'GET') {
+        return Promise.resolve(emptySeqsResponse());
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${path}`));
+    });
+
+    render(<App />);
+
+    await user.type(screen.getByLabelText('账号'), 'test');
+    await user.click(screen.getByLabelText('密码'));
+
+    expect(await screen.findByText('暂时无法确认账号是否存在，可继续输入密码登录')).toBeInTheDocument();
+    expect(screen.queryByText('Response is not a valid JSON envelope')).not.toBeInTheDocument();
+
+    const loginButton = screen.getByRole('button', { name: '登录' });
+    expect(loginButton).toBeEnabled();
+
+    await user.type(screen.getByLabelText('密码'), 'test-password');
+    await user.click(loginButton);
+
+    expect(await screen.findByRole('heading', { name: '消息' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/auth/login',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ identifier: 'test', password: 'test-password' }),
+      }),
+    );
   });
 
   it('registers a new account and enters the four-tab shell', async () => {
@@ -365,6 +427,7 @@ describe('Auth flow', () => {
     expect(await screen.findByRole('heading', { name: 'Admin Console' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '登录 Agents IM' })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/admin/dashboard', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/users/exists'), expect.anything());
   });
 
   it('renders the isolated admin console at the admin domain root for compatibility', async () => {
