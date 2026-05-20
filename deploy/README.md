@@ -233,6 +233,29 @@ For the current single-server k3s + Docker Compose topology, use the application
 When `OBJECT_STORAGE_EXTERNAL_ENDPOINT` differs from the internal `OBJECT_STORAGE_ENDPOINT`, presigned browser URLs default to HTTPS. Set `OBJECT_STORAGE_EXTERNAL_USE_SSL=false` only for an explicitly HTTP external object-storage endpoint.
 `scripts/bootstrap-server.sh` requires `OBJECT_STORAGE_EXTERNAL_ENDPOINT` and rejects browser-local loopback values before writing the Kubernetes secret.
 
+## Sandboxed Python executor
+
+`agent-api` ships with the Python executor disabled. The production ConfigMap sets:
+
+```yaml
+PYTHON_EXECUTOR_BACKEND: "disabled"
+```
+
+To enable the Kubernetes backend, operators must first provision a dedicated sandbox namespace, a reviewed runner image, default-deny NetworkPolicy, Pod Security controls, and scoped RBAC for `agent-api`. Then set:
+
+```yaml
+PYTHON_EXECUTOR_BACKEND: "k8s"
+PYTHON_EXECUTOR_K8S_NAMESPACE: "agent-python-sandbox"
+PYTHON_EXECUTOR_K8S_IMAGE: "ghcr.io/wujunhui99/agents_im/python-sandbox:<pinned-tag-or-digest>"
+PYTHON_EXECUTOR_MAX_TIMEOUT_SECONDS: "30"
+PYTHON_EXECUTOR_MAX_MEMORY_MIB: "256"
+PYTHON_EXECUTOR_MAX_OUTPUT_BYTES: "65536"
+```
+
+The sandbox Job manifest intentionally disables service account token automount, host networking, privileged mode, privilege escalation, hostPath volumes, and Linux capabilities. Do not add Docker socket mounts, host filesystem mounts, shell access, default egress, or runtime package installation to the sandbox path.
+
+Runner image contract and scaffold: [`python-sandbox/README.md`](./python-sandbox/README.md).
+
 ## Public entry
 
 The web service is exposed through k3s NodePort `30080`. Traefik Ingress also routes application paths internally.
@@ -241,4 +264,3 @@ The web service is exposed through k3s NodePort `30080`. Traefik Ingress also ro
 
 - Docker Hub authenticated pulls are configured on the deployment host Docker daemon to avoid anonymous pull limits during Drone Docker-runner deploy stages.
 - If changing this setup, verify `docker:29-cli`, `golang:1.25-alpine`, `node:22-alpine`, `nginx:1.29-alpine`, `alpine:3.22`, and `alpine/git:2.45.2` can be pulled without anonymous rate-limit errors.
-
