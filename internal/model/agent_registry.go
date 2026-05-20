@@ -38,6 +38,7 @@ const (
 	LocalToolHandlerGetConversationContext = "im.get_conversation_context"
 	LocalToolHandlerReadSkillFile          = "skill.read_file"
 	LocalToolHandlerSendAgentMessage       = "im.send_agent_message"
+	LocalToolHandlerPythonExecute          = "python.execute"
 )
 
 const (
