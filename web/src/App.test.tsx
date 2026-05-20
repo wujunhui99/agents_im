@@ -356,6 +356,17 @@ describe('Auth flow', () => {
     window.history.pushState({}, '', '/');
   });
 
+  it('renders the admin console shell at the management system host root before login', async () => {
+    setTestLocation('https://ms.agenticim.xyz/');
+    fetchMock.mockResolvedValue(jsonResponse({ code: 'UNAUTHENTICATED', message: 'invalid or missing bearer token', data: null }, { status: 401 }));
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Admin Console' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '登录 Agents IM' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/admin/dashboard', expect.objectContaining({ method: 'GET' }));
+  });
+
   it('renders the isolated admin console at the admin domain root for compatibility', async () => {
     setTestLocation('https://admin.agenticim.xyz/');
     storeSession({
