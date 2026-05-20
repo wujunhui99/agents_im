@@ -1,40 +1,14 @@
 ---
 kind: pipeline
-name: backend-verification
+name: verification
 type: docker
 
 trigger:
   event:
     - pull_request
-    - push
-  branch:
+  target:
     - develop
     - main
-    - feature/**
-    - fix/**
-    - ci/**
-
-steps:
-  - name: backend verification
-    image: golang:1.24-bookworm
-    commands:
-      - bash scripts/ci/drone-backend-verify.sh
-
----
-kind: pipeline
-name: postgres-integration
-type: docker
-
-trigger:
-  event:
-    - pull_request
-    - push
-  branch:
-    - develop
-    - main
-    - feature/**
-    - fix/**
-    - ci/**
 
 services:
   - name: postgres
@@ -45,10 +19,15 @@ services:
       POSTGRES_PASSWORD: agents_im_dev_password
 
 steps:
-  - name: postgres integration
+  - name: backend-verification
+    image: golang:1.24-bookworm
+    commands:
+      - bash scripts/ci/drone-backend-verify.sh
+
+  - name: postgres-integration
     image: golang:1.24-bookworm
     environment:
-      DATABASE_URL: postgres://agents_im:agents_im_dev_password@postgres:5432/agents_im?sslmode=disable
+      DATABASE_URL: postgres://agents_im:***@postgres:5432/agents_im?sslmode=disable
     commands:
       - bash scripts/ci/drone-postgres-integration.sh
 
@@ -56,10 +35,6 @@ steps:
 kind: pipeline
 name: deploy-main
 type: docker
-
-depends_on:
-  - backend-verification
-  - postgres-integration
 
 trigger:
   event:
