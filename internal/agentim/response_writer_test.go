@@ -3,6 +3,7 @@ package agentim
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
@@ -71,6 +72,48 @@ func TestResponseWriterUsesMessageSenderSeam(t *testing.T) {
 	}
 	if !resp.Metadata.SuppressesAgentTrigger() {
 		t.Fatalf("agent response metadata must suppress recursive triggers by default: %+v", resp.Metadata)
+	}
+}
+
+func TestResponseWriterAllowsLongLLMTextResponses(t *testing.T) {
+	longText := strings.Repeat("Go 和 Python 的区别在于运行时、类型系统和并发模型。", 30)
+	sender := &recordingMessageSender{
+		resp: logic.SendMessageResponse{
+			Message: logic.Message{
+				ServerMsgID:        "msg_agent_long",
+				ConversationID:     "single:agent_1:user_1",
+				Seq:                9,
+				SenderID:           "agent_1",
+				ReceiverID:         "user_1",
+				ChatType:           logic.MessageChatTypeSingle,
+				ContentType:        logic.MessageContentTypeText,
+				Content:            longText,
+				MessageOrigin:      logic.MessageOriginAI,
+				AgentAccountID:     "agent_1",
+				TriggerServerMsgID: "msg_user_long",
+				AgentRunID:         "run_long",
+			},
+		},
+	}
+	writer, err := NewMessageServiceResponseWriter(sender)
+	if err != nil {
+		t.Fatalf("new response writer: %v", err)
+	}
+
+	_, err = writer.WriteAgentResponse(context.Background(), AgentResponseRequest{
+		RequestID:        "agent-run-long-response",
+		AgentRunID:       "run_long",
+		AgentUserID:      "agent_1",
+		ConversationType: ConversationTypeSingle,
+		ReceiverUserID:   "user_1",
+		TriggerMessageID: "msg_user_long",
+		Text:             longText,
+	})
+	if err != nil {
+		t.Fatalf("write long response: %v", err)
+	}
+	if sender.lastReq.Content != longText {
+		t.Fatalf("long response content was modified")
 	}
 }
 
