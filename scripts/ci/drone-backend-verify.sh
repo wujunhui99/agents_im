@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export PATH=/tmp/go/bin:"${HOME}/go/bin:${PATH}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${script_dir}/cache-env.sh"
+source "${script_dir}/apt-cache.sh"
+ci_cache_summary
+
 export GOPROXY="${GOPROXY:-https://goproxy.cn,https://proxy.golang.org,direct}"
 export GONOSUMDB="${GONOSUMDB:-}"
 
@@ -22,15 +26,9 @@ run_timeout_step() {
   echo "[backend-verify] END ${name} $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 
-run_step "install minimal apt dependencies" bash -c '
-  if command -v apt-get >/dev/null 2>&1; then
-    apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates ripgrep python3-yaml
-  else
-    echo "apt-get is required by the Drone backend verification image" >&2
-    exit 1
-  fi
-'
+run_step "install minimal apt dependencies" apt_get_cached ca-certificates ripgrep python3-yaml
+
+run_step "cache diagnostics" bash -c 'go env GOMODCACHE GOCACHE GOPATH; command -v goctl >/dev/null 2>&1 && goctl --version || true'
 
 run_timeout_step "gofmt check" 2m bash -c '
   mapfile -t go_files < <(find . -name "*.go" -print)

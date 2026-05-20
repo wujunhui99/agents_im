@@ -57,7 +57,17 @@ GitHub Actions workflows have been removed because the account has no Actions qu
 
 ## Deployment workflow
 
-`.drone.yml` runs CI on pull requests and selected pushes, and runs deployment only on pushes to `main`.
+`.drone.yml` runs a single `verification` pipeline on pull requests targeting `develop` or `main`, and runs deployment only on pushes to `main`. Verification intentionally does not run on feature/fix/ci branch push events, because each opened or updated MR already emits a `pull_request` build for the same head SHA. Backend verification and PostgreSQL integration are steps in the same pipeline, so each MR exposes one CI task/context instead of two parallel pipeline tasks.
+
+The verification pipeline mounts a trusted host cache volume at `/cache` from `/var/cache/agents-im-ci`. `scripts/ci/cache-env.sh` routes Go module downloads, Go build objects, cached Go tool binaries, npm package tarballs, and apt package archives into that cache:
+
+- `GOMODCACHE=/cache/go/pkg/mod` for `go mod download`.
+- `GOCACHE=/cache/go/build` for `go test` / compile cache.
+- `GOBIN=/cache/go/bin` for cached `goctl`, `protoc-gen-go`, and `protoc-gen-go-grpc` binaries.
+- `npm_config_cache=/cache/npm` for `npx` / npm package downloads.
+- `APT_CACHE_DIR=/cache/apt` for apt package archives and lists.
+
+If the host cache mount is absent during local script runs, the scripts fall back to `/tmp/agents-im-ci-cache` so local verification still works without a privileged volume.
 
 The deploy pipeline has three steps:
 
