@@ -59,6 +59,13 @@ GitHub Actions workflows have been removed because the account has no Actions qu
 
 `.drone.yml` runs a single `verification` pipeline on pull requests targeting `develop` or `main`, and runs deployment only on pushes to `main`. Verification intentionally does not run on feature/fix/ci branch push events, because each opened or updated MR already emits a `pull_request` build for the same head SHA. Backend verification and PostgreSQL integration are steps in the same pipeline, so each MR exposes one CI task/context instead of two parallel pipeline tasks.
 
+Production public entrypoints:
+
+- User web app: `https://agenticim.xyz/`
+- Management System (MS): `https://ms.agenticim.xyz/`
+
+The Management System root serves the web SPA and the frontend opens the read-only admin console from that host. On `ms.agenticim.xyz`, Ingress exposes only the admin API prefixes served by `message-api` (`/admin/dashboard`, `/admin/llm-traces`, `/admin/conversations`, `/admin/users`) plus `/` to `web`. Do not use `admin.agenticim.xyz` as the primary management entrypoint.
+
 The deploy pipeline has three steps:
 
 1. `detect changes`: classifies changed files and emits `build_required`, `deploy_required`, `config_only`, `backend_services`, `web_required`, `image_services`, `rollout_services`, and restart service outputs.
