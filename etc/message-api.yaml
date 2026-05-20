@@ -10,3 +10,15 @@ DeepSeek:
   APIKey: ${DEEPSEEK_API_KEY}
   BaseURL: ${DEEPSEEK_BASE_URL}
   Model: ${DEEPSEEK_MODEL}
+PythonExecutor:
+  Backend: disabled
+  DefaultTimeoutSeconds: 10
+  MaxTimeoutSeconds: 30
+  DefaultMemoryMiB: 256
+  MaxMemoryMiB: 256
+  MaxOutputBytes: 65536
+  K8S:
+    Namespace:
+    Image:
+    ServiceAccountName:
+    RuntimeClassName:

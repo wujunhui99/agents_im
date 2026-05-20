@@ -268,6 +268,42 @@ returning tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, l
 	return row.tool(), nil
 }
 
+func (r *PostgresRepository) UpsertToolByName(ctx context.Context, tool model.AgentTool) (model.AgentTool, error) {
+	mcpServerID := nullableString(tool.MCPServerID)
+	var row postgresAgentToolRow
+	err := r.conn.QueryRowCtx(ctx, &row, `
+insert into agent_tools (
+  name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+  input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by
+)
+values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13)
+on conflict (name) do update
+set description = excluded.description,
+    tool_type = excluded.tool_type,
+    mcp_server_id = excluded.mcp_server_id,
+    mcp_tool_name = excluded.mcp_tool_name,
+    local_handler_key = excluded.local_handler_key,
+    builtin_key = excluded.builtin_key,
+    input_schema_json = excluded.input_schema_json,
+    output_schema_json = excluded.output_schema_json,
+    permission_level = excluded.permission_level,
+    status = excluded.status,
+    admin_configured = excluded.admin_configured,
+    created_by = excluded.created_by,
+    updated_at = now()
+returning tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+          input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by, created_at, updated_at
+`, tool.Name, tool.Description, tool.ToolType, mcpServerID, tool.MCPToolName, tool.LocalHandlerKey, tool.BuiltinKey,
+		tool.InputSchemaJSON, tool.OutputSchemaJSON, tool.PermissionLevel, tool.Status, tool.AdminConfigured, tool.CreatedBy)
+	if err != nil {
+		if isPostgresForeignKeyViolation(err) {
+			return model.AgentTool{}, apperror.NotFound("mcp server not found")
+		}
+		return model.AgentTool{}, mapAgentRegistryPostgresWriteError(err, "tool already exists", "invalid tool")
+	}
+	return row.tool(), nil
+}
+
 func (r *PostgresRepository) GetTool(ctx context.Context, toolID string) (model.AgentTool, error) {
 	var row postgresAgentToolRow
 	err := r.conn.QueryRowCtx(ctx, &row, `

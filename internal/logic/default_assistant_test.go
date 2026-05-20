@@ -69,6 +69,99 @@ func TestDefaultAssistantBackfillCreatesCanonicalAccountAgentAndPrompt(t *testin
 	}
 }
 
+func TestDefaultAssistantBackfillBindsPythonExecuteOnlyToDefaultAssistant(t *testing.T) {
+	ctx := context.Background()
+	accountRepo := repository.NewMemoryRepository()
+	agentRepo := repository.NewMemoryAgentRepository()
+	registryRepo := repository.NewMemoryAgentRegistryRepository()
+	userLogic := NewUserLogic(accountRepo)
+
+	otherAgentAccount := mustCreateDefaultAssistantTestAccount(t, ctx, userLogic, "agent_without_python_tool", model.AccountTypeAgent)
+	otherAgent, err := agentRepo.CreateAgent(ctx, model.Agent{
+		AccountID:   otherAgentAccount.UserID,
+		IMUserID:    otherAgentAccount.UserID,
+		Name:        "agent_without_python_tool",
+		Description: "Non-default test agent",
+		Status:      model.AgentStatusActive,
+		CreatedBy:   otherAgentAccount.UserID,
+	})
+	if err != nil {
+		t.Fatalf("create non-default agent: %v", err)
+	}
+
+	provisioner := NewDefaultAssistantProvisioner(accountRepo, agentRepo, registryRepo)
+	if _, err := provisioner.Backfill(ctx); err != nil {
+		t.Fatalf("backfill default assistant: %v", err)
+	}
+
+	assistant, err := accountRepo.GetByIdentifier(ctx, DefaultAssistantIdentifier)
+	if err != nil {
+		t.Fatalf("get default assistant account: %v", err)
+	}
+	defaultAgent, err := agentRepo.GetAgentByIMUserID(ctx, assistant.AccountID)
+	if err != nil {
+		t.Fatalf("get default assistant agent config: %v", err)
+	}
+
+	defaultBindings, err := registryRepo.ListToolBindings(ctx, defaultAgent.AgentID)
+	if err != nil {
+		t.Fatalf("list default assistant tool bindings: %v", err)
+	}
+	var pythonTool model.AgentTool
+	for _, binding := range defaultBindings {
+		tool, err := registryRepo.GetTool(ctx, binding.ToolID)
+		if err != nil {
+			t.Fatalf("get bound tool %q: %v", binding.ToolID, err)
+		}
+		if tool.Name == model.LocalToolHandlerPythonExecute {
+			pythonTool = tool
+			break
+		}
+	}
+	if pythonTool.ToolID == "" {
+		t.Fatalf("default assistant bindings = %+v, want python.execute tool binding", defaultBindings)
+	}
+	if pythonTool.ToolType != model.AgentToolTypeLocal ||
+		pythonTool.LocalHandlerKey != model.LocalToolHandlerPythonExecute ||
+		pythonTool.PermissionLevel != "restricted" ||
+		pythonTool.Status != model.AgentToolStatusActive ||
+		!pythonTool.AdminConfigured {
+		t.Fatalf("python.execute tool metadata = %+v, want active admin local restricted tool", pythonTool)
+	}
+	for _, want := range []string{`"code"`, `"timeout_seconds"`, `"files"`} {
+		if !strings.Contains(pythonTool.InputSchemaJSON, want) {
+			t.Fatalf("python.execute input schema missing %s: %s", want, pythonTool.InputSchemaJSON)
+		}
+	}
+
+	if _, err := provisioner.Backfill(ctx); err != nil {
+		t.Fatalf("second backfill: %v", err)
+	}
+	secondDefaultBindings, err := registryRepo.ListToolBindings(ctx, defaultAgent.AgentID)
+	if err != nil {
+		t.Fatalf("list default assistant tool bindings after second run: %v", err)
+	}
+	pythonBindingCount := 0
+	for _, binding := range secondDefaultBindings {
+		if binding.ToolID == pythonTool.ToolID {
+			pythonBindingCount++
+		}
+	}
+	if pythonBindingCount != 1 {
+		t.Fatalf("python.execute binding count after idempotent backfill = %d, want 1: %+v", pythonBindingCount, secondDefaultBindings)
+	}
+
+	otherBindings, err := registryRepo.ListToolBindings(ctx, otherAgent.AgentID)
+	if err != nil {
+		t.Fatalf("list non-default agent tool bindings: %v", err)
+	}
+	for _, binding := range otherBindings {
+		if binding.ToolID == pythonTool.ToolID {
+			t.Fatalf("non-default agent received python.execute binding: %+v", otherBindings)
+		}
+	}
+}
+
 func TestDefaultAssistantBackfillAddsAcceptedFriendshipForHumanUsersOnly(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := repository.NewMemoryRepository()
