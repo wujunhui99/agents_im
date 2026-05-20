@@ -221,7 +221,11 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
 }
 
 function isAdminRoute() {
-  return window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
+  return (
+    window.location.hostname === 'admin.agenticim.xyz' ||
+    window.location.pathname === '/admin' ||
+    window.location.pathname.startsWith('/admin/')
+  );
 }
 
 function AuthPage({ prompt = '' }: { prompt?: string }) {

@@ -10,6 +10,7 @@ spec:
   tls:
     - hosts:
         - agenticim.xyz
+        - admin.agenticim.xyz
       secretName: agenticim-xyz-tls
   rules:
     - host: agenticim.xyz
@@ -113,6 +114,44 @@ spec:
                 name: gateway-ws
                 port:
                   number: 8084
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+    - host: admin.agenticim.xyz
+      http:
+        paths:
+          - path: /admin/dashboard
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
+          - path: /admin/llm-traces
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
+          - path: /admin/conversations
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
+          - path: /admin/users
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
           - path: /
             pathType: Prefix
             backend:
