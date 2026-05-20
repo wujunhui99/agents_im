@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -34,6 +35,8 @@ type DeepSeekRuntimeOption func(*DeepSeekRuntime)
 type deepSeekChatModelFactory func(ctx context.Context, cfg config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error)
 
 const defaultMaxDeepSeekRuntimeToolCalls = 8
+
+var deepSeekToolNameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
 
 func WithLLMObservability(sink llmobs.Sink, cfg llmobs.Config) DeepSeekRuntimeOption {
 	return func(runtime *DeepSeekRuntime) {
@@ -182,7 +185,7 @@ func (r *DeepSeekRuntime) generateWithTools(
 	messages := runtimeMessages(req)
 	toolByName := make(map[string]runtimetools.ResolvedTool, len(resolvedTools))
 	for _, tool := range resolvedTools {
-		toolByName[tool.Spec.Name] = tool
+		toolByName[deepSeekToolFunctionName(tool.Spec)] = tool
 	}
 	maxToolCalls := req.Agent.Policy.MaxToolCalls
 	if maxToolCalls <= 0 {
@@ -273,7 +276,7 @@ func executeRuntimeToolCall(
 	if content == "" {
 		content = "{}"
 	}
-	return schema.ToolMessage(content, call.ID, schema.WithToolName(resolved.Spec.Name)), result, nil
+	return schema.ToolMessage(content, call.ID, schema.WithToolName(toolName)), result, nil
 }
 
 func toolInfosFromResolvedTools(resolvedTools []runtimetools.ResolvedTool) ([]*schema.ToolInfo, error) {
@@ -289,7 +292,7 @@ func toolInfosFromResolvedTools(resolvedTools []runtimetools.ResolvedTool) ([]*s
 }
 
 func toolInfoFromSpec(spec runtimetools.ToolSpec) (*schema.ToolInfo, error) {
-	name := strings.TrimSpace(spec.Name)
+	name := deepSeekToolFunctionName(spec)
 	if name == "" {
 		return nil, apperror.InvalidArgument("tool name is required")
 	}
@@ -306,6 +309,16 @@ func toolInfoFromSpec(spec runtimetools.ToolSpec) (*schema.ToolInfo, error) {
 		Desc:        strings.TrimSpace(spec.Description),
 		ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&inputSchema),
 	}, nil
+}
+
+func deepSeekToolFunctionName(spec runtimetools.ToolSpec) string {
+	name := strings.TrimSpace(spec.Name)
+	if name == "" && spec.Local != nil {
+		name = strings.TrimSpace(spec.Local.HandlerKey)
+	}
+	name = deepSeekToolNameUnsafeChars.ReplaceAllString(name, "_")
+	name = strings.Trim(name, "_")
+	return name
 }
 
 func llmObsBaseEvent(req agentruntime.RunRequest, cfg config.DeepSeekConfig) llmobs.Event {

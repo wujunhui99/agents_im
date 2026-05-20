@@ -32,7 +32,11 @@ func TestNewExecutorFromConfigBuildsKubernetesWithInjectedClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new k8s executor from config: %v", err)
 	}
-	if _, ok := executor.(*KubernetesExecutor); !ok {
+	k8sExecutor, ok := executor.(*KubernetesExecutor)
+	if !ok {
 		t.Fatalf("expected kubernetes executor, got %T", executor)
+	}
+	if k8sExecutor.config.ImagePullSecret != "ghcr-pull-secret" {
+		t.Fatalf("kubernetes executor image pull secret = %q, want ghcr-pull-secret", k8sExecutor.config.ImagePullSecret)
 	}
 }
