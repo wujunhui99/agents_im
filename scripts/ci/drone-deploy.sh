@@ -34,12 +34,17 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
     skip_set_image=false
   fi
 
+  drone_deploy_database_url="${DATABASE_URL:-}"
+  if [[ -z "${drone_deploy_database_url}" ]]; then
+    drone_deploy_database_url="$(kubectl --kubeconfig "${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}" -n agents-im get secret agents-im-secrets -o jsonpath='{.data.DATABASE_URL}' | base64 -d | sed 's/@127\.0\.0\.1:5432/@host.docker.internal:5432/')"
+  fi
+
   cd /opt/agents-im/repo
   IMAGE_REGISTRY="${registry}" \
     IMAGE_TAG="${DRONE_COMMIT_SHA}" \
     GHCR_USERNAME="${GHCR_USERNAME}" \
     GHCR_TOKEN="${GHCR_TOKEN}" \
-    DATABASE_URL="${DATABASE_URL:-}" \
+    DATABASE_URL="${drone_deploy_database_url}" \
     KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}" \
     SKIP_SET_IMAGE="${skip_set_image}" \
     SKIP_MIDDLEWARE="${config_only}" \
