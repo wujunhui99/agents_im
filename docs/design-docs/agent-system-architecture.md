@@ -243,7 +243,7 @@ agent_runs
 - 缺少 `DEEPSEEK_API_KEY` 时构造 ChatModel 必须返回明确错误，不能降级为 mock/fake response。
 - 默认 `go test ./...` 不请求 DeepSeek；live smoke test 只能在 `RUN_LIVE_DEEPSEEK_TESTS=1` 且存在 API key 时运行。
 
-该基线不实现完整 Agent runtime orchestration、工具/MCP 调用或上下文装配；当前 Agent-IM runner seam 使用 `internal/agentruntime.Runtime`，但生产 wiring 仍必须显式组装 registry-derived `RunRequest`。
+当前 Eino runtime 支持通过 `internal/agentruntime/tools.Provider` 解析 registry-approved tool bindings，并可执行带显式安全 adapter 的本地工具；`python.execute` 通过注入的 `PythonExecuteAdapter` / `pythonexec.Executor` 执行，默认 executor 仍 fail-closed。MCP 网络工具调用、完整 skill 文件读取和长期审计落库仍是后续任务。当前 Agent-IM runner seam 使用 `internal/agentruntime.Runtime`，生产 wiring 必须显式组装 registry-derived `RunRequest` 并注入 tool provider。
 
 工具调用审计：
 
@@ -337,7 +337,7 @@ agent_python_execs
 - stdout/stderr/result/error 全部记录。
 - 失败必须显式返回，不能伪造成功。
 
-当前仓库只实现 Go 侧 sandbox contract 和 `python.execute` local tool adapter，不实现真实执行器。契约位于 `internal/agent/pythonexec`：
+当前仓库实现 Go 侧 sandbox contract、`python.execute` local tool adapter，以及 DeepSeek/Eino runtime 中对 registry-approved local adapter 的工具调用循环；不实现未隔离的真实执行器。契约位于 `internal/agent/pythonexec`：
 
 ```text
 Executor.Execute(ctx, Request) (*Response, error)

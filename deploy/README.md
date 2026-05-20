@@ -235,13 +235,13 @@ When `OBJECT_STORAGE_EXTERNAL_ENDPOINT` differs from the internal `OBJECT_STORAG
 
 ## Sandboxed Python executor
 
-`agent-api` ships with the Python executor disabled. The production ConfigMap sets:
+`agent-api` and `message-api` ship with the Python executor disabled. The default `agent_creator` / `AI 助手` has a `python.execute` registry binding, but runtime execution still fails closed until the executor backend is explicitly enabled. The production ConfigMap sets:
 
 ```yaml
 PYTHON_EXECUTOR_BACKEND: "disabled"
 ```
 
-To enable the Kubernetes backend, operators must first provision a dedicated sandbox namespace, a reviewed runner image, default-deny NetworkPolicy, Pod Security controls, and scoped RBAC for `agent-api`. Then set:
+To enable the Kubernetes backend, operators must first provision a dedicated sandbox namespace, a reviewed runner image, default-deny NetworkPolicy, Pod Security controls, and scoped RBAC for the API pods that create sandbox Jobs. Then set the shared executor config used by `agent-api` and `message-api`:
 
 ```yaml
 PYTHON_EXECUTOR_BACKEND: "k8s"
@@ -255,6 +255,16 @@ PYTHON_EXECUTOR_MAX_OUTPUT_BYTES: "65536"
 The sandbox Job manifest intentionally disables service account token automount, host networking, privileged mode, privilege escalation, hostPath volumes, and Linux capabilities. Do not add Docker socket mounts, host filesystem mounts, shell access, default egress, or runtime package installation to the sandbox path.
 
 Runner image contract and scaffold: [`python-sandbox/README.md`](./python-sandbox/README.md).
+
+Production enablement checklist:
+
+1. Build and publish a pinned sandbox runner image from the reviewed `deploy/python-sandbox` contract.
+2. Create the dedicated sandbox namespace, for example `agent-python-sandbox`.
+3. Apply default-deny ingress and egress NetworkPolicy in that namespace.
+4. Apply Pod Security controls that reject privileged pods, host namespaces, hostPath, and privilege escalation.
+5. Grant only scoped RBAC for creating/watching/reading/deleting owned sandbox Jobs, ConfigMaps, and logs.
+6. Set `PYTHON_EXECUTOR_BACKEND=k8s` plus namespace/image/resource limits for both `agent-api` and `message-api`.
+7. Smoke test by chatting with `AI 助手` and asking for a calculation that should use Python; verify the final reply and tool-run evidence. A WebSocket open event alone does not prove Python execution works.
 
 ## Public entry
 
