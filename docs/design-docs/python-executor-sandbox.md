@@ -16,11 +16,14 @@ handler_key = python.execute
 
 The registry and resolver may represent this handler only through the local-tool whitelist. A runtime that requires callable tools must request adapters explicitly. The safe adapter is `internal/agentruntime/tools.PythonExecuteAdapter`, backed by the injected `internal/agent/pythonexec.Executor` contract.
 
+The built-in default assistant (`agent_creator` / `AI 助手`) is the only built-in Agent that is automatically bound to `python.execute`. Other Agents must not receive the binding implicitly. Direct assistant replies run in `message-api`, so both `agent-api` and `message-api` keep `PythonExecutor.Backend: disabled` unless operators explicitly configure the Kubernetes backend.
+
 Default wiring remains fail-closed:
 
 - `pythonexec.NewDefaultExecutor()` returns `DisabledExecutor`.
 - `DisabledExecutor` validates request/policy and returns `ErrPythonExecutorDisabled`.
 - `NewDefaultLocalAdapterCatalog(nil)` creates the Python adapter with the disabled executor.
+- The DeepSeek/Eino runtime resolves only registry-approved bound tools with `RequireAdapters=true`; a tool call without an approved adapter is a visible runtime error.
 - No V1 code starts Python, shell, Docker, network calls, or local processes.
 
 The adapter accepts strict JSON input:
@@ -82,8 +85,9 @@ The next-stage backend adds an opt-in Kubernetes executor under `internal/agent/
 Default behavior remains fail-closed:
 
 - missing `PythonExecutor` config resolves to `Backend: disabled`;
-- local/dev and production example configs set `PythonExecutor.Backend: disabled`;
+- local/dev and production example configs for `agent-api` and `message-api` set `PythonExecutor.Backend: disabled`;
 - `agent-api` constructs a disabled executor unless config explicitly selects `k8s`;
+- `message-api` constructs the same executor for direct AI assistant runtime tool calls;
 - selecting `k8s` without a Kubernetes client, namespace, or image is a startup/config error, not a fallback.
 
 The Kubernetes backend creates one Job and one ConfigMap per execution. The ConfigMap contains only the submitted code file and is mounted read-only at `/sandbox/input/main.py`; raw code is not placed in object names, labels, or annotations. Non-empty file allowlists are rejected until explicit file materialization exists.

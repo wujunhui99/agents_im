@@ -2,12 +2,16 @@ package message
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
+	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
 	"github.com/wujunhui99/agents_im/internal/config"
 	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
@@ -135,6 +139,76 @@ func TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting(t *
 	waitForAgentAuditRuns(t, serviceContext.AgentAuditRepo, 1)
 }
 
+func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testing.T) {
+	ctx := context.Background()
+	registryRepo := repository.NewMemoryAgentRegistryRepository()
+	if _, err := registryRepo.RegisterTool(ctx, model.AgentTool{
+		ToolID:           "tool_python_execute",
+		Name:             model.LocalToolHandlerPythonExecute,
+		Description:      "Execute bounded Python code in the configured sandbox.",
+		ToolType:         model.AgentToolTypeLocal,
+		LocalHandlerKey:  model.LocalToolHandlerPythonExecute,
+		InputSchemaJSON:  `{"type":"object","properties":{"code":{"type":"string"}},"required":["code"]}`,
+		OutputSchemaJSON: `{"type":"object"}`,
+		PermissionLevel:  "restricted",
+		Status:           model.AgentToolStatusActive,
+		AdminConfigured:  true,
+		CreatedBy:        "agent_creator",
+	}); err != nil {
+		t.Fatalf("register python.execute tool: %v", err)
+	}
+	if _, _, err := registryRepo.BindTool(ctx, model.AgentToolBinding{
+		AgentID:   "agent_default_assistant",
+		ToolID:    "tool_python_execute",
+		CreatedBy: "agent_creator",
+	}); err != nil {
+		t.Fatalf("bind python.execute tool: %v", err)
+	}
+	executor := &recordingPythonExecutor{
+		resp: &pythonexec.Response{
+			RunID:      "run_python",
+			AuditID:    "req_python",
+			Stdout:     "2\n",
+			ResultJSON: []byte(`null`),
+		},
+	}
+
+	provider, err := newConversationAIHostingToolProvider(registryRepo, executor)
+	if err != nil {
+		t.Fatalf("build runtime tool provider: %v", err)
+	}
+	resolved, err := provider.ResolveTool(ctx, runtimetools.ResolveToolRequest{
+		AgentID:         "agent_default_assistant",
+		ToolID:          "tool_python_execute",
+		RequireAdapters: true,
+		RunID:           "run_python",
+		RequestID:       "req_python",
+	})
+	if err != nil {
+		t.Fatalf("resolve python.execute adapter: %v", err)
+	}
+	if !resolved.HasAdapter() {
+		t.Fatal("resolved python.execute tool has no adapter")
+	}
+	result, err := resolved.Adapter.Invoke(ctx, runtimetools.ToolCall{
+		RunID:     "run_python",
+		AgentID:   "agent_default_assistant",
+		ToolID:    "tool_python_execute",
+		ToolName:  model.LocalToolHandlerPythonExecute,
+		InputJSON: json.RawMessage(`{"code":"print(1 + 1)"}`),
+		RequestID: "req_python",
+	})
+	if err != nil {
+		t.Fatalf("invoke python.execute adapter: %v", err)
+	}
+	if !strings.Contains(string(result.OutputJSON), `"stdout":"2\n"`) {
+		t.Fatalf("python.execute output = %s, want stdout from configured executor", result.OutputJSON)
+	}
+	if executor.calls != 1 || !strings.Contains(executor.lastReq.Code, "1 + 1") {
+		t.Fatalf("configured executor was not called correctly: calls=%d req=%+v", executor.calls, executor.lastReq)
+	}
+}
+
 func completeAIHostingServiceContext() *ServiceContext {
 	messageRepo := repository.NewMemoryMessageRepository()
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
@@ -148,6 +222,22 @@ func completeAIHostingServiceContext() *ServiceContext {
 		AgentAuditRepo:   agentAuditRepo,
 		AgentAuditLogic:  business.NewAgentAuditLogic(agentAuditRepo),
 	}
+}
+
+type recordingPythonExecutor struct {
+	calls   int
+	lastReq pythonexec.Request
+	resp    *pythonexec.Response
+	err     error
+}
+
+func (e *recordingPythonExecutor) Execute(_ context.Context, req pythonexec.Request) (*pythonexec.Response, error) {
+	e.calls++
+	e.lastReq = req
+	if e.err != nil {
+		return nil, e.err
+	}
+	return e.resp, nil
 }
 
 func waitForAgentAuditRuns(t *testing.T, repo repository.AgentAuditRepository, want int64) {
