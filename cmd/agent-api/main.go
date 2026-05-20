@@ -34,6 +34,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("build agent repository: %v", err)
 	}
+	agentRegistryRepo, err := repository.NewAgentRegistryRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent registry repository: %v", err)
+	}
 	userLogic := logic.NewUserLogic(userRepo)
 	var pythonExecutorClient pythonexec.KubernetesSandboxClient
 	if cfg.PythonExecutor.Backend == config.PythonExecutorBackendK8S {
@@ -52,6 +56,7 @@ func main() {
 		cfg.Auth,
 		pythonExecutor,
 	)
+	serviceContext.ConfigureAgentAssembly(userRepo, userRepo, agentRegistryRepo)
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
 		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 		if err != nil {

@@ -480,7 +480,8 @@ func allowedLocalHandlerKey(key string) bool {
 	case model.LocalToolHandlerGetConversationContext,
 		model.LocalToolHandlerReadSkillFile,
 		model.LocalToolHandlerSendAgentMessage,
-		model.LocalToolHandlerPythonExecute:
+		model.LocalToolHandlerPythonExecute,
+		model.LocalToolHandlerAgentCreate:
 		return true
 	default:
 		return false

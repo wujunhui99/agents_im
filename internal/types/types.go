@@ -24,6 +24,47 @@ type AgentResp struct {
 	Data    Agent  `json:"data"`
 }
 
+type AgentDefinitionPrompt struct {
+	PromptID            string `json:"prompt_id"`
+	Name                string `json:"name"`
+	Description         string `json:"description"`
+	Content             string `json:"content"`
+	VariablesSchemaJSON string `json:"variables_schema_json"`
+	Version             string `json:"version"`
+	Status              string `json:"status"`
+	CreatedBy           string `json:"created_by"`
+	CreatedAt           string `json:"created_at"`
+	UpdatedAt           string `json:"updated_at"`
+}
+
+type AgentDefinitionTool struct {
+	ToolID           string `json:"tool_id"`
+	Name             string `json:"name"`
+	Description      string `json:"description"`
+	ToolType         string `json:"tool_type"`
+	MCPServerID      string `json:"mcp_server_id,omitempty"`
+	MCPToolName      string `json:"mcp_tool_name,omitempty"`
+	LocalHandlerKey  string `json:"local_handler_key,omitempty"`
+	BuiltinKey       string `json:"builtin_key,omitempty"`
+	InputSchemaJSON  string `json:"input_schema_json"`
+	OutputSchemaJSON string `json:"output_schema_json"`
+	PermissionLevel  string `json:"permission_level"`
+	Status           string `json:"status"`
+	AdminConfigured  bool   `json:"admin_configured"`
+}
+
+type AgentDefinitionData struct {
+	Agent        Agent                 `json:"agent"`
+	SystemPrompt AgentDefinitionPrompt `json:"system_prompt"`
+	Tools        []AgentDefinitionTool `json:"tools"`
+}
+
+type AgentDefinitionResp struct {
+	Code    string              `json:"code"`
+	Message string              `json:"message"`
+	Data    AgentDefinitionData `json:"data"`
+}
+
 type AddFriendData struct {
 	Friendship Friendship `json:"friendship"`
 	Created    bool       `json:"created"`
@@ -557,6 +598,12 @@ type UpdateAgentReq struct {
 	AgentID     string `path:"agent_id"`
 	Name        string `json:"name,optional"`
 	Description string `json:"description,optional"`
+}
+
+type UpdateAgentDefinitionReq struct {
+	AgentID      string   `path:"agent_id"`
+	SystemPrompt string   `json:"system_prompt"`
+	ToolNames    []string `json:"tool_names,optional"`
 }
 
 type UpdateAgentStatusReq struct {

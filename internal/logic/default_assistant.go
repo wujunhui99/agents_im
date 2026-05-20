@@ -16,8 +16,9 @@ const (
 	DefaultAssistantAgentDescription = "Default general AI assistant"
 	DefaultAssistantPromptName       = "agent_creator_default_system_prompt"
 	DefaultAssistantPromptVersion    = "v1"
-	DefaultAssistantSystemPrompt     = "你是一个通用 AI 助手，回答应准确、简洁、友好。你可以帮助用户解释概念、比较方案、整理信息、生成文本和提供编程/产品建议。不要编造事实；不确定时说明不确定并给出可验证的下一步。"
+	DefaultAssistantSystemPrompt     = "你是一个通用 AI 助手，回答应准确、简洁、友好。你可以帮助用户解释概念、比较方案、整理信息、生成文本和提供编程/产品建议。不要编造事实；不确定时说明不确定并给出可验证的下一步。当用户明确要求创建新的 Agent 时，可以使用 agent.create 工具创建账号、Agent 配置、系统提示词、允许的低风险工具绑定，并把新 Agent 加为该用户好友。"
 	DefaultAssistantPythonToolName   = model.LocalToolHandlerPythonExecute
+	DefaultAssistantAgentCreateName  = model.LocalToolHandlerAgentCreate
 )
 
 const defaultAssistantPythonToolInputSchema = `{
@@ -61,6 +62,52 @@ const defaultAssistantPythonToolOutputSchema = `{
         "message": {"type": "string"}
       }
     }
+  }
+}`
+
+const defaultAssistantAgentCreateInputSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "identifier": {
+      "type": "string",
+      "description": "Optional unique account identifier. If omitted the server allocates one."
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name for the new Agent account and Agent profile."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional Agent description."
+    },
+    "system_prompt": {
+      "type": "string",
+      "description": "System prompt to bind as the Agent definition."
+    },
+    "tool_names": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Optional low-risk tool names to bind. High-risk write, Python, MCP/network, and agent.create tools are rejected by policy."
+    }
+  },
+  "required": ["name", "system_prompt"]
+}`
+
+const defaultAssistantAgentCreateOutputSchema = `{
+  "type": "object",
+  "properties": {
+    "agent_id": {"type": "string"},
+    "account_id": {"type": "string"},
+    "identifier": {"type": "string"},
+    "name": {"type": "string"},
+    "description": {"type": "string"},
+    "prompt_id": {"type": "string"},
+    "tool_names": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "friend_user_id": {"type": "string"}
   }
 }`
 
@@ -172,6 +219,17 @@ func (p *DefaultAssistantProvisioner) ensureDefaultAssistant(ctx context.Context
 	if _, _, err := p.registry.BindTool(ctx, model.AgentToolBinding{
 		AgentID:   agent.AgentID,
 		ToolID:    tool.ToolID,
+		CreatedBy: account.AccountID,
+	}); err != nil {
+		return model.User{}, model.Agent{}, model.AgentPrompt{}, err
+	}
+	createTool, err := p.ensureAgentCreateTool(ctx, account)
+	if err != nil {
+		return model.User{}, model.Agent{}, model.AgentPrompt{}, err
+	}
+	if _, _, err := p.registry.BindTool(ctx, model.AgentToolBinding{
+		AgentID:   agent.AgentID,
+		ToolID:    createTool.ToolID,
 		CreatedBy: account.AccountID,
 	}); err != nil {
 		return model.User{}, model.Agent{}, model.AgentPrompt{}, err
@@ -292,6 +350,21 @@ func (p *DefaultAssistantProvisioner) ensurePythonExecuteTool(ctx context.Contex
 		LocalHandlerKey:  model.LocalToolHandlerPythonExecute,
 		InputSchemaJSON:  defaultAssistantPythonToolInputSchema,
 		OutputSchemaJSON: defaultAssistantPythonToolOutputSchema,
+		PermissionLevel:  "restricted",
+		Status:           model.AgentToolStatusActive,
+		AdminConfigured:  true,
+		CreatedBy:        account.AccountID,
+	})
+}
+
+func (p *DefaultAssistantProvisioner) ensureAgentCreateTool(ctx context.Context, account model.User) (model.AgentTool, error) {
+	return p.registry.UpsertToolByName(ctx, model.AgentTool{
+		Name:             DefaultAssistantAgentCreateName,
+		Description:      "Create a new Agent through the server-side agent assembly workflow.",
+		ToolType:         model.AgentToolTypeLocal,
+		LocalHandlerKey:  model.LocalToolHandlerAgentCreate,
+		InputSchemaJSON:  defaultAssistantAgentCreateInputSchema,
+		OutputSchemaJSON: defaultAssistantAgentCreateOutputSchema,
 		PermissionLevel:  "restricted",
 		Status:           model.AgentToolStatusActive,
 		AdminConfigured:  true,

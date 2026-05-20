@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/config"
@@ -38,6 +39,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("build groups repository: %v", err)
 	}
+	accountRepo, err := repository.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build account repository: %v", err)
+	}
 	messageRepo, err := repository.NewMessageRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {
 		log.Fatalf("build message repository: %v", err)
@@ -54,6 +59,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("build agent repository: %v", err)
 	}
+	agentRegistryRepo, err := repository.NewAgentRegistryRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent registry repository: %v", err)
+	}
 	aiHostingRepo, err := repository.NewConversationAIHostingRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {
 		log.Fatalf("build AI hosting repository: %v", err)
@@ -66,6 +75,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("build presence store: %v", err)
 	}
+	var pythonExecutorClient pythonexec.KubernetesSandboxClient
+	if cfg.PythonExecutor.Backend == config.PythonExecutorBackendK8S {
+		pythonExecutorClient, err = pythonexec.NewInClusterKubernetesSandboxClient()
+		if err != nil {
+			log.Fatalf("build python executor kubernetes client: %v", err)
+		}
+	}
+	pythonExecutor, err := pythonexec.NewExecutorFromConfig(cfg.PythonExecutor, pythonExecutorClient)
+	if err != nil {
+		log.Fatalf("build python executor: %v", err)
+	}
 	groupsLogic := logic.NewGroupsLogic(groupsRepo, nil)
 	messageContext := messagesvc.NewServiceContextWithMedia(
 		messageRepo,
@@ -77,9 +97,13 @@ func main() {
 	messageContext.AgentHostingRepo = agentHostingRepo
 	messageContext.AIHostingRepo = aiHostingRepo
 	messageContext.AgentResolver = agentim.NewAgentRepositoryAccountResolver(agentRepo)
+	messageContext.AccountRepo = accountRepo
+	messageContext.AgentRepo = agentRepo
 	messageContext.AIHostingLogic = logic.NewConversationAIHostingLogic(aiHostingRepo).WithAgentAccountResolver(messageContext.AgentResolver)
 	messageContext.AgentAuditRepo = agentAuditRepo
 	messageContext.AgentAuditLogic = logic.NewAgentAuditLogic(agentAuditRepo)
+	messageContext.AgentRegistryRepo = agentRegistryRepo
+	messageContext.PythonExecutor = pythonExecutor
 	if err := messagesvc.ConfigureConversationAIHosting(messageContext, cfg.DeepSeek, cfg.LLMObservability); err != nil {
 		log.Fatalf("configure gateway conversation AI hosting: %v", err)
 	}

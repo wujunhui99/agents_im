@@ -86,6 +86,8 @@ func main() {
 	serviceContext.AgentHostingRepo = agentHostingRepo
 	serviceContext.AIHostingRepo = aiHostingRepo
 	serviceContext.AgentResolver = agentim.NewAgentRepositoryAccountResolver(agentRepo)
+	serviceContext.AccountRepo = accountRepo
+	serviceContext.AgentRepo = agentRepo
 	serviceContext.AIHostingLogic = logic.NewConversationAIHostingLogic(aiHostingRepo).WithAgentAccountResolver(serviceContext.AgentResolver)
 	serviceContext.AgentAuditRepo = agentAuditRepo
 	serviceContext.AgentAuditLogic = logic.NewAgentAuditLogic(agentAuditRepo)
