@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { vi } from 'vitest';
+import type {} from 'vitest/jsdom';
 import App from './App';
 import type { UserProfile, UserProfilePatch } from './api/user';
 import type { WebSocketFactory, WebSocketLike } from './api/websocketClient';
@@ -124,6 +125,14 @@ function removeInstalledStyles() {
   document.head.querySelectorAll('style[data-test-style="app-shell"]').forEach((style) => style.remove());
 }
 
+function setTestLocation(url: string) {
+  jsdom.reconfigure({ url });
+}
+
+function resetTestLocation() {
+  setTestLocation('http://localhost:3000/');
+}
+
 function getTabPanel(label: string) {
   const panel = screen
     .getAllByRole('tabpanel', { hidden: true })
@@ -146,6 +155,7 @@ describe('Auth flow', () => {
     vi.unstubAllGlobals();
     localStorage.clear();
     removeInstalledStyles();
+    resetTestLocation();
   });
 
   it('shows a WeChat-style login page before authentication and saves the login token', async () => {
@@ -346,6 +356,69 @@ describe('Auth flow', () => {
     window.history.pushState({}, '', '/');
   });
 
+  it('renders the isolated admin console for the management system host root', async () => {
+    setTestLocation('https://ms.agenticim.xyz/');
+    storeSession({
+      user: {
+        userId: '9001',
+        identifier: 'admin_001',
+        displayName: 'Admin',
+        accountType: 'admin',
+      },
+    });
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const path = fetchPath(input);
+      if (path === '/admin/dashboard') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              totals: {
+                users: 1,
+                conversations: 0,
+                messages: 0,
+                aiRuns: 0,
+                failedAiRuns: 0,
+              },
+              recentTraces: [],
+              recentConversations: [],
+            },
+          }),
+        );
+      }
+      if (path === '/conversations/seqs?conversationIds=') {
+        return Promise.resolve(emptySeqsResponse());
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${path}`));
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Admin Console' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /消息/i })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/admin/dashboard',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+      }),
+    );
+  });
+
+  it('keeps the primary domain root on the normal authenticated app shell', async () => {
+    setTestLocation('https://agenticim.xyz/');
+    storeSession();
+    fetchMock.mockResolvedValue(emptySeqsResponse());
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: '消息' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /消息/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Admin Console' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/conversations/seqs?conversationIds=', expect.anything());
+  });
+
   it('blocks registration submit until email and verification code are present', async () => {
     const user = userEvent.setup();
 
@@ -533,6 +606,7 @@ describe('WeChat-inspired app shell', () => {
     vi.unstubAllGlobals();
     localStorage.clear();
     removeInstalledStyles();
+    resetTestLocation();
   });
 
   it('renders the four primary tabs', async () => {
