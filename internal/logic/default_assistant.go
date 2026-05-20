@@ -17,7 +17,52 @@ const (
 	DefaultAssistantPromptName       = "agent_creator_default_system_prompt"
 	DefaultAssistantPromptVersion    = "v1"
 	DefaultAssistantSystemPrompt     = "你是一个通用 AI 助手，回答应准确、简洁、友好。你可以帮助用户解释概念、比较方案、整理信息、生成文本和提供编程/产品建议。不要编造事实；不确定时说明不确定并给出可验证的下一步。"
+	DefaultAssistantPythonToolName   = model.LocalToolHandlerPythonExecute
 )
+
+const defaultAssistantPythonToolInputSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Python code to execute in the configured sandbox."
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 30,
+      "description": "Optional execution timeout in seconds."
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional read-only allowlisted file paths. Empty unless explicitly configured."
+    }
+  },
+  "required": ["code"]
+}`
+
+const defaultAssistantPythonToolOutputSchema = `{
+  "type": "object",
+  "properties": {
+    "stdout": {"type": "string"},
+    "stderr": {"type": "string"},
+    "result_json": {},
+    "exit_code": {"type": "integer"},
+    "timed_out": {"type": "boolean"},
+    "output_truncated": {"type": "boolean"},
+    "error": {
+      "type": ["object", "null"],
+      "properties": {
+        "code": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}`
 
 type DefaultAssistantProvisioner struct {
 	accounts    repository.AccountRepository
@@ -116,6 +161,17 @@ func (p *DefaultAssistantProvisioner) ensureDefaultAssistant(ctx context.Context
 	if _, _, err := p.registry.BindPrompt(ctx, model.AgentPromptBinding{
 		AgentID:   agent.AgentID,
 		PromptID:  prompt.PromptID,
+		CreatedBy: account.AccountID,
+	}); err != nil {
+		return model.User{}, model.Agent{}, model.AgentPrompt{}, err
+	}
+	tool, err := p.ensurePythonExecuteTool(ctx, account)
+	if err != nil {
+		return model.User{}, model.Agent{}, model.AgentPrompt{}, err
+	}
+	if _, _, err := p.registry.BindTool(ctx, model.AgentToolBinding{
+		AgentID:   agent.AgentID,
+		ToolID:    tool.ToolID,
 		CreatedBy: account.AccountID,
 	}); err != nil {
 		return model.User{}, model.Agent{}, model.AgentPrompt{}, err
@@ -225,6 +281,21 @@ func (p *DefaultAssistantProvisioner) ensureDefaultAssistantPrompt(ctx context.C
 		Version:             DefaultAssistantPromptVersion,
 		Status:              model.AgentPromptStatusActive,
 		CreatedBy:           account.AccountID,
+	})
+}
+
+func (p *DefaultAssistantProvisioner) ensurePythonExecuteTool(ctx context.Context, account model.User) (model.AgentTool, error) {
+	return p.registry.UpsertToolByName(ctx, model.AgentTool{
+		Name:             DefaultAssistantPythonToolName,
+		Description:      "Execute bounded Python code through the configured sandbox executor.",
+		ToolType:         model.AgentToolTypeLocal,
+		LocalHandlerKey:  model.LocalToolHandlerPythonExecute,
+		InputSchemaJSON:  defaultAssistantPythonToolInputSchema,
+		OutputSchemaJSON: defaultAssistantPythonToolOutputSchema,
+		PermissionLevel:  "restricted",
+		Status:           model.AgentToolStatusActive,
+		AdminConfigured:  true,
+		CreatedBy:        account.AccountID,
 	})
 }
 

@@ -2,15 +2,19 @@ package eino
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
+	einojsonschema "github.com/eino-contrib/jsonschema"
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	llmdeepseek "github.com/wujunhui99/agents_im/internal/agentruntime/llm/deepseek"
+	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/idgen"
@@ -18,12 +22,18 @@ import (
 )
 
 type DeepSeekRuntime struct {
-	cfg        config.DeepSeekConfig
-	llmobsSink llmobs.Sink
-	llmobsCfg  llmobs.Config
+	cfg              config.DeepSeekConfig
+	llmobsSink       llmobs.Sink
+	llmobsCfg        llmobs.Config
+	toolProvider     runtimetools.Provider
+	chatModelFactory deepSeekChatModelFactory
 }
 
 type DeepSeekRuntimeOption func(*DeepSeekRuntime)
+
+type deepSeekChatModelFactory func(ctx context.Context, cfg config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error)
+
+const defaultMaxDeepSeekRuntimeToolCalls = 8
 
 func WithLLMObservability(sink llmobs.Sink, cfg llmobs.Config) DeepSeekRuntimeOption {
 	return func(runtime *DeepSeekRuntime) {
@@ -32,8 +42,20 @@ func WithLLMObservability(sink llmobs.Sink, cfg llmobs.Config) DeepSeekRuntimeOp
 	}
 }
 
+func WithToolProvider(provider runtimetools.Provider) DeepSeekRuntimeOption {
+	return func(runtime *DeepSeekRuntime) {
+		runtime.toolProvider = provider
+	}
+}
+
+func WithChatModelFactory(factory func(ctx context.Context, cfg config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error)) DeepSeekRuntimeOption {
+	return func(runtime *DeepSeekRuntime) {
+		runtime.chatModelFactory = factory
+	}
+}
+
 func NewDeepSeekRuntime(cfg config.DeepSeekConfig, opts ...DeepSeekRuntimeOption) *DeepSeekRuntime {
-	runtime := &DeepSeekRuntime{cfg: cfg}
+	runtime := &DeepSeekRuntime{cfg: cfg, chatModelFactory: llmdeepseek.NewChatModel}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(runtime)
@@ -51,9 +73,37 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 	if strings.TrimSpace(normalized.Agent.Model.Model) != "" {
 		cfg.Model = normalized.Agent.Model.Model
 	}
-	cm, err := llmdeepseek.NewChatModel(ctx, cfg)
+	factory := r.chatModelFactory
+	if factory == nil {
+		factory = llmdeepseek.NewChatModel
+	}
+	cm, err := factory(ctx, cfg)
 	if err != nil {
 		return agentruntime.RunResult{}, err
+	}
+
+	runID := normalized.RunID
+	if runID == "" {
+		generated, err := idgen.NewString()
+		if err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		runID = "run_" + generated
+	}
+	normalized.RunID = runID
+	resolvedTools, err := r.resolveTools(ctx, normalized, runID)
+	if err != nil {
+		return agentruntime.RunResult{}, err
+	}
+	if len(resolvedTools) > 0 {
+		toolInfos, err := toolInfosFromResolvedTools(resolvedTools)
+		if err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		cm, err = cm.WithTools(toolInfos)
+		if err != nil {
+			return agentruntime.RunResult{}, fmt.Errorf("bind deepseek tools: %w", err)
+		}
 	}
 
 	startedAt := time.Now().UTC()
@@ -64,21 +114,13 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 			Component: components.ComponentOfChatModel,
 		}, llmobs.NewEinoCallbackHandler(r.llmobsSink, llmObsBaseEvent(normalized, cfg), r.llmobsCfg))
 	}
-	resp, err := cm.Generate(ctx, runtimeMessages(normalized))
+	resp, toolCallResults, err := r.generateWithTools(ctx, cm, normalized, runID, resolvedTools)
 	finishedAt := time.Now().UTC()
 	if err != nil {
 		return agentruntime.RunResult{}, fmt.Errorf("deepseek generate AI hosting reply: %w", err)
 	}
 	if resp == nil {
 		return agentruntime.RunResult{}, apperror.Internal("deepseek returned empty response")
-	}
-	runID := normalized.RunID
-	if runID == "" {
-		generated, err := idgen.NewString()
-		if err != nil {
-			return agentruntime.RunResult{}, err
-		}
-		runID = "run_" + generated
 	}
 	result := agentruntime.RunResult{
 		RunID:     runID,
@@ -89,6 +131,7 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 		},
 		StartedAt:  startedAt,
 		FinishedAt: finishedAt,
+		ToolCalls:  toolCallResults,
 	}
 	if resp.ResponseMeta != nil {
 		result.FinishReason = resp.ResponseMeta.FinishReason
@@ -103,6 +146,166 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 		}
 	}
 	return result, nil
+}
+
+func (r *DeepSeekRuntime) resolveTools(ctx context.Context, req agentruntime.RunRequest, runID string) ([]runtimetools.ResolvedTool, error) {
+	if r == nil || r.toolProvider == nil {
+		return nil, nil
+	}
+	toolIDs := make([]string, 0, len(req.Agent.Tools))
+	for _, tool := range req.Agent.Tools {
+		if tool.ToolID != "" {
+			toolIDs = append(toolIDs, tool.ToolID)
+		}
+	}
+	resolved, err := r.toolProvider.ResolveAgentTools(ctx, runtimetools.ResolveAgentToolsRequest{
+		AgentID:         req.Agent.AgentID,
+		ToolIDs:         toolIDs,
+		RequireAdapters: true,
+		RunID:           runID,
+		TraceID:         req.TraceID,
+		RequestID:       req.RequestID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resolved, nil
+}
+
+func (r *DeepSeekRuntime) generateWithTools(
+	ctx context.Context,
+	cm einomodel.ToolCallingChatModel,
+	req agentruntime.RunRequest,
+	runID string,
+	resolvedTools []runtimetools.ResolvedTool,
+) (*schema.Message, []agentruntime.ToolCallResult, error) {
+	messages := runtimeMessages(req)
+	toolByName := make(map[string]runtimetools.ResolvedTool, len(resolvedTools))
+	for _, tool := range resolvedTools {
+		toolByName[tool.Spec.Name] = tool
+	}
+	maxToolCalls := req.Agent.Policy.MaxToolCalls
+	if maxToolCalls <= 0 {
+		maxToolCalls = defaultMaxDeepSeekRuntimeToolCalls
+	}
+	toolCallResults := make([]agentruntime.ToolCallResult, 0)
+	executedToolCalls := 0
+
+	for {
+		resp, err := cm.Generate(ctx, messages)
+		if err != nil {
+			return nil, toolCallResults, err
+		}
+		if resp == nil {
+			return nil, toolCallResults, apperror.Internal("deepseek returned empty response")
+		}
+		if len(resp.ToolCalls) == 0 {
+			return resp, toolCallResults, nil
+		}
+		messages = append(messages, resp)
+		for _, call := range resp.ToolCalls {
+			if executedToolCalls >= maxToolCalls {
+				return nil, toolCallResults, apperror.InvalidArgument("max tool calls exceeded")
+			}
+			executedToolCalls++
+			toolMessage, callResult, err := executeRuntimeToolCall(ctx, req, runID, toolByName, call)
+			toolCallResults = append(toolCallResults, callResult)
+			if err != nil {
+				return nil, toolCallResults, err
+			}
+			messages = append(messages, toolMessage)
+		}
+	}
+}
+
+func executeRuntimeToolCall(
+	ctx context.Context,
+	req agentruntime.RunRequest,
+	runID string,
+	toolByName map[string]runtimetools.ResolvedTool,
+	call schema.ToolCall,
+) (*schema.Message, agentruntime.ToolCallResult, error) {
+	toolName := strings.TrimSpace(call.Function.Name)
+	result := agentruntime.ToolCallResult{
+		ToolCallID: strings.TrimSpace(call.ID),
+		ToolName:   toolName,
+		Status:     "failed",
+	}
+	startedAt := time.Now()
+	if toolName == "" {
+		err := apperror.InvalidArgument("tool call function name is required")
+		result.ErrorCode = string(apperror.From(err).Code)
+		result.ErrorMessage = err.Error()
+		result.DurationMs = time.Since(startedAt).Milliseconds()
+		return nil, result, err
+	}
+	resolved, ok := toolByName[toolName]
+	if !ok || resolved.Adapter == nil {
+		err := apperror.Forbidden("tool call is not approved for this agent")
+		result.ErrorCode = string(apperror.From(err).Code)
+		result.ErrorMessage = err.Error()
+		result.DurationMs = time.Since(startedAt).Milliseconds()
+		return nil, result, err
+	}
+	result.ToolID = resolved.Spec.ToolID
+	result.ToolName = resolved.Spec.Name
+
+	toolResult, err := resolved.Adapter.Invoke(ctx, runtimetools.ToolCall{
+		RunID:     runID,
+		AgentID:   req.Agent.AgentID,
+		ToolID:    resolved.Spec.ToolID,
+		ToolName:  resolved.Spec.Name,
+		InputJSON: json.RawMessage(strings.TrimSpace(call.Function.Arguments)),
+		TraceID:   req.TraceID,
+		RequestID: req.RequestID,
+	})
+	result.DurationMs = time.Since(startedAt).Milliseconds()
+	if err != nil {
+		result.ErrorCode = string(apperror.From(err).Code)
+		result.ErrorMessage = err.Error()
+		return nil, result, err
+	}
+	result.Status = "succeeded"
+	content := strings.TrimSpace(toolResult.Content)
+	if content == "" && len(toolResult.OutputJSON) > 0 {
+		content = string(toolResult.OutputJSON)
+	}
+	if content == "" {
+		content = "{}"
+	}
+	return schema.ToolMessage(content, call.ID, schema.WithToolName(resolved.Spec.Name)), result, nil
+}
+
+func toolInfosFromResolvedTools(resolvedTools []runtimetools.ResolvedTool) ([]*schema.ToolInfo, error) {
+	infos := make([]*schema.ToolInfo, 0, len(resolvedTools))
+	for _, resolved := range resolvedTools {
+		info, err := toolInfoFromSpec(resolved.Spec)
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
+}
+
+func toolInfoFromSpec(spec runtimetools.ToolSpec) (*schema.ToolInfo, error) {
+	name := strings.TrimSpace(spec.Name)
+	if name == "" {
+		return nil, apperror.InvalidArgument("tool name is required")
+	}
+	rawSchema := strings.TrimSpace(spec.InputSchemaJSON)
+	if rawSchema == "" {
+		rawSchema = `{"type":"object"}`
+	}
+	var inputSchema einojsonschema.Schema
+	if err := json.Unmarshal([]byte(rawSchema), &inputSchema); err != nil {
+		return nil, apperror.InvalidArgument("tool input_schema_json must be valid JSON Schema: " + err.Error())
+	}
+	return &schema.ToolInfo{
+		Name:        name,
+		Desc:        strings.TrimSpace(spec.Description),
+		ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&inputSchema),
+	}, nil
 }
 
 func llmObsBaseEvent(req agentruntime.RunRequest, cfg config.DeepSeekConfig) llmobs.Event {

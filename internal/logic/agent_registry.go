@@ -519,7 +519,8 @@ func allowedLocalHandlerKey(key string) bool {
 	switch key {
 	case model.LocalToolHandlerGetConversationContext,
 		model.LocalToolHandlerReadSkillFile,
-		model.LocalToolHandlerSendAgentMessage:
+		model.LocalToolHandlerSendAgentMessage,
+		model.LocalToolHandlerPythonExecute:
 		return true
 	default:
 		return false

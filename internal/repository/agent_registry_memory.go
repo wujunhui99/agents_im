@@ -145,6 +145,34 @@ func (r *MemoryAgentRegistryRepository) RegisterTool(_ context.Context, tool mod
 	return tool.Clone(), nil
 }
 
+func (r *MemoryAgentRegistryRepository) UpsertToolByName(_ context.Context, tool model.AgentTool) (model.AgentTool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := r.now().UTC()
+	for _, existing := range r.tools {
+		if existing.Name != tool.Name {
+			continue
+		}
+		tool.ToolID = existing.ToolID
+		tool.CreatedAt = existing.CreatedAt
+		tool.UpdatedAt = now
+		r.tools[tool.ToolID] = tool.Clone()
+		return tool.Clone(), nil
+	}
+
+	if tool.ToolID == "" {
+		r.nextToolID++
+		tool.ToolID = fmt.Sprintf("tool_%06d", r.nextToolID)
+	} else if _, exists := r.tools[tool.ToolID]; exists {
+		return model.AgentTool{}, apperror.AlreadyExists("tool already exists")
+	}
+	tool.CreatedAt = now
+	tool.UpdatedAt = now
+	r.tools[tool.ToolID] = tool.Clone()
+	return tool.Clone(), nil
+}
+
 func (r *MemoryAgentRegistryRepository) GetTool(_ context.Context, toolID string) (model.AgentTool, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
