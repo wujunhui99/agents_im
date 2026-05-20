@@ -166,6 +166,7 @@ spec:
       labels:
         app: message-api
     spec:
+      serviceAccountName: python-executor-controller
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
@@ -319,6 +320,7 @@ spec:
       labels:
         app: agent-api
     spec:
+      serviceAccountName: python-executor-controller
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:

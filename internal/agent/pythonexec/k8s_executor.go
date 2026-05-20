@@ -35,6 +35,7 @@ type KubernetesExecutorConfig struct {
 	Image              string
 	ServiceAccountName string
 	RuntimeClassName   string
+	ImagePullSecret    string
 	MaxTimeout         time.Duration
 	MaxMemoryBytes     int64
 	MaxOutputBytes     int64
@@ -278,6 +279,9 @@ func buildKubernetesSandboxWorkload(config KubernetesExecutorConfig, req Request
 	}
 	if strings.TrimSpace(config.ServiceAccountName) != "" {
 		podSpec.ServiceAccountName = strings.TrimSpace(config.ServiceAccountName)
+	}
+	if strings.TrimSpace(config.ImagePullSecret) != "" {
+		podSpec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: strings.TrimSpace(config.ImagePullSecret)}}
 	}
 	if strings.TrimSpace(config.RuntimeClassName) != "" {
 		runtimeClassName := strings.TrimSpace(config.RuntimeClassName)

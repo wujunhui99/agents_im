@@ -37,6 +37,12 @@ func TestKubernetesManifestAppliesSandboxSecurityControls(t *testing.T) {
 	if podSpec.RestartPolicy != corev1.RestartPolicyNever {
 		t.Fatalf("restart policy = %q, want Never", podSpec.RestartPolicy)
 	}
+	if podSpec.ServiceAccountName != "" {
+		t.Fatalf("sandbox manifest should not set service account unless configured: %q", podSpec.ServiceAccountName)
+	}
+	if len(podSpec.ImagePullSecrets) != 0 {
+		t.Fatalf("sandbox pod should omit image pull secrets unless configured: %+v", podSpec.ImagePullSecrets)
+	}
 	if podSpec.SecurityContext == nil || podSpec.SecurityContext.RunAsNonRoot == nil || !*podSpec.SecurityContext.RunAsNonRoot {
 		t.Fatalf("pod security context must run as non-root: %+v", podSpec.SecurityContext)
 	}
@@ -79,6 +85,30 @@ func TestKubernetesManifestAppliesSandboxSecurityControls(t *testing.T) {
 	}
 	assertContainerEnv(t, container, "PYTHON_EXECUTOR_CODE_PATH", "/sandbox/input/main.py")
 	assertContainerEnv(t, container, "PYTHON_EXECUTOR_MAX_OUTPUT_BYTES", "65536")
+}
+
+func TestKubernetesManifestUsesConfiguredImagePullSecret(t *testing.T) {
+	cfg := validKubernetesExecutorConfig()
+	cfg.ImagePullSecret = "sandbox-pull-secret"
+	workload, err := buildKubernetesSandboxWorkload(cfg, validKubernetesRequest())
+	if err != nil {
+		t.Fatalf("build workload: %v", err)
+	}
+	podSpec := workload.Job.Spec.Template.Spec
+	if len(podSpec.ImagePullSecrets) != 1 || podSpec.ImagePullSecrets[0].Name != "sandbox-pull-secret" {
+		t.Fatalf("sandbox pod must use configured image pull secret: %+v", podSpec.ImagePullSecrets)
+	}
+}
+
+func TestKubernetesManifestOmitsImagePullSecretWhenUnset(t *testing.T) {
+	cfg := validKubernetesExecutorConfig()
+	workload, err := buildKubernetesSandboxWorkload(cfg, validKubernetesRequest())
+	if err != nil {
+		t.Fatalf("build workload: %v", err)
+	}
+	if len(workload.Job.Spec.Template.Spec.ImagePullSecrets) != 0 {
+		t.Fatalf("sandbox pod should omit image pull secrets when unset: %+v", workload.Job.Spec.Template.Spec.ImagePullSecrets)
+	}
 }
 
 func TestKubernetesManifestRejectsUnsupportedOrExcessivePolicy(t *testing.T) {
