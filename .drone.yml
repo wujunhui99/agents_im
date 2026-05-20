@@ -23,6 +23,9 @@ steps:
     image: golang:1.24-bookworm
     commands:
       - bash scripts/ci/drone-backend-verify.sh
+    volumes:
+      - name: ci_cache
+        path: /cache
 
   - name: postgres-integration
     image: golang:1.24-bookworm
@@ -30,6 +33,9 @@ steps:
       DATABASE_URL: postgres://agents_im:***@postgres:5432/agents_im?sslmode=disable
     commands:
       - bash scripts/ci/drone-postgres-integration.sh
+    volumes:
+      - name: ci_cache
+        path: /cache
 
 ---
 kind: pipeline
@@ -100,6 +106,9 @@ steps:
         read_only: true
 
 volumes:
+  - name: ci_cache
+    host:
+      path: /var/cache/agents-im-ci
   - name: docker_sock
     host:
       path: /var/run/docker.sock
