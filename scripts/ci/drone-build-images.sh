@@ -14,28 +14,224 @@ fi
 
 registry="${IMAGE_REGISTRY:-ghcr.io/wujunhui99/agents_im}"
 commit_sha="${DRONE_COMMIT_SHA}"
+cache_tag="${DRONE_BUILD_CACHE_TAG:-buildcache}"
+cache_scope="${DRONE_BUILD_CACHE_SCOPE:-shared}"
+build_parallelism="${DRONE_IMAGE_BUILD_PARALLELISM:-3}"
+force_all_images="${DRONE_IMAGE_BUILD_FORCE_ALL:-false}"
+
+if ! [[ "${build_parallelism}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "DRONE_IMAGE_BUILD_PARALLELISM must be a positive integer; got ${build_parallelism}." >&2
+  exit 1
+fi
+
+export DOCKER_BUILDKIT=1
+
+if ! docker buildx version >/dev/null 2>&1; then
+  echo "docker buildx is required for cached image builds." >&2
+  exit 1
+fi
+
+builder="agents-im-drone-builder"
+if ! docker buildx inspect "${builder}" >/dev/null 2>&1; then
+  docker buildx create --name "${builder}" --driver docker-container --use
+else
+  docker buildx use "${builder}"
+fi
+docker buildx inspect --bootstrap >/dev/null
 
 echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
-for service in ${image_services_space:-}; do
-  case "${service}" in
-    web)
-      target="web"
-      build_args=()
-      ;;
-    *)
-      target="backend"
-      build_args=(--build-arg "SERVICE=${service}")
-      ;;
-  esac
+if [[ "${force_all_images}" == "true" ]]; then
+  image_services_space="user-api auth-api friends-api message-api gateway-ws groups-api agent-api message-transfer user-rpc auth-rpc friends-rpc groups-rpc message-rpc mail-rpc web"
+  echo "DRONE_IMAGE_BUILD_FORCE_ALL=true; overriding selected image services for performance measurement."
+fi
 
-  echo "Building ${service} image with target ${target}."
-  docker build \
+read -r -a services <<< "${image_services_space:-}"
+if ((${#services[@]} == 0)); then
+  echo "No image services selected."
+  exit 0
+fi
+
+work_dir="$(mktemp -d)"
+trap 'rm -rf "${work_dir}"' EXIT
+
+declare -a completed_services=()
+declare -a service_names=()
+declare -a service_durations=()
+declare -A service_pid=()
+declare -A service_status=()
+declare -A service_duration=()
+
+service_target() {
+  local service="$1"
+  if [[ "${service}" == "web" ]]; then
+    echo "web"
+  else
+    echo "backend"
+  fi
+}
+
+service_cache_name() {
+  local service="$1"
+  if [[ "${service}" == "web" ]]; then
+    echo "web"
+  else
+    echo "backend"
+  fi
+}
+
+run_build() {
+  local service="$1"
+  local export_cache="$2"
+  local target cache_name cache_ref start_epoch end_epoch duration
+  target="$(service_target "${service}")"
+  cache_name="$(service_cache_name "${service}")"
+  cache_ref="${registry}/cache:${cache_scope}-${cache_name}-${cache_tag}"
+
+  local -a build_args=()
+  if [[ "${target}" == "backend" ]]; then
+    build_args=(--build-arg "SERVICE=${service}")
+  fi
+
+  local -a cache_to_args=()
+  if [[ "${export_cache}" == "true" ]]; then
+    cache_to_args=(--cache-to "type=registry,ref=${cache_ref},mode=max,image-manifest=true,oci-mediatypes=true")
+  fi
+
+  echo "Building ${service} image with target ${target}; cache=${cache_ref}; export_cache=${export_cache}."
+  start_epoch="$(date +%s)"
+  docker buildx build \
+    --builder "${builder}" \
     --target "${target}" \
     "${build_args[@]}" \
-    -t "${registry}/${service}:${commit_sha}" \
-    -t "${registry}/${service}:latest" \
+    --cache-from "type=registry,ref=${cache_ref}" \
+    "${cache_to_args[@]}" \
+    --tag "${registry}/${service}:${commit_sha}" \
+    --tag "${registry}/${service}:latest" \
+    --provenance=false \
+    --push \
     .
-  docker push "${registry}/${service}:${commit_sha}"
-  docker push "${registry}/${service}:latest"
+  end_epoch="$(date +%s)"
+  duration="$((end_epoch - start_epoch))"
+  echo "${duration}" > "${work_dir}/${service}.duration"
+  echo "Built and pushed ${service} in ${duration}s."
+}
+
+wait_for_service() {
+  local service="$1"
+  local pid status duration log_file
+  pid="${service_pid[${service}]}"
+  log_file="${work_dir}/${service}.log"
+  set +e
+  wait "${pid}"
+  status="$?"
+  set -e
+  service_status["${service}"]="${status}"
+  completed_services+=("${service}")
+  echo "----- ${service} build log -----"
+  cat "${log_file}"
+  echo "----- end ${service} build log -----"
+  if [[ -f "${work_dir}/${service}.duration" ]]; then
+    duration="$(cat "${work_dir}/${service}.duration")"
+    service_duration["${service}"]="${duration}"
+  fi
+  if [[ "${status}" != "0" ]]; then
+    echo "Image build failed for ${service} with exit status ${status}." >&2
+    return "${status}"
+  fi
+}
+
+run_batch() {
+  local -a batch_services=("$@")
+  local -a active=()
+  local service log_file failed=0
+  for service in "${batch_services[@]}"; do
+    while ((${#active[@]} >= build_parallelism)); do
+      wait_for_service "${active[0]}" || failed=1
+      active=("${active[@]:1}")
+      if ((failed)); then
+        return 1
+      fi
+    done
+    log_file="${work_dir}/${service}.log"
+    echo "Queueing ${service} image build; active=$(( ${#active[@]} + 1 ))/${build_parallelism}."
+    run_build "${service}" "$(if [[ "${service}" == "web" ]]; then echo true; else echo false; fi)" >"${log_file}" 2>&1 &
+    service_pid["${service}"]="$!"
+    active+=("${service}")
+  done
+
+  while ((${#active[@]} > 0)); do
+    wait_for_service "${active[0]}" || failed=1
+    active=("${active[@]:1}")
+    if ((failed)); then
+      return 1
+    fi
+  done
+}
+
+wall_start_epoch="$(date +%s)"
+echo "Image build services: ${services[*]}"
+echo "Image build parallelism: ${build_parallelism}"
+
+# Backend services share one cache ref. Export it once with the first backend build,
+# then run remaining backend builds as cache consumers to avoid repeated registry
+# cache export overhead and concurrent writes to the same cache manifest.
+declare -a remaining_services=()
+seed_backend=""
+for service in "${services[@]}"; do
+  if [[ -z "${seed_backend}" && "$(service_target "${service}")" == "backend" ]]; then
+    seed_backend="${service}"
+  else
+    remaining_services+=("${service}")
+  fi
 done
+
+if [[ -n "${seed_backend}" ]]; then
+  echo "Seeding shared backend cache with ${seed_backend}."
+  service_pid["${seed_backend}"]=""
+  run_build "${seed_backend}" true | tee "${work_dir}/${seed_backend}.log"
+  service_status["${seed_backend}"]=0
+  completed_services+=("${seed_backend}")
+  if [[ -f "${work_dir}/${seed_backend}.duration" ]]; then
+    service_duration["${seed_backend}"]="$(cat "${work_dir}/${seed_backend}.duration")"
+  fi
+fi
+
+if ((${#remaining_services[@]} > 0)); then
+  echo "Building remaining images with parallelism ${build_parallelism}: ${remaining_services[*]}"
+  run_batch "${remaining_services[@]}"
+fi
+
+wall_end_epoch="$(date +%s)"
+wall_duration="$((wall_end_epoch - wall_start_epoch))"
+
+if ((${#completed_services[@]} > 0)); then
+  echo "Image build duration summary:"
+  total_duration=0
+  for service in "${services[@]}"; do
+    if [[ -n "${service_duration[${service}]:-}" ]]; then
+      service_names+=("${service}")
+      service_durations+=("${service_duration[${service}]}")
+      echo "  ${service}: ${service_duration[${service}]}s"
+      total_duration="$((total_duration + service_duration[${service}]))"
+    fi
+  done
+  echo "Total per-service image build duration: ${total_duration}s"
+  echo "Total image build wall-clock duration: ${wall_duration}s"
+fi
+
+if [[ "${DRONE_IMAGE_BUILD_ONLY:-false}" == "true" ]]; then
+  echo "DRONE_IMAGE_BUILD_ONLY=true; marking deploy_required=false after image-build measurement."
+  tmp_env="${work_dir}/drone-deploy.env"
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    if [[ "${line}" == deploy_required=* ]]; then
+      echo "deploy_required=false"
+    else
+      echo "${line}"
+    fi
+  done < .drone-deploy.env > "${tmp_env}"
+  if ! grep -q '^deploy_required=' "${tmp_env}"; then
+    echo "deploy_required=false" >> "${tmp_env}"
+  fi
+  mv "${tmp_env}" .drone-deploy.env
+fi

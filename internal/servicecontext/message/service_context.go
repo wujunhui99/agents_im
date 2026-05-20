@@ -3,6 +3,7 @@ package message
 import (
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	einoruntime "github.com/wujunhui99/agents_im/internal/agentruntime/eino"
+	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/llmobs"
 	"github.com/wujunhui99/agents_im/internal/logic"
@@ -58,14 +59,14 @@ func NewServiceContextWithMedia(repo repository.MessageRepository, mediaRepo rep
 }
 
 func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSeekConfig, obs config.LLMObservabilityConfig) error {
-	if ctx == nil || ctx.MessageLogic == nil || ctx.MessageRepo == nil {
-		return nil
+	if err := validateConversationAIHostingDependencies(ctx); err != nil {
+		return err
 	}
 	if ctx.AgentHostingRepo == nil {
-		ctx.AgentHostingRepo = repository.NewMemoryAgentConversationHostingRepository()
+		return apperror.Internal("agent conversation hosting repository is not configured")
 	}
 	if ctx.AIHostingRepo == nil {
-		ctx.AIHostingRepo = repository.NewMemoryConversationAIHostingRepository()
+		return apperror.Internal("conversation AI hosting repository is not configured")
 	}
 	if ctx.AIHostingLogic == nil {
 		ctx.AIHostingLogic = logic.NewConversationAIHostingLogic(ctx.AIHostingRepo)
@@ -74,7 +75,7 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 		ctx.AIHostingLogic.WithAgentAccountResolver(ctx.AgentResolver)
 	}
 	if ctx.AgentAuditRepo == nil {
-		ctx.AgentAuditRepo = repository.NewMemoryAgentAuditRepository()
+		return apperror.Internal("agent audit repository is not configured")
 	}
 	if ctx.AgentAuditLogic == nil {
 		ctx.AgentAuditLogic = logic.NewAgentAuditLogic(ctx.AgentAuditRepo)
@@ -110,6 +111,7 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 		Runner:               orchestrator,
 		AgentAccountResolver: ctx.AgentResolver,
 		GroupMembers:         ctx.GroupMembers,
+		ReadMarker:           agentim.NewMessageRepositoryReadMarker(ctx.MessageRepo),
 	})
 	if err != nil {
 		return err
@@ -123,6 +125,19 @@ func agentRepositoryFromResolver(resolver logic.AgentAccountExistenceChecker) re
 		AgentRepository() repository.AgentRepository
 	}); ok {
 		return typed.AgentRepository()
+	}
+	return nil
+}
+
+func validateConversationAIHostingDependencies(ctx *ServiceContext) error {
+	if ctx == nil {
+		return apperror.Internal("message service context is not configured")
+	}
+	if ctx.MessageLogic == nil {
+		return apperror.Internal("message logic is not configured")
+	}
+	if ctx.MessageRepo == nil {
+		return apperror.Internal("message repository is not configured")
 	}
 	return nil
 }

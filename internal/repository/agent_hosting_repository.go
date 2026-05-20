@@ -12,6 +12,8 @@ const (
 	AgentTriggerStatusRunning   = "running"
 	AgentTriggerStatusSucceeded = "succeeded"
 	AgentTriggerStatusFailed    = "failed"
+
+	DefaultAgentTriggerRunningTTL = 10 * time.Minute
 )
 
 type AgentConversationHosting struct {
@@ -35,6 +37,7 @@ type AgentTriggerStartInput struct {
 	AgentAccountID     string
 	TriggerServerMsgID string
 	TriggerEventID     string
+	RunningTTL         time.Duration
 }
 
 type AgentTriggerFinishInput struct {
@@ -84,7 +87,18 @@ func normalizeAgentTriggerStartInput(input AgentTriggerStartInput) (AgentTrigger
 		return AgentTriggerStartInput{}, err
 	}
 	input.TriggerEventID = strings.TrimSpace(input.TriggerEventID)
+	input.RunningTTL = normalizeAgentTriggerRunningTTL(input.RunningTTL)
 	return input, nil
+}
+
+func normalizeAgentTriggerRunningTTL(ttl time.Duration) time.Duration {
+	if ttl <= 0 {
+		return DefaultAgentTriggerRunningTTL
+	}
+	if ttl < time.Millisecond {
+		return time.Millisecond
+	}
+	return ttl
 }
 
 func normalizeAgentTriggerFinishInput(input AgentTriggerFinishInput) (AgentTriggerFinishInput, error) {

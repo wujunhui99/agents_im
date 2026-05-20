@@ -79,8 +79,18 @@ func (r *MemoryAgentConversationHostingRepository) TryStartAgentTrigger(_ contex
 
 	now := r.now().UTC()
 	existing, ok := r.triggers[input.IdempotencyKey]
-	if ok && existing.status != AgentTriggerStatusFailed {
-		return false, nil
+	if ok {
+		switch existing.status {
+		case AgentTriggerStatusSucceeded:
+			return false, nil
+		case AgentTriggerStatusRunning:
+			if !agentTriggerRunningIsStale(existing.updatedAt, now, input.RunningTTL) {
+				return false, nil
+			}
+		case AgentTriggerStatusFailed:
+		default:
+			return false, nil
+		}
 	}
 	r.triggers[input.IdempotencyKey] = memoryAgentTrigger{
 		input:     input,
@@ -110,6 +120,14 @@ func (r *MemoryAgentConversationHostingRepository) FinishAgentTrigger(_ context.
 	trigger.updatedAt = r.now().UTC()
 	r.triggers[input.IdempotencyKey] = trigger
 	return nil
+}
+
+func agentTriggerRunningIsStale(updatedAt time.Time, now time.Time, ttl time.Duration) bool {
+	ttl = normalizeAgentTriggerRunningTTL(ttl)
+	if updatedAt.IsZero() {
+		return true
+	}
+	return !updatedAt.UTC().Add(ttl).After(now.UTC())
 }
 
 func firstNonZeroRepositoryTime(values ...time.Time) time.Time {

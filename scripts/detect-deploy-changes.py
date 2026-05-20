@@ -120,6 +120,7 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         ".github/workflows/deploy.yml",
         "scripts/deploy-k3s.sh",
         ".drone.yml",
+        "scripts/ci/drone-build-images.sh",
         "scripts/ci/drone-deploy.sh",
         "scripts/ci/drone-detect-deploy.sh",
         "scripts/detect-deploy-changes.py",
@@ -229,7 +230,7 @@ def build_outputs(selection: DeploySelection) -> dict[str, str]:
 def detect(event_name: str, ref: str, paths: list[str]) -> dict[str, str]:
     selection = DeploySelection()
 
-    if ref != "refs/heads/main":
+    if ref not in {"refs/heads/main", "refs/heads/devops"}:
         return build_outputs(selection)
 
     if event_name == "workflow_dispatch":
@@ -237,10 +238,30 @@ def detect(event_name: str, ref: str, paths: list[str]) -> dict[str, str]:
         selection.add_web()
         return build_outputs(selection)
 
+    if ref == "refs/heads/devops" and any(
+        normalize_path(path) in {".drone.yml", "scripts/ci/drone-build-images.sh"}
+        for path in paths
+    ):
+        # CI/CD lab branch: changes to the image-build pipeline itself should
+        # force a warm-cache build measurement. Main keeps these paths as
+        # config-only deploy orchestration changes.
+        selection.add_all_backends()
+
     for raw_path in paths:
         classify_path(normalize_path(raw_path), selection)
 
-    return build_outputs(selection)
+    outputs = build_outputs(selection)
+    if ref == "refs/heads/devops":
+        # The devops branch is a CI/CD performance lab. It should exercise image
+        # build selection and cache timing without touching production runtime.
+        if outputs["build_required"] == "true":
+            outputs["deploy_required"] = "true"
+        else:
+            outputs["deploy_required"] = "false"
+        outputs["config_only"] = "false"
+        outputs["rollout_services"] = shell_value("")
+        outputs["restart_services"] = shell_value("")
+    return outputs
 
 
 def main() -> None:
