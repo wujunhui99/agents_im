@@ -253,9 +253,16 @@ def detect(event_name: str, ref: str, paths: list[str]) -> dict[str, str]:
     ):
         # CI/CD lab branch: image-build detector/script changes should force a
         # warm-cache all-image measurement. Pure verification/deploy-script
-        # changes should not rebuild every service image.
+        # changes should not rebuild every service image. Keep devops build-only
+        # so performance experiments never touch production runtime.
         selection.add_all_backends()
         selection.add_web()
+        outputs = build_outputs(selection)
+        outputs["deploy_required"] = "false"
+        outputs["config_only"] = "false"
+        outputs["rollout_services"] = shell_value("")
+        outputs["restart_services"] = shell_value("")
+        return outputs
 
     for raw_path in paths:
         classify_path(normalize_path(raw_path), selection)
