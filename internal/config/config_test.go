@@ -203,6 +203,34 @@ func clearMailRPCEnv(t *testing.T) {
 	}
 }
 
+func clearPythonExecutorEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"PYTHON_EXECUTOR_BACKEND",
+		"AGENTS_IM_PYTHON_EXECUTOR_BACKEND",
+		"PYTHON_EXECUTOR_K8S_NAMESPACE",
+		"AGENTS_IM_PYTHON_EXECUTOR_K8S_NAMESPACE",
+		"PYTHON_EXECUTOR_K8S_IMAGE",
+		"AGENTS_IM_PYTHON_EXECUTOR_K8S_IMAGE",
+		"PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME",
+		"AGENTS_IM_PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME",
+		"PYTHON_EXECUTOR_K8S_RUNTIME_CLASS_NAME",
+		"AGENTS_IM_PYTHON_EXECUTOR_K8S_RUNTIME_CLASS_NAME",
+		"PYTHON_EXECUTOR_DEFAULT_TIMEOUT_SECONDS",
+		"AGENTS_IM_PYTHON_EXECUTOR_DEFAULT_TIMEOUT_SECONDS",
+		"PYTHON_EXECUTOR_MAX_TIMEOUT_SECONDS",
+		"AGENTS_IM_PYTHON_EXECUTOR_MAX_TIMEOUT_SECONDS",
+		"PYTHON_EXECUTOR_DEFAULT_MEMORY_MIB",
+		"AGENTS_IM_PYTHON_EXECUTOR_DEFAULT_MEMORY_MIB",
+		"PYTHON_EXECUTOR_MAX_MEMORY_MIB",
+		"AGENTS_IM_PYTHON_EXECUTOR_MAX_MEMORY_MIB",
+		"PYTHON_EXECUTOR_MAX_OUTPUT_BYTES",
+		"AGENTS_IM_PYTHON_EXECUTOR_MAX_OUTPUT_BYTES",
+	} {
+		t.Setenv(key, "")
+	}
+}
+
 func TestLoadAPIConfigResolvesDeepSeekFromFileAndEnv(t *testing.T) {
 	t.Setenv("DEEPSEEK_API_KEY", "unit-test-deepseek-api-key")
 	t.Setenv("DEEPSEEK_BASE_URL", "")
@@ -331,6 +359,95 @@ func TestResolveGatewayWSConfigRejectsWildcardOrigin(t *testing.T) {
 	_, err := ResolveGatewayWSConfig(GatewayWSConfig{AllowedOrigins: []string{"*"}})
 	if err == nil {
 		t.Fatal("expected wildcard allowed origin to be rejected")
+	}
+}
+
+func TestResolvePythonExecutorConfigDefaultsDisabled(t *testing.T) {
+	clearPythonExecutorEnv(t)
+
+	cfg, err := ResolvePythonExecutorConfig(PythonExecutorConfig{})
+	if err != nil {
+		t.Fatalf("resolve python executor config: %v", err)
+	}
+	if cfg.Backend != PythonExecutorBackendDisabled {
+		t.Fatalf("python executor backend = %q, want %q", cfg.Backend, PythonExecutorBackendDisabled)
+	}
+	if cfg.MaxTimeoutSeconds != 30 || cfg.DefaultTimeoutSeconds != 10 {
+		t.Fatalf("python executor timeout defaults mismatch: %+v", cfg)
+	}
+	if cfg.DefaultMemoryMiB != 256 || cfg.MaxMemoryMiB != 256 {
+		t.Fatalf("python executor memory defaults mismatch: %+v", cfg)
+	}
+	if cfg.MaxOutputBytes != 64*1024 {
+		t.Fatalf("python executor max output bytes = %d, want %d", cfg.MaxOutputBytes, 64*1024)
+	}
+}
+
+func TestResolvePythonExecutorConfigRequiresK8SNamespaceAndImage(t *testing.T) {
+	clearPythonExecutorEnv(t)
+
+	_, err := ResolvePythonExecutorConfig(PythonExecutorConfig{Backend: PythonExecutorBackendK8S})
+	if err == nil || !strings.Contains(err.Error(), "namespace") || !strings.Contains(err.Error(), "image") {
+		t.Fatalf("expected k8s namespace/image validation error, got %v", err)
+	}
+
+	cfg, err := ResolvePythonExecutorConfig(PythonExecutorConfig{
+		Backend: PythonExecutorBackendK8S,
+		K8S: PythonExecutorK8SConfig{
+			Namespace: "agent-python-sandbox",
+			Image:     "ghcr.io/wujunhui99/agents_im/python-sandbox:test",
+		},
+	})
+	if err != nil {
+		t.Fatalf("resolve k8s python executor config: %v", err)
+	}
+	if cfg.Backend != PythonExecutorBackendK8S || cfg.K8S.Namespace != "agent-python-sandbox" || cfg.K8S.Image == "" {
+		t.Fatalf("k8s python executor config mismatch: %+v", cfg)
+	}
+}
+
+func TestLoadAPIConfigParsesPythonExecutorConfig(t *testing.T) {
+	clearPythonExecutorEnv(t)
+
+	configPath := filepath.Join(t.TempDir(), "agent-api.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: agent-api
+PythonExecutor:
+  Backend: k8s
+  DefaultTimeoutSeconds: 5
+  MaxTimeoutSeconds: 20
+  DefaultMemoryMiB: 128
+  MaxMemoryMiB: 256
+  MaxOutputBytes: 8192
+  K8S:
+    Namespace: agent-python-sandbox
+    Image: ghcr.io/wujunhui99/agents_im/python-sandbox:test
+    ServiceAccountName: python-sandbox-runner
+    RuntimeClassName: gvisor
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if cfg.PythonExecutor.Backend != PythonExecutorBackendK8S {
+		t.Fatalf("python executor backend = %q, want k8s", cfg.PythonExecutor.Backend)
+	}
+	if cfg.PythonExecutor.K8S.Namespace != "agent-python-sandbox" ||
+		cfg.PythonExecutor.K8S.Image != "ghcr.io/wujunhui99/agents_im/python-sandbox:test" ||
+		cfg.PythonExecutor.K8S.ServiceAccountName != "python-sandbox-runner" ||
+		cfg.PythonExecutor.K8S.RuntimeClassName != "gvisor" {
+		t.Fatalf("python executor k8s config mismatch: %+v", cfg.PythonExecutor.K8S)
+	}
+	if cfg.PythonExecutor.DefaultTimeoutSeconds != 5 ||
+		cfg.PythonExecutor.MaxTimeoutSeconds != 20 ||
+		cfg.PythonExecutor.DefaultMemoryMiB != 128 ||
+		cfg.PythonExecutor.MaxMemoryMiB != 256 ||
+		cfg.PythonExecutor.MaxOutputBytes != 8192 {
+		t.Fatalf("python executor policy defaults mismatch: %+v", cfg.PythonExecutor)
 	}
 }
 

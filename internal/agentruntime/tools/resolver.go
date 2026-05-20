@@ -222,7 +222,7 @@ func (r *Resolver) safeSpec(ctx context.Context, tool model.AgentTool) (ToolSpec
 	if !tool.AdminConfigured {
 		return ToolSpec{}, apperror.Forbidden("tool must be admin configured")
 	}
-	if reason := unsafeToolIdentifier(tool.Name); reason != "" {
+	if reason := unsafeToolIdentifier(tool.Name); reason != "" && !allowedUnsafeLocalToolName(tool) {
 		return ToolSpec{}, apperror.Forbidden("tool name is not allowed: " + reason)
 	}
 	inputSchema, err := normalizeJSON(tool.InputSchemaJSON, "input_schema_json")
@@ -479,11 +479,18 @@ func allowedLocalHandlerKey(key string) bool {
 	switch strings.TrimSpace(key) {
 	case model.LocalToolHandlerGetConversationContext,
 		model.LocalToolHandlerReadSkillFile,
-		model.LocalToolHandlerSendAgentMessage:
+		model.LocalToolHandlerSendAgentMessage,
+		model.LocalToolHandlerPythonExecute:
 		return true
 	default:
 		return false
 	}
+}
+
+func allowedUnsafeLocalToolName(tool model.AgentTool) bool {
+	return tool.ToolType == model.AgentToolTypeLocal &&
+		tool.Name == model.LocalToolHandlerPythonExecute &&
+		tool.LocalHandlerKey == model.LocalToolHandlerPythonExecute
 }
 
 func allowedBuiltinKey(key string) bool {
