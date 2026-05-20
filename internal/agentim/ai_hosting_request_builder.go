@@ -10,6 +10,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/llmobs"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
@@ -23,6 +24,7 @@ type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 	MessageRepository repository.MessageRepository
 	HostingRepository repository.ConversationAIHostingRepository
 	AgentRepository   repository.AgentRepository
+	AgentRegistry     repository.AgentRegistryRepository
 	DeepSeek          config.DeepSeekConfig
 	MaxRecentMessages int
 }
@@ -31,6 +33,7 @@ type ConversationAIHostingRuntimeRequestBuilder struct {
 	messageRepo       repository.MessageRepository
 	hostingRepo       repository.ConversationAIHostingRepository
 	agentRepo         repository.AgentRepository
+	agentRegistry     repository.AgentRegistryRepository
 	deepSeek          config.DeepSeekConfig
 	maxRecentMessages int
 }
@@ -44,6 +47,7 @@ func NewConversationAIHostingRuntimeRequestBuilder(cfg ConversationAIHostingRunt
 		messageRepo:       cfg.MessageRepository,
 		hostingRepo:       cfg.HostingRepository,
 		agentRepo:         cfg.AgentRepository,
+		agentRegistry:     cfg.AgentRegistry,
 		deepSeek:          cfg.DeepSeek,
 		maxRecentMessages: maxRecent,
 	}
@@ -193,7 +197,90 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) agentRuntimeConfig(ctx cont
 	agentConfig.Name = agent.Name
 	agentConfig.Description = agent.Description
 	agentConfig.Status = agent.Status
+	if b.agentRegistry == nil {
+		return agentConfig, nil
+	}
+	prompt, ok, err := b.activeAgentPrompt(ctx, agent.AgentID)
+	if err != nil {
+		return agentruntime.AgentConfig{}, err
+	}
+	if ok {
+		agentConfig.Prompt = prompt
+	}
+	tools, err := b.boundAgentTools(ctx, agent.AgentID)
+	if err != nil {
+		return agentruntime.AgentConfig{}, err
+	}
+	agentConfig.Tools = tools
 	return agentConfig, nil
+}
+
+func (b *ConversationAIHostingRuntimeRequestBuilder) activeAgentPrompt(ctx context.Context, agentID string) (agentruntime.PromptRef, bool, error) {
+	bindings, err := b.agentRegistry.ListPromptBindings(ctx, agentID)
+	if err != nil {
+		return agentruntime.PromptRef{}, false, err
+	}
+	var active *model.AgentPrompt
+	for _, binding := range bindings {
+		prompt, err := b.agentRegistry.GetPrompt(ctx, binding.PromptID)
+		if err != nil {
+			return agentruntime.PromptRef{}, false, err
+		}
+		if prompt.Status != model.AgentPromptStatusActive {
+			continue
+		}
+		if active != nil {
+			return agentruntime.PromptRef{}, false, apperror.Internal("agent has multiple active system prompt bindings")
+		}
+		copied := prompt
+		active = &copied
+	}
+	if active == nil {
+		return agentruntime.PromptRef{}, false, nil
+	}
+	return agentruntime.PromptRef{
+		PromptID:            active.PromptID,
+		Name:                active.Name,
+		Description:         active.Description,
+		Content:             active.Content,
+		Version:             active.Version,
+		VariablesSchemaJSON: active.VariablesSchemaJSON,
+	}, true, nil
+}
+
+func (b *ConversationAIHostingRuntimeRequestBuilder) boundAgentTools(ctx context.Context, agentID string) ([]agentruntime.ToolRef, error) {
+	bindings, err := b.agentRegistry.ListToolBindings(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+	tools := make([]agentruntime.ToolRef, 0, len(bindings))
+	for _, binding := range bindings {
+		tool, err := b.agentRegistry.GetTool(ctx, binding.ToolID)
+		if err != nil {
+			return nil, err
+		}
+		if tool.Status != model.AgentToolStatusActive || !tool.AdminConfigured {
+			continue
+		}
+		tools = append(tools, agentRuntimeToolRef(tool))
+	}
+	return tools, nil
+}
+
+func agentRuntimeToolRef(tool model.AgentTool) agentruntime.ToolRef {
+	return agentruntime.ToolRef{
+		ToolID:           tool.ToolID,
+		Name:             tool.Name,
+		Description:      tool.Description,
+		ToolType:         string(tool.ToolType),
+		MCPServerID:      tool.MCPServerID,
+		MCPToolName:      tool.MCPToolName,
+		LocalHandlerKey:  tool.LocalHandlerKey,
+		BuiltinKey:       tool.BuiltinKey,
+		InputSchemaJSON:  tool.InputSchemaJSON,
+		OutputSchemaJSON: tool.OutputSchemaJSON,
+		PermissionLevel:  tool.PermissionLevel,
+	}
 }
 
 func aiHostingSystemPrompt() string {

@@ -63,6 +63,14 @@ Agent 会话托管第一阶段设计见 [`agent-conversation-hosting.md`](./agen
 
 创建 Agent 时，业务逻辑先调用窄接口 `UserAccountTypeChecker` 验证绑定账号为 `account_type=agent`，再写入 `agents` 表。当前 `agent-api` wiring 使用真实 Account Service profile repository 校验账号类型；无法验证时必须返回明确错误。此设计避免在 Account profile 中塞入 Agent 配置，也避免用假账号或静默 fallback 冒充账号类型能力。
 
+Issue #129 补齐了 Agent Definition/Assembly 后端基础：
+
+- Agent Definition 读取 `agents`、`agent_prompt_bindings`、`agent_prompts`、`agent_tool_bindings`、`agent_tools`，返回 Agent profile、一个活动 system prompt 和已绑定 tool 列表。
+- `PUT /agents/:agent_id/definition` 使用同一套 registry 表更新 system prompt 与 tool list。V1 语义是替换该 Agent 的 prompt bindings 为一个新活动 system prompt；历史 prompt 行保留为元数据，不作为当前定义读取。
+- `agent.create` 是受控 local tool，只在服务端代码白名单中有 handler；数据库只保存 `handler_key=agent.create`、schema、权限级别和绑定关系。
+- `agent.create` 由业务逻辑组装新 Agent：创建 `account_type=agent` 账号/Profile、`agents` 行、活动 system prompt binding、允许的 tool bindings，并与请求该工具的人类用户创建 accepted friendship。
+- 默认数据只把 `agent.create` 绑定到内置 `agent_creator`。由 `agent.create` 创建的新 Agent 默认不能获得 `agent.create`、`python.execute`、MCP/network tool 或 `im.send_agent_message` 等写/执行型工具。
+
 ### Prompt Management
 
 PostgreSQL 表建议：
@@ -140,6 +148,7 @@ im.get_conversation_context
 im.send_agent_message
 skill.read_file
 python.execute
+agent.create
 ```
 
 当前 registry 只登记工具元数据和绑定关系，不执行 handler、不启动 MCP client、不执行 Python。local tool 只接受服务端白名单 `handler_key`；builtin tool 只接受白名单 `builtin_key`；任何 `shell`、`command`、`script` tool type 或类似 handler key 都必须在 logic 层失败。
@@ -151,6 +160,7 @@ python.execute
 - MCP transport 仅允许 `http`、`sse`、`streamable_http`，并拒绝 stdio / local process / command-like config metadata。
 - V0/V1 只提供 metadata contract 与显式安全 adapter；当 runtime 需要可调用 adapter 时必须使用 `RequireAdapters=true`，缺少显式安全 adapter 时返回明确错误。
 - `python.execute` 只能通过 `PythonExecuteAdapter` 调用注入的 `pythonexec.Executor`；默认 executor 是 disabled，真实执行必须走独立沙箱。详细边界见 [`python-executor-sandbox.md`](./python-executor-sandbox.md)。
+- `agent.create` 只能通过 `AgentCreateAdapter` 调用 Agent assembly 业务逻辑。adapter 必须从 runtime `ToolCall` 获得 `requesting_user_id`；缺失时失败。该工具不直接写库、不启动进程、不调用外部网络工具。
 - 该 package 不导入 Eino、不执行 MCP 网络调用、不执行任意本地 handler、不直接调用 Python，也不提供 shell、命令、本地进程或文件系统写入能力。
 
 ### Skill Registry 与 MinIO
