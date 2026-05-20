@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
@@ -9,8 +10,9 @@ import (
 
 type ServiceContext struct {
 	common.AuthRuntime
-	AgentLogic *logic.AgentLogic
-	AgentRepo  repository.AgentRepository
+	AgentLogic     *logic.AgentLogic
+	AgentRepo      repository.AgentRepository
+	PythonExecutor pythonexec.Executor
 }
 
 func NewServiceContext(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker) *ServiceContext {
@@ -18,9 +20,17 @@ func NewServiceContext(repo repository.AgentRepository, accountTypeChecker logic
 }
 
 func NewServiceContextWithAuth(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker, auth config.JWTAuthConfig) *ServiceContext {
+	return NewServiceContextWithAuthAndPythonExecutor(repo, accountTypeChecker, auth, pythonexec.NewDefaultExecutor())
+}
+
+func NewServiceContextWithAuthAndPythonExecutor(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker, auth config.JWTAuthConfig, executor pythonexec.Executor) *ServiceContext {
+	if executor == nil {
+		executor = pythonexec.NewDefaultExecutor()
+	}
 	return &ServiceContext{
-		AuthRuntime: common.NewAuthRuntime(auth),
-		AgentLogic:  logic.NewAgentLogic(repo, accountTypeChecker),
-		AgentRepo:   repo,
+		AuthRuntime:    common.NewAuthRuntime(auth),
+		AgentLogic:     logic.NewAgentLogic(repo, accountTypeChecker),
+		AgentRepo:      repo,
+		PythonExecutor: executor,
 	}
 }
