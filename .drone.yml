@@ -11,9 +11,6 @@ trigger:
     - develop
     - main
     - devops
-    - feature/**
-    - fix/**
-    - ci/**
 
 steps:
   - name: backend verification
@@ -42,9 +39,6 @@ trigger:
     - develop
     - main
     - devops
-    - feature/**
-    - fix/**
-    - ci/**
 
 services:
   - name: postgres
