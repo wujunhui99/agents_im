@@ -430,45 +430,14 @@ describe('Auth flow', () => {
     expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/users/exists'), expect.anything());
   });
 
-  it('renders the isolated admin console at the admin domain root for compatibility', async () => {
+  it('does not use the deprecated admin host as an in-app admin route', () => {
     setTestLocation('https://admin.agenticim.xyz/');
-    storeSession({
-      user: {
-        userId: '9001',
-        identifier: 'admin_001',
-        displayName: 'Admin',
-        accountType: 'admin',
-      },
-    });
-    fetchMock.mockResolvedValue(
-      jsonResponse({
-        code: 'OK',
-        message: 'ok',
-        data: {
-          totals: {
-            users: 1,
-            conversations: 0,
-            messages: 0,
-            aiRuns: 0,
-            failedAiRuns: 0,
-          },
-          recentTraces: [],
-          recentConversations: [],
-        },
-      }),
-    );
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Admin Console' })).toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: /消息/i })).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/admin/dashboard',
-      expect.objectContaining({
-        method: 'GET',
-        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
-      }),
-    );
+    expect(screen.getByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Admin Console' })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('renders the isolated admin console for the management system host root', async () => {

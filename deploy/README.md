@@ -64,7 +64,7 @@ Production public entrypoints:
 - User web app: `https://agenticim.xyz/`
 - Management System (MS): `https://ms.agenticim.xyz/`
 
-The Management System root serves the web SPA and the frontend opens the read-only admin console from that host. On `ms.agenticim.xyz`, Ingress exposes only the admin API prefixes served by `message-api` (`/admin/dashboard`, `/admin/llm-traces`, `/admin/conversations`, `/admin/users`) plus `/` to `web`. Do not use `admin.agenticim.xyz` as the primary management entrypoint.
+The Management System root serves the web SPA and the frontend opens the read-only admin console from that host. On `ms.agenticim.xyz`, Ingress exposes only the admin API prefixes served by `message-api` (`/admin/dashboard`, `/admin/llm-traces`, `/admin/conversations`, `/admin/users`) plus `/` to `web`. `admin.agenticim.xyz` is deprecated and has a Traefik permanent redirect to the same path on `https://ms.agenticim.xyz`; do not use it as the primary management entrypoint.
 
 The deploy pipeline has three steps:
 
