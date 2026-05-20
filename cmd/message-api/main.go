@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 
+	"github.com/wujunhui99/agents_im/internal/agentim"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/handler"
@@ -46,6 +47,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("build agent hosting repository: %v", err)
 	}
+	agentRepo, err := repository.NewAgentRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent repository: %v", err)
+	}
 	aiHostingRepo, err := repository.NewConversationAIHostingRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {
 		log.Fatalf("build AI hosting repository: %v", err)
@@ -64,7 +69,8 @@ func main() {
 	)
 	serviceContext.AgentHostingRepo = agentHostingRepo
 	serviceContext.AIHostingRepo = aiHostingRepo
-	serviceContext.AIHostingLogic = logic.NewConversationAIHostingLogic(aiHostingRepo)
+	serviceContext.AgentResolver = agentim.NewAgentRepositoryAccountResolver(agentRepo)
+	serviceContext.AIHostingLogic = logic.NewConversationAIHostingLogic(aiHostingRepo).WithAgentAccountResolver(serviceContext.AgentResolver)
 	serviceContext.AgentAuditRepo = agentAuditRepo
 	serviceContext.AgentAuditLogic = logic.NewAgentAuditLogic(agentAuditRepo)
 	if err := messagesvc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek, cfg.LLMObservability); err != nil {

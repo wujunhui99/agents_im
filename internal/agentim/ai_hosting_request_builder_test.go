@@ -8,6 +8,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
@@ -96,5 +97,64 @@ func TestConversationAIHostingRuntimeRequestBuilderUsesBoundedRecentMessages(t *
 		if message.ContentType != agentruntime.ContentTypeText {
 			t.Fatalf("unexpected context content type: %+v", message)
 		}
+	}
+}
+
+func TestConversationAIHostingRuntimeRequestBuilderUsesAgentProfileWhenAvailable(t *testing.T) {
+	ctx := context.Background()
+	messageRepo := repository.NewMemoryMessageRepository()
+	messageLogic := logic.NewMessageLogic(messageRepo)
+	agentRepo := repository.NewMemoryAgentRepository()
+	if _, err := agentRepo.CreateAgent(ctx, model.Agent{
+		AgentID:     "agent_default_assistant",
+		AccountID:   "agent_creator",
+		IMUserID:    "agent_creator",
+		Name:        "agent_creator",
+		Description: "Default general AI assistant",
+		Status:      model.AgentStatusActive,
+	}); err != nil {
+		t.Fatalf("create agent profile: %v", err)
+	}
+	conversationID := repository.SingleConversationID("usr_new", "agent_creator")
+	if _, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
+		SenderID:    "usr_new",
+		ReceiverID:  "agent_creator",
+		ChatType:    logic.MessageChatTypeSingle,
+		ClientMsgID: "ask-agent-profile",
+		ContentType: logic.MessageContentTypeText,
+		Content:     "你能做什么？",
+	}); err != nil {
+		t.Fatalf("seed private agent message: %v", err)
+	}
+
+	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
+		MessageRepository: messageRepo,
+		AgentRepository:   agentRepo,
+		DeepSeek:          config.DeepSeekConfig{Model: "deepseek-test"},
+		MaxRecentMessages: 3,
+	})
+	req, err := builder.BuildRuntimeRequest(ctx, AgentTrigger{
+		RequestID:          "message.created:msg_000001:agent_creator",
+		EventID:            "message.created:msg_000001",
+		TriggerType:        TriggerTypeUserPrivateMessage,
+		AgentUserID:        "agent_creator",
+		RequestingUserID:   "usr_new",
+		ConversationID:     conversationID,
+		ConversationType:   ConversationTypeSingle,
+		TriggerMessageID:   "msg_000001",
+		TriggerSeq:         1,
+		PromptText:         "你能做什么？",
+		ReplyToMessageID:   "msg_000001",
+		SourceMessageID:    "msg_000001",
+		SourceMessageSeq:   1,
+		SourceMessageText:  "你能做什么？",
+		SourceContentType:  logic.MessageContentTypeText,
+		TargetAgentUserIDs: []string{"agent_creator"},
+	})
+	if err != nil {
+		t.Fatalf("build runtime request: %v", err)
+	}
+	if req.Agent.AgentID != "agent_default_assistant" || req.Agent.Name != "agent_creator" || req.Agent.Description != "Default general AI assistant" {
+		t.Fatalf("runtime request did not use stored agent profile: %+v", req.Agent)
 	}
 }

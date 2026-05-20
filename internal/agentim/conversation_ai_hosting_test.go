@@ -10,8 +10,91 @@ import (
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
+
+func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
+	ctx := context.Background()
+	messageRepo := repository.NewMemoryMessageRepository()
+	messageLogic := logic.NewMessageLogic(messageRepo)
+	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
+	agentRepo := repository.NewMemoryAgentRepository()
+	auditRepo := repository.NewMemoryAgentAuditRepository()
+	writer, err := NewMessageServiceResponseWriter(messageLogic)
+	if err != nil {
+		t.Fatalf("new response writer: %v", err)
+	}
+
+	if _, err := agentRepo.CreateAgent(ctx, model.Agent{
+		AgentID:   "agent_default_assistant",
+		AccountID: "agent_creator",
+		IMUserID:  "agent_creator",
+		Name:      "agent_creator",
+		Status:    model.AgentStatusActive,
+	}); err != nil {
+		t.Fatalf("create default assistant agent: %v", err)
+	}
+
+	runtimeCalls := 0
+	runtime := agentruntime.RuntimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
+		runtimeCalls++
+		if req.AgentUserID != "agent_creator" || req.RequestingUserID != "usr_new" {
+			t.Fatalf("runtime request used wrong agent/user: %+v", req)
+		}
+		return agentruntime.RunResult{
+			RunID:     req.RunID,
+			FinalText: "我是 AI 助手，有什么可以帮你？",
+		}, nil
+	})
+	orchestrator, err := NewAgentRunOrchestrator(AgentRunOrchestratorConfig{
+		Runtime: runtime,
+		RequestBuilder: RuntimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+			return hostedRuntimeRequest(trigger), nil
+		}),
+		Audit:  logic.NewAgentAuditLogic(auditRepo),
+		Writer: writer,
+	})
+	if err != nil {
+		t.Fatalf("new orchestrator: %v", err)
+	}
+	hosting, err := NewConversationHostingService(ConversationHostingConfig{
+		Repository:           hostingRepo,
+		AIHostingRepository:  aiHostingRepo,
+		Runner:               orchestrator,
+		AgentAccountResolver: NewAgentRepositoryAccountResolver(agentRepo),
+	})
+	if err != nil {
+		t.Fatalf("new hosting: %v", err)
+	}
+	messageLogic.SetMessageCreatedHook(hosting)
+
+	conversationID := repository.SingleConversationID("usr_new", "agent_creator")
+	trigger, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
+		SenderID:    "usr_new",
+		ReceiverID:  "agent_creator",
+		ChatType:    logic.MessageChatTypeSingle,
+		ClientMsgID: "ask-agent-creator",
+		ContentType: logic.MessageContentTypeText,
+		Content:     "你是谁？",
+	})
+	if err != nil {
+		t.Fatalf("send private agent message: %v", err)
+	}
+
+	pulled := waitForPulledMessageCount(t, messageLogic, "usr_new", conversationID, 2)
+	if runtimeCalls != 1 {
+		t.Fatalf("runtime calls = %d, want 1", runtimeCalls)
+	}
+	reply := pulled.Messages[1]
+	if reply.MessageOrigin != logic.MessageOriginAI || reply.SenderID != "agent_creator" || reply.AgentAccountID != "agent_creator" {
+		t.Fatalf("reply did not use agent_creator ai metadata: %+v", reply)
+	}
+	if reply.ReceiverID != "usr_new" || reply.TriggerServerMsgID != trigger.Message.ServerMsgID {
+		t.Fatalf("reply routing/trigger metadata mismatch: trigger=%+v reply=%+v", trigger.Message, reply)
+	}
+}
 
 func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t *testing.T) {
 	ctx := context.Background()
