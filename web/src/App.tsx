@@ -48,7 +48,21 @@ function App(props: AppProps) {
 }
 
 function AuthGate(props: AppProps) {
-  const { authPrompt, session } = useAuth();
+  const { authPrompt, handleAuthFailure, session } = useAuth();
+  const adminApi = useMemo(
+    () =>
+      createAdminApi(
+        createApiClient({
+          getToken: () => session?.token,
+          onAuthFailure: handleAuthFailure,
+        }),
+      ),
+    [handleAuthFailure, session?.token],
+  );
+
+  if (isAdminRoute()) {
+    return <AdminConsole adminApi={adminApi} />;
+  }
 
   if (!session) {
     return <AuthPage prompt={authPrompt} />;
@@ -222,7 +236,12 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
 
 function isAdminRoute() {
   const { hostname, pathname } = window.location;
-  return pathname === '/admin' || pathname.startsWith('/admin/') || (hostname === 'ms.agenticim.xyz' && pathname === '/');
+  return (
+    hostname === 'ms.agenticim.xyz' ||
+    hostname === 'admin.agenticim.xyz' ||
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/')
+  );
 }
 
 function AuthPage({ prompt = '' }: { prompt?: string }) {
