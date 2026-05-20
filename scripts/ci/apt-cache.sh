@@ -10,20 +10,24 @@ apt_get_cached() {
     exit 1
   fi
 
-  apt-get \
-    -o "Dir::Cache=${APT_CACHE_DIR}" \
-    -o "Dir::State::lists=${APT_CACHE_DIR}/lists" \
-    -o "APT::Keep-Downloaded-Packages=true" \
-    -o "Binary::apt::APT::Keep-Downloaded-Packages=true" \
-    update
+  local lock_file="${CI_CACHE_ROOT}/locks/apt.lock"
+  (
+    flock 9
+    apt-get \
+      -o "Dir::Cache=${APT_CACHE_DIR}" \
+      -o "Dir::State::lists=${APT_CACHE_DIR}/lists" \
+      -o "APT::Keep-Downloaded-Packages=true" \
+      -o "Binary::apt::APT::Keep-Downloaded-Packages=true" \
+      update
 
-  DEBIAN_FRONTEND=noninteractive apt-get \
-    -o "Dir::Cache=${APT_CACHE_DIR}" \
-    -o "Dir::State::lists=${APT_CACHE_DIR}/lists" \
-    -o "Dir::Cache::archives=${APT_CACHE_DIR}/archives" \
-    -o "APT::Keep-Downloaded-Packages=true" \
-    -o "Binary::apt::APT::Keep-Downloaded-Packages=true" \
-    install -y --no-install-recommends "$@"
+    DEBIAN_FRONTEND=noninteractive apt-get \
+      -o "Dir::Cache=${APT_CACHE_DIR}" \
+      -o "Dir::State::lists=${APT_CACHE_DIR}/lists" \
+      -o "Dir::Cache::archives=${APT_CACHE_DIR}/archives" \
+      -o "APT::Keep-Downloaded-Packages=true" \
+      -o "Binary::apt::APT::Keep-Downloaded-Packages=true" \
+      install -y --no-install-recommends "$@"
+  ) 9>"${lock_file}"
 }
 
 apt_cache_summary() {
