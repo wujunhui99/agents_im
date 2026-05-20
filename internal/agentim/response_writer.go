@@ -94,7 +94,7 @@ func normalizeAgentResponseRequest(req AgentResponseRequest) (logic.SendMessageR
 	if err != nil {
 		return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", err
 	}
-	text, err := normalizeRequired(req.Text, "text")
+	text, err := normalizeAgentResponseText(req.Text)
 	if err != nil {
 		return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", err
 	}

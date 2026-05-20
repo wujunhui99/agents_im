@@ -108,6 +108,17 @@ func normalizeOptional(value string) string {
 	return strings.TrimSpace(value)
 }
 
+func normalizeAgentResponseText(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", apperror.InvalidArgument("text is required")
+	}
+	if len([]rune(value)) > 4096 {
+		return "", apperror.InvalidArgument("text must be 4096 characters or fewer")
+	}
+	return value, nil
+}
+
 func normalizeConversationType(value string) (string, error) {
 	value = strings.ToLower(strings.TrimSpace(value))
 	switch value {
