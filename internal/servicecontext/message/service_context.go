@@ -23,6 +23,7 @@ type ServiceContext struct {
 	OutboxRepo       repository.OutboxRepository
 	AgentAuditLogic  *logic.AgentAuditLogic
 	AgentAuditRepo   repository.AgentAuditRepository
+	AgentResolver    logic.AgentAccountExistenceChecker
 }
 
 func NewServiceContext(repo repository.MessageRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister) *ServiceContext {
@@ -69,6 +70,9 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 	if ctx.AIHostingLogic == nil {
 		ctx.AIHostingLogic = logic.NewConversationAIHostingLogic(ctx.AIHostingRepo)
 	}
+	if ctx.AgentResolver != nil {
+		ctx.AIHostingLogic.WithAgentAccountResolver(ctx.AgentResolver)
+	}
 	if ctx.AgentAuditRepo == nil {
 		ctx.AgentAuditRepo = repository.NewMemoryAgentAuditRepository()
 	}
@@ -89,6 +93,7 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 		RequestBuilder: agentim.NewConversationAIHostingRuntimeRequestBuilder(agentim.ConversationAIHostingRuntimeRequestBuilderConfig{
 			MessageRepository: ctx.MessageRepo,
 			HostingRepository: ctx.AIHostingRepo,
+			AgentRepository:   agentRepositoryFromResolver(ctx.AgentResolver),
 			DeepSeek:          deepSeek,
 			MaxRecentMessages: 30,
 		}),
@@ -100,15 +105,25 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 		return err
 	}
 	hosting, err := agentim.NewConversationHostingService(agentim.ConversationHostingConfig{
-		Repository:          ctx.AgentHostingRepo,
-		AIHostingRepository: ctx.AIHostingRepo,
-		Runner:              orchestrator,
-		GroupMembers:        ctx.GroupMembers,
+		Repository:           ctx.AgentHostingRepo,
+		AIHostingRepository:  ctx.AIHostingRepo,
+		Runner:               orchestrator,
+		AgentAccountResolver: ctx.AgentResolver,
+		GroupMembers:         ctx.GroupMembers,
 	})
 	if err != nil {
 		return err
 	}
 	ctx.MessageLogic.SetMessageCreatedHook(hosting)
+	return nil
+}
+
+func agentRepositoryFromResolver(resolver logic.AgentAccountExistenceChecker) repository.AgentRepository {
+	if typed, ok := resolver.(interface {
+		AgentRepository() repository.AgentRepository
+	}); ok {
+		return typed.AgentRepository()
+	}
 	return nil
 }
 

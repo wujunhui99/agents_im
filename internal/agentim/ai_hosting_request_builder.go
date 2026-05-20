@@ -16,11 +16,13 @@ import (
 const (
 	defaultAIHostingRecentMessages = 30
 	aiHostingPromptID              = "conversation-ai-hosting-v1"
+	defaultAssistantRuntimeName    = "Conversation AI Hosting"
 )
 
 type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 	MessageRepository repository.MessageRepository
 	HostingRepository repository.ConversationAIHostingRepository
+	AgentRepository   repository.AgentRepository
 	DeepSeek          config.DeepSeekConfig
 	MaxRecentMessages int
 }
@@ -28,6 +30,7 @@ type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 type ConversationAIHostingRuntimeRequestBuilder struct {
 	messageRepo       repository.MessageRepository
 	hostingRepo       repository.ConversationAIHostingRepository
+	agentRepo         repository.AgentRepository
 	deepSeek          config.DeepSeekConfig
 	maxRecentMessages int
 }
@@ -40,6 +43,7 @@ func NewConversationAIHostingRuntimeRequestBuilder(cfg ConversationAIHostingRunt
 	return &ConversationAIHostingRuntimeRequestBuilder{
 		messageRepo:       cfg.MessageRepository,
 		hostingRepo:       cfg.HostingRepository,
+		agentRepo:         cfg.AgentRepository,
 		deepSeek:          cfg.DeepSeek,
 		maxRecentMessages: maxRecent,
 	}
@@ -67,6 +71,11 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 		maxRecent = defaultAIHostingRecentMessages
 	}
 
+	agentConfig, err := b.agentRuntimeConfig(ctx, trigger.AgentUserID)
+	if err != nil {
+		return agentruntime.RunRequest{}, err
+	}
+
 	triggerSeq := trigger.SourceMessageSeq
 	if triggerSeq <= 0 {
 		triggerSeq = trigger.TriggerSeq
@@ -83,7 +92,6 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 		return agentruntime.RunRequest{}, err
 	}
 
-	cfg := config.ResolveDeepSeekConfig(b.deepSeek)
 	conversation := make([]agentruntime.ConversationMessage, 0, len(recent))
 	for _, message := range recent {
 		conversation = append(conversation, runtimeConversationMessage(message, trigger.AgentUserID))
@@ -110,24 +118,8 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 		SourceMessageText:  trigger.SourceMessageText,
 		SourceContentType:  trigger.SourceContentType,
 		TargetAgentUserIDs: append([]string(nil), trigger.TargetAgentUserIDs...),
-		Agent: agentruntime.AgentConfig{
-			AgentID:     "ai-hosting:" + trigger.AgentUserID,
-			AgentUserID: trigger.AgentUserID,
-			Name:        "Conversation AI Hosting",
-			Status:      agentruntime.AgentStatusActive,
-			Prompt: agentruntime.PromptRef{
-				PromptID: aiHostingPromptID,
-				Content:  aiHostingSystemPrompt(),
-			},
-			Model: agentruntime.ModelConfig{
-				Provider: "deepseek",
-				Model:    cfg.Model,
-			},
-			Policy: agentruntime.RuntimePolicy{
-				RequireMessageServiceWriteback: true,
-			},
-		},
-		Conversation: conversation,
+		Agent:              agentConfig,
+		Conversation:       conversation,
 		Metadata: map[string]string{
 			"runtime_mode":         llmobs.RuntimeModeAIHostingAutoReply,
 			"summary_used":         "false",
@@ -166,6 +158,42 @@ func hostingRuntimeText(message logic.Message) string {
 	default:
 		return "[非文本消息]"
 	}
+}
+
+func (b *ConversationAIHostingRuntimeRequestBuilder) agentRuntimeConfig(ctx context.Context, agentUserID string) (agentruntime.AgentConfig, error) {
+	cfg := config.ResolveDeepSeekConfig(b.deepSeek)
+	agentConfig := agentruntime.AgentConfig{
+		AgentID:     "ai-hosting:" + agentUserID,
+		AgentUserID: agentUserID,
+		Name:        defaultAssistantRuntimeName,
+		Status:      agentruntime.AgentStatusActive,
+		Prompt: agentruntime.PromptRef{
+			PromptID: aiHostingPromptID,
+			Content:  aiHostingSystemPrompt(),
+		},
+		Model: agentruntime.ModelConfig{
+			Provider: "deepseek",
+			Model:    cfg.Model,
+		},
+		Policy: agentruntime.RuntimePolicy{
+			RequireMessageServiceWriteback: true,
+		},
+	}
+	if b.agentRepo == nil {
+		return agentConfig, nil
+	}
+	agent, err := b.agentRepo.GetAgentByIMUserID(ctx, agentUserID)
+	if err != nil {
+		if apperror.From(err).Code == apperror.CodeNotFound {
+			return agentConfig, nil
+		}
+		return agentruntime.AgentConfig{}, err
+	}
+	agentConfig.AgentID = agent.AgentID
+	agentConfig.Name = agent.Name
+	agentConfig.Description = agent.Description
+	agentConfig.Status = agent.Status
+	return agentConfig, nil
 }
 
 func aiHostingSystemPrompt() string {

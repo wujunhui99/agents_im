@@ -143,7 +143,7 @@ Response data:
 
 ## Runtime Context
 
-托管回复 runtime request 只能包含 bounded recent messages，当前实现最多取最近 30 条，并携带 `summary_used=false` 占位；不能把全量历史、token、prompt 私密内容或 provider secret 写入日志或响应。缺少 DeepSeek provider/model 配置时 production runtime fail closed，触发记录为失败，不创建硬编码或 fake AI 消息。
+托管回复 runtime request 只能包含 bounded recent messages，当前实现最多取最近 30 条，并携带 `summary_used=false` 占位；不能把全量历史、token 或 provider secret 写入日志或响应。开发初期暂不把 Agent audit 作为合规审计系统处理：运行记录可以保留调试所需的触发输入/模型输出摘要，后续进入正式审计阶段时再收紧脱敏、保留周期和访问控制。缺少 DeepSeek provider/model 配置时 production runtime fail closed，触发记录为失败，不创建硬编码或 fake AI 消息。
 
 ## 失败优先
 
