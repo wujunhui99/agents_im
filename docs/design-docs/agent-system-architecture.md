@@ -312,7 +312,9 @@ agent_python_execs
 - created_at
 ```
 
-审计存储规则：
+审计存储规则（后续正式审计阶段目标）：
+
+开发初期 Agent audit 主要用于调试和运行可观测性，不按合规审计系统验收；允许先保留定位问题所需的触发输入/输出摘要。正式进入审计阶段前，再把下面规则作为收紧目标落地，并补齐数据保留周期、访问控制和脱敏策略。
 
 - 审计表为 append-only；Repository/Logic 不提供 update/delete，PostgreSQL trigger 拒绝直接 update/delete。
 - 审计写入是 required path，失败必须返回调用方。

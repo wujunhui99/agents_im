@@ -114,3 +114,53 @@ func TestConversationAIHostingRejectsNonParticipantsAndGroups(t *testing.T) {
 		t.Fatalf("group read error = %v, want invalid argument", err)
 	}
 }
+
+func TestConversationAIHostingRejectsAgentConversation(t *testing.T) {
+	ctx := context.Background()
+	hosting := NewConversationAIHostingLogic(repository.NewMemoryConversationAIHostingRepository()).WithAgentAccountResolver(AgentAccountExistenceCheckerFunc(func(_ context.Context, accountID string) (bool, error) {
+		return accountID == "agent_creator", nil
+	}))
+	conversationID := repository.SingleConversationID("usr_new", "agent_creator")
+
+	status, err := hosting.GetConversationAIHosting(ctx, GetConversationAIHostingRequest{
+		OwnerAccountID: "usr_new",
+		ConversationID: conversationID,
+	})
+	if err != nil {
+		t.Fatalf("agent conversation status should be visible as unavailable, got: %v", err)
+	}
+	if status.Available || status.Enabled || status.PeerEnabled {
+		t.Fatalf("agent conversation hosting status = %+v, want unavailable and disabled", status)
+	}
+	if !strings.Contains(status.UnavailableReason, "AI 助手") {
+		t.Fatalf("agent conversation unavailable reason = %q, want AI assistant reason", status.UnavailableReason)
+	}
+
+	_, err = hosting.UpdateConversationAIHosting(ctx, UpdateConversationAIHostingRequest{
+		OwnerAccountID: "usr_new",
+		ConversationID: conversationID,
+		Enabled:        true,
+	})
+	if apperror.From(err).Code != apperror.CodeInvalidArgument {
+		t.Fatalf("agent conversation enable error = %v, want invalid argument", err)
+	}
+
+	agentOwnerStatus, err := hosting.GetConversationAIHosting(ctx, GetConversationAIHostingRequest{
+		OwnerAccountID: "agent_creator",
+		ConversationID: conversationID,
+	})
+	if err != nil {
+		t.Fatalf("agent-owned conversation status should be visible as unavailable, got: %v", err)
+	}
+	if agentOwnerStatus.Available {
+		t.Fatalf("agent-owned conversation hosting status = %+v, want unavailable", agentOwnerStatus)
+	}
+	_, err = hosting.UpdateConversationAIHosting(ctx, UpdateConversationAIHostingRequest{
+		OwnerAccountID: "agent_creator",
+		ConversationID: conversationID,
+		Enabled:        true,
+	})
+	if apperror.From(err).Code != apperror.CodeInvalidArgument {
+		t.Fatalf("agent-owned conversation enable error = %v, want invalid argument", err)
+	}
+}

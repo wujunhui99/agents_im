@@ -64,6 +64,10 @@ func (r AgentRepositoryAccountResolver) IsActiveAgentAccount(ctx context.Context
 	return agent.Status == model.AgentStatusActive, nil
 }
 
+func (r AgentRepositoryAccountResolver) AgentRepository() repository.AgentRepository {
+	return r.repo
+}
+
 type ConversationHostingConfig struct {
 	Repository           repository.AgentConversationHostingRepository
 	AIHostingRepository  repository.ConversationAIHostingRepository

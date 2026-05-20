@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/wujunhui99/agents_im/internal/agentim"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/config"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
@@ -45,6 +46,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("build media repository: %v", err)
 	}
+	agentHostingRepo, err := repository.NewAgentConversationHostingRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent hosting repository: %v", err)
+	}
+	agentRepo, err := repository.NewAgentRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent repository: %v", err)
+	}
+	aiHostingRepo, err := repository.NewConversationAIHostingRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build AI hosting repository: %v", err)
+	}
+	agentAuditRepo, err := repository.NewAgentAuditRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build agent audit repository: %v", err)
+	}
 	presenceStore, err := presence.NewStore(cfg.Presence, cfg.Redis)
 	if err != nil {
 		log.Fatalf("build presence store: %v", err)
@@ -57,6 +74,15 @@ func main() {
 		groupsLogic,
 		cfg.Auth,
 	)
+	messageContext.AgentHostingRepo = agentHostingRepo
+	messageContext.AIHostingRepo = aiHostingRepo
+	messageContext.AgentResolver = agentim.NewAgentRepositoryAccountResolver(agentRepo)
+	messageContext.AIHostingLogic = logic.NewConversationAIHostingLogic(aiHostingRepo).WithAgentAccountResolver(messageContext.AgentResolver)
+	messageContext.AgentAuditRepo = agentAuditRepo
+	messageContext.AgentAuditLogic = logic.NewAgentAuditLogic(agentAuditRepo)
+	if err := messagesvc.ConfigureConversationAIHosting(messageContext, cfg.DeepSeek, cfg.LLMObservability); err != nil {
+		log.Fatalf("configure gateway conversation AI hosting: %v", err)
+	}
 	serviceContext := gatewaysvc.NewServiceContext(messageContext.MessageLogic, cfg.Auth)
 	defer closePresenceStore(presenceStore)
 
