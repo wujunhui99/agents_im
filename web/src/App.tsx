@@ -256,7 +256,10 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
   const [error, setError] = useState('');
   const [emailCodeFeedback, setEmailCodeFeedback] = useState<{ kind: 'error' | 'success'; message: string } | null>(null);
   const [sendingEmailCode, setSendingEmailCode] = useState(false);
-  const [identifierCheckMessage, setIdentifierCheckMessage] = useState('');
+  const [identifierCheckFeedback, setIdentifierCheckFeedback] = useState<{
+    kind: 'error' | 'hint';
+    message: string;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const identifierCheckRequest = useRef(0);
   const isRegister = mode === 'register';
@@ -305,7 +308,7 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
     identifierCheckRequest.current += 1;
     setMode(nextMode);
     setError('');
-    setIdentifierCheckMessage('');
+    setIdentifierCheckFeedback(null);
     setEmailCodeFeedback(null);
     setSendingEmailCode(false);
   }
@@ -313,7 +316,7 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
   function handleIdentifierChange(event: ChangeEvent<HTMLInputElement>) {
     identifierCheckRequest.current += 1;
     setIdentifier(event.target.value);
-    setIdentifierCheckMessage('');
+    setIdentifierCheckFeedback(null);
   }
 
   async function checkLoginIdentifierExists() {
@@ -323,7 +326,7 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
     const query = identifier.trim();
     identifierCheckRequest.current += 1;
     const requestID = identifierCheckRequest.current;
-    setIdentifierCheckMessage('');
+    setIdentifierCheckFeedback(null);
     if (!query) {
       return;
     }
@@ -333,12 +336,12 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
       if (identifierCheckRequest.current !== requestID) {
         return;
       }
-      setIdentifierCheckMessage(result.exists ? '' : '账号不存在，请检查后再输入密码');
+      setIdentifierCheckFeedback(result.exists ? null : { kind: 'error', message: '账号不存在，请检查后再输入密码' });
     } catch {
       if (identifierCheckRequest.current !== requestID) {
         return;
       }
-      setIdentifierCheckMessage('暂时无法确认账号是否存在，请稍后重试');
+      setIdentifierCheckFeedback({ kind: 'hint', message: '暂时无法确认账号是否存在，可继续输入密码登录' });
     }
   }
 
@@ -462,9 +465,12 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
             fieldClassName="auth-field"
           />
 
-          {!isRegister && identifierCheckMessage ? (
-            <p className="auth-error" role="alert">
-              {identifierCheckMessage}
+          {!isRegister && identifierCheckFeedback ? (
+            <p
+              className={identifierCheckFeedback.kind === 'error' ? 'auth-error' : 'auth-hint'}
+              role={identifierCheckFeedback.kind === 'error' ? 'alert' : 'status'}
+            >
+              {identifierCheckFeedback.message}
             </p>
           ) : null}
 
