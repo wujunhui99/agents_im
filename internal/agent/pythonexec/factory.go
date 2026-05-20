@@ -24,6 +24,7 @@ func NewExecutorFromConfig(executorConfig config.PythonExecutorConfig, client Ku
 			Image:              resolved.K8S.Image,
 			ServiceAccountName: resolved.K8S.ServiceAccountName,
 			RuntimeClassName:   resolved.K8S.RuntimeClassName,
+			ImagePullSecret:    "ghcr-pull-secret",
 			MaxTimeout:         time.Duration(resolved.MaxTimeoutSeconds) * time.Second,
 			MaxMemoryBytes:     int64(resolved.MaxMemoryMiB) * 1024 * 1024,
 			MaxOutputBytes:     resolved.MaxOutputBytes,

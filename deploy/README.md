@@ -235,18 +235,22 @@ When `OBJECT_STORAGE_EXTERNAL_ENDPOINT` differs from the internal `OBJECT_STORAG
 
 ## Sandboxed Python executor
 
-`agent-api` and `message-api` ship with the Python executor disabled. The default `agent_creator` / `AI 助手` has a `python.execute` registry binding, but runtime execution still fails closed until the executor backend is explicitly enabled. The production ConfigMap sets:
-
-```yaml
-PYTHON_EXECUTOR_BACKEND: "disabled"
-```
-
-To enable the Kubernetes backend, operators must first provision a dedicated sandbox namespace, a reviewed runner image, default-deny NetworkPolicy, Pod Security controls, and scoped RBAC for the API pods that create sandbox Jobs. Then set the shared executor config used by `agent-api` and `message-api`:
+`agent-api` and `message-api` include a fail-closed Python executor. The default `agent_creator` / `AI 助手` is the only built-in Agent with an automatic `python.execute` registry binding; other Agents still require explicit tool binding. Production now enables the Kubernetes backend for the shared runtime used by `agent-api` and `message-api`:
 
 ```yaml
 PYTHON_EXECUTOR_BACKEND: "k8s"
 PYTHON_EXECUTOR_K8S_NAMESPACE: "agent-python-sandbox"
 PYTHON_EXECUTOR_K8S_IMAGE: "ghcr.io/wujunhui99/agents_im/python-sandbox:<pinned-tag-or-digest>"
+PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME: "python-executor-controller"
+```
+
+Keep non-production/local configs disabled unless a reviewed sandbox cluster is available. Enabling `k8s` without namespace/image/client configuration is a startup error, not a silent fallback. The production ConfigMap values must include resource limits as well as the pinned image and sandbox service account:
+
+```yaml
+PYTHON_EXECUTOR_BACKEND: "k8s"
+PYTHON_EXECUTOR_K8S_NAMESPACE: "agent-python-sandbox"
+PYTHON_EXECUTOR_K8S_IMAGE: "ghcr.io/wujunhui99/agents_im/python-sandbox:<pinned-tag-or-digest>"
+PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME: "python-executor-controller"
 PYTHON_EXECUTOR_MAX_TIMEOUT_SECONDS: "30"
 PYTHON_EXECUTOR_MAX_MEMORY_MIB: "256"
 PYTHON_EXECUTOR_MAX_OUTPUT_BYTES: "65536"
@@ -262,9 +266,10 @@ Production enablement checklist:
 2. Create the dedicated sandbox namespace, for example `agent-python-sandbox`.
 3. Apply default-deny ingress and egress NetworkPolicy in that namespace.
 4. Apply Pod Security controls that reject privileged pods, host namespaces, hostPath, and privilege escalation.
-5. Grant only scoped RBAC for creating/watching/reading/deleting owned sandbox Jobs, ConfigMaps, and logs.
-6. Set `PYTHON_EXECUTOR_BACKEND=k8s` plus namespace/image/resource limits for both `agent-api` and `message-api`.
-7. Smoke test by chatting with `AI 助手` and asking for a calculation that should use Python; verify the final reply and tool-run evidence. A WebSocket open event alone does not prove Python execution works.
+5. Grant only scoped RBAC for creating/watching/reading/deleting owned sandbox Jobs, ConfigMaps, and logs; keep the sandbox Pod service account token automount disabled.
+6. Ensure the sandbox namespace has access to the GHCR pull secret referenced by the Job Pod (`ghcr-pull-secret`).
+7. Set `PYTHON_EXECUTOR_BACKEND=k8s` plus namespace/image/service-account/resource limits for both `agent-api` and `message-api`.
+8. Smoke test by chatting with `AI 助手` and asking for a calculation that should use Python; verify the final reply and tool-run evidence. A WebSocket open event alone does not prove Python execution works.
 
 ## Public entry
 

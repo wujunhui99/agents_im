@@ -132,7 +132,7 @@ func TestDeepSeekRuntimeExecutesPythonToolCallAndContinuesToFinalAnswer(t *testi
 				ID:   "call_python_1",
 				Type: "function",
 				Function: schema.FunctionCall{
-					Name:      immodel.LocalToolHandlerPythonExecute,
+					Name:      "python_execute",
 					Arguments: `{"code":"print(1 + 1)"}`,
 				},
 			}}),
@@ -154,8 +154,8 @@ func TestDeepSeekRuntimeExecutesPythonToolCallAndContinuesToFinalAnswer(t *testi
 	if result.FinalText != "计算结果是 2。" {
 		t.Fatalf("final text = %q, want model answer after tool result", result.FinalText)
 	}
-	if len(fakeModel.boundTools) != 1 || fakeModel.boundTools[0].Name != immodel.LocalToolHandlerPythonExecute {
-		t.Fatalf("bound tools = %+v, want python.execute", fakeModel.boundTools)
+	if len(fakeModel.boundTools) != 1 || fakeModel.boundTools[0].Name != "python_execute" {
+		t.Fatalf("bound tools = %+v, want DeepSeek-safe python_execute", fakeModel.boundTools)
 	}
 	if fakeModel.generateCalls != 2 {
 		t.Fatalf("generate calls = %d, want tool call turn and final turn", fakeModel.generateCalls)
@@ -169,7 +169,7 @@ func TestDeepSeekRuntimeExecutesPythonToolCallAndContinuesToFinalAnswer(t *testi
 	}
 	if got := secondInput[len(secondInput)-1]; got.Role != schema.Tool ||
 		got.ToolCallID != "call_python_1" ||
-		got.ToolName != immodel.LocalToolHandlerPythonExecute ||
+		got.ToolName != "python_execute" ||
 		!strings.Contains(got.Content, `"stdout":"2\n"`) {
 		t.Fatalf("second model input missing python tool result: %+v", got)
 	}
@@ -189,7 +189,7 @@ func TestDeepSeekRuntimeReturnsVisibleErrorWhenPythonExecutorDisabled(t *testing
 				ID:   "call_python_disabled",
 				Type: "function",
 				Function: schema.FunctionCall{
-					Name:      immodel.LocalToolHandlerPythonExecute,
+					Name:      "python_execute",
 					Arguments: `{"code":"print(1 + 1)"}`,
 				},
 			}}),
@@ -219,7 +219,7 @@ func TestDeepSeekRuntimeEnforcesMaxToolCalls(t *testing.T) {
 				ID:   "call_python_1",
 				Type: "function",
 				Function: schema.FunctionCall{
-					Name:      immodel.LocalToolHandlerPythonExecute,
+					Name:      "python_execute",
 					Arguments: `{"code":"print(1)"}`,
 				},
 			}}),
@@ -227,7 +227,7 @@ func TestDeepSeekRuntimeEnforcesMaxToolCalls(t *testing.T) {
 				ID:   "call_python_2",
 				Type: "function",
 				Function: schema.FunctionCall{
-					Name:      immodel.LocalToolHandlerPythonExecute,
+					Name:      "python_execute",
 					Arguments: `{"code":"print(2)"}`,
 				},
 			}}),
