@@ -233,6 +233,44 @@ For the current single-server k3s + Docker Compose topology, use the application
 When `OBJECT_STORAGE_EXTERNAL_ENDPOINT` differs from the internal `OBJECT_STORAGE_ENDPOINT`, presigned browser URLs default to HTTPS. Set `OBJECT_STORAGE_EXTERNAL_USE_SSL=false` only for an explicitly HTTP external object-storage endpoint.
 `scripts/bootstrap-server.sh` requires `OBJECT_STORAGE_EXTERNAL_ENDPOINT` and rejects browser-local loopback values before writing the Kubernetes secret.
 
+## Sandboxed Python executor
+
+`agent-api` and `message-api` include a fail-closed Python executor. The default `agent_creator` / `AI 助手` is the only built-in Agent with an automatic `python.execute` registry binding; other Agents still require explicit tool binding. Production now enables the Kubernetes backend for the shared runtime used by `agent-api` and `message-api`:
+
+```yaml
+PYTHON_EXECUTOR_BACKEND: "k8s"
+PYTHON_EXECUTOR_K8S_NAMESPACE: "agent-python-sandbox"
+PYTHON_EXECUTOR_K8S_IMAGE: "ghcr.io/wujunhui99/agents_im/python-sandbox:<pinned-tag-or-digest>"
+PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME: "python-executor-controller"
+```
+
+Keep non-production/local configs disabled unless a reviewed sandbox cluster is available. Enabling `k8s` without namespace/image/client configuration is a startup error, not a silent fallback. The production ConfigMap values must include resource limits as well as the pinned image and sandbox service account:
+
+```yaml
+PYTHON_EXECUTOR_BACKEND: "k8s"
+PYTHON_EXECUTOR_K8S_NAMESPACE: "agent-python-sandbox"
+PYTHON_EXECUTOR_K8S_IMAGE: "ghcr.io/wujunhui99/agents_im/python-sandbox:<pinned-tag-or-digest>"
+PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME: "python-executor-controller"
+PYTHON_EXECUTOR_MAX_TIMEOUT_SECONDS: "30"
+PYTHON_EXECUTOR_MAX_MEMORY_MIB: "256"
+PYTHON_EXECUTOR_MAX_OUTPUT_BYTES: "65536"
+```
+
+The sandbox Job manifest intentionally disables service account token automount, host networking, privileged mode, privilege escalation, hostPath volumes, and Linux capabilities. Do not add Docker socket mounts, host filesystem mounts, shell access, default egress, or runtime package installation to the sandbox path.
+
+Runner image contract and scaffold: [`python-sandbox/README.md`](./python-sandbox/README.md).
+
+Production enablement checklist:
+
+1. Build and publish a pinned sandbox runner image from the reviewed `deploy/python-sandbox` contract.
+2. Create the dedicated sandbox namespace, for example `agent-python-sandbox`.
+3. Apply default-deny ingress and egress NetworkPolicy in that namespace.
+4. Apply Pod Security controls that reject privileged pods, host namespaces, hostPath, and privilege escalation.
+5. Grant only scoped RBAC for creating/watching/reading/deleting owned sandbox Jobs, ConfigMaps, and logs; keep the sandbox Pod service account token automount disabled.
+6. Ensure the sandbox namespace has access to the GHCR pull secret referenced by the Job Pod (`ghcr-pull-secret`).
+7. Set `PYTHON_EXECUTOR_BACKEND=k8s` plus namespace/image/service-account/resource limits for both `agent-api` and `message-api`.
+8. Smoke test by chatting with `AI 助手` and asking for a calculation that should use Python; verify the final reply and tool-run evidence. A WebSocket open event alone does not prove Python execution works.
+
 ## Public entry
 
 The web service is exposed through k3s NodePort `30080`. Traefik Ingress also routes application paths internally.
@@ -241,4 +279,3 @@ The web service is exposed through k3s NodePort `30080`. Traefik Ingress also ro
 
 - Docker Hub authenticated pulls are configured on the deployment host Docker daemon to avoid anonymous pull limits during Drone Docker-runner deploy stages.
 - If changing this setup, verify `docker:29-cli`, `golang:1.25-alpine`, `node:22-alpine`, `nginx:1.29-alpine`, `alpine:3.22`, and `alpine/git:2.45.2` can be pulled without anonymous rate-limit errors.
-

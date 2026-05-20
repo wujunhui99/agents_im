@@ -228,6 +228,30 @@ func TestResolverLocalToolMetadataFailsClosedWithoutAdapter(t *testing.T) {
 	}
 }
 
+func TestResolverAllowsPythonExecuteLocalTool(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemoryAgentRegistryRepository()
+	seedPythonExecuteTool(t, ctx, repo, "agent_support", "tool_python")
+	resolver := newResolver(t, repo)
+
+	resolved, err := resolver.ResolveTool(ctx, ResolveToolRequest{
+		AgentID: "agent_support",
+		ToolID:  "tool_python",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Spec.Local == nil {
+		t.Fatalf("expected local python tool spec: %+v", resolved.Spec)
+	}
+	if resolved.Spec.Local.HandlerKey != model.LocalToolHandlerPythonExecute {
+		t.Fatalf("handler key mismatch: %+v", resolved.Spec.Local)
+	}
+	if resolved.HasAdapter() {
+		t.Fatal("metadata-only resolution should not invent an adapter")
+	}
+}
+
 type seedMCPToolInput struct {
 	AgentID            string
 	ToolID             string
@@ -318,6 +342,33 @@ func seedLocalTool(t *testing.T, ctx context.Context, repo *repository.MemoryAge
 		Name:             model.LocalToolHandlerGetConversationContext,
 		ToolType:         model.AgentToolTypeLocal,
 		LocalHandlerKey:  model.LocalToolHandlerGetConversationContext,
+		InputSchemaJSON:  `{"type":"object"}`,
+		OutputSchemaJSON: `{"type":"object"}`,
+		PermissionLevel:  "agent_bound",
+		Status:           model.AgentToolStatusActive,
+		AdminConfigured:  true,
+		CreatedBy:        "usr_admin",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = repo.BindTool(ctx, model.AgentToolBinding{
+		AgentID:   agentID,
+		ToolID:    toolID,
+		CreatedBy: "usr_admin",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func seedPythonExecuteTool(t *testing.T, ctx context.Context, repo *repository.MemoryAgentRegistryRepository, agentID string, toolID string) {
+	t.Helper()
+	_, err := repo.RegisterTool(ctx, model.AgentTool{
+		ToolID:           toolID,
+		Name:             model.LocalToolHandlerPythonExecute,
+		ToolType:         model.AgentToolTypeLocal,
+		LocalHandlerKey:  model.LocalToolHandlerPythonExecute,
 		InputSchemaJSON:  `{"type":"object"}`,
 		OutputSchemaJSON: `{"type":"object"}`,
 		PermissionLevel:  "agent_bound",

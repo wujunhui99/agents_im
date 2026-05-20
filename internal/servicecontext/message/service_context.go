@@ -1,8 +1,10 @@
 package message
 
 import (
+	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	einoruntime "github.com/wujunhui99/agents_im/internal/agentruntime/eino"
+	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/llmobs"
@@ -13,18 +15,27 @@ import (
 
 type ServiceContext struct {
 	common.AuthRuntime
-	MessageLogic     *logic.MessageLogic
-	AIHostingLogic   *logic.ConversationAIHostingLogic
-	MediaLogic       *logic.MediaLogic
-	MessageRepo      repository.MessageRepository
-	MediaRepo        repository.MediaRepository
-	AgentHostingRepo repository.AgentConversationHostingRepository
-	AIHostingRepo    repository.ConversationAIHostingRepository
-	GroupMembers     logic.GroupMemberLister
-	OutboxRepo       repository.OutboxRepository
-	AgentAuditLogic  *logic.AgentAuditLogic
-	AgentAuditRepo   repository.AgentAuditRepository
-	AgentResolver    logic.AgentAccountExistenceChecker
+	MessageLogic      *logic.MessageLogic
+	AIHostingLogic    *logic.ConversationAIHostingLogic
+	MediaLogic        *logic.MediaLogic
+	MessageRepo       repository.MessageRepository
+	MediaRepo         repository.MediaRepository
+	AgentHostingRepo  repository.AgentConversationHostingRepository
+	AIHostingRepo     repository.ConversationAIHostingRepository
+	GroupMembers      logic.GroupMemberLister
+	OutboxRepo        repository.OutboxRepository
+	AgentAuditLogic   *logic.AgentAuditLogic
+	AgentAuditRepo    repository.AgentAuditRepository
+	AgentResolver     logic.AgentAccountExistenceChecker
+	AgentRegistryRepo repository.AgentRegistryRepository
+	PythonExecutor    pythonexec.Executor
+}
+
+type ConversationAIHostingRuntimeOptions struct {
+	DeepSeek         config.DeepSeekConfig
+	LLMObservability config.LLMObservabilityConfig
+	AgentRegistry    repository.AgentRegistryRepository
+	PythonExecutor   pythonexec.Executor
 }
 
 func NewServiceContext(repo repository.MessageRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister) *ServiceContext {
@@ -59,6 +70,18 @@ func NewServiceContextWithMedia(repo repository.MessageRepository, mediaRepo rep
 }
 
 func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSeekConfig, obs config.LLMObservabilityConfig) error {
+	opts := ConversationAIHostingRuntimeOptions{
+		DeepSeek:         deepSeek,
+		LLMObservability: obs,
+	}
+	if ctx != nil {
+		opts.AgentRegistry = ctx.AgentRegistryRepo
+		opts.PythonExecutor = ctx.PythonExecutor
+	}
+	return ConfigureConversationAIHostingWithRuntimeOptions(ctx, opts)
+}
+
+func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts ConversationAIHostingRuntimeOptions) error {
 	if err := validateConversationAIHostingDependencies(ctx); err != nil {
 		return err
 	}
@@ -84,18 +107,28 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 	if err != nil {
 		return err
 	}
-	llmObsConfig := llmObservabilityConfig(obs)
+	llmObsConfig := llmObservabilityConfig(opts.LLMObservability)
 	llmObsSink, err := llmobs.NewSink(llmObsConfig)
 	if err != nil {
 		return err
 	}
+	toolProvider, err := newConversationAIHostingToolProvider(opts.AgentRegistry, opts.PythonExecutor)
+	if err != nil {
+		return err
+	}
+	runtimeOptions := []einoruntime.DeepSeekRuntimeOption{
+		einoruntime.WithLLMObservability(llmObsSink, llmObsConfig),
+	}
+	if toolProvider != nil {
+		runtimeOptions = append(runtimeOptions, einoruntime.WithToolProvider(toolProvider))
+	}
 	orchestrator, err := agentim.NewAgentRunOrchestrator(agentim.AgentRunOrchestratorConfig{
-		Runtime: einoruntime.NewDeepSeekRuntime(deepSeek, einoruntime.WithLLMObservability(llmObsSink, llmObsConfig)),
+		Runtime: einoruntime.NewDeepSeekRuntime(opts.DeepSeek, runtimeOptions...),
 		RequestBuilder: agentim.NewConversationAIHostingRuntimeRequestBuilder(agentim.ConversationAIHostingRuntimeRequestBuilderConfig{
 			MessageRepository: ctx.MessageRepo,
 			HostingRepository: ctx.AIHostingRepo,
 			AgentRepository:   agentRepositoryFromResolver(ctx.AgentResolver),
-			DeepSeek:          deepSeek,
+			DeepSeek:          opts.DeepSeek,
 			MaxRecentMessages: 30,
 		}),
 		Audit:                ctx.AgentAuditLogic,
@@ -159,4 +192,14 @@ func llmObservabilityConfig(obs config.LLMObservabilityConfig) llmobs.Config {
 func outboxRepositoryFromMessageRepo(repo repository.MessageRepository) repository.OutboxRepository {
 	outboxRepo, _ := repo.(repository.OutboxRepository)
 	return outboxRepo
+}
+
+func newConversationAIHostingToolProvider(registryRepo repository.AgentRegistryRepository, executor pythonexec.Executor) (runtimetools.Provider, error) {
+	if registryRepo == nil {
+		return nil, nil
+	}
+	return runtimetools.NewResolver(
+		registryRepo,
+		runtimetools.WithAdapterCatalog(runtimetools.NewDefaultLocalAdapterCatalog(executor)),
+	)
 }

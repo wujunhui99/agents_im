@@ -149,8 +149,9 @@ python.execute
 - `ResolveAgentTools` 默认从 `agent_tool_bindings` 列出该 Agent 已绑定工具；`ResolveTool` 用于解析指定工具并检查绑定是否存在。
 - 解析时会重新校验 tool 必须为 `active` 且 `admin_configured=true`；MCP tool 还必须引用 `active` 且管理员配置的 MCP server。
 - MCP transport 仅允许 `http`、`sse`、`streamable_http`，并拒绝 stdio / local process / command-like config metadata。
-- V0 只提供 metadata contract；当 runtime 需要可调用 adapter 时必须使用 `RequireAdapters=true`，缺少显式安全 adapter 时返回明确错误。
-- 该 package 不导入 Eino、不执行 MCP 网络调用、不执行本地 handler、不调用 Python，也不提供 shell、命令、本地进程或文件系统写入能力。
+- V0/V1 只提供 metadata contract 与显式安全 adapter；当 runtime 需要可调用 adapter 时必须使用 `RequireAdapters=true`，缺少显式安全 adapter 时返回明确错误。
+- `python.execute` 只能通过 `PythonExecuteAdapter` 调用注入的 `pythonexec.Executor`；默认 executor 是 disabled，真实执行必须走独立沙箱。详细边界见 [`python-executor-sandbox.md`](./python-executor-sandbox.md)。
+- 该 package 不导入 Eino、不执行 MCP 网络调用、不执行任意本地 handler、不直接调用 Python，也不提供 shell、命令、本地进程或文件系统写入能力。
 
 ### Skill Registry 与 MinIO
 
@@ -242,7 +243,7 @@ agent_runs
 - 缺少 `DEEPSEEK_API_KEY` 时构造 ChatModel 必须返回明确错误，不能降级为 mock/fake response。
 - 默认 `go test ./...` 不请求 DeepSeek；live smoke test 只能在 `RUN_LIVE_DEEPSEEK_TESTS=1` 且存在 API key 时运行。
 
-该基线不实现完整 Agent runtime orchestration、工具/MCP 调用或上下文装配；当前 Agent-IM runner seam 使用 `internal/agentruntime.Runtime`，但生产 wiring 仍必须显式组装 registry-derived `RunRequest`。
+当前 Eino runtime 支持通过 `internal/agentruntime/tools.Provider` 解析 registry-approved tool bindings，并可执行带显式安全 adapter 的本地工具；`python.execute` 通过注入的 `PythonExecuteAdapter` / `pythonexec.Executor` 执行，默认 executor 仍 fail-closed。MCP 网络工具调用、完整 skill 文件读取和长期审计落库仍是后续任务。当前 Agent-IM runner seam 使用 `internal/agentruntime.Runtime`，生产 wiring 必须显式组装 registry-derived `RunRequest` 并注入 tool provider。
 
 工具调用审计：
 
@@ -336,7 +337,7 @@ agent_python_execs
 - stdout/stderr/result/error 全部记录。
 - 失败必须显式返回，不能伪造成功。
 
-当前仓库只实现 Go 侧 sandbox contract，不实现真实执行器。契约位于 `internal/agent/pythonexec`：
+当前仓库实现 Go 侧 sandbox contract、`python.execute` local tool adapter，以及 DeepSeek/Eino runtime 中对 registry-approved local adapter 的工具调用循环；不实现未隔离的真实执行器。契约位于 `internal/agent/pythonexec`：
 
 ```text
 Executor.Execute(ctx, Request) (*Response, error)
@@ -362,7 +363,7 @@ Response
 - structured error
 ```
 
-默认实现为 `DisabledExecutor` / `NewDefaultExecutor()`，只校验 request 和 policy，然后返回 `ErrPythonExecutorDisabled`。它不会启动 Python、Docker、shell 或任何本地进程。后续真实 executor 必须是独立沙箱服务或隔离 worker，并在接入前补齐审计落库、资源限制验证和 opt-in 集成测试。
+默认实现为 `DisabledExecutor` / `NewDefaultExecutor()`，只校验 request 和 policy，然后返回 `ErrPythonExecutorDisabled`。它不会启动 Python、Docker、shell 或任何本地进程。`internal/agentruntime/tools.PythonExecuteAdapter` 负责把 local tool input 转成受限 policy；缺少真实 executor 时仍显式失败。后续真实 executor 必须是独立沙箱服务或隔离 worker，并在接入前补齐审计落库、资源限制验证和 opt-in 集成测试。沙箱约束见 [`python-executor-sandbox.md`](./python-executor-sandbox.md)。
 
 工具接口草案：
 
