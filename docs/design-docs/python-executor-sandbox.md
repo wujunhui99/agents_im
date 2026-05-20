@@ -75,6 +75,43 @@ A real executor should run each request in an isolated sandbox with:
 
 Executor integration tests must be opt-in and skipped by default unless the sandbox service and required environment are explicitly configured. Default `go test ./...` must stay local, deterministic, and independent of Python, Docker, network, or provider credentials.
 
+## Kubernetes Backend Foundation
+
+The next-stage backend adds an opt-in Kubernetes executor under `internal/agent/pythonexec`.
+
+Default behavior remains fail-closed:
+
+- missing `PythonExecutor` config resolves to `Backend: disabled`;
+- local/dev and production example configs set `PythonExecutor.Backend: disabled`;
+- `agent-api` constructs a disabled executor unless config explicitly selects `k8s`;
+- selecting `k8s` without a Kubernetes client, namespace, or image is a startup/config error, not a fallback.
+
+The Kubernetes backend creates one Job and one ConfigMap per execution. The ConfigMap contains only the submitted code file and is mounted read-only at `/sandbox/input/main.py`; raw code is not placed in object names, labels, or annotations. Non-empty file allowlists are rejected until explicit file materialization exists.
+
+Per-run manifests enforce:
+
+- `automountServiceAccountToken: false`;
+- `runAsNonRoot: true`;
+- `allowPrivilegeEscalation: false`;
+- all Linux capabilities dropped;
+- read-only root filesystem plus memory-backed `/tmp`;
+- no `hostNetwork`, `hostPID`, `hostIPC`, `hostPath`, privileged containers, shell command, Docker socket, or host filesystem mount;
+- `restartPolicy: Never`, `backoffLimit: 0`, active deadline from request timeout, and CPU/memory/output caps from policy/config.
+
+The runner image contract lives in [`../../deploy/python-sandbox/README.md`](../../deploy/python-sandbox/README.md). The image must be prebuilt with any allowed packages; runtime `pip install` or network dependency is not part of the contract.
+
+Cluster requirements before enabling:
+
+- dedicated namespace, for example `agent-python-sandbox`;
+- default-deny ingress and egress NetworkPolicy for sandbox Pods;
+- tightly scoped Agent Service RBAC that can create/watch/read/delete only the sandbox Jobs, ConfigMaps, and logs it owns;
+- a sandbox Pod service account with token automount disabled by manifest;
+- Pod Security admission or equivalent policy forbidding privileged pods, host namespaces, hostPath, and privilege escalation;
+- image provenance and pinned tags/digests for the runner image;
+- observability on Job creation/failure/timeout/cleanup without logging submitted code or secrets.
+
+Live Kubernetes execution is not part of default test gates. Add or run live smoke only when `AGENTS_IM_PYTHON_EXECUTOR_K8S_TEST=1` and the namespace/image/client configuration are explicitly provided.
+
 ## Verification
 
 V1 foundation verification:
