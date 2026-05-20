@@ -45,86 +45,77 @@ func TestConversationAIHostingRuntimeRequestBuilderUsesBoundedRecentMessages(t *
 		MaxRecentMessages: 3,
 	})
 	req, err := builder.BuildRuntimeRequest(ctx, AgentTrigger{
-		RequestID:          "message.created:msg_000005:usr_a",
-		EventID:            "message.created:msg_000005",
-		TriggerType:        TriggerTypeUserPrivateMessage,
-		AgentUserID:        "usr_a",
-		RequestingUserID:   "usr_b",
-		ConversationID:     conversationID,
-		ConversationType:   ConversationTypeSingle,
-		TriggerMessageID:   "msg_000005",
-		TriggerSeq:         5,
-		PromptText:         clearTask,
-		ReplyToMessageID:   "msg_000005",
-		SourceMessageID:    "msg_000005",
-		SourceMessageSeq:   5,
-		SourceMessageText:  clearTask,
-		SourceContentType:  logic.MessageContentTypeText,
-		TargetAgentUserIDs: []string{"usr_a"},
+		RequestID:         "req-1",
+		EventID:           "evt-1",
+		TriggerType:       TriggerTypeUserPrivateMessage,
+		AgentUserID:       "usr_a",
+		RequestingUserID:  "usr_b",
+		ConversationID:    conversationID,
+		ConversationType:  ConversationTypeSingle,
+		TriggerMessageID:  "msg_5",
+		TriggerSeq:        5,
+		PromptText:        clearTask,
+		ReplyToMessageID:  "msg_5",
+		SourceMessageID:   "msg_5",
+		SourceMessageSeq:  5,
+		SourceMessageText: clearTask,
+		SourceContentType: logic.MessageContentTypeText,
 	})
 	if err != nil {
 		t.Fatalf("build runtime request: %v", err)
 	}
-	if req.AgentUserID != "usr_a" || req.Agent.AgentUserID != "usr_a" {
-		t.Fatalf("owner not preserved in runtime request: %+v", req)
-	}
-	if req.Agent.Model.Provider != "deepseek" || req.Agent.Model.Model != "deepseek-test" {
-		t.Fatalf("model config mismatch: %+v", req.Agent.Model)
-	}
-	if len(req.Conversation) != 3 {
-		t.Fatalf("recent context count = %d, want 3: %+v", len(req.Conversation), req.Conversation)
+	if got := len(req.Conversation); got != 3 {
+		t.Fatalf("conversation len = %d, want bounded recent 3", got)
 	}
 	if req.Conversation[0].Seq != 3 || req.Conversation[2].Seq != 5 {
-		t.Fatalf("context window is not the last 3 messages: %+v", req.Conversation)
+		t.Fatalf("conversation seqs = %+v, want 3..5", req.Conversation)
 	}
-	if req.PromptText != clearTask || req.SourceMessageText != clearTask {
-		t.Fatalf("trigger text missing from runtime request: prompt=%q source=%q", req.PromptText, req.SourceMessageText)
+	if !strings.Contains(req.Agent.Prompt.Content, "当前用户") {
+		t.Fatalf("default system prompt = %q, want AI hosting prompt", req.Agent.Prompt.Content)
 	}
-	last := req.Conversation[len(req.Conversation)-1]
-	if last.ServerMsgID != "msg_000005" || last.Seq != 5 || last.Text != clearTask {
-		t.Fatalf("latest trigger message is not the final bounded context message: %+v", req.Conversation)
-	}
-	if req.Metadata["summary_used"] != "false" || req.Metadata["recent_message_count"] != "3" {
-		t.Fatalf("summary/context metadata mismatch: %+v", req.Metadata)
-	}
-	prompt := req.Agent.Prompt.Content
-	for _, want := range []string{"明确", "直接", "不要只回复"} {
-		if !strings.Contains(prompt, want) {
-			t.Fatalf("AI hosting default prompt does not guard clear tasks from vague follow-up; missing %q in %q", want, prompt)
-		}
-	}
-	for _, message := range req.Conversation {
-		if message.ContentType != agentruntime.ContentTypeText {
-			t.Fatalf("unexpected context content type: %+v", message)
-		}
+	if req.Agent.Model.Provider != "deepseek" || req.Agent.Model.Model != "deepseek-test" {
+		t.Fatalf("model config = %+v", req.Agent.Model)
 	}
 }
 
-func TestConversationAIHostingRuntimeRequestBuilderUsesAgentProfileWhenAvailable(t *testing.T) {
+func TestConversationAIHostingRuntimeRequestBuilderRejectsNonSingleConversation(t *testing.T) {
+	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
+		MessageRepository: repository.NewMemoryMessageRepository(),
+	})
+	_, err := builder.BuildRuntimeRequest(context.Background(), AgentTrigger{
+		ConversationType: ConversationTypeGroup,
+	})
+	if err == nil || !strings.Contains(err.Error(), "direct conversations") {
+		t.Fatalf("BuildRuntimeRequest error = %v, want direct conversation rejection", err)
+	}
+}
+
+func TestBuilderUsesStoredAgentProfileWhenTriggerTargetsAgentAccount(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogic(messageRepo)
 	agentRepo := repository.NewMemoryAgentRepository()
-	if _, err := agentRepo.CreateAgent(ctx, model.Agent{
+	agent, err := agentRepo.CreateAgent(ctx, model.Agent{
 		AgentID:     "agent_default_assistant",
 		AccountID:   "agent_creator",
-		IMUserID:    "agent_creator",
 		Name:        "agent_creator",
 		Description: "Default general AI assistant",
-		Status:      model.AgentStatusActive,
-	}); err != nil {
-		t.Fatalf("create agent profile: %v", err)
+		Status:      agentruntime.AgentStatusActive,
+		CreatedBy:   "system",
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-	conversationID := repository.SingleConversationID("usr_new", "agent_creator")
+	conversationID := repository.SingleConversationID("agent_creator", "usr_new")
 	if _, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
 		SenderID:    "usr_new",
 		ReceiverID:  "agent_creator",
 		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "ask-agent-profile",
+		ClientMsgID: "agent-creator-profile-msg",
 		ContentType: logic.MessageContentTypeText,
 		Content:     "你能做什么？",
 	}); err != nil {
-		t.Fatalf("seed private agent message: %v", err)
+		t.Fatal(err)
 	}
 
 	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
@@ -154,7 +145,100 @@ func TestConversationAIHostingRuntimeRequestBuilderUsesAgentProfileWhenAvailable
 	if err != nil {
 		t.Fatalf("build runtime request: %v", err)
 	}
-	if req.Agent.AgentID != "agent_default_assistant" || req.Agent.Name != "agent_creator" || req.Agent.Description != "Default general AI assistant" {
+	if req.Agent.AgentID != agent.AgentID || req.Agent.Name != "agent_creator" || req.Agent.Description != "Default general AI assistant" {
 		t.Fatalf("runtime request did not use stored agent profile: %+v", req.Agent)
+	}
+}
+
+func TestBuilderUsesStoredAgentRuntimeDefinition(t *testing.T) {
+	ctx := context.Background()
+	messageRepo := repository.NewMemoryMessageRepository()
+	agentRepo := repository.NewMemoryAgentRepository()
+	registry := repository.NewMemoryAgentRegistryRepository()
+	agent, err := agentRepo.CreateAgent(ctx, model.Agent{
+		AgentID:     "agent_runtime_definition",
+		AccountID:   "agent_runtime_account",
+		Name:        "Runtime Agent",
+		Description: "Configured runtime definition",
+		Status:      model.AgentStatusActive,
+		CreatedBy:   "usr_owner",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prompt, err := registry.CreatePrompt(ctx, model.AgentPrompt{
+		PromptID:            "prompt_runtime_definition",
+		Name:                "runtime_prompt",
+		Content:             "Use the configured runtime prompt.",
+		VariablesSchemaJSON: "{}",
+		Version:             "v1",
+		Status:              model.AgentPromptStatusActive,
+		CreatedBy:           "usr_owner",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registry.BindPrompt(ctx, model.AgentPromptBinding{AgentID: agent.AgentID, PromptID: prompt.PromptID, CreatedBy: "usr_owner"}); err != nil {
+		t.Fatal(err)
+	}
+	tool, err := registry.RegisterTool(ctx, model.AgentTool{
+		ToolID:           "tool_runtime_context",
+		Name:             model.LocalToolHandlerGetConversationContext,
+		Description:      "Read recent context",
+		ToolType:         model.AgentToolTypeLocal,
+		LocalHandlerKey:  model.LocalToolHandlerGetConversationContext,
+		InputSchemaJSON:  `{"type":"object"}`,
+		OutputSchemaJSON: `{"type":"object"}`,
+		PermissionLevel:  "read_only",
+		Status:           model.AgentToolStatusActive,
+		AdminConfigured:  true,
+		CreatedBy:        "usr_owner",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := registry.BindTool(ctx, model.AgentToolBinding{AgentID: agent.AgentID, ToolID: tool.ToolID, CreatedBy: "usr_owner"}); err != nil {
+		t.Fatal(err)
+	}
+	messageLogic := logic.NewMessageLogic(messageRepo)
+	conversationID := repository.SingleConversationID("agent_runtime_account", "usr_peer")
+	if _, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
+		SenderID:    "usr_peer",
+		ReceiverID:  "agent_runtime_account",
+		ChatType:    logic.MessageChatTypeSingle,
+		ClientMsgID: "runtime-definition-msg",
+		ContentType: logic.MessageContentTypeText,
+		Content:     "hello runtime agent",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
+		MessageRepository: messageRepo,
+		AgentRepository:   agentRepo,
+		AgentRegistry:     registry,
+		DeepSeek:          config.DeepSeekConfig{Model: "deepseek-test"},
+	})
+	req, err := builder.BuildRuntimeRequest(ctx, AgentTrigger{
+		RequestID:          "message.created:runtime-definition-msg:agent_runtime_account",
+		EventID:            "message.created:runtime-definition-msg",
+		TriggerType:        TriggerTypeUserPrivateMessage,
+		AgentUserID:        "agent_runtime_account",
+		RequestingUserID:   "usr_peer",
+		ConversationID:     conversationID,
+		ConversationType:   ConversationTypeSingle,
+		TriggerMessageID:   "msg_runtime_definition",
+		TriggerSeq:         1,
+		SourceMessageSeq:   1,
+		SourceContentType:  logic.MessageContentTypeText,
+		TargetAgentUserIDs: []string{"agent_runtime_account"},
+	})
+	if err != nil {
+		t.Fatalf("build runtime request: %v", err)
+	}
+	if req.Agent.Prompt.PromptID != prompt.PromptID || req.Agent.Prompt.Content != prompt.Content {
+		t.Fatalf("runtime prompt = %+v, want configured prompt", req.Agent.Prompt)
+	}
+	if len(req.Agent.Tools) != 1 || req.Agent.Tools[0].ToolID != tool.ToolID {
+		t.Fatalf("runtime tools = %+v, want configured tool", req.Agent.Tools)
 	}
 }

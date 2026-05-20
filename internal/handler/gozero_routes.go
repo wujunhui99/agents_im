@@ -126,7 +126,9 @@ func RegisterAgentGoZeroHandlers(server *rest.Server, serverCtx *agentsvc.Servic
 		return []health.Check{
 			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
 			componentCheck("agent_logic", serverCtx != nil && serverCtx.AgentLogic != nil, "configured"),
+			componentCheck("agent_definition_logic", serverCtx != nil && serverCtx.AgentDefinitionLogic != nil, "configured"),
 			componentCheck("agent_repository", serverCtx != nil && serverCtx.AgentRepo != nil, "configured"),
+			componentCheck("agent_registry_repository", serverCtx != nil && serverCtx.AgentRegistryRepo != nil, "configured"),
 		}
 	})
 	addAgentRoutes(server, serverCtx)
@@ -380,6 +382,16 @@ func addAgentRoutes(server *rest.Server, serverCtx *agentsvc.ServiceContext) {
 			Method:  http.MethodGet,
 			Path:    "/agents/:agent_id",
 			Handler: agenthandler.GetAgentHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/agents/:agent_id/definition",
+			Handler: agenthandler.GetAgentDefinitionHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPut,
+			Path:    "/agents/:agent_id/definition",
+			Handler: agenthandler.UpdateAgentDefinitionHandler(serverCtx),
 		},
 		{
 			Method:  http.MethodPatch,
