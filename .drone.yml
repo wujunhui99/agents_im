@@ -96,8 +96,6 @@ steps:
         from_secret: ghcr_token
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
       DRONE_IMAGE_BUILD_PARALLELISM: "4"
-      DRONE_IMAGE_BUILD_FORCE_ALL: "true"
-      DRONE_IMAGE_BUILD_ONLY: "true"
     commands:
       - sh -c 'if ! grep -q "^build_required=true$" .drone-deploy.env; then echo "No image build required."; exit 0; fi'
       - apk add --no-cache bash

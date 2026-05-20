@@ -18,6 +18,20 @@ cache_tag="${DRONE_BUILD_CACHE_TAG:-buildcache}"
 cache_scope="${DRONE_BUILD_CACHE_SCOPE:-shared}"
 build_parallelism="${DRONE_IMAGE_BUILD_PARALLELISM:-3}"
 force_all_images="${DRONE_IMAGE_BUILD_FORCE_ALL:-false}"
+build_only="${DRONE_IMAGE_BUILD_ONLY:-false}"
+branch="${DRONE_BRANCH:-}"
+
+# The devops branch is the CI/CD performance lab. Its Drone environment may force
+# all images and skip runtime deployment to measure warm-cache image build speed.
+# Never let those measurement controls affect main: production deploys must use
+# detector-selected images and continue into the deploy step.
+if [[ "${branch}" != "devops" ]]; then
+  if [[ "${force_all_images}" == "true" || "${build_only}" == "true" ]]; then
+    echo "Ignoring devops-only image build measurement controls on branch ${branch:-<unset>}."
+  fi
+  force_all_images="false"
+  build_only="false"
+fi
 
 if ! [[ "${build_parallelism}" =~ ^[1-9][0-9]*$ ]]; then
   echo "DRONE_IMAGE_BUILD_PARALLELISM must be a positive integer; got ${build_parallelism}." >&2
@@ -220,7 +234,7 @@ if ((${#completed_services[@]} > 0)); then
   echo "Total image build wall-clock duration: ${wall_duration}s"
 fi
 
-if [[ "${DRONE_IMAGE_BUILD_ONLY:-false}" == "true" ]]; then
+if [[ "${build_only}" == "true" ]]; then
   echo "DRONE_IMAGE_BUILD_ONLY=true; marking deploy_required=false after image-build measurement."
   tmp_env="${work_dir}/drone-deploy.env"
   while IFS= read -r line || [[ -n "${line}" ]]; do

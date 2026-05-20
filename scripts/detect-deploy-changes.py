@@ -127,6 +127,10 @@ def classify_path(path: str, selection: DeploySelection) -> None:
     }:
         # CI/deploy orchestration changes should exercise deploy/runtime wiring
         # without rebuilding every service image on each deploy-script fix.
+        # The devops branch has a narrower image-build measurement override in
+        # detect(); on main, CI script changes should stay config-only.
+        if path in {"scripts/ci/drone-build-images.sh", "scripts/detect-deploy-changes.py"}:
+            return
         selection.add_rollout("groups-rpc")
         return
 
@@ -239,13 +243,19 @@ def detect(event_name: str, ref: str, paths: list[str]) -> dict[str, str]:
         return build_outputs(selection)
 
     if ref == "refs/heads/devops" and any(
-        normalize_path(path) in {".drone.yml", "scripts/ci/drone-build-images.sh"}
+        normalize_path(path)
+        in {
+            ".drone.yml",
+            "scripts/ci/drone-build-images.sh",
+            "scripts/detect-deploy-changes.py",
+        }
         for path in paths
     ):
-        # CI/CD lab branch: changes to the image-build pipeline itself should
-        # force a warm-cache build measurement. Main keeps these paths as
-        # config-only deploy orchestration changes.
+        # CI/CD lab branch: image-build detector/script changes should force a
+        # warm-cache all-image measurement. Pure verification/deploy-script
+        # changes should not rebuild every service image.
         selection.add_all_backends()
+        selection.add_web()
 
     for raw_path in paths:
         classify_path(normalize_path(raw_path), selection)
