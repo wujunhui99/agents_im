@@ -236,12 +236,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
 
 function isAdminRoute() {
   const { hostname, pathname } = window.location;
-  return (
-    hostname === 'ms.agenticim.xyz' ||
-    hostname === 'admin.agenticim.xyz' ||
-    pathname === '/admin' ||
-    pathname.startsWith('/admin/')
-  );
+  return hostname === 'ms.agenticim.xyz' || pathname === '/admin' || pathname.startsWith('/admin/');
 }
 
 function AuthPage({ prompt = '' }: { prompt?: string }) {
