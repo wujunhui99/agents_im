@@ -625,6 +625,11 @@ button.md-list-item:hover,
   color: var(--md-sys-color-primary);
 }
 
+.auth-hint {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 .auth-switch {
   display: flex;
   justify-content: center;
