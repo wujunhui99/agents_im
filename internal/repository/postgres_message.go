@@ -69,6 +69,7 @@ func NewPostgresMessageRepositoryFromConn(conn sqlx.SqlConn) *PostgresMessageRep
 }
 
 func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context, input CreateMessageInput) (Message, bool, error) {
+	applyTraceContextToCreateMessageInput(ctx, &input)
 	if _, err := normalizeMessageOriginInput(&input); err != nil {
 		return Message{}, false, err
 	}

@@ -3,6 +3,7 @@ package mailadapter
 import (
 	"errors"
 
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/mailservice"
 	"github.com/zeromicro/go-zero/zrpc"
 )
@@ -13,7 +14,7 @@ func NewOptionalRPCClient(conf zrpc.RpcClientConf) (Client, error) {
 	if !HasRPCClientConfig(conf) {
 		return nil, nil
 	}
-	cli, err := zrpc.NewClient(conf)
+	cli, err := zrpc.NewClient(conf, zrpc.WithUnaryClientInterceptor(observability.GRPCUnaryClientInterceptor()))
 	if err != nil {
 		return nil, err
 	}

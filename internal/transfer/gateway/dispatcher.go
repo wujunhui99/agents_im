@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gatewaydelivery "github.com/wujunhui99/agents_im/internal/gateway/delivery"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/transfer"
 )
 
@@ -48,6 +49,11 @@ func (d *Dispatcher) Dispatch(ctx context.Context, envelope transfer.Envelope) t
 	if d == nil || d.gateway == nil {
 		return d.retryable(ErrGatewayDispatcherRequired)
 	}
+	if envelope.TraceContext.TraceID != "" {
+		ctx = observability.ContextWithTrace(ctx, envelope.TraceContext)
+	}
+	ctx, span := observability.StartSpan(ctx, "message.transfer.local_gateway_dispatch")
+	defer span.End()
 
 	switch strings.TrimSpace(envelope.Event.EventType) {
 	case transfer.EventTypeMessageAccepted:
@@ -140,6 +146,9 @@ func messageReceivedEvent(envelope transfer.Envelope, recipients []string) gatew
 		SendTime:              event.SendTime,
 		CreatedAt:             event.CreatedAt,
 		TraceID:               event.TraceID,
+		RequestID:             event.RequestID,
+		TraceParent:           event.TraceParent,
+		TraceState:            event.TraceState,
 	})
 }
 

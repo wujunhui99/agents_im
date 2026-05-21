@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/segmentio/kafka-go"
+
+	"github.com/wujunhui99/agents_im/internal/observability"
 )
 
 type KafkaProducerConfig struct {
@@ -55,23 +57,24 @@ func (p *KafkaProducer) Publish(ctx context.Context, event MessageEvent) error {
 	if p == nil || p.writer == nil {
 		return ErrProducerClosed
 	}
-	value, err := MarshalMessageEvent(event)
+	if event.Payload.TraceID == "" {
+		traceContext := observability.TraceContextFromContext(ctx)
+		event.Payload.TraceID = traceContext.TraceID
+		event.Payload.RequestID = traceContext.RequestID
+		event.Payload.TraceParent = traceContext.TraceParent
+		event.Payload.TraceState = traceContext.TraceState
+	}
+	message, err := KafkaMessageForEvent(event)
 	if err != nil {
 		return err
 	}
-	messageTime := time.Now().UTC()
-	if event.CreatedAt > 0 {
-		messageTime = time.UnixMilli(event.CreatedAt).UTC()
+	ctx, span := observability.StartSpan(ctx, "kafka.produce")
+	err = p.writer.WriteMessages(ctx, message)
+	if err != nil {
+		observability.RecordSpanError(span, err)
 	}
-	return p.writer.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(event.PartitionKey()),
-		Value: value,
-		Time:  messageTime,
-		Headers: []kafka.Header{
-			{Key: "event_type", Value: []byte(event.EventType)},
-			{Key: "server_msg_id", Value: []byte(event.ServerMsgID)},
-		},
-	})
+	span.End()
+	return err
 }
 
 func (p *KafkaProducer) Close() error {
@@ -97,4 +100,37 @@ func cleanBrokers(brokers []string) []string {
 		}
 	}
 	return cleaned
+}
+
+func KafkaMessageForEvent(event MessageEvent) (kafka.Message, error) {
+	value, err := MarshalMessageEvent(event)
+	if err != nil {
+		return kafka.Message{}, err
+	}
+	messageTime := time.Now().UTC()
+	if event.CreatedAt > 0 {
+		messageTime = time.UnixMilli(event.CreatedAt).UTC()
+	}
+	headers := []kafka.Header{
+		{Key: "event_type", Value: []byte(event.EventType)},
+		{Key: "server_msg_id", Value: []byte(event.ServerMsgID)},
+	}
+	if event.Payload.TraceID != "" {
+		headers = append(headers, kafka.Header{Key: "x-trace-id", Value: []byte(event.Payload.TraceID)})
+	}
+	if event.Payload.RequestID != "" {
+		headers = append(headers, kafka.Header{Key: "x-request-id", Value: []byte(event.Payload.RequestID)})
+	}
+	if event.Payload.TraceParent != "" {
+		headers = append(headers, kafka.Header{Key: "traceparent", Value: []byte(event.Payload.TraceParent)})
+	}
+	if event.Payload.TraceState != "" {
+		headers = append(headers, kafka.Header{Key: "tracestate", Value: []byte(event.Payload.TraceState)})
+	}
+	return kafka.Message{
+		Key:     []byte(event.PartitionKey()),
+		Value:   value,
+		Time:    messageTime,
+		Headers: headers,
+	}, nil
 }

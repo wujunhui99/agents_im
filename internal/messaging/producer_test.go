@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/segmentio/kafka-go"
 )
 
 func TestInMemoryProducerStoresClonedEvents(t *testing.T) {
@@ -56,4 +58,35 @@ func TestParseBrokerList(t *testing.T) {
 	if len(brokers) != 2 || brokers[0] != "localhost:19092" || brokers[1] != "redpanda:9092" {
 		t.Fatalf("unexpected brokers: %#v", brokers)
 	}
+}
+
+func TestKafkaMessageForEventInjectsTraceContextHeaders(t *testing.T) {
+	event := sampleAcceptedEvent()
+	event.Payload.TraceID = "4bf92f3577b34da6a3ce929d0e0e4736"
+	event.Payload.TraceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	event.Payload.TraceState = "rojo=00f067aa0ba902b7"
+
+	message, err := KafkaMessageForEvent(event)
+	if err != nil {
+		t.Fatalf("build kafka message: %v", err)
+	}
+
+	headers := headersByKey(message.Headers)
+	if string(headers["traceparent"]) != event.Payload.TraceParent {
+		t.Fatalf("traceparent header = %q", headers["traceparent"])
+	}
+	if string(headers["tracestate"]) != event.Payload.TraceState {
+		t.Fatalf("tracestate header = %q", headers["tracestate"])
+	}
+	if string(headers["x-trace-id"]) != event.Payload.TraceID {
+		t.Fatalf("x-trace-id header = %q", headers["x-trace-id"])
+	}
+}
+
+func headersByKey(headers []kafka.Header) map[string][]byte {
+	out := make(map[string][]byte, len(headers))
+	for _, header := range headers {
+		out[header.Key] = append([]byte(nil), header.Value...)
+	}
+	return out
 }

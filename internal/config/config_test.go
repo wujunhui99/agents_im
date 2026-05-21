@@ -124,6 +124,56 @@ MailRPC:
 	}
 }
 
+func TestLoadAPIConfigResolvesTracingFromFile(t *testing.T) {
+	clearTracingEnv(t)
+	configPath := filepath.Join(t.TempDir(), "message-api.yaml")
+	if err := os.WriteFile(configPath, []byte(`
+Name: message-api
+Tracing:
+  Enabled: true
+  ServiceName: custom-message-api
+  Environment: staging
+  OTLPEndpoint: otel-collector.agents-im.svc.cluster.local:4317
+  Protocol: grpc
+  SamplerRatio: 0.25
+  JaegerBaseURL: https://jaeger.agenticim.xyz
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if !cfg.Tracing.Enabled ||
+		cfg.Tracing.ServiceName != "custom-message-api" ||
+		cfg.Tracing.Environment != "staging" ||
+		cfg.Tracing.OTLPEndpoint != "otel-collector.agents-im.svc.cluster.local:4317" ||
+		cfg.Tracing.Protocol != "grpc" ||
+		cfg.Tracing.SamplerRatio != 0.25 ||
+		cfg.Tracing.JaegerBaseURL != "https://jaeger.agenticim.xyz" {
+		t.Fatalf("tracing config mismatch: %+v", cfg.Tracing)
+	}
+}
+
+func TestLoadAPIConfigFailsEnabledTracingWithoutEndpoint(t *testing.T) {
+	clearTracingEnv(t)
+	configPath := filepath.Join(t.TempDir(), "message-api.yaml")
+	if err := os.WriteFile(configPath, []byte(`
+Name: message-api
+Tracing:
+  Enabled: true
+  ServiceName: message-api
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	_, err := LoadAPIConfig(configPath)
+	if err == nil || !strings.Contains(err.Error(), "OTLP endpoint") {
+		t.Fatalf("expected enabled tracing without endpoint to fail, got %v", err)
+	}
+}
+
 func TestLoadAPIConfigParsesMailRPCYAMLListEndpoints(t *testing.T) {
 	clearMailRPCEnv(t)
 
@@ -254,6 +304,29 @@ func clearPythonExecutorEnv(t *testing.T) {
 		"AGENTS_IM_PYTHON_EXECUTOR_MAX_MEMORY_MIB",
 		"PYTHON_EXECUTOR_MAX_OUTPUT_BYTES",
 		"AGENTS_IM_PYTHON_EXECUTOR_MAX_OUTPUT_BYTES",
+	} {
+		t.Setenv(key, "")
+	}
+}
+
+func clearTracingEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"AGENTS_IM_TRACING_ENABLED",
+		"TRACING_ENABLED",
+		"AGENTS_IM_TRACING_SERVICE_NAME",
+		"OTEL_SERVICE_NAME",
+		"AGENTS_IM_ENV",
+		"OTEL_RESOURCE_ATTRIBUTES",
+		"AGENTS_IM_OTLP_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+		"AGENTS_IM_OTLP_PROTOCOL",
+		"OTEL_EXPORTER_OTLP_PROTOCOL",
+		"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+		"AGENTS_IM_TRACING_SAMPLER_RATIO",
+		"OTEL_TRACES_SAMPLER_ARG",
+		"AGENTS_IM_JAEGER_BASE_URL",
 	} {
 		t.Setenv(key, "")
 	}

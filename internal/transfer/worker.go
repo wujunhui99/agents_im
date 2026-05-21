@@ -179,6 +179,11 @@ func (w *Worker) RunOnce(ctx context.Context) (result ProcessResult) {
 		}
 		return ProcessResult{Status: StatusRetryable, Retryable: true, RetryAfter: w.retryBackoff, Err: err}
 	}
+	if envelope.TraceContext.TraceID != "" {
+		ctx = observability.ContextWithTrace(ctx, envelope.TraceContext)
+	}
+	ctx, span := observability.StartSpan(ctx, "message.transfer.process")
+	defer span.End()
 	observability.RecordTransferEvent("consumed")
 	if envelope.Attempt <= 0 {
 		envelope.Attempt = 1
