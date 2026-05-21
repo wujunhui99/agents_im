@@ -61,6 +61,9 @@ function AuthGate(props: AppProps) {
   );
 
   if (isAdminRoute()) {
+    if (!session || session.user.accountType !== 'admin') {
+      return <AuthPage prompt={session ? '请使用管理员账号登录管理后台' : authPrompt} adminMode />;
+    }
     return <AdminConsole adminApi={adminApi} />;
   }
 
@@ -239,7 +242,7 @@ function isAdminRoute() {
   return hostname === 'ms.agenticim.xyz' || pathname === '/admin' || pathname.startsWith('/admin/');
 }
 
-function AuthPage({ prompt = '' }: { prompt?: string }) {
+function AuthPage({ prompt = '', adminMode = false }: { prompt?: string; adminMode?: boolean }) {
   const { login, register, requestRegistrationEmailCode } = useAuth();
   const loginUserApi = useMemo(() => createUserApi(createApiClient()), []);
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -257,7 +260,7 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const identifierCheckRequest = useRef(0);
-  const isRegister = mode === 'register';
+  const isRegister = !adminMode && mode === 'register';
   const canSubmitRegister =
     identifier.trim() !== '' &&
     email.trim() !== '' &&
@@ -375,8 +378,8 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
         <div className="auth-hero">
           <Avatar label={<ShieldCheck size={30} />} color="green" size="large" />
           <div className="auth-hero-copy">
-            <p className="auth-kicker">Agents IM</p>
-            <h1>{isRegister ? '注册 Agents IM' : '登录 Agents IM'}</h1>
+            <p className="auth-kicker">{adminMode ? 'Agents IM MS' : 'Agents IM'}</p>
+            <h1>{adminMode ? '登录管理后台' : isRegister ? '注册 Agents IM' : '登录 Agents IM'}</h1>
           </div>
         </div>
 
@@ -486,17 +489,19 @@ function AuthPage({ prompt = '' }: { prompt?: string }) {
           </Button>
         </form>
 
-        <div className="auth-switch">
-          {isRegister ? (
-            <Button variant="text" onClick={() => switchMode('login')}>
-              已有账号，去登录
-            </Button>
-          ) : (
-            <Button variant="text" onClick={() => switchMode('register')}>
-              注册账号
-            </Button>
-          )}
-        </div>
+        {!adminMode ? (
+          <div className="auth-switch">
+            {isRegister ? (
+              <Button variant="text" onClick={() => switchMode('login')}>
+                已有账号，去登录
+              </Button>
+            ) : (
+              <Button variant="text" onClick={() => switchMode('register')}>
+                注册账号
+              </Button>
+            )}
+          </div>
+        ) : null}
       </section>
     </main>
   );

@@ -5,6 +5,10 @@ Port: 8081
 Auth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
+AdminBootstrap:
+  Identifier: ${ADMIN_BOOTSTRAP_IDENTIFIER}
+  Password: ${ADMIN_BOOTSTRAP_PASSWORD}
+  DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME}
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 MailRPC:

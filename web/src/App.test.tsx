@@ -418,16 +418,15 @@ describe('Auth flow', () => {
     window.history.pushState({}, '', '/');
   });
 
-  it('renders the admin console shell at the management system host root before login', async () => {
+  it('requires login at the management system host root before loading admin APIs', async () => {
     setTestLocation('https://ms.agenticim.xyz/');
-    fetchMock.mockResolvedValue(jsonResponse({ code: 'UNAUTHENTICATED', message: 'invalid or missing bearer token', data: null }, { status: 401 }));
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Admin Console' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '登录 Agents IM' })).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith('/admin/dashboard', expect.objectContaining({ method: 'GET' }));
-    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/users/exists'), expect.anything());
+    expect(screen.getByRole('heading', { name: '登录管理后台' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Admin Console' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '注册账号' })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith('/admin/dashboard', expect.anything());
   });
 
   it('does not use the deprecated admin host as an in-app admin route', () => {
