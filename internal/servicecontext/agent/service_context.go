@@ -10,9 +10,11 @@ import (
 
 type ServiceContext struct {
 	common.AuthRuntime
-	AgentLogic     *logic.AgentLogic
-	AgentRepo      repository.AgentRepository
-	PythonExecutor pythonexec.Executor
+	AgentLogic           *logic.AgentLogic
+	AgentDefinitionLogic *logic.AgentAssemblyLogic
+	AgentRepo            repository.AgentRepository
+	AgentRegistryRepo    repository.AgentRegistryRepository
+	PythonExecutor       pythonexec.Executor
 }
 
 func NewServiceContext(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker) *ServiceContext {
@@ -33,4 +35,21 @@ func NewServiceContextWithAuthAndPythonExecutor(repo repository.AgentRepository,
 		AgentRepo:      repo,
 		PythonExecutor: executor,
 	}
+}
+
+func (ctx *ServiceContext) ConfigureAgentRegistry(registry repository.AgentRegistryRepository) {
+	ctx.ConfigureAgentAssembly(nil, nil, registry)
+}
+
+func (ctx *ServiceContext) ConfigureAgentAssembly(accounts repository.AccountRepository, friendships repository.FriendshipRepository, registry repository.AgentRegistryRepository) {
+	if ctx == nil {
+		return
+	}
+	ctx.AgentRegistryRepo = registry
+	ctx.AgentDefinitionLogic = logic.NewAgentAssemblyLogic(logic.AgentAssemblyDependencies{
+		Accounts:    accounts,
+		Friendships: friendships,
+		Agents:      ctx.AgentRepo,
+		Registry:    registry,
+	})
 }

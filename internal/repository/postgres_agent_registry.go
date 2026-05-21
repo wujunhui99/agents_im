@@ -187,6 +187,63 @@ func (r *PostgresRepository) BindPrompt(ctx context.Context, binding model.Agent
 	return row.promptBinding(), true, nil
 }
 
+func (r *PostgresRepository) ListPromptBindings(ctx context.Context, agentID string) ([]model.AgentPromptBinding, error) {
+	var rows []postgresAgentPromptBindingRow
+	err := r.conn.QueryRowsCtx(ctx, &rows, `
+select agent_id, prompt_id, created_by, created_at, updated_at
+from agent_prompt_bindings
+where agent_id = $1
+order by created_at desc, prompt_id
+`, agentID)
+	if err != nil {
+		return nil, err
+	}
+	bindings := make([]model.AgentPromptBinding, 0, len(rows))
+	for _, row := range rows {
+		bindings = append(bindings, row.promptBinding())
+	}
+	return bindings, nil
+}
+
+func (r *PostgresRepository) ReplacePromptBindings(ctx context.Context, agentID string, promptIDs []string, createdBy string) ([]model.AgentPromptBinding, error) {
+	bindings := make([]model.AgentPromptBinding, 0, len(promptIDs))
+	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+		if _, err := session.ExecCtx(ctx, `
+delete from agent_prompt_bindings
+where agent_id = $1
+`, agentID); err != nil {
+			return err
+		}
+		seen := make(map[string]struct{}, len(promptIDs))
+		for _, promptID := range promptIDs {
+			if _, ok := seen[promptID]; ok {
+				continue
+			}
+			seen[promptID] = struct{}{}
+			row, err := insertAgentPromptBinding(ctx, session, model.AgentPromptBinding{
+				AgentID:   agentID,
+				PromptID:  promptID,
+				CreatedBy: createdBy,
+			})
+			if err != nil {
+				return err
+			}
+			bindings = append(bindings, row.promptBinding())
+		}
+		return nil
+	})
+	if err != nil {
+		if isPostgresForeignKeyViolation(err) {
+			return nil, apperror.NotFound("prompt not found")
+		}
+		if isPostgresCheckViolation(err) {
+			return nil, apperror.InvalidArgument("invalid prompt binding")
+		}
+		return nil, err
+	}
+	return bindings, nil
+}
+
 func (r *PostgresRepository) CreateMCPServer(ctx context.Context, server model.AgentMCPServer) (model.AgentMCPServer, error) {
 	var row postgresAgentMCPServerRow
 	var err error
@@ -321,6 +378,42 @@ where tool_id = $1
 	return row.tool(), nil
 }
 
+func (r *PostgresRepository) GetToolByName(ctx context.Context, name string) (model.AgentTool, error) {
+	var row postgresAgentToolRow
+	err := r.conn.QueryRowCtx(ctx, &row, `
+select tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+       input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by, created_at, updated_at
+from agent_tools
+where name = $1
+`, name)
+	if err != nil {
+		if isNotFound(err) {
+			return model.AgentTool{}, apperror.NotFound("tool not found")
+		}
+		return model.AgentTool{}, err
+	}
+	return row.tool(), nil
+}
+
+func (r *PostgresRepository) ListActiveTools(ctx context.Context) ([]model.AgentTool, error) {
+	var rows []postgresAgentToolRow
+	err := r.conn.QueryRowsCtx(ctx, &rows, `
+select tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+       input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by, created_at, updated_at
+from agent_tools
+where status = 'active'
+order by name
+`)
+	if err != nil {
+		return nil, err
+	}
+	tools := make([]model.AgentTool, 0, len(rows))
+	for _, row := range rows {
+		tools = append(tools, row.tool())
+	}
+	return tools, nil
+}
+
 func (r *PostgresRepository) BindTool(ctx context.Context, binding model.AgentToolBinding) (model.AgentToolBinding, bool, error) {
 	existing, err := queryAgentToolBinding(ctx, r.conn, binding.AgentID, binding.ToolID)
 	if err == nil {
@@ -362,6 +455,45 @@ order by tool_id
 	bindings := make([]model.AgentToolBinding, 0, len(rows))
 	for _, row := range rows {
 		bindings = append(bindings, row.toolBinding())
+	}
+	return bindings, nil
+}
+
+func (r *PostgresRepository) ReplaceToolBindings(ctx context.Context, agentID string, toolIDs []string, createdBy string) ([]model.AgentToolBinding, error) {
+	bindings := make([]model.AgentToolBinding, 0, len(toolIDs))
+	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+		if _, err := session.ExecCtx(ctx, `
+delete from agent_tool_bindings
+where agent_id = $1
+`, agentID); err != nil {
+			return err
+		}
+		seen := make(map[string]struct{}, len(toolIDs))
+		for _, toolID := range toolIDs {
+			if _, ok := seen[toolID]; ok {
+				continue
+			}
+			seen[toolID] = struct{}{}
+			row, err := insertAgentToolBinding(ctx, session, model.AgentToolBinding{
+				AgentID:   agentID,
+				ToolID:    toolID,
+				CreatedBy: createdBy,
+			})
+			if err != nil {
+				return err
+			}
+			bindings = append(bindings, row.toolBinding())
+		}
+		return nil
+	})
+	if err != nil {
+		if isPostgresForeignKeyViolation(err) {
+			return nil, apperror.NotFound("tool not found")
+		}
+		if isPostgresCheckViolation(err) {
+			return nil, apperror.InvalidArgument("invalid tool binding")
+		}
+		return nil, err
 	}
 	return bindings, nil
 }

@@ -31,7 +31,23 @@ const dashboard: AdminDashboard = {
       conversationId: 'single:1001:2002',
       maxSeq: 2,
       unreadCount: 0,
-      maxSeqTime: 1777464000000,
+      maxSeqTime: 1777464010000,
+      lastMessage: {
+        serverMsgId: 'msg_2',
+        clientMsgId: 'client_2',
+        conversationId: 'single:1001:2002',
+        seq: 2,
+        senderId: '2002',
+        receiverId: '1001',
+        chatType: 'single',
+        contentType: 'text',
+        content: 'AI response for inspector',
+        messageOrigin: 'ai',
+        agentRunId: 'run_admin_1',
+        triggerServerMsgId: 'msg_1',
+        sendTime: 1777464010000,
+        createdAt: 1777464010000,
+      },
     },
   ],
 };
@@ -87,6 +103,23 @@ const userSearch: AdminUserSearchResponse = {
       accountType: 'user',
       createdAt: '2026-05-01T00:00:00Z',
       updatedAt: '2026-05-01T00:00:00Z',
+    },
+  ],
+};
+
+const bobSearch: AdminUserSearchResponse = {
+  users: [
+    {
+      userId: '2002',
+      identifier: 'bob_002',
+      displayName: 'Bob',
+      name: 'Bob Zhang',
+      gender: '',
+      birthDate: '',
+      region: 'Hangzhou',
+      accountType: 'agent',
+      createdAt: '2026-05-02T00:00:00Z',
+      updatedAt: '2026-05-03T00:00:00Z',
     },
   ],
 };
@@ -166,10 +199,83 @@ describe('AdminConsole', () => {
     await user.type(screen.getByLabelText('Conversation ID'), 'single:1001:2002');
     await user.click(screen.getByRole('button', { name: 'Load conversation' }));
 
-    expect(await screen.findByText('hello from admin inspector')).toBeInTheDocument();
-    expect(screen.getByText('AI response for inspector')).toBeInTheDocument();
-    expect(screen.getByText('seq 2')).toBeInTheDocument();
+    const messages = await screen.findByLabelText('Conversation messages');
+    expect(within(messages).getByText('hello from admin inspector')).toBeInTheDocument();
+    expect(within(messages).getByText('AI response for inspector')).toBeInTheDocument();
+    expect(within(messages).getByText('seq 2')).toBeInTheDocument();
     expect(adminApi.getConversationMessages).toHaveBeenCalledWith('single:1001:2002');
+  });
+
+  it('renders a default conversation list and opens a listed conversation', async () => {
+    const user = userEvent.setup();
+    const adminApi = createAdminApi();
+
+    render(<AdminConsole adminApi={adminApi} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Conversation' }));
+
+    const browseList = await screen.findByRole('table', { name: 'Conversation browse list' });
+    expect(within(browseList).getByText('single:1001:2002')).toBeInTheDocument();
+    expect(within(browseList).getByText('max seq 2')).toBeInTheDocument();
+    expect(within(browseList).getByText('AI response for inspector')).toBeInTheDocument();
+    expect(within(browseList).getByText(/2026/)).toBeInTheDocument();
+
+    await user.click(within(browseList).getByRole('button', { name: 'Open conversation single:1001:2002' }));
+
+    const messages = await screen.findByLabelText('Conversation messages');
+    expect(within(messages).getByText('hello from admin inspector')).toBeInTheDocument();
+    expect(within(messages).getByText('AI response for inspector')).toBeInTheDocument();
+    expect(adminApi.getConversationMessages).toHaveBeenCalledWith('single:1001:2002');
+  });
+
+  it('renders a default user list and opens the existing user drill-down', async () => {
+    const user = userEvent.setup();
+    const adminApi = createAdminApi();
+
+    render(<AdminConsole adminApi={adminApi} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Users' }));
+
+    await waitFor(() => expect(adminApi.searchUsers).toHaveBeenCalledWith(''));
+    const browseList = await screen.findByRole('table', { name: 'User browse results' });
+    expect(within(browseList).getByText('Alice')).toBeInTheDocument();
+    expect(within(browseList).getByText('alice_001')).toBeInTheDocument();
+    expect(within(browseList).getByText('user')).toBeInTheDocument();
+    expect(within(browseList).getByText('Shanghai')).toBeInTheDocument();
+    expect(within(browseList).getByText(/2026-05-01/)).toBeInTheDocument();
+
+    await user.click(within(browseList).getByRole('button', { name: 'Open alice_001' }));
+
+    expect(await screen.findByRole('heading', { name: 'Alice' })).toBeInTheDocument();
+    expect(screen.getByText('bob_002')).toBeInTheDocument();
+    expect(adminApi.getUserDetail).toHaveBeenCalledWith('1001');
+    expect(adminApi.getUserFriends).toHaveBeenCalledWith('1001');
+    expect(adminApi.getUserConversations).toHaveBeenCalledWith('1001');
+  });
+
+  it('keeps user search working and restores the default list for an empty query', async () => {
+    const user = userEvent.setup();
+    const adminApi = createAdminApi({
+      searchUsers: vi.fn(async (query) => (query.trim() === 'bob' ? bobSearch : userSearch)),
+    });
+
+    render(<AdminConsole adminApi={adminApi} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Users' }));
+    await waitFor(() => expect(adminApi.searchUsers).toHaveBeenCalledWith(''));
+
+    await user.type(screen.getByLabelText('User query'), 'bob');
+    await user.click(screen.getByRole('button', { name: 'Search users' }));
+    const searchList = await screen.findByRole('table', { name: 'User browse results' });
+    expect(within(searchList).getByText('Bob')).toBeInTheDocument();
+    expect(within(searchList).getByText('bob_002')).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('User query'));
+    await user.click(screen.getByRole('button', { name: 'Search users' }));
+
+    expect(await screen.findByText('Alice')).toBeInTheDocument();
+    expect(screen.getByText('alice_001')).toBeInTheDocument();
+    await waitFor(() => expect(adminApi.searchUsers).toHaveBeenLastCalledWith(''));
   });
 
   it('searches a user, shows friends and conversations, and opens a clicked conversation', async () => {
@@ -190,7 +296,8 @@ describe('AdminConsole', () => {
 
     expect(await screen.findByRole('heading', { name: 'Conversation Inspector' })).toBeInTheDocument();
     await waitFor(() => expect(adminApi.getConversationMessages).toHaveBeenCalledWith('single:1001:2002'));
-    expect(screen.getByText('AI response for inspector')).toBeInTheDocument();
+    const messages = await screen.findByLabelText('Conversation messages');
+    expect(within(messages).getByText('AI response for inspector')).toBeInTheDocument();
   });
 
   it('does not render user mutation or impersonated send controls', async () => {

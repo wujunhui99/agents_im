@@ -79,13 +79,15 @@ type BuiltinToolSpec struct {
 }
 
 type ToolCall struct {
-	RunID     string          `json:"run_id,omitempty"`
-	AgentID   string          `json:"agent_id"`
-	ToolID    string          `json:"tool_id"`
-	ToolName  string          `json:"tool_name"`
-	InputJSON json.RawMessage `json:"input_json"`
-	TraceID   string          `json:"trace_id,omitempty"`
-	RequestID string          `json:"request_id,omitempty"`
+	RunID            string          `json:"run_id,omitempty"`
+	AgentID          string          `json:"agent_id"`
+	RequestingUserID string          `json:"requesting_user_id,omitempty"`
+	ConversationID   string          `json:"conversation_id,omitempty"`
+	ToolID           string          `json:"tool_id"`
+	ToolName         string          `json:"tool_name"`
+	InputJSON        json.RawMessage `json:"input_json"`
+	TraceID          string          `json:"trace_id,omitempty"`
+	RequestID        string          `json:"request_id,omitempty"`
 }
 
 type ToolResult struct {

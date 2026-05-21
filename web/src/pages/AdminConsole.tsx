@@ -3,6 +3,7 @@ import { Activity, Bot, Database, MessageSquareText, Search, Users } from 'lucid
 import {
   createAdminApi,
   type AdminApi,
+  type AdminConversation,
   type AdminConversationMessagesResponse,
   type AdminDashboard,
   type AdminLLMTrace,
@@ -121,13 +122,17 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
 
   async function searchUsers(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await loadUsers(userQuery);
+  }
+
+  async function loadUsers(query: string) {
     setUserLoading(true);
     setUserError('');
     setUserDetail(null);
     setUserFriends(null);
     setUserConversations(null);
     try {
-      const data = await api.searchUsers(userQuery.trim());
+      const data = await api.searchUsers(query.trim());
       setUserResults(data);
     } catch {
       setUserError('Could not search users');
@@ -160,6 +165,9 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
     setActiveView(view);
     if (view === 'traces' && traceList.length === 0 && !traceLoading) {
       void loadTraces();
+    }
+    if (view === 'users' && userResults === null && !userLoading) {
+      void loadUsers('');
     }
   }
 
@@ -200,12 +208,16 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
             conversationID,
             setConversationID,
             conversation,
+            conversations: dashboard?.recentConversations ?? [],
             loading: conversationLoading,
             error: conversationError,
+            listLoading: dashboardLoading,
+            listError: dashboardError,
             onSubmit: (event) => {
               event.preventDefault();
               void loadConversation();
             },
+            onOpenConversation: loadConversation,
           })}
         {activeView === 'users' &&
           renderUsers({
@@ -362,16 +374,24 @@ function renderConversation({
   conversationID,
   setConversationID,
   conversation,
+  conversations,
   loading,
   error,
+  listLoading,
+  listError,
   onSubmit,
+  onOpenConversation,
 }: {
   conversationID: string;
   setConversationID: (value: string) => void;
   conversation: AdminConversationMessagesResponse | null;
+  conversations: AdminConversation[];
   loading: boolean;
   error: string;
+  listLoading: boolean;
+  listError: string;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onOpenConversation: (conversationID: string) => void;
 }) {
   return (
     <div className="admin-page">
@@ -390,6 +410,32 @@ function renderConversation({
       </form>
       {loading && <p className="admin-status">Loading conversation</p>}
       {error && <p className="admin-error">{error}</p>}
+      <section className="admin-detail-panel">
+        <h3>Recent conversations</h3>
+        {listLoading && <p className="admin-status">Loading conversation list</p>}
+        {listError && <p className="admin-error">Could not load conversation list</p>}
+        {!listLoading && !listError && conversations.length === 0 && (
+          <p className="admin-empty">No active conversations</p>
+        )}
+        {!listLoading && !listError && conversations.length > 0 && (
+          <div className="admin-table" role="table" aria-label="Conversation browse list">
+            {conversations.map((item) => (
+              <button
+                type="button"
+                className="admin-row admin-row-conversation"
+                key={item.conversationId}
+                onClick={() => onOpenConversation(item.conversationId)}
+                aria-label={`Open conversation ${item.conversationId}`}
+              >
+                <span>{item.conversationId}</span>
+                <span>max seq {item.maxSeq}</span>
+                <span>{conversationSummary(item)}</span>
+                <span>{formatAdminTimestamp(item.maxSeqTime || item.lastMessage?.createdAt || item.lastMessage?.sendTime)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
       {conversation && conversation.messages.length === 0 && <p className="admin-empty">No messages found</p>}
       {conversation && conversation.messages.length > 0 && (
         <div className="admin-message-list" aria-label="Conversation messages">
@@ -454,11 +500,20 @@ function renderUsers({
       {error && <p className="admin-error">{error}</p>}
       {userResults && userResults.users.length === 0 && !userDetail && <p className="admin-empty">No users found</p>}
       {userResults && userResults.users.length > 0 && (
-        <div className="admin-table" role="table" aria-label="User search results">
+        <div className="admin-table" role="table" aria-label="User browse results">
           {userResults.users.map((user) => (
-            <button type="button" className="admin-row" key={user.userId} onClick={() => onOpenUser(user)} aria-label={`Open ${user.identifier}`}>
+            <button
+              type="button"
+              className="admin-row admin-row-user"
+              key={user.userId}
+              onClick={() => onOpenUser(user)}
+              aria-label={`Open ${user.identifier}`}
+            >
+              <span>{displayUserName(user)}</span>
               <span>{user.identifier}</span>
               <span>{user.accountType}</span>
+              <span>{user.region || user.gender || 'No profile metadata'}</span>
+              <span>{user.createdAt || user.updatedAt || 'No timestamp'}</span>
             </button>
           ))}
         </div>
@@ -514,6 +569,32 @@ function renderUsers({
       )}
     </div>
   );
+}
+
+function displayUserName(user: AdminUser) {
+  return user.displayName || user.name || user.identifier;
+}
+
+function conversationSummary(conversation: AdminConversation) {
+  const content = conversation.lastMessage?.content.trim();
+  if (content) {
+    return content;
+  }
+  if (conversation.lastMessage?.contentType) {
+    return `${conversation.lastMessage.contentType} message`;
+  }
+  return 'No message summary';
+}
+
+function formatAdminTimestamp(value?: number) {
+  if (!value || value <= 0) {
+    return 'No timestamp';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'No timestamp';
+  }
+  return date.toISOString();
 }
 
 export default AdminConsole;
