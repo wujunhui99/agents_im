@@ -62,9 +62,9 @@ Health, readiness, and metrics routes are intentionally suppressed as span/log n
    - Logs: search structured log fields named `trace_id`.
    - Admin Console: open an LLM trace detail and use the `Open in Jaeger` link when present.
 2. Query Jaeger:
-   - Internal access: `kubectl -n agents-im port-forward svc/jaeger-collector 16686:16686`
-   - Browser: `http://127.0.0.1:16686/search?traceID=<trace_id>`
-   - Configured external link shape: `https://jaeger.agenticim.xyz/search?traceID=<trace_id>`
+   - Authenticated public access: `https://jaeger.agenticim.xyz/search?traceID=<trace_id>`
+   - Private access: `kubectl -n agents-im port-forward svc/jaeger-collector 16686:16686`
+   - Private browser URL: `http://127.0.0.1:16686/search?traceID=<trace_id>`
 3. Expected span path for a WebSocket send:
    - `websocket.handshake`
    - `websocket.command.send_message`
@@ -75,10 +75,12 @@ Health, readiness, and metrics routes are intentionally suppressed as span/log n
 
 ## Security Decision
 
-`jaeger.agenticim.xyz` is not exposed by the current manifests. The repository has no reviewed authentication or network restriction model for the Jaeger UI, and trace data can reveal topology, route names, internal IDs, latency, and error details. Public Ingress for Jaeger is blocked until one of these is implemented:
+`jaeger.agenticim.xyz` is exposed only through the Traefik `observability-basic-auth` middleware. The basic-auth Secret is created outside tracked source, and trace data can reveal topology, route names, internal IDs, latency, and error details. Do not remove the middleware or publish Jaeger as an unauthenticated route.
+
+Acceptable Jaeger access models are:
 
 - authenticated reverse proxy middleware,
-- VPN/private network access only,
+- VPN/private network only, or
 - IP allowlist with TLS and operational owner approval.
 
-Until then, operators should use `kubectl port-forward` or another private access path.
+Operators may still use `kubectl port-forward` or another private access path when debugging from the server/network.
