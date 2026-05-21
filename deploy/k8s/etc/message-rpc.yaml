@@ -5,6 +5,7 @@ StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 Tracing:
   Enabled: true
+  ServiceName: message-rpc
   Environment: ${AGENTS_IM_ENV}
   OTLPEndpoint: ${AGENTS_IM_OTLP_ENDPOINT}
   Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
