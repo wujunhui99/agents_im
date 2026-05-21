@@ -2,6 +2,8 @@
 
 本文档定义项目的并行开发与合并流程。相比直接从功能分支合并到 `main`，本项目采用 `feature/* -> develop -> main` 的集成模式，并通过 `git worktree` 支持多个 Agent 并行开发。
 
+多 Agent 分支、commit message、Git identity 与 CI/CD 归因的详细规范见 [`docs/AGENT_GIT_STANDARD.md`](./AGENT_GIT_STANDARD.md)。CI 会强制校验任务分支格式：`<type>/<agent-name>/<issue>-<task-desc>`，其中第二段必须是可信 Agent 名。
+
 ## 结论
 
 该工作流更适合本项目，原因如下：
@@ -15,15 +17,15 @@
 
 - `main`：稳定主分支，只接收已通过集成测试的 `develop`。
 - `develop`：集成分支，用于合并多个 feature 分支并解决跨功能冲突。
-- `feature/<feature-name>`：v1.0.0 之前的功能分支，功能名使用英文。
+- `feature/<agent-name>/<issue>-<task-desc>` / `fix/<agent-name>/<issue>-<task-desc>` / `ci/<agent-name>/<issue>-<task-desc>` 等：日常任务分支。完整规则见 [`docs/AGENT_GIT_STANDARD.md`](./AGENT_GIT_STANDARD.md)。
 - `feature/v1.x.x`：v1.0.0 之后的版本功能分支。
 
 示例：
 
 ```text
-feature/friend-relationship
-feature/websocket-ack
-feature/agent-group-chat
+feature/eino/issue-131-admin-console-lists
+fix/helios/issue-128-drone-postgres-url
+ci/hermes/issue-142-drone-notifier-routing
 feature/v1.1.0
 ```
 
@@ -120,25 +122,49 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 
 要求：
 
-- 新增或更新 `db/change_log/*.sql`，且不能只提交 `template.sql`。
-- `.sql` 是实际执行数据库改动的事实源，必须能用 `psql -v ON_ERROR_STOP=1 -f <file>.sql` 执行。
-- 建议配对 `.md` 说明目的、影响表/字段、是否破坏性、apply 顺序、rollback/恢复和验证命令。
+- 修改已有 `db/migrations/*.sql`：禁止；已发布 migration 不可变，必须新增下一号 migration。`scripts/ci/verify-migration-immutability.sh` 会阻止 PR 修改、删除、重命名或 type-change 历史 migration。
+- 新增 `db/migrations/*.sql`：允许；仍必须通过 PostgreSQL integration，从空库执行全量 migration，并在 deploy 时只应用生产库尚未记录的新 migration。
+- 修改 `db/schema/`、repository SQL 或 PG integration test：需要配套新增 migration 或明确说明不涉及生产 schema。
 - SQL 不得包含 secret、DSN、密码、token、server 连接信息。
-- `scripts/verify-static.sh` 会在检测到 `db/migrations/`、`db/schema/`、`internal/repository/postgres_*.go` 或 PG integration test 改动时，要求存在非模板 `db/change_log/*.sql`。
+- `scripts/verify-static.sh` 会在检测到 `db/migrations/`、`db/schema/`、`internal/repository/postgres_*.go` 或 PG integration test 改动时，要求存在非模板 `db/change_log/*.sql`；同时禁止修改/删除/重命名已有 `db/migrations/*.sql`。
 
 ## CI Checks
 
-CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从 `main` 发布。当前仓库使用 Drone，pipeline 位于 `.drone.yml`；PR/MR 合入 `develop` 前必须通过默认 `verification` pipeline。为避免同一个 MR 同时触发多轮重复 verification，常规 verification pipeline 只响应目标分支为 `develop` 或 `main` 的 `pull_request` 事件；分支 push 不再触发 verification，且 backend 与 PostgreSQL integration 合并在同一个 Drone pipeline 内顺序执行，因此每个 MR 只有一个 CI task/context。当前 CI checks 包括：
+CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从集成分支发布。当前仓库主要使用 Drone：
 
-- `verification` pipeline 的 `backend-verification` step 安装固定版本 Go/go-zero/protobuf 工具。
+- Drone 地址：<https://drone.agenticim.xyz>
+- Drone 仓库：`wujunhui99/agents_im`
+- Pipeline 定义：`.drone.yml`
+
+不要只看 GitHub 上的红叉；失败时必须点进 Drone build，再打开失败的 pipeline / step，看日志尾部和具体错误。
+
+### MR 阶段怎么看 CI
+
+每次 MR 或 push 后，Drone 会生成 build。普通 MR 重点看这两个 pipeline：
+
+- `backend-verification`
+  - 后端基础验证。
+  - 包括 Go 格式检查、go-zero API 校验、Go 测试、静态验证、Compose/Markdown 等基础检查。
+- `postgres-integration`
+  - PostgreSQL 集成验证。
+  - 会启动 PostgreSQL service，执行 migration，再跑 integration tests。
+
+普通 MR 主要关注 `backend-verification` 和 `postgres-integration` 是否都是 `success`。如果这两个都绿，说明 MR CI 基本通过。
+
+### 当前 CI 内容
+
+`backend-verification` 主要覆盖：
+
+- 安装固定版本 Go/go-zero/protobuf 工具。
 - `goctl api validate -api api/*.api` 验证 go-zero API spec。
 - `gofmt` check，发现未格式化 Go 文件即失败。
 - `go test ./...` 运行普通 Go 测试；默认不设置 PostgreSQL DSN，确保普通测试不依赖真实 PG。
-- `bash scripts/verify-static.sh`，检查仓库关键文件、接口、文档和 Drone workflow 约束。
+- `bash scripts/verify-static.sh`，检查仓库关键文件、接口、文档、Drone workflow 约束，并调用 `scripts/ci/verify-migration-immutability.sh` 禁止 PR 修改历史 migration。
+- `scripts/ci/drone-telegram-notify.py` 在 success / failure 都发送 Telegram 通知，并从分支第二段、`Agent:` trailer、author email 解析负责 Agent，在群里 @ 对应 bot；归因冲突会在通知中展示 warning。
 - `docker compose config`，验证 Compose 配置可解析。
 - Markdown link check，排除 `docs/references/` 和 `.ai-context/`，并忽略外部 HTTP/HTTPS 链接波动。
 
-CI 还包含同一 `verification` pipeline 内的 PostgreSQL integration step。该 step 使用 Drone `postgres:16-alpine` service，设置 `DATABASE_URL` 指向该隔离 service，执行 `bash scripts/migrate-postgres.sh --host-psql` 后运行：
+`postgres-integration` 使用 Drone `postgres:16-alpine` service，设置 `DATABASE_URL` 指向该隔离 service，执行 `bash scripts/migrate-postgres.sh --host-psql` 后运行：
 
 ```bash
 go test -tags=integration ./tests
@@ -166,7 +192,28 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 
 ## CD / Deployment
 
-生产发布由 `.drone.yml` 中的 `deploy-main` pipeline 负责。该 pipeline 只在 `main` 分支 push 后自动触发。发布链路为：
+部署只在 `main` / `devops` 等集成分支 push 时运行，普通 MR 不跑部署。部署 pipeline 是 `deploy-main`，它会：
+
+1. 检测是否需要构建镜像。
+2. 构建并推送镜像。
+3. 部署到 k3s 服务器。
+4. 等待 rollout。
+
+因此日常判断顺序是：
+
+- MR 阶段：看 `backend-verification` + `postgres-integration`。
+- 合并到 `main` 后：再看 `deploy-main`。
+
+失败时按失败 pipeline/step 定位：
+
+- Go test 失败：看具体 package 和 test name。
+- migration / DB 失败：看 `postgres-integration`。
+- 镜像构建失败：看 build images 相关 step。
+- 生产部署失败：看 deploy step。
+
+MR CI 已做并行优化，正常情况下验证应在 2 分 40 秒以内；当前实测通常是几十秒级。明显超过该时间需要报告并排查。
+
+生产发布由 `.drone.yml` 中的 `deploy-main` pipeline 负责。发布链路为：
 
 1. `detect changes` step 先判断本次变更类型，并输出 `build_required`、`deploy_required`、`config_only`、`backend_services`、`web_required`、`image_services` 和 `rollout_services`：
    - `main` push：按变更范围选择性构建/部署。
@@ -252,8 +299,8 @@ git push origin develop
 
 ## Agent 合并前检查清单
 
-- [ ] 当前 worktree 只服务于一个 feature 分支。
-- [ ] 已从最新 `develop` 创建或同步分支。
+- [ ] 分支名符合 `docs/AGENT_GIT_STANDARD.md` 中的 `<type>/<agent-name>/<issue>-<task-desc>`，且第二段 `<agent-name>` 是可信 Agent 名。
+- [ ] commit 使用当前 Agent 专用 Git identity，subject 包含 `[agent-name]`，并包含 `Issue` / `Agent` / `Human-Owner` trailers。
 - [ ] 已完成必要的需求文档、设计文档或执行计划更新。
 - [ ] 已完成自测并记录测试命令和结果。
 - [ ] 已检查与其他已合并 feature 的冲突。
