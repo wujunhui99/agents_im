@@ -11,6 +11,7 @@ Tracing:
   Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
   SamplerRatio: 1.0
   JaegerBaseURL: ${AGENTS_IM_JAEGER_BASE_URL}
+  Insecure: true
 
 Consumer:
   # Production live push consumes durable message_outbox rows written by message-api.
