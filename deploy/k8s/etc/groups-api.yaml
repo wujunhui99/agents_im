@@ -8,9 +8,9 @@ Auth:
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 Tracing:
-  Enabled: ${AGENTS_IM_TRACING_ENABLED}
+  Enabled: true
   Environment: ${AGENTS_IM_ENV}
   OTLPEndpoint: ${AGENTS_IM_OTLP_ENDPOINT}
   Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
-  SamplerRatio: ${AGENTS_IM_TRACING_SAMPLER_RATIO}
+  SamplerRatio: 1.0
   JaegerBaseURL: ${AGENTS_IM_JAEGER_BASE_URL}
