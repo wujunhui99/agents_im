@@ -10,6 +10,15 @@ DeepSeek:
   APIKey: ${DEEPSEEK_API_KEY}
   BaseURL: ${DEEPSEEK_BASE_URL}
   Model: ${DEEPSEEK_MODEL}
+LLMObservability:
+  Enabled: false
+  Backend: ${LLM_OBSERVABILITY_BACKEND}
+  CaptureOutput: false
+  MaxOutputBytes: 2048
+  Langfuse:
+    Host: ${LANGFUSE_HOST}
+    PublicKey: ${LANGFUSE_PUBLIC_KEY}
+    SecretKey: ${LANGFUSE_SECRET_KEY}
 PythonExecutor:
   Backend: disabled
   DefaultTimeoutSeconds: 10

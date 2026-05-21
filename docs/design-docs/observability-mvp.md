@@ -17,7 +17,7 @@ Backend MVP needs a small, local-first observability foundation before frontend 
 
 ## Non-Goals
 
-- No production tracing backend is added.
+- No production system tracing backend is added by this MVP; LLM-specific Langfuse export is covered separately in [`llm-observability.md`](./llm-observability.md).
 - No Prometheus, Grafana, or Jaeger container is required.
 - No core friends, groups, or message delivery semantics are changed.
 - Readiness checks do not perform live network pings in unit tests.

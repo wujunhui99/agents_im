@@ -294,7 +294,7 @@ DeepSeek:
 func TestLoadAPIConfigResolvesLLMObservabilityLangfusePlaceholders(t *testing.T) {
 	t.Setenv("LLM_OBSERVABILITY_ENABLED", "true")
 	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuse")
-	t.Setenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+	t.Setenv("LANGFUSE_HOST", "https://langfuse.config-test.local")
 	t.Setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-unit-test")
 	t.Setenv("LANGFUSE_SECRET_KEY", "sk-lf-unit-test")
 	t.Setenv("LLM_OBSERVABILITY_CAPTURE_OUTPUT", "true")
@@ -325,10 +325,68 @@ LLMObservability:
 	if !cfg.LLMObservability.CaptureOutput {
 		t.Fatalf("capture output should resolve true: %+v", cfg.LLMObservability)
 	}
-	if cfg.LLMObservability.Langfuse.Host != "https://cloud.langfuse.com" ||
+	if cfg.LLMObservability.Langfuse.Host != "https://langfuse.config-test.local" ||
 		cfg.LLMObservability.Langfuse.PublicKey != "pk-lf-unit-test" ||
 		cfg.LLMObservability.Langfuse.SecretKey != "sk-lf-unit-test" {
 		t.Fatalf("langfuse config mismatch: %+v", cfg.LLMObservability.Langfuse)
+	}
+}
+
+func TestResolveLLMObservabilityDefaultsLangfuseHost(t *testing.T) {
+	t.Setenv("LANGFUSE_HOST", "")
+	t.Setenv("LANGFUSE_BASE_URL", "")
+	t.Setenv("LANGFUSE_PUBLIC_KEY", "")
+	t.Setenv("LANGFUSE_SECRET_KEY", "")
+
+	cfg, err := ResolveLLMObservabilityConfig(LLMObservabilityConfig{})
+	if err != nil {
+		t.Fatalf("resolve llm observability config: %v", err)
+	}
+	if cfg.Langfuse.Host != DefaultLangfuseHost {
+		t.Fatalf("langfuse host = %q, want %q", cfg.Langfuse.Host, DefaultLangfuseHost)
+	}
+	if cfg.Enabled || cfg.Backend != LLMObservabilityBackendNoop {
+		t.Fatalf("default llm observability should stay disabled noop: %+v", cfg)
+	}
+}
+
+func TestResolveLLMObservabilityLangfuseHostCanBeOverridden(t *testing.T) {
+	t.Setenv("LANGFUSE_HOST", "https://langfuse.override.local")
+	t.Setenv("LANGFUSE_BASE_URL", "")
+
+	cfg, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
+	if err != nil {
+		t.Fatalf("resolve llm observability config: %v", err)
+	}
+	if cfg.Langfuse.Host != "https://langfuse.override.local" {
+		t.Fatalf("langfuse host = %q, want env override", cfg.Langfuse.Host)
+	}
+}
+
+func TestResolveLLMObservabilityCanEnableLangfuseFromEnv(t *testing.T) {
+	t.Setenv("LLM_OBSERVABILITY_ENABLED", "true")
+	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuse")
+	t.Setenv("LLM_OBSERVABILITY_CAPTURE_OUTPUT", "true")
+	t.Setenv("LLM_OBSERVABILITY_MAX_OUTPUT_BYTES", "4096")
+	t.Setenv("LANGFUSE_HOST", "")
+	t.Setenv("LANGFUSE_BASE_URL", "")
+	t.Setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-unit-test")
+	t.Setenv("LANGFUSE_SECRET_KEY", "sk-lf-unit-test")
+
+	cfg, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
+	if err != nil {
+		t.Fatalf("resolve llm observability config: %v", err)
+	}
+	if !cfg.Enabled || cfg.Backend != LLMObservabilityBackendLangfuse {
+		t.Fatalf("llm observability should enable langfuse from env: %+v", cfg)
+	}
+	if !cfg.CaptureOutput || cfg.MaxOutputBytes != 4096 {
+		t.Fatalf("capture output settings should resolve from env: %+v", cfg)
+	}
+	if cfg.Langfuse.Host != DefaultLangfuseHost ||
+		cfg.Langfuse.PublicKey != "pk-lf-unit-test" ||
+		cfg.Langfuse.SecretKey != "sk-lf-unit-test" {
+		t.Fatalf("langfuse env config mismatch: %+v", cfg.Langfuse)
 	}
 }
 

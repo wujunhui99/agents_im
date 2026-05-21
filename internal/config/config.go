@@ -208,12 +208,14 @@ const (
 	defaultTransferMaxAttempts         = 5
 	defaultTransferObservabilityHost   = "0.0.0.0"
 	defaultTransferObservabilityPort   = 8085
+	defaultLLMObservabilityMaxOutput   = 2048
 	defaultPythonExecutorTimeout       = 10
 	defaultPythonExecutorMaxTimeout    = 30
 	defaultPythonExecutorMemoryMiB     = 256
 	defaultPythonExecutorMaxOutput     = 64 * 1024
 	DefaultDeepSeekBaseURL             = "https://api.deepseek.com"
 	DefaultDeepSeekModel               = "deepseek-v4-pro"
+	DefaultLangfuseHost                = "https://langfuse.agenticim.xyz"
 )
 
 var ErrDeepSeekAPIKeyMissing = errors.New("deepseek API key is required: set DEEPSEEK_API_KEY")
@@ -310,7 +312,10 @@ func DefaultLLMObservabilityConfig() LLMObservabilityConfig {
 	return LLMObservabilityConfig{
 		Enabled:        false,
 		Backend:        LLMObservabilityBackendNoop,
-		MaxOutputBytes: 2048,
+		MaxOutputBytes: defaultLLMObservabilityMaxOutput,
+		Langfuse: LangfuseObservabilityConfig{
+			Host: DefaultLangfuseHost,
+		},
 	}
 }
 
@@ -813,7 +818,7 @@ func ResolveLLMObservabilityConfig(cfg LLMObservabilityConfig) (LLMObservability
 	if err != nil {
 		return cfg, err
 	}
-	maxOutputBytes, err := resolveInt(cfg.MaxOutputBytes, os.Getenv("LLM_OBSERVABILITY_MAX_OUTPUT_BYTES"), os.Getenv("LLM_OBS_MAX_OUTPUT_BYTES"))
+	maxOutputBytes, err := resolveLLMObservabilityMaxOutputBytes(cfg.MaxOutputBytes)
 	if err != nil {
 		return cfg, err
 	}
@@ -824,7 +829,13 @@ func ResolveLLMObservabilityConfig(cfg LLMObservabilityConfig) (LLMObservability
 		maxOutputBytes = DefaultLLMObservabilityConfig().MaxOutputBytes
 	}
 	cfg.MaxOutputBytes = maxOutputBytes
-	cfg.Langfuse.Host = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Langfuse.Host)), os.Getenv("LANGFUSE_HOST"), os.Getenv("LANGFUSE_BASE_URL"))
+	langfuseHost := strings.TrimSpace(os.ExpandEnv(cfg.Langfuse.Host))
+	langfuseHostEnv := firstNonEmpty(os.Getenv("LANGFUSE_HOST"), os.Getenv("LANGFUSE_BASE_URL"))
+	if langfuseHost == "" || langfuseHost == DefaultLangfuseHost {
+		cfg.Langfuse.Host = firstNonEmpty(langfuseHostEnv, langfuseHost, DefaultLangfuseHost)
+	} else {
+		cfg.Langfuse.Host = langfuseHost
+	}
 	cfg.Langfuse.PublicKey = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Langfuse.PublicKey)), os.Getenv("LANGFUSE_PUBLIC_KEY"))
 	cfg.Langfuse.SecretKey = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Langfuse.SecretKey)), os.Getenv("LANGFUSE_SECRET_KEY"))
 	return cfg, nil
@@ -935,8 +946,9 @@ func ResolvePythonExecutorConfig(cfg PythonExecutorConfig) (PythonExecutorConfig
 
 func resolveLLMObservabilityBackend(value string) string {
 	value = strings.ToLower(strings.TrimSpace(os.ExpandEnv(value)))
-	if value == "" {
-		value = strings.ToLower(strings.TrimSpace(firstNonEmpty(os.Getenv("LLM_OBSERVABILITY_BACKEND"), os.Getenv("LLM_OBS_BACKEND"), os.Getenv("AGENTS_IM_LLM_OBSERVABILITY_BACKEND"))))
+	envValue := strings.ToLower(strings.TrimSpace(firstNonEmpty(os.Getenv("LLM_OBSERVABILITY_BACKEND"), os.Getenv("LLM_OBS_BACKEND"), os.Getenv("AGENTS_IM_LLM_OBSERVABILITY_BACKEND"))))
+	if value == "" || (value == LLMObservabilityBackendNoop && envValue != "") {
+		value = envValue
 	}
 	switch value {
 	case LLMObservabilityBackendLangfuse:
@@ -948,6 +960,14 @@ func resolveLLMObservabilityBackend(value string) string {
 	default:
 		return LLMObservabilityBackendNoop
 	}
+}
+
+func resolveLLMObservabilityMaxOutputBytes(current int) (int, error) {
+	envValue := firstNonEmpty(os.Getenv("LLM_OBSERVABILITY_MAX_OUTPUT_BYTES"), os.Getenv("LLM_OBS_MAX_OUTPUT_BYTES"))
+	if envValue != "" && (current == 0 || current == defaultLLMObservabilityMaxOutput) {
+		return strconv.Atoi(strings.TrimSpace(envValue))
+	}
+	return resolveInt(current, envValue)
 }
 
 func ResolveObjectStorageConfig(cfg ObjectStorageConfig, storageDriver string) (ObjectStorageConfig, error) {
