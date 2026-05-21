@@ -171,6 +171,9 @@ func TestAdminLLMTraceListAndDetailReturnMetadataWithConversationLinks(t *testin
 	if trace.TraceID != "trace_admin_1" || trace.RunID != "run_trace_1" || trace.ConversationID != "single:1001:2002" {
 		t.Fatalf("trace metadata missing links: %+v", trace)
 	}
+	if trace.JaegerURL != "" {
+		t.Fatalf("legacy non-OTel trace id should not produce jaeger URL: %+v", trace)
+	}
 	if trace.Provider != "deepseek" || trace.Model != "deepseek-chat" || trace.PromptHash != "prompt-hash-1" {
 		t.Fatalf("trace model/prompt metadata missing: %+v", trace)
 	}
@@ -184,6 +187,20 @@ func TestAdminLLMTraceListAndDetailReturnMetadataWithConversationLinks(t *testin
 		t.Fatalf("trace detail mismatch: %+v", detail.Trace)
 	}
 	assertNoAdminSecretFields(t, detail)
+}
+
+func TestAdminTraceIncludesJaegerURLForOTelTraceID(t *testing.T) {
+	trace := adminTraceFromRun(agentaudit.AgentRun{
+		RunID:     "run_otel_trace",
+		TraceID:   "4bf92f3577b34da6a3ce929d0e0e4736",
+		AgentID:   "agent_1",
+		Status:    agentaudit.StatusSucceeded,
+		CreatedAt: time.Date(2026, 5, 21, 8, 0, 0, 0, time.UTC),
+	})
+
+	if trace.JaegerURL != "https://jaeger.agenticim.xyz/trace/4bf92f3577b34da6a3ce929d0e0e4736" {
+		t.Fatalf("jaeger URL mismatch: %+v", trace)
+	}
 }
 
 func seedAdminUserAndAcceptedFriend(t *testing.T, ctx context.Context, repo *repository.MemoryRepository) (model.User, model.User) {

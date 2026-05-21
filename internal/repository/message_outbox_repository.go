@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"sort"
 	"time"
+
+	"github.com/wujunhui99/agents_im/internal/observability"
 )
 
 const (
@@ -42,8 +44,16 @@ func (e OutboxEvent) Clone() OutboxEvent {
 }
 
 type MessageCreatedOutboxPayload struct {
-	Message        Message  `json:"message"`
-	VisibleUserIDs []string `json:"visible_user_ids"`
+	Message        Message       `json:"message"`
+	VisibleUserIDs []string      `json:"visible_user_ids"`
+	TraceContext   TraceMetadata `json:"trace_context,omitempty"`
+}
+
+type TraceMetadata struct {
+	TraceID     string `json:"trace_id,omitempty"`
+	RequestID   string `json:"request_id,omitempty"`
+	TraceParent string `json:"traceparent,omitempty"`
+	TraceState  string `json:"tracestate,omitempty"`
 }
 
 type OutboxFailure struct {
@@ -63,10 +73,42 @@ func messageCreatedOutboxPayload(message Message, input CreateMessageInput) (jso
 	payload := MessageCreatedOutboxPayload{
 		Message:        message.Clone(),
 		VisibleUserIDs: visibleUserIDs,
+		TraceContext:   traceMetadataFromInput(input),
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
 	return json.RawMessage(encoded), nil
+}
+
+func applyTraceContextToCreateMessageInput(ctx context.Context, input *CreateMessageInput) {
+	if input == nil {
+		return
+	}
+	traceContext := observability.TraceContextFromContext(ctx)
+	if traceContext.TraceID == "" {
+		return
+	}
+	if input.TraceID == "" {
+		input.TraceID = traceContext.TraceID
+	}
+	if input.RequestID == "" {
+		input.RequestID = traceContext.RequestID
+	}
+	if input.TraceParent == "" {
+		input.TraceParent = traceContext.TraceParent
+	}
+	if input.TraceState == "" {
+		input.TraceState = traceContext.TraceState
+	}
+}
+
+func traceMetadataFromInput(input CreateMessageInput) TraceMetadata {
+	return TraceMetadata{
+		TraceID:     input.TraceID,
+		RequestID:   input.RequestID,
+		TraceParent: input.TraceParent,
+		TraceState:  input.TraceState,
+	}
 }

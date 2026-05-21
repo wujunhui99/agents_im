@@ -11,6 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
 	"github.com/wujunhui99/agents_im/internal/model"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
@@ -172,6 +173,7 @@ type AdminLLMTraceDetailResponse struct {
 
 type AdminLLMTrace struct {
 	TraceID           string `json:"traceId"`
+	JaegerURL         string `json:"jaegerUrl,omitempty"`
 	RunID             string `json:"runId"`
 	AgentID           string `json:"agentId"`
 	ConversationID    string `json:"conversationId,omitempty"`
@@ -526,6 +528,7 @@ func adminTraceFromRun(run agentaudit.AgentRun) AdminLLMTrace {
 	}
 	return AdminLLMTrace{
 		TraceID:           traceID,
+		JaegerURL:         observability.JaegerTraceURL(observability.JaegerBaseURLFromEnv(), traceID),
 		RunID:             run.RunID,
 		AgentID:           run.AgentID,
 		ConversationID:    run.ConversationID,

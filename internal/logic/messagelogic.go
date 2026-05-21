@@ -152,6 +152,8 @@ type MarkConversationAsReadResponse struct {
 }
 
 func (l *MessageLogic) SendMessage(ctx context.Context, req SendMessageRequest) (SendMessageResponse, error) {
+	ctx, span := observability.StartSpan(ctx, "message.send")
+	defer span.End()
 	metricsStatus := "accepted"
 	metricsChatType := strings.ToLower(strings.TrimSpace(req.ChatType))
 	defer func() {
@@ -160,12 +162,15 @@ func (l *MessageLogic) SendMessage(ctx context.Context, req SendMessageRequest) 
 
 	if l.repo == nil {
 		metricsStatus = "failed"
-		return SendMessageResponse{}, apperror.Internal("message repository is not configured")
+		err := apperror.Internal("message repository is not configured")
+		observability.RecordSpanError(span, err)
+		return SendMessageResponse{}, err
 	}
 
 	input, err := l.normalizeSendMessage(ctx, req)
 	if err != nil {
 		metricsStatus = "failed"
+		observability.RecordSpanError(span, err)
 		return SendMessageResponse{}, err
 	}
 	metricsChatType = input.ChatType
@@ -173,6 +178,7 @@ func (l *MessageLogic) SendMessage(ctx context.Context, req SendMessageRequest) 
 	message, deduplicated, err := l.repo.CreateMessageIdempotent(ctx, input)
 	if err != nil {
 		metricsStatus = "failed"
+		observability.RecordSpanError(span, err)
 		return SendMessageResponse{}, err
 	}
 	if deduplicated {

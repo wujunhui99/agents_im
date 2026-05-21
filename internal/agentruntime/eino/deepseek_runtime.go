@@ -20,6 +20,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/idgen"
 	"github.com/wujunhui99/agents_im/internal/llmobs"
+	"github.com/wujunhui99/agents_im/internal/observability"
 )
 
 type DeepSeekRuntime struct {
@@ -68,9 +69,15 @@ func NewDeepSeekRuntime(cfg config.DeepSeekConfig, opts ...DeepSeekRuntimeOption
 }
 
 func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
+	ctx, span := observability.StartSpan(ctx, "agentruntime.eino.run")
+	defer span.End()
 	normalized, err := agentruntime.NormalizeRunRequest(req)
 	if err != nil {
+		observability.RecordSpanError(span, err)
 		return agentruntime.RunResult{}, err
+	}
+	if normalized.TraceID == "" {
+		normalized.TraceID = observability.TraceIDFromContext(ctx)
 	}
 	cfg := config.ResolveDeepSeekConfig(r.cfg)
 	if strings.TrimSpace(normalized.Agent.Model.Model) != "" {
@@ -82,6 +89,7 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 	}
 	cm, err := factory(ctx, cfg)
 	if err != nil {
+		observability.RecordSpanError(span, err)
 		return agentruntime.RunResult{}, err
 	}
 
@@ -89,6 +97,7 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 	if runID == "" {
 		generated, err := idgen.NewString()
 		if err != nil {
+			observability.RecordSpanError(span, err)
 			return agentruntime.RunResult{}, err
 		}
 		runID = "run_" + generated
@@ -96,15 +105,18 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 	normalized.RunID = runID
 	resolvedTools, err := r.resolveTools(ctx, normalized, runID)
 	if err != nil {
+		observability.RecordSpanError(span, err)
 		return agentruntime.RunResult{}, err
 	}
 	if len(resolvedTools) > 0 {
 		toolInfos, err := toolInfosFromResolvedTools(resolvedTools)
 		if err != nil {
+			observability.RecordSpanError(span, err)
 			return agentruntime.RunResult{}, err
 		}
 		cm, err = cm.WithTools(toolInfos)
 		if err != nil {
+			observability.RecordSpanError(span, err)
 			return agentruntime.RunResult{}, fmt.Errorf("bind deepseek tools: %w", err)
 		}
 	}
@@ -120,10 +132,13 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 	resp, toolCallResults, err := r.generateWithTools(ctx, cm, normalized, runID, resolvedTools)
 	finishedAt := time.Now().UTC()
 	if err != nil {
+		observability.RecordSpanError(span, err)
 		return agentruntime.RunResult{}, fmt.Errorf("deepseek generate AI hosting reply: %w", err)
 	}
 	if resp == nil {
-		return agentruntime.RunResult{}, apperror.Internal("deepseek returned empty response")
+		err := apperror.Internal("deepseek returned empty response")
+		observability.RecordSpanError(span, err)
+		return agentruntime.RunResult{}, err
 	}
 	result := agentruntime.RunResult{
 		RunID:     runID,
@@ -195,13 +210,21 @@ func (r *DeepSeekRuntime) generateWithTools(
 	executedToolCalls := 0
 
 	for {
-		resp, err := cm.Generate(ctx, messages)
+		generateCtx, generateSpan := observability.StartSpan(ctx, "llm.generate")
+		resp, err := cm.Generate(generateCtx, messages)
 		if err != nil {
+			observability.RecordSpanError(generateSpan, err)
+			generateSpan.End()
 			return nil, toolCallResults, err
 		}
 		if resp == nil {
-			return nil, toolCallResults, apperror.Internal("deepseek returned empty response")
+			err := apperror.Internal("deepseek returned empty response")
+			observability.RecordSpanError(generateSpan, err)
+			generateSpan.End()
+			return nil, toolCallResults, err
 		}
+		generateSpan.End()
+		ctx = generateCtx
 		if len(resp.ToolCalls) == 0 {
 			return resp, toolCallResults, nil
 		}
@@ -228,6 +251,8 @@ func executeRuntimeToolCall(
 	toolByName map[string]runtimetools.ResolvedTool,
 	call schema.ToolCall,
 ) (*schema.Message, agentruntime.ToolCallResult, error) {
+	ctx, span := observability.StartSpan(ctx, "agentruntime.tool_call")
+	defer span.End()
 	toolName := strings.TrimSpace(call.Function.Name)
 	result := agentruntime.ToolCallResult{
 		ToolCallID: strings.TrimSpace(call.ID),
@@ -240,6 +265,7 @@ func executeRuntimeToolCall(
 		result.ErrorCode = string(apperror.From(err).Code)
 		result.ErrorMessage = err.Error()
 		result.DurationMs = time.Since(startedAt).Milliseconds()
+		observability.RecordSpanError(span, err)
 		return nil, result, err
 	}
 	resolved, ok := toolByName[toolName]
@@ -248,6 +274,7 @@ func executeRuntimeToolCall(
 		result.ErrorCode = string(apperror.From(err).Code)
 		result.ErrorMessage = err.Error()
 		result.DurationMs = time.Since(startedAt).Milliseconds()
+		observability.RecordSpanError(span, err)
 		return nil, result, err
 	}
 	result.ToolID = resolved.Spec.ToolID
@@ -268,6 +295,7 @@ func executeRuntimeToolCall(
 	if err != nil {
 		result.ErrorCode = string(apperror.From(err).Code)
 		result.ErrorMessage = err.Error()
+		observability.RecordSpanError(span, err)
 		return nil, result, err
 	}
 	result.Status = "succeeded"

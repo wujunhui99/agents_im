@@ -11,7 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/propagation"
+
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
+	"github.com/wujunhui99/agents_im/internal/observability"
 )
 
 const defaultGatewayHTTPDispatcherTimeout = 5 * time.Second
@@ -49,11 +52,19 @@ func NewGatewayHTTPDispatcher(cfg GatewayHTTPDispatcherConfig) *GatewayHTTPDispa
 }
 
 func (d *GatewayHTTPDispatcher) Dispatch(ctx context.Context, envelope Envelope) DispatchResult {
+	if envelope.TraceContext.TraceID != "" {
+		ctx = observability.ContextWithTrace(ctx, envelope.TraceContext)
+	}
+	ctx, span := observability.StartSpan(ctx, "message.transfer.gateway_dispatch")
+	defer span.End()
 	if err := ctx.Err(); err != nil {
+		observability.RecordSpanError(span, err)
 		return DispatchRetryable(err, 0)
 	}
 	if d == nil || strings.TrimSpace(d.endpoint) == "" {
-		return DispatchFailed(errors.New("gateway dispatcher endpoint is required"))
+		err := errors.New("gateway dispatcher endpoint is required")
+		observability.RecordSpanError(span, err)
+		return DispatchFailed(err)
 	}
 	if len(envelope.Event.ReceiverIDs) == 0 && strings.TrimSpace(envelope.Event.ReceiverID) != "" {
 		envelope.Event.ReceiverIDs = []string{strings.TrimSpace(envelope.Event.ReceiverID)}
@@ -80,9 +91,11 @@ func (d *GatewayHTTPDispatcher) Dispatch(ctx context.Context, envelope Envelope)
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, d.endpoint+"/internal/delivery/conversation", bytes.NewReader(body))
 	if err != nil {
+		observability.RecordSpanError(span, err)
 		return DispatchFailed(err)
 	}
 	request.Header.Set("Content-Type", "application/json")
+	observability.InjectTraceContext(ctx, propagation.HeaderCarrier(request.Header))
 
 	client := d.client
 	if client == nil {
@@ -90,20 +103,26 @@ func (d *GatewayHTTPDispatcher) Dispatch(ctx context.Context, envelope Envelope)
 	}
 	response, err := client.Do(request)
 	if err != nil {
+		observability.RecordSpanError(span, err)
 		return DispatchRetryable(err, 0)
 	}
 	defer response.Body.Close()
 	responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
 	if response.StatusCode >= http.StatusInternalServerError || response.StatusCode == http.StatusTooManyRequests {
-		return DispatchRetryable(fmt.Errorf("gateway dispatcher status %d: %s", response.StatusCode, strings.TrimSpace(string(responseBody))), 0)
+		err := fmt.Errorf("gateway dispatcher status %d: %s", response.StatusCode, strings.TrimSpace(string(responseBody)))
+		observability.RecordSpanError(span, err)
+		return DispatchRetryable(err, 0)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return DispatchFailed(fmt.Errorf("gateway dispatcher status %d: %s", response.StatusCode, strings.TrimSpace(string(responseBody))))
+		err := fmt.Errorf("gateway dispatcher status %d: %s", response.StatusCode, strings.TrimSpace(string(responseBody)))
+		observability.RecordSpanError(span, err)
+		return DispatchFailed(err)
 	}
 
 	var deliveryResult delivery.Result
 	if len(responseBody) > 0 {
 		if err := json.Unmarshal(responseBody, &deliveryResult); err != nil {
+			observability.RecordSpanError(span, err)
 			return DispatchRetryable(err, 0)
 		}
 	}
@@ -131,6 +150,9 @@ func deliveryMessageFromTransferEvent(event MessageEvent) delivery.Message {
 		SendTime:              event.SendTime,
 		CreatedAt:             event.CreatedAt,
 		TraceID:               event.TraceID,
+		RequestID:             event.RequestID,
+		TraceParent:           event.TraceParent,
+		TraceState:            event.TraceState,
 	}
 }
 

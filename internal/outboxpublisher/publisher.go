@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/messaging"
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
@@ -172,12 +173,16 @@ func (p *Publisher) RunOnce(ctx context.Context) (RunOnceResult, error) {
 		if err := ctx.Err(); err != nil {
 			return result, err
 		}
+		eventCtx := observability.ContextWithTrace(ctx, traceContextFromOutbox(outboxEvent))
+		eventCtx, span := observability.StartSpan(eventCtx, "message.outbox.publish")
 
 		messageEvent, err := MessageEventFromOutbox(outboxEvent)
 		if err == nil {
-			err = p.producer.Publish(ctx, messageEvent)
+			err = p.producer.Publish(eventCtx, messageEvent)
 		}
 		if err != nil {
+			observability.RecordSpanError(span, err)
+			span.End()
 			if isContextError(err) {
 				return result, err
 			}
@@ -190,9 +195,12 @@ func (p *Publisher) RunOnce(ctx context.Context) (RunOnceResult, error) {
 			continue
 		}
 
-		if err := p.repo.MarkPublished(ctx, outboxEvent.EventID, p.workerID); err != nil {
+		if err := p.repo.MarkPublished(eventCtx, outboxEvent.EventID, p.workerID); err != nil {
+			observability.RecordSpanError(span, err)
+			span.End()
 			return result, fmt.Errorf("mark outbox event %s published: %w", outboxEvent.EventID, err)
 		}
+		span.End()
 		result.Published++
 	}
 
@@ -255,12 +263,27 @@ func MessageEventFromOutbox(event repository.OutboxEvent) (messaging.MessageEven
 			TriggerServerMsgID:    message.TriggerServerMsgID,
 			AgentRunID:            message.AgentRunID,
 			AllowRecursiveTrigger: message.AllowRecursiveTrigger,
+			TraceID:               payload.TraceContext.TraceID,
+			RequestID:             payload.TraceContext.RequestID,
+			TraceParent:           payload.TraceContext.TraceParent,
+			TraceState:            payload.TraceContext.TraceState,
 		},
 	}
 	if err := accepted.Validate(); err != nil {
 		return messaging.MessageEvent{}, fmt.Errorf("build message.accepted event: %w", err)
 	}
 	return accepted, nil
+}
+
+func traceContextFromOutbox(event repository.OutboxEvent) observability.TraceContext {
+	var payload repository.MessageCreatedOutboxPayload
+	if len(event.Payload) > 0 {
+		_ = json.Unmarshal(event.Payload, &payload)
+	}
+	traceContext := observability.NewTraceContext(payload.TraceContext.TraceID, payload.TraceContext.RequestID)
+	traceContext.TraceParent = payload.TraceContext.TraceParent
+	traceContext.TraceState = payload.TraceContext.TraceState
+	return traceContext
 }
 
 func messageContent(message repository.Message) (json.RawMessage, error) {

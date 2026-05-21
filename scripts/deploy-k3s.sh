@@ -194,7 +194,10 @@ run_migrations() {
     return
   fi
   local database_url
-  database_url="$(${KUBECTL} -n "${NAMESPACE}" get secret agents-im-secrets -o jsonpath='{.data.DATABASE_URL}' | base64 -d)"
+  database_url="${DATABASE_URL:-}"
+  if [[ -z "${database_url}" ]]; then
+    database_url="$(${KUBECTL} -n "${NAMESPACE}" get secret agents-im-secrets -o jsonpath='{.data.DATABASE_URL}' | base64 -d)"
+  fi
   if [[ -z "${database_url}" ]]; then
     echo "DATABASE_URL is missing in ${NAMESPACE}/agents-im-secrets" >&2
     exit 1

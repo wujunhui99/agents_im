@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 	"gopkg.in/yaml.v3"
@@ -25,6 +26,7 @@ type APIConfig struct {
 	Redis            RedisConfig
 	Presence         PresenceConfig
 	Kafka            KafkaConfig
+	Tracing          observability.TracingConfig
 	DeepSeek         DeepSeekConfig
 	LLMObservability LLMObservabilityConfig
 	GatewayWS        GatewayWSConfig
@@ -48,6 +50,7 @@ type RPCConfig struct {
 	Redis         RedisConfig
 	Presence      PresenceConfig
 	Kafka         KafkaConfig
+	Tracing       observability.TracingConfig
 	MailRPC       zrpc.RpcClientConf
 }
 
@@ -139,6 +142,7 @@ type MessageTransferConfig struct {
 	StorageDriver string
 	DataSource    string
 	Kafka         KafkaConfig
+	Tracing       observability.TracingConfig
 	Consumer      TransferConsumerConfig
 	Dispatcher    TransferDispatcherConfig
 	Worker        TransferWorkerConfig
@@ -233,6 +237,7 @@ func DefaultAPIConfig() APIConfig {
 		Redis:            DefaultRedisConfig(),
 		Presence:         DefaultPresenceConfig(),
 		Kafka:            DefaultKafkaConfig(),
+		Tracing:          observability.TracingConfig{},
 		DeepSeek:         DefaultDeepSeekConfig(),
 		LLMObservability: DefaultLLMObservabilityConfig(),
 		GatewayWS:        DefaultGatewayWSConfig(),
@@ -250,6 +255,7 @@ func DefaultRPCConfig() RPCConfig {
 		Redis:         DefaultRedisConfig(),
 		Presence:      DefaultPresenceConfig(),
 		Kafka:         DefaultKafkaConfig(),
+		Tracing:       observability.TracingConfig{},
 	}
 }
 
@@ -345,6 +351,7 @@ func DefaultMessageTransferConfig() MessageTransferConfig {
 		DryRun:        true,
 		StorageDriver: StorageDriverMemory,
 		Kafka:         DefaultKafkaConfig(),
+		Tracing:       observability.TracingConfig{},
 		Consumer: TransferConsumerConfig{
 			Driver: TransferConsumerMemory,
 			Topic:  defaultTransferTopic,
@@ -416,6 +423,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		return cfg, err
 	}
 	cfg.Kafka = kafkaConfigFromValues(values)
+	cfg.Tracing, err = tracingConfigFromValues(values, cfg.Tracing, cfg.Name)
+	if err != nil {
+		return cfg, err
+	}
 	cfg.DeepSeek = deepSeekConfigFromValues(values)
 	cfg.LLMObservability, err = llmObservabilityConfigFromValues(values)
 	if err != nil {
@@ -475,6 +486,10 @@ func LoadRPCConfig(path string) (RPCConfig, error) {
 		return cfg, err
 	}
 	cfg.Kafka = kafkaConfigFromValues(values)
+	cfg.Tracing, err = tracingConfigFromValues(values, cfg.Tracing, cfg.Name)
+	if err != nil {
+		return cfg, err
+	}
 	cfg.MailRPC, err = mailRPCConfigFromValues(values)
 	if err != nil {
 		return cfg, err
@@ -501,6 +516,10 @@ func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
 	}
 	cfg.DataSource = ResolveDataSource(values["DataSource"])
 	cfg.Kafka = kafkaConfigFromValues(values)
+	cfg.Tracing, err = tracingConfigFromValues(values, cfg.Tracing, cfg.Name)
+	if err != nil {
+		return cfg, err
+	}
 	if value := firstNonEmpty(values["Consumer.Driver"], values["ConsumerDriver"]); value != "" {
 		cfg.Consumer.Driver = ResolveTransferConsumerDriver(value)
 	} else {
@@ -633,6 +652,9 @@ func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConf
 	cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
 	cfg.DataSource = ResolveDataSource(cfg.DataSource)
 	cfg.Kafka = ResolveKafkaConfig(cfg.Kafka)
+	if tracing, err := observability.ResolveTracingConfig(cfg.Tracing, cfg.Name); err == nil {
+		cfg.Tracing = tracing
+	}
 	cfg.Consumer.Driver = ResolveTransferConsumerDriver(cfg.Consumer.Driver)
 	cfg.Consumer.Topic = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Topic)), os.Getenv("MESSAGE_TRANSFER_TOPIC"), cfg.Kafka.MessageEventsTopic, defaultTransferTopic)
 	cfg.Consumer.Group = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Group)), os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"), cfg.Kafka.ConsumerGroup, defaultTransferGroup)
@@ -1163,6 +1185,37 @@ func kafkaConfigFromValues(values map[string]string) KafkaConfig {
 		ConsumerGroup:      firstNonEmpty(values["Kafka.ConsumerGroup"], values["KafkaConsumerGroup"]),
 	}
 	return ResolveKafkaConfig(cfg)
+}
+
+func tracingConfigFromValues(values map[string]string, current observability.TracingConfig, serviceName string) (observability.TracingConfig, error) {
+	cfg := current
+	if value := firstNonEmpty(values["Tracing.Enabled"], values["TracingEnabled"]); strings.TrimSpace(value) != "" {
+		enabled, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Enabled = enabled
+	}
+	cfg.ServiceName = firstNonEmpty(values["Tracing.ServiceName"], values["TracingServiceName"], cfg.ServiceName)
+	cfg.Environment = firstNonEmpty(values["Tracing.Environment"], values["TracingEnv"], cfg.Environment)
+	cfg.OTLPEndpoint = firstNonEmpty(values["Tracing.OTLPEndpoint"], values["Tracing.Endpoint"], values["OTLPEndpoint"], cfg.OTLPEndpoint)
+	cfg.Protocol = firstNonEmpty(values["Tracing.Protocol"], values["OTLPProtocol"], cfg.Protocol)
+	if value := firstNonEmpty(values["Tracing.SamplerRatio"], values["TracingSamplerRatio"]); strings.TrimSpace(value) != "" {
+		ratio, err := strconv.ParseFloat(strings.TrimSpace(os.ExpandEnv(value)), 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.SamplerRatio = ratio
+	}
+	cfg.JaegerBaseURL = firstNonEmpty(values["Tracing.JaegerBaseURL"], values["JaegerBaseURL"], cfg.JaegerBaseURL)
+	if value := firstNonEmpty(values["Tracing.Insecure"], values["TracingInsecure"]); strings.TrimSpace(value) != "" {
+		insecure, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Insecure = insecure
+	}
+	return observability.ResolveTracingConfig(cfg, serviceName)
 }
 
 func mailRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error) {

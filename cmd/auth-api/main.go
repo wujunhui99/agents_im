@@ -31,6 +31,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("load api config: %v", err)
 	}
+	shutdownTracing, err := observability.InitServiceTracing(context.Background(), cfg.Tracing, cfg.Name)
+	if err != nil {
+		log.Fatalf("init tracing: %v", err)
+	}
+	defer func() {
+		if err := observability.ShutdownTracing(shutdownTracing); err != nil {
+			log.Printf("shutdown tracing: %v", err)
+		}
+	}()
 
 	userRepo, err := userrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {

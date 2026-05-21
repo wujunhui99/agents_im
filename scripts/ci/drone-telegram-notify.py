@@ -4,7 +4,8 @@
 Attribution is resolved from trusted project metadata, not free-form chat:
 1. PR source branch path: <type>/<agent>/issue-<number>-<task>
 2. commit trailer: Agent: <agent>
-3. commit author email: <agent>@agents.noreply.local
+3. commit subject marker: <type>(<scope>)[<agent>]: <title>
+4. commit author email: <agent>@agents.noreply.local
 
 The branch agent is intentionally first for PR notifications because CI now
 hard-rejects branches without a trusted agent in the second path segment.
@@ -55,6 +56,7 @@ BRANCH_RE = re.compile(
     r"issue-[0-9]+-[a-z0-9][a-z0-9-]*$"
 )
 TRAILER_RE = re.compile(r"^Agent:\s*([a-z0-9_-]+)\s*$", re.MULTILINE)
+SUBJECT_AGENT_RE = re.compile(r"(?:^|\s)([a-z]+)(?:\([a-z0-9_.-]+\))?\[(eino|helios|hermes|achilles|furies|gaia)\]:")
 
 
 @dataclass
@@ -103,6 +105,15 @@ def agent_from_trailer(message: str) -> Optional[str]:
     return candidate if candidate in TRUSTED_AGENTS else None
 
 
+def agent_from_subject(message: str) -> Optional[str]:
+    first_line = (message or "").splitlines()[0] if message else ""
+    match = SUBJECT_AGENT_RE.search(first_line.strip())
+    if not match:
+        return None
+    candidate = match.group(2).strip().lower()
+    return candidate if candidate in TRUSTED_AGENTS else None
+
+
 def agent_from_email(email: str) -> Optional[str]:
     email = (email or "").strip().lower()
     for agent, meta in TRUSTED_AGENTS.items():
@@ -120,12 +131,14 @@ def resolve_attribution() -> Attribution:
 
     branch_agent = agent_from_branch(branch)
     trailer_agent = agent_from_trailer(message)
+    subject_agent = agent_from_subject(message)
     email_agent = agent_from_email(email)
 
     warnings: list[str] = []
     observed = {
         "branch": branch_agent,
         "trailer": trailer_agent,
+        "subject": subject_agent,
         "email": email_agent,
     }
     non_empty = {k: v for k, v in observed.items() if v}
@@ -141,13 +154,16 @@ def resolve_attribution() -> Attribution:
     elif trailer_agent:
         agent = trailer_agent
         method = "commit trailer"
+    elif subject_agent:
+        agent = subject_agent
+        method = "commit subject"
     elif email_agent:
         agent = email_agent
         method = "author email"
     else:
         agent = None
         method = "unresolved"
-        warnings.append("No trusted agent found in branch, Agent trailer, or author email")
+        warnings.append("No trusted agent found in branch, Agent trailer, subject marker, or author email")
 
     mention = TRUSTED_AGENTS[agent]["mention"] if agent else ""
     return Attribution(agent=agent, method=method, mention=mention, warnings=warnings)

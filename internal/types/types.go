@@ -746,6 +746,7 @@ type AdminFriend struct {
 
 type AdminLLMTrace struct {
 	TraceID           string `json:"traceId"`
+	JaegerURL         string `json:"jaegerUrl,omitempty"`
 	RunID             string `json:"runId"`
 	AgentID           string `json:"agentId"`
 	ConversationID    string `json:"conversationId,omitempty"`
