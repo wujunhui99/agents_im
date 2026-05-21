@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/wujunhui99/agents_im/internal/adminbootstrap"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
@@ -56,6 +57,11 @@ func main() {
 	userLogic.WithDefaultAssistantProvisioner(defaultAssistant)
 	if _, err := defaultAssistant.Backfill(context.Background()); err != nil {
 		log.Fatalf("backfill default assistant: %v", err)
+	}
+	if created, err := adminbootstrap.EnsureAdminAccount(context.Background(), adminbootstrap.FromAPIConfig(cfg), userLogic, credentialRepo); err != nil {
+		log.Fatalf("bootstrap admin account: %v", err)
+	} else if created {
+		log.Printf("admin bootstrap account ensured for identifier %q", cfg.AdminBootstrap.Identifier)
 	}
 	serviceContext := authsvc.NewServiceContextWithOptions(
 		credentialRepo,
