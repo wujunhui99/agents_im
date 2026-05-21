@@ -11,9 +11,17 @@ import (
 
 const maxErrorMessageLength = 512
 
-var sensitiveInlinePatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)(bearer\s+)[a-z0-9._~+/=-]+`),
-	regexp.MustCompile(`(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|secret|cookie|dsn)=)[^\s&]+`),
+type redactionPattern struct {
+	pattern     *regexp.Regexp
+	replacement string
+}
+
+var sensitiveInlinePatterns = []redactionPattern{
+	{regexp.MustCompile(`(?i)(bearer\s+)[a-z0-9._~+/=-]+`), "${1}[REDACTED]"},
+	{regexp.MustCompile(`(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|secret|cookie|dsn)=)[^\s&]+`), "${1}[REDACTED]"},
+	{regexp.MustCompile(`(?i)\b((?:postgres(?:ql)?|mysql|redis|mongodb(?:\+srv)?|amqp|kafka)://)[^\s]+`), "${1}[REDACTED]"},
+	{regexp.MustCompile(`\beyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\b`), "[REDACTED]"},
+	{regexp.MustCompile(`(?i)\bsk-[a-z0-9][a-z0-9._-]{10,}\b`), "[REDACTED]"},
 }
 
 func ErrorFields(err error) (string, string) {
@@ -26,7 +34,7 @@ func ErrorFields(err error) (string, string) {
 func RedactPlainText(value string) string {
 	value = strings.TrimSpace(value)
 	for _, pattern := range sensitiveInlinePatterns {
-		value = pattern.ReplaceAllString(value, "${1}[REDACTED]")
+		value = pattern.pattern.ReplaceAllString(value, pattern.replacement)
 	}
 	if len(value) <= maxErrorMessageLength {
 		return value

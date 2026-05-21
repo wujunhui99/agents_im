@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components/model"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type callbackStartedAtKey struct{}
@@ -76,7 +77,15 @@ func observe(ctx context.Context, sink Sink, event Event) {
 	if sink == nil {
 		return
 	}
-	_, _ = sink.Observe(ctx, event)
+	result, err := sink.Observe(ctx, event)
+	if err != nil {
+		backend := result.Backend
+		if backend == "" {
+			backend = BackendNoop
+		}
+		logx.Errorf("llm observability export failed backend=%q trace_id=%q request_id=%q event_type=%q status=%q: %s",
+			backend, event.TraceID, event.RequestID, event.Type, event.Status, RedactPlainText(err.Error()))
+	}
 }
 
 func captureText(value string, maxBytes int) string {

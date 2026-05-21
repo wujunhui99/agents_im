@@ -16,6 +16,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
 	"github.com/wujunhui99/agents_im/internal/llmobs"
 	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type RuntimeRequestBuilder interface {
@@ -229,7 +230,15 @@ func (o *AgentRunOrchestrator) observeLLMRun(ctx context.Context, event llmobs.E
 	if o == nil || o.llmobsSink == nil {
 		return
 	}
-	_, _ = o.llmobsSink.Observe(ctx, event)
+	result, err := o.llmobsSink.Observe(ctx, event)
+	if err != nil {
+		backend := result.Backend
+		if backend == "" {
+			backend = llmobs.BackendNoop
+		}
+		logx.Errorf("llm observability export failed backend=%q trace_id=%q request_id=%q event_type=%q status=%q: %s",
+			backend, event.TraceID, event.RequestID, event.Type, event.Status, llmobs.RedactPlainText(err.Error()))
+	}
 }
 
 func (o *AgentRunOrchestrator) recordFailedRun(ctx context.Context, trigger AgentTrigger, runID string, startedAt time.Time, finishedAt time.Time, code string, cause error) error {

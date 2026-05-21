@@ -2047,7 +2047,7 @@ llm_observability_patterns=(
   "RuntimeModeAIHostingAutoReply"
   "NewEinoCallbackHandler"
   "ErrLangfuseConfigMissing"
-  "ErrLangfuseExportNotImplemented"
+  "langfuseIngestionPath"
   "LLMObservability"
   "LANGFUSE_PUBLIC_KEY"
   "PythonGoPerformanceCaseID"

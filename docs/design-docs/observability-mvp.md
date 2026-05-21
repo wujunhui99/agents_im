@@ -17,7 +17,7 @@ Backend MVP needs a small, local-first observability foundation before frontend 
 
 ## Non-Goals
 
-- The original MVP did not add a production tracing backend.
+- The original MVP did not add a production tracing backend; LLM-specific Langfuse export is covered separately in [`llm-observability.md`](./llm-observability.md).
 - Production Jaeger/OpenTelemetry tracing is now covered by [`distributed-tracing-jaeger.md`](./distributed-tracing-jaeger.md).
 - Local/unit tests still do not require Prometheus, Grafana, or Jaeger.
 - No core friends, groups, or message delivery semantics are changed.

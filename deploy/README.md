@@ -16,6 +16,8 @@ DEEPSEEK_API_KEY='...' ./scripts/bootstrap-server.sh
 
 The bootstrap script writes middleware config to `/opt/agents-im/middleware/.env`, starts Docker middleware, installs `postgresql-client` if missing, and creates the k3s `agents-im-secrets` Secret. Real secrets are stored only on the server/k3s or in Drone repository secrets, not in Git.
 
+Langfuse LLM observability is additive to the existing admin LLM trace/audit tables. The default host is `https://langfuse.agenticim.xyz`, configured through `LANGFUSE_HOST`; credentials are read only from `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` in environment/k3s secrets. Keep the values in server/k3s secret storage only, never in Git, issue comments, or chat transcripts. Leave `LLM_OBSERVABILITY_ENABLED=false` and `LLM_OBSERVABILITY_BACKEND=noop` until both Langfuse credentials are present.
+
 ## Drone repository secrets
 
 Drone is deployed at `https://drone.agenticim.xyz` and the `wujunhui99/agents_im` repository must be active in Drone. Secrets are configured at repository scope in Drone, not in Git.
