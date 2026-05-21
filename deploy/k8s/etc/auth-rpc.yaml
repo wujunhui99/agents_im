@@ -14,6 +14,7 @@ Tracing:
   Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
   SamplerRatio: 1.0
   JaegerBaseURL: ${AGENTS_IM_JAEGER_BASE_URL}
+  Insecure: true
 MailRPC:
   Endpoints:
     - mail-rpc:9095
