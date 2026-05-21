@@ -35,6 +35,36 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
   fi
 
   cd /opt/agents-im/repo
+
+  if [[ "${config_only}" != "true" ]]; then
+    migration_network="${DRONE_LOCAL_MIGRATION_NETWORK:-middleware_default}"
+    migration_host="${DRONE_LOCAL_MIGRATION_HOST:-postgres}"
+    migration_port="${DRONE_LOCAL_MIGRATION_PORT:-5432}"
+    echo "Running database migrations through Docker network ${migration_network}."
+    database_url="$(kubectl --kubeconfig "${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}" -n agents-im get secret agents-im-secrets -o jsonpath='{.data.DATABASE_URL}' | base64 -d)"
+    if [[ -z "${database_url}" ]]; then
+      echo "DATABASE_URL is missing in agents-im/agents-im-secrets" >&2
+      exit 1
+    fi
+    dsn_prefix="${database_url%%@*}"
+    dsn_suffix="${database_url#*@}"
+    dsn_path="${dsn_suffix#*/}"
+    if [[ "${dsn_prefix}" == "${database_url}" || "${dsn_path}" == "${dsn_suffix}" ]]; then
+      echo "DATABASE_URL format is unsupported for local Drone migration rewrite" >&2
+      exit 1
+    fi
+    migration_database_url="${dsn_prefix}@${migration_host}:${migration_port}/${dsn_path}"
+    docker run --rm \
+      --network "${migration_network}" \
+      -v "${PWD}:/repo" \
+      -w /repo \
+      -e DATABASE_URL="${migration_database_url}" \
+      postgres:16-alpine \
+      sh -lc 'apk add --no-cache bash coreutils >/dev/null && bash scripts/migrate-postgres.sh --host-psql'
+  else
+    echo "Skipping database migrations for config-only deployment."
+  fi
+
   IMAGE_REGISTRY="${registry}" \
     IMAGE_TAG="${DRONE_COMMIT_SHA}" \
     GHCR_USERNAME="${GHCR_USERNAME}" \
@@ -42,7 +72,7 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
     KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}" \
     SKIP_SET_IMAGE="${skip_set_image}" \
     SKIP_MIDDLEWARE="${config_only}" \
-    SKIP_MIGRATIONS="${config_only}" \
+    SKIP_MIGRATIONS="true" \
     IMAGE_SERVICES="${image_services_space}" \
     ROLLOUT_SERVICES="${rollout_services}" \
     RESTART_SERVICES="${restart_services}" \
