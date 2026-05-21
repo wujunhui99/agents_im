@@ -23,6 +23,7 @@ steps:
     image: golang:1.24-bookworm
     commands:
       - bash scripts/ci/verify-agent-branch-name.sh
+      - bash scripts/ci/verify-pr-issue-link.sh
       - bash scripts/ci/drone-backend-verify.sh
 
   - name: postgres-integration
