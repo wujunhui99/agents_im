@@ -98,6 +98,66 @@ func (r *MemoryAgentRegistryRepository) BindPrompt(_ context.Context, binding mo
 	return binding.Clone(), true, nil
 }
 
+func (r *MemoryAgentRegistryRepository) ListPromptBindings(_ context.Context, agentID string) ([]model.AgentPromptBinding, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	bindings := make([]model.AgentPromptBinding, 0)
+	for _, binding := range r.promptBinds {
+		if binding.AgentID == agentID {
+			bindings = append(bindings, binding.Clone())
+		}
+	}
+	sort.Slice(bindings, func(i, j int) bool {
+		if bindings[i].CreatedAt.Equal(bindings[j].CreatedAt) {
+			return bindings[i].PromptID < bindings[j].PromptID
+		}
+		return bindings[i].CreatedAt.After(bindings[j].CreatedAt)
+	})
+	return bindings, nil
+}
+
+func (r *MemoryAgentRegistryRepository) ReplacePromptBindings(_ context.Context, agentID string, promptIDs []string, createdBy string) ([]model.AgentPromptBinding, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	seen := make(map[string]struct{}, len(promptIDs))
+	for _, promptID := range promptIDs {
+		if _, ok := seen[promptID]; ok {
+			continue
+		}
+		seen[promptID] = struct{}{}
+		if _, exists := r.prompts[promptID]; !exists {
+			return nil, apperror.NotFound("prompt not found")
+		}
+	}
+	for key, binding := range r.promptBinds {
+		if binding.AgentID == agentID {
+			delete(r.promptBinds, key)
+		}
+	}
+
+	now := r.now().UTC()
+	bindings := make([]model.AgentPromptBinding, 0, len(promptIDs))
+	seen = make(map[string]struct{}, len(promptIDs))
+	for _, promptID := range promptIDs {
+		if _, ok := seen[promptID]; ok {
+			continue
+		}
+		seen[promptID] = struct{}{}
+		binding := model.AgentPromptBinding{
+			AgentID:   agentID,
+			PromptID:  promptID,
+			CreatedBy: createdBy,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		r.promptBinds[promptBindingKey(agentID, promptID)] = binding.Clone()
+		bindings = append(bindings, binding.Clone())
+	}
+	return bindings, nil
+}
+
 func (r *MemoryAgentRegistryRepository) CreateMCPServer(_ context.Context, server model.AgentMCPServer) (model.AgentMCPServer, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -184,6 +244,34 @@ func (r *MemoryAgentRegistryRepository) GetTool(_ context.Context, toolID string
 	return tool.Clone(), nil
 }
 
+func (r *MemoryAgentRegistryRepository) GetToolByName(_ context.Context, name string) (model.AgentTool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, tool := range r.tools {
+		if tool.Name == name {
+			return tool.Clone(), nil
+		}
+	}
+	return model.AgentTool{}, apperror.NotFound("tool not found")
+}
+
+func (r *MemoryAgentRegistryRepository) ListActiveTools(_ context.Context) ([]model.AgentTool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	tools := make([]model.AgentTool, 0)
+	for _, tool := range r.tools {
+		if tool.Status == model.AgentToolStatusActive {
+			tools = append(tools, tool.Clone())
+		}
+	}
+	sort.Slice(tools, func(i, j int) bool {
+		return tools[i].Name < tools[j].Name
+	})
+	return tools, nil
+}
+
 func (r *MemoryAgentRegistryRepository) BindTool(_ context.Context, binding model.AgentToolBinding) (model.AgentToolBinding, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -223,6 +311,47 @@ func (r *MemoryAgentRegistryRepository) ListToolBindings(_ context.Context, agen
 	sort.Slice(bindings, func(i, j int) bool {
 		return bindings[i].ToolID < bindings[j].ToolID
 	})
+	return bindings, nil
+}
+
+func (r *MemoryAgentRegistryRepository) ReplaceToolBindings(_ context.Context, agentID string, toolIDs []string, createdBy string) ([]model.AgentToolBinding, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	seen := make(map[string]struct{}, len(toolIDs))
+	for _, toolID := range toolIDs {
+		if _, ok := seen[toolID]; ok {
+			continue
+		}
+		seen[toolID] = struct{}{}
+		if _, exists := r.tools[toolID]; !exists {
+			return nil, apperror.NotFound("tool not found")
+		}
+	}
+	for key, binding := range r.toolBinds {
+		if binding.AgentID == agentID {
+			delete(r.toolBinds, key)
+		}
+	}
+
+	now := r.now().UTC()
+	bindings := make([]model.AgentToolBinding, 0, len(toolIDs))
+	seen = make(map[string]struct{}, len(toolIDs))
+	for _, toolID := range toolIDs {
+		if _, ok := seen[toolID]; ok {
+			continue
+		}
+		seen[toolID] = struct{}{}
+		binding := model.AgentToolBinding{
+			AgentID:   agentID,
+			ToolID:    toolID,
+			CreatedBy: createdBy,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		r.toolBinds[toolBindingKey(agentID, toolID)] = binding.Clone()
+		bindings = append(bindings, binding.Clone())
+	}
 	return bindings, nil
 }
 
