@@ -58,6 +58,8 @@ LANGFUSE_HOST=https://langfuse.agenticim.xyz
 
 Langfuse placeholders may be present in `.env.example`, but real credentials must come from local env/secrets only. To enable export, set `LLM_OBSERVABILITY_ENABLED=true`, `LLM_OBSERVABILITY_BACKEND=langfuse`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`; missing credentials fail visibly during sink setup instead of pretending remote export succeeded.
 
+The self-hosted Langfuse UI is deployed at `https://langfuse.agenticim.xyz/` by `deploy/k8s/langfuse.yaml`. Its application secrets are separate from ingestion keys: `LANGFUSE_DATABASE_URL`, `NEXTAUTH_SECRET`, `SALT`, and `ENCRYPTION_KEY` must exist in the production k3s `agents-im-secrets` Secret and must not be committed or printed.
+
 ## LLM-as-Judge Eval
 
 `internal/agenteval` contains the deterministic case:

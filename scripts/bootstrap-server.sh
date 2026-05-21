@@ -5,6 +5,7 @@ APP_DIR="${APP_DIR:-/opt/agents-im}"
 MIDDLEWARE_DIR="${APP_DIR}/middleware"
 NAMESPACE="${NAMESPACE:-agents-im}"
 POSTGRES_DB="${POSTGRES_DB:-agents_im}"
+LANGFUSE_POSTGRES_DB="${LANGFUSE_POSTGRES_DB:-langfuse}"
 POSTGRES_USER="${POSTGRES_USER:-agents_im}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
 REDIS_PASSWORD="${REDIS_PASSWORD:-}"
@@ -14,6 +15,12 @@ JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-}"
 DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-}"
 LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY:-}"
 LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-}"
+LANGFUSE_DATABASE_URL="${LANGFUSE_DATABASE_URL:-}"
+LANGFUSE_NEXTAUTH_SECRET="${LANGFUSE_NEXTAUTH_SECRET:-}"
+LANGFUSE_SALT="${LANGFUSE_SALT:-}"
+LANGFUSE_ENCRYPTION_KEY="${LANGFUSE_ENCRYPTION_KEY:-}"
+OBSERVABILITY_BASIC_AUTH_USER="${OBSERVABILITY_BASIC_AUTH_USER:-admin}"
+OBSERVABILITY_BASIC_AUTH_PASSWORD="${OBSERVABILITY_BASIC_AUTH_PASSWORD:-}"
 OBJECT_STORAGE_EXTERNAL_ENDPOINT="${OBJECT_STORAGE_EXTERNAL_ENDPOINT:-}"
 OBJECT_STORAGE_EXTERNAL_USE_SSL="${OBJECT_STORAGE_EXTERNAL_USE_SSL:-true}"
 GITHUB_ACTOR="${GITHUB_ACTOR:-}"
@@ -47,6 +54,11 @@ POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(random_hex)}"
 REDIS_PASSWORD="${REDIS_PASSWORD:-$(random_hex)}"
 MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-$(random_hex)}"
 JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-$(random_hex)}"
+LANGFUSE_DATABASE_URL="${LANGFUSE_DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${LANGFUSE_POSTGRES_DB}?sslmode=disable}"
+LANGFUSE_NEXTAUTH_SECRET="${LANGFUSE_NEXTAUTH_SECRET:-$(openssl rand -base64 32)}"
+LANGFUSE_SALT="${LANGFUSE_SALT:-$(random_hex)}"
+LANGFUSE_ENCRYPTION_KEY="${LANGFUSE_ENCRYPTION_KEY:-$(random_hex)}"
+OBSERVABILITY_BASIC_AUTH_PASSWORD="${OBSERVABILITY_BASIC_AUTH_PASSWORD:-$(openssl rand -base64 24)}"
 
 if [[ -z "${OBJECT_STORAGE_EXTERNAL_ENDPOINT}" ]]; then
   echo "OBJECT_STORAGE_EXTERNAL_ENDPOINT is required for browser uploads in production" >&2
@@ -91,6 +103,9 @@ if ! command -v psql >/dev/null 2>&1; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client
 fi
 
+PGPASSWORD="${POSTGRES_PASSWORD}" psql -h 127.0.0.1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tc "SELECT 1 FROM pg_database WHERE datname = '${LANGFUSE_POSTGRES_DB}'" | grep -q 1 || \
+  PGPASSWORD="${POSTGRES_PASSWORD}" createdb -h 127.0.0.1 -U "${POSTGRES_USER}" "${LANGFUSE_POSTGRES_DB}"
+
 kubectl apply -f deploy/k8s/namespace.yaml
 kubectl -n "${NAMESPACE}" create secret generic agents-im-secrets \
   --from-literal=JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET}" \
@@ -108,7 +123,23 @@ kubectl -n "${NAMESPACE}" create secret generic agents-im-secrets \
   --from-literal=DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY}" \
   --from-literal=LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY}" \
   --from-literal=LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY}" \
+  --from-literal=LANGFUSE_DATABASE_URL="${LANGFUSE_DATABASE_URL}" \
+  --from-literal=NEXTAUTH_SECRET="${LANGFUSE_NEXTAUTH_SECRET}" \
+  --from-literal=SALT="${LANGFUSE_SALT}" \
+  --from-literal=ENCRYPTION_KEY="${LANGFUSE_ENCRYPTION_KEY}" \
   --dry-run=client -o yaml | kubectl apply -f -
+
+observability_htpasswd="${OBSERVABILITY_BASIC_AUTH_USER}:$(openssl passwd -apr1 "${OBSERVABILITY_BASIC_AUTH_PASSWORD}")"
+kubectl -n "${NAMESPACE}" create secret generic observability-basic-auth \
+  --from-literal=users="${observability_htpasswd}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+install -d -m 0700 "${APP_DIR}"
+{
+  printf 'OBSERVABILITY_BASIC_AUTH_USER=%s\n' "${OBSERVABILITY_BASIC_AUTH_USER}"
+  printf 'OBSERVABILITY_BASIC_AUTH_PASSWORD=%s\n' "${OBSERVABILITY_BASIC_AUTH_PASSWORD}"
+} > "${APP_DIR}/observability-basic-auth.env"
+chmod 600 "${APP_DIR}/observability-basic-auth.env"
 
 if [[ -n "${GITHUB_ACTOR}" && -n "${GITHUB_TOKEN}" ]]; then
   kubectl -n "${NAMESPACE}" create secret docker-registry ghcr-pull-secret \
