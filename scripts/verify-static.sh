@@ -466,6 +466,8 @@ for pattern in "${ci_doc_patterns[@]}"; do
 done
 
 
+bash scripts/ci/verify-migration-immutability.sh
+
 change_log_required_paths=(
   'db/migrations/'
   'db/schema/'

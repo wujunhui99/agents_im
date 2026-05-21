@@ -20,6 +20,7 @@
 - 用户负责目标、约束和验收；Agent 负责实现、验证和修复。
 - 复杂任务必须产出或更新可版本化 docs/plan。
 - 默认使用 `git worktree` 并行：一个 Codex 一个独立 worktree/branch。
+- 多 Agent 分支命名必须遵守 `docs/AGENT_GIT_STANDARD.md`：`<type>/<agent-name>/<issue>-<task-desc>`；第二段必须是可信 Agent 名（`eino`、`helios`、`hermes`、`achilles`、`furies`、`gaia`），否则 CI 不通过；commit subject 必须为 `<type>(<scope>)[<agent-name>]: <short title>`，并使用 Agent 专用 Git identity 与 `Issue` / `Agent` / `Human-Owner` trailers。
 - 用户偏好：Hermes/Helios 做 planner/architect/reviewer/integrator，编码测试尽量委派 Codex。
 - feature 原则：`feature/* -> develop -> main`；紧急生产 hotfix 可从 `main -> fix/* -> main`。
 - Codex 是否允许 commit/push 必须由任务说明明确；未明确时不要 push。
@@ -41,6 +42,7 @@
 - 本地开发：[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)
 - 部署：[`deploy/README.md`](./deploy/README.md)
 - Git 工作流：[`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md)
+- 多 Agent 分支/Commit/归因规范：[`docs/AGENT_GIT_STANDARD.md`](./docs/AGENT_GIT_STANDARD.md)
 - Agentic GitHub Project / Issues 工作流：[`docs/AGENTIC_DEVELOPMENT_WORKFLOW.md`](./docs/AGENTIC_DEVELOPMENT_WORKFLOW.md)
 - 安全：[`docs/SECURITY.md`](./docs/SECURITY.md)
 - 可靠性：[`docs/RELIABILITY.md`](./docs/RELIABILITY.md)
