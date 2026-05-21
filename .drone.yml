@@ -6,9 +6,6 @@ type: docker
 trigger:
   event:
     - pull_request
-  target:
-    - develop
-    - main
 
 services:
   - name: postgres
@@ -27,9 +24,23 @@ steps:
   - name: postgres-integration
     image: golang:1.24-bookworm
     environment:
-      DATABASE_URL: postgres://agents_im:***@postgres:5432/agents_im?sslmode=disable
+      DATABASE_URL: postgres://agents_im:agents_im_dev_password@postgres:5432/agents_im?sslmode=disable
     commands:
       - bash scripts/ci/drone-postgres-integration.sh
+
+  - name: notify telegram
+    image: python:3.12-alpine
+    environment:
+      TELEGRAM_BOT_TOKEN:
+        from_secret: telegram_bot_token
+      TELEGRAM_CHAT_ID:
+        from_secret: telegram_chat_id
+    commands:
+      - sh -c 'apk add --no-cache bash >/dev/null && bash scripts/ci/drone-telegram-notify.sh "$DRONE_BUILD_STATUS"'
+    when:
+      status:
+        - success
+        - failure
 
 ---
 kind: pipeline
@@ -98,6 +109,20 @@ steps:
       - name: host_k3s_config
         path: /host/etc/rancher/k3s
         read_only: true
+
+  - name: notify telegram
+    image: python:3.12-alpine
+    environment:
+      TELEGRAM_BOT_TOKEN:
+        from_secret: telegram_bot_token
+      TELEGRAM_CHAT_ID:
+        from_secret: telegram_chat_id
+    commands:
+      - sh -c 'apk add --no-cache bash >/dev/null && bash scripts/ci/drone-telegram-notify.sh "$DRONE_BUILD_STATUS"'
+    when:
+      status:
+        - success
+        - failure
 
 volumes:
   - name: docker_sock

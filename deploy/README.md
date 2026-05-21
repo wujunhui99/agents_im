@@ -28,8 +28,10 @@ Required repository secrets:
 - `deploy_ssh_user`: production deploy SSH user value. Derive from the documented local SSH alias when available; do not paste the raw value in docs or chat.
 - `deploy_ssh_port`: production deploy SSH port value.
 - `deploy_ssh_key`: private key used by the deploy pipeline. Use only a key already authorized for deployment; never commit it or print it in logs.
+- `telegram_bot_token`: Telegram bot token used by CI/CD result notifications. Keep the raw token only in Drone secrets.
+- `telegram_chat_id`: Telegram chat/group id that receives CI/CD result notifications.
 
-Current operational status: these six secrets have been configured for `wujunhui99/agents_im` in Drone. Future agents should verify names only unless rotating credentials. If a secret must be rotated, update it in Drone and record only the secret name and rotation date, never the value.
+Current operational status: these secrets have been configured for `wujunhui99/agents_im` in Drone. Future agents should verify names only unless rotating credentials. If a secret must be rotated, update it in Drone and record only the secret name and rotation date, never the value.
 
 Drone uses `ghcr_token` to push images to GHCR and to refresh the server-side `ghcr-pull-secret` in k3s.
 
@@ -46,6 +48,8 @@ Required Drone repository secrets:
 - `deploy_ssh_user`: production deploy SSH user value. Keep the raw value only in Drone secrets.
 - `deploy_ssh_port`: production deploy SSH port value.
 - `deploy_ssh_key`: private key used by the deploy pipeline.
+- `telegram_bot_token`: Telegram bot token used by CI/CD result notifications.
+- `telegram_chat_id`: Telegram chat/group id used by CI/CD result notifications.
 
 The Drone pipelines intentionally preserve the deployment contract previously handled by GitHub Actions:
 
