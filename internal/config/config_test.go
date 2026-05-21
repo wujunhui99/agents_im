@@ -10,6 +10,34 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func TestLoadAPIConfigResolvesAdminBootstrapFromFileAndEnv(t *testing.T) {
+	t.Setenv("ADMIN_BOOTSTRAP_PASSWORD", "unit-test-admin-password")
+	configPath := filepath.Join(t.TempDir(), "api.yaml")
+	if err := os.WriteFile(configPath, []byte(`
+Name: message-api
+AdminBootstrap:
+  Identifier: amin
+  Password: ${ADMIN_BOOTSTRAP_PASSWORD}
+  DisplayName: 管理后台管理员
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if cfg.AdminBootstrap.Identifier != "amin" {
+		t.Fatalf("admin bootstrap identifier = %q", cfg.AdminBootstrap.Identifier)
+	}
+	if cfg.AdminBootstrap.Password != "unit-test-admin-password" {
+		t.Fatalf("admin bootstrap password was not resolved from env placeholder")
+	}
+	if cfg.AdminBootstrap.DisplayName != "管理后台管理员" {
+		t.Fatalf("admin bootstrap display name = %q", cfg.AdminBootstrap.DisplayName)
+	}
+}
+
 func TestLoadAPIConfigResolvesRedisAndPresenceFromFile(t *testing.T) {
 	t.Setenv("REDIS_PASSWORD", "")
 	t.Setenv("REDIS_DB", "")
