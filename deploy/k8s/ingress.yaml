@@ -102,6 +102,13 @@ spec:
                 name: user-api
                 port:
                   number: 8080
+          - path: /agents
+            pathType: Prefix
+            backend:
+              service:
+                name: agent-api
+                port:
+                  number: 8086
           - path: /agents-im-media
             pathType: Prefix
             backend:
@@ -126,6 +133,27 @@ spec:
     - host: ms.agenticim.xyz
       http:
         paths:
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-api
+                port:
+                  number: 8081
+          - path: /users
+            pathType: Prefix
+            backend:
+              service:
+                name: user-api
+                port:
+                  number: 8080
+          - path: /accounts
+            pathType: Prefix
+            backend:
+              service:
+                name: user-api
+                port:
+                  number: 8080
           - path: /admin/dashboard
             pathType: Prefix
             backend:

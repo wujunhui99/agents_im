@@ -20,7 +20,7 @@
 - 用户负责目标、约束和验收；Agent 负责实现、验证和修复。
 - 复杂任务必须产出或更新可版本化 docs/plan。
 - 默认使用 `git worktree` 并行：一个 Codex 一个独立 worktree/branch。
-- 多 Agent 分支命名必须遵守 `docs/AGENT_GIT_STANDARD.md`：`<type>/<agent-name>/<issue>-<task-desc>`；第二段必须是可信 Agent 名（`eino`、`helios`、`hermes`、`achilles`、`furies`、`gaia`），否则 CI 不通过；commit subject 必须为 `<type>(<scope>)[<agent-name>]: <short title>`，并使用 Agent 专用 Git identity 与 `Issue` / `Agent` / `Human-Owner` trailers。
+- 多 Agent 分支命名必须遵守 `docs/AGENT_GIT_STANDARD.md`：`<type>/<agent-name>/<issue>-<task-desc>`；第二段必须是可信 Agent 名（`eino`、`helios`、`hermes`、`achilles`、`furies`、`gaia`），否则 CI 不通过；每个开发 PR 只解决一个 Issue，PR body 必须包含 `Closes #<issue>`；commit subject 必须为 `<type>(<scope>)[<agent-name>]: <short title>`，并使用 Agent 专用 Git identity 与 `Issue` / `Agent` / `Human-Owner` trailers。
 - 用户偏好：Hermes/Helios 做 planner/architect/reviewer/integrator，编码测试尽量委派 Codex。
 - feature 原则：`feature/* -> develop -> main`；紧急生产 hotfix 可从 `main -> fix/* -> main`。
 - Codex 是否允许 commit/push 必须由任务说明明确；未明确时不要 push。

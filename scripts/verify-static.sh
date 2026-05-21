@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if git grep -n -I -E 'sk-[A-Za-z0-9_-]{20,}' -- . ':!docs/references' ':!.ai-context' ':!web/node_modules'; then
+  echo "tracked files must not contain real-looking provider API keys (sk-...)" >&2
+  exit 1
+fi
+
+if git grep -n -I -E "(DEEPSEEK_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY)[[:space:]]*[:=][[:space:]]*['\"]?sk-[A-Za-z0-9_-]{8,}" -- . ':!docs/references' ':!.ai-context' ':!web/node_modules'; then
+  echo "tracked files must not contain real provider API key assignments" >&2
+  exit 1
+fi
+
 required_files=(
   "api/user.api"
   "api/auth.api"
