@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - python-executor-rbac.yaml
   - configmap.yaml
+  - jaeger.yaml
   - services.yaml
   - deployments.yaml
   - ingress.yaml

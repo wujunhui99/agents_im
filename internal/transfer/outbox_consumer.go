@@ -135,13 +135,14 @@ func EnvelopeFromOutboxEvent(event repository.OutboxEvent) (Envelope, error) {
 		return Envelope{}, err
 	}
 	return Envelope{
-		ID:         event.EventID,
-		Topic:      messaging.DefaultMessageEventsTopic,
-		Key:        messageEvent.PartitionKey(),
-		Attempt:    event.AttemptCount,
-		ReceivedAt: time.Now().UTC(),
-		Event:      MessageEventFromMessagingEvent(messageEvent),
-		RawPayload: append([]byte(nil), event.Payload...),
+		ID:           event.EventID,
+		Topic:        messaging.DefaultMessageEventsTopic,
+		Key:          messageEvent.PartitionKey(),
+		Attempt:      event.AttemptCount,
+		ReceivedAt:   time.Now().UTC(),
+		Event:        MessageEventFromMessagingEvent(messageEvent),
+		TraceContext: traceContextFromMessagingEvent(messageEvent),
+		RawPayload:   append([]byte(nil), event.Payload...),
 	}, nil
 }
 

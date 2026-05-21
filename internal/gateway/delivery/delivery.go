@@ -44,6 +44,9 @@ type Message struct {
 	SendTime              int64                  `json:"send_time,omitempty"`
 	CreatedAt             int64                  `json:"created_at,omitempty"`
 	TraceID               string                 `json:"trace_id,omitempty"`
+	RequestID             string                 `json:"request_id,omitempty"`
+	TraceParent           string                 `json:"traceparent,omitempty"`
+	TraceState            string                 `json:"tracestate,omitempty"`
 }
 
 type Result struct {

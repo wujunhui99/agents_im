@@ -28,7 +28,7 @@ steps:
   - name: postgres-integration
     image: golang:1.24-bookworm
     environment:
-      DATABASE_URL: postgres://agents_im:***@postgres:5432/agents_im?sslmode=disable
+      DATABASE_URL: postgres://agents_im:agents_im_dev_password@postgres:5432/agents_im?sslmode=disable
     commands:
       - bash scripts/ci/drone-postgres-integration.sh
 

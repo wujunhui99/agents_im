@@ -10,6 +10,7 @@ import (
 	"github.com/segmentio/kafka-go"
 
 	"github.com/wujunhui99/agents_im/internal/messaging"
+	"github.com/wujunhui99/agents_im/internal/observability"
 )
 
 const (
@@ -92,6 +93,9 @@ func (c *KafkaEventConsumer) Receive(ctx context.Context) (Envelope, error) {
 	if err != nil {
 		return Envelope{}, err
 	}
+	if envelope.TraceContext.TraceID != "" {
+		ctx = observability.ContextWithTrace(ctx, envelope.TraceContext)
+	}
 	if envelope.Topic == "" {
 		envelope.Topic = c.topic
 	}
@@ -140,17 +144,26 @@ func EnvelopeFromKafkaMessage(message kafka.Message) (Envelope, error) {
 	}
 
 	transferEvent := MessageEventFromMessagingEvent(event)
+	traceContext := traceContextFromMessagingEvent(event)
+	if headerContext := traceContextFromKafkaHeaders(message.Headers); headerContext.TraceID != "" {
+		traceContext = headerContext
+		transferEvent.TraceID = headerContext.TraceID
+		transferEvent.RequestID = headerContext.RequestID
+		transferEvent.TraceParent = headerContext.TraceParent
+		transferEvent.TraceState = headerContext.TraceState
+	}
 
 	return Envelope{
-		ID:         event.EventID,
-		Topic:      message.Topic,
-		Key:        firstTransferString(string(message.Key), event.PartitionKey()),
-		Partition:  int32(message.Partition),
-		Offset:     message.Offset,
-		Attempt:    1,
-		ReceivedAt: time.Now().UTC(),
-		Event:      transferEvent,
-		RawPayload: append([]byte(nil), message.Value...),
+		ID:           event.EventID,
+		Topic:        message.Topic,
+		Key:          firstTransferString(string(message.Key), event.PartitionKey()),
+		Partition:    int32(message.Partition),
+		Offset:       message.Offset,
+		Attempt:      1,
+		ReceivedAt:   time.Now().UTC(),
+		Event:        transferEvent,
+		TraceContext: traceContext,
+		RawPayload:   append([]byte(nil), message.Value...),
 	}, nil
 }
 
@@ -176,7 +189,61 @@ func MessageEventFromMessagingEvent(event messaging.MessageEvent) MessageEvent {
 		AllowRecursiveTrigger: event.Payload.AllowRecursiveTrigger,
 		CreatedAt:             event.CreatedAt,
 		TraceID:               event.Payload.TraceID,
+		RequestID:             event.Payload.RequestID,
+		TraceParent:           event.Payload.TraceParent,
+		TraceState:            event.Payload.TraceState,
 	}
+}
+
+func traceContextFromMessagingEvent(event messaging.MessageEvent) observability.TraceContext {
+	traceContext := observability.NewTraceContext(event.Payload.TraceID, event.Payload.RequestID)
+	traceContext.TraceParent = event.Payload.TraceParent
+	traceContext.TraceState = event.Payload.TraceState
+	if event.Payload.TraceID == "" {
+		return observability.TraceContext{}
+	}
+	return traceContext
+}
+
+func traceContextFromKafkaHeaders(headers []kafka.Header) observability.TraceContext {
+	carrier := propagationCarrierFromKafkaHeaders(headers)
+	if len(carrier) == 0 {
+		return observability.TraceContext{}
+	}
+	traceContext := observability.ExtractTraceContext(context.Background(), carrier)
+	if traceContext.TraceID == "" {
+		return observability.TraceContext{}
+	}
+	return traceContext
+}
+
+type kafkaHeaderCarrier map[string]string
+
+func propagationCarrierFromKafkaHeaders(headers []kafka.Header) kafkaHeaderCarrier {
+	carrier := make(kafkaHeaderCarrier)
+	for _, header := range headers {
+		if strings.TrimSpace(header.Key) == "" {
+			continue
+		}
+		carrier[strings.ToLower(header.Key)] = string(header.Value)
+	}
+	return carrier
+}
+
+func (c kafkaHeaderCarrier) Get(key string) string {
+	return c[strings.ToLower(key)]
+}
+
+func (c kafkaHeaderCarrier) Set(key string, value string) {
+	c[strings.ToLower(key)] = value
+}
+
+func (c kafkaHeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(c))
+	for key := range c {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func receiverIDsFromMessagingEvent(event messaging.MessageEvent) []string {

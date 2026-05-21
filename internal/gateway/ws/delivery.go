@@ -32,7 +32,10 @@ func NewPresenceAwareDeliveryDispatcher(manager *ConnectionManager, store presen
 }
 
 func (d *InMemoryDeliveryDispatcher) DeliverToUser(ctx context.Context, userID string, event delivery.Event) (delivery.Result, error) {
+	ctx, span := observability.StartSpan(ctx, "gateway.delivery.user")
+	defer span.End()
 	if d == nil || d.connections == nil {
+		observability.RecordSpanError(span, errNilConnectionManager)
 		return delivery.Result{}, errNilConnectionManager
 	}
 	userID = strings.TrimSpace(userID)
@@ -50,7 +53,18 @@ func (d *InMemoryDeliveryDispatcher) DeliverToUser(ctx context.Context, userID s
 }
 
 func (d *InMemoryDeliveryDispatcher) DeliverToConversation(ctx context.Context, conversationID string, recipientUserIDs []string, event delivery.Event) (delivery.Result, error) {
+	if event.Data.TraceID != "" {
+		ctx = observability.ContextWithTrace(ctx, observability.TraceContext{
+			TraceID:     event.Data.TraceID,
+			RequestID:   event.Data.RequestID,
+			TraceParent: event.Data.TraceParent,
+			TraceState:  event.Data.TraceState,
+		})
+	}
+	ctx, span := observability.StartSpan(ctx, "gateway.delivery.conversation")
+	defer span.End()
 	if d == nil || d.connections == nil {
+		observability.RecordSpanError(span, errNilConnectionManager)
 		return delivery.Result{}, errNilConnectionManager
 	}
 	conversationID = strings.TrimSpace(conversationID)

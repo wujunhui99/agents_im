@@ -1,8 +1,11 @@
 package entry
 
 import (
+	"context"
 	"fmt"
+	"log"
 
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/auth/internal/config"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/auth/internal/server"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/auth/internal/svc"
@@ -20,6 +23,15 @@ import (
 func Start(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c)
+	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
+	if err != nil {
+		log.Fatalf("init tracing: %v", err)
+	}
+	defer func() {
+		if err := observability.ShutdownTracing(shutdownTracing); err != nil {
+			log.Printf("shutdown tracing: %v", err)
+		}
+	}()
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
@@ -30,6 +42,7 @@ func Start(configFile string) {
 		}
 	})
 	defer s.Stop()
+	s.AddUnaryInterceptors(observability.GRPCUnaryServerInterceptor())
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
 	s.Start()

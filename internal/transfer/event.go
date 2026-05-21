@@ -1,6 +1,10 @@
 package transfer
 
-import "time"
+import (
+	"time"
+
+	"github.com/wujunhui99/agents_im/internal/observability"
+)
 
 const (
 	EventTypeMessageAccepted = "message.accepted"
@@ -29,18 +33,22 @@ type MessageEvent struct {
 	SendTime              int64                  `json:"sendTime,omitempty"`
 	CreatedAt             int64                  `json:"createdAt"`
 	TraceID               string                 `json:"traceId,omitempty"`
+	RequestID             string                 `json:"requestId,omitempty"`
+	TraceParent           string                 `json:"traceparent,omitempty"`
+	TraceState            string                 `json:"tracestate,omitempty"`
 }
 
 type Envelope struct {
-	ID         string
-	Topic      string
-	Key        string
-	Partition  int32
-	Offset     int64
-	Attempt    int
-	ReceivedAt time.Time
-	Event      MessageEvent
-	RawPayload []byte
+	ID           string
+	Topic        string
+	Key          string
+	Partition    int32
+	Offset       int64
+	Attempt      int
+	ReceivedAt   time.Time
+	Event        MessageEvent
+	TraceContext observability.TraceContext
+	RawPayload   []byte
 }
 
 func (e Envelope) IdempotencyKey() string {

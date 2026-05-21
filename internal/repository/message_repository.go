@@ -61,6 +61,10 @@ type CreateMessageInput struct {
 	AgentRunID            string
 	AllowRecursiveTrigger bool
 	ParticipantUserIDs    []string
+	TraceID               string
+	RequestID             string
+	TraceParent           string
+	TraceState            string
 }
 
 type MessageRepository interface {
