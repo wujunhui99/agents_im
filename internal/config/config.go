@@ -19,6 +19,7 @@ type APIConfig struct {
 	Host             string
 	Port             int
 	Auth             JWTAuthConfig
+	AdminBootstrap   AdminBootstrapConfig
 	StorageDriver    string
 	DataSource       string
 	Redis            RedisConfig
@@ -30,6 +31,12 @@ type APIConfig struct {
 	ObjectStorage    ObjectStorageConfig
 	PythonExecutor   PythonExecutorConfig
 	MailRPC          zrpc.RpcClientConf
+}
+
+type AdminBootstrapConfig struct {
+	Identifier  string
+	Password    string
+	DisplayName string
 }
 
 type RPCConfig struct {
@@ -219,6 +226,7 @@ func DefaultAPIConfig() APIConfig {
 		Host:             "0.0.0.0",
 		Port:             8080,
 		Auth:             DefaultJWTAuthConfig(),
+		AdminBootstrap:   DefaultAdminBootstrapConfig(),
 		StorageDriver:    StorageDriverMemory,
 		Redis:            DefaultRedisConfig(),
 		Presence:         DefaultPresenceConfig(),
@@ -247,6 +255,13 @@ func DefaultJWTAuthConfig() JWTAuthConfig {
 	return JWTAuthConfig{
 		AccessSecret: "dev-jwt-secret-change-me",
 		AccessExpire: 86400,
+	}
+}
+
+func DefaultAdminBootstrapConfig() AdminBootstrapConfig {
+	return AdminBootstrapConfig{
+		Identifier:  "amin",
+		DisplayName: "管理后台管理员",
 	}
 }
 
@@ -376,6 +391,7 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		}
 		cfg.Auth.AccessExpire = expire
 	}
+	cfg.AdminBootstrap = adminBootstrapConfigFromValues(values)
 	if value := firstNonEmpty(values["StorageDriver"], values["Repository"]); value != "" {
 		cfg.StorageDriver = ResolveStorageDriver(value)
 	} else {
@@ -1030,6 +1046,20 @@ func isPlaceholderDeepSeekAPIKey(value string) bool {
 	default:
 		return strings.Contains(normalized, "placeholder") || strings.HasPrefix(normalized, "replace-with-")
 	}
+}
+
+func adminBootstrapConfigFromValues(values map[string]string) AdminBootstrapConfig {
+	cfg := DefaultAdminBootstrapConfig()
+	if value := firstNonEmpty(values["AdminBootstrap.Identifier"], os.Getenv("ADMIN_BOOTSTRAP_IDENTIFIER")); value != "" {
+		cfg.Identifier = strings.TrimSpace(os.ExpandEnv(value))
+	}
+	if value := firstNonEmpty(values["AdminBootstrap.Password"], os.Getenv("ADMIN_BOOTSTRAP_PASSWORD")); value != "" {
+		cfg.Password = os.ExpandEnv(value)
+	}
+	if value := firstNonEmpty(values["AdminBootstrap.DisplayName"], os.Getenv("ADMIN_BOOTSTRAP_DISPLAY_NAME")); value != "" {
+		cfg.DisplayName = strings.TrimSpace(os.ExpandEnv(value))
+	}
+	return cfg
 }
 
 func redisConfigFromValues(values map[string]string) (RedisConfig, error) {
