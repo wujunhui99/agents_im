@@ -56,7 +56,7 @@ func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model
 	}
 
 	var row postgresAccountProfileRow
-	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+	err := r.withTx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		if _, err := session.ExecCtx(ctx, `
 insert into accounts (account_id, identifier, account_type)
 values ($1, $2, $3)
@@ -291,7 +291,7 @@ func (r *PostgresRepository) EnsureAcceptedFriendship(ctx context.Context, userI
 		return apperror.InvalidArgument("cannot add self as friend")
 	}
 
-	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+	err := r.withTx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		var accountCount int64
 		if err := session.QueryRowCtx(ctx, &accountCount, `
 select count(*)

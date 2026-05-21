@@ -181,6 +181,73 @@ func TestDeepSeekRuntimeExecutesPythonToolCallAndContinuesToFinalAnswer(t *testi
 	}
 }
 
+func TestDeepSeekRuntimeExecutesAgentCreateWithSafeToolAlias(t *testing.T) {
+	ctx := context.Background()
+	var got runtimetools.AgentCreateRequest
+	toolProvider := agentCreateToolProvider(t, ctx, runtimetools.AgentCreateHandlerFunc(func(_ context.Context, req runtimetools.AgentCreateRequest) (runtimetools.AgentCreateResponse, error) {
+		got = req
+		return runtimetools.AgentCreateResponse{
+			AgentID:      "agent_created",
+			AccountID:    "acct_created",
+			Identifier:   "research_agent",
+			Name:         req.Name,
+			Description:  req.Description,
+			PromptID:     "prompt_created",
+			FriendUserID: req.RequestingUserID,
+		}, nil
+	}))
+	fakeModel := &scriptedToolCallingModel{
+		responses: []*schema.Message{
+			schema.AssistantMessage("", []schema.ToolCall{{
+				ID:   "call_agent_create_1",
+				Type: "function",
+				Function: schema.FunctionCall{
+					Name:      "agent_create",
+					Arguments: `{"name":"Research Agent","description":"Summarizes uploaded notes."}`,
+				},
+			}}),
+			schema.AssistantMessage("已创建 Research Agent。", nil),
+		},
+	}
+	runtime := NewDeepSeekRuntime(
+		config.DeepSeekConfig{APIKey: "test-key", BaseURL: "https://deepseek.example.invalid", Model: "deepseek-test"},
+		WithChatModelFactory(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
+			return fakeModel, nil
+		}),
+		WithToolProvider(toolProvider),
+	)
+
+	req := validPythonToolRuntimeRequest()
+	req.PromptText = "创建一个 Research Agent"
+	req.Agent.Tools = []agentruntime.ToolRef{{
+		ToolID:          "tool_agent_create",
+		Name:            immodel.LocalToolHandlerAgentCreate,
+		ToolType:        string(immodel.AgentToolTypeLocal),
+		LocalHandlerKey: immodel.LocalToolHandlerAgentCreate,
+	}}
+	result, err := runtime.Run(ctx, req)
+	if err != nil {
+		t.Fatalf("run deepseek runtime with agent.create tool call: %v", err)
+	}
+	if result.FinalText != "已创建 Research Agent。" {
+		t.Fatalf("final text = %q, want model answer after tool result", result.FinalText)
+	}
+	if len(fakeModel.boundTools) != 1 || fakeModel.boundTools[0].Name != "agent_create" {
+		t.Fatalf("bound tools = %+v, want DeepSeek-safe agent_create", fakeModel.boundTools)
+	}
+	if got.CreatorAgentID != "agent_default_assistant" || got.RequestingUserID != "usr_user" {
+		t.Fatalf("agent.create handler request ids = %+v, want creator agent and requesting user", got)
+	}
+	if got.Name != "Research Agent" || got.Description != "Summarizes uploaded notes." || got.SystemPrompt != "" {
+		t.Fatalf("agent.create handler request content = %+v, want minimal intent", got)
+	}
+	if len(result.ToolCalls) != 1 ||
+		result.ToolCalls[0].ToolName != immodel.LocalToolHandlerAgentCreate ||
+		result.ToolCalls[0].Status != "succeeded" {
+		t.Fatalf("runtime tool call result = %+v, want succeeded agent.create call", result.ToolCalls)
+	}
+}
+
 func TestDeepSeekRuntimeReturnsVisibleErrorWhenPythonExecutorDisabled(t *testing.T) {
 	ctx := context.Background()
 	fakeModel := &scriptedToolCallingModel{
@@ -282,6 +349,50 @@ func pythonExecuteToolProvider(t *testing.T, ctx context.Context, executor pytho
 		t.Fatalf("bind python.execute tool: %v", err)
 	}
 	provider, err := runtimetools.NewResolver(repo, runtimetools.WithAdapterCatalog(runtimetools.NewDefaultLocalAdapterCatalog(executor)))
+	if err != nil {
+		t.Fatalf("new tool resolver: %v", err)
+	}
+	return provider
+}
+
+func agentCreateToolProvider(t *testing.T, ctx context.Context, handler runtimetools.AgentCreateHandler) runtimetools.Provider {
+	t.Helper()
+	repo := repository.NewMemoryAgentRegistryRepository()
+	_, err := repo.RegisterTool(ctx, immodel.AgentTool{
+		ToolID:           "tool_agent_create",
+		Name:             immodel.LocalToolHandlerAgentCreate,
+		Description:      "Create a new Agent through the server-side agent assembly workflow.",
+		ToolType:         immodel.AgentToolTypeLocal,
+		LocalHandlerKey:  immodel.LocalToolHandlerAgentCreate,
+		InputSchemaJSON:  `{"type":"object","properties":{"name":{"type":"string"},"description":{"type":"string"},"system_prompt":{"type":"string"}},"required":["name","description"]}`,
+		OutputSchemaJSON: `{"type":"object"}`,
+		PermissionLevel:  "restricted",
+		Status:           immodel.AgentToolStatusActive,
+		AdminConfigured:  true,
+		CreatedBy:        "agent_creator",
+	})
+	if err != nil {
+		t.Fatalf("register agent.create tool: %v", err)
+	}
+	_, _, err = repo.BindTool(ctx, immodel.AgentToolBinding{
+		AgentID:   "agent_default_assistant",
+		ToolID:    "tool_agent_create",
+		CreatedBy: "agent_creator",
+	})
+	if err != nil {
+		t.Fatalf("bind agent.create tool: %v", err)
+	}
+	catalog := runtimetools.AdapterCatalogFunc(func(spec runtimetools.ToolSpec) (runtimetools.ToolAdapter, bool, error) {
+		if !runtimetools.IsAgentCreateToolSpec(spec) {
+			return nil, false, nil
+		}
+		adapter, err := runtimetools.NewAgentCreateAdapter(spec, handler)
+		if err != nil {
+			return nil, false, err
+		}
+		return adapter, true, nil
+	})
+	provider, err := runtimetools.NewResolver(repo, runtimetools.WithAdapterCatalog(catalog))
 	if err != nil {
 		t.Fatalf("new tool resolver: %v", err)
 	}

@@ -87,6 +87,7 @@ type UpdateAgentDefinitionRequest struct {
 }
 
 type AgentCreateToolRequest struct {
+	CreatorAgentID   string
 	RequestingUserID string
 	Identifier       string
 	Name             string
@@ -200,6 +201,38 @@ func (l *AgentAssemblyLogic) CreateAgentFromTool(ctx context.Context, req AgentC
 	if err := l.ensureCreateToolConfigured(); err != nil {
 		return AgentCreateToolResponse{}, err
 	}
+	if postgresRepo, ok := l.accounts.(*repository.PostgresRepository); ok {
+		var response AgentCreateToolResponse
+		err := postgresRepo.TransactRepository(ctx, func(txRepo *repository.PostgresRepository) error {
+			txLogic := NewAgentAssemblyLogic(AgentAssemblyDependencies{
+				Accounts:    txRepo,
+				Friendships: txRepo,
+				Agents:      txRepo,
+				Registry:    txRepo,
+			})
+			created, err := txLogic.createAgentFromTool(ctx, req)
+			if err != nil {
+				return err
+			}
+			response = created
+			return nil
+		})
+		if err != nil {
+			return AgentCreateToolResponse{}, err
+		}
+		return response, nil
+	}
+	return l.createAgentFromTool(ctx, req)
+}
+
+func (l *AgentAssemblyLogic) createAgentFromTool(ctx context.Context, req AgentCreateToolRequest) (AgentCreateToolResponse, error) {
+	creatorAgentID, err := normalizeRequiredID(req.CreatorAgentID, "creator_agent_id")
+	if err != nil {
+		return AgentCreateToolResponse{}, err
+	}
+	if err := l.authorizeAgentCreateCaller(ctx, creatorAgentID); err != nil {
+		return AgentCreateToolResponse{}, err
+	}
 	requestingUserID, err := normalizeRequiredID(req.RequestingUserID, "requesting_user_id")
 	if err != nil {
 		return AgentCreateToolResponse{}, err
@@ -220,9 +253,13 @@ func (l *AgentAssemblyLogic) CreateAgentFromTool(ctx context.Context, req AgentC
 		return AgentCreateToolResponse{}, err
 	}
 	if description == "" {
-		description = defaultCreatedAgentDescription
+		return AgentCreateToolResponse{}, apperror.InvalidArgument("description is required")
 	}
-	systemPrompt, err := normalizeSystemPrompt(req.SystemPrompt)
+	systemPrompt := strings.TrimSpace(req.SystemPrompt)
+	if systemPrompt == "" {
+		systemPrompt = generatedAgentSystemPrompt(name, description)
+	}
+	systemPrompt, err = normalizeSystemPrompt(systemPrompt)
 	if err != nil {
 		return AgentCreateToolResponse{}, err
 	}
@@ -296,6 +333,24 @@ func (l *AgentAssemblyLogic) CreateAgentFromTool(ctx context.Context, req AgentC
 		ToolNames:    toolNames,
 		FriendUserID: requestingUserID,
 	}, nil
+}
+
+func (l *AgentAssemblyLogic) authorizeAgentCreateCaller(ctx context.Context, creatorAgentID string) error {
+	agent, err := l.agents.GetAgent(ctx, creatorAgentID)
+	if err != nil {
+		return err
+	}
+	if agent.Status != model.AgentStatusActive {
+		return apperror.Forbidden("agent.create caller must be the active default AI assistant")
+	}
+	account, err := l.accounts.GetByID(ctx, agent.AccountID)
+	if err != nil {
+		return err
+	}
+	if account.AccountType != model.AccountTypeAgent || account.Identifier != DefaultAssistantIdentifier {
+		return apperror.Forbidden("only the default AI assistant can create agents")
+	}
+	return nil
 }
 
 func (l *AgentAssemblyLogic) authorizeAgentDefinitionAccess(ctx context.Context, accountID string, agent model.Agent) error {
@@ -381,6 +436,9 @@ func (l *AgentAssemblyLogic) resolveCreatableTools(ctx context.Context, names []
 	if err != nil {
 		return nil, err
 	}
+	if len(toolNames) == 0 {
+		return l.defaultCreatableTools(ctx)
+	}
 	tools := make([]model.AgentTool, 0, len(toolNames))
 	for _, name := range toolNames {
 		tool, err := l.registry.GetToolByName(ctx, name)
@@ -389,6 +447,21 @@ func (l *AgentAssemblyLogic) resolveCreatableTools(ctx context.Context, names []
 		}
 		if err := validateCreatableTool(tool); err != nil {
 			return nil, err
+		}
+		tools = append(tools, tool)
+	}
+	return tools, nil
+}
+
+func (l *AgentAssemblyLogic) defaultCreatableTools(ctx context.Context) ([]model.AgentTool, error) {
+	activeTools, err := l.registry.ListActiveTools(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tools := make([]model.AgentTool, 0, len(activeTools))
+	for _, tool := range activeTools {
+		if err := validateCreatableTool(tool); err != nil {
+			continue
 		}
 		tools = append(tools, tool)
 	}
@@ -437,6 +510,12 @@ func normalizeSystemPrompt(value string) (string, error) {
 		return "", apperror.InvalidArgument("system_prompt must be 8000 characters or fewer")
 	}
 	return value, nil
+}
+
+func generatedAgentSystemPrompt(name string, description string) string {
+	name = strings.TrimSpace(name)
+	description = strings.TrimSpace(description)
+	return strings.TrimSpace("You are " + name + ".\n\nPurpose: " + description + "\n\nUse only the tools explicitly provided to you. Prefer concise, accurate answers. If required information is missing, ask a brief clarifying question instead of inventing facts.")
 }
 
 func normalizeToolNames(values []string) ([]string, error) {

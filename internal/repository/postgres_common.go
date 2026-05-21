@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 type PostgresRepository struct {
 	conn sqlx.SqlConn
+	inTx bool
 }
 
 func NewPostgresRepository(dataSource string) (*PostgresRepository, error) {
@@ -24,6 +26,26 @@ func NewPostgresRepository(dataSource string) (*PostgresRepository, error) {
 
 func NewPostgresRepositoryFromConn(conn sqlx.SqlConn) *PostgresRepository {
 	return &PostgresRepository{conn: conn}
+}
+
+func newPostgresRepositoryFromSession(session sqlx.Session) *PostgresRepository {
+	return &PostgresRepository{conn: sqlx.NewSqlConnFromSession(session), inTx: true}
+}
+
+func (r *PostgresRepository) TransactRepository(ctx context.Context, fn func(repo *PostgresRepository) error) error {
+	if r.inTx {
+		return fn(r)
+	}
+	return r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+		return fn(newPostgresRepositoryFromSession(session))
+	})
+}
+
+func (r *PostgresRepository) withTx(ctx context.Context, fn func(ctx context.Context, session sqlx.Session) error) error {
+	if r.inTx {
+		return fn(ctx, r.conn)
+	}
+	return r.conn.TransactCtx(ctx, fn)
 }
 
 func NewRepositoryForStorage(driver string, dataSource string) (Repository, error) {

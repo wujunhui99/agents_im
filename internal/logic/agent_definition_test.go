@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
@@ -34,8 +35,10 @@ func TestAgentCreateToolCreatesDefinitionAndFriendship(t *testing.T) {
 		ToolType:        model.AgentToolTypeLocal,
 		LocalHandlerKey: model.LocalToolHandlerGetConversationContext,
 	})
+	assistantAgent := mustProvisionDefinitionDefaultAssistant(t, ctx, accounts, agents, registry)
 
 	created, err := assembly.CreateAgentFromTool(ctx, AgentCreateToolRequest{
+		CreatorAgentID:   assistantAgent.AgentID,
 		RequestingUserID: requester.UserID,
 		Identifier:       "research_agent",
 		Name:             "Research Agent",
@@ -78,6 +81,129 @@ func TestAgentCreateToolCreatesDefinitionAndFriendship(t *testing.T) {
 	assertAcceptedDefinitionFriendship(t, ctx, accounts, created.AccountID, requester.UserID)
 }
 
+func TestAgentCreateToolAcceptsNameDescriptionAndDefaultsSafeTools(t *testing.T) {
+	ctx := context.Background()
+	accounts := repository.NewMemoryRepository()
+	agents := repository.NewMemoryAgentRepository()
+	registry := repository.NewMemoryAgentRegistryRepository()
+	assembly := NewAgentAssemblyLogic(AgentAssemblyDependencies{
+		Accounts:    accounts,
+		Friendships: accounts,
+		Agents:      agents,
+		Registry:    registry,
+	})
+	userLogic := NewUserLogic(accounts)
+	requester, err := userLogic.CreateUser(ctx, CreateUserRequest{
+		Identifier:  "minimal_agent_requester",
+		DisplayName: "Minimal Agent Requester",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	contextTool := mustRegisterDefinitionTool(t, ctx, registry, model.AgentTool{
+		ToolID:          "tool_minimal_context",
+		Name:            model.LocalToolHandlerGetConversationContext,
+		ToolType:        model.AgentToolTypeLocal,
+		LocalHandlerKey: model.LocalToolHandlerGetConversationContext,
+	})
+	mustRegisterDefinitionTool(t, ctx, registry, model.AgentTool{
+		ToolID:          "tool_minimal_python",
+		Name:            model.LocalToolHandlerPythonExecute,
+		ToolType:        model.AgentToolTypeLocal,
+		LocalHandlerKey: model.LocalToolHandlerPythonExecute,
+	})
+	assistantAgent := mustProvisionDefinitionDefaultAssistant(t, ctx, accounts, agents, registry)
+
+	created, err := assembly.CreateAgentFromTool(ctx, AgentCreateToolRequest{
+		CreatorAgentID:   assistantAgent.AgentID,
+		RequestingUserID: requester.UserID,
+		Identifier:       "minimal_research_agent",
+		Name:             "Research Agent",
+		Description:      "Summarizes uploaded notes and recent chat context.",
+	})
+	if err != nil {
+		t.Fatalf("create agent from minimal intent: %v", err)
+	}
+	agent, err := agents.GetAgent(ctx, created.AgentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if agent.Status != model.AgentStatusActive {
+		t.Fatalf("created agent status = %q, want active", agent.Status)
+	}
+	definition, err := assembly.GetAgentDefinition(ctx, AgentDefinitionRequest{AgentID: created.AgentID, RequestedBy: requester.UserID})
+	if err != nil {
+		t.Fatalf("get created definition: %v", err)
+	}
+	if !strings.Contains(definition.SystemPrompt.Content, "Research Agent") ||
+		!strings.Contains(definition.SystemPrompt.Content, "Summarizes uploaded notes") {
+		t.Fatalf("generated system prompt does not reflect name/description: %q", definition.SystemPrompt.Content)
+	}
+	if len(definition.Tools) != 1 || definition.Tools[0].ToolID != contextTool.ToolID {
+		t.Fatalf("default tools = %+v, want only safe context tool", definition.Tools)
+	}
+	for _, tool := range definition.Tools {
+		if tool.Name == model.LocalToolHandlerAgentCreate || tool.Name == model.LocalToolHandlerPythonExecute {
+			t.Fatalf("created agent received forbidden tool by default: %+v", definition.Tools)
+		}
+	}
+}
+
+func TestAgentCreateToolRejectsNonDefaultAssistantCreator(t *testing.T) {
+	ctx := context.Background()
+	accounts := repository.NewMemoryRepository()
+	agents := repository.NewMemoryAgentRepository()
+	registry := repository.NewMemoryAgentRegistryRepository()
+	assembly := NewAgentAssemblyLogic(AgentAssemblyDependencies{
+		Accounts:    accounts,
+		Friendships: accounts,
+		Agents:      agents,
+		Registry:    registry,
+	})
+	userLogic := NewUserLogic(accounts)
+	requester, err := userLogic.CreateUser(ctx, CreateUserRequest{
+		Identifier:  "non_default_creator_requester",
+		DisplayName: "Non Default Creator Requester",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherAgentAccount, err := userLogic.CreateUser(ctx, CreateUserRequest{
+		Identifier:  "non_default_creator_agent",
+		DisplayName: "Non Default Creator Agent",
+		AccountType: string(model.AccountTypeAgent),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherAgent, err := agents.CreateAgent(ctx, model.Agent{
+		AccountID:   otherAgentAccount.UserID,
+		IMUserID:    otherAgentAccount.UserID,
+		Name:        "non_default_creator_agent",
+		Description: "Not the default AI assistant",
+		Status:      model.AgentStatusActive,
+		CreatedBy:   otherAgentAccount.UserID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = assembly.CreateAgentFromTool(ctx, AgentCreateToolRequest{
+		CreatorAgentID:   otherAgent.AgentID,
+		RequestingUserID: requester.UserID,
+		Identifier:       "should_not_be_created",
+		Name:             "Blocked Agent",
+		Description:      "Should not be created by a non-default creator.",
+	})
+	assertAppErrorCode(t, err, apperror.CodeForbidden)
+
+	if exists, err := accounts.ExistsByIdentifier(ctx, "should_not_be_created"); err != nil {
+		t.Fatal(err)
+	} else if exists {
+		t.Fatal("non-default creator created an account")
+	}
+}
+
 func TestAgentCreateToolRejectsHighRiskToolsBeforeCreatingAccount(t *testing.T) {
 	ctx := context.Background()
 	accounts := repository.NewMemoryRepository()
@@ -109,23 +235,28 @@ func TestAgentCreateToolRejectsHighRiskToolsBeforeCreatingAccount(t *testing.T) 
 		ToolType:        model.AgentToolTypeLocal,
 		LocalHandlerKey: model.LocalToolHandlerSendAgentMessage,
 	})
+	assistantAgent := mustProvisionDefinitionDefaultAssistant(t, ctx, accounts, agents, registry)
 
 	for _, toolName := range []string{model.LocalToolHandlerPythonExecute, model.LocalToolHandlerSendAgentMessage} {
 		_, err := assembly.CreateAgentFromTool(ctx, AgentCreateToolRequest{
+			CreatorAgentID:   assistantAgent.AgentID,
 			RequestingUserID: requester.UserID,
 			Identifier:       "blocked_" + toolNameToIdentifierSuffix(toolName),
 			Name:             "Blocked Agent",
+			Description:      "Should not be created.",
 			SystemPrompt:     "Should not be created.",
 			ToolNames:        []string{toolName},
 		})
 		assertAppErrorCode(t, err, apperror.CodeForbidden)
 	}
-	agentAccounts, err := accounts.ListByAccountType(ctx, model.AccountTypeAgent)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(agentAccounts) != 0 {
-		t.Fatalf("high-risk tool request created agent accounts: %+v", agentAccounts)
+	for _, identifier := range []string{"blocked_python", "blocked_send"} {
+		exists, err := accounts.ExistsByIdentifier(ctx, identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if exists {
+			t.Fatalf("high-risk tool request created account %q", identifier)
+		}
 	}
 }
 
@@ -283,6 +414,23 @@ func mustRegisterDefinitionTool(t *testing.T, ctx context.Context, registry repo
 		t.Fatalf("register tool %q: %v", tool.Name, err)
 	}
 	return created
+}
+
+func mustProvisionDefinitionDefaultAssistant(t *testing.T, ctx context.Context, accounts repository.Repository, agents repository.AgentRepository, registry repository.AgentRegistryRepository) model.Agent {
+	t.Helper()
+	provisioner := NewDefaultAssistantProvisioner(accounts, agents, registry)
+	if _, err := provisioner.Backfill(ctx); err != nil {
+		t.Fatalf("backfill default assistant: %v", err)
+	}
+	assistant, err := accounts.GetByIdentifier(ctx, DefaultAssistantIdentifier)
+	if err != nil {
+		t.Fatalf("get default assistant account: %v", err)
+	}
+	assistantAgent, err := agents.GetAgentByIMUserID(ctx, assistant.UserID)
+	if err != nil {
+		t.Fatalf("get default assistant agent: %v", err)
+	}
+	return assistantAgent
 }
 
 func assertAcceptedDefinitionFriendship(t *testing.T, ctx context.Context, repo repository.FriendshipRepository, userID string, friendID string) {
