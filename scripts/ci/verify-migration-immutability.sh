@@ -7,6 +7,13 @@ set -euo pipefail
 MIGRATIONS_GLOB='db/migrations/*.sql'
 BASE_REF="${MIGRATION_IMMUTABILITY_BASE_REF:-}"
 
+# Emergency repair for Issue #166: migration 011 was accidentally modified after
+# production had already applied the original checksum. Allow only restoring that
+# one file to the production-applied content; all other edits remain forbidden.
+declare -A ALLOWED_REPAIR_SHA256=(
+  ["db/migrations/011_default_assistant_agent_create_tool.sql"]="98b920346855c0eab9edba2d2315dcb0a5fb9ebe6f6c68127a5e1bbc7d4cf892"
+)
+
 has_ref() {
   git rev-parse --verify --quiet "$1^{commit}" >/dev/null
 }
@@ -45,9 +52,28 @@ choose_base_ref() {
   return 1
 }
 
+filter_allowed_repairs() {
+  local changes="$1"
+  local filtered=""
+  local status path checksum expected
+  while IFS=$'\t' read -r status path _; do
+    [[ -n "${status:-}" ]] || continue
+    if [[ "${status}" == "M" && -n "${ALLOWED_REPAIR_SHA256[${path}]:-}" && -f "${path}" ]]; then
+      checksum="$(sha256sum "${path}" | awk '{print $1}')"
+      expected="${ALLOWED_REPAIR_SHA256[${path}]}"
+      if [[ "${checksum}" == "${expected}" ]]; then
+        continue
+      fi
+    fi
+    filtered+="${status}"$'\t'"${path}"$'\n'
+  done <<< "${changes}"
+  printf '%s' "${filtered}"
+}
+
 report_forbidden_changes() {
   local title="$1"
   local changes="$2"
+  changes="$(filter_allowed_repairs "${changes}")"
   if [[ -z "${changes}" ]]; then
     return 0
   fi
