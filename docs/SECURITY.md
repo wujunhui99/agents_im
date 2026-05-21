@@ -21,7 +21,8 @@
 - Drone deploy pipeline 使用 `ghcr_token` 推送 GHCR 镜像和刷新服务器侧 `ghcr-pull-secret`，不得把真实 token 写入仓库或日志；文档和示例命令中必须用 `***` 或 `[REDACTED]` 占位。
 - 日志中不得记录明文 token、密码或敏感个人信息。
 - Trace/span/log 属性不得记录 raw query string、Authorization/JWT/cookie、密码、DSN、API key、presigned URL、请求/响应 body 或消息正文。
-- Jaeger UI 可能暴露内部拓扑、路由、trace id、错误和延迟信息；在没有认证、VPN/私网或 IP allowlist 前，不允许把 `jaeger.agenticim.xyz` 作为公开未鉴权入口。
+- Jaeger UI 可能暴露内部拓扑、路由、trace id、错误和延迟信息；公开 `jaeger.agenticim.xyz` 必须保留认证、VPN/私网或 IP allowlist 之一。当前 k3s Ingress 使用 Traefik `observability-basic-auth` middleware，禁止移除后变成未鉴权入口。
+- Langfuse UI 和 ingestion credentials 属于 LLM 观测敏感面；`LANGFUSE_DATABASE_URL`、`NEXTAUTH_SECRET`、`SALT`、`ENCRYPTION_KEY`、`LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY` 只能在服务器/k3s/Drone secret 中维护，不得进入 Git 或聊天记录。
 
 ## 待设计
 

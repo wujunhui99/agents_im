@@ -124,7 +124,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trace/request ID 传播设计见 [`docs/design-docs/observability-mvp.md`](./docs/design-docs/observability-mvp.md)。当前实现不要求本地启动 Prometheus、Grafana 或 Jaeger。
 
-生产分布式追踪使用 OpenTelemetry SDK + OTLP 导出到集群内 Jaeger。新请求的 canonical `trace_id` 是 OpenTelemetry trace ID，同时继续写 `X-Trace-Id` / `X-Request-Id` 兼容响应头，并支持 W3C `traceparent` / `tracestate`。REST、WebSocket、gRPC、message outbox/transfer/gateway delivery 和 Agent runtime 会创建代表性 spans；`/healthz`、`/readyz`、`/metrics` 不产生高噪声 spans。Jaeger UI 仅作为内部 service 部署，仓库当前不公开 `jaeger.agenticim.xyz` Ingress，直到有认证或私网访问模型。设计和 runbook 见 [`docs/design-docs/distributed-tracing-jaeger.md`](./docs/design-docs/distributed-tracing-jaeger.md)。
+生产分布式追踪使用 OpenTelemetry SDK + OTLP 导出到集群内 Jaeger。新请求的 canonical `trace_id` 是 OpenTelemetry trace ID，同时继续写 `X-Trace-Id` / `X-Request-Id` 兼容响应头，并支持 W3C `traceparent` / `tracestate`。REST、WebSocket、gRPC、message outbox/transfer/gateway delivery 和 Agent runtime 会创建代表性 spans；`/healthz`、`/readyz`、`/metrics` 不产生高噪声 spans。Jaeger UI 通过 `jaeger.agenticim.xyz` 暴露时必须保留 Traefik basic-auth middleware；也可继续使用 port-forward 私网访问。设计和 runbook 见 [`docs/design-docs/distributed-tracing-jaeger.md`](./docs/design-docs/distributed-tracing-jaeger.md)。
 
 LLM observability is separate from system metrics/tracing. AI Hosting emits run/generation events through `internal/llmobs`, with Langfuse as the intended UI/backend sink and noop/test behavior by default. Design and privacy constraints are documented in [`docs/design-docs/llm-observability.md`](./docs/design-docs/llm-observability.md).
 
