@@ -78,8 +78,8 @@ steps:
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
       DRONE_IMAGE_BUILD_PARALLELISM: "4"
     commands:
-      - sh -c 'if ! grep -q "^build_required=true$" .drone-deploy.env; then echo "No image build required."; exit 0; fi'
-      - apk add --no-cache bash
+      - apk add --no-cache bash python3
+      - test -f .drone-deploy.env || bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
       - bash scripts/ci/drone-build-images.sh
     volumes:
       - name: docker_sock
@@ -106,7 +106,7 @@ steps:
       DRONE_DEPLOY_LOCAL: "1"
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
     commands:
-      - sh -c 'if ! grep -q "^deploy_required=true$" .drone-deploy.env; then echo "No deployment required."; exit 0; fi; apk add --no-cache bash openssh-client tar curl docker-cli docker-cli-compose postgresql-client; curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl; chmod +x /usr/local/bin/kubectl; mkdir -p /etc/rancher/k3s; cp /host/etc/rancher/k3s/k3s.yaml /etc/rancher/k3s/k3s.yaml; kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config set-cluster default --server=https://host.docker.internal:6443 --insecure-skip-tls-verify=true; kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config unset clusters.default.certificate-authority-data || true; bash scripts/ci/drone-deploy.sh'
+      - sh -c 'test -f .drone-deploy.env || (apk add --no-cache bash python3 && bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env); if ! grep -q "^deploy_required=true$" .drone-deploy.env; then echo "No deployment required."; exit 0; fi; apk add --no-cache bash openssh-client tar curl docker-cli docker-cli-compose postgresql-client; curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl; chmod +x /usr/local/bin/kubectl; mkdir -p /etc/rancher/k3s; cp /host/etc/rancher/k3s/k3s.yaml /etc/rancher/k3s/k3s.yaml; kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config set-cluster default --server=https://host.docker.internal:6443 --insecure-skip-tls-verify=true; kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config unset clusters.default.certificate-authority-data || true; bash scripts/ci/drone-deploy.sh'
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:
