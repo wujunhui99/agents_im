@@ -45,11 +45,11 @@ select
       },
       "description": {
         "type": "string",
-        "description": "Optional Agent description."
+        "description": "Human-facing Agent purpose or job description."
       },
       "system_prompt": {
         "type": "string",
-        "description": "System prompt to bind as the Agent definition."
+        "description": "Optional system prompt to bind as the Agent definition. If omitted, the service generates one from name and description."
       },
       "tool_names": {
         "type": "array",
@@ -57,7 +57,7 @@ select
         "description": "Optional low-risk tool names to bind. High-risk write, Python, MCP/network, and agent.create tools are rejected by policy."
       }
     },
-    "required": ["name", "system_prompt"]
+    "required": ["name", "description"]
   }$$::jsonb,
   $${
     "type": "object",

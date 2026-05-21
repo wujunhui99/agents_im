@@ -241,6 +241,7 @@ func agentCreateHandlerFromContext(ctx *ServiceContext, registry repository.Agen
 	})
 	return runtimetools.AgentCreateHandlerFunc(func(ctx context.Context, req runtimetools.AgentCreateRequest) (runtimetools.AgentCreateResponse, error) {
 		created, err := assembly.CreateAgentFromTool(ctx, logic.AgentCreateToolRequest{
+			CreatorAgentID:   req.CreatorAgentID,
 			RequestingUserID: req.RequestingUserID,
 			Identifier:       req.Identifier,
 			Name:             req.Name,

@@ -25,6 +25,7 @@ func (f AgentCreateHandlerFunc) CreateAgent(ctx context.Context, req AgentCreate
 }
 
 type AgentCreateRequest struct {
+	CreatorAgentID   string   `json:"-"`
 	RequestingUserID string   `json:"-"`
 	Identifier       string   `json:"identifier,omitempty"`
 	Name             string   `json:"name"`
@@ -82,6 +83,10 @@ func (a *AgentCreateAdapter) Invoke(ctx context.Context, call ToolCall) (ToolRes
 	if strings.TrimSpace(call.ToolID) != a.spec.ToolID {
 		return ToolResult{}, apperror.InvalidArgument("tool_id does not match agent.create adapter")
 	}
+	creatorAgentID := strings.TrimSpace(call.AgentID)
+	if creatorAgentID == "" {
+		return ToolResult{}, apperror.InvalidArgument("agent.create requires agent_id")
+	}
 	requestingUserID := strings.TrimSpace(call.RequestingUserID)
 	if requestingUserID == "" {
 		return ToolResult{}, apperror.Forbidden("agent.create requires requesting_user_id")
@@ -90,6 +95,7 @@ func (a *AgentCreateAdapter) Invoke(ctx context.Context, call ToolCall) (ToolRes
 	if err != nil {
 		return ToolResult{}, err
 	}
+	input.CreatorAgentID = creatorAgentID
 	input.RequestingUserID = requestingUserID
 	resp, err := a.handler.CreateAgent(ctx, input)
 	if err != nil {

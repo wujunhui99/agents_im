@@ -69,6 +69,50 @@ func TestAgentCreateAdapterCallsBusinessHandler(t *testing.T) {
 	}
 }
 
+func TestAgentCreateAdapterAcceptsMinimalIntentAndPassesCreatorAgent(t *testing.T) {
+	var got AgentCreateRequest
+	adapter, err := NewAgentCreateAdapter(validAgentCreateToolSpec(), AgentCreateHandlerFunc(func(_ context.Context, req AgentCreateRequest) (AgentCreateResponse, error) {
+		got = req
+		return AgentCreateResponse{
+			AgentID:      "agent_123",
+			AccountID:    "acct_123",
+			Identifier:   "research_agent",
+			Name:         req.Name,
+			Description:  req.Description,
+			PromptID:     "prompt_123",
+			FriendUserID: req.RequestingUserID,
+		}, nil
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := adapter.Invoke(context.Background(), ToolCall{
+		RunID:            "run_agent_create",
+		AgentID:          "agent_default_assistant",
+		RequestingUserID: "usr_requester",
+		ToolID:           "tool_agent_create",
+		ToolName:         model.LocalToolHandlerAgentCreate,
+		InputJSON:        json.RawMessage(`{"name":"Research Agent","description":"Summarizes uploaded notes and recent chat context."}`),
+		RequestID:        "req_agent_create",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.CreatorAgentID != "agent_default_assistant" {
+		t.Fatalf("creator agent id = %q, want agent_default_assistant", got.CreatorAgentID)
+	}
+	if got.RequestingUserID != "usr_requester" || got.Name != "Research Agent" || got.Description == "" {
+		t.Fatalf("handler request mismatch: %+v", got)
+	}
+	if got.SystemPrompt != "" {
+		t.Fatalf("adapter should allow service-generated prompt, got %q", got.SystemPrompt)
+	}
+	if len(result.OutputJSON) == 0 {
+		t.Fatal("adapter returned empty output")
+	}
+}
+
 func validAgentCreateToolSpec() ToolSpec {
 	return ToolSpec{
 		ToolID:          "tool_agent_create",
