@@ -1979,6 +1979,14 @@ button.md-list-item:hover,
   border-radius: 8px;
 }
 
+.admin-row-conversation {
+  grid-template-columns: minmax(0, 1.2fr) minmax(100px, 0.45fr) minmax(0, 1fr) minmax(0, 0.85fr);
+}
+
+.admin-row-user {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(90px, 0.4fr) minmax(0, 0.8fr) minmax(0, 1fr);
+}
+
 .admin-inline-form {
   display: flex;
   gap: 10px;
@@ -2124,7 +2132,9 @@ button.md-list-item:hover,
   }
 
   .admin-row,
-  .admin-row-static {
+  .admin-row-static,
+  .admin-row-conversation,
+  .admin-row-user {
     grid-template-columns: 1fr;
   }
 }
