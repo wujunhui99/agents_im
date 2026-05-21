@@ -359,6 +359,11 @@ function renderTraces({
           <h3>{selectedTrace.traceId}</h3>
           <p>{selectedTrace.runId}</p>
           <p>{selectedTrace.errorMessage || selectedTrace.status}</p>
+          {selectedTrace.jaegerUrl && (
+            <a className="admin-secondary-button" href={selectedTrace.jaegerUrl} target="_blank" rel="noreferrer">
+              Open in Jaeger
+            </a>
+          )}
           {selectedTrace.conversationId && (
             <button type="button" className="admin-secondary-button" onClick={() => onOpenConversation(selectedTrace.conversationId!)}>
               Open conversation

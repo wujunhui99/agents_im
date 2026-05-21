@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	ErrLangfuseConfigMissing        = errors.New("langfuse config is missing: set LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY")
-	ErrLangfuseExportNotImplemented = errors.New("langfuse live export is not implemented in this build")
+	ErrLangfuseConfigMissing = errors.New("langfuse config is missing: set LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY")
 )
+
+const defaultMaxOutputBytes = 2048
 
 type Sink interface {
 	Observe(ctx context.Context, event Event) (ObserveResult, error)
@@ -78,10 +79,6 @@ func (s *MemorySink) Events() []Event {
 	return events
 }
 
-type LangfuseSink struct {
-	config Config
-}
-
 func NewSink(config Config) (Sink, error) {
 	config = normalizeConfig(config)
 	switch config.Backend {
@@ -96,14 +93,10 @@ func NewSink(config Config) (Sink, error) {
 		if err := validateLangfuseConfig(config.Langfuse); err != nil {
 			return nil, err
 		}
-		return nil, ErrLangfuseExportNotImplemented
+		return newLangfuseSink(config)
 	default:
 		return nil, fmt.Errorf("unsupported llm observability backend %q", config.Backend)
 	}
-}
-
-func (s LangfuseSink) Observe(context.Context, Event) (ObserveResult, error) {
-	return ObserveResult{Backend: BackendLangfuse, Exported: false}, ErrLangfuseExportNotImplemented
 }
 
 func normalizeConfig(config Config) Config {
@@ -116,6 +109,9 @@ func normalizeConfig(config Config) Config {
 	config.Langfuse.SecretKey = strings.TrimSpace(config.Langfuse.SecretKey)
 	if config.MaxOutputBytes < 0 {
 		config.MaxOutputBytes = 0
+	}
+	if config.MaxOutputBytes == 0 {
+		config.MaxOutputBytes = defaultMaxOutputBytes
 	}
 	return config
 }

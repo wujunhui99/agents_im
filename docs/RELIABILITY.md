@@ -24,6 +24,8 @@
 - config-only deploy 仅适用于部署配置变更：应跳过镜像更新、middleware 启动和数据库迁移，只重启并等待受影响 deployment；受影响服务列表必须与实际变更一致，不能为了通过发布而跳过异常服务
 - 服务器中间件（PostgreSQL / Redis / Redpanda）由 Docker Compose 独立托管，应用发布脚本必须先确认中间件可启动，再执行迁移和 k3s rollout
 - 当前 k3s manifests 使用 `hostNetwork: true`，服务会直接占用宿主机端口；新增或调整端口前必须检查宿主机端口冲突，并保持 `ListenOn`、`containerPort`、Service `port/targetPort` 一致
+- 生产 tracing 启用时，OTLP endpoint/protocol/sampler 配置错误必须导致服务启动失败；不能静默降级成无 tracing。Jaeger 不可用时应用请求不应伪造成功 trace export，但 shutdown 必须尽量 flush spans。
+- 排查跨服务消息链路时优先使用响应头、WebSocket ACK 或日志里的 OpenTelemetry `trace_id`，再在 Jaeger 中查看 REST/WebSocket/message outbox/transfer/gateway delivery/Agent runtime spans。
 
 ## 生产服务初始化
 

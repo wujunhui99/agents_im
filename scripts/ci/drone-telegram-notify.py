@@ -91,10 +91,20 @@ def commit_author_name() -> str:
 
 
 def agent_from_branch(branch: str) -> Optional[str]:
-    match = BRANCH_RE.match(branch or "")
-    if not match:
-        return None
-    return match.group("agent")
+    branch = branch or ""
+    match = BRANCH_RE.match(branch)
+    if match:
+        return match.group("agent")
+
+    # Legacy compatibility: older open PRs may predate the hard branch gate and
+    # use names such as `ci/telegram-drone-notify`. When no stronger signal is
+    # present, infer from known task slugs so success/failure notifications still
+    # mention the responsible agent instead of silently omitting @mentions.
+    legacy_slug_map = {
+        "telegram-drone-notify": "eino",
+    }
+    tail = branch.split("/", 1)[1] if "/" in branch else branch
+    return legacy_slug_map.get(tail)
 
 
 def agent_from_trailer(message: str) -> Optional[str]:
@@ -150,7 +160,7 @@ def resolve_attribution() -> Attribution:
     # push deploys, branch is an integration branch, so fall back to trailers/email.
     if branch_agent:
         agent = branch_agent
-        method = "branch"
+        method = "branch" if BRANCH_RE.match(branch or "") else "legacy branch"
     elif trailer_agent:
         agent = trailer_agent
         method = "commit trailer"

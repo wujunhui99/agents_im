@@ -49,6 +49,9 @@ type MessageEventPayload struct {
 	HasReadSeq            int64           `json:"has_read_seq,omitempty"`
 	ReadAt                int64           `json:"read_at,omitempty"`
 	TraceID               string          `json:"trace_id,omitempty"`
+	RequestID             string          `json:"request_id,omitempty"`
+	TraceParent           string          `json:"traceparent,omitempty"`
+	TraceState            string          `json:"tracestate,omitempty"`
 }
 
 func (e MessageEvent) Validate() error {

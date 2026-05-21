@@ -16,6 +16,8 @@ DEEPSEEK_API_KEY='...' ./scripts/bootstrap-server.sh
 
 The bootstrap script writes middleware config to `/opt/agents-im/middleware/.env`, starts Docker middleware, installs `postgresql-client` if missing, and creates the k3s `agents-im-secrets` Secret. Real secrets are stored only on the server/k3s or in Drone repository secrets, not in Git.
 
+Langfuse LLM observability is additive to the existing admin LLM trace/audit tables. The default host is `https://langfuse.agenticim.xyz`, configured through `LANGFUSE_HOST`; credentials are read only from `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` in environment/k3s secrets. Keep the values in server/k3s secret storage only, never in Git, issue comments, or chat transcripts. Leave `LLM_OBSERVABILITY_ENABLED=false` and `LLM_OBSERVABILITY_BACKEND=noop` until both Langfuse credentials are present.
+
 ## Drone repository secrets
 
 Drone is deployed at `https://drone.agenticim.xyz` and the `wujunhui99/agents_im` repository must be active in Drone. Secrets are configured at repository scope in Drone, not in Git.
@@ -63,6 +65,19 @@ Production public entrypoints:
 
 - User web app: `https://agenticim.xyz/`
 - Management System (MS): `https://ms.agenticim.xyz/`
+
+Jaeger tracing is deployed as an internal k3s service only:
+
+- OTLP gRPC/HTTP collector: `jaeger-collector.agents-im.svc.cluster.local:4317` / `:4318`
+- Query UI service port: `jaeger-collector:16686`
+
+The prepared domain `https://jaeger.agenticim.xyz` is intentionally not routed by these manifests because there is no reviewed authentication/network access model for the trace UI. Use private access such as:
+
+```bash
+kubectl -n agents-im port-forward svc/jaeger-collector 16686:16686
+```
+
+Then search `http://127.0.0.1:16686/search?traceID=<trace_id>`. Public exposure requires authenticated middleware, VPN/private network access, or an approved IP allowlist.
 
 The Management System root serves the web SPA and the frontend opens the read-only admin console from that host. On `ms.agenticim.xyz`, Ingress exposes only the admin API prefixes served by `message-api` (`/admin/dashboard`, `/admin/llm-traces`, `/admin/conversations`, `/admin/users`) plus `/` to `web`. `admin.agenticim.xyz` is deprecated and has a Traefik permanent redirect to the same path on `https://ms.agenticim.xyz`; do not use it as the primary management entrypoint.
 

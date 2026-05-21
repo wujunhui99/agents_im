@@ -124,6 +124,56 @@ MailRPC:
 	}
 }
 
+func TestLoadAPIConfigResolvesTracingFromFile(t *testing.T) {
+	clearTracingEnv(t)
+	configPath := filepath.Join(t.TempDir(), "message-api.yaml")
+	if err := os.WriteFile(configPath, []byte(`
+Name: message-api
+Tracing:
+  Enabled: true
+  ServiceName: custom-message-api
+  Environment: staging
+  OTLPEndpoint: otel-collector.agents-im.svc.cluster.local:4317
+  Protocol: grpc
+  SamplerRatio: 0.25
+  JaegerBaseURL: https://jaeger.agenticim.xyz
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if !cfg.Tracing.Enabled ||
+		cfg.Tracing.ServiceName != "custom-message-api" ||
+		cfg.Tracing.Environment != "staging" ||
+		cfg.Tracing.OTLPEndpoint != "otel-collector.agents-im.svc.cluster.local:4317" ||
+		cfg.Tracing.Protocol != "grpc" ||
+		cfg.Tracing.SamplerRatio != 0.25 ||
+		cfg.Tracing.JaegerBaseURL != "https://jaeger.agenticim.xyz" {
+		t.Fatalf("tracing config mismatch: %+v", cfg.Tracing)
+	}
+}
+
+func TestLoadAPIConfigFailsEnabledTracingWithoutEndpoint(t *testing.T) {
+	clearTracingEnv(t)
+	configPath := filepath.Join(t.TempDir(), "message-api.yaml")
+	if err := os.WriteFile(configPath, []byte(`
+Name: message-api
+Tracing:
+  Enabled: true
+  ServiceName: message-api
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	_, err := LoadAPIConfig(configPath)
+	if err == nil || !strings.Contains(err.Error(), "OTLP endpoint") {
+		t.Fatalf("expected enabled tracing without endpoint to fail, got %v", err)
+	}
+}
+
 func TestLoadAPIConfigParsesMailRPCYAMLListEndpoints(t *testing.T) {
 	clearMailRPCEnv(t)
 
@@ -259,6 +309,29 @@ func clearPythonExecutorEnv(t *testing.T) {
 	}
 }
 
+func clearTracingEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"AGENTS_IM_TRACING_ENABLED",
+		"TRACING_ENABLED",
+		"AGENTS_IM_TRACING_SERVICE_NAME",
+		"OTEL_SERVICE_NAME",
+		"AGENTS_IM_ENV",
+		"OTEL_RESOURCE_ATTRIBUTES",
+		"AGENTS_IM_OTLP_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+		"AGENTS_IM_OTLP_PROTOCOL",
+		"OTEL_EXPORTER_OTLP_PROTOCOL",
+		"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+		"AGENTS_IM_TRACING_SAMPLER_RATIO",
+		"OTEL_TRACES_SAMPLER_ARG",
+		"AGENTS_IM_JAEGER_BASE_URL",
+	} {
+		t.Setenv(key, "")
+	}
+}
+
 func TestLoadAPIConfigResolvesDeepSeekFromFileAndEnv(t *testing.T) {
 	t.Setenv("DEEPSEEK_API_KEY", "unit-test-deepseek-api-key")
 	t.Setenv("DEEPSEEK_BASE_URL", "")
@@ -294,7 +367,7 @@ DeepSeek:
 func TestLoadAPIConfigResolvesLLMObservabilityLangfusePlaceholders(t *testing.T) {
 	t.Setenv("LLM_OBSERVABILITY_ENABLED", "true")
 	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuse")
-	t.Setenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+	t.Setenv("LANGFUSE_HOST", "https://langfuse.config-test.local")
 	t.Setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-unit-test")
 	t.Setenv("LANGFUSE_SECRET_KEY", "sk-lf-unit-test")
 	t.Setenv("LLM_OBSERVABILITY_CAPTURE_OUTPUT", "true")
@@ -325,10 +398,68 @@ LLMObservability:
 	if !cfg.LLMObservability.CaptureOutput {
 		t.Fatalf("capture output should resolve true: %+v", cfg.LLMObservability)
 	}
-	if cfg.LLMObservability.Langfuse.Host != "https://cloud.langfuse.com" ||
+	if cfg.LLMObservability.Langfuse.Host != "https://langfuse.config-test.local" ||
 		cfg.LLMObservability.Langfuse.PublicKey != "pk-lf-unit-test" ||
 		cfg.LLMObservability.Langfuse.SecretKey != "sk-lf-unit-test" {
 		t.Fatalf("langfuse config mismatch: %+v", cfg.LLMObservability.Langfuse)
+	}
+}
+
+func TestResolveLLMObservabilityDefaultsLangfuseHost(t *testing.T) {
+	t.Setenv("LANGFUSE_HOST", "")
+	t.Setenv("LANGFUSE_BASE_URL", "")
+	t.Setenv("LANGFUSE_PUBLIC_KEY", "")
+	t.Setenv("LANGFUSE_SECRET_KEY", "")
+
+	cfg, err := ResolveLLMObservabilityConfig(LLMObservabilityConfig{})
+	if err != nil {
+		t.Fatalf("resolve llm observability config: %v", err)
+	}
+	if cfg.Langfuse.Host != DefaultLangfuseHost {
+		t.Fatalf("langfuse host = %q, want %q", cfg.Langfuse.Host, DefaultLangfuseHost)
+	}
+	if cfg.Enabled || cfg.Backend != LLMObservabilityBackendNoop {
+		t.Fatalf("default llm observability should stay disabled noop: %+v", cfg)
+	}
+}
+
+func TestResolveLLMObservabilityLangfuseHostCanBeOverridden(t *testing.T) {
+	t.Setenv("LANGFUSE_HOST", "https://langfuse.override.local")
+	t.Setenv("LANGFUSE_BASE_URL", "")
+
+	cfg, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
+	if err != nil {
+		t.Fatalf("resolve llm observability config: %v", err)
+	}
+	if cfg.Langfuse.Host != "https://langfuse.override.local" {
+		t.Fatalf("langfuse host = %q, want env override", cfg.Langfuse.Host)
+	}
+}
+
+func TestResolveLLMObservabilityCanEnableLangfuseFromEnv(t *testing.T) {
+	t.Setenv("LLM_OBSERVABILITY_ENABLED", "true")
+	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuse")
+	t.Setenv("LLM_OBSERVABILITY_CAPTURE_OUTPUT", "true")
+	t.Setenv("LLM_OBSERVABILITY_MAX_OUTPUT_BYTES", "4096")
+	t.Setenv("LANGFUSE_HOST", "")
+	t.Setenv("LANGFUSE_BASE_URL", "")
+	t.Setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-unit-test")
+	t.Setenv("LANGFUSE_SECRET_KEY", "sk-lf-unit-test")
+
+	cfg, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
+	if err != nil {
+		t.Fatalf("resolve llm observability config: %v", err)
+	}
+	if !cfg.Enabled || cfg.Backend != LLMObservabilityBackendLangfuse {
+		t.Fatalf("llm observability should enable langfuse from env: %+v", cfg)
+	}
+	if !cfg.CaptureOutput || cfg.MaxOutputBytes != 4096 {
+		t.Fatalf("capture output settings should resolve from env: %+v", cfg)
+	}
+	if cfg.Langfuse.Host != DefaultLangfuseHost ||
+		cfg.Langfuse.PublicKey != "pk-lf-unit-test" ||
+		cfg.Langfuse.SecretKey != "sk-lf-unit-test" {
+		t.Fatalf("langfuse env config mismatch: %+v", cfg.Langfuse)
 	}
 }
 

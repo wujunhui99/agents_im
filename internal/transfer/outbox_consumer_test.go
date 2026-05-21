@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
@@ -51,6 +52,51 @@ func TestOutboxEventConsumerReceivesMessageAcceptedEnvelope(t *testing.T) {
 	}
 	if !strings.Contains(envelope.Event.Content, "hello outbox") {
 		t.Fatalf("content = %q, want encoded original text", envelope.Event.Content)
+	}
+}
+
+func TestOutboxEventConsumerPropagatesTraceContext(t *testing.T) {
+	traceID := "4bf92f3577b34da6a3ce929d0e0e4736"
+	traceParent := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	ctx := observability.ContextWithTrace(context.Background(), observability.TraceContext{
+		TraceID:     traceID,
+		RequestID:   "req_async_trace",
+		TraceParent: traceParent,
+		TraceState:  "rojo=00f067aa0ba902b7",
+	})
+	repo := repository.NewMemoryMessageRepository()
+	if _, _, err := repo.CreateMessageIdempotent(ctx, repository.CreateMessageInput{
+		SenderID:           "alice",
+		ReceiverID:         "bob",
+		ChatType:           repository.ChatTypeSingle,
+		ClientMsgID:        "client-trace",
+		ContentType:        repository.ContentTypeText,
+		Content:            "hello trace",
+		ParticipantUserIDs: []string{"alice", "bob"},
+	}); err != nil {
+		t.Fatalf("create message: %v", err)
+	}
+
+	consumer, err := NewOutboxEventConsumer(OutboxEventConsumerConfig{
+		Repository: repo,
+		WorkerID:   "transfer-trace-test",
+	})
+	if err != nil {
+		t.Fatalf("new outbox consumer: %v", err)
+	}
+
+	envelope, err := consumer.Receive(context.Background())
+	if err != nil {
+		t.Fatalf("receive: %v", err)
+	}
+	if envelope.TraceContext.TraceID != traceID {
+		t.Fatalf("envelope trace context not propagated: %+v", envelope.TraceContext)
+	}
+	if envelope.TraceContext.TraceParent != traceParent || envelope.TraceContext.TraceState != "rojo=00f067aa0ba902b7" {
+		t.Fatalf("W3C trace metadata not propagated: %+v", envelope.TraceContext)
+	}
+	if envelope.Event.TraceID != traceID {
+		t.Fatalf("legacy event trace id not propagated: %+v", envelope.Event)
 	}
 }
 

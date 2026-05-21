@@ -7,10 +7,26 @@ Auth:
   AccessExpire: 86400
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
+Tracing:
+  Enabled: ${AGENTS_IM_TRACING_ENABLED}
+  Environment: ${AGENTS_IM_ENV}
+  OTLPEndpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
+  SamplerRatio: ${AGENTS_IM_TRACING_SAMPLER_RATIO}
+  JaegerBaseURL: ${AGENTS_IM_JAEGER_BASE_URL}
 DeepSeek:
   APIKey: ${DEEPSEEK_API_KEY}
   BaseURL: ${DEEPSEEK_BASE_URL}
   Model: ${DEEPSEEK_MODEL}
+LLMObservability:
+  Enabled: false
+  Backend: ${LLM_OBSERVABILITY_BACKEND}
+  CaptureOutput: false
+  MaxOutputBytes: 2048
+  Langfuse:
+    Host: ${LANGFUSE_HOST}
+    PublicKey: ${LANGFUSE_PUBLIC_KEY}
+    SecretKey: ${LANGFUSE_SECRET_KEY}
 PythonExecutor:
   Backend: ${PYTHON_EXECUTOR_BACKEND}
   DefaultTimeoutSeconds: ${PYTHON_EXECUTOR_DEFAULT_TIMEOUT_SECONDS}

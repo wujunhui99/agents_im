@@ -11,6 +11,13 @@ AdminBootstrap:
   DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME}
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
+Tracing:
+  Enabled: ${AGENTS_IM_TRACING_ENABLED}
+  Environment: ${AGENTS_IM_ENV}
+  OTLPEndpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
+  SamplerRatio: ${AGENTS_IM_TRACING_SAMPLER_RATIO}
+  JaegerBaseURL: ${AGENTS_IM_JAEGER_BASE_URL}
 MailRPC:
   Endpoints:
     - mail-rpc:9095

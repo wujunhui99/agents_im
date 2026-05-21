@@ -228,6 +228,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	tracedRequest, traceContext := observability.EnsureHTTPTrace(r)
 	r = tracedRequest
+	ctx, span := observability.StartSpan(r.Context(), "websocket.handshake")
+	defer span.End()
+	r = r.WithContext(ctx)
+	traceContext = observability.TraceContextFromContext(ctx)
 	observability.InjectTraceHeaders(w, traceContext)
 
 	if s.configErr != nil {
@@ -495,6 +499,8 @@ func (s *Server) handleCommand(ctx context.Context, conn *Connection, raw []byte
 		traceContext = observability.NewTraceContext(frameTraceID, traceContext.RequestID)
 	}
 	ctx = observability.ContextWithTrace(ctx, traceContext)
+	ctx, span := observability.StartSpan(ctx, "websocket.command."+commandType)
+	defer span.End()
 	if conn != nil && conn.limiter != nil && !conn.limiter.Allow() {
 		resp := errorResponse(requestID, commandType, apperror.RateLimited("command rate limit exceeded"))
 		resp.TraceID = traceContext.TraceID
@@ -642,12 +648,17 @@ func (s *Server) dispatch(ctx context.Context, conn *Connection, commandType str
 }
 
 func (s *Server) pushNewMessage(ctx context.Context, senderID string, message logic.Message, recipientUserIDs []string) {
+	ctx, span := observability.StartSpan(ctx, "websocket.push_new_message")
+	defer span.End()
 	recipients := pushRecipients(senderID, message, recipientUserIDs)
 	if len(recipients) == 0 {
 		return
 	}
-	_, err := s.PushToConversation(ctx, message.ConversationID, recipients, delivery.NewMessageEvent(delivery.EventMessageReceived, toDeliveryMessage(message)))
+	deliveryMessage := toDeliveryMessage(message)
+	applyTraceContextToDeliveryMessage(ctx, &deliveryMessage)
+	_, err := s.PushToConversation(ctx, message.ConversationID, recipients, delivery.NewMessageEvent(delivery.EventMessageReceived, deliveryMessage))
 	if err != nil {
+		observability.RecordSpanError(span, err)
 		traceContext := observability.TraceContextFromContext(ctx)
 		log.Printf("websocket_push_failed trace_id=%s conversation_id=%s server_msg_id=%s error=%v", traceContext.TraceID, message.ConversationID, message.ServerMsgID, err)
 	}
@@ -1002,6 +1013,20 @@ func toDeliveryMessage(message logic.Message) delivery.Message {
 		SendTime:              message.SendTime,
 		CreatedAt:             message.CreatedAt,
 	}
+}
+
+func applyTraceContextToDeliveryMessage(ctx context.Context, message *delivery.Message) {
+	if message == nil {
+		return
+	}
+	traceContext := observability.TraceContextFromContext(ctx)
+	if traceContext.TraceID == "" {
+		return
+	}
+	message.TraceID = traceContext.TraceID
+	message.RequestID = traceContext.RequestID
+	message.TraceParent = traceContext.TraceParent
+	message.TraceState = traceContext.TraceState
 }
 
 func toGatewayMessage(message logic.Message) gateway.MessageSnapshot {

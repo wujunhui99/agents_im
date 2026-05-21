@@ -1,5 +1,12 @@
 Name: mail-rpc
 ListenOn: 0.0.0.0:9095
+Tracing:
+  Enabled: ${AGENTS_IM_TRACING_ENABLED}
+  Environment: ${AGENTS_IM_ENV}
+  OTLPEndpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
+  SamplerRatio: ${AGENTS_IM_TRACING_SAMPLER_RATIO}
+  JaegerBaseURL: ${AGENTS_IM_JAEGER_BASE_URL}
 TencentSES:
   SecretID: ${TENCENT_SES_SECRET_ID}
   SecretKey: ${TENCENT_SES_SECRET_KEY}
