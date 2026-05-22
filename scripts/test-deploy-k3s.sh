@@ -63,8 +63,8 @@ spec:
   template:
     spec:
       containers:
-        - name: web
-          image: ghcr.io/wujunhui99/agents_im/web:__IMAGE_TAG_REQUIRED__
+        - image: ghcr.io/wujunhui99/agents_im/web:__IMAGE_TAG_REQUIRED__
+          name: web
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -75,8 +75,8 @@ spec:
   template:
     spec:
       containers:
-        - name: user-rpc
-          image: ghcr.io/wujunhui99/agents_im/user-rpc:__IMAGE_TAG_REQUIRED__
+        - image: ghcr.io/wujunhui99/agents_im/user-rpc:__IMAGE_TAG_REQUIRED__
+          name: user-rpc
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -96,6 +96,18 @@ metadata:
   name: web
   namespace: agents-im
 YAML
+    if [[ "${FAKE_KUSTOMIZE_UNRENDERED_PLACEHOLDER:-}" == "true" ]]; then
+      cat <<'YAML'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bad-placeholder
+  namespace: agents-im
+data:
+  image: ghcr.io/wujunhui99/agents_im/web:__IMAGE_TAG_REQUIRED__
+YAML
+    fi
     exit 0
     ;;
   set)
@@ -324,5 +336,34 @@ fi
 if ! grep -Fq "mutable latest" /tmp/deploy-k3s-test-latest-tag.err; then
   echo "expected explicit latest IMAGE_TAG error" >&2
   cat /tmp/deploy-k3s-test-latest-tag.err >&2
+  exit 1
+fi
+
+# Rendering must fail closed if any placeholder survives after image overrides.
+: >"${CALL_LOG}"
+if FAKE_KUBECTL_LOG="${CALL_LOG}" \
+  FAKE_KUSTOMIZE_UNRENDERED_PLACEHOLDER=true \
+  NAMESPACE=agents-im \
+  KUBECTL="${FAKE_KUBECTL}" \
+  SKIP_MIDDLEWARE=true \
+  SKIP_MIGRATIONS=true \
+  SKIP_SET_IMAGE=true \
+  ROLLOUT_SERVICES=groups-rpc \
+  RESTART_SERVICES=groups-rpc \
+  "${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-placeholder-guard.out 2>/tmp/deploy-k3s-test-placeholder-guard.err; then
+  echo "expected deploy with an unrendered placeholder to fail" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "refusing to apply placeholder images" /tmp/deploy-k3s-test-placeholder-guard.err; then
+  echo "expected placeholder guard error" >&2
+  cat /tmp/deploy-k3s-test-placeholder-guard.err >&2
+  exit 1
+fi
+
+if grep -Fq "bad-placeholder" "${CALL_LOG}"; then
+  echo "placeholder guard must not apply manifests containing placeholders" >&2
+  cat "${CALL_LOG}" >&2
   exit 1
 fi
