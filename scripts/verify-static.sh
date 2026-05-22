@@ -376,6 +376,7 @@ shell_scripts=(
   "scripts/deploy-k3s.sh"
   "scripts/bootstrap-server.sh"
   "scripts/test-deploy-k3s.sh"
+  "scripts/test-no-latest-images.sh"
   "scripts/verify-static.sh"
 )
 
@@ -2198,6 +2199,9 @@ frontend_files=(
 for pattern in "${frontend_patterns[@]}"; do
   rg -qF "$pattern" "${frontend_files[@]}"
 done
+
+bash scripts/test-deploy-k3s.sh
+bash scripts/test-no-latest-images.sh
 
 if rg -q "mockData|mockConversations|mode=\"mock\"|sendMessageWithMock|cloneMockConversations" web/src --glob "*.ts" --glob "*.tsx"; then
   echo "frontend production mock flow found" >&2

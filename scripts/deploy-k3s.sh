@@ -3,7 +3,7 @@ set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-agents-im}"
 IMAGE_REGISTRY="${IMAGE_REGISTRY:-ghcr.io/wujunhui99/agents_im}"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
+IMAGE_TAG="${IMAGE_TAG:-}"
 MIDDLEWARE_DIR="${MIDDLEWARE_DIR:-/opt/agents-im/middleware}"
 MANIFEST_DIR="${MANIFEST_DIR:-deploy/k8s}"
 KUBECTL="${KUBECTL:-kubectl}"
@@ -130,19 +130,54 @@ current_image_for() {
   return 1
 }
 
-restore_unselected_images() {
+build_image_overrides() {
   local selected=("$@")
   local service image
   for service in "${SERVICES[@]}"; do
     if array_contains "${service}" "${selected[@]}"; then
+      printf '%s=%s\n' "${service}" "${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"
       continue
     fi
     image="$(current_image_for "${service}")"
     if [[ -n "${image}" ]]; then
-      ${KUBECTL} -n "${NAMESPACE}" set image "deployment/${service}" "${service}=${image}" --record=false
-      RESTORED_SERVICES+=("${service}")
+      printf '%s=%s\n' "${service}" "${image}"
     fi
   done
+}
+
+apply_rendered_manifests() {
+  local image_overrides="$1"
+  local app_deployments
+  app_deployments="$(printf '%s\n' "${SERVICES[@]}")"
+  ${KUBECTL} kustomize "${MANIFEST_DIR}" | APP_DEPLOYMENT_NAMES="${app_deployments}" IMAGE_OVERRIDES="${image_overrides}" python3 -c '
+import os
+import re
+import sys
+
+app_deployments = set(os.environ.get("APP_DEPLOYMENT_NAMES", "").splitlines())
+overrides = {}
+for line in os.environ.get("IMAGE_OVERRIDES", "").splitlines():
+    if "=" in line:
+        service, image = line.split("=", 1)
+        overrides[service] = image
+text = sys.stdin.read()
+docs = re.split(r"(?m)^---\s*$", text)
+kept = []
+for doc in docs:
+    if not doc.strip():
+        continue
+    kind_match = re.search(r"(?m)^kind:\s*Deployment\s*$", doc)
+    name_match = re.search(r"(?m)^metadata:\s*$.*?^  name:\s*([^\s#]+)", doc, re.S)
+    name = name_match.group(1) if name_match else ""
+    if kind_match and name in app_deployments:
+        image = overrides.get(name)
+        if not image:
+            continue
+        doc = re.sub(r"(?m)^(\s*image:\s*)\S+\s*$", r"\g<1>" + image, doc, count=1)
+    kept.append(doc.strip() + "\n")
+if kept:
+    sys.stdout.write("---\n" + "---\n".join(kept))
+' | ${KUBECTL} apply -f -
 }
 
 unique_services() {
@@ -207,40 +242,44 @@ run_migrations() {
 
 apply_manifests() {
   local selected_image_services=()
-  local restored_services=()
-  RESTORED_SERVICES=()
+  local restart_rollout_services=()
+  local image_overrides=""
 
+  if ! bool_true "${SKIP_SET_IMAGE}"; then
+    if [[ -z "${IMAGE_TAG}" || "${IMAGE_TAG}" == "latest" ]]; then
+      echo "IMAGE_TAG must be a non-empty immutable tag when SKIP_SET_IMAGE is false; refusing to deploy mutable latest tags" >&2
+      exit 1
+    fi
+    read_selected_services "${IMAGE_SERVICES}" selected_image_services
+  fi
   capture_current_images
-  read_selected_services "${IMAGE_SERVICES}" selected_image_services
+  image_overrides="$(build_image_overrides "${selected_image_services[@]}")"
 
   ${KUBECTL} apply -f "${MANIFEST_DIR}/namespace.yaml"
   ensure_secret
   ensure_image_pull_secret
-  ${KUBECTL} apply -k "${MANIFEST_DIR}"
+  apply_rendered_manifests "${image_overrides}"
 
   if bool_true "${SKIP_SET_IMAGE}"; then
     echo "Skipping image updates; keeping currently deployed image tags."
-    restore_unselected_images
-    restored_services=("${RESTORED_SERVICES[@]:-}")
   else
     local service
     for service in "${selected_image_services[@]}"; do
       [[ -z "${service}" ]] && continue
       ${KUBECTL} -n "${NAMESPACE}" set image "deployment/${service}" "${service}=${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}" --record=false
     done
-    restore_unselected_images "${selected_image_services[@]}"
-    restored_services=("${RESTORED_SERVICES[@]:-}")
   fi
 
   if [[ -n "${RESTART_SERVICES}" ]] || bool_true "${RESTART_ROLLOUT}"; then
     while IFS= read -r service; do
       [[ -z "${service}" ]] && continue
+      restart_rollout_services+=("${service}")
       ${KUBECTL} -n "${NAMESPACE}" rollout restart "deployment/${service}"
     done < <(restart_services)
   fi
 
   mapfile -t rollout_wait_services < <(
-    unique_services "${selected_image_services[@]}" "${restored_services[@]:-}"
+    unique_services "${selected_image_services[@]}" "${restart_rollout_services[@]:-}"
   )
   for service in "${rollout_wait_services[@]}"; do
     [[ -z "${service}" ]] && continue
@@ -253,6 +292,7 @@ apply_manifests() {
 
 main() {
   require "${KUBECTL}"
+  require python3
   if ! bool_true "${SKIP_MIDDLEWARE}"; then
     require docker
   fi

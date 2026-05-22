@@ -280,7 +280,7 @@ spec:
     spec:
       containers:
         - name: <service-name>
-          image: <registry>/<service-name>:latest
+          image: <registry>/<service-name>:<commit-sha>
           ports:
             - containerPort: <port>
           volumeMounts:
