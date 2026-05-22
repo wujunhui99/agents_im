@@ -32,6 +32,8 @@ case "${1:-}" in
     if [[ "${2:-}" == "deployment" || "${2:-}" == "deploy" ]]; then
       service="${3:-}"
       case "${service}" in
+        message-api) echo 'ghcr.io/wujunhui99/agents_im/message-api:new-message-sha' ;;
+        web) echo 'ghcr.io/wujunhui99/agents_im/web:new-web-sha' ;;
         user-rpc) echo 'ghcr.io/wujunhui99/agents_im/user-rpc:stable-backend' ;;
         auth-rpc) echo 'ghcr.io/wujunhui99/agents_im/auth-rpc:stable-backend' ;;
         friends-rpc) echo 'ghcr.io/wujunhui99/agents_im/friends-rpc:stable-backend' ;;
@@ -41,6 +43,26 @@ case "${1:-}" in
         web) echo 'ghcr.io/wujunhui99/agents_im/web:old-web' ;;
         *) echo "ghcr.io/wujunhui99/agents_im/${service}:stable-backend" ;;
       esac
+      exit 0
+    fi
+    if [[ "${2:-}" == "pods" && " ${*} " == *" -o json "* ]]; then
+      selector=""
+      for ((i=1; i <= $#; i++)); do
+        arg="${!i}"
+        if [[ "${arg}" == "-l" ]]; then
+          next=$((i + 1))
+          selector="${!next}"
+        fi
+      done
+      service="${selector#app=}"
+      image="ghcr.io/wujunhui99/agents_im/${service}:stable-backend"
+      case "${service}" in
+        web) image='ghcr.io/wujunhui99/agents_im/web:new-web-sha' ;;
+        message-api) image='ghcr.io/wujunhui99/agents_im/message-api:new-message-sha' ;;
+      esac
+      cat <<JSON
+{"items":[{"metadata":{"name":"${service}-pod"},"status":{"phase":"Running","containerStatuses":[{"name":"${service}","ready":true,"imageID":"ghcr.io/wujunhui99/agents_im/${service}@sha256:testdigest"}]},"spec":{"containers":[{"name":"${service}","image":"${image}"}]}}]}
+JSON
       exit 0
     fi
     exit 0
@@ -63,8 +85,8 @@ spec:
   template:
     spec:
       containers:
-        - name: web
-          image: ghcr.io/wujunhui99/agents_im/web:__IMAGE_TAG_REQUIRED__
+        - image: ghcr.io/wujunhui99/agents_im/web:__IMAGE_TAG_REQUIRED__
+          name: web
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -75,8 +97,20 @@ spec:
   template:
     spec:
       containers:
-        - name: user-rpc
-          image: ghcr.io/wujunhui99/agents_im/user-rpc:__IMAGE_TAG_REQUIRED__
+        - image: ghcr.io/wujunhui99/agents_im/user-rpc:__IMAGE_TAG_REQUIRED__
+          name: user-rpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: message-api
+  namespace: agents-im
+spec:
+  template:
+    spec:
+      containers:
+        - image: ghcr.io/wujunhui99/agents_im/message-api:__IMAGE_TAG_REQUIRED__
+          name: message-api
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -96,6 +130,18 @@ metadata:
   name: web
   namespace: agents-im
 YAML
+    if [[ "${FAKE_KUSTOMIZE_UNRENDERED_PLACEHOLDER:-}" == "true" ]]; then
+      cat <<'YAML'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bad-placeholder
+  namespace: agents-im
+data:
+  image: ghcr.io/wujunhui99/agents_im/web:__IMAGE_TAG_REQUIRED__
+YAML
+    fi
     exit 0
     ;;
   set)
@@ -139,12 +185,6 @@ IMAGE_SERVICES=web \
 ROLLOUT_SERVICES=web \
 "${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test.out
 
-if ! grep -Fq "set image deployment/web web=ghcr.io/wujunhui99/agents_im/web:new-web-sha" "${CALL_LOG}"; then
-  echo "expected web image to be updated to the new release tag" >&2
-  cat "${CALL_LOG}" >&2
-  exit 1
-fi
-
 if grep -Fq "apply -k" "${CALL_LOG}"; then
   echo "deploy must not apply the full kustomization because it contains Deployment image defaults" >&2
   cat "${CALL_LOG}" >&2
@@ -175,8 +215,20 @@ if grep -Fq "__IMAGE_TAG_REQUIRED__" "${CALL_LOG}"; then
   exit 1
 fi
 
-if grep -Fq "set image deployment/user-rpc" "${CALL_LOG}"; then
-  echo "web-only deploy must not touch non-selected user-rpc image" >&2
+if ! grep -Fq "get pods -l app=web -o json" "${CALL_LOG}"; then
+  echo "expected web image deploy to verify running pod image" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "verified image service=web pod=web-pod ready=True image=ghcr.io/wujunhui99/agents_im/web:new-web-sha" /tmp/deploy-k3s-test.out; then
+  echo "expected web deploy to print verified running image evidence" >&2
+  cat /tmp/deploy-k3s-test.out >&2
+  exit 1
+fi
+
+if grep -Fq "set image deployment/" "${CALL_LOG}"; then
+  echo "render-first deploy must not use post-apply kubectl set image" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
@@ -224,6 +276,12 @@ if ! grep -Fq "rollout status deployment/groups-rpc --timeout=180s" "${CALL_LOG}
   exit 1
 fi
 
+if grep -Fq "get pods -l app=groups-rpc -o json" "${CALL_LOG}"; then
+  echo "config-only deploy must not verify image tag for restart-only services" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
 if grep -Fq "rollout status deployment/user-rpc --timeout=180s" "${CALL_LOG}"; then
   echo "config-only deploy must not wait for non-selected user-rpc rollout" >&2
   cat "${CALL_LOG}" >&2
@@ -258,14 +316,20 @@ if grep -Fq "jsonpath={.data.DATABASE_URL}" "${CALL_LOG}"; then
   exit 1
 fi
 
-if ! grep -Fq "set image deployment/message-api message-api=ghcr.io/wujunhui99/agents_im/message-api:new-message-sha" "${CALL_LOG}"; then
-  echo "expected message-api image to be updated when explicit DATABASE_URL is provided" >&2
+if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/message-api:new-message-sha" "${CALL_LOG}"; then
+  echo "expected message-api image to be rendered to the new release tag when explicit DATABASE_URL is provided" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
 
-if grep -Fq "set image deployment/user-rpc" "${CALL_LOG}"; then
-  echo "explicit DATABASE_URL deploy must not touch non-selected user-rpc image" >&2
+if grep -Fq "set image deployment/" "${CALL_LOG}"; then
+  echo "explicit DATABASE_URL deploy must not use post-apply kubectl set image" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "get pods -l app=message-api -o json" "${CALL_LOG}"; then
+  echo "expected message-api deploy to verify running pod image" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
@@ -315,7 +379,7 @@ if FAKE_KUBECTL_LOG="${CALL_LOG}" \
   exit 1
 fi
 
-if grep -Fq "set image deployment/web" "${CALL_LOG}"; then
+if grep -Fq "set image deployment/" "${CALL_LOG}"; then
   echo "deploy with IMAGE_TAG=latest must not set image" >&2
   cat "${CALL_LOG}" >&2
   exit 1
@@ -324,5 +388,34 @@ fi
 if ! grep -Fq "mutable latest" /tmp/deploy-k3s-test-latest-tag.err; then
   echo "expected explicit latest IMAGE_TAG error" >&2
   cat /tmp/deploy-k3s-test-latest-tag.err >&2
+  exit 1
+fi
+
+# Rendering must fail closed if any placeholder survives after image overrides.
+: >"${CALL_LOG}"
+if FAKE_KUBECTL_LOG="${CALL_LOG}" \
+  FAKE_KUSTOMIZE_UNRENDERED_PLACEHOLDER=true \
+  NAMESPACE=agents-im \
+  KUBECTL="${FAKE_KUBECTL}" \
+  SKIP_MIDDLEWARE=true \
+  SKIP_MIGRATIONS=true \
+  SKIP_SET_IMAGE=true \
+  ROLLOUT_SERVICES=groups-rpc \
+  RESTART_SERVICES=groups-rpc \
+  "${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-placeholder-guard.out 2>/tmp/deploy-k3s-test-placeholder-guard.err; then
+  echo "expected deploy with an unrendered placeholder to fail" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "refusing to apply unsafe images" /tmp/deploy-k3s-test-placeholder-guard.err; then
+  echo "expected placeholder guard error" >&2
+  cat /tmp/deploy-k3s-test-placeholder-guard.err >&2
+  exit 1
+fi
+
+if grep -Fq "bad-placeholder" "${CALL_LOG}"; then
+  echo "placeholder guard must not apply manifests containing placeholders" >&2
+  cat "${CALL_LOG}" >&2
   exit 1
 fi

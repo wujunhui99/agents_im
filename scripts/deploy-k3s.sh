@@ -16,6 +16,7 @@ IMAGE_SERVICES="${IMAGE_SERVICES:-}"
 ROLLOUT_SERVICES="${ROLLOUT_SERVICES:-}"
 RESTART_SERVICES="${RESTART_SERVICES:-}"
 RESTART_ROLLOUT="${RESTART_ROLLOUT:-false}"
+RENDER_ONLY="${RENDER_ONLY:-false}"
 
 SERVICES=(
   user-api
@@ -141,6 +142,11 @@ build_image_overrides() {
     image="$(current_image_for "${service}")"
     if [[ -n "${image}" ]]; then
       printf '%s=%s\n' "${service}" "${image}"
+    elif [[ -n "${IMAGE_TAG}" && "${IMAGE_TAG}" != "latest" ]]; then
+      # Fresh clusters have no current image to preserve. Use the immutable
+      # deployment tag so a full manifest apply can create all Deployments
+      # without falling back to placeholders or mutable latest tags.
+      printf '%s=%s\n' "${service}" "${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"
     fi
   done
 }
@@ -172,12 +178,20 @@ for doc in docs:
     if kind_match and name in app_deployments:
         image = overrides.get(name)
         if not image:
-            continue
-        doc = re.sub(r"(?m)^(\s*image:\s*)\S+\s*$", r"\g<1>" + image, doc, count=1)
+            print(f"missing safe image override for Deployment/{name}; refusing to render/apply", file=sys.stderr)
+            sys.exit(1)
+        doc, replacements = re.subn(r"(?m)^(\s*-\s*image:\s*|\s*image:\s*)\S+\s*$", r"\g<1>" + image, doc, count=1)
+        if replacements != 1:
+            print(f"Deployment/{name} did not contain exactly one replaceable image field", file=sys.stderr)
+            sys.exit(1)
     kept.append(doc.strip() + "\n")
 if kept:
-    sys.stdout.write("---\n" + "---\n".join(kept))
-' | ${KUBECTL} apply -f -
+    rendered = "---\n" + "---\n".join(kept)
+    if "__IMAGE_TAG_REQUIRED__" in rendered or re.search(r"(?m)^\s*image:\s*\S+:latest\s*$", rendered):
+        print("rendered manifests still contain placeholder or latest images; refusing to apply unsafe images", file=sys.stderr)
+        sys.exit(1)
+    sys.stdout.write(rendered)
+'
 }
 
 unique_services() {
@@ -240,6 +254,60 @@ run_migrations() {
   DATABASE_URL="${database_url}" bash scripts/migrate-postgres.sh --host-psql
 }
 
+verify_deployed_images() {
+  local service expected deployment_image pods_json
+
+  for service in "$@"; do
+    [[ -z "${service}" ]] && continue
+    expected="${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"
+    deployment_image="$(${KUBECTL} -n "${NAMESPACE}" get deployment "${service}" -o "jsonpath={.spec.template.spec.containers[?(@.name=='${service}')].image}")"
+    if [[ "${deployment_image}" != "${expected}" ]]; then
+      echo "deployment/${service} image mismatch: expected=${expected} actual=${deployment_image}" >&2
+      exit 1
+    fi
+
+    pods_json="$(${KUBECTL} -n "${NAMESPACE}" get pods -l "app=${service}" -o json)"
+    SERVICE="${service}" EXPECTED_IMAGE="${expected}" PODS_JSON="${pods_json}" python3 -c '
+import json
+import os
+import sys
+
+service = os.environ["SERVICE"]
+expected = os.environ["EXPECTED_IMAGE"]
+data = json.loads(os.environ.get("PODS_JSON") or "{}")
+items = data.get("items") or []
+if not items:
+    print(f"deployment/{service} has no pods for app={service}", file=sys.stderr)
+    sys.exit(1)
+
+verified = 0
+for pod in items:
+    name = pod.get("metadata", {}).get("name", "<unknown>")
+    phase = pod.get("status", {}).get("phase", "")
+    containers = {c.get("name"): c for c in pod.get("spec", {}).get("containers", [])}
+    statuses = {s.get("name"): s for s in pod.get("status", {}).get("containerStatuses", [])}
+    container = containers.get(service)
+    status = statuses.get(service, {})
+    image = (container or {}).get("image", "")
+    ready = bool(status.get("ready"))
+    image_id = status.get("imageID", "")
+    if phase != "Running" or image != expected or not ready:
+        print(
+            f"pod/{name} image verification failed for {service}: "
+            f"phase={phase} ready={ready} expected={expected} actual={image} imageID={image_id}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print(f"verified image service={service} pod={name} ready={ready} image={image} imageID={image_id}")
+    verified += 1
+
+if verified == 0:
+    print(f"deployment/{service} has no verifiable pods", file=sys.stderr)
+    sys.exit(1)
+'
+  done
+}
+
 apply_manifests() {
   local selected_image_services=()
   local restart_rollout_services=()
@@ -255,19 +323,18 @@ apply_manifests() {
   capture_current_images
   image_overrides="$(build_image_overrides "${selected_image_services[@]}")"
 
+  if bool_true "${RENDER_ONLY}"; then
+    apply_rendered_manifests "${image_overrides}"
+    return
+  fi
+
   ${KUBECTL} apply -f "${MANIFEST_DIR}/namespace.yaml"
   ensure_secret
   ensure_image_pull_secret
-  apply_rendered_manifests "${image_overrides}"
+  apply_rendered_manifests "${image_overrides}" | ${KUBECTL} apply -f -
 
   if bool_true "${SKIP_SET_IMAGE}"; then
-    echo "Skipping image updates; keeping currently deployed image tags."
-  else
-    local service
-    for service in "${selected_image_services[@]}"; do
-      [[ -z "${service}" ]] && continue
-      ${KUBECTL} -n "${NAMESPACE}" set image "deployment/${service}" "${service}=${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}" --record=false
-    done
+    echo "Skipping image updates; rendered manifest preserves currently deployed image tags."
   fi
 
   if [[ -n "${RESTART_SERVICES}" ]] || bool_true "${RESTART_ROLLOUT}"; then
@@ -286,11 +353,21 @@ apply_manifests() {
     ${KUBECTL} -n "${NAMESPACE}" rollout status "deployment/${service}" --timeout=180s
   done
 
+  if ((${#selected_image_services[@]} > 0)); then
+    verify_deployed_images "${selected_image_services[@]}"
+  fi
+
   ${KUBECTL} -n "${NAMESPACE}" get pods -o wide
   ${KUBECTL} -n "${NAMESPACE}" get svc,ingress
 }
 
 main() {
+  if [[ "${1:-}" == "--render-only" ]]; then
+    RENDER_ONLY="true"
+    SKIP_MIDDLEWARE="true"
+    SKIP_MIGRATIONS="true"
+    shift
+  fi
   require "${KUBECTL}"
   require python3
   if ! bool_true "${SKIP_MIDDLEWARE}"; then
