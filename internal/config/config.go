@@ -835,7 +835,10 @@ func ResolveLLMObservabilityConfig(cfg LLMObservabilityConfig) (LLMObservability
 		return cfg, err
 	}
 	cfg.Enabled = enabled
-	cfg.Backend = resolveLLMObservabilityBackend(cfg.Backend)
+	cfg.Backend, err = resolveLLMObservabilityBackend(cfg.Backend)
+	if err != nil {
+		return cfg, err
+	}
 	cfg.CaptureOutput, err = resolveBool(cfg.CaptureOutput, os.Getenv("LLM_OBSERVABILITY_CAPTURE_OUTPUT"), os.Getenv("LLM_OBS_CAPTURE_OUTPUT"))
 	if err != nil {
 		return cfg, err
@@ -966,21 +969,26 @@ func ResolvePythonExecutorConfig(cfg PythonExecutorConfig) (PythonExecutorConfig
 	return cfg, nil
 }
 
-func resolveLLMObservabilityBackend(value string) string {
+func resolveLLMObservabilityBackend(value string) (string, error) {
 	value = strings.ToLower(strings.TrimSpace(os.ExpandEnv(value)))
 	envValue := strings.ToLower(strings.TrimSpace(firstNonEmpty(os.Getenv("LLM_OBSERVABILITY_BACKEND"), os.Getenv("LLM_OBS_BACKEND"), os.Getenv("AGENTS_IM_LLM_OBSERVABILITY_BACKEND"))))
 	if value == "" || (value == LLMObservabilityBackendNoop && envValue != "") {
 		value = envValue
 	}
+	if value == "" {
+		return LLMObservabilityBackendNoop, nil
+	}
 	switch value {
+	case LLMObservabilityBackendNoop:
+		return LLMObservabilityBackendNoop, nil
 	case LLMObservabilityBackendLangfuse:
-		return LLMObservabilityBackendLangfuse
+		return LLMObservabilityBackendLangfuse, nil
 	case LLMObservabilityBackendMemory:
-		return LLMObservabilityBackendMemory
+		return LLMObservabilityBackendMemory, nil
 	case LLMObservabilityBackendTest:
-		return LLMObservabilityBackendTest
+		return LLMObservabilityBackendTest, nil
 	default:
-		return LLMObservabilityBackendNoop
+		return "", fmt.Errorf("unsupported llm observability backend %q", value)
 	}
 }
 
