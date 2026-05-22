@@ -10,6 +10,8 @@ This is separate from `/admin/llm-traces`. The admin endpoint remains the AI aud
 
 ## Configuration
 
+go-zero v1.10.1 has native `ServiceConf.Telemetry` support, but `agents_im` intentionally uses the repo-level `Tracing` config plus `internal/observability.InitServiceTracing` because it already handles HTTP, WebSocket, RPC, Kafka/outbox, gateway delivery, Agent runtime boundaries, Jaeger deep links, privacy filtering, and local fail-closed validation consistently. Do not add a parallel `Telemetry` block to only some services; all service coverage must stay in the unified `Tracing` config.
+
 Tracing is disabled by default for local/unit-test friendliness. Enabling tracing requires a real OTLP endpoint; bad enabled configuration fails service startup.
 
 Supported config/env fields:

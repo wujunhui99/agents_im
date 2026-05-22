@@ -60,7 +60,7 @@ func TestAdminRoutesRequireAuthenticatedAdminAccount(t *testing.T) {
 func newAdminRouteTestRouter(t *testing.T, serviceContext *adminsvc.ServiceContext) http.Handler {
 	t.Helper()
 
-	httpx.SetErrorHandler(response.GoZeroErrorHandler)
+	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(rest.RestConf{
 		ServiceConf: service.ServiceConf{Name: "admin-route-test"},
 		Host:        "127.0.0.1",

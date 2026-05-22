@@ -68,7 +68,7 @@ func newAuthGoZeroRouter(t *testing.T, serviceContext *authsvc.ServiceContext) h
 func newGoZeroRouter(t *testing.T, register func(*rest.Server)) http.Handler {
 	t.Helper()
 
-	httpx.SetErrorHandler(response.GoZeroErrorHandler)
+	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(rest.RestConf{
 		ServiceConf: service.ServiceConf{Name: "test-api"},
 		Host:        "127.0.0.1",

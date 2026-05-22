@@ -58,7 +58,7 @@ func main() {
 	} else {
 		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", config.ResolveStorageDriver(cfg.StorageDriver))
 	}
-	httpx.SetErrorHandler(response.GoZeroErrorHandler)
+	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()
 	server.Use(observability.TraceMiddlewareFunc)
