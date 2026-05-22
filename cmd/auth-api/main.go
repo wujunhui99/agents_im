@@ -81,7 +81,7 @@ func main() {
 			Mailer:           mailer,
 		},
 	)
-	httpx.SetErrorHandler(response.GoZeroErrorHandler)
+	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(config.ToRestConf(cfg))
 	defer server.Stop()
 	server.Use(observability.TraceMiddlewareFunc)

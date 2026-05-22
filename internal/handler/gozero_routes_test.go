@@ -128,7 +128,7 @@ func TestGroupsAddMemberRouteRequiresOwnerForOtherUsers(t *testing.T) {
 func newRouteTestGroupsRouter(t *testing.T, serviceContext *groupssvc.ServiceContext) http.Handler {
 	t.Helper()
 
-	httpx.SetErrorHandler(response.GoZeroErrorHandler)
+	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(rest.RestConf{
 		ServiceConf: service.ServiceConf{Name: "groups-route-test"},
 		Host:        "127.0.0.1",
