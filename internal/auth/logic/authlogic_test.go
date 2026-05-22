@@ -58,6 +58,9 @@ func TestRegistrationEmailCodeRequestSendsMailAndRegisterConsumesCode(t *testing
 	if mailReq.TemplateData["code"] != "123456" || mailReq.TemplateData["expire_minutes"] != "10" {
 		t.Fatalf("template data = %#v, want code and expire_minutes", mailReq.TemplateData)
 	}
+	if mailReq.Subject == "" {
+		t.Fatalf("mail subject is empty; Tencent SES requires a non-empty Subject")
+	}
 
 	registered, err := authLogic.Register(ctx, RegisterRequest{
 		Identifier:            "alice_email",

@@ -248,6 +248,7 @@ func (l *AuthLogic) RequestRegistrationEmailCode(ctx context.Context, req Regist
 	if err := l.mailer.SendTemplateEmail(ctx, mailadapter.SendTemplateEmailRequest{
 		Recipients: []string{email},
 		TemplateID: 177952,
+		Subject:    "AgenticIM 注册验证码",
 		TemplateData: map[string]string{
 			"code":           code,
 			"expire_minutes": fmt.Sprintf("%d", expireMinutes),
