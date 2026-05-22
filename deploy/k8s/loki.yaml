@@ -175,30 +175,20 @@ data:
       - url: http://loki.agents-im.svc.cluster.local:3100/loki/api/v1/push
 
     scrape_configs:
-      - job_name: kubernetes-pods
-        kubernetes_sd_configs:
-          - role: pod
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_namespace]
-            action: replace
-            target_label: namespace
-          - source_labels: [__meta_kubernetes_pod_name]
-            action: replace
-            target_label: pod
-          - source_labels: [__meta_kubernetes_pod_container_name]
-            action: replace
-            target_label: container
-          - source_labels: [__meta_kubernetes_pod_label_app]
-            action: replace
-            target_label: app
-          - source_labels: [__meta_kubernetes_namespace]
-            regex: agents-im
-            action: keep
-          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
-            separator: /
-            target_label: __path__
-            replacement: /var/log/pods/*$1/*.log
+      - job_name: agents-im-pod-files
+        static_configs:
+          - targets: [localhost]
+            labels:
+              job: agents-im-pod-files
+              namespace: agents-im
+              __path__: /var/log/pods/agents-im_*/*/*.log
         pipeline_stages:
+          - regex:
+              source: filename
+              expression: '^/var/log/pods/agents-im_(?P<pod>[^_]+)_[^/]+/(?P<container>[^/]+)/.*\\.log$'
+          - labels:
+              pod:
+              container:
           - cri: {}
 ---
 apiVersion: apps/v1

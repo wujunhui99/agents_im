@@ -93,11 +93,11 @@ Prometheus scrapes the in-cluster Prometheus service, node-exporter, and the RES
 
 Grafana provisions Prometheus as the default datasource and Loki as the log datasource through `grafana-provisioning`; it stores dashboard/user state on the `grafana-data` PVC. If Grafana admin credentials need rotation, update the `grafana-admin` Secret and `/opt/agents-im/grafana-admin.env`, then restart the Grafana deployment.
 
-Loki stores recent pod logs on the `loki-data` PVC with 7-day retention. Promtail runs as a DaemonSet, reads `/var/log/pods`, keeps only `agents-im` namespace pods, and labels streams by `namespace`, `pod`, `container`, and low-cardinality `app`. Do not expose Loki directly to the public Internet; use Grafana Explore with queries such as:
+Loki stores recent pod logs on the `loki-data` PVC with 7-day retention. Promtail runs as a DaemonSet and reads `/var/log/pods/agents-im_*/*/*.log`, so Loki streams include `namespace="agents-im"` plus the source `filename`. Do not expose Loki directly to the public Internet; use Grafana Explore with queries such as:
 
 ```logql
 {namespace="agents-im"}
-{namespace="agents-im", app="message-api"} |= "error"
+{namespace="agents-im", filename=~".*/message-api/.*"} |= "error"
 ```
 
 Avoid adding user IDs, account IDs, conversation IDs, message IDs, trace IDs, prompts, or message content as Loki labels; those values belong in log fields/text only after normal redaction.
