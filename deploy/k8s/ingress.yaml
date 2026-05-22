@@ -286,3 +286,54 @@ spec:
                 name: langfuse
                 port:
                   number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agents-im-prometheus
+  namespace: agents-im
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: agents-im-observability-basic-auth@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - prometheus.agenticim.xyz
+      secretName: prometheus-agenticim-xyz-tls
+  rules:
+    - host: prometheus.agenticim.xyz
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agents-im-grafana
+  namespace: agents-im
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - grafana.agenticim.xyz
+      secretName: grafana-agenticim-xyz-tls
+  rules:
+    - host: grafana.agenticim.xyz
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
