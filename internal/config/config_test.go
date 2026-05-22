@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wujunhui99/agents_im/internal/observability"
 	"gopkg.in/yaml.v3"
 )
 
@@ -123,7 +124,6 @@ MailRPC:
 		t.Fatalf("mail rpc timeout = %d, want 5000", cfg.MailRPC.Timeout)
 	}
 }
-
 func TestLoadAPIConfigResolvesTracingFromFile(t *testing.T) {
 	clearTracingEnv(t)
 	configPath := filepath.Join(t.TempDir(), "message-api.yaml")
@@ -137,7 +137,8 @@ Tracing:
   Protocol: grpc
   SamplerRatio: 0.25
   JaegerBaseURL: https://jaeger.agenticim.xyz
-`), 0o600); err != nil {
+  Insecure: true
+`), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
@@ -153,6 +154,44 @@ Tracing:
 		cfg.Tracing.SamplerRatio != 0.25 ||
 		cfg.Tracing.JaegerBaseURL != "https://jaeger.agenticim.xyz" {
 		t.Fatalf("tracing config mismatch: %+v", cfg.Tracing)
+	}
+}
+
+func TestToRestConfMapsTracingToGoZeroTelemetry(t *testing.T) {
+	cfg := DefaultAPIConfig()
+	cfg.Name = "friends-api"
+	cfg.Tracing.Enabled = true
+	cfg.Tracing.ServiceName = "friends-api"
+	cfg.Tracing.OTLPEndpoint = "jaeger-collector.agents-im.svc.cluster.local:4317"
+	cfg.Tracing.Protocol = "grpc"
+	cfg.Tracing.SamplerRatio = 1
+
+	restConf := ToRestConf(cfg)
+
+	if restConf.Telemetry.Name != "friends-api" {
+		t.Fatalf("Telemetry.Name = %q", restConf.Telemetry.Name)
+	}
+	if restConf.Telemetry.Endpoint != "jaeger-collector.agents-im.svc.cluster.local:4317" {
+		t.Fatalf("Telemetry.Endpoint = %q", restConf.Telemetry.Endpoint)
+	}
+	if restConf.Telemetry.Batcher != "otlpgrpc" {
+		t.Fatalf("Telemetry.Batcher = %q", restConf.Telemetry.Batcher)
+	}
+	if restConf.Telemetry.Sampler != 1 {
+		t.Fatalf("Telemetry.Sampler = %v", restConf.Telemetry.Sampler)
+	}
+	if restConf.Telemetry.Disabled {
+		t.Fatalf("Telemetry.Disabled = true")
+	}
+}
+
+func TestGoZeroTelemetryConfigDisabledWhenTracingDisabled(t *testing.T) {
+	telemetry := GoZeroTelemetryConfig(observability.TracingConfig{ServiceName: "friends-api"}, "friends-api")
+	if !telemetry.Disabled {
+		t.Fatalf("Telemetry.Disabled = false")
+	}
+	if telemetry.Name != "friends-api" {
+		t.Fatalf("Telemetry.Name = %q", telemetry.Name)
 	}
 }
 
