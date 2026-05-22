@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	appconfig "github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/friends/internal/config"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/friends/internal/server"
@@ -23,6 +24,7 @@ import (
 func Start(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c)
+	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
 	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
 	if err != nil {
 		log.Fatalf("init tracing: %v", err)

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/observability"
+	gozerotrace "github.com/zeromicro/go-zero/core/trace"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 	"gopkg.in/yaml.v3"
@@ -587,7 +588,29 @@ func ToRestConf(cfg APIConfig) rest.RestConf {
 	restConf.Name = cfg.Name
 	restConf.Host = cfg.Host
 	restConf.Port = cfg.Port
+	restConf.Telemetry = GoZeroTelemetryConfig(cfg.Tracing, cfg.Name)
 	return restConf
+}
+
+func GoZeroTelemetryConfig(cfg observability.TracingConfig, serviceName string) gozerotrace.Config {
+	resolved, err := observability.ResolveTracingConfig(cfg, serviceName)
+	if err != nil {
+		return gozerotrace.Config{Name: strings.TrimSpace(serviceName), Disabled: true}
+	}
+	telemetry := gozerotrace.Config{
+		Name:     resolved.ServiceName,
+		Endpoint: resolved.OTLPEndpoint,
+		Sampler:  resolved.SamplerRatio,
+		Disabled: !resolved.Enabled,
+	}
+	switch resolved.Protocol {
+	case observability.TracingProtocolHTTP:
+		telemetry.Batcher = "otlphttp"
+		telemetry.OtlpHttpSecure = !resolved.Insecure
+	default:
+		telemetry.Batcher = "otlpgrpc"
+	}
+	return telemetry
 }
 
 func ResolveStorageDriver(value string) string {
