@@ -51,6 +51,80 @@ volumes: []
 
 ---
 kind: pipeline
+name: devops-lab
+type: docker
+
+trigger:
+  event:
+    - push
+  branch:
+    - devops
+
+steps:
+  - name: detect changes
+    image: alpine/git:2.45.2
+    commands:
+      - apk add --no-cache bash python3
+      - bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
+
+  - name: build image benchmark
+    image: docker.io/library/docker:29-cli
+    environment:
+      GHCR_USERNAME:
+        from_secret: ghcr_username
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+      IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
+      DRONE_IMAGE_BUILD_PARALLELISM: "4"
+      DRONE_IMAGE_BUILD_FORCE_ALL: "true"
+      DRONE_IMAGE_BUILD_ONLY: "true"
+    commands:
+      - apk add --no-cache bash python3
+      - test -f .drone-deploy.env || bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
+      - bash scripts/ci/drone-build-images.sh
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+
+  - name: render deploy plan
+    image: alpine:3.20
+    depends_on:
+      - detect changes
+    commands:
+      - apk add --no-cache bash python3 curl
+      - curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl
+      - chmod +x /usr/local/bin/kubectl
+      - test -f .drone-deploy.env || bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
+      - . ./.drone-deploy.env
+      - IMAGE_TAG="${DRONE_COMMIT_SHA}" SKIP_SET_IMAGE=false IMAGE_SERVICES="${image_services_space}" KUBECTL=kubectl ./scripts/deploy-k3s.sh --render-only >/tmp/rendered.yaml
+      - test -s /tmp/rendered.yaml
+      - '! grep -q "__IMAGE_TAG_REQUIRED__\|:latest" /tmp/rendered.yaml'
+
+  - name: notify telegram
+    image: python:3.12-alpine
+    depends_on:
+      - detect changes
+      - build image benchmark
+      - render deploy plan
+    environment:
+      TELEGRAM_BOT_TOKEN:
+        from_secret: telegram_bot_token
+      TELEGRAM_CHAT_ID:
+        from_secret: telegram_chat_id
+    commands:
+      - python scripts/ci/drone-telegram-notify.py "$DRONE_BUILD_STATUS"
+    when:
+      status:
+        - success
+        - failure
+
+volumes:
+  - name: docker_sock
+    host:
+      path: /var/run/docker.sock
+
+---
+kind: pipeline
 name: deploy-main
 type: docker
 
@@ -59,7 +133,6 @@ trigger:
     - push
   branch:
     - main
-    - devops
 
 steps:
   - name: detect changes
