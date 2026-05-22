@@ -1,6 +1,15 @@
 Name: groups-api
 Host: 0.0.0.0
 Port: 8085
+Tracing:
+  Enabled: false
+  ServiceName: groups-api
+  Environment: local
+  Protocol: grpc
+  SamplerRatio: 1.0
+  JaegerBaseURL: http://localhost:16686
+  Insecure: true
+
 Auth:
   AccessSecret: dev-jwt-secret-change-me
   AccessExpire: 86400

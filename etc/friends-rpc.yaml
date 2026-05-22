@@ -1,5 +1,14 @@
 Name: friends-rpc
 ListenOn: 0.0.0.0:9092
+Tracing:
+  Enabled: false
+  ServiceName: friends-rpc
+  Environment: local
+  Protocol: grpc
+  SamplerRatio: 1.0
+  JaegerBaseURL: http://localhost:16686
+  Insecure: true
+
 JWTAuth:
   AccessSecret: dev-jwt-secret-change-me
   AccessExpire: 86400
