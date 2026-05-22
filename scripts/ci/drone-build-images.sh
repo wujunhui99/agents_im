@@ -121,7 +121,6 @@ run_build() {
     --cache-from "type=registry,ref=${cache_ref}" \
     "${cache_to_args[@]}" \
     --tag "${registry}/${service}:${commit_sha}" \
-    --tag "${registry}/${service}:latest" \
     --provenance=false \
     --push \
     .

@@ -46,6 +46,56 @@ case "${1:-}" in
     exit 0
     ;;
   apply)
+    if [[ "${2:-}" == "-f" && "${3:-}" == "-" ]]; then
+      stdin="$(cat)"
+      printf 'STDIN_START\n%s\nSTDIN_END\n' "${stdin}" >>"${log}"
+    fi
+    exit 0
+    ;;
+  kustomize)
+    cat <<'YAML'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: agents-im
+spec:
+  template:
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/wujunhui99/agents_im/web:__IMAGE_TAG_REQUIRED__
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-rpc
+  namespace: agents-im
+spec:
+  template:
+    spec:
+      containers:
+        - name: user-rpc
+          image: ghcr.io/wujunhui99/agents_im/user-rpc:__IMAGE_TAG_REQUIRED__
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agents-im-minio-proxy
+  namespace: agents-im
+spec:
+  template:
+    spec:
+      containers:
+        - name: socat
+          image: alpine/socat:1.8.0.3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: agents-im
+YAML
     exit 0
     ;;
   set)
@@ -95,19 +145,49 @@ if ! grep -Fq "set image deployment/web web=ghcr.io/wujunhui99/agents_im/web:new
   exit 1
 fi
 
-if ! grep -Fq "set image deployment/user-rpc user-rpc=ghcr.io/wujunhui99/agents_im/user-rpc:stable-backend" "${CALL_LOG}"; then
-  echo "expected non-selected user-rpc image to be restored after kubectl apply" >&2
+if grep -Fq "apply -k" "${CALL_LOG}"; then
+  echo "deploy must not apply the full kustomization because it contains Deployment image defaults" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
 
-if ! grep -Fq "rollout status deployment/user-rpc --timeout=180s" "${CALL_LOG}"; then
-  echo "expected restored non-selected user-rpc rollout to be waited on" >&2
+if ! grep -Fq "name: agents-im-minio-proxy" "${CALL_LOG}"; then
+  echo "expected non-application Deployment manifests to still be applied" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
 
-# Config-only deploy must also preserve all existing service images after apply.
+if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/web:new-web-sha" "${CALL_LOG}"; then
+  echo "expected rendered application Deployment to use the immutable selected image tag" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/user-rpc:stable-backend" "${CALL_LOG}"; then
+  echo "expected non-selected application Deployment to keep the captured current image" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if grep -Fq "__IMAGE_TAG_REQUIRED__" "${CALL_LOG}"; then
+  echo "rendered manifests must not apply placeholder image tags" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if grep -Fq "set image deployment/user-rpc" "${CALL_LOG}"; then
+  echo "web-only deploy must not touch non-selected user-rpc image" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if grep -Fq "rollout status deployment/user-rpc --timeout=180s" "${CALL_LOG}"; then
+  echo "web-only deploy must not wait on non-selected user-rpc rollout" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+# Config-only deploy must apply non-application resources and restart only selected services.
 : >"${CALL_LOG}"
 FAKE_KUBECTL_LOG="${CALL_LOG}" \
 NAMESPACE=agents-im \
@@ -120,8 +200,32 @@ RESTART_SERVICES=groups-rpc \
 "${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-config-only.out
 
 # Config-only deploy checks must run before the next scenario resets CALL_LOG.
-if ! grep -Fq "set image deployment/user-rpc user-rpc=ghcr.io/wujunhui99/agents_im/user-rpc:stable-backend" "${CALL_LOG}"; then
-  echo "expected config-only deploy to restore non-selected user-rpc image after kubectl apply" >&2
+if grep -Fq "apply -k" "${CALL_LOG}"; then
+  echo "config-only deploy must not apply the full kustomization because it contains Deployment image defaults" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if grep -Fq "set image deployment/user-rpc" "${CALL_LOG}"; then
+  echo "config-only deploy must not touch non-selected user-rpc image" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "rollout restart deployment/groups-rpc" "${CALL_LOG}"; then
+  echo "expected config-only deploy to restart the selected groups-rpc deployment" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "rollout status deployment/groups-rpc --timeout=180s" "${CALL_LOG}"; then
+  echo "expected config-only deploy to wait for the selected groups-rpc rollout" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if grep -Fq "rollout status deployment/user-rpc --timeout=180s" "${CALL_LOG}"; then
+  echo "config-only deploy must not wait for non-selected user-rpc rollout" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
@@ -160,8 +264,8 @@ if ! grep -Fq "set image deployment/message-api message-api=ghcr.io/wujunhui99/a
   exit 1
 fi
 
-if ! grep -Fq "set image deployment/user-rpc user-rpc=ghcr.io/wujunhui99/agents_im/user-rpc:stable-backend" "${CALL_LOG}"; then
-  echo "expected explicit DATABASE_URL deploy to preserve non-selected images" >&2
+if grep -Fq "set image deployment/user-rpc" "${CALL_LOG}"; then
+  echo "explicit DATABASE_URL deploy must not touch non-selected user-rpc image" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
@@ -169,5 +273,56 @@ fi
 if grep -Fq "user-rpc=new-message-sha" "${CALL_LOG}"; then
   echo "explicit DATABASE_URL deploy must not set user-rpc to the new release tag" >&2
   cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+# Deploys that update images must provide an immutable image tag.
+: >"${CALL_LOG}"
+if FAKE_KUBECTL_LOG="${CALL_LOG}" \
+  NAMESPACE=agents-im \
+  KUBECTL="${FAKE_KUBECTL}" \
+  SKIP_MIDDLEWARE=true \
+  SKIP_MIGRATIONS=true \
+  IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
+  IMAGE_SERVICES=web \
+  ROLLOUT_SERVICES=web \
+  "${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-missing-tag.out 2>/tmp/deploy-k3s-test-missing-tag.err; then
+  echo "expected deploy without IMAGE_TAG to fail" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "IMAGE_TAG must be a non-empty immutable tag" /tmp/deploy-k3s-test-missing-tag.err; then
+  echo "expected missing IMAGE_TAG error" >&2
+  cat /tmp/deploy-k3s-test-missing-tag.err >&2
+  exit 1
+fi
+
+# Mutable latest must be rejected even when the caller supplies it explicitly.
+: >"${CALL_LOG}"
+if FAKE_KUBECTL_LOG="${CALL_LOG}" \
+  NAMESPACE=agents-im \
+  KUBECTL="${FAKE_KUBECTL}" \
+  SKIP_MIDDLEWARE=true \
+  SKIP_MIGRATIONS=true \
+  IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
+  IMAGE_TAG=latest \
+  IMAGE_SERVICES=web \
+  ROLLOUT_SERVICES=web \
+  "${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-latest-tag.out 2>/tmp/deploy-k3s-test-latest-tag.err; then
+  echo "expected deploy with IMAGE_TAG=latest to fail" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if grep -Fq "set image deployment/web" "${CALL_LOG}"; then
+  echo "deploy with IMAGE_TAG=latest must not set image" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "mutable latest" /tmp/deploy-k3s-test-latest-tag.err; then
+  echo "expected explicit latest IMAGE_TAG error" >&2
+  cat /tmp/deploy-k3s-test-latest-tag.err >&2
   exit 1
 fi

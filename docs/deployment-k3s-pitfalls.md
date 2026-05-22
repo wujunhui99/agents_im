@@ -78,21 +78,23 @@ Long-term fix:
 - Avoid committing duplicate generated `.pb.go` outputs for the same proto service.
 - Add a runtime import/boot smoke test for RPC binaries that can catch init-time protobuf panics before deployment.
 
-## Pitfall: selective deploy can revert non-selected images
+## Pitfall: full Deployment apply can revert images
 
-`kubectl apply -k` reapplies manifests that contain default `:latest` image tags. If only one service is selected for a new image, unselected services can be accidentally reset unless their current images are restored.
+Do not run `kubectl apply -k deploy/k8s` against production while `deploy/k8s` includes Deployment resources. Applying Deployment manifests can overwrite runtime image tags for services unrelated to the current release.
 
 Current mitigation:
 
-- `scripts/deploy-k3s.sh` records current images before apply.
-- It sets new images only for selected services.
-- It restores pre-apply images for unselected services.
+- `scripts/deploy-k3s.sh` renders `deploy/k8s`, substitutes safe immutable application image tags before apply, and still applies Deployment spec/config changes.
+- It uses `${IMAGE_TAG}` only for selected services and keeps currently deployed images for non-selected services.
+- It only runs `kubectl set image` for selected services after apply; non-selected services are not explicitly changed.
+- Business Deployment manifest images use a placeholder tag instead of a mutable tag, and `scripts/test-no-latest-images.sh` prevents runtime `:latest` usage from returning.
 - `scripts/test-deploy-k3s.sh` has regression coverage for web-only and config-only deploys.
 
 Verification:
 
 ```bash
 bash scripts/test-deploy-k3s.sh
+bash scripts/test-no-latest-images.sh
 ```
 
 ## Pitfall: config-only deploys still restart services

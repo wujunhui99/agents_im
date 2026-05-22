@@ -112,7 +112,7 @@ The Management System root serves the web SPA and the frontend opens the read-on
 The deploy pipeline has three steps:
 
 1. `detect changes`: classifies changed files and emits `build_required`, `deploy_required`, `config_only`, `backend_services`, `web_required`, `image_services`, `rollout_services`, and restart service outputs.
-2. `build images`: builds only services listed in `image_services`; backend services use the Dockerfile `backend` target and `SERVICE=<name>` build arg, and web uses the Dockerfile `web` target. Each selected image is published to GHCR with both `${DRONE_COMMIT_SHA}` and `latest` tags.
+2. `build images`: builds only services listed in `image_services`; backend services use the Dockerfile `backend` target and `SERVICE=<name>` build arg, and web uses the Dockerfile `web` target. Each selected image is published to GHCR only with the immutable `${DRONE_COMMIT_SHA}` tag; mutable `latest` tags are not published or deployed.
 3. `deploy`: connects to the server over SSH using the `deploy_ssh_*` secrets, syncs the repository files to `/opt/agents-im/repo`, then runs `scripts/deploy-k3s.sh` with `IMAGE_REGISTRY`, `IMAGE_TAG`, GHCR credentials, `IMAGE_SERVICES`, `ROLLOUT_SERVICES`, optional `RESTART_SERVICES`, and `MIDDLEWARE_DIR=/opt/agents-im/middleware`.
 
 Backend images are built for:
@@ -121,7 +121,7 @@ Backend images are built for:
 - Worker: `message-transfer`
 - RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`, `mail-rpc`
 
-`deploy-k3s.sh` starts middleware Compose, runs PostgreSQL migrations from the server-side k3s secret `DATABASE_URL`, applies `deploy/k8s`, sets selected deployment images to the current commit SHA tag, restores all non-selected deployments to their pre-apply image tags, and waits for rollout status. Middleware Compose includes MinIO for private S3-compatible object storage; `user-api` reads `OBJECT_STORAGE_*` secret values and creates the configured bucket on startup. When `SKIP_SET_IMAGE=false` and `IMAGE_SERVICES` is empty, the script keeps the legacy full-deployment behavior by updating every known deployment image. When `IMAGE_SERVICES` is set, only those services are moved to `${IMAGE_TAG}`; non-selected images are captured before `kubectl apply -k` and re-applied afterward so manifest defaults such as `:latest` cannot regress existing backend/RPC pods during a web-only deploy.
+`deploy-k3s.sh` starts middleware Compose, runs PostgreSQL migrations from the server-side k3s secret `DATABASE_URL`, renders `deploy/k8s` with safe immutable application image tags, applies the rendered resources, sets selected deployment images to the current commit SHA tag, and waits only for selected image updates plus explicit config restarts. Deployment manifests intentionally contain placeholder image tags in Git; deploy-time rendering replaces placeholders with either the selected `${IMAGE_TAG}` or the currently deployed image for non-selected services before `kubectl apply`. When `SKIP_SET_IMAGE=false` and `IMAGE_SERVICES` is empty, the script keeps the manual full-deployment behavior by updating every known deployment image to `${IMAGE_TAG}`. Mutable image tags are refused: callers must provide a non-empty immutable `IMAGE_TAG`.
 
 ### Selective image builds
 
@@ -166,7 +166,7 @@ RESTART_SERVICES='<affected services>'
 RESTART_ROLLOUT=true
 ```
 
-This keeps existing image tags, skips Docker Compose middleware startup and database migrations, applies the k3s manifests, then restarts and waits only for the selected deployment. ConfigMap changes do not reliably recreate Pods by themselves, so config-only deploy must use `RESTART_ROLLOUT=true` for affected services.
+This keeps existing image tags, skips Docker Compose middleware startup and database migrations, applies rendered k3s resources with existing application images preserved, then restarts and waits only for the selected deployment. ConfigMap changes do not reliably recreate Pods by themselves, so config-only deploy must use `RESTART_ROLLOUT=true` for affected services.
 
 ## Drone operations runbook
 
