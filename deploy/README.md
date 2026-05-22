@@ -24,6 +24,8 @@ Jaeger UI is exposed at `https://jaeger.agenticim.xyz/` only behind Traefik basi
 
 Prometheus and Grafana are deployed by k3s from `deploy/k8s/prometheus-grafana.yaml`. Prometheus is exposed at `https://prometheus.agenticim.xyz/` behind the same `observability-basic-auth` Traefik middleware used by Jaeger. Grafana is exposed at `https://grafana.agenticim.xyz/` and uses its own login backed by the `agents-im/grafana-admin` Secret. `scripts/bootstrap-server.sh` creates that Secret for new servers and stores the generated operator credentials at `/opt/agents-im/grafana-admin.env` with mode `0600`. Keep both credential files and k8s Secret values off Git, issues, and chat transcripts.
 
+Loki log aggregation is deployed by k3s from `deploy/k8s/loki.yaml`. Loki is intentionally internal-only at `http://loki.agents-im.svc.cluster.local:3100`; operators query logs through the Grafana `Loki` datasource rather than a public Loki domain.
+
 ## Drone repository secrets
 
 Drone is deployed at `https://drone.agenticim.xyz` and the `wujunhui99/agents_im` repository must be active in Drone. Secrets are configured at repository scope in Drone, not in Git.
@@ -89,7 +91,16 @@ Then search `http://127.0.0.1:16686/search?traceID=<trace_id>`.
 
 Prometheus scrapes the in-cluster Prometheus service, node-exporter, and the REST/worker services that expose `/metrics`: `user-api`, `auth-api`, `friends-api`, `message-api`, `gateway-ws`, `groups-api`, `agent-api`, and `message-transfer`. It intentionally avoids high-cardinality labels such as account IDs, conversation IDs, message IDs, trace IDs, prompts, or message content. The default production manifest keeps retention bounded to 7 days / 7 GiB so the single-node k3s host does not grow unbounded.
 
-Grafana provisions Prometheus as the default datasource through `grafana-provisioning` and stores dashboard/user state on the `grafana-data` PVC. If Grafana admin credentials need rotation, update the `grafana-admin` Secret and `/opt/agents-im/grafana-admin.env`, then restart the Grafana deployment.
+Grafana provisions Prometheus as the default datasource and Loki as the log datasource through `grafana-provisioning`; it stores dashboard/user state on the `grafana-data` PVC. If Grafana admin credentials need rotation, update the `grafana-admin` Secret and `/opt/agents-im/grafana-admin.env`, then restart the Grafana deployment.
+
+Loki stores recent pod logs on the `loki-data` PVC with 7-day retention. Promtail runs as a DaemonSet, reads `/var/log/pods`, keeps only `agents-im` namespace pods, and labels streams by `namespace`, `pod`, `container`, and low-cardinality `app`. Do not expose Loki directly to the public Internet; use Grafana Explore with queries such as:
+
+```logql
+{namespace="agents-im"}
+{namespace="agents-im", app="message-api"} |= "error"
+```
+
+Avoid adding user IDs, account IDs, conversation IDs, message IDs, trace IDs, prompts, or message content as Loki labels; those values belong in log fields/text only after normal redaction.
 
 Langfuse LLM observability has two pieces:
 
