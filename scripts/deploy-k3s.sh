@@ -173,10 +173,14 @@ for doc in docs:
         image = overrides.get(name)
         if not image:
             continue
-        doc = re.sub(r"(?m)^(\s*image:\s*)\S+\s*$", r"\g<1>" + image, doc, count=1)
+        doc = re.sub(r"(?m)^(\s*-\s*image:\s*|\s*image:\s*)\S+\s*$", r"\g<1>" + image, doc, count=1)
     kept.append(doc.strip() + "\n")
 if kept:
-    sys.stdout.write("---\n" + "---\n".join(kept))
+    rendered = "---\n" + "---\n".join(kept)
+    if "__IMAGE_TAG_REQUIRED__" in rendered:
+        print("rendered manifests still contain __IMAGE_TAG_REQUIRED__; refusing to apply placeholder images", file=sys.stderr)
+        sys.exit(1)
+    sys.stdout.write(rendered)
 ' | ${KUBECTL} apply -f -
 }
 
