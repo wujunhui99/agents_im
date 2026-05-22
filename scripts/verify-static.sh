@@ -2061,6 +2061,82 @@ done
 rg -q "llm-observability.md" ARCHITECTURE.md docs/design-docs/index.md
 rg -q "LLM_OBSERVABILITY_BACKEND=noop" .env.example
 
+python3 - <<'PY'
+import sys
+import yaml
+
+with open("deploy/k8s/kustomization.yaml", encoding="utf-8") as f:
+    kustomization = yaml.safe_load(f) or {}
+resources = set(kustomization.get("resources") or [])
+for resource in ("jaeger.yaml", "langfuse.yaml"):
+    if resource not in resources:
+        print(f"deploy/k8s/kustomization.yaml: missing {resource}", file=sys.stderr)
+        sys.exit(1)
+
+with open("deploy/k8s/ingress.yaml", encoding="utf-8") as f:
+    docs = [doc for doc in yaml.safe_load_all(f) if doc]
+
+def ingress_by_host(host):
+    for doc in docs:
+        if doc.get("kind") != "Ingress":
+            continue
+        for rule in doc.get("spec", {}).get("rules", []) or []:
+            if rule.get("host") == host:
+                return doc, rule
+    return None, None
+
+def backend_for(rule, path):
+    for item in rule.get("http", {}).get("paths", []) or []:
+        if item.get("path") == path:
+            service = item.get("backend", {}).get("service", {})
+            return service.get("name"), service.get("port", {}).get("number")
+    return None, None
+
+expected = {
+    "jaeger.agenticim.xyz": ("jaeger-collector", 16686, "jaeger-agenticim-xyz-tls"),
+    "langfuse.agenticim.xyz": ("langfuse", 3000, "langfuse-agenticim-xyz-tls"),
+}
+for host, (svc, port, tls_secret) in expected.items():
+    ingress, rule = ingress_by_host(host)
+    if not ingress:
+        print(f"deploy/k8s/ingress.yaml: missing ingress rule for {host}", file=sys.stderr)
+        sys.exit(1)
+    tls_hosts = {
+        tls_host: tls.get("secretName")
+        for tls in ingress.get("spec", {}).get("tls", []) or []
+        for tls_host in tls.get("hosts", []) or []
+    }
+    if tls_hosts.get(host) != tls_secret:
+        print(f"deploy/k8s/ingress.yaml: {host} must use TLS secret {tls_secret}", file=sys.stderr)
+        sys.exit(1)
+    got_svc, got_port = backend_for(rule, "/")
+    if (got_svc, got_port) != (svc, port):
+        print(f"deploy/k8s/ingress.yaml: {host}/ routes to {(got_svc, got_port)}, want {(svc, port)}", file=sys.stderr)
+        sys.exit(1)
+
+jaeger_ingress, _ = ingress_by_host("jaeger.agenticim.xyz")
+annotations = jaeger_ingress.get("metadata", {}).get("annotations", {}) or {}
+if "agents-im-observability-basic-auth@kubernetescrd" not in annotations.get("traefik.ingress.kubernetes.io/router.middlewares", ""):
+    print("deploy/k8s/ingress.yaml: jaeger public ingress must require observability basic auth middleware", file=sys.stderr)
+    sys.exit(1)
+
+with open("deploy/k8s/langfuse.yaml", encoding="utf-8") as f:
+    langfuse_docs = [doc for doc in yaml.safe_load_all(f) if doc]
+if not any(doc.get("kind") == "Deployment" and doc.get("metadata", {}).get("name") == "langfuse" for doc in langfuse_docs):
+    print("deploy/k8s/langfuse.yaml: missing langfuse Deployment", file=sys.stderr)
+    sys.exit(1)
+if not any(doc.get("kind") == "Service" and doc.get("metadata", {}).get("name") == "langfuse" for doc in langfuse_docs):
+    print("deploy/k8s/langfuse.yaml: missing langfuse Service", file=sys.stderr)
+    sys.exit(1)
+
+with open("deploy/k8s/secrets.example.yaml", encoding="utf-8") as f:
+    secrets_text = f.read()
+for required in ("LANGFUSE_DATABASE_URL", "NEXTAUTH_SECRET", "SALT", "ENCRYPTION_KEY", "observability-basic-auth"):
+    if required not in secrets_text:
+        print(f"deploy/k8s/secrets.example.yaml: missing {required}", file=sys.stderr)
+        sys.exit(1)
+PY
+
 if rg -n "RequestURI|RawQuery|DumpRequest|Authorization|password|token" internal/observability; then
   echo "observability helpers must not log or inspect secrets, auth headers, bodies, or query strings" >&2
   exit 1

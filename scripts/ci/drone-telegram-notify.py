@@ -3,12 +3,14 @@
 
 Attribution is resolved from trusted project metadata, not free-form chat:
 1. PR source branch path: <type>/<agent>/issue-<number>-<task>
-2. commit trailer: Agent: <agent>
-3. commit subject marker: <type>(<scope>)[<agent>]: <title>
+2. commit subject marker: <type>(<scope>)[<agent>]: <title>
+3. commit trailer: Agent: <agent>
 4. commit author email: <agent>@agents.noreply.local
 
 The branch agent is intentionally first for PR notifications because CI now
 hard-rejects branches without a trusted agent in the second path segment.
+Main/devops push deploys are integration branches, so they can still resolve
+ownership from the merge/squash commit subject marker, trailer, or author email.
 """
 from __future__ import annotations
 
@@ -91,10 +93,20 @@ def commit_author_name() -> str:
 
 
 def agent_from_branch(branch: str) -> Optional[str]:
-    match = BRANCH_RE.match(branch or "")
-    if not match:
-        return None
-    return match.group("agent")
+    branch = branch or ""
+    match = BRANCH_RE.match(branch)
+    if match:
+        return match.group("agent")
+
+    # Legacy compatibility: older open PRs may predate the hard branch gate and
+    # use names such as `ci/telegram-drone-notify`. When no stronger signal is
+    # present, infer from known task slugs so success/failure notifications still
+    # mention the responsible agent instead of silently omitting @mentions.
+    legacy_slug_map = {
+        "telegram-drone-notify": "eino",
+    }
+    tail = branch.split("/", 1)[1] if "/" in branch else branch
+    return legacy_slug_map.get(tail)
 
 
 def agent_from_trailer(message: str) -> Optional[str]:
@@ -147,23 +159,24 @@ def resolve_attribution() -> Attribution:
         warnings.append(f"Attribution mismatch: {detail}")
 
     # PR branches are now the enforced source of agent ownership. For main/devops
-    # push deploys, branch is an integration branch, so fall back to trailers/email.
+    # push deploys, branch is an integration branch, so fall back to subject,
+    # trailers, and email.
     if branch_agent:
         agent = branch_agent
-        method = "branch"
-    elif trailer_agent:
-        agent = trailer_agent
-        method = "commit trailer"
+        method = "branch" if BRANCH_RE.match(branch or "") else "legacy branch"
     elif subject_agent:
         agent = subject_agent
         method = "commit subject"
+    elif trailer_agent:
+        agent = trailer_agent
+        method = "commit trailer"
     elif email_agent:
         agent = email_agent
         method = "author email"
     else:
         agent = None
         method = "unresolved"
-        warnings.append("No trusted agent found in branch, Agent trailer, subject marker, or author email")
+        warnings.append("No trusted agent found in branch, subject marker, Agent trailer, or author email")
 
     mention = TRUSTED_AGENTS[agent]["mention"] if agent else ""
     return Attribution(agent=agent, method=method, mention=mention, warnings=warnings)

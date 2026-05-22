@@ -5,6 +5,8 @@ resources:
   - python-executor-rbac.yaml
   - configmap.yaml
   - jaeger.yaml
+  - langfuse.yaml
+  - prometheus-grafana.yaml
   - services.yaml
   - deployments.yaml
   - ingress.yaml

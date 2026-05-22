@@ -207,7 +207,7 @@ order by created_at desc, prompt_id
 
 func (r *PostgresRepository) ReplacePromptBindings(ctx context.Context, agentID string, promptIDs []string, createdBy string) ([]model.AgentPromptBinding, error) {
 	bindings := make([]model.AgentPromptBinding, 0, len(promptIDs))
-	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+	err := r.withTx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		if _, err := session.ExecCtx(ctx, `
 delete from agent_prompt_bindings
 where agent_id = $1
@@ -461,7 +461,7 @@ order by tool_id
 
 func (r *PostgresRepository) ReplaceToolBindings(ctx context.Context, agentID string, toolIDs []string, createdBy string) ([]model.AgentToolBinding, error) {
 	bindings := make([]model.AgentToolBinding, 0, len(toolIDs))
-	err := r.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
+	err := r.withTx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		if _, err := session.ExecCtx(ctx, `
 delete from agent_tool_bindings
 where agent_id = $1

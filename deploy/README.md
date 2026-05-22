@@ -18,6 +18,12 @@ The bootstrap script writes middleware config to `/opt/agents-im/middleware/.env
 
 Langfuse LLM observability is additive to the existing admin LLM trace/audit tables. The default host is `https://langfuse.agenticim.xyz`, configured through `LANGFUSE_HOST`; credentials are read only from `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` in environment/k3s secrets. Keep the values in server/k3s secret storage only, never in Git, issue comments, or chat transcripts. Leave `LLM_OBSERVABILITY_ENABLED=false` and `LLM_OBSERVABILITY_BACKEND=noop` until both Langfuse credentials are present.
 
+The Langfuse web UI is deployed by k3s at `https://langfuse.agenticim.xyz/` using `deploy/k8s/langfuse.yaml`. It reads its own runtime secrets from `agents-im-secrets`: `LANGFUSE_DATABASE_URL`, `NEXTAUTH_SECRET`, `SALT`, and `ENCRYPTION_KEY`. `scripts/bootstrap-server.sh` generates those values and creates a separate `langfuse` PostgreSQL database for new servers; existing servers must add them to the k3s secret and create the database before applying the Langfuse deployment. Do not expose the values in logs or chat.
+
+Jaeger UI is exposed at `https://jaeger.agenticim.xyz/` only behind Traefik basic-auth middleware backed by the `agents-im/observability-basic-auth` Secret. `scripts/bootstrap-server.sh` creates that Secret for new servers and stores the generated operator credentials on the server at `/opt/agents-im/observability-basic-auth.env` with mode `0600`.
+
+Prometheus and Grafana are deployed by k3s from `deploy/k8s/prometheus-grafana.yaml`. Prometheus is exposed at `https://prometheus.agenticim.xyz/` behind the same `observability-basic-auth` Traefik middleware used by Jaeger. Grafana is exposed at `https://grafana.agenticim.xyz/` and uses its own login backed by the `agents-im/grafana-admin` Secret. `scripts/bootstrap-server.sh` creates that Secret for new servers and stores the generated operator credentials at `/opt/agents-im/grafana-admin.env` with mode `0600`. Keep both credential files and k8s Secret values off Git, issues, and chat transcripts.
+
 ## Drone repository secrets
 
 Drone is deployed at `https://drone.agenticim.xyz` and the `wujunhui99/agents_im` repository must be active in Drone. Secrets are configured at repository scope in Drone, not in Git.
@@ -65,19 +71,30 @@ Production public entrypoints:
 
 - User web app: `https://agenticim.xyz/`
 - Management System (MS): `https://ms.agenticim.xyz/`
+- Prometheus: `https://prometheus.agenticim.xyz/` (Traefik basic-auth, same operator credentials as Jaeger)
+- Grafana: `https://grafana.agenticim.xyz/` (Grafana login from the `grafana-admin` Secret)
 
-Jaeger tracing is deployed as an internal k3s service only:
+Jaeger tracing is deployed as a k3s service and exposed through authenticated Traefik ingress:
 
 - OTLP gRPC/HTTP collector: `jaeger-collector.agents-im.svc.cluster.local:4317` / `:4318`
-- Query UI service port: `jaeger-collector:16686`
+- Query UI: `https://jaeger.agenticim.xyz/`
 
-The prepared domain `https://jaeger.agenticim.xyz` is intentionally not routed by these manifests because there is no reviewed authentication/network access model for the trace UI. Use private access such as:
+The public Jaeger UI route must keep the `agents-im-observability-basic-auth@kubernetescrd` middleware attached. Trace data can reveal topology, route names, internal IDs, latency, and error details, so do not remove that access control boundary. Operators can also use private access when needed:
 
 ```bash
 kubectl -n agents-im port-forward svc/jaeger-collector 16686:16686
 ```
 
-Then search `http://127.0.0.1:16686/search?traceID=<trace_id>`. Public exposure requires authenticated middleware, VPN/private network access, or an approved IP allowlist.
+Then search `http://127.0.0.1:16686/search?traceID=<trace_id>`.
+
+Prometheus scrapes the in-cluster Prometheus service, node-exporter, and the REST/worker services that expose `/metrics`: `user-api`, `auth-api`, `friends-api`, `message-api`, `gateway-ws`, `groups-api`, `agent-api`, and `message-transfer`. It intentionally avoids high-cardinality labels such as account IDs, conversation IDs, message IDs, trace IDs, prompts, or message content. The default production manifest keeps retention bounded to 7 days / 7 GiB so the single-node k3s host does not grow unbounded.
+
+Grafana provisions Prometheus as the default datasource through `grafana-provisioning` and stores dashboard/user state on the `grafana-data` PVC. If Grafana admin credentials need rotation, update the `grafana-admin` Secret and `/opt/agents-im/grafana-admin.env`, then restart the Grafana deployment.
+
+Langfuse LLM observability has two pieces:
+
+- In-app export configuration through `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`.
+- The self-hosted Langfuse UI at `https://langfuse.agenticim.xyz/`, deployed by `deploy/k8s/langfuse.yaml` and backed by the k3s `agents-im-secrets` values `LANGFUSE_DATABASE_URL`, `NEXTAUTH_SECRET`, `SALT`, and `ENCRYPTION_KEY`.
 
 The Management System root serves the web SPA and the frontend opens the read-only admin console from that host. On `ms.agenticim.xyz`, Ingress exposes only the admin API prefixes served by `message-api` (`/admin/dashboard`, `/admin/llm-traces`, `/admin/conversations`, `/admin/users`) plus `/` to `web`. `admin.agenticim.xyz` is deprecated and has a Traefik permanent redirect to the same path on `https://ms.agenticim.xyz`; do not use it as the primary management entrypoint.
 
