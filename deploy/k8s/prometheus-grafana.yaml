@@ -209,6 +209,11 @@ data:
         url: http://prometheus.agents-im.svc.cluster.local:9090
         isDefault: true
         editable: false
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.agents-im.svc.cluster.local:3100
+        editable: false
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

@@ -162,7 +162,7 @@ CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从集成分支发
 - `gofmt` check，发现未格式化 Go 文件即失败。
 - `go test ./...` 运行普通 Go 测试；默认不设置 PostgreSQL DSN，确保普通测试不依赖真实 PG。
 - `bash scripts/verify-static.sh`，检查仓库关键文件、接口、文档、Drone workflow 约束，并调用 `scripts/ci/verify-migration-immutability.sh` 禁止 PR 修改历史 migration。
-- `scripts/ci/drone-telegram-notify.py` 在 success / failure 都发送 Telegram 通知，并从分支第二段、`Agent:` trailer、author email 解析负责 Agent，在群里 @ 对应 bot；归因冲突会在通知中展示 warning。
+- `scripts/ci/drone-telegram-notify.py` 在 success / failure 都发送 Telegram 通知；开发 PR 从分支第二段、`Agent:` trailer、subject `[agent]`、author email 解析负责 Agent，在群里 @ 对应 bot；归因冲突会在通知中展示 warning。`main` / `devops` push 是 release / CI-CD operation，固定 @ Eino。
 - `docker compose config`，验证 Compose 配置可解析。
 - Markdown link check，排除 `docs/references/` 和 `.ai-context/`，并忽略外部 HTTP/HTTPS 链接波动。
 
@@ -195,6 +195,8 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 ## CD / Deployment
 
 部署只在 `main` / `devops` 等集成分支 push 时运行，普通 MR 不跑部署。部署 pipeline 是 `deploy-main`，它会：
+
+`main` / `devops` push 的 Drone 通知固定归 Eino（`@eino_hermes_bot`）：`main` 是 release/deploy 批次，可能包含多个 Agent 的开发提交；`devops` 是 CI/CD lane。Eino 先分诊 deploy/runtime/CI 问题，只有根因明确指向某个功能变更时再二次 @ 对应 Agent。
 
 1. 检测是否需要构建镜像。
 2. 构建并推送镜像。

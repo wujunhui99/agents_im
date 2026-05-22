@@ -7,10 +7,10 @@ Attribution is resolved from trusted project metadata, not free-form chat:
 3. commit trailer: Agent: <agent>
 4. commit author email: <agent>@agents.noreply.local
 
-The branch agent is intentionally first for PR notifications because CI now
-hard-rejects branches without a trusted agent in the second path segment.
-Main/devops push deploys are integration branches, so they can still resolve
-ownership from the merge/squash commit subject marker, trailer, or author email.
+Development PR notifications are attributed to the responsible feature agent.
+Integration/release push notifications on ``main`` and ``devops`` are owned by
+Eino because they may include changes from multiple agents and need CI/CD
+triage before routing to a feature owner.
 """
 from __future__ import annotations
 
@@ -134,10 +134,31 @@ def agent_from_email(email: str) -> Optional[str]:
     return None
 
 
+def integration_push_owner(branch: str, event: str) -> Optional[Attribution]:
+    if (event or "").lower() != "push":
+        return None
+    if branch not in {"main", "devops"}:
+        return None
+
+    method = "main release owner" if branch == "main" else "devops owner"
+    return Attribution(
+        agent="eino",
+        method=method,
+        mention=TRUSTED_AGENTS["eino"]["mention"],
+        warnings=[],
+    )
+
+
 def resolve_attribution() -> Attribution:
+    event = env("DRONE_BUILD_EVENT") or env("DRONE_EVENT")
     source_branch = env("DRONE_SOURCE_BRANCH")
     commit_branch = env("DRONE_COMMIT_BRANCH")
     branch = source_branch or commit_branch
+
+    integration_owner = integration_push_owner(commit_branch or branch, event)
+    if integration_owner:
+        return integration_owner
+
     message = commit_message()
     email = commit_author_email()
 
@@ -158,9 +179,10 @@ def resolve_attribution() -> Attribution:
         detail = ", ".join(f"{k}={v}" for k, v in non_empty.items())
         warnings.append(f"Attribution mismatch: {detail}")
 
-    # PR branches are now the enforced source of agent ownership. For main/devops
-    # push deploys, branch is an integration branch, so fall back to subject,
-    # trailers, and email.
+    # Development PRs are attributed to the feature owner. The branch is the
+    # first choice for PR notifications because CI hard-rejects new source
+    # branches without a trusted agent in the second path segment. Integration
+    # pushes to main/devops return early above and are always owned by Eino.
     if branch_agent:
         agent = branch_agent
         method = "branch" if BRANCH_RE.match(branch or "") else "legacy branch"
