@@ -21,6 +21,8 @@ LANGFUSE_SALT="${LANGFUSE_SALT:-}"
 LANGFUSE_ENCRYPTION_KEY="${LANGFUSE_ENCRYPTION_KEY:-}"
 OBSERVABILITY_BASIC_AUTH_USER="${OBSERVABILITY_BASIC_AUTH_USER:-admin}"
 OBSERVABILITY_BASIC_AUTH_PASSWORD="${OBSERVABILITY_BASIC_AUTH_PASSWORD:-}"
+GRAFANA_ADMIN_USER="${GRAFANA_ADMIN_USER:-admin}"
+GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-}"
 OBJECT_STORAGE_EXTERNAL_ENDPOINT="${OBJECT_STORAGE_EXTERNAL_ENDPOINT:-}"
 OBJECT_STORAGE_EXTERNAL_USE_SSL="${OBJECT_STORAGE_EXTERNAL_USE_SSL:-true}"
 GITHUB_ACTOR="${GITHUB_ACTOR:-}"
@@ -59,6 +61,7 @@ LANGFUSE_NEXTAUTH_SECRET="${LANGFUSE_NEXTAUTH_SECRET:-$(openssl rand -base64 32)
 LANGFUSE_SALT="${LANGFUSE_SALT:-$(random_hex)}"
 LANGFUSE_ENCRYPTION_KEY="${LANGFUSE_ENCRYPTION_KEY:-$(random_hex)}"
 OBSERVABILITY_BASIC_AUTH_PASSWORD="${OBSERVABILITY_BASIC_AUTH_PASSWORD:-$(openssl rand -base64 24)}"
+GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-$(openssl rand -base64 24)}"
 
 if [[ -z "${OBJECT_STORAGE_EXTERNAL_ENDPOINT}" ]]; then
   echo "OBJECT_STORAGE_EXTERNAL_ENDPOINT is required for browser uploads in production" >&2
@@ -134,12 +137,22 @@ kubectl -n "${NAMESPACE}" create secret generic observability-basic-auth \
   --from-literal=users="${observability_htpasswd}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
+kubectl -n "${NAMESPACE}" create secret generic grafana-admin \
+  --from-literal=admin-user="${GRAFANA_ADMIN_USER}" \
+  --from-literal=admin-password="${GRAFANA_ADMIN_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 install -d -m 0700 "${APP_DIR}"
 {
   printf 'OBSERVABILITY_BASIC_AUTH_USER=%s\n' "${OBSERVABILITY_BASIC_AUTH_USER}"
   printf 'OBSERVABILITY_BASIC_AUTH_PASSWORD=%s\n' "${OBSERVABILITY_BASIC_AUTH_PASSWORD}"
 } > "${APP_DIR}/observability-basic-auth.env"
 chmod 600 "${APP_DIR}/observability-basic-auth.env"
+{
+  printf 'GRAFANA_ADMIN_USER=%s\n' "${GRAFANA_ADMIN_USER}"
+  printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "${GRAFANA_ADMIN_PASSWORD}"
+} > "${APP_DIR}/grafana-admin.env"
+chmod 600 "${APP_DIR}/grafana-admin.env"
 
 if [[ -n "${GITHUB_ACTOR}" && -n "${GITHUB_TOKEN}" ]]; then
   kubectl -n "${NAMESPACE}" create secret docker-registry ghcr-pull-secret \

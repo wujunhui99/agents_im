@@ -463,6 +463,15 @@ func TestResolveLLMObservabilityCanEnableLangfuseFromEnv(t *testing.T) {
 	}
 }
 
+func TestResolveLLMObservabilityRejectsUnsupportedBackend(t *testing.T) {
+	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuze")
+
+	_, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
+	if err == nil || !strings.Contains(err.Error(), "unsupported llm observability backend") {
+		t.Fatalf("expected unsupported backend error, got %v", err)
+	}
+}
+
 func TestResolveGatewayWSConfigDefaultsAreProductionSafe(t *testing.T) {
 	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "")
 	t.Setenv("GATEWAY_WS_ALLOW_QUERY_TOKEN", "")
