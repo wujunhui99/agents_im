@@ -342,7 +342,7 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 	}
 }
 
-func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendOrFakeAIMessage(t *testing.T) {
+func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifiesUser(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogic(messageRepo)
@@ -415,11 +415,21 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendOrFakeAIMes
 	if pullErr != nil {
 		t.Fatalf("pull after provider failure: %v", pullErr)
 	}
-	if len(pulled.Messages) != 1 {
-		t.Fatalf("provider failure created fake AI message: %+v", pulled.Messages)
+	if len(pulled.Messages) != 2 {
+		t.Fatalf("provider failure messages = %+v, want original human message plus user-visible failure notice", pulled.Messages)
 	}
 	if strings.Contains(pulled.Messages[0].Content, "AI reply") {
 		t.Fatalf("human message content was replaced by fake text: %+v", pulled.Messages[0])
+	}
+	failureNotice := pulled.Messages[1]
+	if failureNotice.MessageOrigin != logic.MessageOriginAI || failureNotice.AgentAccountID != "usr_a" || failureNotice.TriggerServerMsgID == "" {
+		t.Fatalf("failure notice metadata mismatch: %+v", failureNotice)
+	}
+	if !strings.Contains(failureNotice.Content, "AI 助手这次处理失败") || !strings.Contains(failureNotice.Content, "模型或工具权限配置不可用") {
+		t.Fatalf("failure notice content = %q, want user-readable provider failure", failureNotice.Content)
+	}
+	if strings.Contains(failureNotice.Content, "DEEPSEEK_API_KEY") || strings.Contains(failureNotice.Content, missingProviderErr.Error()) {
+		t.Fatalf("failure notice leaked internal provider configuration: %q", failureNotice.Content)
 	}
 }
 
