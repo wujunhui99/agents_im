@@ -125,22 +125,24 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 		observability.RecordSpanError(span, err)
 		finishedAt := now().UTC()
 		o.observeLLMRun(ctx, llmObsFailedFromTrigger(normalized, "", startedAt, finishedAt, "runtime_request_error", err))
-		auditErr := o.recordFailedRun(ctx, normalized, "", startedAt, finishedAt, "runtime_request_error", err)
+		auditRun, auditErr := o.recordFailedRun(ctx, normalized, "", startedAt, finishedAt, "runtime_request_error", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
-		return AgentRunOrchestratorResult{}, err
+		o.notifyRunFailure(ctx, normalized, auditRun.RunID, "runtime_request_error", err)
+		return AgentRunOrchestratorResult{AuditRun: auditRun}, err
 	}
 	runtimeReq, err = normalizeRuntimeRequestForTrigger(runtimeReq, normalized)
 	if err != nil {
 		observability.RecordSpanError(span, err)
 		finishedAt := now().UTC()
 		o.observeLLMRun(ctx, llmObsFailedFromRequest(normalized, runtimeReq, agentruntime.RunResult{}, startedAt, finishedAt, "runtime_request_invalid", err))
-		auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_request_invalid", err)
+		auditRun, auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_request_invalid", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
-		return AgentRunOrchestratorResult{}, err
+		o.notifyRunFailure(ctx, normalized, auditRun.RunID, "runtime_request_invalid", err)
+		return AgentRunOrchestratorResult{AuditRun: auditRun}, err
 	}
 
 	o.observeLLMRun(ctx, llmObsStartedFromRequest(normalized, runtimeReq, startedAt))
@@ -149,11 +151,12 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	if err != nil {
 		observability.RecordSpanError(span, err)
 		o.observeLLMRun(ctx, llmObsFailedFromRequest(normalized, runtimeReq, agentruntime.RunResult{}, startedAt, finishedAt, "runtime_error", err))
-		auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_error", err)
+		auditRun, auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_error", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
-		return AgentRunOrchestratorResult{}, err
+		o.notifyRunFailure(ctx, normalized, auditRun.RunID, "runtime_error", err)
+		return AgentRunOrchestratorResult{AuditRun: auditRun}, err
 	}
 	runtimeResult, err = agentruntime.NormalizeRunResult(runtimeResult)
 	if err != nil {
@@ -163,22 +166,24 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 			code = "empty_final_text"
 		}
 		o.observeLLMRun(ctx, llmObsFailedFromRequest(normalized, runtimeReq, runtimeResult, startedAt, finishedAt, code, err))
-		auditErr := o.recordFailedRun(ctx, normalized, runtimeResult.RunID, startedAt, finishedAt, code, err)
+		auditRun, auditErr := o.recordFailedRun(ctx, normalized, runtimeResult.RunID, startedAt, finishedAt, code, err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
-		return AgentRunOrchestratorResult{}, err
+		o.notifyRunFailure(ctx, normalized, auditRun.RunID, code, err)
+		return AgentRunOrchestratorResult{AuditRun: auditRun}, err
 	}
 	runtimeResult.FinalText = strings.TrimSpace(runtimeResult.FinalText)
 	if runtimeReq.RunID != "" && runtimeResult.RunID != runtimeReq.RunID {
 		err := apperror.Internal("runtime returned mismatched run_id")
 		observability.RecordSpanError(span, err)
 		o.observeLLMRun(ctx, llmObsFailedFromRequest(normalized, runtimeReq, runtimeResult, startedAt, finishedAt, "runtime_result_invalid", err))
-		auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_result_invalid", err)
+		auditRun, auditErr := o.recordFailedRun(ctx, normalized, runtimeReq.RunID, startedAt, finishedAt, "runtime_result_invalid", err)
 		if auditErr != nil {
 			return AgentRunOrchestratorResult{}, errors.Join(err, fmt.Errorf("record failed agent run audit: %w", auditErr))
 		}
-		return AgentRunOrchestratorResult{}, err
+		o.notifyRunFailure(ctx, normalized, auditRun.RunID, "runtime_result_invalid", err)
+		return AgentRunOrchestratorResult{AuditRun: auditRun}, err
 	}
 
 	finalText := runtimeResult.FinalText
@@ -241,8 +246,8 @@ func (o *AgentRunOrchestrator) observeLLMRun(ctx context.Context, event llmobs.E
 	}
 }
 
-func (o *AgentRunOrchestrator) recordFailedRun(ctx context.Context, trigger AgentTrigger, runID string, startedAt time.Time, finishedAt time.Time, code string, cause error) error {
-	_, err := o.audit.RecordAgentRun(ctx, agentaudit.CreateRunInput{
+func (o *AgentRunOrchestrator) recordFailedRun(ctx context.Context, trigger AgentTrigger, runID string, startedAt time.Time, finishedAt time.Time, code string, cause error) (agentaudit.AgentRun, error) {
+	return o.audit.RecordAgentRun(ctx, agentaudit.CreateRunInput{
 		RunID:            runID,
 		AgentID:          trigger.AgentUserID,
 		ConversationID:   trigger.ConversationID,
@@ -257,7 +262,47 @@ func (o *AgentRunOrchestrator) recordFailedRun(ctx context.Context, trigger Agen
 		StartedAt:        startedAt,
 		FinishedAt:       finishedAt,
 	})
-	return err
+}
+
+func (o *AgentRunOrchestrator) notifyRunFailure(ctx context.Context, trigger AgentTrigger, runID string, code string, cause error) {
+	if o == nil || o.writer == nil {
+		return
+	}
+	text := userVisibleRunFailureText(code, cause)
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	responseReq, err := buildAgentResponseRequest(trigger, runID, text, false)
+	if err != nil {
+		logx.Errorf("build agent failure notice failed request_id=%q conversation_id=%q agent_account_id=%q: %v",
+			trigger.RequestID, trigger.ConversationID, trigger.AgentUserID, err)
+		return
+	}
+	if _, err := o.writer.WriteAgentResponse(ctx, responseReq); err != nil {
+		logx.Errorf("write agent failure notice failed request_id=%q conversation_id=%q agent_account_id=%q: %v",
+			trigger.RequestID, trigger.ConversationID, trigger.AgentUserID, err)
+	}
+}
+
+func userVisibleRunFailureText(code string, cause error) string {
+	category := "服务暂时不可用"
+	message := ""
+	if cause != nil {
+		message = strings.ToLower(cause.Error())
+		if app := apperror.From(cause); app.Message != "" {
+			message = strings.ToLower(app.Message + " " + cause.Error())
+		}
+	}
+	if strings.Contains(message, "tool not found") || strings.Contains(message, "tool") || strings.Contains(message, "工具") {
+		category = "工具配置不可用"
+	} else if strings.Contains(message, "timeout") || strings.Contains(message, "deadline") || strings.Contains(message, "超时") {
+		category = "模型响应超时"
+	} else if strings.Contains(message, "api key") || strings.Contains(message, "unauthorized") || strings.Contains(message, "forbidden") || strings.Contains(message, "权限") {
+		category = "模型或工具权限配置不可用"
+	} else if strings.Contains(strings.ToLower(strings.TrimSpace(code)), "empty_final_text") {
+		category = "模型没有返回有效回复"
+	}
+	return "抱歉，AI 助手这次处理失败了。错误类型：" + category + "。我已经记录了这次失败，请稍后重试或联系管理员排查。"
 }
 
 func normalizeAgentTriggerForRun(trigger AgentTrigger) (AgentTrigger, error) {

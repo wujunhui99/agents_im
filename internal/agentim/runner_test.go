@@ -3,6 +3,7 @@ package agentim
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -97,14 +98,27 @@ func TestAgentRunOrchestratorSuccessWritesAuditedResponse(t *testing.T) {
 	}
 }
 
-func TestAgentRunOrchestratorRuntimeFailureRecordsFailedAudit(t *testing.T) {
-	runtimeErr := errors.New("runtime unavailable")
+func TestAgentRunOrchestratorRuntimeFailureRecordsFailedAuditAndNotifiesUser(t *testing.T) {
+	runtimeErr := errors.New("deepseek generate AI hosting reply: NOT_FOUND: tool not found")
 	runtime := &recordingAgentRuntime{err: runtimeErr}
 	builder := &recordingRuntimeRequestBuilder{request: validRuntimeRequestForTrigger(testAgentTrigger())}
 	audit := &recordingAgentRunAuditRecorder{
 		run: agentaudit.AgentRun{RunID: "run_failed_1"},
 	}
-	writer := &recordingAgentResponseWriter{}
+	writer := &recordingAgentResponseWriter{
+		result: AgentResponseResult{
+			Message: logic.Message{
+				ServerMsgID:    "msg_failure_notice_1",
+				ConversationID: "single:agent_1:user_1",
+				Seq:            9,
+				SenderID:       "agent_1",
+				ReceiverID:     "user_1",
+				ChatType:       ConversationTypeSingle,
+				ContentType:    ContentTypeText,
+				Content:        "抱歉，AI 助手这次处理失败了。错误类型：工具配置不可用。",
+			},
+		},
+	}
 	orchestrator := newTestAgentRunOrchestrator(t, runtime, builder, audit, writer)
 
 	_, err := orchestrator.Run(context.Background(), testAgentTrigger())
@@ -117,8 +131,20 @@ func TestAgentRunOrchestratorRuntimeFailureRecordsFailedAudit(t *testing.T) {
 	if audit.lastInput.Status != agentaudit.StatusFailed || audit.lastInput.ErrorCode != "runtime_error" {
 		t.Fatalf("audit did not record runtime failure: %+v", audit.lastInput)
 	}
-	if writer.calls != 0 {
-		t.Fatalf("writer calls = %d, want 0", writer.calls)
+	if writer.calls != 1 {
+		t.Fatalf("writer calls = %d, want user-visible failure notice", writer.calls)
+	}
+	if writer.lastReq.AgentRunID != "run_failed_1" || writer.lastReq.TriggerMessageID != "msg_user_1" {
+		t.Fatalf("failure notice metadata mismatch: %+v", writer.lastReq)
+	}
+	if writer.lastReq.ReceiverUserID != "user_1" || writer.lastReq.GroupID != "" {
+		t.Fatalf("failure notice target mismatch: %+v", writer.lastReq)
+	}
+	if !strings.Contains(writer.lastReq.Text, "AI 助手这次处理失败") || !strings.Contains(writer.lastReq.Text, "工具配置不可用") {
+		t.Fatalf("failure notice text = %q, want user-readable tool config failure", writer.lastReq.Text)
+	}
+	if strings.Contains(writer.lastReq.Text, "NOT_FOUND") || strings.Contains(writer.lastReq.Text, "tool not found") || strings.Contains(writer.lastReq.Text, "deepseek") {
+		t.Fatalf("failure notice leaked internal error: %q", writer.lastReq.Text)
 	}
 }
 
@@ -178,8 +204,11 @@ func TestAgentRunOrchestratorRequestBuilderFailureRecordsFailedAudit(t *testing.
 	if audit.calls != 1 || audit.lastInput.Status != agentaudit.StatusFailed || audit.lastInput.ErrorCode != "runtime_request_error" {
 		t.Fatalf("audit did not record request build failure: calls=%d input=%+v", audit.calls, audit.lastInput)
 	}
-	if writer.calls != 0 {
-		t.Fatalf("writer calls = %d, want 0", writer.calls)
+	if writer.calls != 1 {
+		t.Fatalf("writer calls = %d, want user-visible failure notice", writer.calls)
+	}
+	if !strings.Contains(writer.lastReq.Text, "AI 助手这次处理失败") {
+		t.Fatalf("failure notice text = %q, want user-readable notice", writer.lastReq.Text)
 	}
 }
 
@@ -225,8 +254,11 @@ func TestAgentRunOrchestratorRejectsEmptyFinalText(t *testing.T) {
 	if audit.lastInput.Status != agentaudit.StatusFailed || audit.lastInput.ErrorCode != "empty_final_text" {
 		t.Fatalf("audit did not record empty final text rejection: %+v", audit.lastInput)
 	}
-	if writer.calls != 0 {
-		t.Fatalf("writer calls = %d, want 0", writer.calls)
+	if writer.calls != 1 {
+		t.Fatalf("writer calls = %d, want user-visible failure notice", writer.calls)
+	}
+	if !strings.Contains(writer.lastReq.Text, "AI 助手这次处理失败") {
+		t.Fatalf("failure notice text = %q, want user-readable notice", writer.lastReq.Text)
 	}
 }
 
