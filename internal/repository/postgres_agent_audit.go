@@ -9,6 +9,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
+	"github.com/wujunhui99/agents_im/internal/idgen"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
@@ -108,7 +109,7 @@ func NewPostgresAgentAuditRepository(dataSource string) (*PostgresAgentAuditRepo
 }
 
 func NewPostgresAgentAuditRepositoryFromConn(conn sqlx.SqlConn) *PostgresAgentAuditRepository {
-	return &PostgresAgentAuditRepository{conn: conn, now: time.Now, newID: newAuditID}
+	return &PostgresAgentAuditRepository{conn: conn, now: time.Now, newID: newPostgresAuditID}
 }
 
 func (r *PostgresAgentAuditRepository) CreateAgentRun(ctx context.Context, input agentaudit.CreateRunInput) (agentaudit.AgentRun, error) {
@@ -140,8 +141,8 @@ insert into agent_runs (
   status, input_summary, output_summary, output_message_id,
   error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 )
-values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16)
-returning run_id, agent_id, conversation_id, trigger_message_id, requesting_user_id,
+values ($1::bigint, $2::bigint, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16)
+returning run_id::text as run_id, agent_id::text as agent_id, conversation_id, trigger_message_id, requesting_user_id,
           status, input_summary, output_summary, output_message_id,
           error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 `, normalized.RunID, normalized.AgentID, normalized.ConversationID, normalized.TriggerMessageID, normalized.RequestingUserID,
@@ -160,11 +161,11 @@ func (r *PostgresAgentAuditRepository) GetAgentRun(ctx context.Context, runID st
 	}
 	var row postgresAgentRunAuditRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select run_id, agent_id, conversation_id, trigger_message_id, requesting_user_id,
+select run_id::text as run_id, agent_id::text as agent_id, conversation_id, trigger_message_id, requesting_user_id,
        status, input_summary, output_summary, output_message_id,
        error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 from agent_runs
-where run_id = $1
+where run_id = $1::bigint
 `, runID)
 	if err != nil {
 		if isNotFound(err) {
@@ -190,7 +191,7 @@ func (r *PostgresAgentAuditRepository) ListAgentRuns(ctx context.Context, filter
 	}
 	args = append(args, limit, offset)
 	query := `
-select run_id, agent_id, conversation_id, trigger_message_id, requesting_user_id,
+select run_id::text as run_id, agent_id::text as agent_id, conversation_id, trigger_message_id, requesting_user_id,
        status, input_summary, output_summary, output_message_id,
        error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 from agent_runs
@@ -220,7 +221,7 @@ func (r *PostgresAgentAuditRepository) GetAgentRunByTraceID(ctx context.Context,
 	}
 	var row postgresAgentRunAuditRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select run_id, agent_id, conversation_id, trigger_message_id, requesting_user_id,
+select run_id::text as run_id, agent_id::text as agent_id, conversation_id, trigger_message_id, requesting_user_id,
        status, input_summary, output_summary, output_message_id,
        error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 from agent_runs
@@ -277,8 +278,8 @@ insert into agent_tool_calls (
   input_summary, output_summary, duration_ms,
   error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 )
-values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16)
-returning tool_call_id, run_id, agent_id, tool_id, tool_name, status,
+values ($1::bigint, $2::bigint, $3::bigint, nullif($4, '')::bigint, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16)
+returning tool_call_id::text as tool_call_id, run_id::text as run_id, agent_id::text as agent_id, coalesce(tool_id::text, '') as tool_id, tool_name, status,
           input_summary, output_summary, duration_ms,
           error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 `, normalized.ToolCallID, normalized.RunID, normalized.AgentID, normalized.ToolID, normalized.ToolName, normalized.Status,
@@ -297,11 +298,11 @@ func (r *PostgresAgentAuditRepository) GetAgentToolCall(ctx context.Context, too
 	}
 	var row postgresAgentToolCallAuditRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select tool_call_id, run_id, agent_id, tool_id, tool_name, status,
+select tool_call_id::text as tool_call_id, run_id::text as run_id, agent_id::text as agent_id, coalesce(tool_id::text, '') as tool_id, tool_name, status,
        input_summary, output_summary, duration_ms,
        error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 from agent_tool_calls
-where tool_call_id = $1
+where tool_call_id = $1::bigint
 `, toolCallID)
 	if err != nil {
 		if isNotFound(err) {
@@ -318,11 +319,11 @@ func (r *PostgresAgentAuditRepository) ListAgentToolCallsByRunID(ctx context.Con
 	}
 	var rows []postgresAgentToolCallAuditRow
 	if err := r.conn.QueryRowsCtx(ctx, &rows, `
-select tool_call_id, run_id, agent_id, tool_id, tool_name, status,
+select tool_call_id::text as tool_call_id, run_id::text as run_id, agent_id::text as agent_id, coalesce(tool_id::text, '') as tool_id, tool_name, status,
        input_summary, output_summary, duration_ms,
        error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 from agent_tool_calls
-where run_id = $1
+where run_id = $1::bigint
 order by created_at asc, tool_call_id asc
 `, strings.TrimSpace(runID)); err != nil {
 		return nil, err
@@ -363,8 +364,8 @@ insert into agent_file_reads (
   status, byte_count, content_summary,
   error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 )
-values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17)
-returning file_read_id, run_id, agent_id, skill_id, file_id, object_key, sha256,
+values ($1::bigint, $2::bigint, $3::bigint, $4::bigint, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17)
+returning file_read_id::text as file_read_id, run_id::text as run_id, agent_id::text as agent_id, skill_id::text as skill_id, file_id, object_key, sha256,
           status, byte_count, content_summary,
           error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 `, normalized.FileReadID, normalized.RunID, normalized.AgentID, normalized.SkillID, normalized.FileID, normalized.ObjectKey,
@@ -383,11 +384,11 @@ func (r *PostgresAgentAuditRepository) GetAgentFileRead(ctx context.Context, fil
 	}
 	var row postgresAgentFileReadAuditRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select file_read_id, run_id, agent_id, skill_id, file_id, object_key, sha256,
+select file_read_id::text as file_read_id, run_id::text as run_id, agent_id::text as agent_id, skill_id::text as skill_id, file_id, object_key, sha256,
        status, byte_count, content_summary,
        error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 from agent_file_reads
-where file_read_id = $1
+where file_read_id = $1::bigint
 `, fileReadID)
 	if err != nil {
 		if isNotFound(err) {
@@ -404,11 +405,11 @@ func (r *PostgresAgentAuditRepository) ListAgentFileReadsByRunID(ctx context.Con
 	}
 	var rows []postgresAgentFileReadAuditRow
 	if err := r.conn.QueryRowsCtx(ctx, &rows, `
-select file_read_id, run_id, agent_id, skill_id, file_id, object_key, sha256,
+select file_read_id::text as file_read_id, run_id::text as run_id, agent_id::text as agent_id, skill_id::text as skill_id, file_id, object_key, sha256,
        status, byte_count, content_summary,
        error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 from agent_file_reads
-where run_id = $1
+where run_id = $1::bigint
 order by created_at asc, file_read_id asc
 `, strings.TrimSpace(runID)); err != nil {
 		return nil, err
@@ -465,8 +466,8 @@ insert into agent_python_execs (
   code_summary, resource_summary, stdout_summary, stderr_summary, result_summary,
   error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 )
-values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11, $12, $13, $14, $15, $16, $17)
-returning python_exec_id, run_id, agent_id, sandbox_request_id, status,
+values ($1::bigint, $2::bigint, $3::bigint, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11, $12, $13, $14, $15, $16, $17)
+returning python_exec_id::text as python_exec_id, run_id::text as run_id, agent_id::text as agent_id, sandbox_request_id, status,
           code_summary, resource_summary, stdout_summary, stderr_summary, result_summary,
           error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 `, normalized.PythonExecID, normalized.RunID, normalized.AgentID, normalized.SandboxRequestID, normalized.Status,
@@ -486,11 +487,11 @@ func (r *PostgresAgentAuditRepository) GetAgentPythonExec(ctx context.Context, p
 	}
 	var row postgresAgentPythonExecAuditRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select python_exec_id, run_id, agent_id, sandbox_request_id, status,
+select python_exec_id::text as python_exec_id, run_id::text as run_id, agent_id::text as agent_id, sandbox_request_id, status,
        code_summary, resource_summary, stdout_summary, stderr_summary, result_summary,
        error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 from agent_python_execs
-where python_exec_id = $1
+where python_exec_id = $1::bigint
 `, pythonExecID)
 	if err != nil {
 		if isNotFound(err) {
@@ -507,11 +508,11 @@ func (r *PostgresAgentAuditRepository) ListAgentPythonExecsByRunID(ctx context.C
 	}
 	var rows []postgresAgentPythonExecAuditRow
 	if err := r.conn.QueryRowsCtx(ctx, &rows, `
-select python_exec_id, run_id, agent_id, sandbox_request_id, status,
+select python_exec_id::text as python_exec_id, run_id::text as run_id, agent_id::text as agent_id, sandbox_request_id, status,
        code_summary, resource_summary, stdout_summary, stderr_summary, result_summary,
        error_code, error_message, trace_id, request_id, started_at, finished_at, created_at
 from agent_python_execs
-where run_id = $1
+where run_id = $1::bigint
 order by created_at asc, python_exec_id asc
 `, strings.TrimSpace(runID)); err != nil {
 		return nil, err
@@ -700,4 +701,8 @@ func mapAgentAuditInsertError(err error, alreadyExistsMessage string, notFoundMe
 		return apperror.InvalidArgument("invalid agent audit record")
 	}
 	return err
+}
+
+func newPostgresAuditID(prefix string) (string, error) {
+	return idgen.NewString()
 }
