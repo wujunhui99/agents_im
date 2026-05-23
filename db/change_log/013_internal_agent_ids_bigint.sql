@@ -1,0 +1,6 @@
+-- Change log for migration 013_internal_agent_ids_bigint.sql.
+--
+-- Converts internal database-generated agent registry and audit identifiers from
+-- prefixed text defaults to bigint identity columns. Keeps externally visible or
+-- protocol-shaped identifiers (account_id, conversation_id, client_msg_id,
+-- trace_id, request_id, etc.) as text.

@@ -115,15 +115,15 @@ insert into agent_prompts (
   name, description, content, variables_schema_json, version, status, created_by
 )
 values ($1, $2, $3, $4::jsonb, $5, $6, $7)
-returning prompt_id, name, description, content, variables_schema_json, version, status, created_by, created_at, updated_at
+returning prompt_id::text as prompt_id, name, description, content, variables_schema_json, version, status, created_by, created_at, updated_at
 `, prompt.Name, prompt.Description, prompt.Content, prompt.VariablesSchemaJSON, prompt.Version, prompt.Status, prompt.CreatedBy)
 	} else {
 		err = r.conn.QueryRowCtx(ctx, &row, `
 insert into agent_prompts (
   prompt_id, name, description, content, variables_schema_json, version, status, created_by
 )
-values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)
-returning prompt_id, name, description, content, variables_schema_json, version, status, created_by, created_at, updated_at
+values ($1::bigint, $2, $3, $4, $5::jsonb, $6, $7, $8)
+returning prompt_id::text as prompt_id, name, description, content, variables_schema_json, version, status, created_by, created_at, updated_at
 `, prompt.PromptID, prompt.Name, prompt.Description, prompt.Content, prompt.VariablesSchemaJSON, prompt.Version, prompt.Status, prompt.CreatedBy)
 	}
 	if err != nil {
@@ -135,9 +135,9 @@ returning prompt_id, name, description, content, variables_schema_json, version,
 func (r *PostgresRepository) GetPrompt(ctx context.Context, promptID string) (model.AgentPrompt, error) {
 	var row postgresAgentPromptRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select prompt_id, name, description, content, variables_schema_json, version, status, created_by, created_at, updated_at
+select prompt_id::text as prompt_id, name, description, content, variables_schema_json, version, status, created_by, created_at, updated_at
 from agent_prompts
-where prompt_id = $1
+where prompt_id = $1::bigint
 `, promptID)
 	if err != nil {
 		if isNotFound(err) {
@@ -151,7 +151,7 @@ where prompt_id = $1
 func (r *PostgresRepository) GetPromptByNameVersion(ctx context.Context, name string, version string) (model.AgentPrompt, error) {
 	var row postgresAgentPromptRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select prompt_id, name, description, content, variables_schema_json, version, status, created_by, created_at, updated_at
+select prompt_id::text as prompt_id, name, description, content, variables_schema_json, version, status, created_by, created_at, updated_at
 from agent_prompts
 where name = $1 and version = $2
 `, name, version)
@@ -190,9 +190,9 @@ func (r *PostgresRepository) BindPrompt(ctx context.Context, binding model.Agent
 func (r *PostgresRepository) ListPromptBindings(ctx context.Context, agentID string) ([]model.AgentPromptBinding, error) {
 	var rows []postgresAgentPromptBindingRow
 	err := r.conn.QueryRowsCtx(ctx, &rows, `
-select agent_id, prompt_id, created_by, created_at, updated_at
+select agent_id::text as agent_id, prompt_id::text as prompt_id, created_by, created_at, updated_at
 from agent_prompt_bindings
-where agent_id = $1
+where agent_id = $1::bigint
 order by created_at desc, prompt_id
 `, agentID)
 	if err != nil {
@@ -210,7 +210,7 @@ func (r *PostgresRepository) ReplacePromptBindings(ctx context.Context, agentID 
 	err := r.withTx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		if _, err := session.ExecCtx(ctx, `
 delete from agent_prompt_bindings
-where agent_id = $1
+where agent_id = $1::bigint
 `, agentID); err != nil {
 			return err
 		}
@@ -253,7 +253,7 @@ insert into mcp_servers (
   name, transport, url, config_json, headers_secret_ref, timeout_seconds, status, admin_configured, created_by
 )
 values ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9)
-returning server_id, name, transport, url, config_json, headers_secret_ref, timeout_seconds, status,
+returning server_id::text as server_id, name, transport, url, config_json, headers_secret_ref, timeout_seconds, status,
           admin_configured, created_by, created_at, updated_at
 `, server.Name, server.Transport, server.URL, server.ConfigJSON, server.HeadersSecretRef, server.TimeoutSeconds, server.Status, server.AdminConfigured, server.CreatedBy)
 	} else {
@@ -261,8 +261,8 @@ returning server_id, name, transport, url, config_json, headers_secret_ref, time
 insert into mcp_servers (
   server_id, name, transport, url, config_json, headers_secret_ref, timeout_seconds, status, admin_configured, created_by
 )
-values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10)
-returning server_id, name, transport, url, config_json, headers_secret_ref, timeout_seconds, status,
+values ($1::bigint, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10)
+returning server_id::text as server_id, name, transport, url, config_json, headers_secret_ref, timeout_seconds, status,
           admin_configured, created_by, created_at, updated_at
 `, server.ServerID, server.Name, server.Transport, server.URL, server.ConfigJSON, server.HeadersSecretRef, server.TimeoutSeconds, server.Status, server.AdminConfigured, server.CreatedBy)
 	}
@@ -275,10 +275,10 @@ returning server_id, name, transport, url, config_json, headers_secret_ref, time
 func (r *PostgresRepository) GetMCPServer(ctx context.Context, serverID string) (model.AgentMCPServer, error) {
 	var row postgresAgentMCPServerRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select server_id, name, transport, url, config_json, headers_secret_ref, timeout_seconds, status,
+select server_id::text as server_id, name, transport, url, config_json, headers_secret_ref, timeout_seconds, status,
        admin_configured, created_by, created_at, updated_at
 from mcp_servers
-where server_id = $1
+where server_id = $1::bigint
 `, serverID)
 	if err != nil {
 		if isNotFound(err) {
@@ -299,8 +299,8 @@ insert into agent_tools (
   name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
   input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by
 )
-values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13)
-returning tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+values ($1, $2, $3, $4::bigint, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13)
+returning tool_id::text as tool_id, name, description, tool_type, mcp_server_id::text as mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
           input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by, created_at, updated_at
 `, tool.Name, tool.Description, tool.ToolType, mcpServerID, tool.MCPToolName, tool.LocalHandlerKey, tool.BuiltinKey,
 			tool.InputSchemaJSON, tool.OutputSchemaJSON, tool.PermissionLevel, tool.Status, tool.AdminConfigured, tool.CreatedBy)
@@ -310,8 +310,8 @@ insert into agent_tools (
   tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
   input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by
 )
-values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12, $13, $14)
-returning tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+values ($1::bigint, $2, $3, $4, $5::bigint, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12, $13, $14)
+returning tool_id::text as tool_id, name, description, tool_type, mcp_server_id::text as mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
           input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by, created_at, updated_at
 `, tool.ToolID, tool.Name, tool.Description, tool.ToolType, mcpServerID, tool.MCPToolName, tool.LocalHandlerKey, tool.BuiltinKey,
 			tool.InputSchemaJSON, tool.OutputSchemaJSON, tool.PermissionLevel, tool.Status, tool.AdminConfigured, tool.CreatedBy)
@@ -333,7 +333,7 @@ insert into agent_tools (
   name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
   input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by
 )
-values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13)
+values ($1, $2, $3, $4::bigint, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13)
 on conflict (name) do update
 set description = excluded.description,
     tool_type = excluded.tool_type,
@@ -348,7 +348,7 @@ set description = excluded.description,
     admin_configured = excluded.admin_configured,
     created_by = excluded.created_by,
     updated_at = now()
-returning tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+returning tool_id::text as tool_id, name, description, tool_type, mcp_server_id::text as mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
           input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by, created_at, updated_at
 `, tool.Name, tool.Description, tool.ToolType, mcpServerID, tool.MCPToolName, tool.LocalHandlerKey, tool.BuiltinKey,
 		tool.InputSchemaJSON, tool.OutputSchemaJSON, tool.PermissionLevel, tool.Status, tool.AdminConfigured, tool.CreatedBy)
@@ -364,10 +364,10 @@ returning tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, l
 func (r *PostgresRepository) GetTool(ctx context.Context, toolID string) (model.AgentTool, error) {
 	var row postgresAgentToolRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+select tool_id::text as tool_id, name, description, tool_type, mcp_server_id::text as mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
        input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by, created_at, updated_at
 from agent_tools
-where tool_id = $1
+where tool_id = $1::bigint
 `, toolID)
 	if err != nil {
 		if isNotFound(err) {
@@ -381,7 +381,7 @@ where tool_id = $1
 func (r *PostgresRepository) GetToolByName(ctx context.Context, name string) (model.AgentTool, error) {
 	var row postgresAgentToolRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+select tool_id::text as tool_id, name, description, tool_type, mcp_server_id::text as mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
        input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by, created_at, updated_at
 from agent_tools
 where name = $1
@@ -398,7 +398,7 @@ where name = $1
 func (r *PostgresRepository) ListActiveTools(ctx context.Context) ([]model.AgentTool, error) {
 	var rows []postgresAgentToolRow
 	err := r.conn.QueryRowsCtx(ctx, &rows, `
-select tool_id, name, description, tool_type, mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
+select tool_id::text as tool_id, name, description, tool_type, mcp_server_id::text as mcp_server_id, mcp_tool_name, local_handler_key, builtin_key,
        input_schema_json, output_schema_json, permission_level, status, admin_configured, created_by, created_at, updated_at
 from agent_tools
 where status = 'active'
@@ -444,9 +444,9 @@ func (r *PostgresRepository) GetToolBinding(ctx context.Context, agentID string,
 func (r *PostgresRepository) ListToolBindings(ctx context.Context, agentID string) ([]model.AgentToolBinding, error) {
 	var rows []postgresAgentToolBindingRow
 	err := r.conn.QueryRowsCtx(ctx, &rows, `
-select agent_id, tool_id, created_by, created_at, updated_at
+select agent_id::text as agent_id, tool_id::text as tool_id, created_by, created_at, updated_at
 from agent_tool_bindings
-where agent_id = $1
+where agent_id = $1::bigint
 order by tool_id
 `, agentID)
 	if err != nil {
@@ -464,7 +464,7 @@ func (r *PostgresRepository) ReplaceToolBindings(ctx context.Context, agentID st
 	err := r.withTx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		if _, err := session.ExecCtx(ctx, `
 delete from agent_tool_bindings
-where agent_id = $1
+where agent_id = $1::bigint
 `, agentID); err != nil {
 			return err
 		}
@@ -507,15 +507,15 @@ insert into agent_skills (
   name, description, version, object_key, sha256, content_type, size_bytes, status, created_by
 )
 values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-returning skill_id, name, description, version, object_key, sha256, content_type, size_bytes, status, created_by, created_at, updated_at
+returning skill_id::text as skill_id, name, description, version, object_key, sha256, content_type, size_bytes, status, created_by, created_at, updated_at
 `, skill.Name, skill.Description, skill.Version, skill.ObjectKey, skill.SHA256, skill.ContentType, skill.SizeBytes, skill.Status, skill.CreatedBy)
 	} else {
 		err = r.conn.QueryRowCtx(ctx, &row, `
 insert into agent_skills (
   skill_id, name, description, version, object_key, sha256, content_type, size_bytes, status, created_by
 )
-values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-returning skill_id, name, description, version, object_key, sha256, content_type, size_bytes, status, created_by, created_at, updated_at
+values ($1::bigint, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+returning skill_id::text as skill_id, name, description, version, object_key, sha256, content_type, size_bytes, status, created_by, created_at, updated_at
 `, skill.SkillID, skill.Name, skill.Description, skill.Version, skill.ObjectKey, skill.SHA256, skill.ContentType, skill.SizeBytes, skill.Status, skill.CreatedBy)
 	}
 	if err != nil {
@@ -527,9 +527,9 @@ returning skill_id, name, description, version, object_key, sha256, content_type
 func (r *PostgresRepository) GetSkill(ctx context.Context, skillID string) (model.AgentSkill, error) {
 	var row postgresAgentSkillRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select skill_id, name, description, version, object_key, sha256, content_type, size_bytes, status, created_by, created_at, updated_at
+select skill_id::text as skill_id, name, description, version, object_key, sha256, content_type, size_bytes, status, created_by, created_at, updated_at
 from agent_skills
-where skill_id = $1
+where skill_id = $1::bigint
 `, skillID)
 	if err != nil {
 		if isNotFound(err) {
@@ -566,7 +566,7 @@ func (r *PostgresRepository) BindSkill(ctx context.Context, binding model.AgentS
 func queryAgentPromptBinding(ctx context.Context, session sqlx.Session, agentID string, promptID string) (model.AgentPromptBinding, error) {
 	var row postgresAgentPromptBindingRow
 	err := session.QueryRowCtx(ctx, &row, `
-select agent_id, prompt_id, created_by, created_at, updated_at
+select agent_id::text as agent_id, prompt_id::text as prompt_id, created_by, created_at, updated_at
 from agent_prompt_bindings
 where agent_id = $1 and prompt_id = $2
 `, agentID, promptID)
@@ -583,8 +583,8 @@ func insertAgentPromptBinding(ctx context.Context, session sqlx.Session, binding
 	var row postgresAgentPromptBindingRow
 	err := session.QueryRowCtx(ctx, &row, `
 insert into agent_prompt_bindings (agent_id, prompt_id, created_by)
-values ($1, $2, $3)
-returning agent_id, prompt_id, created_by, created_at, updated_at
+values ($1::bigint, $2::bigint, $3)
+returning agent_id::text as agent_id, prompt_id::text as prompt_id, created_by, created_at, updated_at
 `, binding.AgentID, binding.PromptID, binding.CreatedBy)
 	return row, err
 }
@@ -592,7 +592,7 @@ returning agent_id, prompt_id, created_by, created_at, updated_at
 func queryAgentToolBinding(ctx context.Context, session sqlx.Session, agentID string, toolID string) (model.AgentToolBinding, error) {
 	var row postgresAgentToolBindingRow
 	err := session.QueryRowCtx(ctx, &row, `
-select agent_id, tool_id, created_by, created_at, updated_at
+select agent_id::text as agent_id, tool_id::text as tool_id, created_by, created_at, updated_at
 from agent_tool_bindings
 where agent_id = $1 and tool_id = $2
 `, agentID, toolID)
@@ -609,8 +609,8 @@ func insertAgentToolBinding(ctx context.Context, session sqlx.Session, binding m
 	var row postgresAgentToolBindingRow
 	err := session.QueryRowCtx(ctx, &row, `
 insert into agent_tool_bindings (agent_id, tool_id, created_by)
-values ($1, $2, $3)
-returning agent_id, tool_id, created_by, created_at, updated_at
+values ($1::bigint, $2::bigint, $3)
+returning agent_id::text as agent_id, tool_id::text as tool_id, created_by, created_at, updated_at
 `, binding.AgentID, binding.ToolID, binding.CreatedBy)
 	return row, err
 }
@@ -618,7 +618,7 @@ returning agent_id, tool_id, created_by, created_at, updated_at
 func queryAgentSkillBinding(ctx context.Context, session sqlx.Session, agentID string, skillID string) (model.AgentSkillBinding, error) {
 	var row postgresAgentSkillBindingRow
 	err := session.QueryRowCtx(ctx, &row, `
-select agent_id, skill_id, created_by, created_at, updated_at
+select agent_id::text as agent_id, skill_id::text as skill_id, created_by, created_at, updated_at
 from agent_skill_bindings
 where agent_id = $1 and skill_id = $2
 `, agentID, skillID)
@@ -635,8 +635,8 @@ func insertAgentSkillBinding(ctx context.Context, session sqlx.Session, binding 
 	var row postgresAgentSkillBindingRow
 	err := session.QueryRowCtx(ctx, &row, `
 insert into agent_skill_bindings (agent_id, skill_id, created_by)
-values ($1, $2, $3)
-returning agent_id, skill_id, created_by, created_at, updated_at
+values ($1::bigint, $2::bigint, $3)
+returning agent_id::text as agent_id, skill_id::text as skill_id, created_by, created_at, updated_at
 `, binding.AgentID, binding.SkillID, binding.CreatedBy)
 	return row, err
 }
