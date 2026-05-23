@@ -35,7 +35,7 @@ func (r *PostgresRepository) CreateAgent(ctx context.Context, agent model.Agent)
 	err := r.conn.QueryRowCtx(ctx, &row, `
 insert into agents (agent_id, account_id, name, description, status, created_by)
 values ($1, $2, $3, $4, $5, $6)
-returning agent_id, account_id, name, description, status, created_by, created_at, updated_at
+returning agent_id::text as agent_id, account_id, name, description, status, created_by, created_at, updated_at
 `, agent.AgentID, agent.AccountID, agent.Name, agent.Description, agent.Status, agent.CreatedBy)
 	if err != nil {
 		if isPostgresUniqueViolation(err) {
@@ -55,9 +55,9 @@ returning agent_id, account_id, name, description, status, created_by, created_a
 func (r *PostgresRepository) GetAgent(ctx context.Context, agentID string) (model.Agent, error) {
 	var row postgresAgentRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select agent_id, account_id, name, description, status, created_by, created_at, updated_at
+select agent_id::text as agent_id, account_id, name, description, status, created_by, created_at, updated_at
 from agents
-where agent_id = $1
+where agent_id = $1::bigint
 `, agentID)
 	if err != nil {
 		if isNotFound(err) {
@@ -71,7 +71,7 @@ where agent_id = $1
 func (r *PostgresRepository) GetAgentByIMUserID(ctx context.Context, imUserID string) (model.Agent, error) {
 	var row postgresAgentRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select agent_id, account_id, name, description, status, created_by, created_at, updated_at
+select agent_id::text as agent_id, account_id, name, description, status, created_by, created_at, updated_at
 from agents
 where account_id = $1
 `, imUserID)
@@ -97,7 +97,7 @@ func (r *PostgresRepository) ListAgents(ctx context.Context, filter AgentListFil
 	}
 
 	query := `
-select agent_id, account_id, name, description, status, created_by, created_at, updated_at
+select agent_id::text as agent_id, account_id, name, description, status, created_by, created_at, updated_at
 from agents
 `
 	if len(clauses) > 0 {
@@ -147,8 +147,8 @@ func (r *PostgresRepository) UpdateAgent(ctx context.Context, agentID string, pa
 	query := `
 update agents
 set ` + strings.Join(setters, ", ") + `, updated_at = now()
-where agent_id = $` + itoa(len(args)) + `
-returning agent_id, account_id, name, description, status, created_by, created_at, updated_at
+where agent_id = $` + itoa(len(args)) + `::bigint
+returning agent_id::text as agent_id, account_id, name, description, status, created_by, created_at, updated_at
 `
 	var row postgresAgentRow
 	if err := r.conn.QueryRowCtx(ctx, &row, query, args...); err != nil {
@@ -168,8 +168,8 @@ func (r *PostgresRepository) UpdateAgentStatus(ctx context.Context, agentID stri
 	if err := r.conn.QueryRowCtx(ctx, &row, `
 update agents
 set status = $2, updated_at = now()
-where agent_id = $1
-returning agent_id, account_id, name, description, status, created_by, created_at, updated_at
+where agent_id = $1::bigint
+returning agent_id::text as agent_id, account_id, name, description, status, created_by, created_at, updated_at
 `, agentID, status); err != nil {
 		if isNotFound(err) {
 			return model.Agent{}, apperror.NotFound("agent not found")
