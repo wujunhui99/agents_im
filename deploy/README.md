@@ -93,7 +93,7 @@ Then query through Grafana or Tempo's local API using the trace ID from logs/hea
 
 Prometheus scrapes the in-cluster Prometheus service, node-exporter, and the REST/worker services that expose `/metrics`: `user-api`, `auth-api`, `friends-api`, `message-api`, `gateway-ws`, `groups-api`, `agent-api`, and `message-transfer`. It intentionally avoids high-cardinality labels such as account IDs, conversation IDs, message IDs, trace IDs, prompts, or message content. The default production manifest keeps retention bounded to 7 days / 7 GiB so the single-node k3s host does not grow unbounded.
 
-Grafana provisions Prometheus as the default datasource and Loki as the log datasource through `grafana-provisioning`; it stores dashboard/user state on the `grafana-data` PVC. If Grafana admin credentials need rotation, update the `grafana-admin` Secret and `/opt/agents-im/grafana-admin.env`, then restart the Grafana deployment.
+Grafana provisions the full Grafana observability stack through `grafana-provisioning`: Prometheus (`uid: prometheus`) as the default metrics datasource, Loki (`uid: loki`) as the log datasource, and Tempo (`uid: tempo`) as the trace datasource with trace-to-logs correlation back to Loki. Grafana stores dashboard/user state on the `grafana-data` PVC. If Grafana admin credentials need rotation, update the `grafana-admin` Secret and `/opt/agents-im/grafana-admin.env`, then restart the Grafana deployment.
 
 Loki stores recent pod logs on the `loki-data` PVC with 7-day retention. Promtail runs as a DaemonSet and reads `/var/log/pods/agents-im_*/*/*.log`, so Loki streams include `namespace="agents-im"` plus the source `filename`. Do not expose Loki directly to the public Internet; use Grafana Explore with queries such as:
 
