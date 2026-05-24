@@ -2069,12 +2069,56 @@ import yaml
 with open("deploy/k8s/kustomization.yaml", encoding="utf-8") as f:
     kustomization = yaml.safe_load(f) or {}
 resources = set(kustomization.get("resources") or [])
-for resource in ("tempo.yaml", "otel-collector.yaml", "langfuse.yaml"):
+for resource in ("tempo.yaml", "otel-collector.yaml", "prometheus-grafana.yaml", "loki.yaml", "langfuse.yaml"):
     if resource not in resources:
         print(f"deploy/k8s/kustomization.yaml: missing {resource}", file=sys.stderr)
         sys.exit(1)
 if "jaeger.yaml" in resources:
     print("deploy/k8s/kustomization.yaml: jaeger.yaml must not be an active resource", file=sys.stderr)
+    sys.exit(1)
+
+with open("deploy/k8s/loki.yaml", encoding="utf-8") as f:
+    loki_docs = [doc for doc in yaml.safe_load_all(f) if doc]
+loki_by_kind_name = {(doc.get("kind"), doc.get("metadata", {}).get("name")): doc for doc in loki_docs}
+for kind, name in (("ConfigMap", "loki-config"), ("ConfigMap", "promtail-config"), ("PersistentVolumeClaim", "loki-data"), ("Deployment", "loki"), ("DaemonSet", "promtail"), ("Service", "loki")):
+    if (kind, name) not in loki_by_kind_name:
+        print(f"deploy/k8s/loki.yaml: missing {kind} {name}", file=sys.stderr)
+        sys.exit(1)
+loki_config = yaml.safe_load((loki_by_kind_name[("ConfigMap", "loki-config")].get("data") or {}).get("config.yaml") or "") or {}
+if loki_config.get("limits_config", {}).get("retention_period") != "168h":
+    print("deploy/k8s/loki.yaml: Loki must keep bounded 7-day retention", file=sys.stderr)
+    sys.exit(1)
+promtail_config = yaml.safe_load((loki_by_kind_name[("ConfigMap", "promtail-config")].get("data") or {}).get("config.yaml") or "") or {}
+promtail_clients = promtail_config.get("clients") or []
+if not any(client.get("url") == "http://loki.agents-im.svc.cluster.local:3100/loki/api/v1/push" for client in promtail_clients):
+    print("deploy/k8s/loki.yaml: Promtail must push to the in-cluster Loki service", file=sys.stderr)
+    sys.exit(1)
+
+with open("deploy/k8s/prometheus-grafana.yaml", encoding="utf-8") as f:
+    prometheus_grafana_docs = [doc for doc in yaml.safe_load_all(f) if doc]
+prometheus_grafana_by_kind_name = {(doc.get("kind"), doc.get("metadata", {}).get("name")): doc for doc in prometheus_grafana_docs}
+for kind, name in (("ConfigMap", "grafana-provisioning"), ("PersistentVolumeClaim", "prometheus-data"), ("Deployment", "prometheus"), ("Deployment", "grafana"), ("Service", "prometheus"), ("Service", "grafana")):
+    if (kind, name) not in prometheus_grafana_by_kind_name:
+        print(f"deploy/k8s/prometheus-grafana.yaml: missing {kind} {name}", file=sys.stderr)
+        sys.exit(1)
+datasource_config = yaml.safe_load((prometheus_grafana_by_kind_name[("ConfigMap", "grafana-provisioning")].get("data") or {}).get("datasource.yml") or "") or {}
+datasources = {item.get("name"): item for item in datasource_config.get("datasources") or []}
+expected_datasources = {
+    "Prometheus": {"uid": "prometheus", "type": "prometheus", "url": "http://prometheus.agents-im.svc.cluster.local:9090"},
+    "Loki": {"uid": "loki", "type": "loki", "url": "http://loki.agents-im.svc.cluster.local:3100"},
+    "Tempo": {"uid": "tempo", "type": "tempo", "url": "http://tempo.agents-im.svc.cluster.local:3200"},
+}
+for name, expected in expected_datasources.items():
+    got = datasources.get(name)
+    if not got:
+        print(f"deploy/k8s/prometheus-grafana.yaml: missing Grafana datasource {name}", file=sys.stderr)
+        sys.exit(1)
+    for key, want in expected.items():
+        if got.get(key) != want:
+            print(f"deploy/k8s/prometheus-grafana.yaml: Grafana datasource {name} {key}={got.get(key)!r}, want {want!r}", file=sys.stderr)
+            sys.exit(1)
+if datasources["Tempo"].get("jsonData", {}).get("tracesToLogsV2", {}).get("datasourceUid") != "loki":
+    print("deploy/k8s/prometheus-grafana.yaml: Tempo tracesToLogsV2 must target Loki uid", file=sys.stderr)
     sys.exit(1)
 
 with open("deploy/k8s/tempo.yaml", encoding="utf-8") as f:
