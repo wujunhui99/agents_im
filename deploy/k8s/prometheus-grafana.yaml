@@ -204,24 +204,27 @@ data:
     apiVersion: 1
     datasources:
       - name: Prometheus
+        uid: prometheus
         type: prometheus
         access: proxy
         url: http://prometheus.agents-im.svc.cluster.local:9090
         isDefault: true
         editable: false
       - name: Loki
+        uid: loki
         type: loki
         access: proxy
         url: http://loki.agents-im.svc.cluster.local:3100
         editable: false
       - name: Tempo
+        uid: tempo
         type: tempo
         access: proxy
         url: http://tempo.agents-im.svc.cluster.local:3200
         editable: false
         jsonData:
           tracesToLogsV2:
-            datasourceUid: Loki
+            datasourceUid: loki
             filterByTraceID: true
 ---
 apiVersion: v1
