@@ -1238,7 +1238,7 @@ func tracingConfigFromValues(values map[string]string, current observability.Tra
 		}
 		cfg.SamplerRatio = ratio
 	}
-	cfg.JaegerBaseURL = firstNonEmpty(values["Tracing.JaegerBaseURL"], values["JaegerBaseURL"], cfg.JaegerBaseURL)
+	cfg.TraceUIBaseURL = firstNonEmpty(values["Tracing.TraceUIBaseURL"], values["TraceUIBaseURL"], cfg.TraceUIBaseURL)
 	if value := firstNonEmpty(values["Tracing.Insecure"], values["TracingInsecure"]); strings.TrimSpace(value) != "" {
 		insecure, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
 		if err != nil {

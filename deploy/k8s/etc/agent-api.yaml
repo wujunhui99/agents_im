@@ -14,7 +14,7 @@ Tracing:
   OTLPEndpoint: ${AGENTS_IM_OTLP_ENDPOINT}
   Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
   SamplerRatio: 1.0
-  JaegerBaseURL: ${AGENTS_IM_JAEGER_BASE_URL}
+  TraceUIBaseURL: ${AGENTS_IM_TRACE_UI_BASE_URL}
   Insecure: true
 DeepSeek:
   APIKey: ${DEEPSEEK_API_KEY}

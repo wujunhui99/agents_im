@@ -2069,10 +2069,41 @@ import yaml
 with open("deploy/k8s/kustomization.yaml", encoding="utf-8") as f:
     kustomization = yaml.safe_load(f) or {}
 resources = set(kustomization.get("resources") or [])
-for resource in ("jaeger.yaml", "langfuse.yaml"):
+for resource in ("tempo.yaml", "otel-collector.yaml", "langfuse.yaml"):
     if resource not in resources:
         print(f"deploy/k8s/kustomization.yaml: missing {resource}", file=sys.stderr)
         sys.exit(1)
+if "jaeger.yaml" in resources:
+    print("deploy/k8s/kustomization.yaml: jaeger.yaml must not be an active resource", file=sys.stderr)
+    sys.exit(1)
+
+with open("deploy/k8s/tempo.yaml", encoding="utf-8") as f:
+    tempo_docs = [doc for doc in yaml.safe_load_all(f) if doc]
+if not any(doc.get("kind") == "PersistentVolumeClaim" and doc.get("metadata", {}).get("name") == "tempo-data" for doc in tempo_docs):
+    print("deploy/k8s/tempo.yaml: Tempo must use a persistent tempo-data PVC", file=sys.stderr)
+    sys.exit(1)
+if not any(doc.get("kind") == "Deployment" and doc.get("metadata", {}).get("name") == "tempo" for doc in tempo_docs):
+    print("deploy/k8s/tempo.yaml: missing Tempo Deployment", file=sys.stderr)
+    sys.exit(1)
+if not any(doc.get("kind") == "Service" and doc.get("metadata", {}).get("name") == "tempo" for doc in tempo_docs):
+    print("deploy/k8s/tempo.yaml: missing Tempo Service", file=sys.stderr)
+    sys.exit(1)
+
+with open("deploy/k8s/otel-collector.yaml", encoding="utf-8") as f:
+    otel_text = f.read()
+    otel_docs = [doc for doc in yaml.safe_load_all(otel_text) if doc]
+if "tempo.agents-im.svc.cluster.local:4317" not in otel_text:
+    print("deploy/k8s/otel-collector.yaml: collector must export traces to Tempo", file=sys.stderr)
+    sys.exit(1)
+if "health_check" not in otel_text or "13133" not in otel_text:
+    print("deploy/k8s/otel-collector.yaml: collector must expose health_check extension for probes", file=sys.stderr)
+    sys.exit(1)
+if not any(doc.get("kind") == "Deployment" and doc.get("metadata", {}).get("name") == "otel-collector" for doc in otel_docs):
+    print("deploy/k8s/otel-collector.yaml: missing otel-collector Deployment", file=sys.stderr)
+    sys.exit(1)
+if not any(doc.get("kind") == "Service" and doc.get("metadata", {}).get("name") == "otel-collector" for doc in otel_docs):
+    print("deploy/k8s/otel-collector.yaml: missing otel-collector Service", file=sys.stderr)
+    sys.exit(1)
 
 with open("deploy/k8s/ingress.yaml", encoding="utf-8") as f:
     docs = [doc for doc in yaml.safe_load_all(f) if doc]
@@ -2094,7 +2125,6 @@ def backend_for(rule, path):
     return None, None
 
 expected = {
-    "jaeger.agenticim.xyz": ("jaeger-collector", 16686, "jaeger-agenticim-xyz-tls"),
     "langfuse.agenticim.xyz": ("langfuse", 3000, "langfuse-agenticim-xyz-tls"),
 }
 for host, (svc, port, tls_secret) in expected.items():
@@ -2116,9 +2146,8 @@ for host, (svc, port, tls_secret) in expected.items():
         sys.exit(1)
 
 jaeger_ingress, _ = ingress_by_host("jaeger.agenticim.xyz")
-annotations = jaeger_ingress.get("metadata", {}).get("annotations", {}) or {}
-if "agents-im-observability-basic-auth@kubernetescrd" not in annotations.get("traefik.ingress.kubernetes.io/router.middlewares", ""):
-    print("deploy/k8s/ingress.yaml: jaeger public ingress must require observability basic auth middleware", file=sys.stderr)
+if jaeger_ingress:
+    print("deploy/k8s/ingress.yaml: jaeger public ingress must be removed; use Grafana Tempo instead", file=sys.stderr)
     sys.exit(1)
 
 with open("deploy/k8s/langfuse.yaml", encoding="utf-8") as f:

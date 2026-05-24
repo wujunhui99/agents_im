@@ -65,7 +65,7 @@ export type AdminFriend = {
 
 export type AdminLLMTrace = {
   traceId: string;
-  jaegerUrl?: string;
+  traceUrl?: string;
   runId: string;
   agentId: string;
   conversationId?: string;

@@ -4,7 +4,8 @@ resources:
   - namespace.yaml
   - python-executor-rbac.yaml
   - configmap.yaml
-  - jaeger.yaml
+  - tempo.yaml
+  - otel-collector.yaml
   - langfuse.yaml
   - prometheus-grafana.yaml
   - loki.yaml

@@ -20,9 +20,9 @@ Langfuse LLM observability is additive to the existing admin LLM trace/audit tab
 
 The Langfuse web UI is deployed by k3s at `https://langfuse.agenticim.xyz/` using `deploy/k8s/langfuse.yaml`. It reads its own runtime secrets from `agents-im-secrets`: `LANGFUSE_DATABASE_URL`, `NEXTAUTH_SECRET`, `SALT`, and `ENCRYPTION_KEY`. `scripts/bootstrap-server.sh` generates those values and creates a separate `langfuse` PostgreSQL database for new servers; existing servers must add them to the k3s secret and create the database before applying the Langfuse deployment. Do not expose the values in logs or chat.
 
-Jaeger UI is exposed at `https://jaeger.agenticim.xyz/` only behind Traefik basic-auth middleware backed by the `agents-im/observability-basic-auth` Secret. `scripts/bootstrap-server.sh` creates that Secret for new servers and stores the generated operator credentials on the server at `/opt/agents-im/observability-basic-auth.env` with mode `0600`.
+Tempo trace storage is deployed by k3s from `deploy/k8s/tempo.yaml` and receives traces through `deploy/k8s/otel-collector.yaml`. Tempo is intentionally internal-only; operators query traces through Grafana's `Tempo` datasource instead of a public Tempo or Jaeger domain.
 
-Prometheus and Grafana are deployed by k3s from `deploy/k8s/prometheus-grafana.yaml`. Prometheus is exposed at `https://prometheus.agenticim.xyz/` behind the same `observability-basic-auth` Traefik middleware used by Jaeger. Grafana is exposed at `https://grafana.agenticim.xyz/` and uses its own login backed by the `agents-im/grafana-admin` Secret. `scripts/bootstrap-server.sh` creates that Secret for new servers and stores the generated operator credentials at `/opt/agents-im/grafana-admin.env` with mode `0600`. Keep both credential files and k8s Secret values off Git, issues, and chat transcripts.
+Prometheus and Grafana are deployed by k3s from `deploy/k8s/prometheus-grafana.yaml`. Prometheus is exposed at `https://prometheus.agenticim.xyz/` behind the `observability-basic-auth` Traefik middleware. Grafana is exposed at `https://grafana.agenticim.xyz/` and uses its own login backed by the `agents-im/grafana-admin` Secret. `scripts/bootstrap-server.sh` creates that Secret for new servers and stores the generated operator credentials at `/opt/agents-im/grafana-admin.env` with mode `0600`. Keep both credential files and k8s Secret values off Git, issues, and chat transcripts.
 
 Loki log aggregation is deployed by k3s from `deploy/k8s/loki.yaml`. Loki is intentionally internal-only at `http://loki.agents-im.svc.cluster.local:3100`; operators query logs through the Grafana `Loki` datasource rather than a public Loki domain.
 
@@ -73,21 +73,23 @@ Production public entrypoints:
 
 - User web app: `https://agenticim.xyz/`
 - Management System (MS): `https://ms.agenticim.xyz/`
-- Prometheus: `https://prometheus.agenticim.xyz/` (Traefik basic-auth, same operator credentials as Jaeger)
+- Prometheus: `https://prometheus.agenticim.xyz/` (Traefik basic-auth)
 - Grafana: `https://grafana.agenticim.xyz/` (Grafana login from the `grafana-admin` Secret)
 
-Jaeger tracing is deployed as a k3s service and exposed through authenticated Traefik ingress:
+Distributed tracing is deployed as OpenTelemetry Collector plus Grafana Tempo:
 
-- OTLP gRPC/HTTP collector: `jaeger-collector.agents-im.svc.cluster.local:4317` / `:4318`
-- Query UI: `https://jaeger.agenticim.xyz/`
+- Service OTLP gRPC/HTTP receiver: `otel-collector.agents-im.svc.cluster.local:4317` / `:4318`
+- Collector export target: `tempo.agents-im.svc.cluster.local:4317`
+- Tempo query API: `http://tempo.agents-im.svc.cluster.local:3200` (internal-only)
+- Query UI: Grafana Explore at `https://grafana.agenticim.xyz/` using the `Tempo` datasource
 
-The public Jaeger UI route must keep the `agents-im-observability-basic-auth@kubernetescrd` middleware attached. Trace data can reveal topology, route names, internal IDs, latency, and error details, so do not remove that access control boundary. Operators can also use private access when needed:
+Tempo must keep the `tempo-data` PVC and bounded retention from `deploy/k8s/tempo.yaml`; do not use Jaeger all-in-one memory storage or expose Tempo directly through public ingress. Operators can also use private access when needed:
 
 ```bash
-kubectl -n agents-im port-forward svc/jaeger-collector 16686:16686
+kubectl -n agents-im port-forward svc/tempo 3200:3200
 ```
 
-Then search `http://127.0.0.1:16686/search?traceID=<trace_id>`.
+Then query through Grafana or Tempo's local API using the trace ID from logs/headers.
 
 Prometheus scrapes the in-cluster Prometheus service, node-exporter, and the REST/worker services that expose `/metrics`: `user-api`, `auth-api`, `friends-api`, `message-api`, `gateway-ws`, `groups-api`, `agent-api`, and `message-transfer`. It intentionally avoids high-cardinality labels such as account IDs, conversation IDs, message IDs, trace IDs, prompts, or message content. The default production manifest keeps retention bounded to 7 days / 7 GiB so the single-node k3s host does not grow unbounded.
 

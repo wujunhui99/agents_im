@@ -136,7 +136,7 @@ Tracing:
   OTLPEndpoint: otel-collector.agents-im.svc.cluster.local:4317
   Protocol: grpc
   SamplerRatio: 0.25
-  JaegerBaseURL: https://jaeger.agenticim.xyz
+  TraceUIBaseURL: https://grafana.agenticim.xyz
   Insecure: true
 `), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -152,7 +152,7 @@ Tracing:
 		cfg.Tracing.OTLPEndpoint != "otel-collector.agents-im.svc.cluster.local:4317" ||
 		cfg.Tracing.Protocol != "grpc" ||
 		cfg.Tracing.SamplerRatio != 0.25 ||
-		cfg.Tracing.JaegerBaseURL != "https://jaeger.agenticim.xyz" {
+		cfg.Tracing.TraceUIBaseURL != "https://grafana.agenticim.xyz" {
 		t.Fatalf("tracing config mismatch: %+v", cfg.Tracing)
 	}
 }
@@ -162,7 +162,7 @@ func TestToRestConfMapsTracingToGoZeroTelemetry(t *testing.T) {
 	cfg.Name = "friends-api"
 	cfg.Tracing.Enabled = true
 	cfg.Tracing.ServiceName = "friends-api"
-	cfg.Tracing.OTLPEndpoint = "jaeger-collector.agents-im.svc.cluster.local:4317"
+	cfg.Tracing.OTLPEndpoint = "otel-collector.agents-im.svc.cluster.local:4317"
 	cfg.Tracing.Protocol = "grpc"
 	cfg.Tracing.SamplerRatio = 1
 
@@ -171,7 +171,7 @@ func TestToRestConfMapsTracingToGoZeroTelemetry(t *testing.T) {
 	if restConf.Telemetry.Name != "friends-api" {
 		t.Fatalf("Telemetry.Name = %q", restConf.Telemetry.Name)
 	}
-	if restConf.Telemetry.Endpoint != "jaeger-collector.agents-im.svc.cluster.local:4317" {
+	if restConf.Telemetry.Endpoint != "otel-collector.agents-im.svc.cluster.local:4317" {
 		t.Fatalf("Telemetry.Endpoint = %q", restConf.Telemetry.Endpoint)
 	}
 	if restConf.Telemetry.Batcher != "otlpgrpc" {
@@ -365,7 +365,7 @@ func clearTracingEnv(t *testing.T) {
 		"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
 		"AGENTS_IM_TRACING_SAMPLER_RATIO",
 		"OTEL_TRACES_SAMPLER_ARG",
-		"AGENTS_IM_JAEGER_BASE_URL",
+		"AGENTS_IM_TRACE_UI_BASE_URL",
 	} {
 		t.Setenv(key, "")
 	}
