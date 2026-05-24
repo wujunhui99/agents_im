@@ -119,12 +119,12 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 - Prometheus：指标采集
 - Grafana：监控面板
-- Jaeger：分布式追踪
+- Grafana Tempo：分布式追踪存储与查询（通过 Grafana Explore）
 - `trace_id`：跨服务链路追踪 ID
 
-Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trace/request ID 传播设计见 [`docs/design-docs/observability-mvp.md`](./docs/design-docs/observability-mvp.md)。当前实现不要求本地启动 Prometheus、Grafana 或 Jaeger。
+Backend MVP 的轻量健康检查、readiness、Prometheus text metrics 和 trace/request ID 传播设计见 [`docs/design-docs/observability-mvp.md`](./docs/design-docs/observability-mvp.md)。当前实现不要求本地启动 Prometheus、Grafana 或 Tempo。
 
-生产分布式追踪使用 OpenTelemetry SDK + OTLP 导出到集群内 Jaeger。新请求的 canonical `trace_id` 是 OpenTelemetry trace ID，同时继续写 `X-Trace-Id` / `X-Request-Id` 兼容响应头，并支持 W3C `traceparent` / `tracestate`。REST、WebSocket、gRPC、message outbox/transfer/gateway delivery 和 Agent runtime 会创建代表性 spans；`/healthz`、`/readyz`、`/metrics` 不产生高噪声 spans。Jaeger UI 通过 `jaeger.agenticim.xyz` 暴露时必须保留 Traefik basic-auth middleware；也可继续使用 port-forward 私网访问。设计和 runbook 见 [`docs/design-docs/distributed-tracing-jaeger.md`](./docs/design-docs/distributed-tracing-jaeger.md)。
+生产分布式追踪使用 OpenTelemetry SDK + OTLP 导出到集群内 OTel Collector，再写入 Grafana Tempo 持久化存储。新请求的 canonical `trace_id` 是 OpenTelemetry trace ID，同时继续写 `X-Trace-Id` / `X-Request-Id` 兼容响应头，并支持 W3C `traceparent` / `tracestate`。REST、WebSocket、gRPC、message outbox/transfer/gateway delivery 和 Agent runtime 会创建代表性 spans；`/healthz`、`/readyz`、`/metrics` 不产生高噪声 spans。Grafana 通过 Tempo datasource 查询 trace，Tempo 不暴露公网 ingress。设计和 runbook 见 [`docs/design-docs/distributed-tracing-tempo.md`](./docs/design-docs/distributed-tracing-tempo.md)。
 
 LLM observability is separate from system metrics/tracing. AI Hosting emits run/generation events through `internal/llmobs`, with Langfuse as the intended UI/backend sink and noop/test behavior by default. Design and privacy constraints are documented in [`docs/design-docs/llm-observability.md`](./docs/design-docs/llm-observability.md).
 

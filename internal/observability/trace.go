@@ -340,13 +340,14 @@ func IsNoisyRoute(route string) bool {
 	}
 }
 
-func JaegerTraceURL(baseURL string, traceID string) string {
+func TraceUIURL(baseURL string, traceID string) string {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	traceID = strings.ToLower(strings.TrimSpace(traceID))
 	if baseURL == "" || !isCanonicalTraceID(traceID) {
 		return ""
 	}
-	return baseURL + "/trace/" + traceID
+	left := fmt.Sprintf(`{"datasource":"Tempo","queries":[{"queryType":"traceId","query":"%s"}],"range":{"from":"now-6h","to":"now"}}`, traceID)
+	return baseURL + "/explore?left=" + url.QueryEscape(left)
 }
 
 func traceIDFromTraceparent(value string) string {

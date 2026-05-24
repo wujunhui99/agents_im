@@ -25,18 +25,18 @@ const (
 	TracingProtocolGRPC = "grpc"
 	TracingProtocolHTTP = "http/protobuf"
 
-	DefaultJaegerBaseURL = "https://jaeger.agenticim.xyz"
+	DefaultTraceUIBaseURL = "https://grafana.agenticim.xyz"
 )
 
 type TracingConfig struct {
-	Enabled       bool
-	ServiceName   string
-	Environment   string
-	OTLPEndpoint  string
-	Protocol      string
-	SamplerRatio  float64
-	JaegerBaseURL string
-	Insecure      bool
+	Enabled        bool
+	ServiceName    string
+	Environment    string
+	OTLPEndpoint   string
+	Protocol       string
+	SamplerRatio   float64
+	TraceUIBaseURL string
+	Insecure       bool
 }
 
 type TracingShutdown func(context.Context) error
@@ -82,10 +82,10 @@ func ResolveTracingConfig(cfg TracingConfig, defaultServiceName string) (Tracing
 	if cfg.SamplerRatio == 0 {
 		cfg.SamplerRatio = 1
 	}
-	cfg.JaegerBaseURL = strings.TrimRight(firstTracingValue(
-		strings.TrimSpace(os.ExpandEnv(cfg.JaegerBaseURL)),
-		firstTracingEnv("AGENTS_IM_JAEGER_BASE_URL"),
-		DefaultJaegerBaseURL,
+	cfg.TraceUIBaseURL = strings.TrimRight(firstTracingValue(
+		strings.TrimSpace(os.ExpandEnv(cfg.TraceUIBaseURL)),
+		firstTracingEnv("AGENTS_IM_TRACE_UI_BASE_URL", "GRAFANA_TRACE_UI_BASE_URL"),
+		DefaultTraceUIBaseURL,
 	), "/")
 	if value := firstTracingEnv("AGENTS_IM_OTLP_INSECURE", "OTEL_EXPORTER_OTLP_INSECURE"); value != "" {
 		insecure, err := strconv.ParseBool(value)
@@ -165,8 +165,8 @@ func TracingEnabled() bool {
 	return tracingEnabled.Load()
 }
 
-func JaegerBaseURLFromEnv() string {
-	return strings.TrimRight(firstTracingValue(firstTracingEnv("AGENTS_IM_JAEGER_BASE_URL"), DefaultJaegerBaseURL), "/")
+func TraceUIBaseURLFromEnv() string {
+	return strings.TrimRight(firstTracingValue(firstTracingEnv("AGENTS_IM_TRACE_UI_BASE_URL", "GRAFANA_TRACE_UI_BASE_URL"), DefaultTraceUIBaseURL), "/")
 }
 
 func ShutdownTracing(shutdown TracingShutdown) error {

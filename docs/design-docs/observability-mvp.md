@@ -4,7 +4,7 @@ Status: Implemented
 
 ## Background
 
-Backend MVP needs a small, local-first observability foundation before frontend integration starts. The goal is to make service liveness, readiness, metrics, and trace correlation available without requiring Prometheus, Grafana, Jaeger, Redis, Kafka, or PostgreSQL to be live during unit tests.
+Backend MVP needs a small, local-first observability foundation before frontend integration starts. The goal is to make service liveness, readiness, metrics, and trace correlation available without requiring Prometheus, Grafana, Tempo, Redis, Kafka, or PostgreSQL to be live during unit tests.
 
 ## Goals
 
@@ -18,8 +18,8 @@ Backend MVP needs a small, local-first observability foundation before frontend 
 ## Non-Goals
 
 - The original MVP did not add a production tracing backend; LLM-specific Langfuse export is covered separately in [`llm-observability.md`](./llm-observability.md).
-- Production Jaeger/OpenTelemetry tracing is now covered by [`distributed-tracing-jaeger.md`](./distributed-tracing-jaeger.md).
-- Local/unit tests still do not require Prometheus, Grafana, or Jaeger.
+- Production OpenTelemetry/Tempo tracing is now covered by [`distributed-tracing-tempo.md`](./distributed-tracing-tempo.md).
+- Local/unit tests still do not require Prometheus, Grafana, or Tempo.
 - No core friends, groups, or message delivery semantics are changed.
 - Readiness checks do not perform live network pings in unit tests.
 

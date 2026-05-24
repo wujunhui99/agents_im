@@ -359,9 +359,9 @@ function renderTraces({
           <h3>{selectedTrace.traceId}</h3>
           <p>{selectedTrace.runId}</p>
           <p>{selectedTrace.errorMessage || selectedTrace.status}</p>
-          {selectedTrace.jaegerUrl && (
-            <a className="admin-secondary-button" href={selectedTrace.jaegerUrl} target="_blank" rel="noreferrer">
-              Open in Jaeger
+          {selectedTrace.traceUrl && (
+            <a className="admin-secondary-button" href={selectedTrace.traceUrl} target="_blank" rel="noreferrer">
+              Open in Tempo
             </a>
           )}
           {selectedTrace.conversationId && (
