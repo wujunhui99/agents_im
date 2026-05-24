@@ -173,7 +173,7 @@ type AdminLLMTraceDetailResponse struct {
 
 type AdminLLMTrace struct {
 	TraceID           string `json:"traceId"`
-	JaegerURL         string `json:"jaegerUrl,omitempty"`
+	TraceURL          string `json:"traceUrl,omitempty"`
 	RunID             string `json:"runId"`
 	AgentID           string `json:"agentId"`
 	ConversationID    string `json:"conversationId,omitempty"`
@@ -528,7 +528,7 @@ func adminTraceFromRun(run agentaudit.AgentRun) AdminLLMTrace {
 	}
 	return AdminLLMTrace{
 		TraceID:           traceID,
-		JaegerURL:         observability.JaegerTraceURL(observability.JaegerBaseURLFromEnv(), traceID),
+		TraceURL:          observability.TraceUIURL(observability.TraceUIBaseURLFromEnv(), traceID),
 		RunID:             run.RunID,
 		AgentID:           run.AgentID,
 		ConversationID:    run.ConversationID,

@@ -239,32 +239,6 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: agents-im-jaeger
-  namespace: agents-im
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    traefik.ingress.kubernetes.io/router.middlewares: agents-im-observability-basic-auth@kubernetescrd
-spec:
-  ingressClassName: traefik
-  tls:
-    - hosts:
-        - jaeger.agenticim.xyz
-      secretName: jaeger-agenticim-xyz-tls
-  rules:
-    - host: jaeger.agenticim.xyz
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: jaeger-collector
-                port:
-                  number: 16686
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
   name: agents-im-langfuse
   namespace: agents-im
   annotations:

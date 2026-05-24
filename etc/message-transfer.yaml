@@ -5,7 +5,7 @@ Tracing:
   Environment: local
   Protocol: grpc
   SamplerRatio: 1.0
-  JaegerBaseURL: http://localhost:16686
+  TraceUIBaseURL: http://localhost:3000
   Insecure: true
 
 WorkerID: ${HOSTNAME}

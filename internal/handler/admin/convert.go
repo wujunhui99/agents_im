@@ -200,7 +200,7 @@ func adminTraces(traces []business.AdminLLMTrace) []types.AdminLLMTrace {
 func adminTrace(trace business.AdminLLMTrace) types.AdminLLMTrace {
 	return types.AdminLLMTrace{
 		TraceID:           trace.TraceID,
-		JaegerURL:         trace.JaegerURL,
+		TraceURL:          trace.TraceURL,
 		RunID:             trace.RunID,
 		AgentID:           trace.AgentID,
 		ConversationID:    trace.ConversationID,

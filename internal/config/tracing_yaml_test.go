@@ -56,7 +56,7 @@ func TestTracingYAMLCoverageForAllBackendServices(t *testing.T) {
 	}
 }
 
-func TestProductionTracingConfigMapPointsAtJaegerCollector(t *testing.T) {
+func TestProductionTracingConfigMapPointsAtOTelCollectorForTempo(t *testing.T) {
 	content, err := os.ReadFile("../../deploy/k8s/configmap.yaml")
 	if err != nil {
 		t.Fatalf("read configmap: %v", err)
@@ -70,10 +70,16 @@ func TestProductionTracingConfigMapPointsAtJaegerCollector(t *testing.T) {
 	if got := doc.Data["AGENTS_IM_TRACING_ENABLED"]; got != "true" {
 		t.Fatalf("AGENTS_IM_TRACING_ENABLED = %q", got)
 	}
-	if got := doc.Data["AGENTS_IM_OTLP_ENDPOINT"]; got != "jaeger-collector.agents-im.svc.cluster.local:4317" {
+	if got := doc.Data["AGENTS_IM_OTLP_ENDPOINT"]; got != "otel-collector.agents-im.svc.cluster.local:4317" {
 		t.Fatalf("AGENTS_IM_OTLP_ENDPOINT = %q", got)
 	}
 	if got := doc.Data["AGENTS_IM_OTLP_PROTOCOL"]; got != "grpc" {
 		t.Fatalf("AGENTS_IM_OTLP_PROTOCOL = %q", got)
+	}
+	if got := doc.Data["AGENTS_IM_TRACE_UI_BASE_URL"]; got != "https://grafana.agenticim.xyz" {
+		t.Fatalf("AGENTS_IM_TRACE_UI_BASE_URL = %q", got)
+	}
+	if _, ok := doc.Data["AGENTS_IM_JAEGER_BASE_URL"]; ok {
+		t.Fatalf("AGENTS_IM_JAEGER_BASE_URL should not be present in production configmap")
 	}
 }

@@ -16,7 +16,7 @@ const dashboard: AdminDashboard = {
     {
       traceId: 'trace_admin_1',
       runId: 'run_admin_1',
-      jaegerUrl: 'https://jaeger.agenticim.xyz/search?traceID=4bf92f3577b34da6a3ce929d0e0e4736',
+      traceUrl: 'https://grafana.agenticim.xyz/explore?left=tempo-trace-4bf92f3577b34da6a3ce929d0e0e4736',
       status: 'failed',
       conversationId: 'single:1001:2002',
       agentId: 'agent_1',
@@ -190,15 +190,15 @@ describe('AdminConsole', () => {
     expect(screen.getByText('trace_admin_1')).toBeInTheDocument();
   });
 
-  it('shows Jaeger span graph link on LLM trace detail when provided', async () => {
+  it('shows Tempo span graph link on LLM trace detail when provided', async () => {
     const user = userEvent.setup();
     render(<AdminConsole adminApi={createAdminApi()} />);
 
     await user.click(await screen.findByRole('button', { name: 'LLM Traces' }));
     await user.click(await screen.findByRole('button', { name: /trace_admin_1/ }));
 
-    const link = await screen.findByRole('link', { name: 'Open in Jaeger' });
-    expect(link).toHaveAttribute('href', 'https://jaeger.agenticim.xyz/search?traceID=4bf92f3577b34da6a3ce929d0e0e4736');
+    const link = await screen.findByRole('link', { name: 'Open in Tempo' });
+    expect(link).toHaveAttribute('href', 'https://grafana.agenticim.xyz/explore?left=tempo-trace-4bf92f3577b34da6a3ce929d0e0e4736');
   });
 
   it('loads messages after entering a conversation id', async () => {

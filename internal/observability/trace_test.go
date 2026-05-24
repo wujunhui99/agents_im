@@ -129,13 +129,15 @@ func TestRouteTemplateSanitizesDynamicSegmentsAndSystemRoutes(t *testing.T) {
 	}
 }
 
-func TestJaegerTraceURL(t *testing.T) {
-	got := JaegerTraceURL("https://jaeger.agenticim.xyz", "4bf92f3577b34da6a3ce929d0e0e4736")
-	want := "https://jaeger.agenticim.xyz/trace/4bf92f3577b34da6a3ce929d0e0e4736"
-	if got != want {
-		t.Fatalf("JaegerTraceURL = %q, want %q", got, want)
+func TestTraceUIURLUsesGrafanaTempoExplore(t *testing.T) {
+	got := TraceUIURL("https://grafana.agenticim.xyz", "4bf92f3577b34da6a3ce929d0e0e4736")
+	if !strings.HasPrefix(got, "https://grafana.agenticim.xyz/explore?") {
+		t.Fatalf("TraceUIURL should point at Grafana Explore, got %q", got)
 	}
-	if got := JaegerTraceURL("https://jaeger.agenticim.xyz/", "not a trace"); got != "" {
+	if !strings.Contains(got, "Tempo") || !strings.Contains(got, "4bf92f3577b34da6a3ce929d0e0e4736") {
+		t.Fatalf("TraceUIURL should include Tempo datasource and trace ID, got %q", got)
+	}
+	if got := TraceUIURL("https://grafana.agenticim.xyz/", "not a trace"); got != "" {
 		t.Fatalf("invalid trace id should not build URL, got %q", got)
 	}
 }
