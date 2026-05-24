@@ -126,6 +126,7 @@ type ValidateTokenRequest struct {
 type AuthResponse struct {
 	UserID        string `json:"user_id"`
 	Identifier    string `json:"identifier"`
+	Email         string `json:"email"`
 	DisplayName   string `json:"display_name"`
 	Name          string `json:"name"`
 	Gender        string `json:"gender"`
@@ -174,12 +175,14 @@ func (l *AuthLogic) Register(ctx context.Context, req RegisterRequest) (AuthResp
 	}
 
 	profile, err := l.users.CreateUser(ctx, useradapter.CreateUserRequest{
-		Identifier:  exists.Identifier,
-		DisplayName: req.DisplayName,
-		Name:        req.Name,
-		Gender:      req.Gender,
-		BirthDate:   req.BirthDate,
-		Region:      req.Region,
+		Identifier:      exists.Identifier,
+		Email:           email,
+		EmailVerifiedAt: verifiedAt,
+		DisplayName:     req.DisplayName,
+		Name:            req.Name,
+		Gender:          req.Gender,
+		BirthDate:       req.BirthDate,
+		Region:          req.Region,
 	})
 	if err != nil {
 		return AuthResponse{}, err
@@ -394,6 +397,7 @@ func (l *AuthLogic) issueToken(ctx context.Context, profile useradapter.UserProf
 	return AuthResponse{
 		UserID:        claims.UserID,
 		Identifier:    claims.Identifier,
+		Email:         profile.Email,
 		DisplayName:   profile.DisplayName,
 		Name:          profile.Name,
 		Gender:        profile.Gender,

@@ -14,11 +14,13 @@ const (
 )
 
 type Account struct {
-	AccountID   string
-	Identifier  string
-	AccountType AccountType
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	AccountID       string
+	Identifier      string
+	Email           string
+	EmailVerifiedAt time.Time
+	AccountType     AccountType
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 func (a Account) Clone() Account {
@@ -43,19 +45,21 @@ func (p Profile) Clone() Profile {
 }
 
 type User struct {
-	AccountID     string
-	UserID        string
-	Identifier    string
-	DisplayName   string
-	Name          string
-	Gender        string
-	BirthDate     string
-	Region        string
-	AccountType   AccountType
-	AvatarMediaID string
-	AvatarURL     string
-	CreatedAt     time.Time // V0 compatibility alias for ProfileCreatedAt.
-	UpdatedAt     time.Time // V0 compatibility alias for ProfileUpdatedAt.
+	AccountID       string
+	UserID          string
+	Identifier      string
+	Email           string
+	EmailVerifiedAt time.Time
+	DisplayName     string
+	Name            string
+	Gender          string
+	BirthDate       string
+	Region          string
+	AccountType     AccountType
+	AvatarMediaID   string
+	AvatarURL       string
+	CreatedAt       time.Time // V0 compatibility alias for ProfileCreatedAt.
+	UpdatedAt       time.Time // V0 compatibility alias for ProfileUpdatedAt.
 
 	AccountCreatedAt time.Time
 	AccountUpdatedAt time.Time
@@ -100,6 +104,8 @@ func NewAccountProfile(account Account, profile Profile) User {
 		AccountID:        account.AccountID,
 		UserID:           account.AccountID,
 		Identifier:       account.Identifier,
+		Email:            account.Email,
+		EmailVerifiedAt:  account.EmailVerifiedAt,
 		DisplayName:      profile.DisplayName,
 		Name:             profile.Name,
 		Gender:           profile.Gender,
@@ -122,11 +128,13 @@ func NewAccountProfile(account Account, profile Profile) User {
 func (u User) ToAccount() Account {
 	u.normalizeAliases()
 	return Account{
-		AccountID:   u.AccountID,
-		Identifier:  u.Identifier,
-		AccountType: u.AccountType,
-		CreatedAt:   u.AccountCreatedAt,
-		UpdatedAt:   u.AccountUpdatedAt,
+		AccountID:       u.AccountID,
+		Identifier:      u.Identifier,
+		Email:           u.Email,
+		EmailVerifiedAt: u.EmailVerifiedAt,
+		AccountType:     u.AccountType,
+		CreatedAt:       u.AccountCreatedAt,
+		UpdatedAt:       u.AccountUpdatedAt,
 	}
 }
 

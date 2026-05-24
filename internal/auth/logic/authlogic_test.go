@@ -289,11 +289,13 @@ func (c *authProfileClient) CreateUser(_ context.Context, req useradapter.Create
 	c.nextID++
 	userID := "auth_user_" + strconv.Itoa(c.nextID)
 	profile := useradapter.UserProfile{
-		UserID:      userID,
-		Identifier:  req.Identifier,
-		DisplayName: req.DisplayName,
-		Name:        req.DisplayName,
-		AccountType: "user",
+		UserID:          userID,
+		Identifier:      req.Identifier,
+		Email:           req.Email,
+		EmailVerifiedAt: req.EmailVerifiedAt,
+		DisplayName:     req.DisplayName,
+		Name:            req.DisplayName,
+		AccountType:     "user",
 	}
 	c.identifierID[req.Identifier] = userID
 	c.profiles[userID] = profile

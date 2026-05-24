@@ -26,6 +26,7 @@ func NewCreateUserLogic(ctx context.Context, svcCtx *usersvc.ServiceContext) *Cr
 func (l *CreateUserLogic) CreateUser(req *types.CreateUserReq) (*types.UserResp, error) {
 	profile, err := l.svcCtx.UserLogic.CreateUser(l.ctx, business.CreateUserRequest{
 		Identifier:  req.Identifier,
+		Email:       req.Email,
 		DisplayName: req.DisplayName,
 		Name:        req.Name,
 		Gender:      req.Gender,

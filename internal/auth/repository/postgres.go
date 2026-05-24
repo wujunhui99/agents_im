@@ -88,10 +88,10 @@ func (r *PostgresRepository) Create(ctx context.Context, credential model.Creden
 
 	var row postgresCredentialRow
 	err = r.conn.QueryRowCtx(ctx, &row, `
-insert into auth_credentials (account_id, email_normalized, email_verified_at, password_hash, password_algo)
-values ($1, $2, $3, $4, $5)
-returning account_id, $6::text as identifier, email_normalized, email_verified_at, password_hash, password_algo, created_at, updated_at
-`, credential.UserID, credential.Email, nullableTime(credential.EmailVerifiedAt), credential.PasswordHash, passwordAlgo, credential.Identifier)
+insert into auth_credentials (account_id, password_hash, password_algo)
+values ($1, $2, $3)
+returning account_id, $4::text as identifier, $5::text as email_normalized, $6::timestamptz as email_verified_at, password_hash, password_algo, created_at, updated_at
+`, credential.UserID, credential.PasswordHash, passwordAlgo, credential.Identifier, credential.Email, nullableTime(credential.EmailVerifiedAt))
 	if err != nil {
 		if isPgUniqueViolation(err) {
 			return model.Credential{}, apperror.AlreadyExists("auth credential already exists")
@@ -161,7 +161,7 @@ where account_id = $1 and active_session_id <> ''
 func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier string) (model.Credential, error) {
 	var row postgresCredentialRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select c.account_id, a.identifier, c.email_normalized, c.email_verified_at, c.password_hash, c.password_algo, c.created_at, c.updated_at
+select c.account_id, a.identifier, a.email_normalized, a.email_verified_at, c.password_hash, c.password_algo, c.created_at, c.updated_at
 from auth_credentials c
 join accounts a on a.account_id = c.account_id
 where a.identifier = $1
@@ -179,10 +179,10 @@ where a.identifier = $1
 func (r *PostgresRepository) GetByEmail(ctx context.Context, email string) (model.Credential, error) {
 	var row postgresCredentialRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
-select c.account_id, a.identifier, c.email_normalized, c.email_verified_at, c.password_hash, c.password_algo, c.created_at, c.updated_at
+select c.account_id, a.identifier, a.email_normalized, a.email_verified_at, c.password_hash, c.password_algo, c.created_at, c.updated_at
 from auth_credentials c
 join accounts a on a.account_id = c.account_id
-where c.email_normalized = $1 and c.email_normalized <> ''
+where a.email_normalized = $1 and a.email_normalized <> ''
 `, email)
 	if err != nil {
 		if errors.Is(err, sqlx.ErrNotFound) {

@@ -39,31 +39,35 @@ func NewAccountLogic(repo repository.AccountRepository) *AccountLogic {
 }
 
 type UserProfile struct {
-	AccountID     string `json:"account_id"`
-	UserID        string `json:"user_id"`
-	Identifier    string `json:"identifier"`
-	DisplayName   string `json:"display_name"`
-	Name          string `json:"name"`
-	Gender        string `json:"gender"`
-	BirthDate     string `json:"birth_date"`
-	Region        string `json:"region"`
-	AccountType   string `json:"account_type"`
-	AvatarMediaID string `json:"avatar_media_id"`
-	AvatarURL     string `json:"avatar_url"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	AccountID       string    `json:"account_id"`
+	UserID          string    `json:"user_id"`
+	Identifier      string    `json:"identifier"`
+	Email           string    `json:"email"`
+	EmailVerifiedAt time.Time `json:"-"`
+	DisplayName     string    `json:"display_name"`
+	Name            string    `json:"name"`
+	Gender          string    `json:"gender"`
+	BirthDate       string    `json:"birth_date"`
+	Region          string    `json:"region"`
+	AccountType     string    `json:"account_type"`
+	AvatarMediaID   string    `json:"avatar_media_id"`
+	AvatarURL       string    `json:"avatar_url"`
+	CreatedAt       string    `json:"created_at"`
+	UpdatedAt       string    `json:"updated_at"`
 }
 
 type AccountProfile = UserProfile
 
 type CreateUserRequest struct {
-	Identifier  string `json:"identifier"`
-	DisplayName string `json:"display_name"`
-	Name        string `json:"name"`
-	Gender      string `json:"gender"`
-	BirthDate   string `json:"birth_date"`
-	Region      string `json:"region"`
-	AccountType string `json:"account_type"`
+	Identifier      string    `json:"identifier"`
+	Email           string    `json:"email"`
+	EmailVerifiedAt time.Time `json:"-"`
+	DisplayName     string    `json:"display_name"`
+	Name            string    `json:"name"`
+	Gender          string    `json:"gender"`
+	BirthDate       string    `json:"birth_date"`
+	Region          string    `json:"region"`
+	AccountType     string    `json:"account_type"`
 }
 
 type CreateAccountRequest = CreateUserRequest
@@ -134,13 +138,15 @@ func (l *UserLogic) CreateUser(ctx context.Context, req CreateUserRequest) (User
 	}
 
 	user, err := l.repo.Create(ctx, model.User{
-		Identifier:  identifier,
-		DisplayName: displayName,
-		Name:        name,
-		Gender:      gender,
-		BirthDate:   strings.TrimSpace(req.BirthDate),
-		Region:      region,
-		AccountType: accountType,
+		Identifier:      identifier,
+		Email:           strings.TrimSpace(req.Email),
+		EmailVerifiedAt: req.EmailVerifiedAt,
+		DisplayName:     displayName,
+		Name:            name,
+		Gender:          gender,
+		BirthDate:       strings.TrimSpace(req.BirthDate),
+		Region:          region,
+		AccountType:     accountType,
 	})
 	if err != nil {
 		return UserProfile{}, err
@@ -376,19 +382,21 @@ func normalizeRegion(region string) (string, error) {
 func toProfile(user model.User) UserProfile {
 	user = user.Clone()
 	return UserProfile{
-		AccountID:     user.AccountID,
-		UserID:        user.UserID,
-		Identifier:    user.Identifier,
-		DisplayName:   user.DisplayName,
-		Name:          user.Name,
-		Gender:        user.Gender,
-		BirthDate:     user.BirthDate,
-		Region:        user.Region,
-		AccountType:   string(user.AccountType),
-		AvatarMediaID: user.AvatarMediaID,
-		AvatarURL:     user.AvatarURL,
-		CreatedAt:     formatTime(user.CreatedAt),
-		UpdatedAt:     formatTime(user.UpdatedAt),
+		AccountID:       user.AccountID,
+		UserID:          user.UserID,
+		Identifier:      user.Identifier,
+		Email:           user.Email,
+		EmailVerifiedAt: user.EmailVerifiedAt,
+		DisplayName:     user.DisplayName,
+		Name:            user.Name,
+		Gender:          user.Gender,
+		BirthDate:       user.BirthDate,
+		Region:          user.Region,
+		AccountType:     string(user.AccountType),
+		AvatarMediaID:   user.AvatarMediaID,
+		AvatarURL:       user.AvatarURL,
+		CreatedAt:       formatTime(user.CreatedAt),
+		UpdatedAt:       formatTime(user.UpdatedAt),
 	}
 }
 

@@ -13,6 +13,7 @@ func authResp(result business.AuthResponse) *types.AuthResp {
 		Data: types.AuthData{
 			UserID:        result.UserID,
 			Identifier:    result.Identifier,
+			Email:         result.Email,
 			DisplayName:   result.DisplayName,
 			Name:          result.Name,
 			Gender:        result.Gender,

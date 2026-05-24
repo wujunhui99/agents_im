@@ -31,6 +31,7 @@ func userRespWithAvatarFields(profile business.UserProfile) *types.UserResp {
 		Data: types.User{
 			UserID:        profile.UserID,
 			Identifier:    profile.Identifier,
+			Email:         profile.Email,
 			DisplayName:   profile.DisplayName,
 			Name:          profile.Name,
 			Gender:        profile.Gender,

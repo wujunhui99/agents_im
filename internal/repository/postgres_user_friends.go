@@ -13,20 +13,22 @@ import (
 )
 
 type postgresAccountProfileRow struct {
-	AccountID        string    `db:"account_id"`
-	Identifier       string    `db:"identifier"`
-	AccountType      int16     `db:"account_type"`
-	AccountCreatedAt time.Time `db:"account_created_at"`
-	AccountUpdatedAt time.Time `db:"account_updated_at"`
-	DisplayName      string    `db:"display_name"`
-	Name             string    `db:"name"`
-	Gender           int16     `db:"gender"`
-	BirthDate        string    `db:"birth_date"`
-	Region           string    `db:"region"`
-	AvatarMediaID    string    `db:"avatar_media_id"`
-	AvatarURL        string    `db:"avatar_url"`
-	ProfileCreatedAt time.Time `db:"profile_created_at"`
-	ProfileUpdatedAt time.Time `db:"profile_updated_at"`
+	AccountID        string       `db:"account_id"`
+	Identifier       string       `db:"identifier"`
+	AccountType      int16        `db:"account_type"`
+	Email            string       `db:"email_normalized"`
+	EmailVerifiedAt  sql.NullTime `db:"email_verified_at"`
+	AccountCreatedAt time.Time    `db:"account_created_at"`
+	AccountUpdatedAt time.Time    `db:"account_updated_at"`
+	DisplayName      string       `db:"display_name"`
+	Name             string       `db:"name"`
+	Gender           int16        `db:"gender"`
+	BirthDate        string       `db:"birth_date"`
+	Region           string       `db:"region"`
+	AvatarMediaID    string       `db:"avatar_media_id"`
+	AvatarURL        string       `db:"avatar_url"`
+	ProfileCreatedAt time.Time    `db:"profile_created_at"`
+	ProfileUpdatedAt time.Time    `db:"profile_updated_at"`
 }
 
 type postgresFriendshipRow struct {
@@ -58,9 +60,9 @@ func (r *PostgresRepository) Create(ctx context.Context, user model.User) (model
 	var row postgresAccountProfileRow
 	err := r.withTx(ctx, func(ctx context.Context, session sqlx.Session) error {
 		if _, err := session.ExecCtx(ctx, `
-insert into accounts (account_id, identifier, account_type)
-values ($1, $2, $3)
-`, accountID, user.Identifier, accountTypeToDB(accountType)); err != nil {
+insert into accounts (account_id, identifier, account_type, email_normalized, email_verified_at)
+values ($1, $2, $3, $4, $5)
+`, accountID, user.Identifier, accountTypeToDB(accountType), strings.TrimSpace(user.Email), nullableTime(user.EmailVerifiedAt)); err != nil {
 			return err
 		}
 
@@ -90,7 +92,7 @@ func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier str
 	var row postgresAccountProfileRow
 	err := r.conn.QueryRowCtx(ctx, &row, `
 select
-  a.account_id, a.identifier, a.account_type,
+  a.account_id, a.identifier, a.account_type, a.email_normalized, a.email_verified_at,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
   p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
@@ -122,7 +124,7 @@ func (r *PostgresRepository) SearchAccounts(ctx context.Context, filter AccountS
 	var rows []postgresAccountProfileRow
 	err := r.conn.QueryRowsCtx(ctx, &rows, `
 select
-  a.account_id, a.identifier, a.account_type,
+  a.account_id, a.identifier, a.account_type, a.email_normalized, a.email_verified_at,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
   p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
@@ -169,7 +171,7 @@ func (r *PostgresRepository) ListByAccountType(ctx context.Context, accountType 
 	var rows []postgresAccountProfileRow
 	err := r.conn.QueryRowsCtx(ctx, &rows, `
 select
-  a.account_id, a.identifier, a.account_type,
+  a.account_id, a.identifier, a.account_type, a.email_normalized, a.email_verified_at,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
   p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
@@ -214,7 +216,7 @@ returning account_id
 
 const accountProfileByIDQuery = `
 select
-  a.account_id, a.identifier, a.account_type,
+  a.account_id, a.identifier, a.account_type, a.email_normalized, a.email_verified_at,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
   p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
@@ -590,11 +592,13 @@ func (r postgresAccountProfileRow) user() model.User {
 	accountType := accountTypeFromDB(r.AccountType)
 	return model.NewAccountProfile(
 		model.Account{
-			AccountID:   r.AccountID,
-			Identifier:  r.Identifier,
-			AccountType: accountType,
-			CreatedAt:   r.AccountCreatedAt,
-			UpdatedAt:   r.AccountUpdatedAt,
+			AccountID:       r.AccountID,
+			Identifier:      r.Identifier,
+			Email:           r.Email,
+			EmailVerifiedAt: nullTimeValue(r.EmailVerifiedAt),
+			AccountType:     accountType,
+			CreatedAt:       r.AccountCreatedAt,
+			UpdatedAt:       r.AccountUpdatedAt,
 		},
 		model.Profile{
 			AccountID:     r.AccountID,
@@ -619,6 +623,20 @@ func (r postgresFriendshipRow) friendship() model.Friendship {
 		CreatedAt: r.CreatedAt,
 		UpdatedAt: r.UpdatedAt,
 	}
+}
+
+func nullableTime(t time.Time) sql.NullTime {
+	if t.IsZero() {
+		return sql.NullTime{}
+	}
+	return sql.NullTime{Time: t.UTC(), Valid: true}
+}
+
+func nullTimeValue(t sql.NullTime) time.Time {
+	if !t.Valid {
+		return time.Time{}
+	}
+	return t.Time
 }
 
 func itoa(value int) string {

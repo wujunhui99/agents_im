@@ -147,6 +147,8 @@ Proposed columns:
 ```text
 account_id text primary key
 identifier text not null unique
+email_normalized text not null default ''
+email_verified_at timestamptz null
 account_type smallint not null default 1
 created_at timestamptz not null default now()
 updated_at timestamptz not null default now()
@@ -156,6 +158,7 @@ Decisions:
 
 - `account_id` remains the stable internal primary key.
 - `identifier` remains unique in `accounts`.
+- `email_normalized` and `email_verified_at` live in `accounts`, not `auth_credentials`, because email is account-owned identity/contact data used by profile reads and login lookup.
 - `account_type` becomes `smallint`, not text.
 - No DB CHECK for numeric-only ID, account type enum, or identifier blankness. These move to application validation.
 - No role prefixes in `account_id`; continue using Snowflake-style numeric strings.
@@ -165,6 +168,7 @@ Indexes:
 ```text
 primary key (account_id)
 unique index accounts_identifier_uniq(identifier)
+unique index accounts_email_normalized_uniq(email_normalized) where email_normalized <> ''
 ordinary index accounts_account_type_idx(account_type) if filtering by type becomes common
 ```
 
@@ -234,8 +238,8 @@ Final direction from discussion: store only `account_id` as the account referenc
 Reasoning:
 
 - Duplicating `identifier` in both `accounts` and `auth_credentials` creates update coupling. If the user changes identifier, both tables must be updated in one transaction.
-- Keeping identifier only in `accounts` makes identifier changes affect one table only.
-- Login can first resolve `accounts.identifier -> account_id`, then read `auth_credentials.account_id -> password_hash`; or use a join/query encapsulated in repository code.
+- Keeping identifier and email only in `accounts` makes identity changes affect one table only.
+- Login can first resolve `accounts.identifier/email_normalized -> account_id`, then read `auth_credentials.account_id -> password_hash`; or use a join/query encapsulated in repository code.
 - This avoids long-term drift between two unique identifier copies.
 
 Proposed columns:

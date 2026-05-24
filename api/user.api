@@ -10,6 +10,7 @@ info (
 type User {
 	UserID      string `json:"user_id"`
 	Identifier  string `json:"identifier"`
+	Email       string `json:"email"`
 	DisplayName string `json:"display_name"`
 	Name        string `json:"name"`
 	Gender      string `json:"gender"`
@@ -25,6 +26,7 @@ type User {
 
 type CreateUserReq {
 	Identifier  string `json:"identifier"`
+	Email       string `json:"email,optional"`
 	DisplayName string `json:"display_name,optional"`
 	Name        string `json:"name,optional"`
 	Gender      string `json:"gender,optional"`

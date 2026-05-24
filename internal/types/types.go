@@ -93,6 +93,7 @@ type KickMemberReq struct {
 type AuthData struct {
 	UserID        string `json:"user_id"`
 	Identifier    string `json:"identifier"`
+	Email         string `json:"email,omitempty"`
 	DisplayName   string `json:"display_name,omitempty"`
 	Name          string `json:"name,omitempty"`
 	Gender        string `json:"gender,omitempty"`
@@ -175,6 +176,7 @@ type CreateAgentReq struct {
 
 type CreateUserReq struct {
 	Identifier  string `json:"identifier"`
+	Email       string `json:"email,optional"`
 	DisplayName string `json:"display_name,optional"`
 	Name        string `json:"name,optional"`
 	Gender      string `json:"gender,optional"`
@@ -614,6 +616,7 @@ type UpdateAgentStatusReq struct {
 type User struct {
 	UserID             string `json:"user_id"`
 	Identifier         string `json:"identifier"`
+	Email              string `json:"email"`
 	DisplayName        string `json:"display_name"`
 	Name               string `json:"name"`
 	Gender             string `json:"gender"`

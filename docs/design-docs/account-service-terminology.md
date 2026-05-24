@@ -21,7 +21,7 @@ IM 身份主体不只包含人类用户。Agent、admin、未来服务号/公众
 - Account Service 同时提供 `/accounts`、`/accounts/exists`、`/accounts/:identifier` aliases，语义与对应 `/users` path 相同。
 - JSON/RPC 中的 `user_id` 当前不批量改名；它是 account id alias。新增 public `account_id` 字段时必须保留 `user_id` alias 并提供兼容测试。
 - `proto/user.proto`、`cmd/user-api`、`cmd/user-rpc`、`api/user.api` 文件路径和部分 Go generated symbol 仍保留 `user`，作为 V0 transport compatibility。新增业务代码应优先使用 Account 术语或本仓库提供的 account alias seam。
-- PostgreSQL source-of-truth 表为 `accounts` 与 `profiles`。`accounts` 保存 `account_id`、`identifier`、`account_type` 和账号时间戳；`profiles` 保存展示名、名称、性别、生日、地区、头像 media 和资料时间戳；不持久化年龄。
+- PostgreSQL source-of-truth 表为 `accounts` 与 `profiles`。`accounts` 保存 `account_id`、`identifier`、`email_normalized`、`email_verified_at`、`account_type` 和账号时间戳；`profiles` 保存展示名、名称、性别、生日、地区、头像 media 和资料时间戳；不持久化年龄。
 - 旧 `account_type=normal` 不再作为有效输入兼容；迁移前必须转换为 `user`，否则按非法账号类型失败。
 
 ## Service Boundary
@@ -30,6 +30,7 @@ Account Service owns:
 
 - Snowflake account id / V0 `user_id` alias generation and lookup;
 - `identifier` uniqueness and public profile lookup;
+- `email_normalized` / `email_verified_at` as account-owned contact/login identity fields;
 - profile fields such as `display_name`、`name`、`gender`、`birth_date`、`region`;
 - `account_type=user|agent|admin`;
 - `/me` current account profile read/update through JWT identity.
