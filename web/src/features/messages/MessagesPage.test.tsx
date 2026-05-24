@@ -1150,6 +1150,22 @@ describe('MessagesPage real API mode', () => {
     expect(within(row).queryByText('1')).not.toBeInTheDocument();
   });
 
+  it('renders conversation previews from seqs before full message history finishes', async () => {
+    const history = deferred<Awaited<ReturnType<MessageApi['pullMessages']>>>();
+    const seedMessage = serverMessage({ seq: 1, content: 'seq preview before history' });
+    const messageApi = createMessageApi([seedMessage]);
+    vi.mocked(messageApi.pullMessages).mockReturnValueOnce(history.promise);
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} />);
+
+    expect(await screen.findByText('seq preview before history')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('正在同步消息');
+    expect(messageApi.pullMessages).toHaveBeenCalledWith(conversationId, { fromSeq: 1, limit: 50, order: 'asc' });
+
+    history.resolve({ conversationId, messages: [seedMessage] });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('已加载 1 个会话'));
+  });
+
   it('loads conversations from the message API and sends through POST /messages', async () => {
     const user = userEvent.setup();
     const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({

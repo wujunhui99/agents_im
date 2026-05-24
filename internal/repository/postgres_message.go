@@ -245,10 +245,8 @@ where s.account_id = $1 and t.conversation_id = $2
 
 func (r *PostgresMessageRepository) GetConversationSeqStates(ctx context.Context, userID string, conversationIDs []string) ([]ConversationSeqState, error) {
 	ids := conversationIDs
+	needsTargetedRepair := len(ids) > 0
 	if len(ids) == 0 {
-		if err := repairAllDirectConversationStates(ctx, r.conn, userID); err != nil {
-			return nil, err
-		}
 		if err := r.conn.QueryRowsCtx(ctx, &ids, `
 select conversation_id
 from user_conversation_states
@@ -257,12 +255,27 @@ order by updated_at desc, conversation_id asc
 `, userID); err != nil {
 			return nil, err
 		}
+		if len(ids) == 0 {
+			if err := repairAllDirectConversationStates(ctx, r.conn, userID); err != nil {
+				return nil, err
+			}
+			if err := r.conn.QueryRowsCtx(ctx, &ids, `
+select conversation_id
+from user_conversation_states
+where account_id = $1
+order by updated_at desc, conversation_id asc
+`, userID); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	states := make([]ConversationSeqState, 0, len(ids))
 	for _, conversationID := range ids {
-		if err := repairDirectConversationState(ctx, r.conn, userID, conversationID); err != nil {
-			return nil, err
+		if needsTargetedRepair {
+			if err := repairDirectConversationState(ctx, r.conn, userID, conversationID); err != nil {
+				return nil, err
+			}
 		}
 		state, err := queryConversationSeqState(ctx, r.conn, userID, conversationID)
 		if err != nil {

@@ -128,11 +128,27 @@ export function MessagesPage({
       try {
         const response = await messageApi.getConversationSeqs([]);
         const states = response.states ?? response.conversations ?? response.seqs ?? [];
-        const conversations = await Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi, groupsApi)));
-        const needsFriendProfiles = conversations.some(
+        const previewConversations = states.map((state) => conversationStateToView(state, currentUserId, state.lastMessage ? [state.lastMessage] : []));
+        const needsFriendProfiles = previewConversations.some(
           (conversation) => conversation.chatType === 'single' && conversation.receiverId && conversation.title === UNKNOWN_CONTACT_LABEL,
         );
-        const friendProfiles = needsFriendProfiles ? await loadAcceptedFriendProfileMap(contactsApi) : new Map<string, UserProfile>();
+        const conversationsPromise = Promise.all(states.map((state) => loadConversation(state, currentUserId, messageApi, groupsApi)));
+        const friendProfilesPromise = needsFriendProfiles
+          ? loadAcceptedFriendProfileMap(contactsApi)
+          : Promise.resolve(new Map<string, UserProfile>());
+        if (!cancelled) {
+          setItems((current) => mergeLoadedConversations(current, previewConversations));
+          setStatus(previewConversations.length > 0 ? `已加载 ${previewConversations.length} 个会话，正在同步消息` : '暂无会话');
+        }
+
+        void friendProfilesPromise.then((friendProfiles) => {
+          if (!cancelled && friendProfiles.size > 0) {
+            setItems((current) => hydrateConversationTitles(current, friendProfiles));
+          }
+        });
+
+        const conversations = await conversationsPromise;
+        const friendProfiles = await friendProfilesPromise;
         if (!cancelled) {
           setItems((current) => mergeLoadedConversations(current, hydrateConversationTitles(conversations, friendProfiles)));
           setStatus(conversations.length > 0 ? `已加载 ${conversations.length} 个会话` : '暂无会话');
@@ -1454,16 +1470,26 @@ async function loadConversation(
   messageApi: MessageApi,
   groupsApi: GroupsApi,
 ): Promise<Conversation> {
-  const pulled = await messageApi.pullMessages(state.conversationId, { fromSeq: 1, limit: 50, order: 'asc' });
-  const conversation = conversationStateToView(state, currentUserId, pulled.messages);
-  if (conversation.chatType !== 'group' || !conversation.groupId) {
-    return conversation;
+  const previewMessages = state.lastMessage ? [state.lastMessage] : [];
+  const previewConversation = conversationStateToView(state, currentUserId, previewMessages);
+  const messagesPromise = messageApi.pullMessages(state.conversationId, { fromSeq: 1, limit: 50, order: 'asc' });
+
+  if (previewConversation.chatType !== 'group' || !previewConversation.groupId) {
+    const pulled = await messagesPromise;
+    return conversationStateToView(state, currentUserId, pulled.messages);
   }
+
   try {
-    const [group, members] = await Promise.all([groupsApi.getGroup(conversation.groupId), groupsApi.listMembers(conversation.groupId)]);
+    const [pulled, group, members] = await Promise.all([
+      messagesPromise,
+      groupsApi.getGroup(previewConversation.groupId),
+      groupsApi.listMembers(previewConversation.groupId),
+    ]);
+    const conversation = conversationStateToView(state, currentUserId, pulled.messages);
     return applyGroupMetadata(conversation, group, members.members ?? []);
   } catch {
-    return conversation;
+    const pulled = await messagesPromise;
+    return conversationStateToView(state, currentUserId, pulled.messages);
   }
 }
 
