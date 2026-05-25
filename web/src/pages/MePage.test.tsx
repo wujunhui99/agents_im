@@ -79,7 +79,7 @@ describe('MePage', () => {
     expect(status).toHaveTextContent('object storage unavailable');
   });
 
-  it('submits user feedback from the Me page', async () => {
+  it('submits polished user feedback with formal categories and selected image context', async () => {
     const user = userEvent.setup();
     const onSubmitFeedback = vi.fn(async () => undefined);
 
@@ -87,20 +87,43 @@ describe('MePage', () => {
       <MePage profile={profile} onUpdateProfile={vi.fn()} onUploadAvatar={vi.fn()} onSubmitFeedback={onSubmitFeedback} />,
     );
 
-    await user.click(screen.getByRole('button', { name: '意见反馈' }));
-    await user.selectOptions(screen.getByLabelText('反馈类型'), 'bug');
-    await user.type(screen.getByLabelText('标题'), '消息发送失败');
-    await user.type(screen.getByLabelText('反馈内容'), '点击发送后没有任何响应');
-    await user.type(screen.getByLabelText('联系方式（选填）'), 'alice@example.com');
-    await user.click(screen.getByRole('button', { name: '提交反馈' }));
+    expect(screen.getByRole('button', { name: /帮助我们改进 Agents IM/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /帮助我们改进 Agents IM/ }));
+
+    const feedbackForm = screen.getByRole('region', { name: '意见反馈表单' });
+    expect(within(feedbackForm).getByRole('radio', { name: /问题反馈/ })).toBeChecked();
+    expect(within(feedbackForm).getByRole('radio', { name: /体验建议/ })).toBeInTheDocument();
+    expect(within(feedbackForm).getByRole('radio', { name: /功能建议/ })).toBeInTheDocument();
+    expect(within(feedbackForm).getByRole('radio', { name: /其他反馈/ })).toBeInTheDocument();
+    expect(within(feedbackForm).queryByText('Bug')).not.toBeInTheDocument();
+    expect(within(feedbackForm).queryByText('体验不好')).not.toBeInTheDocument();
+
+    await user.click(within(feedbackForm).getByRole('radio', { name: /体验建议/ }));
+    await user.type(within(feedbackForm).getByLabelText('反馈标题'), '消息发送入口不明显');
+    await user.type(within(feedbackForm).getByLabelText('详细说明'), '输入区域层级不清晰，希望更容易找到发送按钮');
+    await user.type(within(feedbackForm).getByLabelText('联系方式（选填）'), 'alice@example.com');
+    await user.upload(
+      within(feedbackForm).getByLabelText('添加截图或图片'),
+      new File([new Uint8Array(1024)], 'feedback-screen.png', { type: 'image/png' }),
+    );
+
+    expect(within(feedbackForm).getByText('feedback-screen.png')).toBeInTheDocument();
+    expect(within(feedbackForm).getByText('图片将在后续版本上传到反馈工单')).toBeInTheDocument();
+
+    await user.click(within(feedbackForm).getByRole('button', { name: '提交反馈' }));
 
     await waitFor(() => expect(onSubmitFeedback).toHaveBeenCalledWith({
-      category: 'bug',
-      title: '消息发送失败',
-      content: '点击发送后没有任何响应',
+      category: 'poor_experience',
+      title: '消息发送入口不明显',
+      content: '输入区域层级不清晰，希望更容易找到发送按钮',
       contact: 'alice@example.com',
       pageUrl: expect.any(String),
       userAgent: expect.any(String),
+      clientMeta: {
+        attachmentFileNames: ['feedback-screen.png'],
+        attachmentCount: 1,
+        attachmentUploadStatus: 'local_selection_only',
+      },
     }));
     expect(await screen.findByRole('status')).toHaveTextContent('反馈已提交');
   });
