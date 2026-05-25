@@ -1172,10 +1172,9 @@ describe('WeChat-inspired app shell', () => {
 
     expect(screen.queryByText('user_id')).not.toBeInTheDocument();
     expect(screen.queryByText('1001')).not.toBeInTheDocument();
-    expect(screen.getByText('alice_001')).toBeInTheDocument();
-    expect(screen.getByText('用户')).toBeInTheDocument();
-    expect(screen.getByText('女')).toBeInTheDocument();
-    expect(screen.getByText('1996-05-02')).toBeInTheDocument();
+    expect(screen.getByText('账号：alice_001')).toBeInTheDocument();
+    expect(screen.getByText('账号类型：用户')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '个人资料详情' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '编辑个人资料' }));
     await user.clear(screen.getByLabelText('昵称'));
@@ -1193,7 +1192,7 @@ describe('WeChat-inspired app shell', () => {
       region: 'Hangzhou',
     });
     expect((await screen.findAllByText('Alice Chen')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Hangzhou').length).toBeGreaterThan(0);
+    expect(screen.getByText('地区：Hangzhou')).toBeInTheDocument();
   });
 
   it('keeps an uploaded avatar visible after remounting from the persisted session', async () => {
@@ -1515,12 +1514,10 @@ describe('WeChat-inspired app shell', () => {
 
     await user.click(screen.getByRole('tab', { name: /我的/i }));
 
-    expect(screen.getByText('账号')).toBeInTheDocument();
-    expect(screen.getByText('昵称')).toBeInTheDocument();
-    expect(screen.getByText('账号类型')).toBeInTheDocument();
-    expect(screen.getByText('性别')).toBeInTheDocument();
-    expect(screen.getByText('女')).toBeInTheDocument();
-    expect(screen.getByText('地区')).toBeInTheDocument();
+    expect(screen.getByText('账号：alice_001')).toBeInTheDocument();
+    expect(screen.getByText('账号类型：用户')).toBeInTheDocument();
+    expect(screen.getByText('地区：Shanghai')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '个人资料详情' })).not.toBeInTheDocument();
     expect(screen.queryByText('identifier')).not.toBeInTheDocument();
     expect(screen.queryByText('display_name')).not.toBeInTheDocument();
     expect(screen.queryByText('gender')).not.toBeInTheDocument();
@@ -1530,6 +1527,30 @@ describe('WeChat-inspired app shell', () => {
     expect(screen.getByLabelText('昵称')).toBeInTheDocument();
     expect(screen.getByLabelText('性别')).toBeInTheDocument();
     expect(screen.getByLabelText('地区')).toBeInTheDocument();
+  });
+
+  it('opens feedback from Me as a dedicated route and returns with browser back', async () => {
+    const user = userEvent.setup();
+    render(<App initialUser={initialProfile} />);
+
+    await user.click(screen.getByRole('tab', { name: /我的/i }));
+    expect(screen.getByRole('heading', { name: '我的' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '意见反馈表单' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '反馈' }));
+
+    expect(window.location.pathname).toBe('/feedback');
+    expect(await screen.findByRole('heading', { name: '反馈' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '意见反馈表单' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /我的/i })).not.toBeInTheDocument();
+
+    act(() => {
+      window.history.back();
+    });
+
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(await screen.findByRole('heading', { name: '我的' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /我的/i })).toBeInTheDocument();
   });
 
   it('loads friends automatically when entering contacts and opens a friend chat from the contact row', async () => {

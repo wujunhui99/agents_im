@@ -136,10 +136,12 @@ make status
   - `/observability/llm` -> 302 到 `langfuse.agenticim.xyz`
 - `langfuse.agenticim.xyz` 保留独立域名，MS 只提供跳转入口。
 - Management System 的数据列表必须有表头或字段 label，不能只展示一组无字段名的值。
+- Management System 的 SPA 页面路由可以使用 `/admin/*`；新增/易冲突的数据接口应使用明确 JSON API 前缀，当前反馈管理数据使用 `/api/admin/feedback`，避免 `/admin/feedback` 页面路由被误当成 API。
 
 ## REST Adapter 约定
 
 - `web/src/api/contacts.ts`：`listFriends` -> `GET /friends`，`addFriend` -> `POST /friends`，`deleteFriend` -> `DELETE /friends/:user_id`。
 - `web/src/api/groups.ts`：`listGroups` -> `GET /groups`，`getGroup` -> `GET /groups/:group_id`，`createGroup` -> `POST /groups`（支持 `member_user_ids`），`joinGroup` -> `POST /groups/:group_id/members`，`leaveGroup` -> `DELETE /groups/:group_id/members/me`，`listMembers` -> `GET /groups/:group_id/members`。
 - `web/src/api/messages.ts`：`sendMessage` -> `POST /messages`，`pullMessages` -> `GET /conversations/:conversation_id/messages`，`getConversationSeqs` -> `GET /conversations/seqs`，`markRead` -> `POST /conversations/:conversation_id/read`，`getAIHosting` -> `GET /conversations/:conversation_id/ai-hosting`，`updateAIHosting` -> `PUT /conversations/:conversation_id/ai-hosting`。
+- `web/src/api/admin.ts`：反馈管理使用 `GET /api/admin/feedback`、`GET /api/admin/feedback/:feedback_id`、`PATCH /api/admin/feedback/:feedback_id`，不要用 `/admin/feedback` 作为 JSON fetch 目标。
 - Adapter 接受可注入 `fetcher` 和 bearer token；示例 token 只能使用 `***` 或测试 fixture 值。

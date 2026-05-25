@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { UserProfile } from '../api/user';
@@ -22,12 +22,12 @@ describe('MePage', () => {
   it('shows profile labels without exposing the internal user id', () => {
     render(<MePage profile={profile} onUpdateProfile={vi.fn()} onUploadAvatar={vi.fn()} />);
 
-    const details = screen.getByRole('region', { name: '个人资料详情' });
-    expect(within(details).queryByText('user_id')).not.toBeInTheDocument();
-    expect(within(details).queryByText('1001')).not.toBeInTheDocument();
-    expect(within(details).getByText('alice_001')).toBeInTheDocument();
-    expect(within(details).getByText('Alice Chen')).toBeInTheDocument();
-    expect(within(details).getByText('用户')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '个人资料详情' })).not.toBeInTheDocument();
+    expect(screen.queryByText('user_id')).not.toBeInTheDocument();
+    expect(screen.queryByText('1001')).not.toBeInTheDocument();
+    expect(screen.getByText('账号：alice_001')).toBeInTheDocument();
+    expect(screen.getByText('账号类型：用户')).toBeInTheDocument();
+    expect(screen.getByText('地区：Shanghai')).toBeInTheDocument();
   });
 
   it('keeps Me-scoped menu entries and excludes moments', () => {
@@ -37,6 +37,19 @@ describe('MePage', () => {
     expect(screen.getByText('收藏')).toBeInTheDocument();
     expect(screen.getByText('设置')).toBeInTheDocument();
     expect(screen.queryByText('朋友圈')).not.toBeInTheDocument();
+  });
+
+  it('renders feedback as a compact list row without an inline form', () => {
+    const onOpenFeedback = vi.fn();
+
+    render(<MePage profile={profile} onUpdateProfile={vi.fn()} onUploadAvatar={vi.fn()} onOpenFeedback={onOpenFeedback} />);
+
+    const feedbackButton = screen.getByRole('button', { name: '反馈' });
+    expect(feedbackButton).toHaveClass('md-list-item');
+    expect(screen.queryByRole('region', { name: '意见反馈表单' })).not.toBeInTheDocument();
+
+    feedbackButton.click();
+    expect(onOpenFeedback).toHaveBeenCalledTimes(1);
   });
 
   it('renders the current avatar image and uploads a selected replacement', async () => {
@@ -79,52 +92,4 @@ describe('MePage', () => {
     expect(status).toHaveTextContent('object storage unavailable');
   });
 
-  it('submits polished user feedback with formal categories and selected image context', async () => {
-    const user = userEvent.setup();
-    const onSubmitFeedback = vi.fn(async () => undefined);
-
-    render(
-      <MePage profile={profile} onUpdateProfile={vi.fn()} onUploadAvatar={vi.fn()} onSubmitFeedback={onSubmitFeedback} />,
-    );
-
-    expect(screen.getByRole('button', { name: /帮助我们改进 Agents IM/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /帮助我们改进 Agents IM/ }));
-
-    const feedbackForm = screen.getByRole('region', { name: '意见反馈表单' });
-    expect(within(feedbackForm).getByRole('radio', { name: /问题反馈/ })).toBeChecked();
-    expect(within(feedbackForm).getByRole('radio', { name: /体验建议/ })).toBeInTheDocument();
-    expect(within(feedbackForm).getByRole('radio', { name: /功能建议/ })).toBeInTheDocument();
-    expect(within(feedbackForm).getByRole('radio', { name: /其他反馈/ })).toBeInTheDocument();
-    expect(within(feedbackForm).queryByText('Bug')).not.toBeInTheDocument();
-    expect(within(feedbackForm).queryByText('体验不好')).not.toBeInTheDocument();
-
-    await user.click(within(feedbackForm).getByRole('radio', { name: /体验建议/ }));
-    await user.type(within(feedbackForm).getByLabelText('反馈标题'), '消息发送入口不明显');
-    await user.type(within(feedbackForm).getByLabelText('详细说明'), '输入区域层级不清晰，希望更容易找到发送按钮');
-    await user.type(within(feedbackForm).getByLabelText('联系方式（选填）'), 'alice@example.com');
-    await user.upload(
-      within(feedbackForm).getByLabelText('添加截图或图片'),
-      new File([new Uint8Array(1024)], 'feedback-screen.png', { type: 'image/png' }),
-    );
-
-    expect(within(feedbackForm).getByText('feedback-screen.png')).toBeInTheDocument();
-    expect(within(feedbackForm).getByText('图片将在后续版本上传到反馈工单')).toBeInTheDocument();
-
-    await user.click(within(feedbackForm).getByRole('button', { name: '提交反馈' }));
-
-    await waitFor(() => expect(onSubmitFeedback).toHaveBeenCalledWith({
-      category: 'poor_experience',
-      title: '消息发送入口不明显',
-      content: '输入区域层级不清晰，希望更容易找到发送按钮',
-      contact: 'alice@example.com',
-      pageUrl: expect.any(String),
-      userAgent: expect.any(String),
-      clientMeta: {
-        attachmentFileNames: ['feedback-screen.png'],
-        attachmentCount: 1,
-        attachmentUploadStatus: 'local_selection_only',
-      },
-    }));
-    expect(await screen.findByRole('status')).toHaveTextContent('反馈已提交');
-  });
 });

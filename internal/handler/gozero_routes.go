@@ -437,17 +437,17 @@ func addAdminRoutes(server *rest.Server, serverCtx *adminsvc.ServiceContext) {
 		},
 		{
 			Method:  http.MethodGet,
-			Path:    "/admin/feedback",
+			Path:    "/api/admin/feedback",
 			Handler: adminhandler.ListFeedbackHandler(serverCtx),
 		},
 		{
 			Method:  http.MethodGet,
-			Path:    "/admin/feedback/:feedback_id",
+			Path:    "/api/admin/feedback/:feedback_id",
 			Handler: adminhandler.GetFeedbackHandler(serverCtx),
 		},
 		{
 			Method:  http.MethodPatch,
-			Path:    "/admin/feedback/:feedback_id",
+			Path:    "/api/admin/feedback/:feedback_id",
 			Handler: adminhandler.UpdateFeedbackHandler(serverCtx),
 		},
 		{
