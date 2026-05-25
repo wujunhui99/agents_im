@@ -22,7 +22,7 @@ The Langfuse web UI is deployed by k3s at `https://langfuse.agenticim.xyz/` usin
 
 Tempo trace storage is deployed by k3s from `deploy/k8s/tempo.yaml` and receives traces through `deploy/k8s/otel-collector.yaml`. Tempo is intentionally internal-only; operators query traces through Grafana's `Tempo` datasource instead of a public Tempo or Jaeger domain.
 
-Prometheus and Grafana are deployed by k3s from `deploy/k8s/prometheus-grafana.yaml`. Prometheus is exposed at `https://prometheus.agenticim.xyz/` behind the `observability-basic-auth` Traefik middleware. Grafana is exposed at `https://grafana.agenticim.xyz/` and uses its own login backed by the `agents-im/grafana-admin` Secret. `scripts/bootstrap-server.sh` creates that Secret for new servers and stores the generated operator credentials at `/opt/agents-im/grafana-admin.env` with mode `0600`. Keep both credential files and k8s Secret values off Git, issues, and chat transcripts.
+Prometheus and Grafana are deployed by k3s from `deploy/k8s/prometheus-grafana.yaml`. Prometheus is exposed only through the Management System path `https://ms.agenticim.xyz/observability/metrics` behind the `observability-basic-auth` Traefik middleware; do not expose `prometheus.agenticim.xyz`. Grafana is exposed at `https://grafana.agenticim.xyz/` and uses its own login backed by the `agents-im/grafana-admin` Secret. `scripts/bootstrap-server.sh` creates that Secret for new servers and stores the generated operator credentials at `/opt/agents-im/grafana-admin.env` with mode `0600`. Keep both credential files and k3s Secret values out of Git and chat logs.
 
 Loki log aggregation is deployed by k3s from `deploy/k8s/loki.yaml`. Loki is intentionally internal-only at `http://loki.agents-im.svc.cluster.local:3100`; operators query logs through the Grafana `Loki` datasource rather than a public Loki domain.
 
@@ -73,7 +73,7 @@ Production public entrypoints:
 
 - User web app: `https://agenticim.xyz/`
 - Management System (MS): `https://ms.agenticim.xyz/`
-- Prometheus: `https://prometheus.agenticim.xyz/` (Traefik basic-auth)
+- Prometheus: `https://ms.agenticim.xyz/observability/metrics` (Traefik basic-auth; no separate `prometheus.agenticim.xyz` ingress)
 - Grafana: `https://grafana.agenticim.xyz/` (Grafana login from the `grafana-admin` Secret)
 
 Distributed tracing is deployed as OpenTelemetry Collector plus Grafana Tempo:
@@ -109,7 +109,7 @@ Langfuse LLM observability has two pieces:
 - In-app export configuration through `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`.
 - The self-hosted Langfuse UI at `https://langfuse.agenticim.xyz/`, deployed by `deploy/k8s/langfuse.yaml` and backed by the k3s `agents-im-secrets` values `LANGFUSE_DATABASE_URL`, `NEXTAUTH_SECRET`, `SALT`, and `ENCRYPTION_KEY`.
 
-The Management System root serves the web SPA and the frontend opens **AgenticIM Management** from that host. On `ms.agenticim.xyz`, Ingress exposes only the admin API prefixes served by `message-api` (`/admin/dashboard`, `/admin/llm-traces`, `/admin/conversations`, `/admin/users`) plus `/` to `web`. AgenticIM Management also provides learning/operator shortcuts at `/observability/logs`, `/observability/traces`, and `/observability/metrics`; those routes stay inside the SPA and link to Grafana Explore or the protected Prometheus UI instead of exposing raw Loki/Tempo public ingress. `langfuse.agenticim.xyz` remains an independent domain and is linked from Management System. `admin.agenticim.xyz` is deprecated and has a Traefik permanent redirect to the same path on `https://ms.agenticim.xyz`; do not use it as the primary management entrypoint.
+The Management System root serves the web SPA and the frontend opens **AgenticIM Management** from that host. On `ms.agenticim.xyz`, Ingress exposes the admin API prefixes served by `message-api` (`/admin/dashboard`, `/admin/llm-traces`, `/admin/conversations`, `/admin/users`) plus `/` to `web`. AgenticIM Management provides operator shortcuts whose paths are real routes: `/observability/logs` redirects to Grafana Explore with Loki, `/observability/traces` redirects to Grafana Explore with Tempo, `/observability/metrics` serves the protected Prometheus UI directly, and `/observability/llm` redirects to the independent `https://langfuse.agenticim.xyz/` domain. Loki and Tempo keep no public domains, `prometheus.agenticim.xyz` must remain unexposed, and Langfuse keeps its independent domain. `admin.agenticim.xyz` is deprecated and has a Traefik permanent redirect to the same path on `https://ms.agenticim.xyz`; do not use it as the primary management entrypoint.
 
 The deploy pipeline has three steps:
 

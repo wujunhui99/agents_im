@@ -2194,6 +2194,45 @@ if jaeger_ingress:
     print("deploy/k8s/ingress.yaml: jaeger public ingress must be removed; use Grafana Tempo instead", file=sys.stderr)
     sys.exit(1)
 
+prometheus_ingress, _ = ingress_by_host("prometheus.agenticim.xyz")
+if prometheus_ingress:
+    print("deploy/k8s/ingress.yaml: prometheus.agenticim.xyz public ingress must be removed; use ms.agenticim.xyz/observability/metrics", file=sys.stderr)
+    sys.exit(1)
+
+def backend_for_host_path(host, path):
+    for doc in docs:
+        for rule in doc.get("spec", {}).get("rules", []) or []:
+            if rule.get("host") != host:
+                continue
+            service_name, service_port = backend_for(rule, path)
+            if service_name:
+                return doc, service_name, service_port
+    return None, None, None
+
+metrics_ingress, metrics_svc, metrics_port = backend_for_host_path("ms.agenticim.xyz", "/observability/metrics")
+if (metrics_svc, metrics_port) != ("prometheus", 9090):
+    print("deploy/k8s/ingress.yaml: ms.agenticim.xyz/observability/metrics must route to prometheus:9090", file=sys.stderr)
+    sys.exit(1)
+metrics_middlewares = metrics_ingress.get("metadata", {}).get("annotations", {}).get("traefik.ingress.kubernetes.io/router.middlewares", "")
+if "agents-im-observability-basic-auth@kubernetescrd" not in metrics_middlewares:
+    print("deploy/k8s/ingress.yaml: /observability/metrics must keep observability basic auth", file=sys.stderr)
+    sys.exit(1)
+
+redirect_expectations = {
+    "/observability/logs": "agents-im-observability-logs-redirect@kubernetescrd",
+    "/observability/traces": "agents-im-observability-traces-redirect@kubernetescrd",
+    "/observability/llm": "agents-im-observability-llm-redirect@kubernetescrd",
+}
+for path, middleware in redirect_expectations.items():
+    redirect_ingress, _, _ = backend_for_host_path("ms.agenticim.xyz", path)
+    if not redirect_ingress:
+        print(f"deploy/k8s/ingress.yaml: missing ms.agenticim.xyz{path} redirect ingress", file=sys.stderr)
+        sys.exit(1)
+    middlewares = redirect_ingress.get("metadata", {}).get("annotations", {}).get("traefik.ingress.kubernetes.io/router.middlewares", "")
+    if middleware not in middlewares:
+        print(f"deploy/k8s/ingress.yaml: {path} must use {middleware}", file=sys.stderr)
+        sys.exit(1)
+
 with open("deploy/k8s/langfuse.yaml", encoding="utf-8") as f:
     langfuse_docs = [doc for doc in yaml.safe_load_all(f) if doc]
 if not any(doc.get("kind") == "Deployment" and doc.get("metadata", {}).get("name") == "langfuse" for doc in langfuse_docs):
