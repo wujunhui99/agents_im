@@ -18,7 +18,7 @@ RESTART_SERVICES="${RESTART_SERVICES:-}"
 RESTART_ROLLOUT="${RESTART_ROLLOUT:-false}"
 RENDER_ONLY="${RENDER_ONLY:-false}"
 
-SERVICES=(
+IMAGE_DEPLOYMENTS=(
   user-api
   auth-api
   friends-api
@@ -36,6 +36,17 @@ SERVICES=(
   web
 )
 
+RESTARTABLE_DEPLOYMENTS=(
+  "${IMAGE_DEPLOYMENTS[@]}"
+  agents-im-minio-proxy
+  prometheus
+  grafana
+  loki
+  tempo
+  otel-collector
+  langfuse
+)
+
 require() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "required command not found: $1" >&2
@@ -49,8 +60,9 @@ bool_true() {
 
 known_service() {
   local service="$1"
+  shift
   local known
-  for known in "${SERVICES[@]}"; do
+  for known in "$@"; do
     if [[ "${known}" == "${service}" ]]; then
       return 0
     fi
@@ -72,39 +84,43 @@ array_contains() {
 
 read_selected_services() {
   local service_list="$1"
-  local -n out_ref="$2"
+  local -n allowed_ref="$2"
+  local -n out_ref="$3"
   local service
   out_ref=()
   if [[ -n "${service_list}" ]]; then
     for service in ${service_list}; do
-      if ! known_service "${service}"; then
+      if ! known_service "${service}" "${allowed_ref[@]}"; then
         echo "unknown deployment service: ${service}" >&2
         exit 1
       fi
       out_ref+=("${service}")
     done
   else
-    out_ref=("${SERVICES[@]}")
+    out_ref=("${allowed_ref[@]}")
   fi
 }
 
 selected_services() {
+  local service_list="$1"
+  shift
+  local allowed=("$@")
   local services=()
-  read_selected_services "$1" services
+  read_selected_services "${service_list}" allowed services
   printf '%s\n' "${services[@]}"
 }
 
 image_services() {
-  selected_services "${IMAGE_SERVICES}"
+  selected_services "${IMAGE_SERVICES}" "${IMAGE_DEPLOYMENTS[@]}"
 }
 
 rollout_services() {
-  selected_services "${ROLLOUT_SERVICES}"
+  selected_services "${ROLLOUT_SERVICES}" "${RESTARTABLE_DEPLOYMENTS[@]}"
 }
 
 restart_services() {
   if [[ -n "${RESTART_SERVICES}" ]]; then
-    selected_services "${RESTART_SERVICES}"
+    selected_services "${RESTART_SERVICES}" "${RESTARTABLE_DEPLOYMENTS[@]}"
   elif bool_true "${RESTART_ROLLOUT}"; then
     rollout_services
   fi
@@ -113,7 +129,7 @@ restart_services() {
 capture_current_images() {
   CURRENT_IMAGES=()
   local service image
-  for service in "${SERVICES[@]}"; do
+  for service in "${IMAGE_DEPLOYMENTS[@]}"; do
     image="$(${KUBECTL} -n "${NAMESPACE}" get deployment "${service}" -o "jsonpath={.spec.template.spec.containers[?(@.name=='${service}')].image}" 2>/dev/null || true)"
     CURRENT_IMAGES+=("${service}=${image}")
   done
@@ -134,7 +150,7 @@ current_image_for() {
 build_image_overrides() {
   local selected=("$@")
   local service image
-  for service in "${SERVICES[@]}"; do
+  for service in "${IMAGE_DEPLOYMENTS[@]}"; do
     if array_contains "${service}" "${selected[@]}"; then
       printf '%s=%s\n' "${service}" "${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"
       continue
@@ -154,7 +170,7 @@ build_image_overrides() {
 apply_rendered_manifests() {
   local image_overrides="$1"
   local app_deployments
-  app_deployments="$(printf '%s\n' "${SERVICES[@]}")"
+  app_deployments="$(printf '%s\n' "${IMAGE_DEPLOYMENTS[@]}")"
   ${KUBECTL} kustomize "${MANIFEST_DIR}" | APP_DEPLOYMENT_NAMES="${app_deployments}" IMAGE_OVERRIDES="${image_overrides}" python3 -c '
 import os
 import re
@@ -324,7 +340,7 @@ apply_manifests() {
       echo "IMAGE_TAG must be a non-empty immutable tag when SKIP_SET_IMAGE is false; refusing to deploy mutable latest tags" >&2
       exit 1
     fi
-    read_selected_services "${IMAGE_SERVICES}" selected_image_services
+    read_selected_services "${IMAGE_SERVICES}" IMAGE_DEPLOYMENTS selected_image_services
   fi
   capture_current_images
   image_overrides="$(build_image_overrides "${selected_image_services[@]}")"

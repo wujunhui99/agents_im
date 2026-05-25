@@ -160,6 +160,29 @@ exit 0
 FAKE
 chmod +x "${FAKE_KUBECTL}"
 
+DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
+  --event-name push \
+  --ref refs/heads/main \
+  deploy/k8s/prometheus-grafana.yaml)"
+if ! grep -Fq "config_only=true" <<<"${DETECT_OUTPUT}" || \
+  ! grep -Fq "rollout_services='prometheus grafana'" <<<"${DETECT_OUTPUT}" || \
+  ! grep -Fq "restart_services='prometheus grafana'" <<<"${DETECT_OUTPUT}"; then
+  echo "expected prometheus-grafana manifest change to restart prometheus and grafana" >&2
+  printf '%s\n' "${DETECT_OUTPUT}" >&2
+  exit 1
+fi
+
+DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
+  --event-name push \
+  --ref refs/heads/main \
+  deploy/k8s/tempo.yaml)"
+if ! grep -Fq "rollout_services='grafana tempo'" <<<"${DETECT_OUTPUT}" || \
+  ! grep -Fq "restart_services='grafana tempo'" <<<"${DETECT_OUTPUT}"; then
+  echo "expected tempo manifest change to restart tempo and grafana" >&2
+  printf '%s\n' "${DETECT_OUTPUT}" >&2
+  exit 1
+fi
+
 cat >"${TMP_DIR}/psql" <<'FAKEPSQL'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -302,6 +325,38 @@ fi
 
 if grep -Fq "user-rpc=new-web-sha" "${CALL_LOG}"; then
   echo "config-only deploy must not set user-rpc to the new release tag" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+# Config-only deploys must be able to restart observability deployments that do
+# not use application images. Grafana datasource ConfigMap changes depend on this
+# restart so newly provisioned datasources such as Tempo are loaded.
+: >"${CALL_LOG}"
+FAKE_KUBECTL_LOG="${CALL_LOG}" \
+NAMESPACE=agents-im \
+KUBECTL="${FAKE_KUBECTL}" \
+SKIP_MIDDLEWARE=true \
+SKIP_MIGRATIONS=true \
+SKIP_SET_IMAGE=true \
+ROLLOUT_SERVICES=grafana \
+RESTART_SERVICES=grafana \
+"${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-grafana-restart.out
+
+if ! grep -Fq "rollout restart deployment/grafana" "${CALL_LOG}"; then
+  echo "expected config-only deploy to restart grafana" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "rollout status deployment/grafana --timeout=180s" "${CALL_LOG}"; then
+  echo "expected config-only deploy to wait for grafana rollout" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if grep -Fq "grafana=ghcr.io/wujunhui99/agents_im/grafana" "${CALL_LOG}"; then
+  echo "observability deploys must not receive application image overrides" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi

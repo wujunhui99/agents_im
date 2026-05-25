@@ -26,6 +26,25 @@ BACKEND_SERVICES = [
 
 ALL_IMAGE_SERVICES = [*BACKEND_SERVICES, "web"]
 
+CONFIG_ROLLOUT_SERVICES = [
+    *ALL_IMAGE_SERVICES,
+    "agents-im-minio-proxy",
+    "prometheus",
+    "grafana",
+    "loki",
+    "tempo",
+    "otel-collector",
+    "langfuse",
+]
+
+OBSERVABILITY_MANIFEST_ROLLOUTS = {
+    "deploy/k8s/prometheus-grafana.yaml": ["prometheus", "grafana"],
+    "deploy/k8s/loki.yaml": ["loki"],
+    "deploy/k8s/tempo.yaml": ["tempo", "grafana"],
+    "deploy/k8s/otel-collector.yaml": ["otel-collector"],
+    "deploy/k8s/langfuse.yaml": ["langfuse"],
+}
+
 API_SERVICES = {
     "user": "user-api",
     "auth": "auth-api",
@@ -71,7 +90,11 @@ class DeploySelection:
             self.restart_services.add(service)
 
     def add_all_rollouts(self, *, restart: bool = True) -> None:
-        for service in ALL_IMAGE_SERVICES:
+        for service in CONFIG_ROLLOUT_SERVICES:
+            self.add_rollout(service, restart=restart)
+
+    def add_rollouts(self, services: list[str], *, restart: bool = True) -> None:
+        for service in services:
             self.add_rollout(service, restart=restart)
 
 
@@ -97,7 +120,7 @@ def service_from_yaml(path: str, prefix: str) -> str | None:
 
 
 def add_config_rollout(selection: DeploySelection, service: str | None) -> None:
-    if service in ALL_IMAGE_SERVICES:
+    if service in CONFIG_ROLLOUT_SERVICES:
         selection.add_rollout(service)
     else:
         selection.add_all_rollouts()
@@ -136,7 +159,11 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         return
 
     if path.startswith("deploy/k8s/"):
-        selection.add_all_rollouts()
+        observability_rollouts = OBSERVABILITY_MANIFEST_ROLLOUTS.get(path)
+        if observability_rollouts is not None:
+            selection.add_rollouts(observability_rollouts)
+        else:
+            selection.add_all_rollouts()
         return
 
     service = service_from_yaml(path, "etc/")
@@ -204,10 +231,10 @@ def shell_value(value: str) -> str:
 def build_outputs(selection: DeploySelection) -> dict[str, str]:
     backend_services = ordered(selection.backend_services, BACKEND_SERVICES)
     image_services = ordered(selection.image_services, ALL_IMAGE_SERVICES)
-    rollout_services = ordered(selection.rollout_services, ALL_IMAGE_SERVICES)
+    rollout_services = ordered(selection.rollout_services, CONFIG_ROLLOUT_SERVICES)
     restart_services = ordered(
         selection.restart_services - selection.image_services,
-        ALL_IMAGE_SERVICES,
+        CONFIG_ROLLOUT_SERVICES,
     )
 
     build_required = bool(backend_services or "web" in image_services)
