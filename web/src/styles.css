@@ -1906,7 +1906,8 @@ button.md-list-item:hover,
 }
 
 .admin-stat-card,
-.admin-detail-panel {
+.admin-detail-panel,
+.admin-observability-card {
   background: #ffffff;
   border: 1px solid #d9dee7;
   border-radius: 8px;
@@ -1950,7 +1951,8 @@ button.md-list-item:hover,
 }
 
 .admin-row,
-.admin-row-static {
+.admin-row-static,
+.admin-table-header {
   width: 100%;
   min-height: 44px;
   padding: 10px 12px;
@@ -1962,6 +1964,17 @@ button.md-list-item:hover,
   gap: 10px;
   align-items: center;
   text-align: left;
+}
+
+.admin-table-header {
+  min-height: 36px;
+  border-color: #c7d1dd;
+  background: #eef4f8;
+  color: #344054;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .admin-row:hover {
@@ -2028,6 +2041,52 @@ button.md-list-item:hover,
 .admin-secondary-button {
   background: #e7f5ee;
   color: #0f6b45;
+  text-decoration: none;
+}
+
+.admin-link {
+  color: #176b4d;
+  font-size: 0.85rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.admin-page-copy {
+  margin-top: 6px;
+  color: #52606d;
+}
+
+.admin-observability-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.admin-observability-card {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.admin-observability-card svg {
+  color: #0f6b45;
+}
+
+.admin-observability-card h3 {
+  margin: 0;
+}
+
+.admin-observability-card p {
+  margin: 6px 0 0;
+  color: #52606d;
+}
+
+.admin-observability-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .admin-status,
@@ -2127,12 +2186,14 @@ button.md-list-item:hover,
   }
 
   .admin-stat-grid,
-  .admin-grid-two {
+  .admin-grid-two,
+  .admin-observability-grid {
     grid-template-columns: 1fr;
   }
 
   .admin-row,
   .admin-row-static,
+  .admin-table-header,
   .admin-row-conversation,
   .admin-row-user {
     grid-template-columns: 1fr;

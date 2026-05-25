@@ -378,8 +378,8 @@ function AuthPage({ prompt = '', adminMode = false }: { prompt?: string; adminMo
         <div className="auth-hero">
           <Avatar label={<ShieldCheck size={30} />} color="green" size="large" />
           <div className="auth-hero-copy">
-            <p className="auth-kicker">{adminMode ? 'Agents IM MS' : 'Agents IM'}</p>
-            <h1>{adminMode ? '登录管理后台' : isRegister ? '注册 Agents IM' : '登录 Agents IM'}</h1>
+            <p className="auth-kicker">{adminMode ? 'AgenticIM Management' : 'Agents IM'}</p>
+            <h1>{adminMode ? '登录 AgenticIM Management' : isRegister ? '注册 Agents IM' : '登录 Agents IM'}</h1>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Activity, Bot, Database, MessageSquareText, Search, Users } from 'lucide-react';
+import { Activity, Bot, Database, LineChart, MessageSquareText, Search, Users } from 'lucide-react';
 import {
   createAdminApi,
   type AdminApi,
@@ -14,7 +14,7 @@ import {
   type AdminUserSearchResponse,
 } from '../api/admin';
 
-type AdminView = 'dashboard' | 'traces' | 'conversation' | 'users';
+type AdminView = 'dashboard' | 'traces' | 'conversation' | 'users' | 'observability';
 
 type AdminConsoleProps = {
   adminApi?: AdminApi;
@@ -25,11 +25,12 @@ const navItems: Array<{ key: AdminView; label: string }> = [
   { key: 'traces', label: 'LLM Traces' },
   { key: 'conversation', label: 'Conversation' },
   { key: 'users', label: 'Users' },
+  { key: 'observability', label: 'Observability' },
 ];
 
 export function AdminConsole({ adminApi }: AdminConsoleProps) {
   const api = useMemo(() => adminApi ?? createAdminApi(), [adminApi]);
-  const [activeView, setActiveView] = useState<AdminView>('dashboard');
+  const [activeView, setActiveView] = useState<AdminView>(() => initialAdminViewFromPath());
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState('');
@@ -173,10 +174,10 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
 
   return (
     <main className="admin-shell">
-      <aside className="admin-sidebar" aria-label="Admin navigation">
+      <aside className="admin-sidebar" aria-label="Management navigation">
         <div>
-          <p className="admin-kicker">Agents IM</p>
-          <h1>Admin Console</h1>
+          <p className="admin-kicker">Management System</p>
+          <h1>AgenticIM Management</h1>
         </div>
         <nav className="admin-nav">
           {navItems.map((item) => (
@@ -233,8 +234,100 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
             onOpenUser: openUser,
             onOpenConversation: loadConversation,
           })}
+        {activeView === 'observability' && renderObservability()}
       </section>
     </main>
+  );
+}
+
+
+function initialAdminViewFromPath(): AdminView {
+  const { pathname } = window.location;
+  if (pathname === '/observability' || pathname.startsWith('/observability/')) {
+    return 'observability';
+  }
+  return 'dashboard';
+}
+
+function TableHeader({ labels, className = '' }: { labels: string[]; className?: string }) {
+  return (
+    <div className={`admin-table-header ${className}`.trim()} role="row">
+      {labels.map((label) => (
+        <span role="columnheader" key={label}>
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const observabilityLinks = [
+  {
+    path: '/observability/logs',
+    title: 'Logs / Loki',
+    description: 'Open Grafana Explore with the Loki datasource for pod logs and trace_id searches.',
+    href: 'https://grafana.agenticim.xyz/explore?orgId=1&left=%7B%22datasource%22:%22loki%22%7D',
+    cta: 'Open Loki in Grafana',
+  },
+  {
+    path: '/observability/traces',
+    title: 'Traces / Tempo',
+    description: 'Open Grafana Explore with the Tempo datasource for distributed traces by trace ID.',
+    href: 'https://grafana.agenticim.xyz/explore?orgId=1&left=%7B%22datasource%22:%22tempo%22%7D',
+    cta: 'Open Tempo in Grafana',
+  },
+  {
+    path: '/observability/metrics',
+    title: 'Metrics / Prometheus',
+    description: 'Open Grafana Explore with Prometheus, or use the protected Prometheus UI while learning queries.',
+    href: 'https://grafana.agenticim.xyz/explore?orgId=1&left=%7B%22datasource%22:%22prometheus%22%7D',
+    secondaryHref: 'https://prometheus.agenticim.xyz/',
+    cta: 'Open Prometheus in Grafana',
+    secondaryCta: 'Open Prometheus UI',
+  },
+  {
+    path: '/observability/llm',
+    title: 'LLM Observability / Langfuse',
+    description: 'Open the independent Langfuse domain for LLM generations, tool calls, and agent run analysis.',
+    href: 'https://langfuse.agenticim.xyz/',
+    cta: 'Open Langfuse',
+  },
+];
+
+function renderObservability() {
+  return (
+    <div className="admin-page">
+      <header className="admin-page-header">
+        <div>
+          <h2>Observability</h2>
+          <p className="admin-page-copy">Loki, Tempo, Prometheus, Grafana, and Langfuse learning shortcuts.</p>
+        </div>
+      </header>
+      <section className="admin-observability-grid" aria-label="Observability shortcuts">
+        {observabilityLinks.map((link) => (
+          <article className="admin-observability-card" key={link.path}>
+            <LineChart aria-hidden="true" size={20} />
+            <div>
+              <h3>{link.title}</h3>
+              <p>{link.description}</p>
+            </div>
+            <div className="admin-observability-actions">
+              <a className="admin-secondary-button" href={link.href} target="_blank" rel="noreferrer">
+                {link.cta}
+              </a>
+              <a className="admin-link" href={link.path}>
+                {link.path}
+              </a>
+              {link.secondaryHref && link.secondaryCta ? (
+                <a className="admin-secondary-button" href={link.secondaryHref} target="_blank" rel="noreferrer">
+                  {link.secondaryCta}
+                </a>
+              ) : null}
+            </div>
+          </article>
+        ))}
+      </section>
+    </div>
   );
 }
 
@@ -286,6 +379,7 @@ function renderDashboard(
             <p className="admin-empty">No traces found</p>
           ) : (
             <div className="admin-table" role="table" aria-label="Recent traces">
+              <TableHeader labels={['Trace ID', 'Status', 'Conversation']} />
               {dashboard.recentTraces.map((trace) => (
                 <button type="button" className="admin-row" key={trace.traceId} onClick={() => trace.conversationId && onOpenConversation(trace.conversationId)}>
                   <span>{trace.traceId}</span>
@@ -302,6 +396,7 @@ function renderDashboard(
             <p className="admin-empty">No active conversations</p>
           ) : (
             <div className="admin-table" role="table" aria-label="Recent conversations">
+              <TableHeader labels={['Conversation ID', 'Max seq']} />
               {dashboard.recentConversations.map((conversation) => (
                 <button
                   type="button"
@@ -345,6 +440,7 @@ function renderTraces({
       {error && <p className="admin-error">{error}</p>}
       {!loading && traces.length === 0 && <p className="admin-empty">No traces found</p>}
       <div className="admin-table" role="table" aria-label="LLM trace list">
+        <TableHeader labels={['Trace ID', 'Status', 'Model / Provider', 'Conversation']} />
         {traces.map((trace) => (
           <button type="button" className="admin-row" key={trace.traceId} onClick={() => onOpenTrace(trace)}>
             <span>{trace.traceId}</span>
@@ -424,6 +520,7 @@ function renderConversation({
         )}
         {!listLoading && !listError && conversations.length > 0 && (
           <div className="admin-table" role="table" aria-label="Conversation browse list">
+            <TableHeader className="admin-row-conversation" labels={['Conversation ID', 'Max seq', 'Summary', 'Last activity']} />
             {conversations.map((item) => (
               <button
                 type="button"
@@ -506,6 +603,7 @@ function renderUsers({
       {userResults && userResults.users.length === 0 && !userDetail && <p className="admin-empty">No users found</p>}
       {userResults && userResults.users.length > 0 && (
         <div className="admin-table" role="table" aria-label="User browse results">
+          <TableHeader className="admin-row-user" labels={['Display name', 'Identifier', 'Type', 'Profile', 'Created / Updated']} />
           {userResults.users.map((user) => (
             <button
               type="button"
@@ -542,12 +640,15 @@ function renderUsers({
           {userFriends.friends.length === 0 ? (
             <p className="admin-empty">No accepted friends</p>
           ) : (
-            userFriends.friends.map((friend) => (
+            <div className="admin-table" role="table" aria-label="Accepted friends">
+              <TableHeader labels={['Friend', 'Status']} />
+              {userFriends.friends.map((friend) => (
               <div className="admin-row-static" key={friend.friendId}>
                 <span>{friend.friend?.identifier || friend.friendId}</span>
                 <span>{friend.status}</span>
               </div>
-            ))
+              ))}
+            </div>
           )}
         </section>
       )}
@@ -557,7 +658,9 @@ function renderUsers({
           {userConversations.conversations.length === 0 ? (
             <p className="admin-empty">No conversations found</p>
           ) : (
-            userConversations.conversations.map((conversation) => (
+            <div className="admin-table" role="table" aria-label="User conversation list">
+              <TableHeader labels={['Conversation ID', 'Max seq']} />
+              {userConversations.conversations.map((conversation) => (
               <button
                 type="button"
                 className="admin-row"
@@ -568,7 +671,8 @@ function renderUsers({
                 <span>{conversation.conversationId}</span>
                 <span>max seq {conversation.maxSeq}</span>
               </button>
-            ))
+              ))}
+            </div>
           )}
         </section>
       )}

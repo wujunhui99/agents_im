@@ -126,6 +126,16 @@ make status
 - 前端用户资料更新必须走 `web/src/api/user.ts`，只向 `PATCH /me` 发送可变字段，不发送 `user_id` 或 `identifier`。
 - 默认禁止新增 `@material/web`、`@mui/*` 等重依赖；如未来必须引入，需要先在执行计划和本文档中记录原因、替代方案与验证结果。
 
+## Management System 约定
+
+- `ms.agenticim.xyz` 是 **AgenticIM Management** 入口，不再使用 `Admin Console` 作为面向用户的主品牌。
+- Loki、Tempo 不新增独立公网域名；MS 提供学习/运维快捷入口，跳到 Grafana Explore：
+  - `/observability/logs` -> Loki datasource
+  - `/observability/traces` -> Tempo datasource
+  - `/observability/metrics` -> Prometheus datasource / 受保护的 Prometheus UI
+- `langfuse.agenticim.xyz` 保留独立域名，MS 只提供跳转入口。
+- Management System 的数据列表必须有表头或字段 label，不能只展示一组无字段名的值。
+
 ## REST Adapter 约定
 
 - `web/src/api/contacts.ts`：`listFriends` -> `GET /friends`，`addFriend` -> `POST /friends`，`deleteFriend` -> `DELETE /friends/:user_id`。
