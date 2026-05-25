@@ -170,6 +170,47 @@ function createAdminApi(overrides?: Partial<AdminApi>): AdminApi {
         },
       ],
     })),
+    listFeedback: vi.fn(async () => ({
+      items: [
+        {
+          feedbackId: 'fb_1',
+          userId: '1001',
+          category: 'bug',
+          status: 'new',
+          title: '消息发送失败',
+          content: '点击发送后没有响应',
+          contact: 'alice@example.com',
+          createdAt: '2026-05-25T01:00:00Z',
+          updatedAt: '2026-05-25T01:00:00Z',
+        },
+      ],
+    })),
+    getFeedback: vi.fn(async () => ({
+      feedback: {
+        feedbackId: 'fb_1',
+        userId: '1001',
+        category: 'bug',
+        status: 'new',
+        title: '消息发送失败',
+        content: '点击发送后没有响应',
+        contact: 'alice@example.com',
+        createdAt: '2026-05-25T01:00:00Z',
+        updatedAt: '2026-05-25T01:00:00Z',
+      },
+    })),
+    updateFeedback: vi.fn(async () => ({
+      feedback: {
+        feedbackId: 'fb_1',
+        userId: '1001',
+        category: 'bug',
+        status: 'triaged',
+        title: '消息发送失败',
+        content: '点击发送后没有响应',
+        adminNote: '已分派',
+        createdAt: '2026-05-25T01:00:00Z',
+        updatedAt: '2026-05-25T01:05:00Z',
+      },
+    })),
     ...overrides,
   };
 }
@@ -184,6 +225,7 @@ describe('AdminConsole', () => {
     expect(screen.getByRole('button', { name: 'LLM Traces' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Conversation' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Users' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Feedback' })).toBeInTheDocument();
     expect(screen.getByText('Users')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('Failed AI runs')).toBeInTheDocument();
@@ -310,6 +352,29 @@ describe('AdminConsole', () => {
     await waitFor(() => expect(adminApi.getConversationMessages).toHaveBeenCalledWith('single:1001:2002'));
     const messages = await screen.findByLabelText('Conversation messages');
     expect(within(messages).getByText('AI response for inspector')).toBeInTheDocument();
+  });
+
+  it('lists feedback and allows admin status updates', async () => {
+    const user = userEvent.setup();
+    const adminApi = createAdminApi();
+
+    render(<AdminConsole adminApi={adminApi} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Feedback' }));
+    await waitFor(() => expect(adminApi.listFeedback).toHaveBeenCalledWith({ status: 'new' }));
+    const feedbackTable = await screen.findByRole('table', { name: 'Feedback list' });
+    expect(within(feedbackTable).getByText('消息发送失败')).toBeInTheDocument();
+    expect(within(feedbackTable).getByText('bug')).toBeInTheDocument();
+    expect(within(feedbackTable).getByText('new')).toBeInTheDocument();
+
+    await user.click(within(feedbackTable).getByRole('button', { name: 'Open feedback fb_1' }));
+    expect(await screen.findByRole('heading', { name: '消息发送失败' })).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('反馈状态'), 'triaged');
+    await user.type(screen.getByLabelText('管理员备注'), '已分派');
+    await user.click(screen.getByRole('button', { name: '保存反馈处理' }));
+
+    await waitFor(() => expect(adminApi.updateFeedback).toHaveBeenCalledWith('fb_1', { status: 'triaged', adminNote: '已分派' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('反馈已更新');
   });
 
   it('does not render user mutation or impersonated send controls', async () => {

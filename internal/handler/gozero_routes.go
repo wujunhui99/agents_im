@@ -114,6 +114,8 @@ func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *messagesvc.Se
 			componentCheck("message_logic", serverCtx != nil && serverCtx.MessageLogic != nil, "configured"),
 			componentCheck("ai_hosting_logic", serverCtx != nil && serverCtx.AIHostingLogic != nil, "configured"),
 			componentCheck("message_repository", serverCtx != nil && serverCtx.MessageRepo != nil, "configured"),
+			componentCheck("feedback_logic", serverCtx != nil && serverCtx.FeedbackLogic != nil, "configured"),
+			componentCheck("feedback_repository", serverCtx != nil && serverCtx.FeedbackRepo != nil, "configured"),
 			componentCheck("ai_hosting_repository", serverCtx != nil && serverCtx.AIHostingRepo != nil, "configured"),
 			componentCheck("outbox_repository", serverCtx != nil && serverCtx.OutboxRepo != nil, "configured"),
 		}
@@ -339,6 +341,11 @@ func addMessageRoutes(server *rest.Server, serverCtx *messagesvc.ServiceContext)
 			Handler: messagehandler.SendMessageHandler(serverCtx),
 		},
 		{
+			Method:  http.MethodPost,
+			Path:    "/feedback",
+			Handler: messagehandler.CreateFeedbackHandler(serverCtx),
+		},
+		{
 			Method:  http.MethodGet,
 			Path:    "/conversations/:conversation_id/messages",
 			Handler: messagehandler.PullMessagesHandler(serverCtx),
@@ -427,6 +434,21 @@ func addAdminRoutes(server *rest.Server, serverCtx *adminsvc.ServiceContext) {
 			Method:  http.MethodGet,
 			Path:    "/admin/llm-traces/:trace_id",
 			Handler: adminhandler.GetLLMTraceHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/admin/feedback",
+			Handler: adminhandler.ListFeedbackHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/admin/feedback/:feedback_id",
+			Handler: adminhandler.GetFeedbackHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPatch,
+			Path:    "/admin/feedback/:feedback_id",
+			Handler: adminhandler.UpdateFeedbackHandler(serverCtx),
 		},
 		{
 			Method:  http.MethodGet,

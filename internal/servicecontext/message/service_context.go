@@ -20,8 +20,10 @@ type ServiceContext struct {
 	MessageLogic      *logic.MessageLogic
 	AIHostingLogic    *logic.ConversationAIHostingLogic
 	MediaLogic        *logic.MediaLogic
+	FeedbackLogic     *logic.FeedbackLogic
 	MessageRepo       repository.MessageRepository
 	MediaRepo         repository.MediaRepository
+	FeedbackRepo      repository.FeedbackRepository
 	AgentHostingRepo  repository.AgentConversationHostingRepository
 	AIHostingRepo     repository.ConversationAIHostingRepository
 	GroupMembers      logic.GroupMemberLister
@@ -49,10 +51,15 @@ func NewServiceContext(repo repository.MessageRepository, userExists logic.UserE
 
 func NewServiceContextWithAuth(repo repository.MessageRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
 	mediaRepo := repository.NewMemoryMediaRepository()
-	return NewServiceContextWithMedia(repo, mediaRepo, userExists, groups, auth)
+	feedbackRepo := repository.NewMemoryFeedbackRepository()
+	return NewServiceContextWithFeedback(repo, mediaRepo, feedbackRepo, userExists, groups, auth)
 }
 
 func NewServiceContextWithMedia(repo repository.MessageRepository, mediaRepo repository.MediaRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
+	return NewServiceContextWithFeedback(repo, mediaRepo, repository.NewMemoryFeedbackRepository(), userExists, groups, auth)
+}
+
+func NewServiceContextWithFeedback(repo repository.MessageRepository, mediaRepo repository.MediaRepository, feedbackRepo repository.FeedbackRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
 	mediaLogic := logic.NewMediaLogic(mediaRepo, nil, config.DefaultObjectStorageConfig().Bucket)
 	mediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(repo))
 	agentHostingRepo := repository.NewMemoryAgentConversationHostingRepository()
@@ -63,8 +70,10 @@ func NewServiceContextWithMedia(repo repository.MessageRepository, mediaRepo rep
 		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
 		AIHostingLogic:   logic.NewConversationAIHostingLogic(aiHostingRepo),
 		MediaLogic:       mediaLogic,
+		FeedbackLogic:    logic.NewFeedbackLogic(feedbackRepo),
 		MessageRepo:      repo,
 		MediaRepo:        mediaRepo,
+		FeedbackRepo:     feedbackRepo,
 		AgentHostingRepo: agentHostingRepo,
 		AIHostingRepo:    aiHostingRepo,
 		GroupMembers:     groups,

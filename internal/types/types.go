@@ -575,6 +575,27 @@ type SendMessageResp struct {
 	Data    SendMessageData `json:"data"`
 }
 
+type CreateFeedbackReq struct {
+	Category   string         `json:"category"`
+	Title      string         `json:"title"`
+	Content    string         `json:"content"`
+	Contact    string         `json:"contact,optional"`
+	PageURL    string         `json:"pageUrl,optional"`
+	UserAgent  string         `json:"userAgent,optional"`
+	ClientMeta map[string]any `json:"clientMeta,optional"`
+}
+
+type FeedbackData struct {
+	FeedbackID string `json:"feedbackId"`
+	Status     string `json:"status"`
+}
+
+type CreateFeedbackResp struct {
+	Code    string       `json:"code"`
+	Message string       `json:"message"`
+	Data    FeedbackData `json:"data"`
+}
+
 type UpdateMeAvatarReq struct {
 	MediaID string `json:"mediaId"`
 }
@@ -682,6 +703,22 @@ type AdminLLMTraceListReq struct {
 
 type AdminLLMTraceReq struct {
 	TraceID string `path:"trace_id"`
+}
+
+type AdminFeedbackListReq struct {
+	Status string `form:"status,optional"`
+	Limit  int64  `form:"limit,optional"`
+	Offset int64  `form:"offset,optional"`
+}
+
+type AdminFeedbackReq struct {
+	FeedbackID string `path:"feedback_id"`
+}
+
+type AdminFeedbackUpdateReq struct {
+	FeedbackID string `path:"feedback_id"`
+	Status     string `json:"status"`
+	AdminNote  string `json:"adminNote,optional"`
 }
 
 type AdminDashboardTotals struct {
@@ -848,6 +885,30 @@ type AdminLLMTraceDetailData struct {
 	PythonExecs []AdminAgentPythonExec `json:"pythonExecs"`
 }
 
+type AdminFeedback struct {
+	FeedbackID string         `json:"feedbackId"`
+	UserID     string         `json:"userId"`
+	Category   string         `json:"category"`
+	Status     string         `json:"status"`
+	Title      string         `json:"title"`
+	Content    string         `json:"content"`
+	Contact    string         `json:"contact,omitempty"`
+	PageURL    string         `json:"pageUrl,omitempty"`
+	UserAgent  string         `json:"userAgent,omitempty"`
+	ClientMeta map[string]any `json:"clientMeta,omitempty"`
+	AdminNote  string         `json:"adminNote,omitempty"`
+	CreatedAt  string         `json:"createdAt"`
+	UpdatedAt  string         `json:"updatedAt"`
+}
+
+type AdminFeedbackListData struct {
+	Items []AdminFeedback `json:"items"`
+}
+
+type AdminFeedbackDetailData struct {
+	Feedback AdminFeedback `json:"feedback"`
+}
+
 type AdminDashboardResp struct {
 	Code    string             `json:"code"`
 	Message string             `json:"message"`
@@ -894,4 +955,16 @@ type AdminLLMTraceDetailResp struct {
 	Code    string                  `json:"code"`
 	Message string                  `json:"message"`
 	Data    AdminLLMTraceDetailData `json:"data"`
+}
+
+type AdminFeedbackListResp struct {
+	Code    string                `json:"code"`
+	Message string                `json:"message"`
+	Data    AdminFeedbackListData `json:"data"`
+}
+
+type AdminFeedbackDetailResp struct {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    AdminFeedbackDetailData `json:"data"`
 }

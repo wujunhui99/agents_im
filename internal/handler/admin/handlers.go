@@ -157,3 +157,62 @@ func GetUserConversationsHandler(svcCtx *adminsvc.ServiceContext) http.HandlerFu
 		httpx.OkJsonCtx(r.Context(), w, adminUserConversationsResp(resp))
 	}
 }
+
+func ListFeedbackHandler(svcCtx *adminsvc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.AdminFeedbackListReq
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+
+		resp, err := svcCtx.AdminLogic.ListFeedback(r.Context(), business.AdminFeedbackListRequest{
+			Status: req.Status,
+			Limit:  int(req.Limit),
+			Offset: int(req.Offset),
+		})
+		if err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+		httpx.OkJsonCtx(r.Context(), w, adminFeedbackListResp(resp))
+	}
+}
+
+func GetFeedbackHandler(svcCtx *adminsvc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.AdminFeedbackReq
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+
+		resp, err := svcCtx.AdminLogic.GetFeedback(r.Context(), business.AdminFeedbackDetailRequest{FeedbackID: req.FeedbackID})
+		if err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+		httpx.OkJsonCtx(r.Context(), w, adminFeedbackDetailResp(resp))
+	}
+}
+
+func UpdateFeedbackHandler(svcCtx *adminsvc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.AdminFeedbackUpdateReq
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+
+		resp, err := svcCtx.AdminLogic.UpdateFeedback(r.Context(), business.AdminFeedbackUpdateRequest{
+			FeedbackID: req.FeedbackID,
+			Status:     req.Status,
+			AdminNote:  req.AdminNote,
+		})
+		if err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+		httpx.OkJsonCtx(r.Context(), w, adminFeedbackDetailResp(business.AdminFeedbackDetailResponse{Feedback: resp.Feedback}))
+	}
+}
