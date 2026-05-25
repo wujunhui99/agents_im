@@ -5,6 +5,7 @@ import type { AuthUser } from './auth/session';
 import { createAdminApi } from './api/admin';
 import { createApiClient } from './api/client';
 import { createContactsApi, type ContactsApi } from './api/contacts';
+import { createFeedbackApi, type FeedbackApi, type SubmitFeedbackRequest } from './api/feedback';
 import { createGroupsApi, type Group, type GroupsApi } from './api/groups';
 import { createMediaApi, type MediaApi } from './api/media';
 import { createMessageApi, type MessageApi } from './api/messages';
@@ -107,6 +108,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
     [handleAuthFailure, session?.token],
   );
   const messageApi = useMemo(() => createMessageApi(authedApiClient), [authedApiClient]);
+  const feedbackApi = useMemo(() => createFeedbackApi(authedApiClient), [authedApiClient]);
   const mediaApi = useMemo(() => createMediaApi(authedApiClient), [authedApiClient]);
   const contactsApi = useMemo(() => createContactsApi(authedApiClient), [authedApiClient]);
   const groupsApi = useMemo(() => createGroupsApi(authedApiClient), [authedApiClient]);
@@ -212,6 +214,7 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
                   contactsApi,
                   groupsApi,
                   messageApi,
+                  feedbackApi,
                   mediaApi,
                   uploadAvatar,
                   webSocketUrl,
@@ -516,6 +519,7 @@ function renderPage(
   contactsApi: ContactsApi,
   groupsApi: GroupsApi,
   messageApi: MessageApi,
+  feedbackApi: FeedbackApi,
   mediaApi: MediaApi,
   onUploadAvatar: (file: File) => Promise<UserProfile>,
   webSocketUrl: string | undefined,
@@ -570,7 +574,12 @@ function renderPage(
 
   return (
     <>
-      <MePage profile={currentUser} onUpdateProfile={onUpdateProfile} onUploadAvatar={onUploadAvatar} />
+      <MePage
+        profile={currentUser}
+        onUpdateProfile={onUpdateProfile}
+        onUploadAvatar={onUploadAvatar}
+        onSubmitFeedback={(request: SubmitFeedbackRequest) => feedbackApi.submitFeedback(request).then(() => undefined)}
+      />
       <Button variant="tonal" className="logout-button" onClick={onLogout}>
         退出登录
       </Button>

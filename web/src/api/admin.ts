@@ -164,6 +164,41 @@ export type AdminLLMTraceDetailResponse = {
   pythonExecs: AdminAgentPythonExec[];
 };
 
+export type AdminFeedback = {
+  feedbackId: string;
+  userId: string;
+  category: string;
+  status: string;
+  title: string;
+  content: string;
+  contact?: string;
+  pageUrl?: string;
+  userAgent?: string;
+  clientMeta?: Record<string, unknown>;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminFeedbackListRequest = {
+  status?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type AdminFeedbackListResponse = {
+  items: AdminFeedback[];
+};
+
+export type AdminFeedbackDetailResponse = {
+  feedback: AdminFeedback;
+};
+
+export type AdminFeedbackUpdateRequest = {
+  status: string;
+  adminNote?: string;
+};
+
 export type AdminApi = {
   getDashboard: () => Promise<AdminDashboard>;
   listLLMTraces: () => Promise<AdminLLMTraceListResponse>;
@@ -173,6 +208,9 @@ export type AdminApi = {
   getUserDetail: (accountId: string) => Promise<AdminUserDetailResponse>;
   getUserFriends: (accountId: string) => Promise<AdminUserFriendsResponse>;
   getUserConversations: (accountId: string) => Promise<AdminUserConversationsResponse>;
+  listFeedback: (request?: AdminFeedbackListRequest) => Promise<AdminFeedbackListResponse>;
+  getFeedback: (feedbackId: string) => Promise<AdminFeedbackDetailResponse>;
+  updateFeedback: (feedbackId: string, request: AdminFeedbackUpdateRequest) => Promise<AdminFeedbackDetailResponse>;
 };
 
 export function createAdminApi(api: ApiClient = createApiClient()): AdminApi {
@@ -204,6 +242,20 @@ export function createAdminApi(api: ApiClient = createApiClient()): AdminApi {
     },
     getUserConversations(accountId) {
       return api.get<AdminUserConversationsResponse>(`/admin/users/${encodeURIComponent(accountId)}/conversations`);
+    },
+    listFeedback(request = {}) {
+      const params = new URLSearchParams();
+      if (request.status) params.set('status', request.status);
+      if (request.limit !== undefined) params.set('limit', String(request.limit));
+      if (request.offset !== undefined) params.set('offset', String(request.offset));
+      const query = params.toString();
+      return api.get<AdminFeedbackListResponse>(`/admin/feedback${query ? `?${query}` : ''}`);
+    },
+    getFeedback(feedbackId) {
+      return api.get<AdminFeedbackDetailResponse>(`/admin/feedback/${encodeURIComponent(feedbackId)}`);
+    },
+    updateFeedback(feedbackId, request) {
+      return api.patch<AdminFeedbackDetailResponse>(`/admin/feedback/${encodeURIComponent(feedbackId)}`, request);
     },
   };
 }

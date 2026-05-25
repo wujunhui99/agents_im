@@ -12,14 +12,17 @@ type ActionRowProps = {
   badge?: string;
   icon?: ComponentType<{ size?: number }>;
   trailingIcon?: ComponentType<{ size?: number }>;
+  onClick?: () => void;
 };
 
-export function ActionRow({ label, helper, accent, badge, icon, trailingIcon: TrailingIcon = ChevronRight }: ActionRowProps) {
+export function ActionRow({ label, helper, accent, badge, icon, trailingIcon: TrailingIcon = ChevronRight, onClick }: ActionRowProps) {
   const LeadingIcon = icon ?? defaultIconForAccent(accent);
 
   return (
     <ListItem
       className="action-row"
+      onClick={onClick}
+      ariaLabel={onClick ? label : undefined}
       leading={
         <div className={`action-icon action-${accent}`}>
           <LeadingIcon size={19} />

@@ -38,6 +38,22 @@ type AdminLLMTraceReq {
 	TraceID string `path:"trace_id"`
 }
 
+type AdminFeedbackListReq {
+	Status string `form:"status,optional"`
+	Limit  int64  `form:"limit,optional"`
+	Offset int64  `form:"offset,optional"`
+}
+
+type AdminFeedbackReq {
+	FeedbackID string `path:"feedback_id"`
+}
+
+type AdminFeedbackUpdateReq {
+	FeedbackID string `path:"feedback_id"`
+	Status     string `json:"status"`
+	AdminNote  string `json:"adminNote,optional"`
+}
+
 type AdminDashboardTotals {
 	Users         int64 `json:"users"`
 	Conversations int64 `json:"conversations"`
@@ -161,6 +177,22 @@ type AdminAgentPythonExec {
 	CreatedAt    string `json:"createdAt,optional"`
 }
 
+type AdminFeedback {
+	FeedbackID string         `json:"feedbackId"`
+	UserID     string         `json:"userId"`
+	Category   string         `json:"category"`
+	Status     string         `json:"status"`
+	Title      string         `json:"title"`
+	Content    string         `json:"content"`
+	Contact    string         `json:"contact,optional"`
+	PageURL    string         `json:"pageUrl,optional"`
+	UserAgent  string         `json:"userAgent,optional"`
+	ClientMeta map[string]any `json:"clientMeta,optional"`
+	AdminNote  string         `json:"adminNote,optional"`
+	CreatedAt  string         `json:"createdAt"`
+	UpdatedAt  string         `json:"updatedAt"`
+}
+
 type AdminDashboardData {
 	Totals              AdminDashboardTotals `json:"totals"`
 	RecentTraces        []AdminLLMTrace      `json:"recentTraces"`
@@ -199,6 +231,14 @@ type AdminLLMTraceDetailData {
 	ToolCalls   []AdminAgentToolCall `json:"toolCalls"`
 	FileReads   []AdminAgentFileRead `json:"fileReads"`
 	PythonExecs []AdminAgentPythonExec `json:"pythonExecs"`
+}
+
+type AdminFeedbackListData {
+	Items []AdminFeedback `json:"items"`
+}
+
+type AdminFeedbackDetailData {
+	Feedback AdminFeedback `json:"feedback"`
 }
 
 type AdminDashboardResp {
@@ -249,6 +289,18 @@ type AdminLLMTraceDetailResp {
 	Data    AdminLLMTraceDetailData `json:"data"`
 }
 
+type AdminFeedbackListResp {
+	Code    string                `json:"code"`
+	Message string                `json:"message"`
+	Data    AdminFeedbackListData `json:"data"`
+}
+
+type AdminFeedbackDetailResp {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    AdminFeedbackDetailData `json:"data"`
+}
+
 @server (
 	jwt:   Auth
 	group: admin
@@ -262,6 +314,15 @@ service admin-api {
 
 	@handler adminGetLLMTrace
 	get /admin/llm-traces/:trace_id (AdminLLMTraceReq) returns (AdminLLMTraceDetailResp)
+
+	@handler adminListFeedback
+	get /admin/feedback (AdminFeedbackListReq) returns (AdminFeedbackListResp)
+
+	@handler adminGetFeedback
+	get /admin/feedback/:feedback_id (AdminFeedbackReq) returns (AdminFeedbackDetailResp)
+
+	@handler adminUpdateFeedback
+	patch /admin/feedback/:feedback_id (AdminFeedbackUpdateReq) returns (AdminFeedbackDetailResp)
 
 	@handler adminGetConversationMessages
 	get /admin/conversations/:conversation_id/messages (AdminConversationMessagesReq) returns (AdminConversationMessagesResp)

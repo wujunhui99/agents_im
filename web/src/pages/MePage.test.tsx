@@ -78,4 +78,30 @@ describe('MePage', () => {
     expect(status).toHaveTextContent('头像上传失败');
     expect(status).toHaveTextContent('object storage unavailable');
   });
+
+  it('submits user feedback from the Me page', async () => {
+    const user = userEvent.setup();
+    const onSubmitFeedback = vi.fn(async () => undefined);
+
+    render(
+      <MePage profile={profile} onUpdateProfile={vi.fn()} onUploadAvatar={vi.fn()} onSubmitFeedback={onSubmitFeedback} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: '意见反馈' }));
+    await user.selectOptions(screen.getByLabelText('反馈类型'), 'bug');
+    await user.type(screen.getByLabelText('标题'), '消息发送失败');
+    await user.type(screen.getByLabelText('反馈内容'), '点击发送后没有任何响应');
+    await user.type(screen.getByLabelText('联系方式（选填）'), 'alice@example.com');
+    await user.click(screen.getByRole('button', { name: '提交反馈' }));
+
+    await waitFor(() => expect(onSubmitFeedback).toHaveBeenCalledWith({
+      category: 'bug',
+      title: '消息发送失败',
+      content: '点击发送后没有任何响应',
+      contact: 'alice@example.com',
+      pageUrl: expect.any(String),
+      userAgent: expect.any(String),
+    }));
+    expect(await screen.findByRole('status')).toHaveTextContent('反馈已提交');
+  });
 });

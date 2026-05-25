@@ -6,6 +6,7 @@ import {
   type AdminConversation,
   type AdminConversationMessagesResponse,
   type AdminDashboard,
+  type AdminFeedback,
   type AdminLLMTrace,
   type AdminUser,
   type AdminUserConversationsResponse,
@@ -14,7 +15,7 @@ import {
   type AdminUserSearchResponse,
 } from '../api/admin';
 
-type AdminView = 'dashboard' | 'traces' | 'conversation' | 'users' | 'observability';
+type AdminView = 'dashboard' | 'traces' | 'conversation' | 'users' | 'feedback' | 'observability';
 
 type AdminConsoleProps = {
   adminApi?: AdminApi;
@@ -25,6 +26,7 @@ const navItems: Array<{ key: AdminView; label: string }> = [
   { key: 'traces', label: 'LLM Traces' },
   { key: 'conversation', label: 'Conversation' },
   { key: 'users', label: 'Users' },
+  { key: 'feedback', label: 'Feedback' },
   { key: 'observability', label: 'Observability' },
 ];
 
@@ -49,6 +51,13 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
   const [userConversations, setUserConversations] = useState<AdminUserConversationsResponse | null>(null);
   const [userLoading, setUserLoading] = useState(false);
   const [userError, setUserError] = useState('');
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState('new');
+  const [feedbackList, setFeedbackList] = useState<AdminFeedback[]>([]);
+  const [selectedFeedback, setSelectedFeedback] = useState<AdminFeedback | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState('');
+  const [feedbackAdminNote, setFeedbackAdminNote] = useState('');
+  const [feedbackUpdateStatus, setFeedbackUpdateStatus] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -162,6 +171,58 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
     }
   }
 
+  async function loadFeedback(status = feedbackStatusFilter) {
+    setFeedbackLoading(true);
+    setFeedbackError('');
+    try {
+      const data = await api.listFeedback({ status });
+      setFeedbackList(data.items);
+    } catch {
+      setFeedbackError('Could not load feedback');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
+
+  async function openFeedback(item: AdminFeedback) {
+    setFeedbackLoading(true);
+    setFeedbackError('');
+    try {
+      const data = await api.getFeedback(item.feedbackId);
+      setSelectedFeedback(data.feedback);
+      setFeedbackUpdateStatus(data.feedback.status);
+      setFeedbackAdminNote(data.feedback.adminNote ?? '');
+    } catch {
+      setFeedbackError('Could not load feedback detail');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
+
+  async function saveFeedback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedFeedback) {
+      return;
+    }
+    setFeedbackLoading(true);
+    setFeedbackError('');
+    try {
+      const data = await api.updateFeedback(selectedFeedback.feedbackId, {
+        status: feedbackUpdateStatus,
+        adminNote: feedbackAdminNote,
+      });
+      setSelectedFeedback(data.feedback);
+      setFeedbackUpdateStatus(data.feedback.status);
+      setFeedbackAdminNote(data.feedback.adminNote ?? '');
+      setFeedbackList((items) => items.map((item) => (item.feedbackId === data.feedback.feedbackId ? data.feedback : item)));
+      setFeedbackError('反馈已更新');
+    } catch {
+      setFeedbackError('Could not update feedback');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
+
   function switchView(view: AdminView) {
     setActiveView(view);
     if (view === 'traces' && traceList.length === 0 && !traceLoading) {
@@ -169,6 +230,9 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
     }
     if (view === 'users' && userResults === null && !userLoading) {
       void loadUsers('');
+    }
+    if (view === 'feedback' && feedbackList.length === 0 && !feedbackLoading) {
+      void loadFeedback('new');
     }
   }
 
@@ -233,6 +297,22 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
             onSearch: searchUsers,
             onOpenUser: openUser,
             onOpenConversation: loadConversation,
+          })}
+        {activeView === 'feedback' &&
+          renderFeedback({
+            statusFilter: feedbackStatusFilter,
+            setStatusFilter: setFeedbackStatusFilter,
+            items: feedbackList,
+            selectedFeedback,
+            updateStatus: feedbackUpdateStatus,
+            setUpdateStatus: setFeedbackUpdateStatus,
+            adminNote: feedbackAdminNote,
+            setAdminNote: setFeedbackAdminNote,
+            loading: feedbackLoading,
+            error: feedbackError,
+            onReload: loadFeedback,
+            onOpen: openFeedback,
+            onSave: saveFeedback,
           })}
         {activeView === 'observability' && renderObservability()}
       </section>
@@ -669,6 +749,111 @@ function renderUsers({
           )}
         </section>
       )}
+    </div>
+  );
+}
+
+function renderFeedback({
+  statusFilter,
+  setStatusFilter,
+  items,
+  selectedFeedback,
+  updateStatus,
+  setUpdateStatus,
+  adminNote,
+  setAdminNote,
+  loading,
+  error,
+  onReload,
+  onOpen,
+  onSave,
+}: {
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  items: AdminFeedback[];
+  selectedFeedback: AdminFeedback | null;
+  updateStatus: string;
+  setUpdateStatus: (value: string) => void;
+  adminNote: string;
+  setAdminNote: (value: string) => void;
+  loading: boolean;
+  error: string;
+  onReload: (status: string) => void;
+  onOpen: (item: AdminFeedback) => void;
+  onSave: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <div className="admin-page">
+      <header className="admin-page-header">
+        <h2>Feedback</h2>
+      </header>
+      <form
+        className="admin-inline-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onReload(statusFilter);
+        }}
+      >
+        <label>
+          <span>Feedback status</span>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="new">new</option>
+            <option value="triaged">triaged</option>
+            <option value="planned">planned</option>
+            <option value="resolved">resolved</option>
+            <option value="rejected">rejected</option>
+          </select>
+        </label>
+        <button type="submit" className="admin-primary-button">Load feedback</button>
+      </form>
+      {loading && <p className="admin-status">Loading feedback</p>}
+      {error === '反馈已更新' ? <p className="admin-status" role="status">{error}</p> : null}
+      {error && error !== '反馈已更新' ? <p className="admin-error">{error}</p> : null}
+      {items.length === 0 && !loading ? <p className="admin-empty">No feedback found</p> : null}
+      {items.length > 0 ? (
+        <div className="admin-table" role="table" aria-label="Feedback list">
+          <TableHeader labels={['Title', 'Category', 'Status', 'User', 'Created']} />
+          {items.map((item) => (
+            <button
+              type="button"
+              className="admin-row"
+              key={item.feedbackId}
+              onClick={() => onOpen(item)}
+              aria-label={`Open feedback ${item.feedbackId}`}
+            >
+              <span>{item.title}</span>
+              <span>{item.category}</span>
+              <span>{item.status}</span>
+              <span>{item.userId}</span>
+              <span>{item.createdAt}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {selectedFeedback ? (
+        <section className="admin-detail-panel">
+          <h3>{selectedFeedback.title}</h3>
+          <p>{selectedFeedback.content}</p>
+          {selectedFeedback.contact ? <p>Contact: {selectedFeedback.contact}</p> : null}
+          <form className="admin-inline-form" onSubmit={onSave}>
+            <label>
+              <span>反馈状态</span>
+              <select value={updateStatus} onChange={(event) => setUpdateStatus(event.target.value)}>
+                <option value="new">new</option>
+                <option value="triaged">triaged</option>
+                <option value="planned">planned</option>
+                <option value="resolved">resolved</option>
+                <option value="rejected">rejected</option>
+              </select>
+            </label>
+            <label>
+              <span>管理员备注</span>
+              <textarea value={adminNote} onChange={(event) => setAdminNote(event.target.value)} />
+            </label>
+            <button type="submit" className="admin-primary-button">保存反馈处理</button>
+          </form>
+        </section>
+      ) : null}
     </div>
   );
 }
