@@ -2233,6 +2233,22 @@ for path, middleware in redirect_expectations.items():
         print(f"deploy/k8s/ingress.yaml: {path} must use {middleware}", file=sys.stderr)
         sys.exit(1)
 
+middlewares_by_name = {
+    doc.get("metadata", {}).get("name"): doc
+    for doc in docs
+    if doc.get("kind") == "Middleware"
+}
+redirect_url_expectations = {
+    "observability-logs-redirect": ("schemaVersion=1", "%22type%22%3A%22loki%22", "%22uid%22%3A%22loki%22"),
+    "observability-traces-redirect": ("schemaVersion=1", "%22type%22%3A%22tempo%22", "%22uid%22%3A%22tempo%22", "%22queryType%22%3A%22traceql%22"),
+}
+for name, required_parts in redirect_url_expectations.items():
+    replacement = middlewares_by_name.get(name, {}).get("spec", {}).get("redirectRegex", {}).get("replacement", "")
+    missing = [part for part in required_parts if part not in replacement]
+    if missing:
+        print(f"deploy/k8s/ingress.yaml: {name} replacement must use explicit Grafana Explore panes datasource; missing {missing}", file=sys.stderr)
+        sys.exit(1)
+
 with open("deploy/k8s/langfuse.yaml", encoding="utf-8") as f:
     langfuse_docs = [doc for doc in yaml.safe_load_all(f) if doc]
 if not any(doc.get("kind") == "Deployment" and doc.get("metadata", {}).get("name") == "langfuse" for doc in langfuse_docs):

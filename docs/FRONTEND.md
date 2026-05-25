@@ -130,8 +130,8 @@ make status
 
 - `ms.agenticim.xyz` 是 **AgenticIM Management** 入口，不再使用 `Admin Console` 作为面向用户的主品牌。
 - Loki、Tempo 不新增独立公网域名；MS 提供实际路由跳转入口：
-  - `/observability/logs` -> 302 到 Grafana Explore / Loki datasource
-  - `/observability/traces` -> 302 到 Grafana Explore / Tempo datasource
+  - `/observability/logs` -> 302 到 Grafana Explore / Loki datasource（使用 `schemaVersion=1&panes=...` 明确 `uid=loki`，不要用旧 `left={datasource:...}`）
+  - `/observability/traces` -> 302 到 Grafana Explore / Tempo datasource（使用 `schemaVersion=1&panes=...` 明确 `uid=tempo` + `queryType=traceql`，避免 Grafana fallback 到上次/默认 Loki）
   - `/observability/metrics` -> 直接承接受保护的 Prometheus UI，不再暴露 `prometheus.agenticim.xyz`
   - `/observability/llm` -> 302 到 `langfuse.agenticim.xyz`
 - `langfuse.agenticim.xyz` 保留独立域名，MS 只提供跳转入口。
