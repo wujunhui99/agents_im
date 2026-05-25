@@ -179,7 +179,7 @@ describe('AdminConsole', () => {
     render(<AdminConsole adminApi={createAdminApi()} />);
 
     expect(screen.getByText('Loading admin dashboard')).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Admin Console' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'AgenticIM Management' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'LLM Traces' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Conversation' })).toBeInTheDocument();
@@ -315,7 +315,7 @@ describe('AdminConsole', () => {
   it('does not render user mutation or impersonated send controls', async () => {
     render(<AdminConsole adminApi={createAdminApi()} />);
 
-    await screen.findByRole('heading', { name: 'Admin Console' });
+    await screen.findByRole('heading', { name: 'AgenticIM Management' });
     expect(screen.queryByRole('button', { name: /edit user/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /delete friend/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /send message/i })).not.toBeInTheDocument();

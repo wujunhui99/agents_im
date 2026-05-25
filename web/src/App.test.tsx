@@ -224,7 +224,7 @@ describe('Auth flow', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Admin Console' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'AgenticIM Management' })).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('账号'), 'missing_001');
     await user.click(screen.getByLabelText('密码'));
@@ -406,7 +406,7 @@ describe('Auth flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Admin Console' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'AgenticIM Management' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /消息/i })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/admin/dashboard',
@@ -423,8 +423,8 @@ describe('Auth flow', () => {
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: '登录管理后台' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Admin Console' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '登录 AgenticIM Management' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'AgenticIM Management' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '注册账号' })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith('/admin/dashboard', expect.anything());
   });
@@ -435,7 +435,7 @@ describe('Auth flow', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: '登录 Agents IM' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Admin Console' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'AgenticIM Management' })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -478,7 +478,7 @@ describe('Auth flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Admin Console' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'AgenticIM Management' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /消息/i })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/admin/dashboard',
@@ -487,6 +487,166 @@ describe('Auth flow', () => {
         headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
       }),
     );
+  });
+
+  it('shows observability shortcuts under the management system route', async () => {
+    setTestLocation('https://ms.agenticim.xyz/observability/logs');
+    storeSession({
+      user: {
+        userId: '9001',
+        identifier: 'admin_001',
+        displayName: 'Admin',
+        accountType: 'admin',
+      },
+    });
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        code: 'OK',
+        message: 'ok',
+        data: {
+          totals: {
+            users: 1,
+            conversations: 0,
+            messages: 0,
+            aiRuns: 0,
+            failedAiRuns: 0,
+          },
+          recentTraces: [],
+          recentConversations: [],
+        },
+      }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'AgenticIM Management' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Observability' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Loki in Grafana' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('grafana.agenticim.xyz/explore'),
+    );
+    expect(screen.getByRole('link', { name: 'Open Tempo in Grafana' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('datasource%22:%22tempo'),
+    );
+    expect(screen.getByRole('link', { name: 'Open Prometheus UI' })).toHaveAttribute(
+      'href',
+      'https://prometheus.agenticim.xyz/',
+    );
+    expect(screen.getByRole('link', { name: 'Open Langfuse' })).toHaveAttribute(
+      'href',
+      'https://langfuse.agenticim.xyz/',
+    );
+  });
+
+  it.each([
+    ['https://ms.agenticim.xyz/observability/traces', 'Open Tempo in Grafana'],
+    ['https://ms.agenticim.xyz/observability/metrics', 'Open Prometheus in Grafana'],
+  ])('keeps %s inside the management observability view', async (url, linkName) => {
+    setTestLocation(url);
+    storeSession({
+      user: {
+        userId: '9001',
+        identifier: 'admin_001',
+        displayName: 'Admin',
+        accountType: 'admin',
+      },
+    });
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        code: 'OK',
+        message: 'ok',
+        data: {
+          totals: {
+            users: 1,
+            conversations: 0,
+            messages: 0,
+            aiRuns: 0,
+            failedAiRuns: 0,
+          },
+          recentTraces: [],
+          recentConversations: [],
+        },
+      }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Observability' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: linkName })).toHaveAttribute(
+      'href',
+      expect.stringContaining('grafana.agenticim.xyz/explore'),
+    );
+  });
+
+  it('labels management system user result columns with headers', async () => {
+    const user = userEvent.setup();
+    setTestLocation('https://ms.agenticim.xyz/');
+    storeSession({
+      user: {
+        userId: '9001',
+        identifier: 'admin_001',
+        displayName: 'Admin',
+        accountType: 'admin',
+      },
+    });
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const path = fetchPath(input);
+      if (path === '/admin/dashboard') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              totals: {
+                users: 1,
+                conversations: 0,
+                messages: 0,
+                aiRuns: 0,
+                failedAiRuns: 0,
+              },
+              recentTraces: [],
+              recentConversations: [],
+            },
+          }),
+        );
+      }
+      if (path === '/admin/users?query=&limit=20') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              users: [
+                {
+                  userId: '1001',
+                  identifier: 'alice_001',
+                  displayName: 'Alice',
+                  name: 'Alice',
+                  gender: 'female',
+                  birthDate: '1996-05-02',
+                  region: 'Shanghai',
+                  accountType: 'user',
+                  createdAt: '2026-04-29T12:00:00Z',
+                  updatedAt: '2026-04-30T12:00:00Z',
+                },
+              ],
+            },
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${path}`));
+    });
+
+    render(<App />);
+    await screen.findByRole('heading', { name: 'AgenticIM Management' });
+    await user.click(screen.getByRole('button', { name: 'Users' }));
+
+    expect(await screen.findByRole('columnheader', { name: 'Display name' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Identifier' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Type' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Created / Updated' })).toBeInTheDocument();
   });
 
   it('keeps the primary domain root on the normal authenticated app shell', async () => {
@@ -498,7 +658,7 @@ describe('Auth flow', () => {
 
     expect(await screen.findByRole('heading', { name: '消息' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /消息/i })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Admin Console' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'AgenticIM Management' })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/conversations/seqs?conversationIds=', expect.anything());
   });
 
