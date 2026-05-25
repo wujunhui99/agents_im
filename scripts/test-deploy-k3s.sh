@@ -191,6 +191,12 @@ if grep -Fq "apply -k" "${CALL_LOG}"; then
   exit 1
 fi
 
+if ! grep -Fq "delete ingress agents-im-prometheus --ignore-not-found=true" "${CALL_LOG}"; then
+  echo "deploy must delete the retired prometheus.agenticim.xyz ingress" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
 if ! grep -Fq "name: agents-im-minio-proxy" "${CALL_LOG}"; then
   echo "expected non-application Deployment manifests to still be applied" >&2
   cat "${CALL_LOG}" >&2
@@ -254,6 +260,12 @@ RESTART_SERVICES=groups-rpc \
 # Config-only deploy checks must run before the next scenario resets CALL_LOG.
 if grep -Fq "apply -k" "${CALL_LOG}"; then
   echo "config-only deploy must not apply the full kustomization because it contains Deployment image defaults" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+if ! grep -Fq "delete ingress agents-im-prometheus --ignore-not-found=true" "${CALL_LOG}"; then
+  echo "config-only deploy must delete the retired prometheus.agenticim.xyz ingress" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
