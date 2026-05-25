@@ -2,7 +2,7 @@ syntax = "v1"
 
 info (
 	title:   "Admin API"
-	desc:    "Read-only operator console API served by message-api under /admin."
+	desc:    "Read-only operator console API served by message-api under management API prefixes."
 	author:  "Codex"
 	version: "v0.1.0"
 )
@@ -316,13 +316,13 @@ service admin-api {
 	get /admin/llm-traces/:trace_id (AdminLLMTraceReq) returns (AdminLLMTraceDetailResp)
 
 	@handler adminListFeedback
-	get /admin/feedback (AdminFeedbackListReq) returns (AdminFeedbackListResp)
+	get /api/admin/feedback (AdminFeedbackListReq) returns (AdminFeedbackListResp)
 
 	@handler adminGetFeedback
-	get /admin/feedback/:feedback_id (AdminFeedbackReq) returns (AdminFeedbackDetailResp)
+	get /api/admin/feedback/:feedback_id (AdminFeedbackReq) returns (AdminFeedbackDetailResp)
 
 	@handler adminUpdateFeedback
-	patch /admin/feedback/:feedback_id (AdminFeedbackUpdateReq) returns (AdminFeedbackDetailResp)
+	patch /api/admin/feedback/:feedback_id (AdminFeedbackUpdateReq) returns (AdminFeedbackDetailResp)
 
 	@handler adminGetConversationMessages
 	get /admin/conversations/:conversation_id/messages (AdminConversationMessagesReq) returns (AdminConversationMessagesResp)

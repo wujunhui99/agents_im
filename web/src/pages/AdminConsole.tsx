@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Activity, Bot, Database, LineChart, MessageSquareText, Search, Users } from 'lucide-react';
+import { Activity, Bot, Database, Filter, Inbox, LineChart, MessageSquareText, RefreshCw, Search, Users } from 'lucide-react';
 import {
   createAdminApi,
   type AdminApi,
@@ -85,6 +85,12 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
       active = false;
     };
   }, [api]);
+
+  useEffect(() => {
+    if (activeView === 'feedback') {
+      void loadFeedback(feedbackStatusFilter);
+    }
+  }, []);
 
   async function loadTraces() {
     setTraceLoading(true);
@@ -325,6 +331,9 @@ function initialAdminViewFromPath(): AdminView {
   const { pathname } = window.location;
   if (pathname === '/observability' || pathname.startsWith('/observability/')) {
     return 'observability';
+  }
+  if (pathname === '/admin/feedback' || pathname.startsWith('/admin/feedback/')) {
+    return 'feedback';
   }
   return 'dashboard';
 }
@@ -783,47 +792,64 @@ function renderFeedback({
   onSave: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <div className="admin-page">
+    <div className="admin-page admin-feedback-page">
       <header className="admin-page-header">
-        <h2>Feedback</h2>
+        <div>
+          <h2>Feedback</h2>
+          <p className="admin-page-copy">Review user feedback, filter by workflow status, and update triage notes.</p>
+        </div>
       </header>
       <form
-        className="admin-inline-form"
+        className="admin-feedback-toolbar"
         onSubmit={(event) => {
           event.preventDefault();
           onReload(statusFilter);
         }}
       >
-        <label>
-          <span>Feedback status</span>
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-            <option value="new">new</option>
-            <option value="triaged">triaged</option>
-            <option value="planned">planned</option>
-            <option value="resolved">resolved</option>
-            <option value="rejected">rejected</option>
+        <label className="admin-select-field">
+          <span>
+            <Filter aria-hidden="true" size={16} />
+            Feedback status
+          </span>
+          <select className="admin-select-control" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            {feedbackStatusOptions.map((option) => (
+              <option value={option.value} key={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
-        <button type="submit" className="admin-primary-button">Load feedback</button>
+        <button type="submit" className="admin-primary-button">
+          <RefreshCw aria-hidden="true" size={16} />
+          Load feedback
+        </button>
       </form>
       {loading && <p className="admin-status">Loading feedback</p>}
       {error === '反馈已更新' ? <p className="admin-status" role="status">{error}</p> : null}
       {error && error !== '反馈已更新' ? <p className="admin-error">{error}</p> : null}
-      {items.length === 0 && !loading ? <p className="admin-empty">No feedback found</p> : null}
+      {items.length === 0 && !loading && !error ? (
+        <section className="admin-empty admin-feedback-empty" aria-label="Empty feedback state">
+          <Inbox aria-hidden="true" size={24} />
+          <div>
+            <h3>No feedback yet</h3>
+            <p>没有反馈</p>
+          </div>
+        </section>
+      ) : null}
       {items.length > 0 ? (
         <div className="admin-table" role="table" aria-label="Feedback list">
-          <TableHeader labels={['Title', 'Category', 'Status', 'User', 'Created']} />
+          <TableHeader className="admin-row-feedback" labels={['Title', 'Category', 'Status', 'User', 'Created']} />
           {items.map((item) => (
             <button
               type="button"
-              className="admin-row"
+              className="admin-row admin-row-feedback"
               key={item.feedbackId}
               onClick={() => onOpen(item)}
               aria-label={`Open feedback ${item.feedbackId}`}
             >
               <span>{item.title}</span>
               <span>{item.category}</span>
-              <span>{item.status}</span>
+              <span className={`admin-status-pill admin-status-${item.status}`}>{statusLabel(item.status)}</span>
               <span>{item.userId}</span>
               <span>{item.createdAt}</span>
             </button>
@@ -831,22 +857,38 @@ function renderFeedback({
         </div>
       ) : null}
       {selectedFeedback ? (
-        <section className="admin-detail-panel">
-          <h3>{selectedFeedback.title}</h3>
-          <p>{selectedFeedback.content}</p>
-          {selectedFeedback.contact ? <p>Contact: {selectedFeedback.contact}</p> : null}
-          <form className="admin-inline-form" onSubmit={onSave}>
-            <label>
+        <section className="admin-detail-panel admin-feedback-detail">
+          <header className="admin-feedback-detail-header">
+            <span className={`admin-status-pill admin-status-${selectedFeedback.status}`}>{statusLabel(selectedFeedback.status)}</span>
+            <h3>{selectedFeedback.title}</h3>
+          </header>
+          <p className="admin-feedback-content">{selectedFeedback.content}</p>
+          <dl className="admin-definition-grid">
+            <dt>Category</dt>
+            <dd>{selectedFeedback.category}</dd>
+            <dt>User</dt>
+            <dd>{selectedFeedback.userId}</dd>
+            <dt>Created</dt>
+            <dd>{selectedFeedback.createdAt}</dd>
+            {selectedFeedback.contact ? (
+              <>
+                <dt>Contact</dt>
+                <dd>{selectedFeedback.contact}</dd>
+              </>
+            ) : null}
+          </dl>
+          <form className="admin-feedback-update-form" onSubmit={onSave}>
+            <label className="admin-select-field">
               <span>反馈状态</span>
-              <select value={updateStatus} onChange={(event) => setUpdateStatus(event.target.value)}>
-                <option value="new">new</option>
-                <option value="triaged">triaged</option>
-                <option value="planned">planned</option>
-                <option value="resolved">resolved</option>
-                <option value="rejected">rejected</option>
+              <select className="admin-select-control" value={updateStatus} onChange={(event) => setUpdateStatus(event.target.value)}>
+                {feedbackStatusOptions.map((option) => (
+                  <option value={option.value} key={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
-            <label>
+            <label className="admin-textarea-field">
               <span>管理员备注</span>
               <textarea value={adminNote} onChange={(event) => setAdminNote(event.target.value)} />
             </label>
@@ -856,6 +898,18 @@ function renderFeedback({
       ) : null}
     </div>
   );
+}
+
+const feedbackStatusOptions = [
+  { value: 'new', label: 'New' },
+  { value: 'triaged', label: 'Triaged' },
+  { value: 'planned', label: 'Planned' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'rejected', label: 'Rejected' },
+];
+
+function statusLabel(status: string) {
+  return feedbackStatusOptions.find((option) => option.value === status)?.label ?? status;
 }
 
 function displayUserName(user: AdminUser) {

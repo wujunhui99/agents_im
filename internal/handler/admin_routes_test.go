@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,6 +33,7 @@ func TestAdminRoutesRequireAuthenticatedAdminAccount(t *testing.T) {
 		Friends:     accountRepo,
 		Messages:    repository.NewMemoryMessageRepository(),
 		AgentAudits: repository.NewMemoryAgentAuditRepository(),
+		Feedback:    repository.NewMemoryFeedbackRepository(),
 	}, auth)
 	router := newAdminRouteTestRouter(t, serviceContext)
 
@@ -54,6 +57,62 @@ func TestAdminRoutesRequireAuthenticatedAdminAccount(t *testing.T) {
 	router.ServeHTTP(adminResp, adminReq)
 	if adminResp.Code != http.StatusOK {
 		t.Fatalf("admin status = %d, body = %s", adminResp.Code, adminResp.Body.String())
+	}
+}
+
+func TestAdminFeedbackJSONRouteUsesApiPrefix(t *testing.T) {
+	ctx := context.Background()
+	auth := testAdminRouteJWTAuthConfig()
+	accountRepo := repository.NewMemoryRepository()
+	feedbackRepo := repository.NewMemoryFeedbackRepository()
+	userLogic := logic.NewUserLogic(accountRepo)
+	admin := mustCreateAdminRouteUser(t, ctx, userLogic, "admin_route_feedback_admin", model.AccountTypeAdmin)
+	created, err := feedbackRepo.CreateFeedback(ctx, model.Feedback{
+		UserID:   admin.UserID,
+		Category: model.FeedbackCategoryBug,
+		Status:   model.FeedbackStatusNew,
+		Title:    "broken feedback route",
+		Content:  "admin feedback data must be JSON",
+	})
+	if err != nil {
+		t.Fatalf("create feedback: %v", err)
+	}
+	serviceContext := adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
+		Accounts:    accountRepo,
+		Friends:     accountRepo,
+		Messages:    repository.NewMemoryMessageRepository(),
+		AgentAudits: repository.NewMemoryAgentAuditRepository(),
+		Feedback:    feedbackRepo,
+	}, auth)
+	router := newAdminRouteTestRouter(t, serviceContext)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/feedback?status=new", nil)
+	req.Header.Set("Authorization", adminRouteBearerTokenForUser(t, auth, admin.UserID))
+	router.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("admin feedback status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+	if contentType := resp.Header().Get("Content-Type"); !strings.Contains(contentType, "application/json") {
+		t.Fatalf("content type = %q, want JSON", contentType)
+	}
+	if strings.Contains(resp.Body.String(), "<!doctype html") {
+		t.Fatalf("admin feedback returned HTML: %s", resp.Body.String())
+	}
+
+	var envelope struct {
+		Code string `json:"code"`
+		Data struct {
+			Items []struct {
+				FeedbackID string `json:"feedbackId"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode admin feedback JSON: %v; body = %s", err, resp.Body.String())
+	}
+	if envelope.Code != "OK" || len(envelope.Data.Items) != 1 || envelope.Data.Items[0].FeedbackID != created.FeedbackID {
+		t.Fatalf("unexpected admin feedback envelope: %+v", envelope)
 	}
 }
 

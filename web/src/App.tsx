@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Compass, Contact, MessageCircle, ShieldCheck, UserRound } from 'lucide-react';
 import { AuthProvider, authErrorMessage, useAuth } from './auth/AuthContext';
 import type { AuthUser } from './auth/session';
 import { createAdminApi } from './api/admin';
 import { createApiClient } from './api/client';
 import { createContactsApi, type ContactsApi } from './api/contacts';
-import { createFeedbackApi, type FeedbackApi, type SubmitFeedbackRequest } from './api/feedback';
+import { createFeedbackApi, type SubmitFeedbackRequest } from './api/feedback';
 import { createGroupsApi, type Group, type GroupsApi } from './api/groups';
 import { createMediaApi, type MediaApi } from './api/media';
 import { createMessageApi, type MessageApi } from './api/messages';
@@ -20,10 +20,12 @@ import { TopBar } from './components/ui/TopBar';
 import { MessagesPage } from './features/messages/MessagesPage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { AdminConsole } from './pages/AdminConsole';
+import { FeedbackPage } from './pages/FeedbackPage';
 import { MePage } from './pages/MePage';
 import { uploadAvatarForProfile } from './utils/avatarUpload';
 
 type TabKey = 'messages' | 'contacts' | 'discover' | 'me';
+type AppRoute = 'main' | 'feedback';
 
 const tabs: TabDefinition<TabKey>[] = [
   { key: 'messages', label: '消息', icon: MessageCircle },
@@ -82,6 +84,7 @@ type AuthenticatedAppProps = AppProps & {
 function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSocketToken, webSocketFactory }: AuthenticatedAppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('messages');
   const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(() => new Set(['messages']));
+  const [appRoute, setAppRoute] = useState<AppRoute>(() => appRouteFromLocation());
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => initialUser ?? userProfileFromAuth(authUser));
   const [startChatSignal, setStartChatSignal] = useState(0);
   const [pendingChatProfile, setPendingChatProfile] = useState<UserProfile | null>(null);
@@ -117,6 +120,15 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
   const handleWebSocketAuthFailure = useCallback(() => {
     handleAuthFailure({ token: activeWebSocketToken ?? null });
   }, [activeWebSocketToken, handleAuthFailure]);
+
+  useEffect(() => {
+    function handlePopState() {
+      setAppRoute(appRouteFromLocation());
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   async function updateProfile(patch: UserProfilePatch) {
     const updatedUser = await effectiveUserApi.patchCurrentUser(patch);
@@ -175,8 +187,37 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
     });
   }
 
+  function openFeedbackPage() {
+    if (window.location.pathname !== '/feedback') {
+      window.history.pushState({ route: 'feedback' }, '', '/feedback');
+    }
+    setAppRoute('feedback');
+  }
+
+  function closeFeedbackPage() {
+    if (window.location.pathname === '/feedback' && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.history.replaceState({}, '', '/');
+    setAppRoute('main');
+  }
+
   if (isAdminRoute()) {
     return <AdminConsole adminApi={adminApi} />;
+  }
+
+  if (appRoute === 'feedback') {
+    return (
+      <main className="app-shell" aria-label="Agents IM Material 3-inspired 微信式主框架">
+        <section className="phone-frame">
+          <TopBar title="反馈" onBack={closeFeedbackPage} />
+          <section className="content-area">
+            <FeedbackPage onSubmitFeedback={(request: SubmitFeedbackRequest) => feedbackApi.submitFeedback(request).then(() => undefined)} />
+          </section>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -214,9 +255,9 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
                   contactsApi,
                   groupsApi,
                   messageApi,
-                  feedbackApi,
                   mediaApi,
                   uploadAvatar,
+                  openFeedbackPage,
                   webSocketUrl,
                   activeWebSocketToken,
                   webSocketFactory,
@@ -243,6 +284,10 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
 function isAdminRoute() {
   const { hostname, pathname } = window.location;
   return hostname === 'ms.agenticim.xyz' || pathname === '/admin' || pathname.startsWith('/admin/');
+}
+
+function appRouteFromLocation(): AppRoute {
+  return window.location.pathname === '/feedback' ? 'feedback' : 'main';
 }
 
 function AuthPage({ prompt = '', adminMode = false }: { prompt?: string; adminMode?: boolean }) {
@@ -519,9 +564,9 @@ function renderPage(
   contactsApi: ContactsApi,
   groupsApi: GroupsApi,
   messageApi: MessageApi,
-  feedbackApi: FeedbackApi,
   mediaApi: MediaApi,
   onUploadAvatar: (file: File) => Promise<UserProfile>,
+  onOpenFeedback: () => void,
   webSocketUrl: string | undefined,
   webSocketToken: string | undefined,
   webSocketFactory: WebSocketFactory | undefined,
@@ -578,7 +623,7 @@ function renderPage(
         profile={currentUser}
         onUpdateProfile={onUpdateProfile}
         onUploadAvatar={onUploadAvatar}
-        onSubmitFeedback={(request: SubmitFeedbackRequest) => feedbackApi.submitFeedback(request).then(() => undefined)}
+        onOpenFeedback={onOpenFeedback}
       />
       <Button variant="tonal" className="logout-button" onClick={onLogout}>
         退出登录
