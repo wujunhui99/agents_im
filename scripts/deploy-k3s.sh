@@ -308,6 +308,12 @@ if verified == 0:
   done
 }
 
+cleanup_obsolete_resources() {
+  # kubectl apply does not prune resources that were removed from manifests.
+  # Keep explicit tombstones here for renamed/retired public entrypoints.
+  ${KUBECTL} -n "${NAMESPACE}" delete ingress agents-im-prometheus --ignore-not-found=true
+}
+
 apply_manifests() {
   local selected_image_services=()
   local restart_rollout_services=()
@@ -331,6 +337,7 @@ apply_manifests() {
   ${KUBECTL} apply -f "${MANIFEST_DIR}/namespace.yaml"
   ensure_secret
   ensure_image_pull_secret
+  cleanup_obsolete_resources
   apply_rendered_manifests "${image_overrides}" | ${KUBECTL} apply -f -
 
   if bool_true "${SKIP_SET_IMAGE}"; then
