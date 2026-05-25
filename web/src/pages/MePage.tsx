@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
+import type { SubmitFeedbackRequest } from '../api/feedback';
 import type { UserProfile, UserProfilePatch } from '../api/user';
 import { ActionRow } from '../components/ui/ActionRow';
 import { Avatar } from '../components/ui/Avatar';
@@ -21,9 +22,21 @@ type MePageProps = {
   onUpdateProfile: (patch: UserProfilePatch) => Promise<void>;
   onUploadAvatar: (file: File) => Promise<UserProfile>;
   onAvatarUpdated?: (profile: UserProfile) => void;
+  onSubmitFeedback?: (request: SubmitFeedbackRequest) => Promise<void>;
 };
 
-export function MePage({ profile, onUpdateProfile, onUploadAvatar, onAvatarUpdated }: MePageProps) {
+type FeedbackDraft = {
+  category: string;
+  title: string;
+  content: string;
+  contact: string;
+};
+
+function defaultFeedbackDraft(): FeedbackDraft {
+  return { category: 'bug', title: '', content: '', contact: '' };
+}
+
+export function MePage({ profile, onUpdateProfile, onUploadAvatar, onAvatarUpdated, onSubmitFeedback }: MePageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileDraft>(() => createDraft(profile));
   const [isSaving, setIsSaving] = useState(false);
@@ -31,6 +44,11 @@ export function MePage({ profile, onUpdateProfile, onUploadAvatar, onAvatarUpdat
   const [avatarStatus, setAvatarStatus] = useState('');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarURL, setAvatarURL] = useState(profile.avatar_url ?? '');
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackDraft, setFeedbackDraft] = useState<FeedbackDraft>(() => defaultFeedbackDraft());
+  const [feedbackStatus, setFeedbackStatus] = useState('');
+  const [feedbackError, setFeedbackError] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const visibleProfile = { ...profile, avatar_url: avatarURL };
 
   useEffect(() => {
@@ -87,6 +105,33 @@ export function MePage({ profile, onUpdateProfile, onUploadAvatar, onAvatarUpdat
     setDraft(createDraft(profile));
     setError('');
     setIsEditing(false);
+  }
+
+  async function handleFeedbackSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFeedbackStatus('');
+    setFeedbackError('');
+    if (!onSubmitFeedback) {
+      setFeedbackError('反馈功能暂不可用');
+      return;
+    }
+    setFeedbackSubmitting(true);
+    try {
+      await onSubmitFeedback({
+        category: feedbackDraft.category,
+        title: feedbackDraft.title.trim(),
+        content: feedbackDraft.content.trim(),
+        contact: feedbackDraft.contact.trim(),
+        pageUrl: window.location.href,
+        userAgent: navigator.userAgent,
+      });
+      setFeedbackDraft(defaultFeedbackDraft());
+      setFeedbackStatus('反馈已提交，感谢你的帮助');
+    } catch {
+      setFeedbackError('反馈提交失败，请稍后重试');
+    } finally {
+      setFeedbackSubmitting(false);
+    }
   }
 
   return (
@@ -204,8 +249,56 @@ export function MePage({ profile, onUpdateProfile, onUploadAvatar, onAvatarUpdat
       </ListCard>
       <ListCard>
         <ActionRow label="收藏" helper="重要消息和 Agent 输出" accent="orange" />
+        <ActionRow label="意见反馈" helper="Bug、体验问题和功能建议" accent="green" onClick={() => setFeedbackOpen((current) => !current)} />
         <ActionRow label="设置" helper="账号、安全、通知" accent="gray" trailingIcon={Settings} />
       </ListCard>
+
+      {feedbackOpen ? (
+        <ListCard ariaLabel="意见反馈" className="feedback-card">
+          <form className="profile-edit-form" onSubmit={handleFeedbackSubmit}>
+            <label className="profile-field">
+              <span>反馈类型</span>
+              <select
+                value={feedbackDraft.category}
+                onChange={(event) => setFeedbackDraft((current) => ({ ...current, category: event.target.value }))}
+              >
+                <option value="bug">Bug</option>
+                <option value="poor_experience">体验不好</option>
+                <option value="feature_request">功能建议</option>
+                <option value="other">其他</option>
+              </select>
+            </label>
+            <TextField
+              label="标题"
+              value={feedbackDraft.title}
+              onChange={(event) => setFeedbackDraft((current) => ({ ...current, title: event.target.value }))}
+              fieldClassName="profile-field"
+              required
+            />
+            <label className="profile-field">
+              <span>反馈内容</span>
+              <textarea
+                value={feedbackDraft.content}
+                onChange={(event) => setFeedbackDraft((current) => ({ ...current, content: event.target.value }))}
+                required
+              />
+            </label>
+            <TextField
+              label="联系方式（选填）"
+              value={feedbackDraft.contact}
+              onChange={(event) => setFeedbackDraft((current) => ({ ...current, contact: event.target.value }))}
+              fieldClassName="profile-field"
+            />
+            {feedbackError ? <p className="form-error" role="alert">{feedbackError}</p> : null}
+            {feedbackStatus ? <p className="profile-avatar-status" role="status">{feedbackStatus}</p> : null}
+            <div className="profile-form-actions">
+              <Button type="submit" className="primary-button" disabled={feedbackSubmitting}>
+                {feedbackSubmitting ? '提交中' : '提交反馈'}
+              </Button>
+            </div>
+          </form>
+        </ListCard>
+      ) : null}
     </div>
   );
 }

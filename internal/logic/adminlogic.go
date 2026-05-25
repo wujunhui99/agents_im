@@ -20,6 +20,7 @@ type AdminLogicConfig struct {
 	Friends     repository.FriendshipRepository
 	Messages    repository.AdminMessageRepository
 	AgentAudits repository.AdminAgentAuditRepository
+	Feedback    repository.FeedbackRepository
 }
 
 type AdminLogic struct {
@@ -27,6 +28,7 @@ type AdminLogic struct {
 	friends     repository.FriendshipRepository
 	messages    repository.AdminMessageRepository
 	agentAudits repository.AdminAgentAuditRepository
+	feedback    repository.FeedbackRepository
 }
 
 type AdminDashboardRequest struct {
@@ -150,6 +152,50 @@ type AdminConversation struct {
 	LastMessage    *AdminMessage `json:"lastMessage,omitempty"`
 }
 
+type AdminFeedbackListRequest struct {
+	Status string
+	Limit  int
+	Offset int
+}
+
+type AdminFeedbackDetailRequest struct {
+	FeedbackID string
+}
+
+type AdminFeedbackUpdateRequest struct {
+	FeedbackID string
+	Status     string
+	AdminNote  string
+}
+
+type AdminFeedbackListResponse struct {
+	Items []AdminFeedback `json:"items"`
+}
+
+type AdminFeedbackDetailResponse struct {
+	Feedback AdminFeedback `json:"feedback"`
+}
+
+type AdminFeedbackUpdateResponse struct {
+	Feedback AdminFeedback `json:"feedback"`
+}
+
+type AdminFeedback struct {
+	FeedbackID string         `json:"feedbackId"`
+	UserID     string         `json:"userId"`
+	Category   string         `json:"category"`
+	Status     string         `json:"status"`
+	Title      string         `json:"title"`
+	Content    string         `json:"content"`
+	Contact    string         `json:"contact,omitempty"`
+	PageURL    string         `json:"pageUrl,omitempty"`
+	UserAgent  string         `json:"userAgent,omitempty"`
+	ClientMeta map[string]any `json:"clientMeta,omitempty"`
+	AdminNote  string         `json:"adminNote,omitempty"`
+	CreatedAt  string         `json:"createdAt"`
+	UpdatedAt  string         `json:"updatedAt"`
+}
+
 type AdminLLMTraceListRequest struct {
 	Status string
 	Limit  int
@@ -238,6 +284,7 @@ func NewAdminLogic(config AdminLogicConfig) *AdminLogic {
 		friends:     config.Friends,
 		messages:    config.Messages,
 		agentAudits: config.AgentAudits,
+		feedback:    config.Feedback,
 	}
 }
 
@@ -604,6 +651,103 @@ func adminPythonExecsFromAudit(execs []agentaudit.AgentPythonExec) []AdminAgentP
 		})
 	}
 	return out
+}
+
+func (l *AdminLogic) ListFeedback(ctx context.Context, req AdminFeedbackListRequest) (AdminFeedbackListResponse, error) {
+	if l == nil || l.feedback == nil {
+		return AdminFeedbackListResponse{}, apperror.Internal("feedback repository is not configured")
+	}
+	var status model.FeedbackStatus
+	if strings.TrimSpace(req.Status) != "" {
+		parsed, ok := model.NormalizeFeedbackStatus(strings.TrimSpace(req.Status))
+		if !ok {
+			return AdminFeedbackListResponse{}, apperror.InvalidArgument("feedback status is invalid")
+		}
+		status = parsed
+	}
+	items, err := l.feedback.ListFeedback(ctx, repository.FeedbackListFilter{
+		Status: status,
+		Limit:  normalizeAdminLogicLimit(req.Limit, 50, 200),
+		Offset: req.Offset,
+	})
+	if err != nil {
+		return AdminFeedbackListResponse{}, err
+	}
+	resp := AdminFeedbackListResponse{Items: make([]AdminFeedback, 0, len(items))}
+	for _, item := range items {
+		resp.Items = append(resp.Items, adminFeedback(item))
+	}
+	return resp, nil
+}
+
+func (l *AdminLogic) GetFeedback(ctx context.Context, req AdminFeedbackDetailRequest) (AdminFeedbackDetailResponse, error) {
+	if l == nil || l.feedback == nil {
+		return AdminFeedbackDetailResponse{}, apperror.Internal("feedback repository is not configured")
+	}
+	feedbackID, err := normalizeAdminFeedbackID(req.FeedbackID)
+	if err != nil {
+		return AdminFeedbackDetailResponse{}, err
+	}
+	feedback, err := l.feedback.GetFeedback(ctx, feedbackID)
+	if err != nil {
+		return AdminFeedbackDetailResponse{}, err
+	}
+	return AdminFeedbackDetailResponse{Feedback: adminFeedback(feedback)}, nil
+}
+
+func (l *AdminLogic) UpdateFeedback(ctx context.Context, req AdminFeedbackUpdateRequest) (AdminFeedbackUpdateResponse, error) {
+	if l == nil || l.feedback == nil {
+		return AdminFeedbackUpdateResponse{}, apperror.Internal("feedback repository is not configured")
+	}
+	feedbackID, err := normalizeAdminFeedbackID(req.FeedbackID)
+	if err != nil {
+		return AdminFeedbackUpdateResponse{}, err
+	}
+	status, ok := model.NormalizeFeedbackStatus(strings.TrimSpace(req.Status))
+	if !ok {
+		return AdminFeedbackUpdateResponse{}, apperror.InvalidArgument("feedback status is invalid")
+	}
+	updated, err := l.feedback.UpdateFeedback(ctx, model.Feedback{
+		FeedbackID: feedbackID,
+		Status:     status,
+		AdminNote:  strings.TrimSpace(req.AdminNote),
+	})
+	if err != nil {
+		return AdminFeedbackUpdateResponse{}, err
+	}
+	return AdminFeedbackUpdateResponse{Feedback: adminFeedback(updated)}, nil
+}
+
+func adminFeedback(feedback model.Feedback) AdminFeedback {
+	return AdminFeedback{
+		FeedbackID: feedback.FeedbackID,
+		UserID:     feedback.UserID,
+		Category:   string(feedback.Category),
+		Status:     string(feedback.Status),
+		Title:      feedback.Title,
+		Content:    feedback.Content,
+		Contact:    feedback.Contact,
+		PageURL:    feedback.PageURL,
+		UserAgent:  feedback.UserAgent,
+		ClientMeta: feedback.ClientMeta,
+		AdminNote:  feedback.AdminNote,
+		CreatedAt:  formatAdminTime(feedback.CreatedAt),
+		UpdatedAt:  formatAdminTime(feedback.UpdatedAt),
+	}
+}
+
+func normalizeAdminFeedbackID(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", apperror.InvalidArgument("feedback_id is required")
+	}
+	if len([]rune(value)) > 128 {
+		return "", apperror.InvalidArgument("feedback_id must be 128 characters or fewer")
+	}
+	if strings.Contains(value, "\x00") {
+		return "", apperror.InvalidArgument("feedback_id cannot contain NUL")
+	}
+	return value, nil
 }
 
 func normalizeAdminConversationID(value string) (string, error) {

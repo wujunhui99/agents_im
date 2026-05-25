@@ -12,6 +12,7 @@ type Dependencies struct {
 	Friends     repository.FriendshipRepository
 	Messages    repository.AdminMessageRepository
 	AgentAudits repository.AdminAgentAuditRepository
+	Feedback    repository.FeedbackRepository
 }
 
 type ServiceContext struct {
@@ -21,6 +22,7 @@ type ServiceContext struct {
 	Friends     repository.FriendshipRepository
 	Messages    repository.AdminMessageRepository
 	AgentAudits repository.AdminAgentAuditRepository
+	Feedback    repository.FeedbackRepository
 }
 
 func NewServiceContext(deps Dependencies) *ServiceContext {
@@ -35,10 +37,12 @@ func NewServiceContextWithAuth(deps Dependencies, auth config.JWTAuthConfig) *Se
 			Friends:     deps.Friends,
 			Messages:    deps.Messages,
 			AgentAudits: deps.AgentAudits,
+			Feedback:    deps.Feedback,
 		}),
 		Accounts:    deps.Accounts,
 		Friends:     deps.Friends,
 		Messages:    deps.Messages,
 		AgentAudits: deps.AgentAudits,
+		Feedback:    deps.Feedback,
 	}
 }

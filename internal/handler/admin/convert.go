@@ -84,6 +84,22 @@ func adminTraceDetailResp(data business.AdminLLMTraceDetailResponse) *types.Admi
 	}
 }
 
+func adminFeedbackListResp(data business.AdminFeedbackListResponse) *types.AdminFeedbackListResp {
+	return &types.AdminFeedbackListResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data:    types.AdminFeedbackListData{Items: adminFeedbackItems(data.Items)},
+	}
+}
+
+func adminFeedbackDetailResp(data business.AdminFeedbackDetailResponse) *types.AdminFeedbackDetailResp {
+	return &types.AdminFeedbackDetailResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data:    types.AdminFeedbackDetailData{Feedback: adminFeedback(data.Feedback)},
+	}
+}
+
 func adminDashboardTotals(t business.AdminDashboardTotals) types.AdminDashboardTotals {
 	return types.AdminDashboardTotals{
 		Users:         t.Users,
@@ -219,6 +235,32 @@ func adminTrace(trace business.AdminLLMTrace) types.AdminLLMTrace {
 		StartedAt:         trace.StartedAt,
 		FinishedAt:        trace.FinishedAt,
 		CreatedAt:         trace.CreatedAt,
+	}
+}
+
+func adminFeedbackItems(items []business.AdminFeedback) []types.AdminFeedback {
+	out := make([]types.AdminFeedback, 0, len(items))
+	for _, item := range items {
+		out = append(out, adminFeedback(item))
+	}
+	return out
+}
+
+func adminFeedback(item business.AdminFeedback) types.AdminFeedback {
+	return types.AdminFeedback{
+		FeedbackID: item.FeedbackID,
+		UserID:     item.UserID,
+		Category:   item.Category,
+		Status:     item.Status,
+		Title:      item.Title,
+		Content:    item.Content,
+		Contact:    item.Contact,
+		PageURL:    item.PageURL,
+		UserAgent:  item.UserAgent,
+		ClientMeta: item.ClientMeta,
+		AdminNote:  item.AdminNote,
+		CreatedAt:  item.CreatedAt,
+		UpdatedAt:  item.UpdatedAt,
 	}
 }
 

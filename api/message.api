@@ -53,6 +53,27 @@ type SendMessageResp {
 	Data    SendMessageData `json:"data"`
 }
 
+type CreateFeedbackReq {
+	Category   string         `json:"category"`
+	Title      string         `json:"title"`
+	Content    string         `json:"content"`
+	Contact    string         `json:"contact,optional"`
+	PageURL    string         `json:"pageUrl,optional"`
+	UserAgent  string         `json:"userAgent,optional"`
+	ClientMeta map[string]any `json:"clientMeta,optional"`
+}
+
+type FeedbackData {
+	FeedbackID string `json:"feedbackId"`
+	Status     string `json:"status"`
+}
+
+type CreateFeedbackResp {
+	Code    string       `json:"code"`
+	Message string       `json:"message"`
+	Data    FeedbackData `json:"data"`
+}
+
 type PullMessagesReq {
 	ConversationID string `path:"conversation_id"`
 	FromSeq        int64  `form:"fromSeq,optional"`
@@ -148,6 +169,9 @@ type ConversationAIHostingResp {
 service message-api {
 	@handler sendMessage
 	post /messages (SendMessageReq) returns (SendMessageResp)
+
+	@handler createFeedback
+	post /feedback (CreateFeedbackReq) returns (CreateFeedbackResp)
 
 	@handler pullMessages
 	get /conversations/:conversation_id/messages (PullMessagesReq) returns (PullMessagesResp)

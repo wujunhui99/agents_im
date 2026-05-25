@@ -74,6 +74,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("build agent audit repository: %v", err)
 	}
+	feedbackRepo, err := repository.NewFeedbackRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build feedback repository: %v", err)
+	}
 	var pythonExecutorClient pythonexec.KubernetesSandboxClient
 	if cfg.PythonExecutor.Backend == config.PythonExecutorBackendK8S {
 		pythonExecutorClient, err = pythonexec.NewInClusterKubernetesSandboxClient()
@@ -86,9 +90,10 @@ func main() {
 		log.Fatalf("build python executor: %v", err)
 	}
 	groupsLogic := logic.NewGroupsLogic(groupsRepo, nil)
-	serviceContext := messagesvc.NewServiceContextWithMedia(
+	serviceContext := messagesvc.NewServiceContextWithFeedback(
 		messageRepo,
 		mediaRepo,
+		feedbackRepo,
 		nil,
 		groupsLogic,
 		cfg.Auth,
@@ -120,11 +125,16 @@ func main() {
 		if !ok {
 			log.Fatalf("postgres agent audit repository has unexpected type %T", agentAuditRepo)
 		}
+		postgresFeedbackRepo, ok := feedbackRepo.(*repository.PostgresFeedbackRepository)
+		if !ok {
+			log.Fatalf("postgres feedback repository has unexpected type %T", feedbackRepo)
+		}
 		adminContext = adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
 			Accounts:    postgresAccountRepo,
 			Friends:     postgresAccountRepo,
 			Messages:    postgresMessageRepo,
 			AgentAudits: postgresAgentAuditRepo,
+			Feedback:    postgresFeedbackRepo,
 		}, cfg.Auth)
 	} else {
 		memoryAccountRepo, ok := accountRepo.(*repository.MemoryRepository)
@@ -139,11 +149,16 @@ func main() {
 		if !ok {
 			log.Fatalf("memory agent audit repository has unexpected type %T", agentAuditRepo)
 		}
+		memoryFeedbackRepo, ok := feedbackRepo.(*repository.MemoryFeedbackRepository)
+		if !ok {
+			log.Fatalf("memory feedback repository has unexpected type %T", feedbackRepo)
+		}
 		adminContext = adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
 			Accounts:    memoryAccountRepo,
 			Friends:     memoryAccountRepo,
 			Messages:    memoryMessageRepo,
 			AgentAudits: memoryAgentAuditRepo,
+			Feedback:    memoryFeedbackRepo,
 		}, cfg.Auth)
 	}
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
