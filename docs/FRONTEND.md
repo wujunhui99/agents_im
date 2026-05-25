@@ -129,10 +129,11 @@ make status
 ## Management System 约定
 
 - `ms.agenticim.xyz` 是 **AgenticIM Management** 入口，不再使用 `Admin Console` 作为面向用户的主品牌。
-- Loki、Tempo 不新增独立公网域名；MS 提供学习/运维快捷入口，跳到 Grafana Explore：
-  - `/observability/logs` -> Loki datasource
-  - `/observability/traces` -> Tempo datasource
-  - `/observability/metrics` -> Prometheus datasource / 受保护的 Prometheus UI
+- Loki、Tempo 不新增独立公网域名；MS 提供实际路由跳转入口：
+  - `/observability/logs` -> 302 到 Grafana Explore / Loki datasource
+  - `/observability/traces` -> 302 到 Grafana Explore / Tempo datasource
+  - `/observability/metrics` -> 直接承接受保护的 Prometheus UI，不再暴露 `prometheus.agenticim.xyz`
+  - `/observability/llm` -> 302 到 `langfuse.agenticim.xyz`
 - `langfuse.agenticim.xyz` 保留独立域名，MS 只提供跳转入口。
 - Management System 的数据列表必须有表头或字段 label，不能只展示一组无字段名的值。
 

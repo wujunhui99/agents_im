@@ -19,6 +19,7 @@ data:
 
     scrape_configs:
       - job_name: prometheus
+        metrics_path: /observability/metrics/metrics
         static_configs:
           - targets: ["127.0.0.1:9090"]
 
@@ -75,6 +76,8 @@ spec:
             - --storage.tsdb.retention.time=7d
             - --storage.tsdb.retention.size=7GB
             - --web.enable-lifecycle
+            - --web.external-url=https://ms.agenticim.xyz/observability/metrics
+            - --web.route-prefix=/observability/metrics
           ports:
             - name: http
               containerPort: 9090
@@ -87,13 +90,13 @@ spec:
               memory: 1536Mi
           readinessProbe:
             httpGet:
-              path: /-/ready
+              path: /observability/metrics/-/ready
               port: http
             initialDelaySeconds: 10
             periodSeconds: 15
           livenessProbe:
             httpGet:
-              path: /-/healthy
+              path: /observability/metrics/-/healthy
               port: http
             initialDelaySeconds: 30
             periodSeconds: 30

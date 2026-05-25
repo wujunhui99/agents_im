@@ -261,10 +261,121 @@ spec:
                 port:
                   number: 3000
 ---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: observability-logs-redirect
+  namespace: agents-im
+spec:
+  redirectRegex:
+    regex: '^https?://ms\.agenticim\.xyz/observability/logs/?(.*)'
+    replacement: 'https://grafana.agenticim.xyz/explore?orgId=1&left=%7B%22datasource%22:%22loki%22%7D'
+    permanent: false
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: observability-traces-redirect
+  namespace: agents-im
+spec:
+  redirectRegex:
+    regex: '^https?://ms\.agenticim\.xyz/observability/traces/?(.*)'
+    replacement: 'https://grafana.agenticim.xyz/explore?orgId=1&left=%7B%22datasource%22:%22tempo%22%7D'
+    permanent: false
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: observability-llm-redirect
+  namespace: agents-im
+spec:
+  redirectRegex:
+    regex: '^https?://ms\.agenticim\.xyz/observability/llm/?(.*)'
+    replacement: 'https://langfuse.agenticim.xyz/'
+    permanent: false
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: agents-im-prometheus
+  name: agents-im-observability-logs
+  namespace: agents-im
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: agents-im-observability-logs-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ms.agenticim.xyz
+      secretName: ms-agenticim-xyz-tls
+  rules:
+    - host: ms.agenticim.xyz
+      http:
+        paths:
+          - path: /observability/logs
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agents-im-observability-traces
+  namespace: agents-im
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: agents-im-observability-traces-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ms.agenticim.xyz
+      secretName: ms-agenticim-xyz-tls
+  rules:
+    - host: ms.agenticim.xyz
+      http:
+        paths:
+          - path: /observability/traces
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agents-im-observability-llm
+  namespace: agents-im
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: agents-im-observability-llm-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ms.agenticim.xyz
+      secretName: ms-agenticim-xyz-tls
+  rules:
+    - host: ms.agenticim.xyz
+      http:
+        paths:
+          - path: /observability/llm
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agents-im-observability-metrics
   namespace: agents-im
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
@@ -273,13 +384,13 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - prometheus.agenticim.xyz
-      secretName: prometheus-agenticim-xyz-tls
+        - ms.agenticim.xyz
+      secretName: ms-agenticim-xyz-tls
   rules:
-    - host: prometheus.agenticim.xyz
+    - host: ms.agenticim.xyz
       http:
         paths:
-          - path: /
+          - path: /observability/metrics
             pathType: Prefix
             backend:
               service:
