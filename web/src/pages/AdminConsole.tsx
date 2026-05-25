@@ -265,31 +265,29 @@ const observabilityLinks = [
   {
     path: '/observability/logs',
     title: 'Logs / Loki',
-    description: 'Open Grafana Explore with the Loki datasource for pod logs and trace_id searches.',
-    href: 'https://grafana.agenticim.xyz/explore?orgId=1&left=%7B%22datasource%22:%22loki%22%7D',
-    cta: 'Open Loki in Grafana',
+    description: 'Jump to Loki logs through Grafana Explore. Loki stays internal-only without a public domain.',
+    href: '/observability/logs',
+    cta: 'Open Logs',
   },
   {
     path: '/observability/traces',
     title: 'Traces / Tempo',
-    description: 'Open Grafana Explore with the Tempo datasource for distributed traces by trace ID.',
-    href: 'https://grafana.agenticim.xyz/explore?orgId=1&left=%7B%22datasource%22:%22tempo%22%7D',
-    cta: 'Open Tempo in Grafana',
+    description: 'Jump to Tempo traces through Grafana Explore. Tempo stays internal-only without a public domain.',
+    href: '/observability/traces',
+    cta: 'Open Traces',
   },
   {
     path: '/observability/metrics',
     title: 'Metrics / Prometheus',
-    description: 'Open Grafana Explore with Prometheus, or use the protected Prometheus UI while learning queries.',
-    href: 'https://grafana.agenticim.xyz/explore?orgId=1&left=%7B%22datasource%22:%22prometheus%22%7D',
-    secondaryHref: 'https://prometheus.agenticim.xyz/',
-    cta: 'Open Prometheus in Grafana',
-    secondaryCta: 'Open Prometheus UI',
+    description: 'Open the protected Prometheus UI through the Management System path; no separate Prometheus domain is exposed.',
+    href: '/observability/metrics',
+    cta: 'Open Metrics',
   },
   {
     path: '/observability/llm',
     title: 'LLM Observability / Langfuse',
-    description: 'Open the independent Langfuse domain for LLM generations, tool calls, and agent run analysis.',
-    href: 'https://langfuse.agenticim.xyz/',
+    description: 'Jump to the independent Langfuse domain for LLM generations, tool calls, and agent run analysis.',
+    href: '/observability/llm',
     cta: 'Open Langfuse',
   },
 ];
@@ -318,11 +316,6 @@ function renderObservability() {
               <a className="admin-link" href={link.path}>
                 {link.path}
               </a>
-              {link.secondaryHref && link.secondaryCta ? (
-                <a className="admin-secondary-button" href={link.secondaryHref} target="_blank" rel="noreferrer">
-                  {link.secondaryCta}
-                </a>
-              ) : null}
             </div>
           </article>
         ))}

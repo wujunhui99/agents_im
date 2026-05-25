@@ -521,28 +521,18 @@ describe('Auth flow', () => {
 
     expect(await screen.findByRole('heading', { name: 'AgenticIM Management' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Observability' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open Loki in Grafana' })).toHaveAttribute(
-      'href',
-      expect.stringContaining('grafana.agenticim.xyz/explore'),
-    );
-    expect(screen.getByRole('link', { name: 'Open Tempo in Grafana' })).toHaveAttribute(
-      'href',
-      expect.stringContaining('datasource%22:%22tempo'),
-    );
-    expect(screen.getByRole('link', { name: 'Open Prometheus UI' })).toHaveAttribute(
-      'href',
-      'https://prometheus.agenticim.xyz/',
-    );
-    expect(screen.getByRole('link', { name: 'Open Langfuse' })).toHaveAttribute(
-      'href',
-      'https://langfuse.agenticim.xyz/',
-    );
+    expect(screen.getByRole('link', { name: 'Open Logs' })).toHaveAttribute('href', '/observability/logs');
+    expect(screen.getByRole('link', { name: 'Open Traces' })).toHaveAttribute('href', '/observability/traces');
+    expect(screen.getByRole('link', { name: 'Open Metrics' })).toHaveAttribute('href', '/observability/metrics');
+    expect(screen.getByRole('link', { name: 'Open Langfuse' })).toHaveAttribute('href', '/observability/llm');
+    expect(screen.queryByRole('link', { name: 'Open Prometheus UI' })).not.toBeInTheDocument();
   });
 
   it.each([
-    ['https://ms.agenticim.xyz/observability/traces', 'Open Tempo in Grafana'],
-    ['https://ms.agenticim.xyz/observability/metrics', 'Open Prometheus in Grafana'],
-  ])('keeps %s inside the management observability view', async (url, linkName) => {
+    ['https://ms.agenticim.xyz/observability/traces', 'Open Traces', '/observability/traces'],
+    ['https://ms.agenticim.xyz/observability/metrics', 'Open Metrics', '/observability/metrics'],
+    ['https://ms.agenticim.xyz/observability/llm', 'Open Langfuse', '/observability/llm'],
+  ])('keeps %s inside the management observability view before ingress redirect', async (url, linkName, href) => {
     setTestLocation(url);
     storeSession({
       user: {
@@ -573,10 +563,7 @@ describe('Auth flow', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Observability' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: linkName })).toHaveAttribute(
-      'href',
-      expect.stringContaining('grafana.agenticim.xyz/explore'),
-    );
+    expect(screen.getByRole('link', { name: linkName })).toHaveAttribute('href', href);
   });
 
   it('labels management system user result columns with headers', async () => {
