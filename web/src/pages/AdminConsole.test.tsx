@@ -365,7 +365,7 @@ describe('AdminConsole', () => {
     const feedbackTable = await screen.findByRole('table', { name: 'Feedback list' });
     expect(within(feedbackTable).getByText('消息发送失败')).toBeInTheDocument();
     expect(within(feedbackTable).getByText('bug')).toBeInTheDocument();
-    expect(within(feedbackTable).getByText('new')).toBeInTheDocument();
+    expect(within(feedbackTable).getByText('New')).toBeInTheDocument();
 
     await user.click(within(feedbackTable).getByRole('button', { name: 'Open feedback fb_1' }));
     expect(await screen.findByRole('heading', { name: '消息发送失败' })).toBeInTheDocument();
@@ -375,6 +375,35 @@ describe('AdminConsole', () => {
 
     await waitFor(() => expect(adminApi.updateFeedback).toHaveBeenCalledWith('fb_1', { status: 'triaged', adminNote: '已分派' }));
     expect(await screen.findByRole('status')).toHaveTextContent('反馈已更新');
+  });
+
+  it('shows a polished empty feedback state without treating empty data as an error', async () => {
+    const user = userEvent.setup();
+    const adminApi = createAdminApi({
+      listFeedback: vi.fn(async () => ({ items: [] })),
+    });
+
+    render(<AdminConsole adminApi={adminApi} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Feedback' }));
+
+    await waitFor(() => expect(adminApi.listFeedback).toHaveBeenCalledWith({ status: 'new' }));
+    expect(screen.getByLabelText('Feedback status')).toHaveClass('admin-select-control');
+    const emptyState = await screen.findByRole('region', { name: 'Empty feedback state' });
+    expect(within(emptyState).getByText('No feedback yet')).toBeInTheDocument();
+    expect(within(emptyState).getByText('没有反馈')).toBeInTheDocument();
+    expect(screen.queryByText('Could not load feedback')).not.toBeInTheDocument();
+  });
+
+  it('opens feedback directly for the /admin/feedback SPA route', async () => {
+    window.history.pushState({}, '', '/admin/feedback');
+    const adminApi = createAdminApi();
+
+    render(<AdminConsole adminApi={adminApi} />);
+
+    expect(await screen.findByRole('heading', { name: 'Feedback' })).toBeInTheDocument();
+    await waitFor(() => expect(adminApi.listFeedback).toHaveBeenCalledWith({ status: 'new' }));
+    window.history.pushState({}, '', '/');
   });
 
   it('does not render user mutation or impersonated send controls', async () => {

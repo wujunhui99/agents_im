@@ -214,6 +214,8 @@ export type AdminApi = {
 };
 
 export function createAdminApi(api: ApiClient = createApiClient()): AdminApi {
+  const feedbackBasePath = '/api/admin/feedback';
+
   return {
     getDashboard() {
       return api.get<AdminDashboard>('/admin/dashboard');
@@ -249,13 +251,13 @@ export function createAdminApi(api: ApiClient = createApiClient()): AdminApi {
       if (request.limit !== undefined) params.set('limit', String(request.limit));
       if (request.offset !== undefined) params.set('offset', String(request.offset));
       const query = params.toString();
-      return api.get<AdminFeedbackListResponse>(`/admin/feedback${query ? `?${query}` : ''}`);
+      return api.get<AdminFeedbackListResponse>(`${feedbackBasePath}${query ? `?${query}` : ''}`);
     },
     getFeedback(feedbackId) {
-      return api.get<AdminFeedbackDetailResponse>(`/admin/feedback/${encodeURIComponent(feedbackId)}`);
+      return api.get<AdminFeedbackDetailResponse>(`${feedbackBasePath}/${encodeURIComponent(feedbackId)}`);
     },
     updateFeedback(feedbackId, request) {
-      return api.patch<AdminFeedbackDetailResponse>(`/admin/feedback/${encodeURIComponent(feedbackId)}`, request);
+      return api.patch<AdminFeedbackDetailResponse>(`${feedbackBasePath}/${encodeURIComponent(feedbackId)}`, request);
     },
   };
 }

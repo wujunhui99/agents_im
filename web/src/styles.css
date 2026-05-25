@@ -307,12 +307,21 @@ time {
 }
 
 .md-top-app-bar h1 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   color: var(--md-sys-color-on-surface);
   font-size: var(--md-type-title-large);
   font-weight: 700;
   line-height: var(--md-line-height-tight);
   letter-spacing: 0;
+}
+
+.md-top-app-bar-navigation {
+  display: flex;
+  align-items: center;
+  margin-left: -8px;
+  margin-right: 4px;
 }
 
 .md-top-app-bar-actions {
@@ -2256,6 +2265,44 @@ button.md-list-item:hover,
   background: #ffffff;
 }
 
+.admin-inline-form select,
+.admin-inline-form textarea,
+.admin-select-control,
+.admin-textarea-field textarea {
+  min-height: 42px;
+  border: 1px solid #a7b0bf;
+  border-radius: 8px;
+  padding: 0 12px;
+  font: inherit;
+  color: #1f2933;
+  background: #ffffff;
+}
+
+.admin-inline-form textarea,
+.admin-textarea-field textarea {
+  min-height: 112px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.admin-select-control {
+  appearance: none;
+  padding-right: 38px;
+  background:
+    linear-gradient(45deg, transparent 50%, #52606d 50%) calc(100% - 20px) 50% / 6px 6px no-repeat,
+    linear-gradient(135deg, #52606d 50%, transparent 50%) calc(100% - 14px) 50% / 6px 6px no-repeat,
+    #ffffff;
+}
+
+.admin-select-control:focus,
+.admin-textarea-field textarea:focus,
+.admin-inline-form input:focus,
+.admin-inline-form select:focus,
+.admin-inline-form textarea:focus {
+  outline: 3px solid rgba(23, 107, 77, 0.18);
+  border-color: #176b4d;
+}
+
 .admin-primary-button,
 .admin-secondary-button {
   min-height: 42px;
@@ -2384,6 +2431,118 @@ button.md-list-item:hover,
   gap: 10px;
 }
 
+.admin-feedback-page {
+  gap: 18px;
+}
+
+.admin-feedback-toolbar,
+.admin-feedback-update-form {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+  padding: 14px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.admin-feedback-update-form {
+  align-items: stretch;
+}
+
+.admin-select-field,
+.admin-textarea-field {
+  display: grid;
+  gap: 7px;
+  min-width: min(360px, 100%);
+  color: #344054;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.admin-select-field > span,
+.admin-textarea-field > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-row-feedback {
+  grid-template-columns: minmax(0, 1.4fr) minmax(110px, 0.5fr) minmax(110px, 0.45fr) minmax(0, 0.8fr) minmax(0, 0.9fr);
+}
+
+.admin-status-pill {
+  width: fit-content;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #eef4f8;
+  color: #344054;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.admin-status-new {
+  background: #e7f5ee;
+  color: #0f6b45;
+}
+
+.admin-status-triaged,
+.admin-status-planned {
+  background: #eef4ff;
+  color: #314b7d;
+}
+
+.admin-status-resolved {
+  background: #ecfdf3;
+  color: #087443;
+}
+
+.admin-status-rejected {
+  background: #fff1f1;
+  color: #9b1c1c;
+}
+
+.admin-feedback-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+}
+
+.admin-feedback-empty svg {
+  color: #0f6b45;
+}
+
+.admin-feedback-empty h3,
+.admin-feedback-empty p,
+.admin-feedback-content {
+  margin: 0;
+}
+
+.admin-feedback-empty h3 {
+  color: #1f2933;
+  font-size: 1rem;
+}
+
+.admin-feedback-detail {
+  gap: 14px;
+}
+
+.admin-feedback-detail-header {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-feedback-content {
+  color: #344054;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
 .admin-definition-grid {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr);
@@ -2428,7 +2587,8 @@ button.md-list-item:hover,
   .admin-row-static,
   .admin-table-header,
   .admin-row-conversation,
-  .admin-row-user {
+  .admin-row-user,
+  .admin-row-feedback {
     grid-template-columns: 1fr;
   }
 }
