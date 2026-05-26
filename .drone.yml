@@ -180,20 +180,12 @@ steps:
         from_secret: ghcr_username
       GHCR_TOKEN:
         from_secret: ghcr_token
-      DRONE_DEPLOY_LOCAL: "1"
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
     commands:
-      - sh -c 'test -f .drone-deploy.env || (apk add --no-cache bash python3 && bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env); if ! grep -q "^deploy_required=true$" .drone-deploy.env; then echo "No deployment required."; exit 0; fi; apk add --no-cache bash python3 openssh-client tar curl docker-cli docker-cli-compose postgresql-client; curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl; chmod +x /usr/local/bin/kubectl; mkdir -p /etc/rancher/k3s; cp /host/etc/rancher/k3s/k3s.yaml /etc/rancher/k3s/k3s.yaml; kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config set-cluster default --server=https://host.docker.internal:6443 --insecure-skip-tls-verify=true; kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml config unset clusters.default.certificate-authority-data || true; bash scripts/ci/drone-deploy.sh'
-    extra_hosts:
-      - host.docker.internal:host-gateway
-    volumes:
-      - name: docker_sock
-        path: /var/run/docker.sock
-      - name: host_opt_agents_im
-        path: /opt/agents-im
-      - name: host_k3s_config
-        path: /host/etc/rancher/k3s
-        read_only: true
+      - test -f .drone-deploy.env || (apk add --no-cache bash python3 && bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env)
+      - if ! grep -q "^deploy_required=true$" .drone-deploy.env; then echo "No deployment required."; exit 0; fi
+      - apk add --no-cache bash openssh-client tar
+      - bash scripts/ci/drone-deploy.sh
 
   - name: notify telegram
     image: python:3.12-alpine

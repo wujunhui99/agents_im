@@ -36,7 +36,17 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
 
   cd /opt/agents-im/repo
 
-  if [[ "${config_only}" != "true" ]]; then
+  skip_migrations=true
+  if [[ "${migration_required:-false}" == "true" ]]; then
+    skip_migrations=false
+  fi
+
+  skip_middleware=true
+  if [[ "${skip_migrations}" != "true" ]]; then
+    skip_middleware=false
+  fi
+
+  if [[ "${skip_migrations}" != "true" ]]; then
     migration_network="${DRONE_LOCAL_MIGRATION_NETWORK:-middleware_default}"
     migration_host="${DRONE_LOCAL_MIGRATION_HOST:-postgres}"
     migration_port="${DRONE_LOCAL_MIGRATION_PORT:-5432}"
@@ -62,7 +72,7 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
       postgres:16-alpine \
       sh -lc 'apk add --no-cache bash coreutils >/dev/null && bash scripts/migrate-postgres.sh --host-psql'
   else
-    echo "Skipping database migrations for config-only deployment."
+    echo "Skipping database migrations: migration_required=${migration_required:-false}."
   fi
 
   IMAGE_REGISTRY="${registry}" \
@@ -71,7 +81,7 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
     GHCR_TOKEN="${GHCR_TOKEN}" \
     KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}" \
     SKIP_SET_IMAGE="${skip_set_image}" \
-    SKIP_MIDDLEWARE="${config_only}" \
+    SKIP_MIDDLEWARE="${skip_middleware}" \
     SKIP_MIGRATIONS="true" \
     IMAGE_SERVICES="${image_services_space}" \
     ROLLOUT_SERVICES="${rollout_services}" \
@@ -123,8 +133,13 @@ remote_cmd+=" GHCR_USERNAME=$(q "${GHCR_USERNAME}")"
 remote_cmd+=" GHCR_TOKEN=$(q "${GHCR_TOKEN}")"
 remote_cmd+=" DATABASE_URL=$(q "${DATABASE_URL:-}")"
 remote_cmd+=" SKIP_SET_IMAGE=$(q "${skip_set_image}")"
-remote_cmd+=" SKIP_MIDDLEWARE=$(q "${config_only}")"
-remote_cmd+=" SKIP_MIGRATIONS=$(q "${config_only}")"
+skip_migrations=true
+if [[ "${migration_required:-false}" == "true" ]]; then
+  skip_migrations=false
+fi
+
+remote_cmd+=" SKIP_MIDDLEWARE=$(q "${skip_migrations}")"
+remote_cmd+=" SKIP_MIGRATIONS=$(q "${skip_migrations}")"
 remote_cmd+=" IMAGE_SERVICES=$(q "${image_services_space}")"
 remote_cmd+=" ROLLOUT_SERVICES=$(q "${rollout_services}")"
 remote_cmd+=" RESTART_SERVICES=$(q "${restart_services}")"
