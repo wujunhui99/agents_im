@@ -18,6 +18,7 @@
 - 真实 provider API key（例如 DeepSeek/OpenAI/Anthropic 的 `sk-...`）不得出现在任何 tracked source、docs、example、CI 配置、执行计划或命令记录中；示例只能使用明显占位符。
 - `scripts/verify-static.sh` 会扫描 tracked files 中的 real-looking `sk-...` 和 provider key assignment；发现后必须失败，不能把“已脱敏命令示例”写成真实 key。
 - 生产部署 secret 只保存在服务器/k3s 或 Drone repository secrets 中；`deploy/middleware/.env.example` 与 `deploy/k8s/secrets.example.yaml` 只能保留占位示例。
+- 仓库根目录 `secret/` 仅用于 operator-local 便捷文件：真实内容被 Git ignore，tracked 文件只能是 `.gitignore`、`README.md` 和 `*.example` 占位模板；不得把真实 token、密码、私钥、DSN、server host/user/port 或 k8s 凭据提交进仓库。
 - Drone deploy pipeline 使用 `ghcr_token` 推送 GHCR 镜像和刷新服务器侧 `ghcr-pull-secret`，不得把真实 token 写入仓库或日志；文档和示例命令中必须用 `***` 或 `[REDACTED]` 占位。
 - 日志中不得记录明文 token、密码或敏感个人信息。
 - Trace/span/log 属性不得记录 raw query string、Authorization/JWT/cookie、密码、DSN、API key、presigned URL、请求/响应 body 或消息正文。
