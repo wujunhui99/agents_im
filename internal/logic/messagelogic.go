@@ -42,12 +42,13 @@ func (f MessageCreatedHookFunc) OnMessageCreated(ctx context.Context, input Mess
 }
 
 type MessageCreatedHookInput struct {
-	EventID          string
-	OperationID      string
-	TraceID          string
-	Message          Message
-	Deduplicated     bool
-	RecipientUserIDs []string
+	EventID               string
+	OperationID           string
+	TraceID               string
+	Message               Message
+	Deduplicated          bool
+	RecipientUserIDs      []string
+	TargetAgentAccountIDs []string
 }
 
 type MessageLogic struct {
