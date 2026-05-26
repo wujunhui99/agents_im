@@ -9,3 +9,9 @@ web/coverage/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Local-only operator secrets. Track only guard/template files; never real values.
+/secret/*
+!/secret/.gitignore
+!/secret/README.md
+!/secret/*.example
