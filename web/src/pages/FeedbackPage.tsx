@@ -1,12 +1,15 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { CircleHelp, ImagePlus, Lightbulb, MessageSquareWarning, Sparkles, type LucideIcon } from 'lucide-react';
 import type { SubmitFeedbackRequest } from '../api/feedback';
+import { createMediaApi, uploadMediaBytes, type MediaApi } from '../api/media';
 import { Button } from '../components/ui/Button';
 import { ListCard } from '../components/ui/ListCard';
 import { TextField } from '../components/ui/TextField';
 
 type FeedbackPageProps = {
   onSubmitFeedback?: (request: SubmitFeedbackRequest) => Promise<void>;
+  mediaApi?: MediaApi;
+  uploadFetch?: typeof fetch;
 };
 
 type FeedbackDraft = {
@@ -21,6 +24,13 @@ type FeedbackCategoryOption = {
   label: string;
   helper: string;
   icon: LucideIcon;
+};
+
+type UploadedFeedbackAttachment = {
+  mediaId: string;
+  filename: string;
+  sizeBytes: number;
+  contentType: string;
 };
 
 const feedbackCategories: FeedbackCategoryOption[] = [
@@ -54,7 +64,7 @@ function defaultFeedbackDraft(): FeedbackDraft {
   return { category: 'bug', title: '', content: '', contact: '' };
 }
 
-export function FeedbackPage({ onSubmitFeedback }: FeedbackPageProps) {
+export function FeedbackPage({ onSubmitFeedback, mediaApi = createMediaApi(), uploadFetch = fetch }: FeedbackPageProps) {
   const [feedbackDraft, setFeedbackDraft] = useState<FeedbackDraft>(() => defaultFeedbackDraft());
   const [feedbackStatus, setFeedbackStatus] = useState('');
   const [feedbackError, setFeedbackError] = useState('');
@@ -67,6 +77,28 @@ export function FeedbackPage({ onSubmitFeedback }: FeedbackPageProps) {
     setFeedbackAttachments(files.slice(0, 4));
   }
 
+  async function uploadFeedbackAttachments(): Promise<UploadedFeedbackAttachment[]> {
+    const uploaded: UploadedFeedbackAttachment[] = [];
+    for (const file of feedbackAttachments) {
+      const contentType = file.type || 'application/octet-stream';
+      const intent = await mediaApi.createUploadIntent({
+        purpose: 'message_image',
+        filename: file.name,
+        contentType,
+        sizeBytes: file.size,
+      });
+      await uploadMediaBytes(intent.uploadUrl, file, contentType, uploadFetch);
+      const completed = await mediaApi.completeUpload(intent.mediaId);
+      uploaded.push({
+        mediaId: completed.media?.mediaId ?? intent.mediaId,
+        filename: file.name,
+        sizeBytes: file.size,
+        contentType,
+      });
+    }
+    return uploaded;
+  }
+
   async function handleFeedbackSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedbackStatus('');
@@ -77,6 +109,7 @@ export function FeedbackPage({ onSubmitFeedback }: FeedbackPageProps) {
     }
     setFeedbackSubmitting(true);
     try {
+      const uploadedAttachments = await uploadFeedbackAttachments();
       await onSubmitFeedback({
         category: feedbackDraft.category,
         title: feedbackDraft.title.trim(),
@@ -87,7 +120,8 @@ export function FeedbackPage({ onSubmitFeedback }: FeedbackPageProps) {
         clientMeta: {
           attachmentFileNames: feedbackAttachments.map((file) => file.name),
           attachmentCount: feedbackAttachments.length,
-          attachmentUploadStatus: 'local_selection_only',
+          attachmentUploadStatus: uploadedAttachments.length === feedbackAttachments.length ? 'uploaded' : 'none',
+          attachments: uploadedAttachments,
         },
       });
       setFeedbackDraft(defaultFeedbackDraft());
@@ -169,8 +203,7 @@ export function FeedbackPage({ onSubmitFeedback }: FeedbackPageProps) {
             </span>
             <span>
               <strong>添加截图或图片</strong>
-              <small>最多 4 张，当前版本先随反馈记录文件名</small>
-              <small>图片将在后续版本上传到反馈工单</small>
+              <small>最多 4 张，图片会随反馈上传并展示在后台</small>
             </span>
             <input
               className="sr-only"

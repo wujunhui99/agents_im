@@ -2559,6 +2559,63 @@ button.md-list-item:hover,
   overflow-wrap: anywhere;
 }
 
+.admin-feedback-attachments {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-feedback-attachments h4 {
+  margin: 0;
+  color: #1f2933;
+  font-size: 0.95rem;
+}
+
+.admin-feedback-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.admin-feedback-attachment-card {
+  min-height: 132px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 10px;
+  border: 1px solid #d9dee7;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #1f2933;
+  text-decoration: none;
+}
+
+.admin-feedback-attachment-card:hover {
+  border-color: #0f6b45;
+  box-shadow: 0 10px 24px rgba(15, 107, 69, 0.12);
+}
+
+.admin-feedback-attachment-card img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #e4e7ec;
+}
+
+.admin-feedback-attachment-card span {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #e4e7ec;
+  color: #52606d;
+}
+
+.admin-feedback-attachment-card small {
+  overflow-wrap: anywhere;
+  color: #52606d;
+}
+
 @media (max-width: 840px) {
   .admin-shell {
     grid-template-columns: 1fr;

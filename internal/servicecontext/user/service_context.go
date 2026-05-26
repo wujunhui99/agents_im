@@ -38,7 +38,7 @@ func NewServiceContextWithMedia(repo repository.Repository, mediaRepo repository
 	ctx := NewServiceContextWithAuth(repo, auth)
 	ctx.MediaRepo = mediaRepo
 	ctx.ObjectStore = objectStore
-	ctx.MediaLogic = logic.NewMediaLogic(mediaRepo, objectStore, bucket)
+	ctx.MediaLogic = logic.NewMediaLogic(mediaRepo, objectStore, bucket).WithAccountRepository(repo)
 	return ctx
 }
 

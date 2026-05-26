@@ -175,6 +175,41 @@ func TestMediaCompleteAndDownloadRequireOwnerAndObjectStat(t *testing.T) {
 	}
 }
 
+func TestAdminCanGetFeedbackAttachmentDownloadURL(t *testing.T) {
+	ctx := context.Background()
+	store := objectstorage.NewMemoryStore()
+	mediaRepo := repository.NewMemoryMediaRepository()
+	accountRepo := repository.NewMemoryRepository()
+	if _, err := accountRepo.Create(ctx, model.User{UserID: "usr_admin", Identifier: "admin-feedback-media", AccountType: model.AccountTypeAdmin}); err != nil {
+		t.Fatalf("create admin account: %v", err)
+	}
+	mediaLogic := NewMediaLogic(mediaRepo, store, "agents-im-media").WithAccountRepository(accountRepo)
+	image := createMediaForTest(t, mediaRepo, model.MediaObject{
+		MediaID:          "med_feedback_image_ready",
+		OwnerUserID:      "usr_feedback_owner",
+		Bucket:           "agents-im-media",
+		ObjectKey:        "users/usr_feedback_owner/media/med_feedback_image_ready/screenshot.jpg",
+		ContentType:      "image/jpeg",
+		SizeBytes:        1024,
+		OriginalFilename: "screenshot.jpg",
+		Purpose:          model.MediaPurposeMessageImage,
+		Status:           model.MediaStatusReady,
+	})
+	store.PutObjectInfo(objectstorage.ObjectInfo{ObjectKey: image.ObjectKey, ContentType: image.ContentType, SizeBytes: image.SizeBytes})
+
+	download, err := mediaLogic.GetDownloadURL(ctx, GetMediaDownloadURLRequest{
+		OwnerUserID:     "usr_feedback_owner",
+		RequesterUserID: "usr_admin",
+		MediaID:         image.MediaID,
+	})
+	if err != nil {
+		t.Fatalf("admin get feedback attachment download URL: %v", err)
+	}
+	if download.DownloadURL == "" || download.ExpiresAt == 0 {
+		t.Fatalf("missing admin download URL fields: %+v", download)
+	}
+}
+
 func TestMessageParticipantCanGetMediaDownloadURL(t *testing.T) {
 	ctx := context.Background()
 	store := objectstorage.NewMemoryStore()
