@@ -452,6 +452,16 @@ func addAdminRoutes(server *rest.Server, serverCtx *adminsvc.ServiceContext) {
 		},
 		{
 			Method:  http.MethodGet,
+			Path:    "/api/admin/task-reports",
+			Handler: adminhandler.ListTaskReportsHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/api/admin/task-reports",
+			Handler: adminhandler.IngestTaskReportHandler(serverCtx),
+		},
+		{
+			Method:  http.MethodGet,
 			Path:    "/admin/conversations/:conversation_id/messages",
 			Handler: adminhandler.GetConversationMessagesHandler(serverCtx),
 		},

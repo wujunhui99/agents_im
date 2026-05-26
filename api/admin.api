@@ -54,6 +54,47 @@ type AdminFeedbackUpdateReq {
 	AdminNote  string `json:"adminNote,optional"`
 }
 
+type AdminTaskReportListReq {
+	Outcome string `form:"outcome,optional"`
+	Limit   int64  `form:"limit,optional"`
+	Offset  int64  `form:"offset,optional"`
+}
+
+type AdminTaskReportIssue {
+	Number int64  `json:"number,optional"`
+	URL    string `json:"url,optional"`
+}
+
+type AdminTaskReportPermissionAnalysis {
+	WouldMorePermissionHelp string   `json:"would_more_permission_help,optional"`
+	CandidatePermissions    []string `json:"candidate_permissions,optional"`
+	Reason                  string   `json:"reason,optional"`
+}
+
+type AdminTaskReportIngestReq {
+	TaskID             string                            `json:"task_id"`
+	Agent              string                            `json:"agent"`
+	CodexSessionID     string                            `json:"codex_session_id,optional"`
+	Issue              AdminTaskReportIssue              `json:"issue,optional"`
+	Repo               string                            `json:"repo"`
+	Branch             string                            `json:"branch,optional"`
+	Worktree           string                            `json:"worktree,optional"`
+	Commit             string                            `json:"commit,optional"`
+	Outcome            string                            `json:"outcome"`
+	StartedAt          string                            `json:"started_at,optional"`
+	EndedAt            string                            `json:"ended_at,optional"`
+	DurationSeconds    int64                             `json:"duration_seconds,optional"`
+	TokensUsed         int64                             `json:"tokens_used,optional"`
+	PRURL              string                            `json:"pr_url,optional"`
+	Evidence           []string                          `json:"evidence,optional"`
+	Blockers           []string                          `json:"blockers,optional"`
+	MajorTimeSinks     []string                          `json:"major_time_sinks,optional"`
+	PermissionAnalysis AdminTaskReportPermissionAnalysis `json:"permission_analysis,optional"`
+	PitfallsOrLessons  []string                          `json:"pitfalls_or_lessons,optional"`
+	Notes              string                            `json:"notes,optional"`
+	RecordedAt         string                            `json:"recorded_at,optional"`
+}
+
 type AdminDashboardTotals {
 	Users         int64 `json:"users"`
 	Conversations int64 `json:"conversations"`
@@ -193,6 +234,33 @@ type AdminFeedback {
 	UpdatedAt  string         `json:"updatedAt"`
 }
 
+type AdminTaskReport {
+	TaskID                  string   `json:"taskId"`
+	Agent                   string   `json:"agent"`
+	CodexSessionID          string   `json:"codexSessionId,optional"`
+	IssueNumber             int64    `json:"issueNumber,optional"`
+	IssueURL                string   `json:"issueUrl,optional"`
+	Repo                    string   `json:"repo"`
+	Branch                  string   `json:"branch,optional"`
+	Worktree                string   `json:"worktree,optional"`
+	Commit                  string   `json:"commit,optional"`
+	Outcome                 string   `json:"outcome"`
+	StartedAt               string   `json:"startedAt,optional"`
+	EndedAt                 string   `json:"endedAt,optional"`
+	DurationSeconds         int64    `json:"durationSeconds,optional"`
+	TokensUsed              int64    `json:"tokensUsed,optional"`
+	PRURL                   string   `json:"prUrl,optional"`
+	Evidence                []string `json:"evidence"`
+	Blockers                []string `json:"blockers"`
+	MajorTimeSinks          []string `json:"majorTimeSinks"`
+	WouldMorePermissionHelp string   `json:"wouldMorePermissionHelp,optional"`
+	CandidatePermissions    []string `json:"candidatePermissions"`
+	PermissionReason        string   `json:"permissionReason,optional"`
+	PitfallsOrLessons       []string `json:"pitfallsOrLessons"`
+	Notes                   string   `json:"notes,optional"`
+	RecordedAt              string   `json:"recordedAt"`
+}
+
 type AdminDashboardData {
 	Totals              AdminDashboardTotals `json:"totals"`
 	RecentTraces        []AdminLLMTrace      `json:"recentTraces"`
@@ -239,6 +307,14 @@ type AdminFeedbackListData {
 
 type AdminFeedbackDetailData {
 	Feedback AdminFeedback `json:"feedback"`
+}
+
+type AdminTaskReportListData {
+	Items []AdminTaskReport `json:"items"`
+}
+
+type AdminTaskReportDetailData {
+	Report AdminTaskReport `json:"report"`
 }
 
 type AdminDashboardResp {
@@ -301,6 +377,18 @@ type AdminFeedbackDetailResp {
 	Data    AdminFeedbackDetailData `json:"data"`
 }
 
+type AdminTaskReportListResp {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    AdminTaskReportListData `json:"data"`
+}
+
+type AdminTaskReportDetailResp {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    AdminTaskReportDetailData `json:"data"`
+}
+
 @server (
 	jwt:   Auth
 	group: admin
@@ -323,6 +411,12 @@ service admin-api {
 
 	@handler adminUpdateFeedback
 	patch /api/admin/feedback/:feedback_id (AdminFeedbackUpdateReq) returns (AdminFeedbackDetailResp)
+
+	@handler adminListTaskReports
+	get /api/admin/task-reports (AdminTaskReportListReq) returns (AdminTaskReportListResp)
+
+	@handler adminIngestTaskReport
+	post /api/admin/task-reports (AdminTaskReportIngestReq) returns (AdminTaskReportDetailResp)
 
 	@handler adminGetConversationMessages
 	get /admin/conversations/:conversation_id/messages (AdminConversationMessagesReq) returns (AdminConversationMessagesResp)

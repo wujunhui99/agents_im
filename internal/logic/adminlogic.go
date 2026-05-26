@@ -21,6 +21,7 @@ type AdminLogicConfig struct {
 	Messages    repository.AdminMessageRepository
 	AgentAudits repository.AdminAgentAuditRepository
 	Feedback    repository.FeedbackRepository
+	TaskReports repository.TaskReportRepository
 }
 
 type AdminLogic struct {
@@ -29,6 +30,7 @@ type AdminLogic struct {
 	messages    repository.AdminMessageRepository
 	agentAudits repository.AdminAgentAuditRepository
 	feedback    repository.FeedbackRepository
+	taskReports repository.TaskReportRepository
 }
 
 type AdminDashboardRequest struct {
@@ -196,6 +198,51 @@ type AdminFeedback struct {
 	UpdatedAt  string         `json:"updatedAt"`
 }
 
+type AdminTaskReportListRequest struct {
+	Outcome string
+	Limit   int
+	Offset  int
+}
+
+type AdminTaskReportUpsertRequest struct {
+	Report AdminTaskReport
+}
+
+type AdminTaskReportListResponse struct {
+	Items []AdminTaskReport `json:"items"`
+}
+
+type AdminTaskReportDetailResponse struct {
+	Report AdminTaskReport `json:"report"`
+}
+
+type AdminTaskReport struct {
+	TaskID                  string   `json:"taskId"`
+	Agent                   string   `json:"agent"`
+	CodexSessionID          string   `json:"codexSessionId,omitempty"`
+	IssueNumber             int64    `json:"issueNumber,omitempty"`
+	IssueURL                string   `json:"issueUrl,omitempty"`
+	Repo                    string   `json:"repo"`
+	Branch                  string   `json:"branch,omitempty"`
+	Worktree                string   `json:"worktree,omitempty"`
+	Commit                  string   `json:"commit,omitempty"`
+	Outcome                 string   `json:"outcome"`
+	StartedAt               string   `json:"startedAt,omitempty"`
+	EndedAt                 string   `json:"endedAt,omitempty"`
+	DurationSeconds         int64    `json:"durationSeconds,omitempty"`
+	TokensUsed              int64    `json:"tokensUsed,omitempty"`
+	PRURL                   string   `json:"prUrl,omitempty"`
+	Evidence                []string `json:"evidence"`
+	Blockers                []string `json:"blockers"`
+	MajorTimeSinks          []string `json:"majorTimeSinks"`
+	WouldMorePermissionHelp string   `json:"wouldMorePermissionHelp,omitempty"`
+	CandidatePermissions    []string `json:"candidatePermissions"`
+	PermissionReason        string   `json:"permissionReason,omitempty"`
+	PitfallsOrLessons       []string `json:"pitfallsOrLessons"`
+	Notes                   string   `json:"notes,omitempty"`
+	RecordedAt              string   `json:"recordedAt"`
+}
+
 type AdminLLMTraceListRequest struct {
 	Status string
 	Limit  int
@@ -285,6 +332,7 @@ func NewAdminLogic(config AdminLogicConfig) *AdminLogic {
 		messages:    config.Messages,
 		agentAudits: config.AgentAudits,
 		feedback:    config.Feedback,
+		taskReports: config.TaskReports,
 	}
 }
 
@@ -733,6 +781,94 @@ func adminFeedback(feedback model.Feedback) AdminFeedback {
 		AdminNote:  feedback.AdminNote,
 		CreatedAt:  formatAdminTime(feedback.CreatedAt),
 		UpdatedAt:  formatAdminTime(feedback.UpdatedAt),
+	}
+}
+
+func (l *AdminLogic) ListTaskReports(ctx context.Context, req AdminTaskReportListRequest) (AdminTaskReportListResponse, error) {
+	if l == nil || l.taskReports == nil {
+		return AdminTaskReportListResponse{}, apperror.Internal("task report repository is not configured")
+	}
+	reports, err := l.taskReports.ListTaskReports(ctx, repository.TaskReportListFilter{
+		Outcome: strings.TrimSpace(req.Outcome),
+		Limit:   normalizeAdminLogicLimit(req.Limit, 50, 200),
+		Offset:  req.Offset,
+	})
+	if err != nil {
+		return AdminTaskReportListResponse{}, err
+	}
+	items := make([]AdminTaskReport, 0, len(reports))
+	for _, report := range reports {
+		items = append(items, adminTaskReportFromRepository(report))
+	}
+	return AdminTaskReportListResponse{Items: items}, nil
+}
+
+func (l *AdminLogic) UpsertTaskReport(ctx context.Context, req AdminTaskReportUpsertRequest) (AdminTaskReportDetailResponse, error) {
+	if l == nil || l.taskReports == nil {
+		return AdminTaskReportDetailResponse{}, apperror.Internal("task report repository is not configured")
+	}
+	report, err := l.taskReports.UpsertTaskReport(ctx, adminTaskReportToRepository(req.Report))
+	if err != nil {
+		return AdminTaskReportDetailResponse{}, err
+	}
+	return AdminTaskReportDetailResponse{Report: adminTaskReportFromRepository(report)}, nil
+}
+
+func adminTaskReportFromRepository(report repository.TaskReport) AdminTaskReport {
+	return AdminTaskReport{
+		TaskID:                  report.TaskID,
+		Agent:                   report.Agent,
+		CodexSessionID:          report.CodexSessionID,
+		IssueNumber:             report.IssueNumber,
+		IssueURL:                report.IssueURL,
+		Repo:                    report.Repo,
+		Branch:                  report.Branch,
+		Worktree:                report.Worktree,
+		Commit:                  report.Commit,
+		Outcome:                 report.Outcome,
+		StartedAt:               report.StartedAt,
+		EndedAt:                 report.EndedAt,
+		DurationSeconds:         report.DurationSeconds,
+		TokensUsed:              report.TokensUsed,
+		PRURL:                   report.PRURL,
+		Evidence:                report.Evidence,
+		Blockers:                report.Blockers,
+		MajorTimeSinks:          report.MajorTimeSinks,
+		WouldMorePermissionHelp: report.WouldMorePermissionHelp,
+		CandidatePermissions:    report.CandidatePermissions,
+		PermissionReason:        report.PermissionReason,
+		PitfallsOrLessons:       report.PitfallsOrLessons,
+		Notes:                   report.Notes,
+		RecordedAt:              report.RecordedAt,
+	}
+}
+
+func adminTaskReportToRepository(report AdminTaskReport) repository.TaskReport {
+	return repository.TaskReport{
+		TaskID:                  strings.TrimSpace(report.TaskID),
+		Agent:                   strings.TrimSpace(report.Agent),
+		CodexSessionID:          strings.TrimSpace(report.CodexSessionID),
+		IssueNumber:             report.IssueNumber,
+		IssueURL:                strings.TrimSpace(report.IssueURL),
+		Repo:                    strings.TrimSpace(report.Repo),
+		Branch:                  strings.TrimSpace(report.Branch),
+		Worktree:                strings.TrimSpace(report.Worktree),
+		Commit:                  strings.TrimSpace(report.Commit),
+		Outcome:                 strings.TrimSpace(report.Outcome),
+		StartedAt:               strings.TrimSpace(report.StartedAt),
+		EndedAt:                 strings.TrimSpace(report.EndedAt),
+		DurationSeconds:         report.DurationSeconds,
+		TokensUsed:              report.TokensUsed,
+		PRURL:                   strings.TrimSpace(report.PRURL),
+		Evidence:                report.Evidence,
+		Blockers:                report.Blockers,
+		MajorTimeSinks:          report.MajorTimeSinks,
+		WouldMorePermissionHelp: strings.TrimSpace(report.WouldMorePermissionHelp),
+		CandidatePermissions:    report.CandidatePermissions,
+		PermissionReason:        strings.TrimSpace(report.PermissionReason),
+		PitfallsOrLessons:       report.PitfallsOrLessons,
+		Notes:                   strings.TrimSpace(report.Notes),
+		RecordedAt:              strings.TrimSpace(report.RecordedAt),
 	}
 }
 

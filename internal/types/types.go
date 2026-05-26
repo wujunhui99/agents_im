@@ -721,6 +721,47 @@ type AdminFeedbackUpdateReq struct {
 	AdminNote  string `json:"adminNote,optional"`
 }
 
+type AdminTaskReportListReq struct {
+	Outcome string `form:"outcome,optional"`
+	Limit   int64  `form:"limit,optional"`
+	Offset  int64  `form:"offset,optional"`
+}
+
+type AdminTaskReportIssue struct {
+	Number int64  `json:"number,optional"`
+	URL    string `json:"url,optional"`
+}
+
+type AdminTaskReportPermissionAnalysis struct {
+	WouldMorePermissionHelp string   `json:"would_more_permission_help,optional"`
+	CandidatePermissions    []string `json:"candidate_permissions,optional"`
+	Reason                  string   `json:"reason,optional"`
+}
+
+type AdminTaskReportIngestReq struct {
+	TaskID             string                            `json:"task_id"`
+	Agent              string                            `json:"agent"`
+	CodexSessionID     string                            `json:"codex_session_id,optional"`
+	Issue              AdminTaskReportIssue              `json:"issue,optional"`
+	Repo               string                            `json:"repo"`
+	Branch             string                            `json:"branch,optional"`
+	Worktree           string                            `json:"worktree,optional"`
+	Commit             string                            `json:"commit,optional"`
+	Outcome            string                            `json:"outcome"`
+	StartedAt          string                            `json:"started_at,optional"`
+	EndedAt            string                            `json:"ended_at,optional"`
+	DurationSeconds    int64                             `json:"duration_seconds,optional"`
+	TokensUsed         int64                             `json:"tokens_used,optional"`
+	PRURL              string                            `json:"pr_url,optional"`
+	Evidence           []string                          `json:"evidence,optional"`
+	Blockers           []string                          `json:"blockers,optional"`
+	MajorTimeSinks     []string                          `json:"major_time_sinks,optional"`
+	PermissionAnalysis AdminTaskReportPermissionAnalysis `json:"permission_analysis,optional"`
+	PitfallsOrLessons  []string                          `json:"pitfalls_or_lessons,optional"`
+	Notes              string                            `json:"notes,optional"`
+	RecordedAt         string                            `json:"recorded_at,optional"`
+}
+
 type AdminDashboardTotals struct {
 	Users         int64 `json:"users"`
 	Conversations int64 `json:"conversations"`
@@ -901,12 +942,47 @@ type AdminFeedback struct {
 	UpdatedAt  string         `json:"updatedAt"`
 }
 
+type AdminTaskReport struct {
+	TaskID                  string   `json:"taskId"`
+	Agent                   string   `json:"agent"`
+	CodexSessionID          string   `json:"codexSessionId,omitempty"`
+	IssueNumber             int64    `json:"issueNumber,omitempty"`
+	IssueURL                string   `json:"issueUrl,omitempty"`
+	Repo                    string   `json:"repo"`
+	Branch                  string   `json:"branch,omitempty"`
+	Worktree                string   `json:"worktree,omitempty"`
+	Commit                  string   `json:"commit,omitempty"`
+	Outcome                 string   `json:"outcome"`
+	StartedAt               string   `json:"startedAt,omitempty"`
+	EndedAt                 string   `json:"endedAt,omitempty"`
+	DurationSeconds         int64    `json:"durationSeconds,omitempty"`
+	TokensUsed              int64    `json:"tokensUsed,omitempty"`
+	PRURL                   string   `json:"prUrl,omitempty"`
+	Evidence                []string `json:"evidence"`
+	Blockers                []string `json:"blockers"`
+	MajorTimeSinks          []string `json:"majorTimeSinks"`
+	WouldMorePermissionHelp string   `json:"wouldMorePermissionHelp,omitempty"`
+	CandidatePermissions    []string `json:"candidatePermissions"`
+	PermissionReason        string   `json:"permissionReason,omitempty"`
+	PitfallsOrLessons       []string `json:"pitfallsOrLessons"`
+	Notes                   string   `json:"notes,omitempty"`
+	RecordedAt              string   `json:"recordedAt"`
+}
+
 type AdminFeedbackListData struct {
 	Items []AdminFeedback `json:"items"`
 }
 
 type AdminFeedbackDetailData struct {
 	Feedback AdminFeedback `json:"feedback"`
+}
+
+type AdminTaskReportListData struct {
+	Items []AdminTaskReport `json:"items"`
+}
+
+type AdminTaskReportDetailData struct {
+	Report AdminTaskReport `json:"report"`
 }
 
 type AdminDashboardResp struct {
@@ -967,4 +1043,16 @@ type AdminFeedbackDetailResp struct {
 	Code    string                  `json:"code"`
 	Message string                  `json:"message"`
 	Data    AdminFeedbackDetailData `json:"data"`
+}
+
+type AdminTaskReportListResp struct {
+	Code    string                  `json:"code"`
+	Message string                  `json:"message"`
+	Data    AdminTaskReportListData `json:"data"`
+}
+
+type AdminTaskReportDetailResp struct {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    AdminTaskReportDetailData `json:"data"`
 }
