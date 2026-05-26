@@ -8,23 +8,25 @@ import (
 )
 
 type Dependencies struct {
-	Accounts    repository.AdminAccountRepository
-	Friends     repository.FriendshipRepository
-	Messages    repository.AdminMessageRepository
-	AgentAudits repository.AdminAgentAuditRepository
-	Feedback    repository.FeedbackRepository
-	TaskReports repository.TaskReportRepository
+	Accounts           repository.AdminAccountRepository
+	Friends            repository.FriendshipRepository
+	Messages           repository.AdminMessageRepository
+	AgentAudits        repository.AdminAgentAuditRepository
+	Feedback           repository.FeedbackRepository
+	TaskReports        repository.TaskReportRepository
+	MessageCreatedHook logic.MessageCreatedHook
 }
 
 type ServiceContext struct {
 	common.AuthRuntime
-	AdminLogic  *logic.AdminLogic
-	Accounts    repository.AdminAccountRepository
-	Friends     repository.FriendshipRepository
-	Messages    repository.AdminMessageRepository
-	AgentAudits repository.AdminAgentAuditRepository
-	Feedback    repository.FeedbackRepository
-	TaskReports repository.TaskReportRepository
+	AdminLogic    *logic.AdminLogic
+	AIReplayLogic *logic.AdminAIReplayLogic
+	Accounts      repository.AdminAccountRepository
+	Friends       repository.FriendshipRepository
+	Messages      repository.AdminMessageRepository
+	AgentAudits   repository.AdminAgentAuditRepository
+	Feedback      repository.FeedbackRepository
+	TaskReports   repository.TaskReportRepository
 }
 
 func NewServiceContext(deps Dependencies) *ServiceContext {
@@ -42,11 +44,12 @@ func NewServiceContextWithAuth(deps Dependencies, auth config.JWTAuthConfig) *Se
 			Feedback:    deps.Feedback,
 			TaskReports: deps.TaskReports,
 		}),
-		Accounts:    deps.Accounts,
-		Friends:     deps.Friends,
-		Messages:    deps.Messages,
-		AgentAudits: deps.AgentAudits,
-		Feedback:    deps.Feedback,
-		TaskReports: deps.TaskReports,
+		AIReplayLogic: logic.NewAdminAIReplayLogic(deps.Messages, deps.MessageCreatedHook),
+		Accounts:      deps.Accounts,
+		Friends:       deps.Friends,
+		Messages:      deps.Messages,
+		AgentAudits:   deps.AgentAudits,
+		Feedback:      deps.Feedback,
+		TaskReports:   deps.TaskReports,
 	}
 }

@@ -471,6 +471,11 @@ func addAdminRoutes(server *rest.Server, serverCtx *adminsvc.ServiceContext) {
 			Handler: adminhandler.GetConversationMessagesHandler(serverCtx),
 		},
 		{
+			Method:  http.MethodPost,
+			Path:    "/admin/conversations/:conversation_id/messages/:server_msg_id/replay-agent",
+			Handler: adminhandler.ReplayAgentMessageHandler(serverCtx),
+		},
+		{
 			Method:  http.MethodGet,
 			Path:    "/admin/users",
 			Handler: adminhandler.SearchUsersHandler(serverCtx),
