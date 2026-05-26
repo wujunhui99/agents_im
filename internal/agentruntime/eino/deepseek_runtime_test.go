@@ -11,6 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
+	"github.com/wujunhui99/agents_im/internal/apperror"
 	"github.com/wujunhui99/agents_im/internal/config"
 	immodel "github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
@@ -271,6 +272,59 @@ func TestDeepSeekRuntimeExecutesAgentCreateWithSafeToolAlias(t *testing.T) {
 		result.ToolCalls[0].ToolName != immodel.LocalToolHandlerAgentCreate ||
 		result.ToolCalls[0].Status != "succeeded" {
 		t.Fatalf("runtime tool call result = %+v, want succeeded agent.create call", result.ToolCalls)
+	}
+}
+
+func TestDeepSeekRuntimeContinuesWhenAgentCreateRejectsUnsupportedToolName(t *testing.T) {
+	ctx := context.Background()
+	toolProvider := agentCreateToolProvider(t, ctx, runtimetools.AgentCreateHandlerFunc(func(_ context.Context, req runtimetools.AgentCreateRequest) (runtimetools.AgentCreateResponse, error) {
+		if len(req.ToolNames) != 1 || req.ToolNames[0] != "python_execute" {
+			t.Fatalf("agent.create tool names = %+v, want unsafe python alias from model", req.ToolNames)
+		}
+		return runtimetools.AgentCreateResponse{}, apperror.NotFound("tool not found")
+	}))
+	fakeModel := &scriptedToolCallingModel{
+		responses: []*schema.Message{
+			schema.AssistantMessage("", []schema.ToolCall{{
+				ID:   "call_agent_create_unsupported_tool",
+				Type: "function",
+				Function: schema.FunctionCall{
+					Name:      "agent_create",
+					Arguments: `{"name":"Python大师","description":"精通 Python 的专家","tool_names":["python_execute"]}`,
+				},
+			}}),
+			schema.AssistantMessage("我不能给新 Agent 绑定 Python 执行工具，但可以先创建不带高风险工具的专家 Agent，或请管理员配置。", nil),
+		},
+	}
+	runtime := NewDeepSeekRuntime(
+		config.DeepSeekConfig{APIKey: "test-key", BaseURL: "https://deepseek.example.invalid", Model: "deepseek-test"},
+		WithChatModelFactory(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
+			return fakeModel, nil
+		}),
+		WithToolProvider(toolProvider),
+	)
+
+	req := validPythonToolRuntimeRequest()
+	req.PromptText = "你好！"
+	req.Agent.Tools = []agentruntime.ToolRef{{
+		ToolID:          "tool_agent_create",
+		Name:            immodel.LocalToolHandlerAgentCreate,
+		ToolType:        string(immodel.AgentToolTypeLocal),
+		LocalHandlerKey: immodel.LocalToolHandlerAgentCreate,
+	}}
+	result, err := runtime.Run(ctx, req)
+	if err != nil {
+		t.Fatalf("runtime should let model recover from rejected agent.create input: %v", err)
+	}
+	if !strings.Contains(result.FinalText, "不能给新 Agent 绑定 Python") {
+		t.Fatalf("final text = %q, want model-visible tool rejection explanation", result.FinalText)
+	}
+	if len(result.ToolCalls) != 1 || result.ToolCalls[0].Status != "failed" || result.ToolCalls[0].ErrorCode != string(apperror.CodeNotFound) {
+		t.Fatalf("tool call result = %+v, want failed NOT_FOUND recorded", result.ToolCalls)
+	}
+	secondInput := fakeModel.inputs[1]
+	if got := secondInput[len(secondInput)-1]; got.Role != schema.Tool || !strings.Contains(got.Content, "tool not found") {
+		t.Fatalf("second model input missing recoverable tool error: %+v", got)
 	}
 }
 

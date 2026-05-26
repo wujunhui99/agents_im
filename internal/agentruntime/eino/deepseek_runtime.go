@@ -293,9 +293,20 @@ func executeRuntimeToolCall(
 	})
 	result.DurationMs = time.Since(startedAt).Milliseconds()
 	if err != nil {
-		result.ErrorCode = string(apperror.From(err).Code)
+		appErr := apperror.From(err)
+		result.ErrorCode = string(appErr.Code)
 		result.ErrorMessage = err.Error()
 		observability.RecordSpanError(span, err)
+		if isRecoverableToolInputError(appErr) {
+			content, marshalErr := json.Marshal(map[string]string{
+				"error_code":    string(appErr.Code),
+				"error_message": appErr.Message,
+			})
+			if marshalErr != nil {
+				return nil, result, marshalErr
+			}
+			return schema.ToolMessage(string(content), call.ID, schema.WithToolName(toolName)), result, nil
+		}
 		return nil, result, err
 	}
 	result.Status = "succeeded"
@@ -307,6 +318,18 @@ func executeRuntimeToolCall(
 		content = "{}"
 	}
 	return schema.ToolMessage(content, call.ID, schema.WithToolName(toolName)), result, nil
+}
+
+func isRecoverableToolInputError(err *apperror.Error) bool {
+	if err == nil {
+		return false
+	}
+	switch err.Code {
+	case apperror.CodeInvalidArgument, apperror.CodeForbidden, apperror.CodeNotFound:
+		return true
+	default:
+		return false
+	}
 }
 
 func toolInfosFromResolvedTools(resolvedTools []runtimetools.ResolvedTool) ([]*schema.ToolInfo, error) {
