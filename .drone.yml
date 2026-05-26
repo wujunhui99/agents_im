@@ -75,7 +75,7 @@ steps:
       GHCR_TOKEN:
         from_secret: ghcr_token
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
-      DRONE_IMAGE_BUILD_PARALLELISM: "6"
+      DRONE_IMAGE_BUILD_PARALLELISM: "3"
       DRONE_EXPORT_BACKEND_CACHE: "false"
       DRONE_EXPORT_WEB_CACHE: "true"
       DRONE_IMAGE_BUILD_FORCE_ALL: "true"
@@ -151,7 +151,7 @@ steps:
       GHCR_TOKEN:
         from_secret: ghcr_token
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
-      DRONE_IMAGE_BUILD_PARALLELISM: "6"
+      DRONE_IMAGE_BUILD_PARALLELISM: "3"
       DRONE_EXPORT_BACKEND_CACHE: "false"
       DRONE_EXPORT_WEB_CACHE: "true"
     commands:
