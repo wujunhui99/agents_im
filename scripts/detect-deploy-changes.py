@@ -107,6 +107,7 @@ class DeploySelection:
         self.image_services: set[str] = set()
         self.rollout_services: set[str] = set()
         self.restart_services: set[str] = set()
+        self.migration_required = False
 
     def add_backend(self, service: str) -> None:
         self.backend_services.add(service)
@@ -140,6 +141,9 @@ class DeploySelection:
     def add_rollouts(self, services: list[str], *, restart: bool = True) -> None:
         for service in services:
             self.add_rollout(service, restart=restart)
+
+    def require_migration(self) -> None:
+        self.migration_required = True
 
 
 def normalize_path(path: str) -> str:
@@ -277,7 +281,12 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         selection.add_all_backends()
         return
 
-    if path.startswith("db/") or path == "scripts/migrate-postgres.sh":
+    if path.startswith("db/migrations/") or path == "scripts/migrate-postgres.sh":
+        selection.require_migration()
+        selection.add_all_backends()
+        return
+
+    if path.startswith("db/"):
         selection.add_all_backends()
         return
 
@@ -316,6 +325,7 @@ def build_outputs(selection: DeploySelection) -> dict[str, str]:
         "image_services_space": shell_value(" ".join(image_services)),
         "rollout_services": shell_value(" ".join(rollout_services)),
         "restart_services": shell_value(" ".join(restart_services)),
+        "migration_required": str(selection.migration_required).lower(),
     }
 
 
@@ -328,6 +338,7 @@ def detect(event_name: str, ref: str, paths: list[str]) -> dict[str, str]:
     if event_name == "workflow_dispatch":
         selection.add_all_backends()
         selection.add_web()
+        selection.require_migration()
         return build_outputs(selection)
 
     if ref == "refs/heads/devops" and any(
