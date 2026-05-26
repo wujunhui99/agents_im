@@ -4,7 +4,7 @@
 
 ## 背景
 
-Redis presence 和 WebSocket Gateway server 正在其他分支并行推进。当前分支只建立仓库级 CI 护栏，确保后续并行开发在合入 `develop` 前至少通过 go-zero API、Go 格式、单元测试、静态约束和 Compose 配置检查。
+Redis presence 和 WebSocket Gateway server 正在其他分支并行推进。当前分支只建立仓库级 CI 护栏，确保后续并行开发在进入 GitHub Merge Queue 前至少通过 go-zero API、Go 格式、单元测试、静态约束和 Compose 配置检查。
 
 ## 目标
 

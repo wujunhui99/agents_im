@@ -58,23 +58,42 @@ class DroneTelegramNotifyAttributionTest(unittest.TestCase):
         self.assertIn("Attribution: branch", result.stdout)
         self.assertNotIn("Attribution mismatch", result.stdout)
 
-    def test_main_push_notification_routes_to_eino_release_owner(self) -> None:
+    def test_main_push_notification_routes_to_merged_feature_agent(self) -> None:
         result = self.run_notify(
             DRONE_BUILD_EVENT="push",
             DRONE_SOURCE_BRANCH="",
             DRONE_TARGET_BRANCH="",
             DRONE_COMMIT_BRANCH="main",
-            DRONE_COMMIT_AUTHOR="Hermes (AI Agent)",
-            DRONE_COMMIT_AUTHOR_EMAIL="hermes@agents.noreply.local",
+            DRONE_COMMIT_AUTHOR="wujunhui99",
+            DRONE_COMMIT_AUTHOR_EMAIL="53573423+wujunhui99@users.noreply.github.com",
             DRONE_COMMIT_MESSAGE=(
-                "feat(agent)[hermes]: add agent runtime feature\n\n"
+                "feat(agent)[hermes]: add agent runtime feature (#123)\n\n"
                 "Issue: #123\nAgent: hermes\nHuman-Owner: junhui\n"
             ),
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Agent: eino @eino_hermes_bot", result.stdout)
-        self.assertIn("Attribution: main release owner", result.stdout)
+        self.assertIn("Agent: hermes @ws_ubuntu_hermes_bot", result.stdout)
+        self.assertIn("Attribution: commit subject", result.stdout)
+        self.assertNotIn("Attribution mismatch", result.stdout)
+
+    def test_main_merge_commit_notification_uses_source_branch_agent(self) -> None:
+        result = self.run_notify(
+            DRONE_BUILD_EVENT="push",
+            DRONE_SOURCE_BRANCH="",
+            DRONE_TARGET_BRANCH="",
+            DRONE_COMMIT_BRANCH="main",
+            DRONE_COMMIT_AUTHOR="wujunhui99",
+            DRONE_COMMIT_AUTHOR_EMAIL="53573423+wujunhui99@users.noreply.github.com",
+            DRONE_COMMIT_MESSAGE=(
+                "Merge pull request #281 from wujunhui99/fix/helios/issue-280-login-refresh\n\n"
+                "fix(auth): repair login refresh token handling\n"
+            ),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Agent: helios @ws_ubuntu_claw_bot", result.stdout)
+        self.assertIn("Attribution: merged source branch", result.stdout)
         self.assertNotIn("Attribution mismatch", result.stdout)
 
     def test_devops_push_notification_routes_to_eino_owner(self) -> None:

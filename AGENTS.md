@@ -23,17 +23,17 @@
 - 默认使用 `git worktree` 并行：一个 Codex 一个独立 worktree/branch。
 - 多 Agent 分支命名必须遵守 `docs/AGENT_GIT_STANDARD.md`：`<type>/<agent-name>/<issue>-<task-desc>`；第二段必须是可信 Agent 名（`eino`、`helios`、`hermes`、`achilles`、`furies`、`gaia`），否则 CI 不通过；每个开发 PR 只解决一个 Issue，PR body 必须包含 `Closes #<issue>`；commit subject 必须为 `<type>(<scope>)[<agent-name>]: <short title>`，并使用 Agent 专用 Git identity 与 `Issue` / `Agent` / `Human-Owner` trailers。
 - 用户偏好：Hermes/Helios 做 planner/architect/reviewer/integrator，编码测试尽量委派 Codex。详细角色边界和交付契约见 [`docs/agent-ops/hermes-codex-operating-model.md`](./docs/agent-ops/hermes-codex-operating-model.md) 与 [`docs/agent-ops/codex-worker-handoff.md`](./docs/agent-ops/codex-worker-handoff.md)。
-- feature 原则：`feature/* -> develop -> main`；紧急生产 hotfix 可从 `main -> fix/* -> main`。
+- 发布原则：取消 `develop` 集成分支；所有代码变更通过任务分支 PR 到 `main`，CI 通过后必须进入 GitHub Merge Queue，由 Merge Queue 验证通过后自动合并到 `main`；禁止直接 commit/push 到 `main`，也禁止绕过 Merge Queue 直接 merge。
 - Codex 是否允许 commit/push 必须由任务说明明确；未明确时不要 push。
 - Codex 相关长期规则尽量直接写入本 `AGENTS.md`，因为 Codex 会自动读取；不要只放在聊天或临时 prompt 里。
 - Codex 解决 GitHub Issue 后必须在对应 Issue 评论一次：评论要**简洁但不丢信息**，不要求一句话；方便 Controller 快速 review。
   - Bug：说明 root cause、fix、测试摘要、分支/commit/PR、blockers（如有）。
   - Feature / 新需求：说明实现的用户可见行为、关键文件/API/数据流、范围边界、测试摘要、分支/commit/PR、blockers（如有）。
   - Research / 调研任务：可以更详细；说明调研结论、证据来源（文件/命令/链接）、可选方案与 tradeoff、推荐方案、风险和未决问题。
-- Controller 必须复核 Codex 的 diff、测试和分支状态，不能只信自述。Codex 完成后，Hermes 第一轮验收先看 `git diff`/业务逻辑是否偏离需求，再跑/核验测试；review 通过后应尽快 MR/merge 到 `develop`。
-- Hermes 在 Issue 评论验证结果后再关闭，Issue 关闭必须等 `develop` 集成成功。
+- Controller 必须复核 Codex 的 diff、测试和分支状态，不能只信自述。Codex 完成后，Hermes 第一轮验收先看 `git diff`/业务逻辑是否偏离需求，再跑/核验测试；review 通过后将 PR 加入 GitHub Merge Queue。
+- Hermes 在 Issue 评论验证结果后再关闭；Issue 关闭必须等 PR 经 Merge Queue 合并到 `main`，并完成必要的部署/runtime 验证。
 - Codex commit 前验证门禁：按改动范围运行 gofmt、git diff --check、go test ./...、scripts/verify-static.sh；web 改动加前端测试/build；DB/repository SQL 改动加 PostgreSQL integration。
-- 数据库 schema/data 变更必须新增 `db/change_log/*.sql`；`.md` 只作说明，SQL 是事实源。
+- 数据库 schema/data 变更必须新增 `db/migrations/*.sql` 作为唯一可执行 SQL 事实源；`db/change_log/` 只放 Markdown 人类/audit 说明，不再新增重复可执行 SQL。
 
 ## 快速导航
 

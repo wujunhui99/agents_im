@@ -3,14 +3,14 @@
 
 Attribution is resolved from trusted project metadata, not free-form chat:
 1. PR source branch path: <type>/<agent>/issue-<number>-<task>
-2. commit subject marker: <type>(<scope>)[<agent>]: <title>
-3. commit trailer: Agent: <agent>
-4. commit author email: <agent>@agents.noreply.local
+2. main merge commit source branch: Merge pull request ... from owner/<type>/<agent>/issue-...
+3. commit subject marker: <type>(<scope>)[<agent>]: <title>
+4. commit trailer: Agent: <agent>
+5. commit author email: <agent>@agents.noreply.local
 
-Development PR notifications are attributed to the responsible feature agent.
-Integration/release push notifications on ``main`` and ``devops`` are owned by
-Eino because they may include changes from multiple agents and need CI/CD
-triage before routing to a feature owner.
+Development PR and main push notifications are attributed to the responsible
+feature agent. ``devops`` push notifications remain owned by Eino because that
+lane is CI/CD operations rather than a feature merge.
 """
 from __future__ import annotations
 
@@ -59,6 +59,13 @@ BRANCH_RE = re.compile(
 )
 TRAILER_RE = re.compile(r"^Agent:\s*([a-z0-9_-]+)\s*$", re.MULTILINE)
 SUBJECT_AGENT_RE = re.compile(r"(?:^|\s)([a-z]+)(?:\([a-z0-9_.-]+\))?\[(eino|helios|hermes|achilles|furies|gaia)\]:")
+MERGE_SOURCE_BRANCH_RE = re.compile(
+    r"^Merge pull request #[0-9]+ from [^/]+/"
+    r"(?P<branch>(?:feature|fix|refactor|docs|test|chore|ci|perf|style|hotfix)/"
+    r"(?:eino|helios|hermes|achilles|furies|gaia)/"
+    r"issue-[0-9]+-[a-z0-9][a-z0-9-]*)$",
+    re.MULTILINE,
+)
 
 
 @dataclass
@@ -126,6 +133,11 @@ def agent_from_subject(message: str) -> Optional[str]:
     return candidate if candidate in TRUSTED_AGENTS else None
 
 
+def merged_source_branch(message: str) -> str:
+    match = MERGE_SOURCE_BRANCH_RE.search(message or "")
+    return match.group("branch") if match else ""
+
+
 def agent_from_email(email: str) -> Optional[str]:
     email = (email or "").strip().lower()
     for agent, meta in TRUSTED_AGENTS.items():
@@ -134,16 +146,15 @@ def agent_from_email(email: str) -> Optional[str]:
     return None
 
 
-def integration_push_owner(branch: str, event: str) -> Optional[Attribution]:
+def devops_push_owner(branch: str, event: str) -> Optional[Attribution]:
     if (event or "").lower() != "push":
         return None
-    if branch not in {"main", "devops"}:
+    if branch != "devops":
         return None
 
-    method = "main release owner" if branch == "main" else "devops owner"
     return Attribution(
         agent="eino",
-        method=method,
+        method="devops owner",
         mention=TRUSTED_AGENTS["eino"]["mention"],
         warnings=[],
     )
@@ -155,14 +166,21 @@ def resolve_attribution() -> Attribution:
     commit_branch = env("DRONE_COMMIT_BRANCH")
     branch = source_branch or commit_branch
 
-    integration_owner = integration_push_owner(commit_branch or branch, event)
-    if integration_owner:
-        return integration_owner
+    devops_owner = devops_push_owner(commit_branch or branch, event)
+    if devops_owner:
+        return devops_owner
 
     message = commit_message()
     email = commit_author_email()
 
+    merge_branch = (
+        merged_source_branch(message)
+        if (event or "").lower() == "push" and (commit_branch or branch) == "main"
+        else ""
+    )
+
     branch_agent = agent_from_branch(branch)
+    merge_branch_agent = agent_from_branch(merge_branch)
     trailer_agent = agent_from_trailer(message)
     subject_agent = agent_from_subject(message)
     email_agent = agent_from_email(email)
@@ -170,6 +188,7 @@ def resolve_attribution() -> Attribution:
     warnings: list[str] = []
     observed = {
         "branch": branch_agent,
+        "merged source branch": merge_branch_agent,
         "trailer": trailer_agent,
         "subject": subject_agent,
         "email": email_agent,
@@ -179,13 +198,17 @@ def resolve_attribution() -> Attribution:
         detail = ", ".join(f"{k}={v}" for k, v in non_empty.items())
         warnings.append(f"Attribution mismatch: {detail}")
 
-    # Development PRs are attributed to the feature owner. The branch is the
-    # first choice for PR notifications because CI hard-rejects new source
-    # branches without a trusted agent in the second path segment. Integration
-    # pushes to main/devops return early above and are always owned by Eino.
+    # Development PRs and main pushes are attributed to the feature owner. For
+    # PR notifications the source branch is first because CI hard-rejects new
+    # branches without a trusted agent in the second path segment. For main
+    # push notifications, GitHub's merge/squash commit often has a human author,
+    # so use the merged source branch or subject/trailer before author email.
     if branch_agent:
         agent = branch_agent
         method = "branch" if BRANCH_RE.match(branch or "") else "legacy branch"
+    elif merge_branch_agent:
+        agent = merge_branch_agent
+        method = "merged source branch"
     elif subject_agent:
         agent = subject_agent
         method = "commit subject"

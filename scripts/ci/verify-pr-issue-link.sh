@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Enforce the agents_im issue lifecycle contract for pull_request builds.
 # Rule: one issue -> one PR; PR body must contain exactly one GitHub closing keyword.
-# This makes a PR merge to develop the explicit completion point for its issue.
+# This makes a PR merge to main via GitHub Merge Queue the explicit completion point for its issue.
 
 if [[ "${DRONE_BUILD_EVENT:-}" != "pull_request" ]]; then
   echo "PR issue link check skipped: DRONE_BUILD_EVENT=${DRONE_BUILD_EVENT:-<unset>}"
