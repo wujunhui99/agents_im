@@ -85,8 +85,9 @@ func (l *AdminAIReplayLogic) ReplayAgentMessage(ctx context.Context, req AdminRe
 
 	eventID := "admin.replay.message.created:" + trigger.ServerMsgID
 	if err := l.hook.OnMessageCreated(ctx, MessageCreatedHookInput{
-		EventID: eventID,
-		Message: trigger.Clone(),
+		EventID:               eventID,
+		Message:               trigger.Clone(),
+		TargetAgentAccountIDs: []string{trigger.ReceiverID},
 	}); err != nil {
 		return AdminReplayAgentMessageResponse{}, err
 	}
