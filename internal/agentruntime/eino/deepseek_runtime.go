@@ -100,7 +100,7 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 			observability.RecordSpanError(span, err)
 			return agentruntime.RunResult{}, err
 		}
-		runID = "run_" + generated
+		runID = generated
 	}
 	normalized.RunID = runID
 	resolvedTools, err := r.resolveTools(ctx, normalized, runID)

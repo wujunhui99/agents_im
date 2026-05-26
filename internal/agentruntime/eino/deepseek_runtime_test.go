@@ -51,6 +51,32 @@ func TestDeepSeekRuntimeFailsClosedWhenProviderConfigMissing(t *testing.T) {
 	}
 }
 
+func TestDeepSeekRuntimeGeneratedRunIDIsPostgresAuditCompatible(t *testing.T) {
+	ctx := context.Background()
+	fakeModel := &scriptedToolCallingModel{responses: []*schema.Message{schema.AssistantMessage("ok", nil)}}
+	runtime := NewDeepSeekRuntime(
+		config.DeepSeekConfig{APIKey: "test-key", BaseURL: "https://deepseek.example.invalid", Model: "deepseek-test"},
+		WithChatModelFactory(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
+			return fakeModel, nil
+		}),
+	)
+	req := validPythonToolRuntimeRequest()
+	req.RunID = ""
+	req.Agent.Tools = nil
+	result, err := runtime.Run(ctx, req)
+	if err != nil {
+		t.Fatalf("run deepseek runtime: %v", err)
+	}
+	if result.RunID == "" || strings.Contains(result.RunID, "run_") {
+		t.Fatalf("generated run_id = %q, want numeric database-compatible id", result.RunID)
+	}
+	for _, ch := range result.RunID {
+		if ch < '0' || ch > '9' {
+			t.Fatalf("generated run_id = %q, want digits only", result.RunID)
+		}
+	}
+}
+
 func TestRuntimeMessagesUsesPromptTextAsCurrentTaskWhenConversationContextExists(t *testing.T) {
 	clearTask := "请总结一下这段日志的风险点。"
 	req := agentruntime.RunRequest{
