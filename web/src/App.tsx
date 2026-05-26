@@ -52,22 +52,22 @@ function App(props: AppProps) {
 
 function AuthGate(props: AppProps) {
   const { authPrompt, handleAuthFailure, session } = useAuth();
-  const adminApi = useMemo(
+  const adminApiClient = useMemo(
     () =>
-      createAdminApi(
-        createApiClient({
-          getToken: () => session?.token,
-          onAuthFailure: handleAuthFailure,
-        }),
-      ),
+      createApiClient({
+        getToken: () => session?.token,
+        onAuthFailure: handleAuthFailure,
+      }),
     [handleAuthFailure, session?.token],
   );
+  const adminApi = useMemo(() => createAdminApi(adminApiClient), [adminApiClient]);
+  const adminMediaApi = useMemo(() => createMediaApi(adminApiClient), [adminApiClient]);
 
   if (isAdminRoute()) {
     if (!session || session.user.accountType !== 'admin') {
       return <AuthPage prompt={session ? '请使用管理员账号登录管理后台' : authPrompt} adminMode />;
     }
-    return <AdminConsole adminApi={adminApi} />;
+    return <AdminConsole adminApi={adminApi} mediaApi={adminMediaApi} />;
   }
 
   if (!session) {
@@ -213,7 +213,10 @@ function AuthenticatedApp({ authUser, initialUser, userApi, webSocketUrl, webSoc
         <section className="phone-frame">
           <TopBar title="反馈" onBack={closeFeedbackPage} />
           <section className="content-area">
-            <FeedbackPage onSubmitFeedback={(request: SubmitFeedbackRequest) => feedbackApi.submitFeedback(request).then(() => undefined)} />
+            <FeedbackPage
+              mediaApi={mediaApi}
+              onSubmitFeedback={(request: SubmitFeedbackRequest) => feedbackApi.submitFeedback(request).then(() => undefined)}
+            />
           </section>
         </section>
       </main>
