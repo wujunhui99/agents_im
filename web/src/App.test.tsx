@@ -1553,6 +1553,94 @@ describe('WeChat-inspired app shell', () => {
     expect(screen.getByRole('tab', { name: /我的/i })).toBeInTheDocument();
   });
 
+  it('uses the logged-in bearer token when uploading feedback images', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = fetchPath(input);
+      const method = fetchMethod(init);
+      if (path === '/conversations/seqs?conversationIds=' && method === 'GET') {
+        return Promise.resolve(emptySeqsResponse());
+      }
+      if (path === '/media/uploads' && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              mediaId: 'med_feedback_auth',
+              objectKey: 'users/1001/media/med_feedback_auth/feedback-screen.png',
+              uploadUrl: 'https://storage.test/upload/feedback-screen.png',
+              expiresAt: 1779780000,
+            },
+          }),
+        );
+      }
+      if (path === 'https://storage.test/upload/feedback-screen.png' && method === 'PUT') {
+        return Promise.resolve(new Response(null, { status: 200 }));
+      }
+      if (path === '/media/uploads/med_feedback_auth/complete' && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({
+            code: 'OK',
+            message: 'ok',
+            data: {
+              media: {
+                mediaId: 'med_feedback_auth',
+                ownerUserId: '1001',
+                bucket: 'agents-im-media',
+                objectKey: 'users/1001/media/med_feedback_auth/feedback-screen.png',
+                sha256: '',
+                contentType: 'image/png',
+                sizeBytes: 1024,
+                originalFilename: 'feedback-screen.png',
+                purpose: 'message_image',
+                status: 'ready',
+                createdAt: '2026-05-26T12:00:00Z',
+                updatedAt: '2026-05-26T12:00:00Z',
+              },
+            },
+          }),
+        );
+      }
+      if (path === '/api/feedback' && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({ code: 'OK', message: 'ok', data: { feedbackId: 'fb_auth', status: 'new' } }),
+        );
+      }
+      return Promise.resolve(emptySeqsResponse());
+    });
+
+    render(<App initialUser={initialProfile} />);
+
+    await user.click(screen.getByRole('tab', { name: /我的/i }));
+    await user.click(screen.getByRole('button', { name: '反馈' }));
+    const feedbackForm = await screen.findByRole('region', { name: '意见反馈表单' });
+    await user.type(within(feedbackForm).getByLabelText('反馈标题'), '反馈图片上传 401');
+    await user.type(within(feedbackForm).getByLabelText('详细说明'), '浏览器已经登录，上传图片仍然 401');
+    await user.upload(
+      within(feedbackForm).getByLabelText('添加截图或图片'),
+      new File([new Uint8Array(1024)], 'feedback-screen.png', { type: 'image/png' }),
+    );
+
+    await user.click(within(feedbackForm).getByRole('button', { name: '提交反馈' }));
+
+    await screen.findByRole('status');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/media/uploads',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/feedback',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+      }),
+    );
+  });
+
   it('loads friends automatically when entering contacts and opens a friend chat from the contact row', async () => {
     const user = userEvent.setup();
     fetchMock.mockReset();
