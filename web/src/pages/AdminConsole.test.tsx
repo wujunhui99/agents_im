@@ -211,6 +211,32 @@ function createAdminApi(overrides?: Partial<AdminApi>): AdminApi {
         updatedAt: '2026-05-25T01:05:00Z',
       },
     })),
+    listTaskReports: vi.fn(async () => ({
+      items: [
+        {
+          taskId: 'codex-236-feedback-ui',
+          agent: 'codex',
+          codexSessionId: 'sess_feedback_236',
+          issueNumber: 236,
+          issueUrl: 'https://github.com/wujunhui99/agents_im/issues/236',
+          repo: 'wujunhui99/agents_im',
+          branch: 'fix/hermes/issue-236-feedback-ui',
+          commit: 'b29906ad9ff4',
+          outcome: 'success',
+          durationSeconds: 3720,
+          tokensUsed: 42000,
+          prUrl: 'https://github.com/wujunhui99/agents_im/pull/237',
+          evidence: ['npm run frontend:build'],
+          blockers: ['attribution cleanup'],
+          majorTimeSinks: [],
+          wouldMorePermissionHelp: 'no',
+          candidatePermissions: [],
+          permissionReason: '',
+          pitfallsOrLessons: ['report must be visible in management'],
+          recordedAt: '2026-05-26T00:00:00Z',
+        },
+      ],
+    })),
     ...overrides,
   };
 }
@@ -436,5 +462,34 @@ describe('AdminConsole', () => {
     await user.type(screen.getByLabelText('Conversation ID'), 'missing-conversation');
     await user.click(screen.getByRole('button', { name: 'Load conversation' }));
     expect(await screen.findByText('Could not load conversation')).toBeInTheDocument();
+  });
+
+  it('renders task reports in management task view and reloads by outcome filter', async () => {
+    const user = userEvent.setup();
+    const adminApi = createAdminApi();
+    render(<AdminConsole adminApi={adminApi} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Task Reports' }));
+
+    expect(await screen.findByRole('heading', { name: 'Task Reports' })).toBeInTheDocument();
+    expect(screen.getByText('codex-236-feedback-ui')).toBeInTheDocument();
+    expect(screen.getByText('Blockers: attribution cleanup')).toBeInTheDocument();
+    expect(screen.getByText('Evidence: npm run frontend:build')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Outcome'), 'success');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => expect(adminApi.listTaskReports).toHaveBeenLastCalledWith({ outcome: 'success', limit: 100 }));
+  });
+
+  it('opens task reports directly for the /admin/task-reports SPA route', async () => {
+    window.history.pushState({}, '', '/admin/task-reports');
+    const adminApi = createAdminApi();
+
+    render(<AdminConsole adminApi={adminApi} />);
+
+    expect(await screen.findByRole('heading', { name: 'Task Reports' })).toBeInTheDocument();
+    await waitFor(() => expect(adminApi.listTaskReports).toHaveBeenCalledWith({ outcome: undefined, limit: 100 }));
+    window.history.pushState({}, '', '/');
   });
 });

@@ -78,6 +78,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("build feedback repository: %v", err)
 	}
+	taskReportRepo, err := repository.NewTaskReportRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+	if err != nil {
+		log.Fatalf("build task report repository: %v", err)
+	}
 	var pythonExecutorClient pythonexec.KubernetesSandboxClient
 	if cfg.PythonExecutor.Backend == config.PythonExecutorBackendK8S {
 		pythonExecutorClient, err = pythonexec.NewInClusterKubernetesSandboxClient()
@@ -129,12 +133,17 @@ func main() {
 		if !ok {
 			log.Fatalf("postgres feedback repository has unexpected type %T", feedbackRepo)
 		}
+		postgresTaskReportRepo, ok := taskReportRepo.(*repository.PostgresTaskReportRepository)
+		if !ok {
+			log.Fatalf("postgres task report repository has unexpected type %T", taskReportRepo)
+		}
 		adminContext = adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
 			Accounts:    postgresAccountRepo,
 			Friends:     postgresAccountRepo,
 			Messages:    postgresMessageRepo,
 			AgentAudits: postgresAgentAuditRepo,
 			Feedback:    postgresFeedbackRepo,
+			TaskReports: postgresTaskReportRepo,
 		}, cfg.Auth)
 	} else {
 		memoryAccountRepo, ok := accountRepo.(*repository.MemoryRepository)
@@ -153,12 +162,17 @@ func main() {
 		if !ok {
 			log.Fatalf("memory feedback repository has unexpected type %T", feedbackRepo)
 		}
+		memoryTaskReportRepo, ok := taskReportRepo.(*repository.MemoryTaskReportRepository)
+		if !ok {
+			log.Fatalf("memory task report repository has unexpected type %T", taskReportRepo)
+		}
 		adminContext = adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
 			Accounts:    memoryAccountRepo,
 			Friends:     memoryAccountRepo,
 			Messages:    memoryMessageRepo,
 			AgentAudits: memoryAgentAuditRepo,
 			Feedback:    memoryFeedbackRepo,
+			TaskReports: memoryTaskReportRepo,
 		}, cfg.Auth)
 	}
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {

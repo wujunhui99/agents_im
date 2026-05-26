@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Activity, Bot, Database, Filter, Inbox, LineChart, MessageSquareText, RefreshCw, Search, Users } from 'lucide-react';
+import { Activity, Bot, CheckSquare, Database, Filter, Inbox, LineChart, MessageSquareText, RefreshCw, Search, Users } from 'lucide-react';
 import {
   createAdminApi,
   type AdminApi,
@@ -8,6 +8,7 @@ import {
   type AdminDashboard,
   type AdminFeedback,
   type AdminLLMTrace,
+  type AdminTaskReport,
   type AdminUser,
   type AdminUserConversationsResponse,
   type AdminUserDetailResponse,
@@ -15,7 +16,7 @@ import {
   type AdminUserSearchResponse,
 } from '../api/admin';
 
-type AdminView = 'dashboard' | 'traces' | 'conversation' | 'users' | 'feedback' | 'observability';
+type AdminView = 'dashboard' | 'traces' | 'conversation' | 'users' | 'feedback' | 'taskReports' | 'observability';
 
 type AdminConsoleProps = {
   adminApi?: AdminApi;
@@ -27,6 +28,7 @@ const navItems: Array<{ key: AdminView; label: string }> = [
   { key: 'conversation', label: 'Conversation' },
   { key: 'users', label: 'Users' },
   { key: 'feedback', label: 'Feedback' },
+  { key: 'taskReports', label: 'Task Reports' },
   { key: 'observability', label: 'Observability' },
 ];
 
@@ -58,6 +60,10 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
   const [feedbackError, setFeedbackError] = useState('');
   const [feedbackAdminNote, setFeedbackAdminNote] = useState('');
   const [feedbackUpdateStatus, setFeedbackUpdateStatus] = useState('');
+  const [taskReports, setTaskReports] = useState<AdminTaskReport[]>([]);
+  const [taskReportOutcomeFilter, setTaskReportOutcomeFilter] = useState('');
+  const [taskReportsLoading, setTaskReportsLoading] = useState(false);
+  const [taskReportsError, setTaskReportsError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -89,6 +95,9 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
   useEffect(() => {
     if (activeView === 'feedback') {
       void loadFeedback(feedbackStatusFilter);
+    }
+    if (activeView === 'taskReports') {
+      void loadTaskReports(taskReportOutcomeFilter);
     }
   }, []);
 
@@ -229,6 +238,19 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
     }
   }
 
+  async function loadTaskReports(outcome = taskReportOutcomeFilter) {
+    setTaskReportsLoading(true);
+    setTaskReportsError('');
+    try {
+      const data = await api.listTaskReports({ outcome: outcome || undefined, limit: 100 });
+      setTaskReports(data.items);
+    } catch {
+      setTaskReportsError('Could not load task reports');
+    } finally {
+      setTaskReportsLoading(false);
+    }
+  }
+
   function switchView(view: AdminView) {
     setActiveView(view);
     if (view === 'traces' && traceList.length === 0 && !traceLoading) {
@@ -239,6 +261,9 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
     }
     if (view === 'feedback' && feedbackList.length === 0 && !feedbackLoading) {
       void loadFeedback('new');
+    }
+    if (view === 'taskReports' && taskReports.length === 0 && !taskReportsLoading) {
+      void loadTaskReports('');
     }
   }
 
@@ -320,6 +345,15 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
             onOpen: openFeedback,
             onSave: saveFeedback,
           })}
+        {activeView === 'taskReports' &&
+          renderTaskReports({
+            items: taskReports,
+            outcomeFilter: taskReportOutcomeFilter,
+            setOutcomeFilter: setTaskReportOutcomeFilter,
+            loading: taskReportsLoading,
+            error: taskReportsError,
+            onReload: loadTaskReports,
+          })}
         {activeView === 'observability' && renderObservability()}
       </section>
     </main>
@@ -334,6 +368,9 @@ function initialAdminViewFromPath(): AdminView {
   }
   if (pathname === '/admin/feedback' || pathname.startsWith('/admin/feedback/')) {
     return 'feedback';
+  }
+  if (pathname === '/admin/task-reports' || pathname.startsWith('/admin/task-reports/')) {
+    return 'taskReports';
   }
   return 'dashboard';
 }
@@ -757,6 +794,100 @@ function renderUsers({
             </div>
           )}
         </section>
+      )}
+    </div>
+  );
+}
+
+function formatTaskReportDuration(seconds?: number) {
+  if (!seconds) return 'n/a';
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) return remainingSeconds ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
+function renderTaskReports({
+  items,
+  outcomeFilter,
+  setOutcomeFilter,
+  loading,
+  error,
+  onReload,
+}: {
+  items: AdminTaskReport[];
+  outcomeFilter: string;
+  setOutcomeFilter: (value: string) => void;
+  loading: boolean;
+  error: string;
+  onReload: (outcome?: string) => void;
+}) {
+  return (
+    <div className="admin-page">
+      <header className="admin-page-header">
+        <div>
+          <h2>Task Reports</h2>
+          <p className="admin-page-copy">Hermes/Codex task reports published by hermes-task-report.py for task management.</p>
+        </div>
+        <button type="button" className="admin-secondary-button" onClick={() => onReload(outcomeFilter)} disabled={loading}>
+          <RefreshCw aria-hidden="true" size={16} />
+          Refresh reports
+        </button>
+      </header>
+      <form
+        className="admin-filter-bar"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onReload(outcomeFilter);
+        }}
+      >
+        <label>
+          Outcome
+          <select value={outcomeFilter} onChange={(event) => setOutcomeFilter(event.target.value)}>
+            <option value="">All</option>
+            <option value="success">success</option>
+            <option value="failed">failed</option>
+            <option value="blocked">blocked</option>
+          </select>
+        </label>
+        <button type="submit" className="admin-primary-button" disabled={loading}>
+          <CheckSquare aria-hidden="true" size={16} />
+          Apply
+        </button>
+      </form>
+      {loading && <p className="admin-status">Loading task reports</p>}
+      {error && <p className="admin-error">{error}</p>}
+      {!loading && items.length === 0 && <p className="admin-empty">No task reports yet</p>}
+      {items.length > 0 && (
+        <div className="admin-table admin-task-report-table" role="table" aria-label="Task report list">
+          <TableHeader labels={['Task', 'Outcome', 'Issue / PR', 'Duration', 'Blockers / evidence']} />
+          {items.map((report) => (
+            <article className="admin-row admin-task-report-row" role="row" key={report.taskId}>
+              <span>
+                <strong>{report.taskId}</strong>
+                <small>{report.agent}{report.codexSessionId ? ` · ${report.codexSessionId}` : ''}</small>
+                <small>{report.branch || report.commit || report.repo}</small>
+              </span>
+              <span>{report.outcome}</span>
+              <span>
+                {report.issueUrl ? <a href={report.issueUrl} target="_blank" rel="noreferrer">Issue {report.issueNumber || ''}</a> : 'No issue'}
+                {report.prUrl && <a href={report.prUrl} target="_blank" rel="noreferrer">PR</a>}
+              </span>
+              <span>
+                {formatTaskReportDuration(report.durationSeconds)}
+                {report.tokensUsed ? <small>{report.tokensUsed} tokens</small> : null}
+              </span>
+              <span>
+                {report.blockers.length > 0 ? <small>Blockers: {report.blockers.join('; ')}</small> : <small>No blockers</small>}
+                {report.evidence.length > 0 ? <small>Evidence: {report.evidence.join('; ')}</small> : null}
+                {report.wouldMorePermissionHelp ? <small>Permission help: {report.wouldMorePermissionHelp}</small> : null}
+              </span>
+            </article>
+          ))}
+        </div>
       )}
     </div>
   );

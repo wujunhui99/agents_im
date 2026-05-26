@@ -199,6 +199,47 @@ export type AdminFeedbackUpdateRequest = {
   adminNote?: string;
 };
 
+export type AdminTaskReport = {
+  taskId: string;
+  agent: string;
+  codexSessionId?: string;
+  issueNumber?: number;
+  issueUrl?: string;
+  repo: string;
+  branch?: string;
+  worktree?: string;
+  commit?: string;
+  outcome: string;
+  startedAt?: string;
+  endedAt?: string;
+  durationSeconds?: number;
+  tokensUsed?: number;
+  prUrl?: string;
+  evidence: string[];
+  blockers: string[];
+  majorTimeSinks: string[];
+  wouldMorePermissionHelp?: string;
+  candidatePermissions: string[];
+  permissionReason?: string;
+  pitfallsOrLessons: string[];
+  notes?: string;
+  recordedAt: string;
+};
+
+export type AdminTaskReportListRequest = {
+  outcome?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type AdminTaskReportListResponse = {
+  items: AdminTaskReport[];
+};
+
+export type AdminTaskReportDetailResponse = {
+  report: AdminTaskReport;
+};
+
 export type AdminApi = {
   getDashboard: () => Promise<AdminDashboard>;
   listLLMTraces: () => Promise<AdminLLMTraceListResponse>;
@@ -211,10 +252,12 @@ export type AdminApi = {
   listFeedback: (request?: AdminFeedbackListRequest) => Promise<AdminFeedbackListResponse>;
   getFeedback: (feedbackId: string) => Promise<AdminFeedbackDetailResponse>;
   updateFeedback: (feedbackId: string, request: AdminFeedbackUpdateRequest) => Promise<AdminFeedbackDetailResponse>;
+  listTaskReports: (request?: AdminTaskReportListRequest) => Promise<AdminTaskReportListResponse>;
 };
 
 export function createAdminApi(api: ApiClient = createApiClient()): AdminApi {
   const feedbackBasePath = '/api/admin/feedback';
+  const taskReportsBasePath = '/api/admin/task-reports';
 
   return {
     getDashboard() {
@@ -258,6 +301,14 @@ export function createAdminApi(api: ApiClient = createApiClient()): AdminApi {
     },
     updateFeedback(feedbackId, request) {
       return api.patch<AdminFeedbackDetailResponse>(`${feedbackBasePath}/${encodeURIComponent(feedbackId)}`, request);
+    },
+    listTaskReports(request = {}) {
+      const params = new URLSearchParams();
+      if (request.outcome) params.set('outcome', request.outcome);
+      if (request.limit !== undefined) params.set('limit', String(request.limit));
+      if (request.offset !== undefined) params.set('offset', String(request.offset));
+      const query = params.toString();
+      return api.get<AdminTaskReportListResponse>(`${taskReportsBasePath}${query ? `?${query}` : ''}`);
     },
   };
 }

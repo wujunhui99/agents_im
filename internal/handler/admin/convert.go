@@ -100,6 +100,22 @@ func adminFeedbackDetailResp(data business.AdminFeedbackDetailResponse) *types.A
 	}
 }
 
+func adminTaskReportListResp(data business.AdminTaskReportListResponse) *types.AdminTaskReportListResp {
+	return &types.AdminTaskReportListResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data:    types.AdminTaskReportListData{Items: adminTaskReports(data.Items)},
+	}
+}
+
+func adminTaskReportDetailResp(data business.AdminTaskReportDetailResponse) *types.AdminTaskReportDetailResp {
+	return &types.AdminTaskReportDetailResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data:    types.AdminTaskReportDetailData{Report: adminTaskReport(data.Report)},
+	}
+}
+
 func adminDashboardTotals(t business.AdminDashboardTotals) types.AdminDashboardTotals {
 	return types.AdminDashboardTotals{
 		Users:         t.Users,
@@ -244,6 +260,43 @@ func adminFeedbackItems(items []business.AdminFeedback) []types.AdminFeedback {
 		out = append(out, adminFeedback(item))
 	}
 	return out
+}
+
+func adminTaskReports(items []business.AdminTaskReport) []types.AdminTaskReport {
+	out := make([]types.AdminTaskReport, 0, len(items))
+	for _, item := range items {
+		out = append(out, adminTaskReport(item))
+	}
+	return out
+}
+
+func adminTaskReport(report business.AdminTaskReport) types.AdminTaskReport {
+	return types.AdminTaskReport{
+		TaskID:                  report.TaskID,
+		Agent:                   report.Agent,
+		CodexSessionID:          report.CodexSessionID,
+		IssueNumber:             report.IssueNumber,
+		IssueURL:                report.IssueURL,
+		Repo:                    report.Repo,
+		Branch:                  report.Branch,
+		Worktree:                report.Worktree,
+		Commit:                  report.Commit,
+		Outcome:                 report.Outcome,
+		StartedAt:               report.StartedAt,
+		EndedAt:                 report.EndedAt,
+		DurationSeconds:         report.DurationSeconds,
+		TokensUsed:              report.TokensUsed,
+		PRURL:                   report.PRURL,
+		Evidence:                report.Evidence,
+		Blockers:                report.Blockers,
+		MajorTimeSinks:          report.MajorTimeSinks,
+		WouldMorePermissionHelp: report.WouldMorePermissionHelp,
+		CandidatePermissions:    report.CandidatePermissions,
+		PermissionReason:        report.PermissionReason,
+		PitfallsOrLessons:       report.PitfallsOrLessons,
+		Notes:                   report.Notes,
+		RecordedAt:              report.RecordedAt,
+	}
 }
 
 func adminFeedback(item business.AdminFeedback) types.AdminFeedback {
