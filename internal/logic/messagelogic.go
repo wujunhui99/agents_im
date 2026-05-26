@@ -88,6 +88,10 @@ func (l *MessageLogic) SetMessageCreatedHook(hook MessageCreatedHook) {
 	l.messageCreatedHook = hook
 }
 
+func (l *MessageLogic) HasMessageCreatedHook() bool {
+	return l != nil && l.messageCreatedHook != nil
+}
+
 type Message = repository.Message
 
 type ConversationSeqState = repository.ConversationSeqState

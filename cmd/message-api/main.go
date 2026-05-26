@@ -138,12 +138,13 @@ func main() {
 			log.Fatalf("postgres task report repository has unexpected type %T", taskReportRepo)
 		}
 		adminContext = adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
-			Accounts:    postgresAccountRepo,
-			Friends:     postgresAccountRepo,
-			Messages:    postgresMessageRepo,
-			AgentAudits: postgresAgentAuditRepo,
-			Feedback:    postgresFeedbackRepo,
-			TaskReports: postgresTaskReportRepo,
+			Accounts:           postgresAccountRepo,
+			Friends:            postgresAccountRepo,
+			Messages:           postgresMessageRepo,
+			AgentAudits:        postgresAgentAuditRepo,
+			Feedback:           postgresFeedbackRepo,
+			TaskReports:        postgresTaskReportRepo,
+			MessageCreatedHook: serviceContext.AgentMessageHook,
 		}, cfg.Auth)
 	} else {
 		memoryAccountRepo, ok := accountRepo.(*repository.MemoryRepository)
@@ -167,12 +168,13 @@ func main() {
 			log.Fatalf("memory task report repository has unexpected type %T", taskReportRepo)
 		}
 		adminContext = adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
-			Accounts:    memoryAccountRepo,
-			Friends:     memoryAccountRepo,
-			Messages:    memoryMessageRepo,
-			AgentAudits: memoryAgentAuditRepo,
-			Feedback:    memoryFeedbackRepo,
-			TaskReports: memoryTaskReportRepo,
+			Accounts:           memoryAccountRepo,
+			Friends:            memoryAccountRepo,
+			Messages:           memoryMessageRepo,
+			AgentAudits:        memoryAgentAuditRepo,
+			Feedback:           memoryFeedbackRepo,
+			TaskReports:        memoryTaskReportRepo,
+			MessageCreatedHook: serviceContext.AgentMessageHook,
 		}, cfg.Auth)
 	}
 	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {

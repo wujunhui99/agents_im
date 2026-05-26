@@ -31,6 +31,21 @@ func adminConversationMessagesResp(data business.AdminConversationMessagesRespon
 	}
 }
 
+func adminReplayAgentMessageResp(data business.AdminReplayAgentMessageResponse) *types.AdminReplayAgentMessageResp {
+	return &types.AdminReplayAgentMessageResp{
+		Code:    string(apperror.CodeOK),
+		Message: "ok",
+		Data: types.AdminReplayAgentMessageData{
+			ConversationID: data.ConversationID,
+			ServerMsgID:    data.ServerMsgID,
+			Triggered:      data.Triggered,
+			Skipped:        data.Skipped,
+			Reason:         data.Reason,
+			Message:        adminMessage(data.Message),
+		},
+	}
+}
+
 func adminUserSearchResp(data business.AdminUserSearchResponse) *types.AdminUserSearchResp {
 	return &types.AdminUserSearchResp{
 		Code:    string(apperror.CodeOK),
