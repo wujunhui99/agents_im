@@ -34,4 +34,19 @@ describe('admin API adapter', () => {
     await expect(api.listFeedback({ status: 'new', limit: 25 })).resolves.toEqual({ items: [] });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
+
+  it('fetches task reports from the task-management JSON API route', async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      expect(fetchPath(input)).toBe('/api/admin/task-reports?outcome=success&limit=100');
+      return jsonResponse({
+        code: 'OK',
+        message: 'ok',
+        data: { items: [] },
+      });
+    });
+    const api = createAdminApi(createApiClient({ fetchImpl }));
+
+    await expect(api.listTaskReports({ outcome: 'success', limit: 100 })).resolves.toEqual({ items: [] });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
 });

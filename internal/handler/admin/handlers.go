@@ -216,3 +216,66 @@ func UpdateFeedbackHandler(svcCtx *adminsvc.ServiceContext) http.HandlerFunc {
 		httpx.OkJsonCtx(r.Context(), w, adminFeedbackDetailResp(business.AdminFeedbackDetailResponse{Feedback: resp.Feedback}))
 	}
 }
+
+func ListTaskReportsHandler(svcCtx *adminsvc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.AdminTaskReportListReq
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+
+		resp, err := svcCtx.AdminLogic.ListTaskReports(r.Context(), business.AdminTaskReportListRequest{
+			Outcome: req.Outcome,
+			Limit:   int(req.Limit),
+			Offset:  int(req.Offset),
+		})
+		if err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+		httpx.OkJsonCtx(r.Context(), w, adminTaskReportListResp(resp))
+	}
+}
+
+func IngestTaskReportHandler(svcCtx *adminsvc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.AdminTaskReportIngestReq
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+
+		resp, err := svcCtx.AdminLogic.UpsertTaskReport(r.Context(), business.AdminTaskReportUpsertRequest{Report: business.AdminTaskReport{
+			TaskID:                  req.TaskID,
+			Agent:                   req.Agent,
+			CodexSessionID:          req.CodexSessionID,
+			IssueNumber:             req.Issue.Number,
+			IssueURL:                req.Issue.URL,
+			Repo:                    req.Repo,
+			Branch:                  req.Branch,
+			Worktree:                req.Worktree,
+			Commit:                  req.Commit,
+			Outcome:                 req.Outcome,
+			StartedAt:               req.StartedAt,
+			EndedAt:                 req.EndedAt,
+			DurationSeconds:         req.DurationSeconds,
+			TokensUsed:              req.TokensUsed,
+			PRURL:                   req.PRURL,
+			Evidence:                req.Evidence,
+			Blockers:                req.Blockers,
+			MajorTimeSinks:          req.MajorTimeSinks,
+			WouldMorePermissionHelp: req.PermissionAnalysis.WouldMorePermissionHelp,
+			CandidatePermissions:    req.PermissionAnalysis.CandidatePermissions,
+			PermissionReason:        req.PermissionAnalysis.Reason,
+			PitfallsOrLessons:       req.PitfallsOrLessons,
+			Notes:                   req.Notes,
+			RecordedAt:              req.RecordedAt,
+		}})
+		if err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+		httpx.OkJsonCtx(r.Context(), w, adminTaskReportDetailResp(resp))
+	}
+}
