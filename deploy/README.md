@@ -67,7 +67,7 @@ GitHub Actions workflows have been removed because the account has no Actions qu
 
 ## Deployment workflow
 
-`.drone.yml` runs a single `verification` pipeline on pull requests targeting `develop` or `main`, and runs deployment only on pushes to `main`. Verification intentionally does not run on feature/fix/ci branch push events, because each opened or updated MR already emits a `pull_request` build for the same head SHA. Backend verification and PostgreSQL integration are steps in the same pipeline, so each MR exposes one CI task/context instead of two parallel pipeline tasks.
+`.drone.yml` runs a single `verification` pipeline on pull requests targeting `main`, and runs deployment only on pushes to `main` / `devops`. Verification intentionally does not run on feature/fix/ci branch push events, because each opened or updated PR already emits a `pull_request` build for the same head SHA. Backend verification and PostgreSQL integration are steps in the same pipeline, so each PR exposes one CI task/context instead of two parallel pipeline tasks.
 
 Production public entrypoints:
 

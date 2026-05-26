@@ -1,6 +1,6 @@
 # Git Workflow
 
-本文档定义项目的并行开发与合并流程。相比直接从功能分支合并到 `main`，本项目采用 `feature/* -> develop -> main` 的集成模式，并通过 `git worktree` 支持多个 Agent 并行开发。
+本文档定义项目的并行开发与合并流程。本项目采用 `feature/fix/ci/... -> main` 的 GitHub Merge Queue 模式，并通过 `git worktree` 支持多个 Agent 并行开发。
 
 多 Agent 分支、commit message、Git identity 与 CI/CD 归因的详细规范见 [`docs/AGENT_GIT_STANDARD.md`](./AGENT_GIT_STANDARD.md)。CI 会强制校验任务分支格式：`<type>/<agent-name>/<issue>-<task-desc>`，其中第二段必须是可信 Agent 名。
 
@@ -9,14 +9,13 @@
 该工作流更适合本项目，原因如下：
 
 - 支持多个 Agent 并行开发，避免所有 Agent 共用同一个工作目录导致互相覆盖。
-- `develop` 作为集成分支，可以提前暴露多个 feature 分支之间的冲突。
-- `main` 保持稳定，只接收经过集成测试的 `develop`。
-- 每个 Agent 的实现、自测、冲突处理和验证结果都可以独立记录。
+- 取消日常 `develop` 集成，减少双阶段 promotion 和额外等待。
+- `main` 通过 GitHub Merge Queue 保持稳定：PR 先通过常规 CI，再由队列验证并自动合并。
+- 每个 Agent 的实现、自测、冲突处理和验证结果都可以独立记录，并可从 feature 分支 / commit metadata 溯源。
 
 ## 分支模型
 
-- `main`：稳定主分支，只接收已通过集成测试的 `develop`。
-- `develop`：集成分支，用于合并多个 feature 分支并解决跨功能冲突。
+- `main`：唯一长期主分支和发布分支。只允许 GitHub Merge Queue 合并进入；禁止直接 push 或绕过队列 merge。
 - `feature/<agent-name>/<issue>-<task-desc>` / `fix/<agent-name>/<issue>-<task-desc>` / `ci/<agent-name>/<issue>-<task-desc>` 等：日常任务分支。完整规则见 [`docs/AGENT_GIT_STANDARD.md`](./AGENT_GIT_STANDARD.md)。
 - `feature/v1.x.x`：v1.0.0 之后的版本功能分支。
 
@@ -50,30 +49,24 @@ git fetch origin
 mkdir -p /home/ws/project/worktrees
 
 git worktree add \
-  -b feature/friend-relationship \
-  /home/ws/project/worktrees/friend-relationship \
-  origin/develop
+  -b feature/eino/issue-131-admin-console-lists \
+  /home/ws/project/worktrees/eino-issue-131-admin-console-lists \
+  origin/main
 ```
 
-如果远端还没有 `develop`，则先从 `main` 创建：
-
-```bash
-git checkout main
-git pull origin main
-git checkout -b develop
-git push -u origin develop
-```
 
 ## 单个 Agent 的开发流程
 
-1. 从最新 `develop` 创建 feature 分支和 worktree。
+1. 从最新 `origin/main` 创建任务分支和 worktree。
 2. 阅读 `AGENTS.md`、`ARCHITECTURE.md` 以及相关 `docs/` 文档。
 3. 对复杂需求，在 `docs/exec-plans/active/` 创建执行计划。
 4. 完成功能实现。
 5. 在当前 worktree 内完成自测。
 6. 提交代码并推送 feature 分支。
-7. 创建 PR/MR：`feature/* -> develop`。
-8. CI 通过后，将 feature 分支合并到 `develop`。
+7. 创建 PR：`feature/fix/ci/... -> main`。
+8. 常规 CI 通过、Hermes/Eino 验收后，将 PR 加入 GitHub Merge Queue。
+9. Merge Queue 验证通过后自动合并到 `main`。
+10. `main` push 触发 `deploy-main`，Telegram 通知按 feature agent 溯源 @ 对应 bot。
 
 ## Agentic GitHub Project / Issues 工作流
 
@@ -130,7 +123,7 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 
 ## CI Checks
 
-CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从集成分支发布。当前仓库主要使用 Drone：
+CI 是 PR 进入 GitHub Merge Queue 和合并到 `main` 的质量门禁；CD 只从 `main` / `devops` 等发布分支运行。当前仓库主要使用 Drone：
 
 - Drone 地址：<https://drone.agenticim.xyz>
 - Drone 仓库：`wujunhui99/agents_im`
@@ -138,9 +131,9 @@ CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从集成分支发
 
 不要只看 GitHub 上的红叉；失败时必须点进 Drone build，再打开失败的 pipeline / step，看日志尾部和具体错误。
 
-### MR 阶段怎么看 CI
+### PR 阶段怎么看 CI
 
-每次 MR 或 push 后，Drone 会生成 build。普通 MR 重点看这两个 pipeline：
+每次 PR 或 push 后，Drone 会生成 build。普通 PR 重点看这两个 pipeline：
 
 - `backend-verification`
   - 后端基础验证。
@@ -149,7 +142,7 @@ CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从集成分支发
   - PostgreSQL 集成验证。
   - 会启动 PostgreSQL service，执行 migration，再跑 integration tests。
 
-普通 MR 主要关注 `backend-verification` 和 `postgres-integration` 是否都是 `success`。如果这两个都绿，说明 MR CI 基本通过。
+普通 PR 主要关注 `backend-verification` 和 `postgres-integration` 是否都是 `success`。如果这两个都绿，说明 PR CI 基本通过；进入 Merge Queue 后仍必须以 Merge Queue 的合并组验证结果为最终合并门禁。
 
 ### 当前 CI 内容
 
@@ -162,7 +155,7 @@ CI 是 feature 分支合入 `develop` 的质量门禁；CD 只从集成分支发
 - `gofmt` check，发现未格式化 Go 文件即失败。
 - `go test ./...` 运行普通 Go 测试；默认不设置 PostgreSQL DSN，确保普通测试不依赖真实 PG。
 - `bash scripts/verify-static.sh`，检查仓库关键文件、接口、文档、Drone workflow 约束，并调用 `scripts/ci/verify-migration-immutability.sh` 禁止 PR 修改历史 migration。
-- `scripts/ci/drone-telegram-notify.py` 在 success / failure 都发送 Telegram 通知；开发 PR 从分支第二段、`Agent:` trailer、subject `[agent]`、author email 解析负责 Agent，在群里 @ 对应 bot；归因冲突会在通知中展示 warning。`main` / `devops` push 是 release / CI-CD operation，固定 @ Eino。
+- `scripts/ci/drone-telegram-notify.py` 在 success / failure 都发送 Telegram 通知；开发 PR 和 `main` push 从分支第二段、main merge source branch、subject `[agent]`、`Agent:` trailer、author email 解析负责 Agent，在群里 @ 对应 bot；归因冲突会在通知中展示 warning。`devops` push 是 CI/CD lane，固定 @ Eino。
 - `docker compose config`，验证 Compose 配置可解析。
 - Markdown link check，排除 `docs/references/` 和 `.ai-context/`，并忽略外部 HTTP/HTTPS 链接波动。
 
@@ -194,9 +187,9 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 
 ## CD / Deployment
 
-部署只在 `main` / `devops` 等集成分支 push 时运行，普通 MR 不跑部署。部署 pipeline 是 `deploy-main`，它会：
+部署只在 `main` / `devops` 等发布分支 push 时运行，普通 PR 不跑部署。部署 pipeline 是 `deploy-main`，它会：
 
-`main` / `devops` push 的 Drone 通知固定归 Eino（`@eino_hermes_bot`）：`main` 是 release/deploy 批次，可能包含多个 Agent 的开发提交；`devops` 是 CI/CD lane。Eino 先分诊 deploy/runtime/CI 问题，只有根因明确指向某个功能变更时再二次 @ 对应 Agent。
+`main` push 的 Drone 通知会根据 Merge Queue 合入的 feature/fix/ci 分支和 commit metadata 溯源到功能 Agent，并直接 @ 对应 bot；`devops` push 仍固定归 Eino（`@eino_hermes_bot`），因为它是 CI/CD lane。
 
 1. 检测是否需要构建镜像。
 2. 构建并推送镜像。
@@ -205,7 +198,8 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 
 因此日常判断顺序是：
 
-- MR 阶段：看 `backend-verification` + `postgres-integration`。
+- PR 阶段：看 `backend-verification` + `postgres-integration`。
+- Merge Queue 阶段：看 merge group / queued PR 对应验证。
 - 合并到 `main` 后：再看 `deploy-main`。
 
 失败时按失败 pipeline/step 定位：
@@ -215,7 +209,7 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 - 镜像构建失败：看 build images 相关 step。
 - 生产部署失败：看 deploy step。
 
-MR CI 已做并行优化，正常情况下验证应在 2 分 40 秒以内；当前实测通常是几十秒级。明显超过该时间需要报告并排查。
+PR CI 已做并行优化，正常情况下验证应在 2 分 40 秒以内；当前实测通常是几十秒级。明显超过该时间需要报告并排查。
 
 生产发布由 `.drone.yml` 中的 `deploy-main` pipeline 负责。发布链路为：
 
