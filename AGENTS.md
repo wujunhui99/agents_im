@@ -9,7 +9,8 @@
 3. **根因优先**：修复前先复现、读完整错误、追踪数据流；不要未理解原因就堆补丁。
 4. **验证优先**：声称完成必须给出可重复命令。没有真实启动/请求时，只能说 contract/unit/static verification。
 5. **密钥脱敏**：不要输出 token、JWT、密码、cookie、DSN、server host/user/port/key、MinIO/JWT/DB secret；统一写 `[REDACTED]`。
-6. **文档按需读取**：先读本文件，再按任务类型读下面的专题文档，不要一次性读完整 `docs/`。
+6. **本地 secret 目录**：仓库根目录 `secret/` 是 operator-local 便捷目录，真实文件被 Git ignore；tracked 内容只能是 `.gitignore`、`README.md` 和 `*.example` 占位模板。需要 Drone、服务器 SSH、k8s 等本地凭据时，可以读取本地存在的独立文件（例如 `secret/drone_token`、`secret/server_ssh`、`secret/k8s_access`），但绝不能打印、提交、粘贴真实值；日志/Issue/PR/聊天里一律写 `[REDACTED]`。每个 secret 或访问提示使用一个独立文件，权威 secret 仍保存在 Drone、服务器或 Kubernetes Secret 中。
+7. **文档按需读取**：先读本文件，再按任务类型读下面的专题文档，不要一次性读完整 `docs/`。
 
 ## 项目一句话
 
