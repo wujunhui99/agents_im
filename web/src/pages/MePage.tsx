@@ -172,7 +172,7 @@ export function MePage({ profile, onUpdateProfile, onUploadAvatar, onAvatarUpdat
       ) : null}
 
       <ListCard>
-        <ActionRow label="服务" helper="钱包、收藏、卡包等能力预留" accent="green" />
+        <ActionRow label="服务" helper="钱包、收藏、卡包等能力预留" accent="green" badge="MVP 占位" />
       </ListCard>
 
       <ListCard>
@@ -183,8 +183,8 @@ export function MePage({ profile, onUpdateProfile, onUploadAvatar, onAvatarUpdat
           icon={MessageSquareWarning}
           onClick={onOpenFeedback}
         />
-        <ActionRow label="收藏" helper="重要消息和 Agent 输出" accent="orange" />
-        <ActionRow label="设置" helper="账号、安全、通知" accent="gray" trailingIcon={Settings} />
+        <ActionRow label="收藏" helper="重要消息和 Agent 输出" accent="orange" badge="MVP 占位" />
+        <ActionRow label="设置" helper="账号、安全、通知" accent="gray" badge="MVP 占位" trailingIcon={Settings} />
       </ListCard>
     </div>
   );

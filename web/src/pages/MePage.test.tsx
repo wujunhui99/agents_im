@@ -30,12 +30,15 @@ describe('MePage', () => {
     expect(screen.getByText('地区：Shanghai')).toBeInTheDocument();
   });
 
-  it('keeps Me-scoped menu entries and excludes moments', () => {
+  it('keeps Me-scoped menu entries and marks placeholder entries as MVP except feedback', () => {
     render(<MePage profile={profile} onUpdateProfile={vi.fn()} onUploadAvatar={vi.fn()} />);
 
     expect(screen.getByText('服务')).toBeInTheDocument();
     expect(screen.getByText('收藏')).toBeInTheDocument();
     expect(screen.getByText('设置')).toBeInTheDocument();
+    expect(screen.getAllByText('MVP 占位')).toHaveLength(3);
+    expect(screen.getByText('反馈')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /反馈.*MVP 占位/ })).not.toBeInTheDocument();
     expect(screen.queryByText('朋友圈')).not.toBeInTheDocument();
   });
 
