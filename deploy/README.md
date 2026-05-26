@@ -331,3 +331,8 @@ The web service is exposed through k3s NodePort `30080`. Traefik Ingress also ro
 
 - Docker Hub authenticated pulls are configured on the deployment host Docker daemon to avoid anonymous pull limits during Drone Docker-runner deploy stages.
 - If changing this setup, verify `docker:29-cli`, `golang:1.25-alpine`, `node:22-alpine`, `nginx:1.29-alpine`, `alpine:3.22`, and `alpine/git:2.45.2` can be pulled without anonymous rate-limit errors.
+
+
+## Promote duration target
+
+`deploy-main` is optimized for normal scoped changes to finish under 180 seconds: selected backend images compile only their own `SERVICE`, backend registry cache export is disabled by default, and domain-specific internal paths no longer force every backend/RPC/worker image to rebuild.

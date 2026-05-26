@@ -75,7 +75,9 @@ steps:
       GHCR_TOKEN:
         from_secret: ghcr_token
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
-      DRONE_IMAGE_BUILD_PARALLELISM: "4"
+      DRONE_IMAGE_BUILD_PARALLELISM: "6"
+      DRONE_EXPORT_BACKEND_CACHE: "false"
+      DRONE_EXPORT_WEB_CACHE: "true"
       DRONE_IMAGE_BUILD_FORCE_ALL: "true"
       DRONE_IMAGE_BUILD_ONLY: "true"
     commands:
@@ -149,7 +151,9 @@ steps:
       GHCR_TOKEN:
         from_secret: ghcr_token
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
-      DRONE_IMAGE_BUILD_PARALLELISM: "4"
+      DRONE_IMAGE_BUILD_PARALLELISM: "6"
+      DRONE_EXPORT_BACKEND_CACHE: "false"
+      DRONE_EXPORT_WEB_CACHE: "true"
     commands:
       - apk add --no-cache bash python3
       - test -f .drone-deploy.env || bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env

@@ -183,6 +183,34 @@ if ! grep -Fq "rollout_services='grafana tempo'" <<<"${DETECT_OUTPUT}" || \
   exit 1
 fi
 
+
+DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
+  --event-name push \
+  --ref refs/heads/main \
+  api/message.api \
+  internal/handler/gozero_routes.go \
+  internal/handler/gozero_routes_test.go \
+  web/src/api/feedback.ts)"
+if ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"message-api\",\"groups-api\",\"agent-api\"]'" <<<"${DETECT_OUTPUT}" || \
+  grep -Fq 'gateway-ws' <<<"${DETECT_OUTPUT}" || \
+  grep -Fq 'user-rpc' <<<"${DETECT_OUTPUT}" || \
+  ! grep -Fq "image_services_space='user-api auth-api friends-api message-api groups-api agent-api web'" <<<"${DETECT_OUTPUT}"; then
+  echo "expected API route/web changes to rebuild API backends plus web, not every backend/RPC/worker" >&2
+  printf '%s\n' "${DETECT_OUTPUT}" >&2
+  exit 1
+fi
+
+DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
+  --event-name push \
+  --ref refs/heads/main \
+  internal/logic/message/create_feedback_logic.go)"
+if ! grep -Fq "backend_services='[\"message-api\",\"message-transfer\"]'" <<<"${DETECT_OUTPUT}" || \
+  grep -Fq 'user-api' <<<"${DETECT_OUTPUT}"; then
+  echo "expected message-domain logic changes to rebuild message-api and message-transfer only" >&2
+  printf '%s\n' "${DETECT_OUTPUT}" >&2
+  exit 1
+fi
+
 cat >"${TMP_DIR}/psql" <<'FAKEPSQL'
 #!/usr/bin/env bash
 set -euo pipefail
