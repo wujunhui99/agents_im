@@ -63,6 +63,43 @@ PROTO_DOMAINS = {
     "mail": "mailpb",
 }
 
+API_BACKEND_SERVICES = [
+    "user-api",
+    "auth-api",
+    "friends-api",
+    "message-api",
+    "groups-api",
+    "agent-api",
+]
+
+INTERNAL_DOMAIN_SERVICE_PREFIXES = {
+    "internal/handler/user/": ["user-api"],
+    "internal/handler/auth/": ["auth-api"],
+    "internal/handler/friends/": ["friends-api"],
+    "internal/handler/groups/": ["groups-api"],
+    "internal/handler/message/": ["message-api"],
+    "internal/handler/agent/": ["agent-api"],
+    "internal/handler/admin/": ["message-api"],
+    "internal/logic/user/": ["user-api"],
+    "internal/logic/auth/": ["auth-api"],
+    "internal/logic/friends/": ["friends-api"],
+    "internal/logic/groups/": ["groups-api"],
+    "internal/logic/message/": ["message-api", "message-transfer"],
+    "internal/logic/agent/": ["agent-api"],
+    "internal/servicecontext/user/": ["user-api"],
+    "internal/servicecontext/auth/": ["auth-api"],
+    "internal/servicecontext/friends/": ["friends-api"],
+    "internal/servicecontext/groups/": ["groups-api"],
+    "internal/servicecontext/message/": ["message-api", "message-transfer"],
+    "internal/servicecontext/agent/": ["agent-api"],
+}
+
+INTERNAL_EXACT_SERVICE_PATHS = {
+    "internal/handler/gozero_routes.go": API_BACKEND_SERVICES,
+    "internal/handler/gozero_routes_test.go": API_BACKEND_SERVICES,
+    "internal/handler/admin_routes_test.go": ["message-api"],
+}
+
 
 class DeploySelection:
     def __init__(self) -> None:
@@ -79,6 +116,13 @@ class DeploySelection:
     def add_all_backends(self) -> None:
         for service in BACKEND_SERVICES:
             self.add_backend(service)
+
+    def add_backends(self, services: list[str]) -> None:
+        for service in services:
+            self.add_backend(service)
+
+    def add_api_backends(self) -> None:
+        self.add_backends(API_BACKEND_SERVICES)
 
     def add_web(self) -> None:
         self.image_services.add("web")
@@ -207,12 +251,33 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         selection.add_all_backends()
         return
 
-    if (
-        path in {"go.mod", "go.sum", "Dockerfile", ".dockerignore"}
-        or path.startswith("internal/")
-        or path.startswith("db/")
-        or path == "scripts/migrate-postgres.sh"
-    ):
+    if path in {"go.mod", "go.sum", "Dockerfile", ".dockerignore"}:
+        selection.add_all_backends()
+        return
+
+    exact_services = INTERNAL_EXACT_SERVICE_PATHS.get(path)
+    if exact_services is not None:
+        selection.add_backends(exact_services)
+        return
+
+    for prefix, services in INTERNAL_DOMAIN_SERVICE_PREFIXES.items():
+        if path.startswith(prefix):
+            selection.add_backends(services)
+            return
+
+    if path.startswith("internal/rpcgen/"):
+        selection.add_all_backends()
+        return
+
+    if path.startswith("internal/"):
+        # Shared internal packages (model/repository/config/response/auth/etc.) can
+        # be imported by multiple APIs, RPCs, workers, or migrations. Keep those
+        # conservative while domain-specific handler/logic/servicecontext paths
+        # above remain selective.
+        selection.add_all_backends()
+        return
+
+    if path.startswith("db/") or path == "scripts/migrate-postgres.sh":
         selection.add_all_backends()
         return
 

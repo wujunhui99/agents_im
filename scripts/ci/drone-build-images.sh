@@ -20,6 +20,8 @@ build_parallelism="${DRONE_IMAGE_BUILD_PARALLELISM:-3}"
 force_all_images="${DRONE_IMAGE_BUILD_FORCE_ALL:-false}"
 build_only="${DRONE_IMAGE_BUILD_ONLY:-false}"
 branch="${DRONE_BRANCH:-}"
+export_backend_cache="${DRONE_EXPORT_BACKEND_CACHE:-false}"
+export_web_cache="${DRONE_EXPORT_WEB_CACHE:-true}"
 
 # DRONE_IMAGE_BUILD_FORCE_ALL and DRONE_IMAGE_BUILD_ONLY are measurement
 # controls for the devops CI/CD lab branch only. Production main deploys must
@@ -90,7 +92,16 @@ service_cache_name() {
   if [[ "${service}" == "web" ]]; then
     echo "web"
   else
-    echo "backend"
+    echo "backend-${service}"
+  fi
+}
+
+should_export_cache() {
+  local service="$1"
+  if [[ "${service}" == "web" ]]; then
+    [[ "${export_web_cache}" == "true" ]]
+  else
+    [[ "${export_backend_cache}" == "true" ]]
   fi
 }
 
@@ -168,7 +179,7 @@ run_batch() {
     done
     log_file="${work_dir}/${service}.log"
     echo "Queueing ${service} image build; active=$(( ${#active[@]} + 1 ))/${build_parallelism}."
-    run_build "${service}" "$(if [[ "${service}" == "web" ]]; then echo true; else echo false; fi)" >"${log_file}" 2>&1 &
+    run_build "${service}" "$(if should_export_cache "${service}"; then echo true; else echo false; fi)" >"${log_file}" 2>&1 &
     service_pid["${service}"]="$!"
     active+=("${service}")
   done
@@ -186,34 +197,10 @@ wall_start_epoch="$(date +%s)"
 echo "Image build services: ${services[*]}"
 echo "Image build parallelism: ${build_parallelism}"
 
-# Backend services share one cache ref. Export it once with the first backend build,
-# then run remaining backend builds as cache consumers to avoid repeated registry
-# cache export overhead and concurrent writes to the same cache manifest.
-declare -a remaining_services=()
-seed_backend=""
-for service in "${services[@]}"; do
-  if [[ -z "${seed_backend}" && "$(service_target "${service}")" == "backend" ]]; then
-    seed_backend="${service}"
-  else
-    remaining_services+=("${service}")
-  fi
-done
-
-if [[ -n "${seed_backend}" ]]; then
-  echo "Seeding shared backend cache with ${seed_backend}."
-  service_pid["${seed_backend}"]=""
-  run_build "${seed_backend}" true | tee "${work_dir}/${seed_backend}.log"
-  service_status["${seed_backend}"]=0
-  completed_services+=("${seed_backend}")
-  if [[ -f "${work_dir}/${seed_backend}.duration" ]]; then
-    service_duration["${seed_backend}"]="$(cat "${work_dir}/${seed_backend}.duration")"
-  fi
-fi
-
-if ((${#remaining_services[@]} > 0)); then
-  echo "Building remaining images with parallelism ${build_parallelism}: ${remaining_services[*]}"
-  run_batch "${remaining_services[@]}"
-fi
+echo "Backend cache export enabled: ${export_backend_cache}"
+echo "Web cache export enabled: ${export_web_cache}"
+echo "Building images with parallelism ${build_parallelism}: ${services[*]}"
+run_batch "${services[@]}"
 
 wall_end_epoch="$(date +%s)"
 wall_duration="$((wall_end_epoch - wall_start_epoch))"

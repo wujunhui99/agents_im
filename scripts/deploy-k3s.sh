@@ -381,7 +381,9 @@ apply_manifests() {
   fi
 
   ${KUBECTL} -n "${NAMESPACE}" get pods -o wide
-  ${KUBECTL} -n "${NAMESPACE}" get svc,ingress
+  if [[ "${AGENTS_IM_DEPLOY_LIST_RESOURCES:-false}" == "true" ]]; then
+    ${KUBECTL} -n "${NAMESPACE}" get svc,ingress
+  fi
 }
 
 main() {
