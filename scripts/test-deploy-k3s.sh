@@ -205,8 +205,20 @@ DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --ref refs/heads/main \
   internal/logic/message/create_feedback_logic.go)"
 if ! grep -Fq "backend_services='[\"message-api\",\"message-transfer\"]'" <<<"${DETECT_OUTPUT}" || \
-  grep -Fq 'user-api' <<<"${DETECT_OUTPUT}"; then
-  echo "expected message-domain logic changes to rebuild message-api and message-transfer only" >&2
+  grep -Fq 'user-api' <<<"${DETECT_OUTPUT}" || \
+  ! grep -Fq "migration_required=false" <<<"${DETECT_OUTPUT}"; then
+  echo "expected message-domain logic changes to rebuild message-api and message-transfer only without migrations" >&2
+  printf '%s\n' "${DETECT_OUTPUT}" >&2
+  exit 1
+fi
+
+DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
+  --event-name push \
+  --ref refs/heads/main \
+  db/migrations/202605260001_example.sql)"
+if ! grep -Fq "migration_required=true" <<<"${DETECT_OUTPUT}" || \
+  ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"message-api\",\"gateway-ws\",\"groups-api\",\"agent-api\",\"message-transfer\",\"user-rpc\",\"auth-rpc\",\"friends-rpc\",\"groups-rpc\",\"message-rpc\",\"mail-rpc\"]'" <<<"${DETECT_OUTPUT}"; then
+  echo "expected executable migration changes to require migrations and rebuild all backends" >&2
   printf '%s\n' "${DETECT_OUTPUT}" >&2
   exit 1
 fi
