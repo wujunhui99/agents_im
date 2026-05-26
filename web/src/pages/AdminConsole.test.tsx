@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminConsole } from './AdminConsole';
 import type { AdminApi, AdminConversationMessagesResponse, AdminDashboard, AdminUserSearchResponse } from '../api/admin';
+import type { MediaApi } from '../api/media';
 
 const dashboard: AdminDashboard = {
   totals: {
@@ -125,6 +126,18 @@ const bobSearch: AdminUserSearchResponse = {
   ],
 };
 
+function createMediaApi(): MediaApi {
+  return {
+    createUploadIntent: vi.fn(),
+    completeUpload: vi.fn(),
+    getDownloadURL: vi.fn(async (mediaId: string) => ({
+      mediaId,
+      downloadUrl: `https://media.test/${mediaId}`,
+      expiresAt: Date.now() + 600_000,
+    })),
+  };
+}
+
 function createAdminApi(overrides?: Partial<AdminApi>): AdminApi {
   return {
     getDashboard: vi.fn(async () => dashboard),
@@ -194,6 +207,13 @@ function createAdminApi(overrides?: Partial<AdminApi>): AdminApi {
         title: '消息发送失败',
         content: '点击发送后没有响应',
         contact: 'alice@example.com',
+        clientMeta: {
+          attachmentCount: 1,
+          attachmentUploadStatus: 'uploaded',
+          attachments: [
+            { mediaId: 'med_feedback_1', filename: 'feedback-screen.png', sizeBytes: 1024, contentType: 'image/png' },
+          ],
+        },
         createdAt: '2026-05-25T01:00:00Z',
         updatedAt: '2026-05-25T01:00:00Z',
       },
@@ -380,11 +400,12 @@ describe('AdminConsole', () => {
     expect(within(messages).getByText('AI response for inspector')).toBeInTheDocument();
   });
 
-  it('lists feedback and allows admin status updates', async () => {
+  it('lists feedback attachments and allows admin status updates', async () => {
     const user = userEvent.setup();
     const adminApi = createAdminApi();
+    const mediaApi = createMediaApi();
 
-    render(<AdminConsole adminApi={adminApi} />);
+    render(<AdminConsole adminApi={adminApi} mediaApi={mediaApi} />);
 
     await user.click(await screen.findByRole('button', { name: 'Feedback' }));
     await waitFor(() => expect(adminApi.listFeedback).toHaveBeenCalledWith({ status: 'new' }));
@@ -395,6 +416,13 @@ describe('AdminConsole', () => {
 
     await user.click(within(feedbackTable).getByRole('button', { name: 'Open feedback fb_1' }));
     expect(await screen.findByRole('heading', { name: '消息发送失败' })).toBeInTheDocument();
+    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_feedback_1'));
+    const attachments = await screen.findByRole('region', { name: '反馈图片' });
+    expect(within(attachments).getByRole('link', { name: '打开 feedback-screen.png' })).toHaveAttribute(
+      'href',
+      'https://media.test/med_feedback_1',
+    );
+    expect(within(attachments).getByAltText('feedback-screen.png')).toHaveAttribute('src', 'https://media.test/med_feedback_1');
     await user.selectOptions(screen.getByLabelText('反馈状态'), 'triaged');
     await user.type(screen.getByLabelText('管理员备注'), '已分派');
     await user.click(screen.getByRole('button', { name: '保存反馈处理' }));

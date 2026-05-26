@@ -38,6 +38,7 @@ type MediaLogic struct {
 	store            objectstorage.ObjectStore
 	bucket           string
 	attachmentAccess MediaAttachmentAccessChecker
+	accounts         repository.AccountRepository
 	now              func() time.Time
 	newID            func() (string, error)
 }
@@ -132,6 +133,13 @@ func NewMediaLogic(repo repository.MediaRepository, store objectstorage.ObjectSt
 func (l *MediaLogic) WithAttachmentAccessChecker(checker MediaAttachmentAccessChecker) *MediaLogic {
 	if l != nil {
 		l.attachmentAccess = checker
+	}
+	return l
+}
+
+func (l *MediaLogic) WithAccountRepository(accounts repository.AccountRepository) *MediaLogic {
+	if l != nil {
+		l.accounts = accounts
 	}
 	return l
 }
@@ -258,9 +266,15 @@ func (l *MediaLogic) GetDownloadURL(ctx context.Context, req GetMediaDownloadURL
 		return GetMediaDownloadURLResponse{}, err
 	}
 	if media.OwnerUserID != requesterUserID {
-		allowed, err := l.canAccessMessageAttachment(ctx, requesterUserID, media)
+		allowed, err := l.canAccessAnyMediaAsAdmin(ctx, requesterUserID)
 		if err != nil {
 			return GetMediaDownloadURLResponse{}, err
+		}
+		if !allowed {
+			allowed, err = l.canAccessMessageAttachment(ctx, requesterUserID, media)
+			if err != nil {
+				return GetMediaDownloadURLResponse{}, err
+			}
 		}
 		if !allowed {
 			return GetMediaDownloadURLResponse{}, apperror.Forbidden("media object is not accessible by requester")
@@ -433,6 +447,20 @@ func (l *MediaLogic) mediaByID(ctx context.Context, mediaID string) (model.Media
 		return model.MediaObject{}, apperror.NotFound("media object not found")
 	}
 	return media, nil
+}
+
+func (l *MediaLogic) canAccessAnyMediaAsAdmin(ctx context.Context, requesterUserID string) (bool, error) {
+	if l.accounts == nil {
+		return false, nil
+	}
+	user, err := l.accounts.GetByID(ctx, requesterUserID)
+	if err != nil {
+		if apperror.From(err).Code == apperror.CodeNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	return user.AccountType == model.AccountTypeAdmin, nil
 }
 
 func (l *MediaLogic) canAccessMessageAttachment(ctx context.Context, requesterUserID string, media model.MediaObject) (bool, error) {

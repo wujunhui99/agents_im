@@ -15,11 +15,23 @@ import {
   type AdminUserFriendsResponse,
   type AdminUserSearchResponse,
 } from '../api/admin';
+import {
+  createMediaApi,
+  type MediaApi,
+} from '../api/media';
 
 type AdminView = 'dashboard' | 'traces' | 'conversation' | 'users' | 'feedback' | 'taskReports' | 'observability';
 
+type FeedbackAttachment = {
+  mediaId: string;
+  filename: string;
+  sizeBytes?: number;
+  contentType?: string;
+};
+
 type AdminConsoleProps = {
   adminApi?: AdminApi;
+  mediaApi?: MediaApi;
 };
 
 const navItems: Array<{ key: AdminView; label: string }> = [
@@ -32,8 +44,9 @@ const navItems: Array<{ key: AdminView; label: string }> = [
   { key: 'observability', label: 'Observability' },
 ];
 
-export function AdminConsole({ adminApi }: AdminConsoleProps) {
+export function AdminConsole({ adminApi, mediaApi }: AdminConsoleProps) {
   const api = useMemo(() => adminApi ?? createAdminApi(), [adminApi]);
+  const media = useMemo(() => mediaApi ?? createMediaApi(), [mediaApi]);
   const [activeView, setActiveView] = useState<AdminView>(() => initialAdminViewFromPath());
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -60,10 +73,43 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
   const [feedbackError, setFeedbackError] = useState('');
   const [feedbackAdminNote, setFeedbackAdminNote] = useState('');
   const [feedbackUpdateStatus, setFeedbackUpdateStatus] = useState('');
+  const [feedbackAttachmentURLs, setFeedbackAttachmentURLs] = useState<Record<string, string>>({});
+  const [feedbackAttachmentError, setFeedbackAttachmentError] = useState('');
   const [taskReports, setTaskReports] = useState<AdminTaskReport[]>([]);
   const [taskReportOutcomeFilter, setTaskReportOutcomeFilter] = useState('');
   const [taskReportsLoading, setTaskReportsLoading] = useState(false);
   const [taskReportsError, setTaskReportsError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    const attachments = feedbackAttachmentsFromMeta(selectedFeedback?.clientMeta);
+    setFeedbackAttachmentURLs({});
+    setFeedbackAttachmentError('');
+    if (attachments.length === 0) {
+      return () => {
+        active = false;
+      };
+    }
+    Promise.all(
+      attachments.map(async (attachment) => {
+        const result = await media.getDownloadURL(attachment.mediaId);
+        return [attachment.mediaId, result.downloadUrl] as const;
+      }),
+    )
+      .then((entries) => {
+        if (active) {
+          setFeedbackAttachmentURLs(Object.fromEntries(entries));
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFeedbackAttachmentError('Could not load feedback images');
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [media, selectedFeedback]);
 
   useEffect(() => {
     let active = true;
@@ -341,6 +387,8 @@ export function AdminConsole({ adminApi }: AdminConsoleProps) {
             setAdminNote: setFeedbackAdminNote,
             loading: feedbackLoading,
             error: feedbackError,
+            attachmentURLs: feedbackAttachmentURLs,
+            attachmentError: feedbackAttachmentError,
             onReload: loadFeedback,
             onOpen: openFeedback,
             onSave: saveFeedback,
@@ -904,6 +952,8 @@ function renderFeedback({
   setAdminNote,
   loading,
   error,
+  attachmentURLs,
+  attachmentError,
   onReload,
   onOpen,
   onSave,
@@ -918,6 +968,8 @@ function renderFeedback({
   setAdminNote: (value: string) => void;
   loading: boolean;
   error: string;
+  attachmentURLs: Record<string, string>;
+  attachmentError: string;
   onReload: (status: string) => void;
   onOpen: (item: AdminFeedback) => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
@@ -1008,6 +1060,11 @@ function renderFeedback({
               </>
             ) : null}
           </dl>
+          <FeedbackAttachmentsPanel
+            attachments={feedbackAttachmentsFromMeta(selectedFeedback.clientMeta)}
+            urls={attachmentURLs}
+            error={attachmentError}
+          />
           <form className="admin-feedback-update-form" onSubmit={onSave}>
             <label className="admin-select-field">
               <span>反馈状态</span>
@@ -1029,6 +1086,70 @@ function renderFeedback({
       ) : null}
     </div>
   );
+}
+
+function FeedbackAttachmentsPanel({
+  attachments,
+  urls,
+  error,
+}: {
+  attachments: FeedbackAttachment[];
+  urls: Record<string, string>;
+  error: string;
+}) {
+  if (attachments.length === 0) {
+    return null;
+  }
+  return (
+    <section className="admin-feedback-attachments" aria-label="反馈图片">
+      <h4>反馈图片</h4>
+      {error ? <p className="admin-error">{error}</p> : null}
+      <div className="admin-feedback-attachment-grid">
+        {attachments.map((attachment) => {
+          const url = urls[attachment.mediaId];
+          return (
+            <a
+              className="admin-feedback-attachment-card"
+              href={url ?? '#'}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`打开 ${attachment.filename}`}
+              key={attachment.mediaId}
+            >
+              {url ? <img src={url} alt={attachment.filename} /> : <span>图片加载中</span>}
+              <small>{attachment.filename}</small>
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function feedbackAttachmentsFromMeta(meta: Record<string, unknown> | undefined): FeedbackAttachment[] {
+  const raw = meta?.attachments;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+    const attachment = item as Record<string, unknown>;
+    const mediaId = typeof attachment.mediaId === 'string' ? attachment.mediaId.trim() : '';
+    const filename = typeof attachment.filename === 'string' ? attachment.filename.trim() : mediaId;
+    if (!mediaId || !filename) {
+      return [];
+    }
+    return [
+      {
+        mediaId,
+        filename,
+        sizeBytes: typeof attachment.sizeBytes === 'number' ? attachment.sizeBytes : undefined,
+        contentType: typeof attachment.contentType === 'string' ? attachment.contentType : undefined,
+      },
+    ];
+  });
 }
 
 const feedbackStatusOptions = [
