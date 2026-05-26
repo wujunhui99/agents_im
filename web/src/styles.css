@@ -140,6 +140,7 @@ time {
   display: flex;
   flex-direction: column;
   gap: var(--md-space-3);
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
 }
 
 .page-stack > .md-card {
