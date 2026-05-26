@@ -997,6 +997,26 @@ type AdminConversationMessagesResp struct {
 	Data    AdminConversationMessagesData `json:"data"`
 }
 
+type AdminReplayAgentMessageReq struct {
+	ConversationID string `path:"conversation_id"`
+	ServerMsgID    string `path:"server_msg_id"`
+}
+
+type AdminReplayAgentMessageData struct {
+	ConversationID string       `json:"conversationId"`
+	ServerMsgID    string       `json:"serverMsgId"`
+	Triggered      bool         `json:"triggered"`
+	Skipped        bool         `json:"skipped"`
+	Reason         string       `json:"reason,omitempty"`
+	Message        AdminMessage `json:"message"`
+}
+
+type AdminReplayAgentMessageResp struct {
+	Code    string                      `json:"code"`
+	Message string                      `json:"message"`
+	Data    AdminReplayAgentMessageData `json:"data"`
+}
+
 type AdminUserSearchResp struct {
 	Code    string              `json:"code"`
 	Message string              `json:"message"`

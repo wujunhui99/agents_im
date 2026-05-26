@@ -18,6 +18,7 @@ import (
 type ServiceContext struct {
 	common.AuthRuntime
 	MessageLogic      *logic.MessageLogic
+	AgentMessageHook  logic.MessageCreatedHook
 	AIHostingLogic    *logic.ConversationAIHostingLogic
 	MediaLogic        *logic.MediaLogic
 	FeedbackLogic     *logic.FeedbackLogic
@@ -165,6 +166,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	if err != nil {
 		return err
 	}
+	ctx.AgentMessageHook = hosting
 	ctx.MessageLogic.SetMessageCreatedHook(hosting)
 	return nil
 }

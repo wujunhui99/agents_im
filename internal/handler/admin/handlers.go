@@ -87,6 +87,26 @@ func GetConversationMessagesHandler(svcCtx *adminsvc.ServiceContext) http.Handle
 	}
 }
 
+func ReplayAgentMessageHandler(svcCtx *adminsvc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.AdminReplayAgentMessageReq
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+
+		resp, err := svcCtx.AIReplayLogic.ReplayAgentMessage(r.Context(), business.AdminReplayAgentMessageRequest{
+			ConversationID: req.ConversationID,
+			ServerMsgID:    req.ServerMsgID,
+		})
+		if err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+		httpx.OkJsonCtx(r.Context(), w, adminReplayAgentMessageResp(resp))
+	}
+}
+
 func SearchUsersHandler(svcCtx *adminsvc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.AdminUserSearchReq
