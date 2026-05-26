@@ -143,5 +143,6 @@ make status
 - `web/src/api/contacts.ts`：`listFriends` -> `GET /friends`，`addFriend` -> `POST /friends`，`deleteFriend` -> `DELETE /friends/:user_id`。
 - `web/src/api/groups.ts`：`listGroups` -> `GET /groups`，`getGroup` -> `GET /groups/:group_id`，`createGroup` -> `POST /groups`（支持 `member_user_ids`），`joinGroup` -> `POST /groups/:group_id/members`，`leaveGroup` -> `DELETE /groups/:group_id/members/me`，`listMembers` -> `GET /groups/:group_id/members`。
 - `web/src/api/messages.ts`：`sendMessage` -> `POST /messages`，`pullMessages` -> `GET /conversations/:conversation_id/messages`，`getConversationSeqs` -> `GET /conversations/seqs`，`markRead` -> `POST /conversations/:conversation_id/read`，`getAIHosting` -> `GET /conversations/:conversation_id/ai-hosting`，`updateAIHosting` -> `PUT /conversations/:conversation_id/ai-hosting`。
+- `web/src/api/feedback.ts`：用户反馈提交使用 `POST /api/feedback`，不要提交到 `/feedback`，因为 `/feedback` 是 SPA 页面路由。
 - `web/src/api/admin.ts`：反馈管理使用 `GET /api/admin/feedback`、`GET /api/admin/feedback/:feedback_id`、`PATCH /api/admin/feedback/:feedback_id`，任务报告使用 `GET /api/admin/task-reports`；不要用 `/admin/feedback` 或 `/admin/task-reports` 作为 JSON fetch 目标。
 - Adapter 接受可注入 `fetcher` 和 bearer token；示例 token 只能使用 `***` 或测试 fixture 值。

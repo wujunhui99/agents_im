@@ -102,6 +102,13 @@ spec:
                 name: message-api
                 port:
                   number: 8083
+          - path: /api/feedback
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
           - path: /groups
             pathType: Prefix
             backend:
@@ -204,6 +211,13 @@ spec:
                 port:
                   number: 8083
           - path: /api/admin/task-reports
+            pathType: Prefix
+            backend:
+              service:
+                name: message-api
+                port:
+                  number: 8083
+          - path: /api/feedback
             pathType: Prefix
             backend:
               service:

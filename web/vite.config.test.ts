@@ -11,6 +11,7 @@ describe('Vite local backend proxy', () => {
     expect(proxy['/admin/users']).toMatchObject({ target: 'http://127.0.0.1:8083' });
     expect(proxy['/api/admin/feedback']).toMatchObject({ target: 'http://127.0.0.1:8083' });
     expect(proxy['/api/admin/task-reports']).toMatchObject({ target: 'http://127.0.0.1:8083' });
+    expect(proxy['/api/feedback']).toMatchObject({ target: 'http://127.0.0.1:8083' });
     expect(proxy['/auth']).toMatchObject({ target: 'http://127.0.0.1:8081' });
     expect(proxy['/me']).toMatchObject({ target: 'http://127.0.0.1:8080' });
     expect(proxy['/users']).toMatchObject({ target: 'http://127.0.0.1:8080' });

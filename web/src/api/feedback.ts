@@ -22,7 +22,7 @@ export type FeedbackApi = {
 export function createFeedbackApi(api: ApiClient = createApiClient()): FeedbackApi {
   return {
     submitFeedback(request) {
-      return api.post<SubmitFeedbackResponse>('/feedback', request);
+      return api.post<SubmitFeedbackResponse>('/api/feedback', request);
     },
   };
 }
