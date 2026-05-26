@@ -173,6 +173,9 @@ service message-api {
 	@handler createFeedback
 	post /feedback (CreateFeedbackReq) returns (CreateFeedbackResp)
 
+	@handler createFeedback
+	post /api/feedback (CreateFeedbackReq) returns (CreateFeedbackResp)
+
 	@handler pullMessages
 	get /conversations/:conversation_id/messages (PullMessagesReq) returns (PullMessagesResp)
 

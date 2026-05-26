@@ -346,6 +346,11 @@ func addMessageRoutes(server *rest.Server, serverCtx *messagesvc.ServiceContext)
 			Handler: messagehandler.CreateFeedbackHandler(serverCtx),
 		},
 		{
+			Method:  http.MethodPost,
+			Path:    "/api/feedback",
+			Handler: messagehandler.CreateFeedbackHandler(serverCtx),
+		},
+		{
 			Method:  http.MethodGet,
 			Path:    "/conversations/:conversation_id/messages",
 			Handler: messagehandler.PullMessagesHandler(serverCtx),

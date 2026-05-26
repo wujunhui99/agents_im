@@ -16,6 +16,7 @@ export default defineConfig({
       '/admin/users': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
       '/api/admin/feedback': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
       '/api/admin/task-reports': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
+      '/api/feedback': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
       '/auth': { target: httpTarget('AUTH_API_PORT', 8081), changeOrigin: true },
       '/messages': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
       '/conversations': { target: httpTarget('MESSAGE_API_PORT', 8083), changeOrigin: true },
