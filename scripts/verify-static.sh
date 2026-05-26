@@ -2218,6 +2218,19 @@ if "agents-im-observability-basic-auth@kubernetescrd" not in metrics_middlewares
     print("deploy/k8s/ingress.yaml: /observability/metrics must keep observability basic auth", file=sys.stderr)
     sys.exit(1)
 
+ms_media_expectations = {
+    "/media": ("user-api", 8080),
+    "/agents-im-media": ("agents-im-minio", 9000),
+}
+for path, expected_backend in ms_media_expectations.items():
+    _, service_name, service_port = backend_for_host_path("ms.agenticim.xyz", path)
+    if (service_name, service_port) != expected_backend:
+        print(
+            f"deploy/k8s/ingress.yaml: ms.agenticim.xyz{path} routes to {(service_name, service_port)}, want {expected_backend}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
 redirect_expectations = {
     "/observability/logs": "agents-im-observability-logs-redirect@kubernetescrd",
     "/observability/traces": "agents-im-observability-traces-redirect@kubernetescrd",
