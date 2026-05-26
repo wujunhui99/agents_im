@@ -55,6 +55,9 @@ func TestAdminAIReplayLogicReplaysDirectHumanMessageToAgent(t *testing.T) {
 	if hook.last.Message.ServerMsgID != trigger.ServerMsgID || hook.last.Message.ReceiverID != "agent_default_assistant_account" {
 		t.Fatalf("hook message = %+v, want replayed trigger", hook.last.Message)
 	}
+	if len(hook.last.TargetAgentAccountIDs) != 1 || hook.last.TargetAgentAccountIDs[0] != "agent_default_assistant_account" {
+		t.Fatalf("target agent ids = %+v, want explicit receiver target", hook.last.TargetAgentAccountIDs)
+	}
 }
 
 func TestAdminAIReplayLogicSkipsWhenAIResponseAlreadyExists(t *testing.T) {

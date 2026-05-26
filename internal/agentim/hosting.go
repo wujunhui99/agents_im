@@ -208,7 +208,7 @@ func (s *ConversationHostingService) OnMessageCreated(ctx context.Context, input
 		OperationID:           input.OperationID,
 		TraceID:               input.TraceID,
 		Message:               input.Message,
-		TargetAgentAccountIDs: nil,
+		TargetAgentAccountIDs: input.TargetAgentAccountIDs,
 	})
 	return err
 }
