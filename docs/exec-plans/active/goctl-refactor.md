@@ -93,7 +93,7 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/message.proto --go_ou
   - `internal/logic/agent/*_logic.go`
   - `internal/logic/auth/*_logic.go`
 - 已新增正式 RPC generated pb packages：
-  - `proto/userpb`
+  - `service/user/rpc/user`
   - `proto/authpb`
   - `proto/friendspb`
   - `proto/groupspb`

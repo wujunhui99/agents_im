@@ -8,7 +8,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/config"
-	"github.com/wujunhui99/agents_im/service/user/rpc/userservice"
+	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
@@ -16,7 +16,7 @@ var ErrUserRPCConfigRequired = errors.New("user rpc client config is required")
 
 type ServiceContext struct {
 	Config  config.Config
-	UserRPC userservice.UserService
+	UserRPC userclient.User
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
@@ -29,7 +29,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	}
 	return &ServiceContext{
 		Config:  c,
-		UserRPC: userservice.NewUserService(cli),
+		UserRPC: userclient.NewUser(cli),
 	}, nil
 }
 

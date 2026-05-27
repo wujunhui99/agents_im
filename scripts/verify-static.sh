@@ -35,8 +35,8 @@ required_files=(
   "proto/groups.proto"
   "proto/message.proto"
   "proto/mail.proto"
-  "proto/userpb/user.pb.go"
-  "proto/userpb/user_grpc.pb.go"
+  "service/user/rpc/user/user.pb.go"
+  "service/user/rpc/user/user_grpc.pb.go"
   "proto/authpb/auth.pb.go"
   "proto/authpb/auth_grpc.pb.go"
   "proto/friendspb/friends.pb.go"
@@ -48,7 +48,7 @@ required_files=(
   "proto/mailpb/mail.pb.go"
   "proto/mailpb/mail_grpc.pb.go"
   "service/user/rpc/user.v1.go"
-  "service/user/rpc/internal/server/user_service_server.go"
+  "service/user/rpc/internal/server/userserver.go"
   "service/user/api/user.go"
   "service/user/api/entry/entry.go"
   "service/user/api/internal/config/config.go"
@@ -941,7 +941,7 @@ for dir in "${rpc_generated_dirs[@]}"; do
 done
 
 rpc_generated_servers=(
-  "service/user/rpc/internal/server/user_service_server.go:UserServiceServer"
+  "service/user/rpc/internal/server/userserver.go:UserServer"
   "internal/rpcgen/auth/internal/server/auth_service_server.go:AuthServiceServer"
   "internal/rpcgen/friends/internal/server/friends_service_server.go:FriendsServiceServer"
   "internal/rpcgen/groups/internal/server/groups_service_server.go:GroupsServiceServer"
@@ -958,7 +958,7 @@ for server_spec in "${rpc_generated_servers[@]}"; do
 done
 
 rpc_generated_entrypoints=(
-  "service/user/rpc/user.v1.go:RegisterUserServiceServer"
+  "service/user/rpc/user.v1.go:RegisterUserServer"
   "internal/rpcgen/auth/auth.v1.go:RegisterAuthServiceServer"
   "internal/rpcgen/friends/friends.v1.go:RegisterFriendsServiceServer"
   "internal/rpcgen/groups/groups.v1.go:RegisterGroupsServiceServer"
@@ -1052,8 +1052,8 @@ if rg -n "RegisterHandlers|RegisterUserHandlers|RegisterFriendsHandlers|Register
 fi
 
 rpc_generated_proto_files=(
-  "proto/userpb/user.pb.go"
-  "proto/userpb/user_grpc.pb.go"
+  "service/user/rpc/user/user.pb.go"
+  "service/user/rpc/user/user_grpc.pb.go"
   "proto/authpb/auth.pb.go"
   "proto/authpb/auth_grpc.pb.go"
   "proto/friendspb/friends.pb.go"

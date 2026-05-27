@@ -4,7 +4,7 @@
 // 	protoc        v3.19.4
 // source: service/user/rpc/user.proto
 
-package userpb
+package user
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -21,9 +21,9 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// User is the V0 transport message for an Account/Profile aggregate. user_id is
+// UserEntity is the V0 transport message for an Account/Profile aggregate. user_id is
 // the compatibility alias for internal account_id.
-type User struct {
+type UserEntity struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Identifier    string                 `protobuf:"bytes,2,opt,name=identifier,proto3" json:"identifier,omitempty"`
@@ -42,20 +42,20 @@ type User struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *User) Reset() {
-	*x = User{}
+func (x *UserEntity) Reset() {
+	*x = UserEntity{}
 	mi := &file_service_user_rpc_user_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *User) String() string {
+func (x *UserEntity) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*User) ProtoMessage() {}
+func (*UserEntity) ProtoMessage() {}
 
-func (x *User) ProtoReflect() protoreflect.Message {
+func (x *UserEntity) ProtoReflect() protoreflect.Message {
 	mi := &file_service_user_rpc_user_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -67,96 +67,96 @@ func (x *User) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use User.ProtoReflect.Descriptor instead.
-func (*User) Descriptor() ([]byte, []int) {
+// Deprecated: Use UserEntity.ProtoReflect.Descriptor instead.
+func (*UserEntity) Descriptor() ([]byte, []int) {
 	return file_service_user_rpc_user_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *User) GetUserId() string {
+func (x *UserEntity) GetUserId() string {
 	if x != nil {
 		return x.UserId
 	}
 	return ""
 }
 
-func (x *User) GetIdentifier() string {
+func (x *UserEntity) GetIdentifier() string {
 	if x != nil {
 		return x.Identifier
 	}
 	return ""
 }
 
-func (x *User) GetDisplayName() string {
+func (x *UserEntity) GetDisplayName() string {
 	if x != nil {
 		return x.DisplayName
 	}
 	return ""
 }
 
-func (x *User) GetName() string {
+func (x *UserEntity) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *User) GetGender() string {
+func (x *UserEntity) GetGender() string {
 	if x != nil {
 		return x.Gender
 	}
 	return ""
 }
 
-func (x *User) GetBirthDate() string {
+func (x *UserEntity) GetBirthDate() string {
 	if x != nil {
 		return x.BirthDate
 	}
 	return ""
 }
 
-func (x *User) GetRegion() string {
+func (x *UserEntity) GetRegion() string {
 	if x != nil {
 		return x.Region
 	}
 	return ""
 }
 
-func (x *User) GetCreatedAt() string {
+func (x *UserEntity) GetCreatedAt() string {
 	if x != nil {
 		return x.CreatedAt
 	}
 	return ""
 }
 
-func (x *User) GetUpdatedAt() string {
+func (x *UserEntity) GetUpdatedAt() string {
 	if x != nil {
 		return x.UpdatedAt
 	}
 	return ""
 }
 
-func (x *User) GetAccountType() string {
+func (x *UserEntity) GetAccountType() string {
 	if x != nil {
 		return x.AccountType
 	}
 	return ""
 }
 
-func (x *User) GetAvatarMediaId() string {
+func (x *UserEntity) GetAvatarMediaId() string {
 	if x != nil {
 		return x.AvatarMediaId
 	}
 	return ""
 }
 
-func (x *User) GetEmail() string {
+func (x *UserEntity) GetEmail() string {
 	if x != nil {
 		return x.Email
 	}
 	return ""
 }
 
-func (x *User) GetAvatarUrl() string {
+func (x *UserEntity) GetAvatarUrl() string {
 	if x != nil {
 		return x.AvatarUrl
 	}
@@ -535,7 +535,7 @@ type UpdateUserAvatarRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	// avatar_media_id is the uploaded media object to validate and attach as the
-	// profile avatar. The name intentionally matches User.avatar_media_id; HTTP
+	// profile avatar. The name intentionally matches UserEntity.avatar_media_id; HTTP
 	// compatibility may still accept legacy JSON field mediaId at the BFF layer.
 	AvatarMediaId string `protobuf:"bytes,2,opt,name=avatar_media_id,json=avatarMediaId,proto3" json:"avatar_media_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -588,7 +588,7 @@ func (x *UpdateUserAvatarRequest) GetAvatarMediaId() string {
 
 type UserResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	User          *UserEntity            `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -623,7 +623,7 @@ func (*UserResponse) Descriptor() ([]byte, []int) {
 	return file_service_user_rpc_user_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *UserResponse) GetUser() *User {
+func (x *UserResponse) GetUser() *UserEntity {
 	if x != nil {
 		return x.User
 	}
@@ -634,8 +634,9 @@ var File_service_user_rpc_user_proto protoreflect.FileDescriptor
 
 const file_service_user_rpc_user_proto_rawDesc = "" +
 	"\n" +
-	"\x1bservice/user/rpc/user.proto\x12\auser.v1\"\x83\x03\n" +
-	"\x04User\x12\x17\n" +
+	"\x1bservice/user/rpc/user.proto\x12\auser.v1\"\x89\x03\n" +
+	"\n" +
+	"UserEntity\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x02 \x01(\tR\n" +
@@ -698,17 +699,17 @@ const file_service_user_rpc_user_proto_rawDesc = "" +
 	"\a_region\"Z\n" +
 	"\x17UpdateUserAvatarRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12&\n" +
-	"\x0favatar_media_id\x18\x02 \x01(\tR\ravatarMediaId\"1\n" +
-	"\fUserResponse\x12!\n" +
-	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user2\xdf\x03\n" +
-	"\vUserService\x12?\n" +
+	"\x0favatar_media_id\x18\x02 \x01(\tR\ravatarMediaId\"7\n" +
+	"\fUserResponse\x12'\n" +
+	"\x04user\x18\x01 \x01(\v2\x13.user.v1.UserEntityR\x04user2\xd8\x03\n" +
+	"\x04User\x12?\n" +
 	"\n" +
 	"CreateUser\x12\x1a.user.v1.CreateUserRequest\x1a\x15.user.v1.UserResponse\x12Q\n" +
 	"\x13GetUserByIdentifier\x12#.user.v1.GetUserByIdentifierRequest\x1a\x15.user.v1.UserResponse\x12]\n" +
 	"\x12ExistsByIdentifier\x12\".user.v1.ExistsByIdentifierRequest\x1a#.user.v1.ExistsByIdentifierResponse\x12A\n" +
 	"\vGetUserByID\x12\x1b.user.v1.GetUserByIDRequest\x1a\x15.user.v1.UserResponse\x12M\n" +
 	"\x11UpdateUserProfile\x12!.user.v1.UpdateUserProfileRequest\x1a\x15.user.v1.UserResponse\x12K\n" +
-	"\x10UpdateUserAvatar\x12 .user.v1.UpdateUserAvatarRequest\x1a\x15.user.v1.UserResponseB.Z,github.com/wujunhui99/agents_im/proto/userpbb\x06proto3"
+	"\x10UpdateUserAvatar\x12 .user.v1.UpdateUserAvatarRequest\x1a\x15.user.v1.UserResponseB7Z5github.com/wujunhui99/agents_im/service/user/rpc/userb\x06proto3"
 
 var (
 	file_service_user_rpc_user_proto_rawDescOnce sync.Once
@@ -724,7 +725,7 @@ func file_service_user_rpc_user_proto_rawDescGZIP() []byte {
 
 var file_service_user_rpc_user_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_service_user_rpc_user_proto_goTypes = []any{
-	(*User)(nil),                       // 0: user.v1.User
+	(*UserEntity)(nil),                 // 0: user.v1.UserEntity
 	(*CreateUserRequest)(nil),          // 1: user.v1.CreateUserRequest
 	(*GetUserByIdentifierRequest)(nil), // 2: user.v1.GetUserByIdentifierRequest
 	(*ExistsByIdentifierRequest)(nil),  // 3: user.v1.ExistsByIdentifierRequest
@@ -735,19 +736,19 @@ var file_service_user_rpc_user_proto_goTypes = []any{
 	(*UserResponse)(nil),               // 8: user.v1.UserResponse
 }
 var file_service_user_rpc_user_proto_depIdxs = []int32{
-	0, // 0: user.v1.UserResponse.user:type_name -> user.v1.User
-	1, // 1: user.v1.UserService.CreateUser:input_type -> user.v1.CreateUserRequest
-	2, // 2: user.v1.UserService.GetUserByIdentifier:input_type -> user.v1.GetUserByIdentifierRequest
-	3, // 3: user.v1.UserService.ExistsByIdentifier:input_type -> user.v1.ExistsByIdentifierRequest
-	5, // 4: user.v1.UserService.GetUserByID:input_type -> user.v1.GetUserByIDRequest
-	6, // 5: user.v1.UserService.UpdateUserProfile:input_type -> user.v1.UpdateUserProfileRequest
-	7, // 6: user.v1.UserService.UpdateUserAvatar:input_type -> user.v1.UpdateUserAvatarRequest
-	8, // 7: user.v1.UserService.CreateUser:output_type -> user.v1.UserResponse
-	8, // 8: user.v1.UserService.GetUserByIdentifier:output_type -> user.v1.UserResponse
-	4, // 9: user.v1.UserService.ExistsByIdentifier:output_type -> user.v1.ExistsByIdentifierResponse
-	8, // 10: user.v1.UserService.GetUserByID:output_type -> user.v1.UserResponse
-	8, // 11: user.v1.UserService.UpdateUserProfile:output_type -> user.v1.UserResponse
-	8, // 12: user.v1.UserService.UpdateUserAvatar:output_type -> user.v1.UserResponse
+	0, // 0: user.v1.UserResponse.user:type_name -> user.v1.UserEntity
+	1, // 1: user.v1.User.CreateUser:input_type -> user.v1.CreateUserRequest
+	2, // 2: user.v1.User.GetUserByIdentifier:input_type -> user.v1.GetUserByIdentifierRequest
+	3, // 3: user.v1.User.ExistsByIdentifier:input_type -> user.v1.ExistsByIdentifierRequest
+	5, // 4: user.v1.User.GetUserByID:input_type -> user.v1.GetUserByIDRequest
+	6, // 5: user.v1.User.UpdateUserProfile:input_type -> user.v1.UpdateUserProfileRequest
+	7, // 6: user.v1.User.UpdateUserAvatar:input_type -> user.v1.UpdateUserAvatarRequest
+	8, // 7: user.v1.User.CreateUser:output_type -> user.v1.UserResponse
+	8, // 8: user.v1.User.GetUserByIdentifier:output_type -> user.v1.UserResponse
+	4, // 9: user.v1.User.ExistsByIdentifier:output_type -> user.v1.ExistsByIdentifierResponse
+	8, // 10: user.v1.User.GetUserByID:output_type -> user.v1.UserResponse
+	8, // 11: user.v1.User.UpdateUserProfile:output_type -> user.v1.UserResponse
+	8, // 12: user.v1.User.UpdateUserAvatar:output_type -> user.v1.UserResponse
 	7, // [7:13] is the sub-list for method output_type
 	1, // [1:7] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name

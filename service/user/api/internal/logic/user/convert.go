@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/proto/userpb"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/types"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

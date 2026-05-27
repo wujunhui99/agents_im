@@ -4,7 +4,7 @@
 
 ## 背景
 
-Account Service 是账号资料的权威边界。Account 可代表 human user、agent、admin，未来可扩展 service/official accounts。当前 REST 与 RPC transport 仍保留 `user-api` / `user-rpc` V0 compatibility；canonical RPC proto 已迁移到 `service/user/rpc/user.proto`，Go package 输出仍是 `proto/userpb` 以保持 import 兼容。旧手写 HTTP mux 注册层和 `internal/rpc` wrapper 已移除；业务行为继续由 `internal/logic` 与 repository 承载，后续逐步把数据边界收敛到 `service/user/rpc/internal/model`。
+Account Service 是账号资料的权威边界。Account 可代表 human user、agent、admin，未来可扩展 service/official accounts。当前 REST 与 RPC transport 仍保留 `user-api` / `user-rpc` V0 compatibility；canonical RPC proto 已迁移到 `service/user/rpc/user.proto`，Go package 输出与 RPC 服务同目录，位于 `service/user/rpc/user`；goctl client 位于 `service/user/rpc/userclient`。旧手写 HTTP mux 注册层和 `internal/rpc` wrapper 已移除；业务行为继续由 `internal/logic` 与 repository 承载，后续逐步把数据边界收敛到 `service/user/rpc/internal/model`。
 
 术语规则：
 
@@ -64,10 +64,10 @@ service/user/rpc/internal/logic
 service/user/rpc/internal/model        # goctl model scaffold for user RPC data boundary
 service/user/rpc/internal/server
 service/user/rpc/internal/svc
-service/user/rpc/userservice
+service/user/rpc/userclient
 service/user/rpc/entry
 service/user/rpc/user.v1.go
-proto/userpb                           # generated pb/grpc output for import compatibility
+service/user/rpc/user                   # generated pb/grpc output
 cmd/user-api/main.go
 cmd/user-rpc/main.go
 etc/user-api.yaml

@@ -5,8 +5,8 @@ import (
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
-	"github.com/wujunhui99/agents_im/proto/userpb"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

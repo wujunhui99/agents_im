@@ -128,9 +128,9 @@ goctl rpc protoc service/user/rpc/user.proto \
 test -f service/user/rpc/user.v1.go
 test -f service/user/rpc/internal/server/user_service_server.go
 test -f service/user/rpc/internal/svc/service_context.go
-test -f service/user/rpc/userservice/user_service.go
-test -f proto/userpb/user.pb.go
-test -f proto/userpb/user_grpc.pb.go
+test -f service/user/rpc/userclient/user.go
+test -f service/user/rpc/user/user.pb.go
+test -f service/user/rpc/user/user_grpc.pb.go
 ```
 
 `cmd/<domain>-rpc/main.go` 不直接 import `service/<domain>/rpc/internal/*`，因为 Go `internal` 可见性不允许。需要添加桥接包：
@@ -307,14 +307,14 @@ service/user/rpc/internal/logic/*.go
 service/user/rpc/internal/model/*.go
 service/user/rpc/internal/server/user_service_server.go
 service/user/rpc/internal/svc/service_context.go
-service/user/rpc/userservice/user_service.go
+service/user/rpc/userclient/user.go
 service/user/rpc/entry/entry.go
 ```
 
-同时保留 `proto/userpb/*` 作为 Go package 输出，供现有服务继续 import：
+同时生成 `service/user/rpc/user/*` 作为 RPC-local protobuf Go package 输出，供 `userclient` 与 user API import：
 
 ```go
-github.com/wujunhui99/agents_im/proto/userpb
+github.com/wujunhui99/agents_im/service/user/rpc/user
 ```
 
 `cmd/user-rpc/main.go` 只导入 `service/user/rpc/entry`，不再导入旧 `internal/rpcgen/user/entry`。
@@ -331,4 +331,4 @@ service/user/api/internal/types/types.go
 service/user/api/entry/entry.go
 ```
 
-`cmd/user-api/main.go` 只导入 `service/user/api/entry`。`service/user/api/internal/svc.ServiceContext` 只持有 API config 和 `service/user/rpc/userservice.UserService` RPC client；用户 API 逻辑不得 import `internal/repository`、`internal/model`、`internal/objectstorage` 或旧 `internal/servicecontext/user`。
+`cmd/user-api/main.go` 只导入 `service/user/api/entry`。`service/user/api/internal/svc.ServiceContext` 只持有 API config 和 `service/user/rpc/userclient.User` RPC client；用户 API 逻辑不得 import `internal/repository`、`internal/model`、`internal/objectstorage` 或旧 `internal/servicecontext/user`。

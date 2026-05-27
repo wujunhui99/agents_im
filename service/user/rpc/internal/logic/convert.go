@@ -2,12 +2,12 @@ package logic
 
 import (
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/proto/userpb"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 )
 
 func toUserResponse(profile business.UserProfile) *userpb.UserResponse {
 	return &userpb.UserResponse{
-		User: &userpb.User{
+		User: &userpb.UserEntity{
 			UserId:        profile.UserID,
 			Identifier:    profile.Identifier,
 			DisplayName:   profile.DisplayName,

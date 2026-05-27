@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
-	"github.com/wujunhui99/agents_im/proto/userpb"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/types"
-	"github.com/wujunhui99/agents_im/service/user/rpc/userservice"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 	"google.golang.org/grpc"
 )
 
@@ -115,7 +115,7 @@ func TestUpdateMeAvatarCallsUserRPCWithAuthenticatedUser(t *testing.T) {
 }
 
 type recordingUserRPC struct {
-	userservice.UserService
+	userclient.User
 
 	createReq         *userpb.CreateUserRequest
 	createResp        *userpb.UserResponse
@@ -142,7 +142,7 @@ func (c *recordingUserRPC) UpdateUserAvatar(_ context.Context, in *userpb.Update
 
 func userResponse(userID string, identifier string, email string, displayName string) *userpb.UserResponse {
 	return &userpb.UserResponse{
-		User: &userpb.User{
+		User: &userpb.UserEntity{
 			UserId:        userID,
 			Identifier:    identifier,
 			Email:         email,

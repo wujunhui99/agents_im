@@ -7,10 +7,10 @@ import (
 
 	appconfig "github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/observability"
-	"github.com/wujunhui99/agents_im/proto/userpb"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -37,7 +37,7 @@ func Start(configFile string) {
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
-		userpb.RegisterUserServiceServer(grpcServer, server.NewUserServiceServer(ctx))
+		userpb.RegisterUserServer(grpcServer, server.NewUserServer(ctx))
 
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
 			reflection.Register(grpcServer)
