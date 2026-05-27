@@ -205,8 +205,31 @@ ListenOn: 127.0.0.1:${AUTH_RPC_PORT:-9091}
 TokenAuth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: ${JWT_ACCESS_EXPIRE}
+AdminBootstrap:
+  Identifier: ${ADMIN_BOOTSTRAP_IDENTIFIER:-amin}
+  Password: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+  DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME:-管理后台管理员}
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
+MailRPC:
+  Endpoints:
+    - 127.0.0.1:${MAIL_RPC_PORT:-9095}
+  Timeout: 5000
+YAML
+}
+
+write_auth_api_config() {
+  cat > "${CONFIG_DIR}/auth-api.yaml" <<YAML
+Name: auth-api
+Host: 127.0.0.1
+Port: ${AUTH_API_PORT:-8081}
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: ${JWT_ACCESS_EXPIRE}
+AuthRPC:
+  Endpoints:
+    - 127.0.0.1:${AUTH_RPC_PORT:-9091}
+  Timeout: 5000
 YAML
 }
 
@@ -269,7 +292,7 @@ ObjectStorage:
   ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
   AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
   SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}"
-  write_api_config "auth-api" "${AUTH_API_PORT:-8081}"
+  write_auth_api_config
   write_api_config "friends-api" "${FRIENDS_API_PORT:-8082}"
   write_api_config "message-api" "${MESSAGE_API_PORT:-8083}"
   write_api_config "gateway-ws" "${GATEWAY_WS_PORT:-8084}" "Presence:
@@ -366,6 +389,7 @@ main() {
   stop_services
   write_configs
   start_service "user-rpc"
+  start_service "auth-rpc"
   start_service "user-api"
   start_service "auth-api"
   start_service "friends-api"

@@ -272,11 +272,9 @@ MailRPC:
 	}
 }
 
-func TestAuthConfigExamplesUseMailRPCEndpointLists(t *testing.T) {
+func TestAuthRPCConfigExamplesUseMailRPCEndpointLists(t *testing.T) {
 	for _, path := range []string{
-		filepath.Join("..", "..", "etc", "auth-api.yaml"),
 		filepath.Join("..", "..", "etc", "auth-rpc.yaml"),
-		filepath.Join("..", "..", "deploy", "k8s", "etc", "auth-api.yaml"),
 		filepath.Join("..", "..", "deploy", "k8s", "etc", "auth-rpc.yaml"),
 	} {
 		t.Run(path, func(t *testing.T) {
