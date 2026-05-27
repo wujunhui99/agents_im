@@ -1,15 +1,20 @@
-package agent
+package svc
 
 import (
+	"log"
+
 	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
+	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
+	apiconfig "github.com/wujunhui99/agents_im/service/agent/api/internal/config"
 )
 
 type ServiceContext struct {
 	common.AuthRuntime
+	Config               apiconfig.Config
 	AgentLogic           *logic.AgentLogic
 	AgentDefinitionLogic *logic.AgentAssemblyLogic
 	AgentRepo            repository.AgentRepository
@@ -25,12 +30,62 @@ func NewServiceContextWithAuth(repo repository.AgentRepository, accountTypeCheck
 	return NewServiceContextWithAuthAndPythonExecutor(repo, accountTypeChecker, auth, pythonexec.NewDefaultExecutor())
 }
 
+func NewServiceContextFromConfig(c apiconfig.Config) (*ServiceContext, error) {
+	userRepo, err := repository.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
+	if err != nil {
+		return nil, err
+	}
+	agentRepo, err := repository.NewAgentRepositoryForStorage(c.StorageDriver, c.DataSource)
+	if err != nil {
+		return nil, err
+	}
+	agentRegistryRepo, err := repository.NewAgentRegistryRepositoryForStorage(c.StorageDriver, c.DataSource)
+	if err != nil {
+		return nil, err
+	}
+	userLogic := logic.NewUserLogic(userRepo)
+
+	var pythonExecutorClient pythonexec.KubernetesSandboxClient
+	if c.PythonExecutor.Backend == config.PythonExecutorBackendK8S {
+		pythonExecutorClient, err = pythonexec.NewInClusterKubernetesSandboxClient()
+		if err != nil {
+			return nil, err
+		}
+	}
+	pythonExecutor, err := pythonexec.NewExecutorFromConfig(c.PythonExecutor, pythonExecutorClient)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceContext := NewServiceContextWithAuthAndPythonExecutor(
+		agentRepo,
+		logic.NewUserLogicAccountTypeChecker(userLogic),
+		c.Auth,
+		pythonExecutor,
+	)
+	serviceContext.Config = c
+	serviceContext.ConfigureAgentAssembly(userRepo, userRepo, agentRegistryRepo)
+
+	if config.ResolveStorageDriver(c.StorageDriver) == config.StorageDriverPostgres {
+		authSessions, err := authrepo.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
+		if err != nil {
+			return nil, err
+		}
+		serviceContext.AuthSessions = authSessions
+	} else {
+		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", config.ResolveStorageDriver(c.StorageDriver))
+	}
+
+	return serviceContext, nil
+}
+
 func NewServiceContextWithAuthAndPythonExecutor(repo repository.AgentRepository, accountTypeChecker logic.UserAccountTypeChecker, auth config.JWTAuthConfig, executor pythonexec.Executor) *ServiceContext {
 	if executor == nil {
 		executor = pythonexec.NewDefaultExecutor()
 	}
 	return &ServiceContext{
 		AuthRuntime:    common.NewAuthRuntime(auth),
+		Config:         apiconfig.Config{Auth: auth},
 		AgentLogic:     logic.NewAgentLogic(repo, accountTypeChecker),
 		AgentRepo:      repo,
 		PythonExecutor: executor,

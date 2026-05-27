@@ -6,22 +6,22 @@ package agent
 import (
 	"net/http"
 
-	"github.com/wujunhui99/agents_im/internal/logic/agent"
-	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
-	"github.com/wujunhui99/agents_im/internal/types"
+	"github.com/wujunhui99/agents_im/service/agent/api/internal/logic/agent"
+	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
+	"github.com/wujunhui99/agents_im/service/agent/api/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func ListAgentsHandler(svcCtx *agentsvc.ServiceContext) http.HandlerFunc {
+func UpdateAgentHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req types.ListAgentsReq
+		var req types.UpdateAgentReq
 		if err := httpx.Parse(r, &req); err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}
 
-		l := agent.NewListAgentsLogic(r.Context(), svcCtx)
-		resp, err := l.ListAgents(&req)
+		l := agent.NewUpdateAgentLogic(r.Context(), svcCtx)
+		resp, err := l.UpdateAgent(&req)
 		if err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 		} else {

@@ -53,13 +53,14 @@ Agent 会话托管第一阶段设计见 [`agent-conversation-hosting.md`](./agen
 - 启用、禁用、归档；
 - 管理 API 鉴权和权限检查。
 
-当前 `feature/agent-core-management` 已落地 Agent profile 管理基础：
+当前 Agent profile 管理基础：
 
-- REST 契约：[`../../api/agent.api`](../../api/agent.api)。
-- 入口：`cmd/agent-api`，配置文件：`etc/agent-api.yaml`。
-- 业务逻辑：`internal/logic/agentlogic.go`，go-zero adapter：`internal/logic/agent/`。
+- REST 契约：[`../../service/agent/api/agent.api`](../../service/agent/api/agent.api)。
+- 入口：`cmd/agent-api`，配置文件：`etc/agent-api.yaml`，启动桥接：`service/agent/api/entry`。
+- 业务逻辑：`internal/logic/agentlogic.go`，go-zero adapter：`service/agent/api/internal/logic/agent/`。
 - 仓储契约：`internal/repository/agent_repository.go`，默认测试仓储：`internal/repository/agent_memory.go`，PostgreSQL 仓储：`internal/repository/postgres_agent.go`。
 - PostgreSQL schema：`db/migrations/002_agent_management.sql`。
+- 当前没有真实 Agent RPC/proto contract；不要为了目录形状创建空 RPC scaffold。Agent API 仍沿用现有直接 repository wiring，直到后续 issue 补齐真实 Agent RPC 边界。
 
 创建 Agent 时，业务逻辑先调用窄接口 `UserAccountTypeChecker` 验证绑定账号为 `account_type=agent`，再写入 `agents` 表。当前 `agent-api` wiring 使用真实 Account Service profile repository 校验账号类型；无法验证时必须返回明确错误。此设计避免在 Account profile 中塞入 Agent 配置，也避免用假账号或静默 fallback 冒充账号类型能力。
 

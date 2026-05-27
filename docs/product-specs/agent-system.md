@@ -99,7 +99,7 @@ Agent 是由 profile、系统提示词、工具、skills、模型配置和运行
 
 #### 当前管理和运行基础接口
 
-当前 Agent profile 管理 REST 契约见 [`../../api/agent.api`](../../api/agent.api)，覆盖：
+当前 Agent profile 管理 REST 契约见 [`../../service/agent/api/agent.api`](../../service/agent/api/agent.api)，覆盖：
 
 - `POST /agents`：创建 Agent profile，绑定已有 IM account；
 - `GET /agents`：按 `status`、`created_by` 可选过滤列表；
@@ -113,6 +113,7 @@ Agent 是由 profile、系统提示词、工具、skills、模型配置和运行
 - Agent 配置只写入 `agents` 表，不写入 `accounts` / `profiles` 的资料字段。
 - 创建 Agent 必须绑定 `account_type=agent` 的现有 IM account。
 - 生产 wiring 必须使用真实 `UserAccountTypeChecker` 验证账号类型；无法验证账号类型时创建必须失败，不能静默创建假用户或假 Agent。
+- 当前没有真实 Agent RPC/proto contract；不要创建空 RPC scaffold。Agent API 的直接 repository wiring 是现有行为，后续补真实 Agent RPC 时再迁移数据边界。
 
 ### Model Provider Config
 

@@ -139,3 +139,4 @@ service agent-api {
 	@handler deleteAgent
 	delete /agents/:agent_id (AgentPathReq) returns (AgentResp)
 }
+

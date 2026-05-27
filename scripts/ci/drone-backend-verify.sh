@@ -39,6 +39,9 @@ protoc-gen-go-grpc --version
 for f in api/*.api; do
   goctl api validate -api "$f"
 done
+for f in service/*/api/*.api; do
+  goctl api validate -api "$f"
+done
 
 mapfile -t go_files < <(find . -name "*.go" -print)
 if ((${#go_files[@]} > 0)); then

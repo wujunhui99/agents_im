@@ -8,18 +8,18 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
-	"github.com/wujunhui99/agents_im/internal/types"
+	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
+	"github.com/wujunhui99/agents_im/service/agent/api/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type GetAgentDefinitionLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *agentsvc.ServiceContext
+	svcCtx *svc.ServiceContext
 }
 
-func NewGetAgentDefinitionLogic(ctx context.Context, svcCtx *agentsvc.ServiceContext) *GetAgentDefinitionLogic {
+func NewGetAgentDefinitionLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetAgentDefinitionLogic {
 	return &GetAgentDefinitionLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,

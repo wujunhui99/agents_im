@@ -34,6 +34,7 @@ required_files=(
   "service/friends/api/friends.api"
   "service/groups/rpc/groups.proto"
   "service/groups/api/groups.api"
+  "service/agent/api/agent.api"
   "proto/auth.proto"
   "proto/friends.proto"
   "proto/groups.proto"
@@ -67,6 +68,8 @@ required_files=(
   "service/friends/api/entry/entry.go"
   "service/groups/api/groups.go"
   "service/groups/api/entry/entry.go"
+  "service/agent/api/agent.go"
+  "service/agent/api/entry/entry.go"
   "service/user/api/internal/config/config.go"
   "service/user/api/internal/handler/routes.go"
   "service/user/api/internal/svc/service_context.go"
@@ -106,6 +109,19 @@ required_files=(
   "service/groups/api/internal/logic/groups/kick_member_logic.go"
   "service/groups/api/internal/logic/groups/list_members_logic.go"
   "service/groups/api/internal/logic/groups/convert.go"
+  "service/agent/api/internal/config/config.go"
+  "service/agent/api/internal/handler/routes.go"
+  "service/agent/api/internal/svc/service_context.go"
+  "service/agent/api/internal/types/types.go"
+  "service/agent/api/internal/logic/agent/create_agent_logic.go"
+  "service/agent/api/internal/logic/agent/get_agent_logic.go"
+  "service/agent/api/internal/logic/agent/list_agents_logic.go"
+  "service/agent/api/internal/logic/agent/update_agent_logic.go"
+  "service/agent/api/internal/logic/agent/update_agent_status_logic.go"
+  "service/agent/api/internal/logic/agent/delete_agent_logic.go"
+  "service/agent/api/internal/logic/agent/get_agent_definition_logic.go"
+  "service/agent/api/internal/logic/agent/update_agent_definition_logic.go"
+  "service/agent/api/internal/logic/agent/convert.go"
   "internal/rpcgen/auth/auth.v1.go"
   "internal/rpcgen/auth/internal/server/auth_service_server.go"
   "internal/rpcgen/friends/friends.v1.go"
@@ -181,13 +197,6 @@ required_files=(
   "internal/logic/media/get_download_u_r_l_logic.go"
   "internal/logic/media/get_avatar_logic.go"
   "internal/logic/media/convert.go"
-  "internal/logic/agent/create_agent_logic.go"
-  "internal/logic/agent/get_agent_logic.go"
-  "internal/logic/agent/list_agents_logic.go"
-  "internal/logic/agent/update_agent_logic.go"
-  "internal/logic/agent/update_agent_status_logic.go"
-  "internal/logic/agent/delete_agent_logic.go"
-  "internal/logic/agent/convert.go"
   "internal/logic/medialogic.go"
   "internal/model/friendship.go"
   "internal/model/group.go"
@@ -228,7 +237,6 @@ required_files=(
   "internal/servicecontext/friends/service_context.go"
   "internal/servicecontext/groups/service_context.go"
   "internal/servicecontext/message/service_context.go"
-  "internal/servicecontext/agent/service_context.go"
   "internal/servicecontext/gateway/service_context.go"
   "internal/health/health.go"
   "internal/health/health_test.go"
@@ -1056,6 +1064,8 @@ api_entry_patterns=(
   "service/user/api/entry/entry.go:Start bridges cmd/user-api"
   "service/friends/api/entry/entry.go:Start bridges cmd/friends-api"
   "service/groups/api/entry/entry.go:Start bridges cmd/groups-api"
+  "cmd/agent-api/main.go:service/agent/api/entry"
+  "service/agent/api/entry/entry.go:Start bridges cmd/agent-api"
 )
 
 for entry_spec in "${api_entry_patterns[@]}"; do
@@ -1086,6 +1096,11 @@ fi
 
 if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" service/friends/api/internal/logic; then
   echo "generated friends API logic still contains empty scaffold behavior" >&2
+  exit 1
+fi
+
+if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" service/agent/api/internal/logic; then
+  echo "generated agent API logic still contains empty scaffold behavior" >&2
   exit 1
 fi
 
@@ -1811,6 +1826,7 @@ jwt_api_files=(
   "api/groups.api"
   "api/message.api"
   "api/media.api"
+  "service/agent/api/agent.api"
 )
 
 for file in "${jwt_api_files[@]}"; do
@@ -2131,6 +2147,9 @@ for api_main in cmd/*-api/main.go; do
     cmd/groups-api/main.go)
       rg -q "TraceMiddlewareFunc" service/groups/api/entry/entry.go
       ;;
+    cmd/agent-api/main.go)
+      rg -q "TraceMiddlewareFunc" service/agent/api/entry/entry.go
+      ;;
     *)
       rg -q "TraceMiddlewareFunc" "$api_main"
       ;;
@@ -2146,6 +2165,7 @@ observability_wiring_patterns=(
 
 for pattern in "${observability_wiring_patterns[@]}"; do
   rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go service/friends/api/entry/entry.go service/groups/api/entry/entry.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
+  rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go service/agent/api/entry/entry.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
 done
 
 observability_metric_hooks=(

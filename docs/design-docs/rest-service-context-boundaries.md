@@ -19,7 +19,7 @@ REST/Gateway 运行时上下文位于：
 | friends-api | `internal/servicecontext/friends` | `FriendsLogic`、Account lookup |
 | groups-api | `internal/servicecontext/groups` | `GroupsLogic`、Groups repo、Account existence checker |
 | message-api | `internal/servicecontext/message` | `MessageLogic`、Media validator、AI hosting/audit/outbox |
-| agent-api | `internal/servicecontext/agent` | `AgentLogic`、Agent repo、Account type checker |
+| agent-api | `service/agent/api/internal/svc` | `AgentLogic`、Agent repo、Account type checker |
 | gateway-ws | `internal/servicecontext/gateway` | JWT auth runtime、`MessageLogic` |
 | shared auth runtime | `internal/servicecontext/common` | JWT config、optional active-session repository |
 
