@@ -29,6 +29,7 @@ required_files=(
   "docs/exec-plans/active/goctl-refactor.md"
   "docs/exec-plans/active/ci-pipeline.md"
   "service/user/rpc/user.proto"
+  "service/user/api/user.api"
   "proto/auth.proto"
   "proto/friends.proto"
   "proto/groups.proto"
@@ -48,6 +49,22 @@ required_files=(
   "proto/mailpb/mail_grpc.pb.go"
   "service/user/rpc/user.v1.go"
   "service/user/rpc/internal/server/user_service_server.go"
+  "service/user/api/user.go"
+  "service/user/api/entry/entry.go"
+  "service/user/api/internal/config/config.go"
+  "service/user/api/internal/handler/routes.go"
+  "service/user/api/internal/svc/service_context.go"
+  "service/user/api/internal/types/types.go"
+  "service/user/api/internal/logic/user/create_user_logic.go"
+  "service/user/api/internal/logic/user/create_account_logic.go"
+  "service/user/api/internal/logic/user/exists_user_logic.go"
+  "service/user/api/internal/logic/user/exists_account_logic.go"
+  "service/user/api/internal/logic/user/get_me_logic.go"
+  "service/user/api/internal/logic/user/get_user_by_identifier_logic.go"
+  "service/user/api/internal/logic/user/get_account_by_identifier_logic.go"
+  "service/user/api/internal/logic/user/update_me_logic.go"
+  "service/user/api/internal/logic/user/update_me_avatar_logic.go"
+  "service/user/api/internal/logic/user/convert.go"
   "internal/rpcgen/auth/auth.v1.go"
   "internal/rpcgen/auth/internal/server/auth_service_server.go"
   "internal/rpcgen/friends/friends.v1.go"
@@ -593,6 +610,7 @@ api_patterns=(
 
 for pattern in "${api_patterns[@]}"; do
   rg -q "$pattern" api/user.api
+  rg -q "$pattern" service/user/api/user.api
 done
 
 auth_api_patterns=(
@@ -764,6 +782,7 @@ proto_patterns=(
   "rpc ExistsByIdentifier"
   "rpc GetUserByID"
   "rpc UpdateUserProfile"
+  "rpc UpdateUserAvatar"
 )
 
 for pattern in "${proto_patterns[@]}"; do
@@ -980,6 +999,27 @@ for entry_spec in "${rpc_entry_patterns[@]}"; do
   pattern="${entry_spec##*:}"
   rg -q "$pattern" "$file"
 done
+
+api_entry_patterns=(
+  "cmd/user-api/main.go:service/user/api/entry"
+  "service/user/api/entry/entry.go:Start bridges cmd/user-api"
+)
+
+for entry_spec in "${api_entry_patterns[@]}"; do
+  file="${entry_spec%%:*}"
+  pattern="${entry_spec##*:}"
+  rg -q "$pattern" "$file"
+done
+
+if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/user)"|DataSource|StorageDriver|New.*Repository' cmd/user-api service/user/api --glob '*.go' --glob '!*_test.go'; then
+  echo "user API entry and service/user/api must not own data access; use RPC/BFF calls" >&2
+  exit 1
+fi
+
+if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" service/user/api/internal/logic; then
+  echo "generated user API logic still contains empty scaffold behavior" >&2
+  exit 1
+fi
 
 if rg -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic|auth/repository)"' internal/rpcgen/*/entry --glob '*.go'; then
   echo "rpc entry bridges must not own business wiring; keep dependencies behind generated rpc service contexts" >&2
@@ -2012,7 +2052,11 @@ for pattern in "${observability_code_patterns[@]}"; do
 done
 
 for api_main in cmd/*-api/main.go; do
-  rg -q "TraceMiddlewareFunc" "$api_main"
+  if [[ "$api_main" == "cmd/user-api/main.go" ]]; then
+    rg -q "TraceMiddlewareFunc" service/user/api/entry/entry.go
+  else
+    rg -q "TraceMiddlewareFunc" "$api_main"
+  fi
 done
 
 observability_wiring_patterns=(
@@ -2023,7 +2067,7 @@ observability_wiring_patterns=(
 )
 
 for pattern in "${observability_wiring_patterns[@]}"; do
-  rg -q "$pattern" internal/handler/gozero_routes.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
+  rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
 done
 
 observability_metric_hooks=(

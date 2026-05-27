@@ -36,6 +36,8 @@ type User struct {
 	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	AccountType   string                 `protobuf:"bytes,10,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
 	AvatarMediaId string                 `protobuf:"bytes,11,opt,name=avatar_media_id,json=avatarMediaId,proto3" json:"avatar_media_id,omitempty"`
+	Email         string                 `protobuf:"bytes,12,opt,name=email,proto3" json:"email,omitempty"`
+	AvatarUrl     string                 `protobuf:"bytes,13,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -147,6 +149,20 @@ func (x *User) GetAvatarMediaId() string {
 	return ""
 }
 
+func (x *User) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *User) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
 type CreateUserRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Identifier    string                 `protobuf:"bytes,1,opt,name=identifier,proto3" json:"identifier,omitempty"`
@@ -156,6 +172,7 @@ type CreateUserRequest struct {
 	BirthDate     string                 `protobuf:"bytes,5,opt,name=birth_date,json=birthDate,proto3" json:"birth_date,omitempty"`
 	Region        string                 `protobuf:"bytes,6,opt,name=region,proto3" json:"region,omitempty"`
 	AccountType   string                 `protobuf:"bytes,7,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
+	Email         string                 `protobuf:"bytes,8,opt,name=email,proto3" json:"email,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -235,6 +252,13 @@ func (x *CreateUserRequest) GetRegion() string {
 func (x *CreateUserRequest) GetAccountType() string {
 	if x != nil {
 		return x.AccountType
+	}
+	return ""
+}
+
+func (x *CreateUserRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
 	}
 	return ""
 }
@@ -507,6 +531,58 @@ func (x *UpdateUserProfileRequest) GetRegion() string {
 	return ""
 }
 
+type UpdateUserAvatarRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	MediaId       string                 `protobuf:"bytes,2,opt,name=media_id,json=mediaId,proto3" json:"media_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateUserAvatarRequest) Reset() {
+	*x = UpdateUserAvatarRequest{}
+	mi := &file_service_user_rpc_user_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateUserAvatarRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateUserAvatarRequest) ProtoMessage() {}
+
+func (x *UpdateUserAvatarRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_user_rpc_user_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateUserAvatarRequest.ProtoReflect.Descriptor instead.
+func (*UpdateUserAvatarRequest) Descriptor() ([]byte, []int) {
+	return file_service_user_rpc_user_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *UpdateUserAvatarRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UpdateUserAvatarRequest) GetMediaId() string {
+	if x != nil {
+		return x.MediaId
+	}
+	return ""
+}
+
 type UserResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
@@ -516,7 +592,7 @@ type UserResponse struct {
 
 func (x *UserResponse) Reset() {
 	*x = UserResponse{}
-	mi := &file_service_user_rpc_user_proto_msgTypes[7]
+	mi := &file_service_user_rpc_user_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -528,7 +604,7 @@ func (x *UserResponse) String() string {
 func (*UserResponse) ProtoMessage() {}
 
 func (x *UserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_user_rpc_user_proto_msgTypes[7]
+	mi := &file_service_user_rpc_user_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -541,7 +617,7 @@ func (x *UserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserResponse.ProtoReflect.Descriptor instead.
 func (*UserResponse) Descriptor() ([]byte, []int) {
-	return file_service_user_rpc_user_proto_rawDescGZIP(), []int{7}
+	return file_service_user_rpc_user_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UserResponse) GetUser() *User {
@@ -555,7 +631,7 @@ var File_service_user_rpc_user_proto protoreflect.FileDescriptor
 
 const file_service_user_rpc_user_proto_rawDesc = "" +
 	"\n" +
-	"\x1bservice/user/rpc/user.proto\x12\auser.v1\"\xce\x02\n" +
+	"\x1bservice/user/rpc/user.proto\x12\auser.v1\"\x83\x03\n" +
 	"\x04User\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1e\n" +
 	"\n" +
@@ -573,7 +649,10 @@ const file_service_user_rpc_user_proto_rawDesc = "" +
 	"updated_at\x18\t \x01(\tR\tupdatedAt\x12!\n" +
 	"\faccount_type\x18\n" +
 	" \x01(\tR\vaccountType\x12&\n" +
-	"\x0favatar_media_id\x18\v \x01(\tR\ravatarMediaId\"\xdc\x01\n" +
+	"\x0favatar_media_id\x18\v \x01(\tR\ravatarMediaId\x12\x14\n" +
+	"\x05email\x18\f \x01(\tR\x05email\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\r \x01(\tR\tavatarUrl\"\xf2\x01\n" +
 	"\x11CreateUserRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +
@@ -584,7 +663,8 @@ const file_service_user_rpc_user_proto_rawDesc = "" +
 	"\n" +
 	"birth_date\x18\x05 \x01(\tR\tbirthDate\x12\x16\n" +
 	"\x06region\x18\x06 \x01(\tR\x06region\x12!\n" +
-	"\faccount_type\x18\a \x01(\tR\vaccountType\"<\n" +
+	"\faccount_type\x18\a \x01(\tR\vaccountType\x12\x14\n" +
+	"\x05email\x18\b \x01(\tR\x05email\"<\n" +
 	"\x1aGetUserByIdentifierRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +
@@ -612,16 +692,20 @@ const file_service_user_rpc_user_proto_rawDesc = "" +
 	"\x05_nameB\t\n" +
 	"\a_genderB\r\n" +
 	"\v_birth_dateB\t\n" +
-	"\a_region\"1\n" +
+	"\a_region\"M\n" +
+	"\x17UpdateUserAvatarRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x19\n" +
+	"\bmedia_id\x18\x02 \x01(\tR\amediaId\"1\n" +
 	"\fUserResponse\x12!\n" +
-	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user2\x92\x03\n" +
+	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user2\xdf\x03\n" +
 	"\vUserService\x12?\n" +
 	"\n" +
 	"CreateUser\x12\x1a.user.v1.CreateUserRequest\x1a\x15.user.v1.UserResponse\x12Q\n" +
 	"\x13GetUserByIdentifier\x12#.user.v1.GetUserByIdentifierRequest\x1a\x15.user.v1.UserResponse\x12]\n" +
 	"\x12ExistsByIdentifier\x12\".user.v1.ExistsByIdentifierRequest\x1a#.user.v1.ExistsByIdentifierResponse\x12A\n" +
 	"\vGetUserByID\x12\x1b.user.v1.GetUserByIDRequest\x1a\x15.user.v1.UserResponse\x12M\n" +
-	"\x11UpdateUserProfile\x12!.user.v1.UpdateUserProfileRequest\x1a\x15.user.v1.UserResponseB.Z,github.com/wujunhui99/agents_im/proto/userpbb\x06proto3"
+	"\x11UpdateUserProfile\x12!.user.v1.UpdateUserProfileRequest\x1a\x15.user.v1.UserResponse\x12K\n" +
+	"\x10UpdateUserAvatar\x12 .user.v1.UpdateUserAvatarRequest\x1a\x15.user.v1.UserResponseB.Z,github.com/wujunhui99/agents_im/proto/userpbb\x06proto3"
 
 var (
 	file_service_user_rpc_user_proto_rawDescOnce sync.Once
@@ -635,7 +719,7 @@ func file_service_user_rpc_user_proto_rawDescGZIP() []byte {
 	return file_service_user_rpc_user_proto_rawDescData
 }
 
-var file_service_user_rpc_user_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_service_user_rpc_user_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_service_user_rpc_user_proto_goTypes = []any{
 	(*User)(nil),                       // 0: user.v1.User
 	(*CreateUserRequest)(nil),          // 1: user.v1.CreateUserRequest
@@ -644,7 +728,8 @@ var file_service_user_rpc_user_proto_goTypes = []any{
 	(*ExistsByIdentifierResponse)(nil), // 4: user.v1.ExistsByIdentifierResponse
 	(*GetUserByIDRequest)(nil),         // 5: user.v1.GetUserByIDRequest
 	(*UpdateUserProfileRequest)(nil),   // 6: user.v1.UpdateUserProfileRequest
-	(*UserResponse)(nil),               // 7: user.v1.UserResponse
+	(*UpdateUserAvatarRequest)(nil),    // 7: user.v1.UpdateUserAvatarRequest
+	(*UserResponse)(nil),               // 8: user.v1.UserResponse
 }
 var file_service_user_rpc_user_proto_depIdxs = []int32{
 	0, // 0: user.v1.UserResponse.user:type_name -> user.v1.User
@@ -653,13 +738,15 @@ var file_service_user_rpc_user_proto_depIdxs = []int32{
 	3, // 3: user.v1.UserService.ExistsByIdentifier:input_type -> user.v1.ExistsByIdentifierRequest
 	5, // 4: user.v1.UserService.GetUserByID:input_type -> user.v1.GetUserByIDRequest
 	6, // 5: user.v1.UserService.UpdateUserProfile:input_type -> user.v1.UpdateUserProfileRequest
-	7, // 6: user.v1.UserService.CreateUser:output_type -> user.v1.UserResponse
-	7, // 7: user.v1.UserService.GetUserByIdentifier:output_type -> user.v1.UserResponse
-	4, // 8: user.v1.UserService.ExistsByIdentifier:output_type -> user.v1.ExistsByIdentifierResponse
-	7, // 9: user.v1.UserService.GetUserByID:output_type -> user.v1.UserResponse
-	7, // 10: user.v1.UserService.UpdateUserProfile:output_type -> user.v1.UserResponse
-	6, // [6:11] is the sub-list for method output_type
-	1, // [1:6] is the sub-list for method input_type
+	7, // 6: user.v1.UserService.UpdateUserAvatar:input_type -> user.v1.UpdateUserAvatarRequest
+	8, // 7: user.v1.UserService.CreateUser:output_type -> user.v1.UserResponse
+	8, // 8: user.v1.UserService.GetUserByIdentifier:output_type -> user.v1.UserResponse
+	4, // 9: user.v1.UserService.ExistsByIdentifier:output_type -> user.v1.ExistsByIdentifierResponse
+	8, // 10: user.v1.UserService.GetUserByID:output_type -> user.v1.UserResponse
+	8, // 11: user.v1.UserService.UpdateUserProfile:output_type -> user.v1.UserResponse
+	8, // 12: user.v1.UserService.UpdateUserAvatar:output_type -> user.v1.UserResponse
+	7, // [7:13] is the sub-list for method output_type
+	1, // [1:7] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name
@@ -677,7 +764,7 @@ func file_service_user_rpc_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_user_rpc_user_proto_rawDesc), len(file_service_user_rpc_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -47,3 +47,8 @@ func (s *UserServiceServer) UpdateUserProfile(ctx context.Context, in *userpb.Up
 	l := logic.NewUpdateUserProfileLogic(ctx, s.svcCtx)
 	return l.UpdateUserProfile(in)
 }
+
+func (s *UserServiceServer) UpdateUserAvatar(ctx context.Context, in *userpb.UpdateUserAvatarRequest) (*userpb.UserResponse, error) {
+	l := logic.NewUpdateUserAvatarLogic(ctx, s.svcCtx)
+	return l.UpdateUserAvatar(in)
+}

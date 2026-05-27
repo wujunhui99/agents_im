@@ -5,8 +5,6 @@ Port: 8080
 Auth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
-StorageDriver: postgres
-DataSource: ${DATABASE_URL}
 Tracing:
   Enabled: true
   ServiceName: user-api
@@ -16,13 +14,7 @@ Tracing:
   SamplerRatio: 1.0
   TraceUIBaseURL: ${AGENTS_IM_TRACE_UI_BASE_URL}
   Insecure: true
-ObjectStorage:
-  Driver: ${OBJECT_STORAGE_DRIVER}
-  Endpoint: ${OBJECT_STORAGE_ENDPOINT}
-  ExternalEndpoint: ${OBJECT_STORAGE_EXTERNAL_ENDPOINT}
-  Bucket: ${OBJECT_STORAGE_BUCKET}
-  Region: ${OBJECT_STORAGE_REGION}
-  UseSSL: ${OBJECT_STORAGE_USE_SSL}
-  ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
-  AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
-  SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+UserRPC:
+  Endpoints:
+    - user-rpc:9090
+  Timeout: 5000

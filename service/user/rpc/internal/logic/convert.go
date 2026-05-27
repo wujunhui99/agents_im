@@ -17,6 +17,8 @@ func toUserResponse(profile business.UserProfile) *userpb.UserResponse {
 			Region:        profile.Region,
 			AccountType:   profile.AccountType,
 			AvatarMediaId: profile.AvatarMediaID,
+			Email:         profile.Email,
+			AvatarUrl:     profile.AvatarURL,
 			CreatedAt:     profile.CreatedAt,
 			UpdatedAt:     profile.UpdatedAt,
 		},

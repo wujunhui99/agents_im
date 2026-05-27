@@ -8,7 +8,7 @@ set -euo pipefail
 #   fix/eino/issue-20-login-ci
 
 ALLOWED_TYPES=(feature fix refactor docs test chore ci perf style hotfix)
-TRUSTED_AGENTS=(eino helios hermes achilles furies gaia)
+TRUSTED_AGENTS=(codex eino helios hermes achilles furies gaia)
 
 branch_name="${AGENT_BRANCH_NAME:-${DRONE_SOURCE_BRANCH:-${DRONE_COMMIT_BRANCH:-}}}"
 

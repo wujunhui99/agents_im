@@ -85,7 +85,7 @@ Human goal
 
 - Use one independent worktree per worker branch.
 - Branch format: `<type>/<agent>/issue-<number>-<short-desc>`.
-- Allowed agent names are governed by `docs/AGENT_GIT_STANDARD.md`.
+- Allowed agent names are governed by `docs/AGENT_GIT_STANDARD.md`; Codex worker branches use `codex`.
 - Do not reuse a dirty or conflicted worktree for a new task.
 - Do not start from stale local branches; fetch the target base first.
 

@@ -23,7 +23,7 @@
 字段规则：
 
 - `type`：使用小写英文，允许值：`feature`、`fix`、`refactor`、`docs`、`test`、`chore`、`ci`、`perf`、`style`、`hotfix`。
-- `agent-name`：**硬性必填，且必须是第二个路径段**。可信 Agent id 只有：`eino`、`helios`、`hermes`、`achilles`、`furies`、`gaia`。
+- `agent-name`：**硬性必填，且必须是第二个路径段**。可信 Agent id 只有：`codex`、`eino`、`helios`、`hermes`、`achilles`、`furies`、`gaia`。
 - `issue`：必须使用 GitHub Issue 编号，格式为 `issue-<number>`。
 - `task-desc`：简短英文 slug，单词用 `-` 分隔。
 - 全部分支名使用小写，不使用空格、下划线或中文。
@@ -34,6 +34,7 @@ CI 硬门禁：`scripts/ci/verify-agent-branch-name.sh` 会在 Drone `backend-ve
 
 ```text
 feature/eino/issue-131-admin-console-lists
+refactor/codex/issue-281-user-api-service-layout
 fix/helios/issue-128-drone-postgres-url
 docs/gaia/issue-140-agent-git-standard
 ci/hermes/issue-142-drone-notifier-routing
@@ -58,6 +59,7 @@ git worktree add \
 当前约定：
 
 - `eino`：`Eino (AI Agent) <eino@agents.noreply.local>`
+- `codex`：`Codex (AI Agent) <codex@agents.noreply.local>`
 - `helios`：`Helios (AI Agent) <helios@agents.noreply.local>`
 - `hermes`：`Hermes (AI Agent) <hermes@agents.noreply.local>`
 - `achilles`：`Achilles (AI Agent) <achilles@agents.noreply.local>`
@@ -251,7 +253,7 @@ Logs: <drone build url>
 ```text
 You must follow the agents_im multi-agent Git standard:
 1. Work only inside your assigned worktree.
-2. Branch name must be <type>/<agent-name>/<issue>-<task-desc>; the second path segment must be a trusted team agent id: eino, helios, hermes, achilles, furies, or gaia. CI rejects branches without this agent-name segment.
+2. Branch name must be <type>/<agent-name>/<issue>-<task-desc>; the second path segment must be a trusted team agent id: codex, eino, helios, hermes, achilles, furies, or gaia. CI rejects branches without this agent-name segment.
 3. Every commit subject must be <type>(<scope>)[<agent-name>]: <short title>.
 4. Every commit must use your dedicated Git author/committer name and email.
 5. Every commit must include Issue, Agent, and Human-Owner trailers.
