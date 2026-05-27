@@ -200,7 +200,7 @@ The exact helper should be central, not duplicated across handlers.
 
 ## RPC contract
 
-Use `proto/message.proto` for service-to-service and future gateway integration.
+Use `service/message/rpc/message.proto` for service-to-service and future gateway integration.
 
 Suggested proto package:
 
@@ -209,7 +209,7 @@ syntax = "proto3";
 
 package message;
 
-option go_package = "github.com/wujunhui99/agents_im/proto/messagepb";
+option go_package = "github.com/wujunhui99/agents_im/service/message/rpc/message";
 
 service MessageService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);

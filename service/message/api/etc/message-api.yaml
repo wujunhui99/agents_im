@@ -1,0 +1,42 @@
+Name: message-api
+Host: 0.0.0.0
+Port: 8083
+Tracing:
+  Enabled: false
+  ServiceName: message-api
+  Environment: local
+  Protocol: grpc
+  SamplerRatio: 1.0
+  TraceUIBaseURL: http://localhost:3000
+  Insecure: true
+
+Auth:
+  AccessSecret: dev-jwt-secret-change-me
+  AccessExpire: 86400
+StorageDriver: memory
+DataSource: ${DATABASE_URL}
+DeepSeek:
+  APIKey: ${DEEPSEEK_API_KEY}
+  BaseURL: ${DEEPSEEK_BASE_URL}
+  Model: ${DEEPSEEK_MODEL}
+LLMObservability:
+  Enabled: false
+  Backend: ${LLM_OBSERVABILITY_BACKEND}
+  CaptureOutput: false
+  MaxOutputBytes: 2048
+  Langfuse:
+    Host: ${LANGFUSE_HOST}
+    PublicKey: ${LANGFUSE_PUBLIC_KEY}
+    SecretKey: ${LANGFUSE_SECRET_KEY}
+PythonExecutor:
+  Backend: disabled
+  DefaultTimeoutSeconds: 10
+  MaxTimeoutSeconds: 30
+  DefaultMemoryMiB: 256
+  MaxMemoryMiB: 256
+  MaxOutputBytes: 65536
+  K8S:
+    Namespace:
+    Image:
+    ServiceAccountName:
+    RuntimeClassName:

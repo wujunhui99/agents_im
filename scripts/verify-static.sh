@@ -35,10 +35,11 @@ required_files=(
   "service/groups/rpc/groups.proto"
   "service/groups/api/groups.api"
   "service/agent/api/agent.api"
+  "service/message/rpc/message.proto"
+  "service/message/api/message.api"
   "proto/auth.proto"
   "proto/friends.proto"
   "proto/groups.proto"
-  "proto/message.proto"
   "proto/mail.proto"
   "service/user/rpc/user/user.pb.go"
   "service/user/rpc/user/user_grpc.pb.go"
@@ -52,8 +53,6 @@ required_files=(
   "proto/friendspb/friends_grpc.pb.go"
   "proto/groupspb/groups.pb.go"
   "proto/groupspb/groups_grpc.pb.go"
-  "proto/messagepb/message.pb.go"
-  "proto/messagepb/message_grpc.pb.go"
   "proto/mailpb/mail.pb.go"
   "proto/mailpb/mail_grpc.pb.go"
   "service/user/rpc/user.v1.go"
@@ -62,6 +61,18 @@ required_files=(
   "service/friends/rpc/internal/server/friendsserver.go"
   "service/groups/rpc/groups.v1.go"
   "service/groups/rpc/internal/server/groupsserver.go"
+  "service/message/rpc/message.go"
+  "service/message/rpc/entry/entry.go"
+  "service/message/rpc/internal/config/config.go"
+  "service/message/rpc/etc/message-rpc.yaml"
+  "service/message/rpc/internal/svc/service_context.go"
+  "service/message/rpc/internal/server/message_service_server.go"
+  "service/message/rpc/internal/logic/send_message_logic.go"
+  "service/message/rpc/internal/logic/pull_messages_logic.go"
+  "service/message/rpc/internal/logic/get_conversation_seqs_logic.go"
+  "service/message/rpc/internal/logic/mark_conversation_as_read_logic.go"
+  "service/message/rpc/internal/logic/convert.go"
+  "service/message/rpc/messageservice/message_service.go"
   "service/user/api/user.go"
   "service/user/api/entry/entry.go"
   "service/friends/api/friends.go"
@@ -70,6 +81,9 @@ required_files=(
   "service/groups/api/entry/entry.go"
   "service/agent/api/agent.go"
   "service/agent/api/entry/entry.go"
+  "service/message/api/message.go"
+  "service/message/api/entry/entry.go"
+  "service/message/api/etc/message-api.yaml"
   "service/user/api/internal/config/config.go"
   "service/user/api/internal/handler/routes.go"
   "service/user/api/internal/svc/service_context.go"
@@ -122,14 +136,34 @@ required_files=(
   "service/agent/api/internal/logic/agent/get_agent_definition_logic.go"
   "service/agent/api/internal/logic/agent/update_agent_definition_logic.go"
   "service/agent/api/internal/logic/agent/convert.go"
+  "service/message/api/internal/config/config.go"
+  "service/message/api/internal/handler/authenticated_routes.go"
+  "service/message/api/internal/handler/routes.go"
+  "service/message/api/internal/handler/message/send_message_handler.go"
+  "service/message/api/internal/handler/message/pull_messages_handler.go"
+  "service/message/api/internal/handler/message/get_conversation_seqs_handler.go"
+  "service/message/api/internal/handler/message/mark_conversation_as_read_handler.go"
+  "service/message/api/internal/handler/message/get_conversation_a_i_hosting_handler.go"
+  "service/message/api/internal/handler/message/update_conversation_a_i_hosting_handler.go"
+  "service/message/api/internal/handler/message/create_feedback_handler.go"
+  "service/message/api/internal/handler/message/create_a_p_i_feedback_handler.go"
+  "service/message/api/internal/svc/service_context.go"
+  "service/message/api/internal/types/types.go"
+  "service/message/api/internal/logic/message/send_message_logic.go"
+  "service/message/api/internal/logic/message/pull_messages_logic.go"
+  "service/message/api/internal/logic/message/get_conversation_seqs_logic.go"
+  "service/message/api/internal/logic/message/mark_conversation_as_read_logic.go"
+  "service/message/api/internal/logic/message/get_conversation_a_i_hosting_logic.go"
+  "service/message/api/internal/logic/message/update_conversation_a_i_hosting_logic.go"
+  "service/message/api/internal/logic/message/create_feedback_logic.go"
+  "service/message/api/internal/logic/message/create_a_p_i_feedback_logic.go"
+  "service/message/api/internal/logic/message/convert.go"
   "internal/rpcgen/auth/auth.v1.go"
   "internal/rpcgen/auth/internal/server/auth_service_server.go"
   "internal/rpcgen/friends/friends.v1.go"
   "internal/rpcgen/friends/internal/server/friends_service_server.go"
   "internal/rpcgen/groups/groups.v1.go"
   "internal/rpcgen/groups/internal/server/groups_service_server.go"
-  "internal/rpcgen/message/message.go"
-  "internal/rpcgen/message/internal/server/message_service_server.go"
   "internal/rpcgen/mail/mail.v1.go"
   "internal/rpcgen/mail/internal/server/mail_service_server.go"
   "cmd/user-api/main.go"
@@ -270,7 +304,7 @@ required_files=(
   "internal/rpcgen/friends/entry/entry.go"
   "service/groups/rpc/entry/entry.go"
   "internal/rpcgen/groups/entry/entry.go"
-  "internal/rpcgen/message/entry/entry.go"
+  "service/message/rpc/entry/entry.go"
   "internal/rpcgen/rpcerror/error.go"
   "internal/gateway/contract.go"
   "internal/transfer/event.go"
@@ -885,7 +919,7 @@ message_proto_patterns=(
 )
 
 for pattern in "${message_proto_patterns[@]}"; do
-  rg -q "$pattern" proto/message.proto
+  rg -q "$pattern" service/message/rpc/message.proto
 done
 
 mail_proto_patterns=(
@@ -910,7 +944,7 @@ agent_conversation_hosting_contract_patterns=(
 )
 
 for pattern in "${agent_conversation_hosting_contract_patterns[@]}"; do
-  rg -q "$pattern" proto/message.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go internal/messaging/event.go docs/design-docs/agent-conversation-hosting.md docs/design-docs/message-chain-contract.md docs/product-specs/message-chain.md
+  rg -q "$pattern" service/message/rpc/message.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go internal/messaging/event.go docs/design-docs/agent-conversation-hosting.md docs/design-docs/message-chain-contract.md docs/product-specs/message-chain.md
 done
 
 agent_conversation_hosting_camel_patterns=(
@@ -978,10 +1012,10 @@ rpc_generated_dirs=(
   "service/user/rpc"
   "service/friends/rpc"
   "service/groups/rpc"
+  "service/message/rpc"
   "internal/rpcgen/auth"
   "internal/rpcgen/friends"
   "internal/rpcgen/groups"
-  "internal/rpcgen/message"
   "internal/rpcgen/mail"
 )
 
@@ -996,10 +1030,10 @@ rpc_generated_servers=(
   "service/user/rpc/internal/server/userserver.go:UserServer"
   "service/friends/rpc/internal/server/friendsserver.go:FriendsServer"
   "service/groups/rpc/internal/server/groupsserver.go:GroupsServer"
+  "service/message/rpc/internal/server/message_service_server.go:MessageServiceServer"
   "internal/rpcgen/auth/internal/server/auth_service_server.go:AuthServiceServer"
   "internal/rpcgen/friends/internal/server/friends_service_server.go:FriendsServiceServer"
   "internal/rpcgen/groups/internal/server/groups_service_server.go:GroupsServiceServer"
-  "internal/rpcgen/message/internal/server/message_service_server.go:MessageServiceServer"
   "internal/rpcgen/mail/internal/server/mail_service_server.go:MailServiceServer"
 )
 
@@ -1015,10 +1049,10 @@ rpc_generated_entrypoints=(
   "service/user/rpc/user.v1.go:RegisterUserServer"
   "service/friends/rpc/friends.v1.go:RegisterFriendsServer"
   "service/groups/rpc/groups.v1.go:RegisterGroupsServer"
+  "service/message/rpc/message.go:RegisterMessageServiceServer"
   "internal/rpcgen/auth/auth.v1.go:RegisterAuthServiceServer"
   "internal/rpcgen/friends/friends.v1.go:RegisterFriendsServiceServer"
   "internal/rpcgen/groups/groups.v1.go:RegisterGroupsServiceServer"
-  "internal/rpcgen/message/message.go:RegisterMessageServiceServer"
   "internal/rpcgen/mail/mail.v1.go:RegisterMailServiceServer"
 )
 
@@ -1040,14 +1074,14 @@ rpc_entry_patterns=(
   "cmd/friends-rpc/main.go:service/friends/rpc/entry"
   "cmd/auth-rpc/main.go:internal/rpcgen/auth/entry"
   "cmd/groups-rpc/main.go:service/groups/rpc/entry"
-  "cmd/message-rpc/main.go:internal/rpcgen/message/entry"
+  "cmd/message-rpc/main.go:service/message/rpc/entry"
   "cmd/mail-rpc/main.go:internal/rpcgen/mail/entry"
   "service/user/rpc/entry/entry.go:Start bridges cmd/user-rpc"
   "service/friends/rpc/entry/entry.go:Start bridges cmd/friends-rpc"
   "internal/rpcgen/auth/entry/entry.go:Start bridges cmd/auth-rpc"
   "service/groups/rpc/entry/entry.go:Start bridges cmd/groups-rpc"
   "internal/rpcgen/groups/entry/entry.go:Start bridges cmd/groups-rpc"
-  "internal/rpcgen/message/entry/entry.go:Start bridges cmd/message-rpc"
+  "service/message/rpc/entry/entry.go:Start bridges cmd/message-rpc"
   "internal/rpcgen/mail/entry/entry.go:Start bridges cmd/mail-rpc"
 )
 
@@ -1061,11 +1095,13 @@ api_entry_patterns=(
   "cmd/user-api/main.go:service/user/api/entry"
   "cmd/friends-api/main.go:service/friends/api/entry"
   "cmd/groups-api/main.go:service/groups/api/entry"
+  "cmd/message-api/main.go:service/message/api/entry"
   "service/user/api/entry/entry.go:Start bridges cmd/user-api"
   "service/friends/api/entry/entry.go:Start bridges cmd/friends-api"
   "service/groups/api/entry/entry.go:Start bridges cmd/groups-api"
   "cmd/agent-api/main.go:service/agent/api/entry"
   "service/agent/api/entry/entry.go:Start bridges cmd/agent-api"
+  "service/message/api/entry/entry.go:Start bridges cmd/message-api"
 )
 
 for entry_spec in "${api_entry_patterns[@]}"; do
@@ -1104,12 +1140,17 @@ if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" service/agent
   exit 1
 fi
 
+if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" service/message/api/internal/logic; then
+  echo "generated message API logic still contains empty scaffold behavior" >&2
+  exit 1
+fi
+
 if rg -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic|auth/repository)"' internal/rpcgen/*/entry --glob '*.go'; then
   echo "rpc entry bridges must not own business wiring; keep dependencies behind generated rpc service contexts" >&2
   exit 1
 fi
 
-if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" internal/rpcgen/*/internal/logic service/user/rpc/internal/logic; then
+if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" internal/rpcgen/*/internal/logic service/user/rpc/internal/logic service/message/rpc/internal/logic; then
   echo "generated rpc logic still contains empty scaffold behavior" >&2
   exit 1
 fi
@@ -1117,10 +1158,10 @@ fi
 rpc_logic_markers=(
   "service/user/rpc/internal/logic:UserLogic"
   "service/friends/rpc/internal/logic:FriendsLogic"
+  "service/message/rpc/internal/logic:MessageLogic"
   "internal/rpcgen/auth/internal/logic:AuthLogic"
   "internal/rpcgen/friends/internal/logic:FriendsLogic"
   "internal/rpcgen/groups/internal/logic:GroupsLogic"
-  "internal/rpcgen/message/internal/logic:MessageLogic"
   "internal/rpcgen/mail/internal/logic:MailProvider"
 )
 
@@ -1138,14 +1179,14 @@ fi
 rpc_generated_proto_files=(
   "service/user/rpc/user/user.pb.go"
   "service/user/rpc/user/user_grpc.pb.go"
+  "service/message/rpc/message/message.pb.go"
+  "service/message/rpc/message/message_grpc.pb.go"
   "proto/authpb/auth.pb.go"
   "proto/authpb/auth_grpc.pb.go"
   "proto/friendspb/friends.pb.go"
   "proto/friendspb/friends_grpc.pb.go"
   "proto/groupspb/groups.pb.go"
   "proto/groupspb/groups_grpc.pb.go"
-  "proto/messagepb/message.pb.go"
-  "proto/messagepb/message_grpc.pb.go"
   "proto/mailpb/mail.pb.go"
   "proto/mailpb/mail_grpc.pb.go"
 )
@@ -2004,9 +2045,9 @@ if rg -n 'account_type.*normal|normal.*account_type|`normal`' \
   exit 1
 fi
 
-rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go internal/rpcgen/message/internal/svc/service_context.go
-rg -q "NewMessageLogicWithMediaValidator" internal/rpcgen/message/internal/svc/service_context.go
-rg -q "NewMessageRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
+rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go service/message/rpc/internal/svc/service_context.go
+rg -q "NewMessageLogicWithMediaValidator" service/message/rpc/internal/svc/service_context.go
+rg -q "NewMessageRepositoryForStorage" service/message/rpc/internal/svc/service_context.go
 pg_persistence_patterns=(
   "accounts"
   "profiles"
@@ -2147,6 +2188,9 @@ for api_main in cmd/*-api/main.go; do
     cmd/groups-api/main.go)
       rg -q "TraceMiddlewareFunc" service/groups/api/entry/entry.go
       ;;
+    cmd/message-api/main.go)
+      rg -q "TraceMiddlewareFunc" service/message/api/entry/entry.go
+      ;;
     cmd/agent-api/main.go)
       rg -q "TraceMiddlewareFunc" service/agent/api/entry/entry.go
       ;;
@@ -2166,6 +2210,7 @@ observability_wiring_patterns=(
 for pattern in "${observability_wiring_patterns[@]}"; do
   rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go service/friends/api/entry/entry.go service/groups/api/entry/entry.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
   rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go service/agent/api/entry/entry.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
+  rg -q "$pattern" internal/handler/gozero_routes.go service/message/api/entry/entry.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
 done
 
 observability_metric_hooks=(
@@ -2441,7 +2486,7 @@ if rg -n "password|password_hash|verification_code|oauth_token|credential" \
 fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
-  api/message.api proto/message.proto \
+  api/message.api service/message/api/message.api service/message/rpc/message.proto \
   internal/logic/messagelogic.go internal/repository/message_memory.go \
   internal/repository/message_repository.go internal/handler/message; then
   echo "forbidden auth secret field found in message contract source" >&2

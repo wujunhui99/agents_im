@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	messageentry "github.com/wujunhui99/agents_im/internal/rpcgen/message/entry"
+	messageentry "github.com/wujunhui99/agents_im/service/message/rpc/entry"
 )
 
 func main() {
