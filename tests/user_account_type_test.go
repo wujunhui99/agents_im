@@ -15,7 +15,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
-	"github.com/wujunhui99/agents_im/proto/userpb"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 )
 
 func TestAccountTypeDefaultsAndExplicitInternalCreate(t *testing.T) {
@@ -190,7 +190,7 @@ func TestUserRPCAccountTypeContract(t *testing.T) {
 		t.Fatalf("rpc create account_type = %q, want %q", req.GetAccountType(), model.AccountTypeAgent)
 	}
 
-	user := &userpb.User{AccountType: string(model.AccountTypeAdmin)}
+	user := &userpb.UserEntity{AccountType: string(model.AccountTypeAdmin)}
 	if user.GetAccountType() != string(model.AccountTypeAdmin) {
 		t.Fatalf("rpc user account_type = %q, want %q", user.GetAccountType(), model.AccountTypeAdmin)
 	}

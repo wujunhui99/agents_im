@@ -2,13 +2,13 @@ syntax = "proto3";
 
 package user.v1;
 
-option go_package = "github.com/wujunhui99/agents_im/proto/userpb";
+option go_package = "github.com/wujunhui99/agents_im/service/user/rpc/user";
 
-// UserService is the V0 transport name for the account/profile service.
+// User is the V0 transport name for the account/profile service.
 // New domain documentation should refer to Account Service semantics; public
 // user_id fields remain account_id aliases for compatibility. Account IDs are
 // Snowflake numeric strings without type prefixes.
-service UserService {
+service User {
   rpc CreateUser(CreateUserRequest) returns (UserResponse);
   rpc GetUserByIdentifier(GetUserByIdentifierRequest) returns (UserResponse);
   rpc ExistsByIdentifier(ExistsByIdentifierRequest) returns (ExistsByIdentifierResponse);
@@ -17,9 +17,9 @@ service UserService {
   rpc UpdateUserAvatar(UpdateUserAvatarRequest) returns (UserResponse);
 }
 
-// User is the V0 transport message for an Account/Profile aggregate. user_id is
+// UserEntity is the V0 transport message for an Account/Profile aggregate. user_id is
 // the compatibility alias for internal account_id.
-message User {
+message UserEntity {
   string user_id = 1;
   string identifier = 2;
   string display_name = 3;
@@ -75,11 +75,11 @@ message UpdateUserProfileRequest {
 message UpdateUserAvatarRequest {
   string user_id = 1;
   // avatar_media_id is the uploaded media object to validate and attach as the
-  // profile avatar. The name intentionally matches User.avatar_media_id; HTTP
+  // profile avatar. The name intentionally matches UserEntity.avatar_media_id; HTTP
   // compatibility may still accept legacy JSON field mediaId at the BFF layer.
   string avatar_media_id = 2;
 }
 
 message UserResponse {
-  User user = 1;
+  UserEntity user = 1;
 }

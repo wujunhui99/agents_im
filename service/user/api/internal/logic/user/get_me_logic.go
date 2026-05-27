@@ -7,9 +7,9 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
-	"github.com/wujunhui99/agents_im/proto/userpb"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/types"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
