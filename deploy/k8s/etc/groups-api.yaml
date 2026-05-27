@@ -5,8 +5,9 @@ Port: 8085
 Auth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
-StorageDriver: postgres
-DataSource: ${DATABASE_URL}
+GroupsRPC:
+  Target: dns:///groups-rpc:9103
+  Timeout: 5000
 Tracing:
   Enabled: true
   ServiceName: groups-api

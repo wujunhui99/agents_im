@@ -32,6 +32,8 @@ required_files=(
   "service/user/api/user.api"
   "service/friends/rpc/friends.proto"
   "service/friends/api/friends.api"
+  "service/groups/rpc/groups.proto"
+  "service/groups/api/groups.api"
   "proto/auth.proto"
   "proto/friends.proto"
   "proto/groups.proto"
@@ -41,6 +43,8 @@ required_files=(
   "service/user/rpc/user/user_grpc.pb.go"
   "service/friends/rpc/friends/friends.pb.go"
   "service/friends/rpc/friends/friends_grpc.pb.go"
+  "service/groups/rpc/groups/groups.pb.go"
+  "service/groups/rpc/groups/groups_grpc.pb.go"
   "proto/authpb/auth.pb.go"
   "proto/authpb/auth_grpc.pb.go"
   "proto/friendspb/friends.pb.go"
@@ -55,10 +59,14 @@ required_files=(
   "service/user/rpc/internal/server/userserver.go"
   "service/friends/rpc/friends.v1.go"
   "service/friends/rpc/internal/server/friendsserver.go"
+  "service/groups/rpc/groups.v1.go"
+  "service/groups/rpc/internal/server/groupsserver.go"
   "service/user/api/user.go"
   "service/user/api/entry/entry.go"
   "service/friends/api/friends.go"
   "service/friends/api/entry/entry.go"
+  "service/groups/api/groups.go"
+  "service/groups/api/entry/entry.go"
   "service/user/api/internal/config/config.go"
   "service/user/api/internal/handler/routes.go"
   "service/user/api/internal/svc/service_context.go"
@@ -85,6 +93,19 @@ required_files=(
   "service/friends/api/internal/logic/friends/accept_friend_request_logic.go"
   "service/friends/api/internal/logic/friends/reject_friend_request_logic.go"
   "service/friends/api/internal/logic/friends/convert.go"
+  "service/groups/api/internal/config/config.go"
+  "service/groups/api/internal/handler/routes.go"
+  "service/groups/api/internal/svc/service_context.go"
+  "service/groups/api/internal/types/types.go"
+  "service/groups/api/internal/logic/groups/create_group_logic.go"
+  "service/groups/api/internal/logic/groups/list_groups_logic.go"
+  "service/groups/api/internal/logic/groups/get_group_logic.go"
+  "service/groups/api/internal/logic/groups/update_group_logic.go"
+  "service/groups/api/internal/logic/groups/add_member_logic.go"
+  "service/groups/api/internal/logic/groups/leave_group_logic.go"
+  "service/groups/api/internal/logic/groups/kick_member_logic.go"
+  "service/groups/api/internal/logic/groups/list_members_logic.go"
+  "service/groups/api/internal/logic/groups/convert.go"
   "internal/rpcgen/auth/auth.v1.go"
   "internal/rpcgen/auth/internal/server/auth_service_server.go"
   "internal/rpcgen/friends/friends.v1.go"
@@ -239,6 +260,7 @@ required_files=(
   "service/user/rpc/entry/entry.go"
   "internal/rpcgen/auth/entry/entry.go"
   "internal/rpcgen/friends/entry/entry.go"
+  "service/groups/rpc/entry/entry.go"
   "internal/rpcgen/groups/entry/entry.go"
   "internal/rpcgen/message/entry/entry.go"
   "internal/rpcgen/rpcerror/error.go"
@@ -947,6 +969,7 @@ fi
 rpc_generated_dirs=(
   "service/user/rpc"
   "service/friends/rpc"
+  "service/groups/rpc"
   "internal/rpcgen/auth"
   "internal/rpcgen/friends"
   "internal/rpcgen/groups"
@@ -964,6 +987,7 @@ done
 rpc_generated_servers=(
   "service/user/rpc/internal/server/userserver.go:UserServer"
   "service/friends/rpc/internal/server/friendsserver.go:FriendsServer"
+  "service/groups/rpc/internal/server/groupsserver.go:GroupsServer"
   "internal/rpcgen/auth/internal/server/auth_service_server.go:AuthServiceServer"
   "internal/rpcgen/friends/internal/server/friends_service_server.go:FriendsServiceServer"
   "internal/rpcgen/groups/internal/server/groups_service_server.go:GroupsServiceServer"
@@ -982,6 +1006,7 @@ done
 rpc_generated_entrypoints=(
   "service/user/rpc/user.v1.go:RegisterUserServer"
   "service/friends/rpc/friends.v1.go:RegisterFriendsServer"
+  "service/groups/rpc/groups.v1.go:RegisterGroupsServer"
   "internal/rpcgen/auth/auth.v1.go:RegisterAuthServiceServer"
   "internal/rpcgen/friends/friends.v1.go:RegisterFriendsServiceServer"
   "internal/rpcgen/groups/groups.v1.go:RegisterGroupsServiceServer"
@@ -1006,12 +1031,13 @@ rpc_entry_patterns=(
   "cmd/user-rpc/main.go:service/user/rpc/entry"
   "cmd/friends-rpc/main.go:service/friends/rpc/entry"
   "cmd/auth-rpc/main.go:internal/rpcgen/auth/entry"
-  "cmd/groups-rpc/main.go:internal/rpcgen/groups/entry"
+  "cmd/groups-rpc/main.go:service/groups/rpc/entry"
   "cmd/message-rpc/main.go:internal/rpcgen/message/entry"
   "cmd/mail-rpc/main.go:internal/rpcgen/mail/entry"
   "service/user/rpc/entry/entry.go:Start bridges cmd/user-rpc"
   "service/friends/rpc/entry/entry.go:Start bridges cmd/friends-rpc"
   "internal/rpcgen/auth/entry/entry.go:Start bridges cmd/auth-rpc"
+  "service/groups/rpc/entry/entry.go:Start bridges cmd/groups-rpc"
   "internal/rpcgen/groups/entry/entry.go:Start bridges cmd/groups-rpc"
   "internal/rpcgen/message/entry/entry.go:Start bridges cmd/message-rpc"
   "internal/rpcgen/mail/entry/entry.go:Start bridges cmd/mail-rpc"
@@ -1026,8 +1052,10 @@ done
 api_entry_patterns=(
   "cmd/user-api/main.go:service/user/api/entry"
   "cmd/friends-api/main.go:service/friends/api/entry"
+  "cmd/groups-api/main.go:service/groups/api/entry"
   "service/user/api/entry/entry.go:Start bridges cmd/user-api"
   "service/friends/api/entry/entry.go:Start bridges cmd/friends-api"
+  "service/groups/api/entry/entry.go:Start bridges cmd/groups-api"
 )
 
 for entry_spec in "${api_entry_patterns[@]}"; do
@@ -1038,6 +1066,11 @@ done
 
 if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/user)"|DataSource|StorageDriver|New.*Repository' cmd/user-api service/user/api --glob '*.go' --glob '!*_test.go'; then
   echo "user API entry and service/user/api must not own data access; use RPC/BFF calls" >&2
+  exit 1
+fi
+
+if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/groups)"|DataSource|StorageDriver|New.*Repository' cmd/groups-api service/groups/api --glob '*.go' --glob '!*_test.go'; then
+  echo "groups API entry and service/groups/api must not own data access; use RPC/BFF calls" >&2
   exit 1
 fi
 
@@ -2095,6 +2128,9 @@ for api_main in cmd/*-api/main.go; do
     cmd/friends-api/main.go)
       rg -q "TraceMiddlewareFunc" service/friends/api/entry/entry.go
       ;;
+    cmd/groups-api/main.go)
+      rg -q "TraceMiddlewareFunc" service/groups/api/entry/entry.go
+      ;;
     *)
       rg -q "TraceMiddlewareFunc" "$api_main"
       ;;
@@ -2109,7 +2145,7 @@ observability_wiring_patterns=(
 )
 
 for pattern in "${observability_wiring_patterns[@]}"; do
-  rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
+  rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go service/friends/api/entry/entry.go service/groups/api/entry/entry.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
 done
 
 observability_metric_hooks=(
