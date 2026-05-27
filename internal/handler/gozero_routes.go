@@ -11,7 +11,6 @@ import (
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/ctxuser"
 	adminhandler "github.com/wujunhui99/agents_im/internal/handler/admin"
-	agenthandler "github.com/wujunhui99/agents_im/internal/handler/agent"
 	authhandler "github.com/wujunhui99/agents_im/internal/handler/auth"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
@@ -22,7 +21,6 @@ import (
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/observability"
 	adminsvc "github.com/wujunhui99/agents_im/internal/servicecontext/admin"
-	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
 	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
@@ -121,19 +119,6 @@ func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *messagesvc.Se
 		}
 	})
 	addMessageRoutes(server, serverCtx)
-}
-
-func RegisterAgentGoZeroHandlers(server *rest.Server, serverCtx *agentsvc.ServiceContext) {
-	registerGoZeroObservabilityHandlers(server, "agent-api", func(*http.Request) []health.Check {
-		return []health.Check{
-			componentCheck("auth_config", serverCtx != nil && serverCtx.Auth.AccessSecret != "", "configured"),
-			componentCheck("agent_logic", serverCtx != nil && serverCtx.AgentLogic != nil, "configured"),
-			componentCheck("agent_definition_logic", serverCtx != nil && serverCtx.AgentDefinitionLogic != nil, "configured"),
-			componentCheck("agent_repository", serverCtx != nil && serverCtx.AgentRepo != nil, "configured"),
-			componentCheck("agent_registry_repository", serverCtx != nil && serverCtx.AgentRegistryRepo != nil, "configured"),
-		}
-	})
-	addAgentRoutes(server, serverCtx)
 }
 
 func RegisterAdminGoZeroHandlers(server *rest.Server, serverCtx *adminsvc.ServiceContext) {
@@ -374,51 +359,6 @@ func addMessageRoutes(server *rest.Server, serverCtx *messagesvc.ServiceContext)
 			Method:  http.MethodPut,
 			Path:    "/conversations/:conversation_id/ai-hosting",
 			Handler: messagehandler.UpdateConversationAIHostingHandler(serverCtx),
-		},
-	}), jwtOption(serverCtx))
-}
-
-func addAgentRoutes(server *rest.Server, serverCtx *agentsvc.ServiceContext) {
-	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
-		{
-			Method:  http.MethodPost,
-			Path:    "/agents",
-			Handler: agenthandler.CreateAgentHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/agents",
-			Handler: agenthandler.ListAgentsHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/agents/:agent_id",
-			Handler: agenthandler.GetAgentHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/agents/:agent_id/definition",
-			Handler: agenthandler.GetAgentDefinitionHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodPut,
-			Path:    "/agents/:agent_id/definition",
-			Handler: agenthandler.UpdateAgentDefinitionHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodPatch,
-			Path:    "/agents/:agent_id",
-			Handler: agenthandler.UpdateAgentHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodPatch,
-			Path:    "/agents/:agent_id/status",
-			Handler: agenthandler.UpdateAgentStatusHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodDelete,
-			Path:    "/agents/:agent_id",
-			Handler: agenthandler.DeleteAgentHandler(serverCtx),
 		},
 	}), jwtOption(serverCtx))
 }

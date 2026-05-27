@@ -3,7 +3,7 @@ package agent
 import (
 	"github.com/wujunhui99/agents_im/internal/apperror"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/types"
+	"github.com/wujunhui99/agents_im/service/agent/api/internal/types"
 )
 
 func optionalAgentString(value string) *string {

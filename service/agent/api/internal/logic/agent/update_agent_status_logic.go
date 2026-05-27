@@ -4,18 +4,18 @@ import (
 	"context"
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
-	"github.com/wujunhui99/agents_im/internal/types"
+	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
+	"github.com/wujunhui99/agents_im/service/agent/api/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type UpdateAgentStatusLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *agentsvc.ServiceContext
+	svcCtx *svc.ServiceContext
 }
 
-func NewUpdateAgentStatusLogic(ctx context.Context, svcCtx *agentsvc.ServiceContext) *UpdateAgentStatusLogic {
+func NewUpdateAgentStatusLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateAgentStatusLogic {
 	return &UpdateAgentStatusLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,

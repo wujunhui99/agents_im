@@ -10,7 +10,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	agentsvc "github.com/wujunhui99/agents_im/internal/servicecontext/agent"
+	agententry "github.com/wujunhui99/agents_im/service/agent/api/entry"
 )
 
 func TestAgentLogicCreateRequiresAgentAccountType(t *testing.T) {
@@ -197,7 +197,7 @@ func TestAgentLogicUpdateListStatusAndArchive(t *testing.T) {
 }
 
 func TestAgentHTTPHandlers(t *testing.T) {
-	serviceContext := agentsvc.NewServiceContextWithAuth(
+	serviceContext := agententry.NewServiceContextWithAuth(
 		repository.NewMemoryAgentRepository(),
 		testAccountTypeChecker{accountTypes: map[string]string{
 			"usr_agent": logic.AccountTypeAgent,
@@ -205,7 +205,7 @@ func TestAgentHTTPHandlers(t *testing.T) {
 		}},
 		testJWTAuthConfig(),
 	)
-	mux := newAgentGoZeroRouter(t, serviceContext)
+	mux := newAgentAPIServiceRouter(t, serviceContext)
 	adminBearer := bearerTokenForUser(t, "usr_admin")
 
 	missingTokenResp := httptest.NewRecorder()

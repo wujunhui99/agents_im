@@ -133,6 +133,8 @@ Backend images are built for:
 - `web/**`, including web package files and nginx config, builds and deploys only `web`.
 - `cmd/<service>/**` builds and deploys only that backend service.
 - `api/<domain>.api` builds the matching API service, for example `api/user.api` -> `user-api`.
+- `service/<domain>/api/**` builds the matching API service, for example `service/agent/api/**` -> `agent-api`.
+- `service/<domain>/rpc/**` builds the matching RPC service when that service exists, for example `service/user/rpc/**` -> `user-rpc`.
 - `etc/<service>.yaml` and `deploy/k8s/etc/<service>.yaml` are config-only service rollouts and do not build images.
 - `deploy/k8s/**` shared manifest changes deploy config and restart affected services; broad manifest files use all services because ownership is not safely inferable.
 - `proto/**` changes build all backend services. Generated RPC contracts can affect callers across service boundaries, so the first selective version intentionally fails safe here.

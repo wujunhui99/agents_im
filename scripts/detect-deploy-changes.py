@@ -78,20 +78,17 @@ INTERNAL_DOMAIN_SERVICE_PREFIXES = {
     "internal/handler/friends/": ["friends-api"],
     "internal/handler/groups/": ["groups-api"],
     "internal/handler/message/": ["message-api"],
-    "internal/handler/agent/": ["agent-api"],
     "internal/handler/admin/": ["message-api"],
     "internal/logic/user/": ["user-api"],
     "internal/logic/auth/": ["auth-api"],
     "internal/logic/friends/": ["friends-api"],
     "internal/logic/groups/": ["groups-api"],
     "internal/logic/message/": ["message-api", "message-transfer"],
-    "internal/logic/agent/": ["agent-api"],
     "internal/servicecontext/user/": ["user-api"],
     "internal/servicecontext/auth/": ["auth-api"],
     "internal/servicecontext/friends/": ["friends-api"],
     "internal/servicecontext/groups/": ["groups-api"],
     "internal/servicecontext/message/": ["message-api", "message-transfer"],
-    "internal/servicecontext/agent/": ["agent-api"],
 }
 
 INTERNAL_EXACT_SERVICE_PATHS = {
@@ -231,6 +228,24 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         else:
             selection.add_all_backends()
         return
+
+    if len(parts) >= 4 and parts[0] == "service":
+        domain = parts[1]
+        kind = parts[2]
+        if kind == "api":
+            service = API_SERVICES.get(domain)
+            if service is None:
+                selection.add_all_backends()
+            else:
+                selection.add_backend(service)
+            return
+        if kind == "rpc":
+            rpc_service = f"{domain}-rpc"
+            if rpc_service in BACKEND_SERVICES:
+                selection.add_backend(rpc_service)
+            else:
+                selection.add_all_backends()
+            return
 
     if len(parts) == 2 and parts[0] == "api" and parts[1].endswith(".api"):
         domain = parts[1][: -len(".api")]
