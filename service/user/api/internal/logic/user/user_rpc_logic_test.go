@@ -106,7 +106,7 @@ func TestUpdateMeAvatarCallsUserRPCWithAuthenticatedUser(t *testing.T) {
 	if got := client.updateAvatarReq.GetUserId(); got != "usr_1" {
 		t.Fatalf("UpdateMeAvatar used wrong user id: %q", got)
 	}
-	if got := client.updateAvatarReq.GetMediaId(); got != "med_avatar_1" {
+	if got := client.updateAvatarReq.GetAvatarMediaId(); got != "med_avatar_1" {
 		t.Fatalf("UpdateMeAvatar used wrong media id: %q", got)
 	}
 	if got := resp.Data.AvatarMediaID; got != "med_avatar_1" {

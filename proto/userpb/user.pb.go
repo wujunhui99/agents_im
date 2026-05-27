@@ -532,9 +532,12 @@ func (x *UpdateUserProfileRequest) GetRegion() string {
 }
 
 type UpdateUserAvatarRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	MediaId       string                 `protobuf:"bytes,2,opt,name=media_id,json=mediaId,proto3" json:"media_id,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// avatar_media_id is the uploaded media object to validate and attach as the
+	// profile avatar. The name intentionally matches User.avatar_media_id; HTTP
+	// compatibility may still accept legacy JSON field mediaId at the BFF layer.
+	AvatarMediaId string `protobuf:"bytes,2,opt,name=avatar_media_id,json=avatarMediaId,proto3" json:"avatar_media_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -576,9 +579,9 @@ func (x *UpdateUserAvatarRequest) GetUserId() string {
 	return ""
 }
 
-func (x *UpdateUserAvatarRequest) GetMediaId() string {
+func (x *UpdateUserAvatarRequest) GetAvatarMediaId() string {
 	if x != nil {
-		return x.MediaId
+		return x.AvatarMediaId
 	}
 	return ""
 }
@@ -692,10 +695,10 @@ const file_service_user_rpc_user_proto_rawDesc = "" +
 	"\x05_nameB\t\n" +
 	"\a_genderB\r\n" +
 	"\v_birth_dateB\t\n" +
-	"\a_region\"M\n" +
+	"\a_region\"Z\n" +
 	"\x17UpdateUserAvatarRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x19\n" +
-	"\bmedia_id\x18\x02 \x01(\tR\amediaId\"1\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12&\n" +
+	"\x0favatar_media_id\x18\x02 \x01(\tR\ravatarMediaId\"1\n" +
 	"\fUserResponse\x12!\n" +
 	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user2\xdf\x03\n" +
 	"\vUserService\x12?\n" +

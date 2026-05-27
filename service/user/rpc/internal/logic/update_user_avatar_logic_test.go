@@ -44,8 +44,8 @@ func TestUpdateUserAvatarValidatesMediaAndUpdatesProfile(t *testing.T) {
 	}
 
 	resp, err := NewUpdateUserAvatarLogic(ctx, svcCtx).UpdateUserAvatar(&userpb.UpdateUserAvatarRequest{
-		UserId:  profile.UserID,
-		MediaId: media.MediaID,
+		UserId:        profile.UserID,
+		AvatarMediaId: media.MediaID,
 	})
 	if err != nil {
 		t.Fatalf("UpdateUserAvatar returned error: %v", err)

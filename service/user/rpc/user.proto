@@ -74,7 +74,10 @@ message UpdateUserProfileRequest {
 
 message UpdateUserAvatarRequest {
   string user_id = 1;
-  string media_id = 2;
+  // avatar_media_id is the uploaded media object to validate and attach as the
+  // profile avatar. The name intentionally matches User.avatar_media_id; HTTP
+  // compatibility may still accept legacy JSON field mediaId at the BFF layer.
+  string avatar_media_id = 2;
 }
 
 message UserResponse {

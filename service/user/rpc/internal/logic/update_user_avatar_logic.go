@@ -26,12 +26,12 @@ func NewUpdateUserAvatarLogic(ctx context.Context, svcCtx *svc.ServiceContext) *
 }
 
 func (l *UpdateUserAvatarLogic) UpdateUserAvatar(in *userpb.UpdateUserAvatarRequest) (*userpb.UserResponse, error) {
-	if _, err := l.svcCtx.MediaLogic.ValidateAvatarMedia(l.ctx, in.GetUserId(), in.GetMediaId()); err != nil {
+	if _, err := l.svcCtx.MediaLogic.ValidateAvatarMedia(l.ctx, in.GetUserId(), in.GetAvatarMediaId()); err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
 	profile, err := l.svcCtx.UserLogic.UpdateUserAvatar(l.ctx, business.UpdateUserAvatarRequest{
 		UserID:  in.GetUserId(),
-		MediaID: in.GetMediaId(),
+		MediaID: in.GetAvatarMediaId(),
 	})
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)

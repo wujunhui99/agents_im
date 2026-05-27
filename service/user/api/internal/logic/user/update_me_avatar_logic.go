@@ -34,8 +34,8 @@ func (l *UpdateMeAvatarLogic) UpdateMeAvatar(req *types.UpdateMeAvatarReq) (resp
 		return nil, err
 	}
 	userResp, err := l.svcCtx.UserRPC.UpdateUserAvatar(l.ctx, &userpb.UpdateUserAvatarRequest{
-		UserId:  userID,
-		MediaId: req.MediaID,
+		UserId:        userID,
+		AvatarMediaId: req.MediaID,
 	})
 	if err != nil {
 		return nil, apiError(err)
