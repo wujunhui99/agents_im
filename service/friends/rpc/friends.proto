@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package friends.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/service/friends/rpc/friends";
+
+service Friends {
+  rpc AddFriend(AddFriendRequest) returns (AddFriendResponse);
+  rpc DeleteFriend(DeleteFriendRequest) returns (DeleteFriendResponse);
+  rpc ListFriends(ListFriendsRequest) returns (ListFriendsResponse);
+  rpc GetFriendship(GetFriendshipRequest) returns (GetFriendshipResponse);
+  rpc ListFriendRequests(ListFriendRequestsRequest) returns (ListFriendRequestsResponse);
+  rpc AcceptFriendRequest(FriendRequestDecisionRequest) returns (FriendRequestDecisionResponse);
+  rpc RejectFriendRequest(FriendRequestDecisionRequest) returns (FriendRequestDecisionResponse);
+}
+
+message FriendProfile {
+  string user_id = 1;
+  string identifier = 2;
+  string display_name = 3;
+  string name = 4;
+  string gender = 5;
+  string birth_date = 6;
+  string region = 7;
+  string account_type = 8;
+  string avatar_media_id = 9;
+  string avatar_url = 10;
+  int64 avatar_url_expires_at = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}
+
+message Friendship {
+  string user_id = 1;
+  string friend_id = 2;
+  string status = 3;
+  bool is_friend = 4;
+  string created_at = 5;
+  string updated_at = 6;
+  FriendProfile friend = 7;
+}
+
+message AddFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message AddFriendResponse {
+  Friendship friendship = 1;
+  bool created = 2;
+}
+
+message DeleteFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message DeleteFriendResponse {
+  Friendship friendship = 1;
+  bool deleted = 2;
+}
+
+message ListFriendsRequest {
+  string user_id = 1;
+}
+
+message ListFriendsResponse {
+  repeated Friendship friends = 1;
+}
+
+message GetFriendshipRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message GetFriendshipResponse {
+  Friendship friendship = 1;
+}
+
+message ListFriendRequestsRequest {
+  string user_id = 1;
+}
+
+message ListFriendRequestsResponse {
+  repeated Friendship incoming = 1;
+  repeated Friendship outgoing = 2;
+}
+
+message FriendRequestDecisionRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message FriendRequestDecisionResponse {
+  Friendship friendship = 1;
+  bool updated = 2;
+}
