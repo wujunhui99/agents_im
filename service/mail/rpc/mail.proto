@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package mail.v1;
 
-option go_package = "github.com/wujunhui99/agents_im/proto/mailpb";
+option go_package = "github.com/wujunhui99/agents_im/service/mail/rpc/mail";
 
 service MailService {
   rpc SendTemplateEmail(SendTemplateEmailRequest) returns (SendTemplateEmailResponse);

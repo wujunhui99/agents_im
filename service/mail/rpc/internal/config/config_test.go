@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	mailconfig "github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/config"
+	mailconfig "github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
 	"github.com/zeromicro/go-zero/core/conf"
 )
 

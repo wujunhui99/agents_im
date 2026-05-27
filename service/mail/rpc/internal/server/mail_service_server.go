@@ -7,14 +7,14 @@ package server
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/svc"
-	"github.com/wujunhui99/agents_im/proto/mailpb"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/logic"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
+	mail "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
 )
 
 type MailServiceServer struct {
 	svcCtx *svc.ServiceContext
-	mailpb.UnimplementedMailServiceServer
+	mail.UnimplementedMailServiceServer
 }
 
 func NewMailServiceServer(svcCtx *svc.ServiceContext) *MailServiceServer {
@@ -23,7 +23,7 @@ func NewMailServiceServer(svcCtx *svc.ServiceContext) *MailServiceServer {
 	}
 }
 
-func (s *MailServiceServer) SendTemplateEmail(ctx context.Context, in *mailpb.SendTemplateEmailRequest) (*mailpb.SendTemplateEmailResponse, error) {
+func (s *MailServiceServer) SendTemplateEmail(ctx context.Context, in *mail.SendTemplateEmailRequest) (*mail.SendTemplateEmailResponse, error) {
 	l := logic.NewSendTemplateEmailLogic(ctx, s.svcCtx)
 	return l.SendTemplateEmail(in)
 }

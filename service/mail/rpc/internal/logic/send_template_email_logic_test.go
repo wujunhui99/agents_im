@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/wujunhui99/agents_im/internal/mail"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/config"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/svc"
-	"github.com/wujunhui99/agents_im/proto/mailpb"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
+	mailpb "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

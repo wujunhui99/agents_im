@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v3.19.4
-// source: proto/mail.proto
+// source: service/mail/rpc/mail.proto
 
-package mailpb
+package mail
 
 import (
 	context "context"
@@ -117,5 +117,5 @@ var MailService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/mail.proto",
+	Metadata: "service/mail/rpc/mail.proto",
 }

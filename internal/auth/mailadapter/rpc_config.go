@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/wujunhui99/agents_im/internal/observability"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/mailservice"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/mailservice"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 

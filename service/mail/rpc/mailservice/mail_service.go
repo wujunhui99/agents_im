@@ -7,15 +7,15 @@ package mailservice
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/proto/mailpb"
+	mail "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
 )
 
 type (
-	SendTemplateEmailRequest  = mailpb.SendTemplateEmailRequest
-	SendTemplateEmailResponse = mailpb.SendTemplateEmailResponse
+	SendTemplateEmailRequest  = mail.SendTemplateEmailRequest
+	SendTemplateEmailResponse = mail.SendTemplateEmailResponse
 
 	MailService interface {
 		SendTemplateEmail(ctx context.Context, in *SendTemplateEmailRequest, opts ...grpc.CallOption) (*SendTemplateEmailResponse, error)
@@ -33,6 +33,6 @@ func NewMailService(cli zrpc.Client) MailService {
 }
 
 func (m *defaultMailService) SendTemplateEmail(ctx context.Context, in *SendTemplateEmailRequest, opts ...grpc.CallOption) (*SendTemplateEmailResponse, error) {
-	client := mailpb.NewMailServiceClient(m.cli.Conn())
+	client := mail.NewMailServiceClient(m.cli.Conn())
 	return client.SendTemplateEmail(ctx, in, opts...)
 }

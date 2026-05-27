@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/config"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/server"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/svc"
-	"github.com/wujunhui99/agents_im/proto/mailpb"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/server"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
+	mail "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
@@ -26,7 +26,7 @@ func main() {
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
-		mailpb.RegisterMailServiceServer(grpcServer, server.NewMailServiceServer(ctx))
+		mail.RegisterMailServiceServer(grpcServer, server.NewMailServiceServer(ctx))
 
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
 			reflection.Register(grpcServer)

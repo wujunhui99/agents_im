@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/wujunhui99/agents_im/internal/mail"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/config"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
 )
 
 type ServiceContext struct {

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/mail"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/svc"
-	"github.com/wujunhui99/agents_im/proto/mailpb"
+	mailprovider "github.com/wujunhui99/agents_im/internal/mail"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
+	mailpb "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"
@@ -47,7 +47,7 @@ func (l *SendTemplateEmailLogic) SendTemplateEmail(in *mailpb.SendTemplateEmailR
 		return nil, status.Error(codes.FailedPrecondition, "mail provider is not configured")
 	}
 
-	resp, err := l.svcCtx.MailProvider.SendTemplateEmail(l.ctx, mail.TemplateEmailRequest{
+	resp, err := l.svcCtx.MailProvider.SendTemplateEmail(l.ctx, mailprovider.TemplateEmailRequest{
 		Recipients:     recipients,
 		TemplateID:     templateID,
 		TemplateData:   cloneTemplateData(in.GetTemplateData()),
@@ -91,7 +91,7 @@ func cloneTemplateData(values map[string]string) map[string]string {
 }
 
 func providerErrorToStatus(err error) error {
-	var providerErr *mail.ProviderError
+	var providerErr *mailprovider.ProviderError
 	if errors.As(err, &providerErr) {
 		message := providerErr.Code
 		if providerErr.Message != "" {

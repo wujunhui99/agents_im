@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	mailentry "github.com/wujunhui99/agents_im/internal/rpcgen/mail/entry"
+	mailentry "github.com/wujunhui99/agents_im/service/mail/rpc/entry"
 )
 
 func main() {
