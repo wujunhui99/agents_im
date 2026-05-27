@@ -24,9 +24,9 @@ Options:
   --middleware-only  Start Docker middleware and migrations, but skip Go services.
   --with-services   Start Go services after middleware. This is the default.
   --services-only   Restart only host Go services; skip Docker middleware and migrations.
-                   Service ports can be overridden with USER_API_PORT, AUTH_API_PORT,
-                   FRIENDS_API_PORT, MESSAGE_API_PORT, GATEWAY_WS_PORT, GROUPS_API_PORT,
-                   AGENT_API_PORT, and MESSAGE_TRANSFER_OBSERVABILITY_PORT.
+                   Service ports can be overridden with USER_API_PORT, USER_RPC_PORT,
+                   AUTH_API_PORT, FRIENDS_API_PORT, MESSAGE_API_PORT, GATEWAY_WS_PORT,
+                   GROUPS_API_PORT, AGENT_API_PORT, and MESSAGE_TRANSFER_OBSERVABILITY_PORT.
   --no-migrate      Skip PostgreSQL migrations.
   --stop            Stop host Go services started by this script.
   -h, --help        Show this help.
@@ -210,6 +210,15 @@ DataSource: ${DATABASE_URL}
 YAML
 }
 
+write_user_rpc_config() {
+  cat > "${CONFIG_DIR}/user-rpc.yaml" <<YAML
+Name: user-rpc
+ListenOn: 127.0.0.1:${USER_RPC_PORT:-9090}
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
+YAML
+}
+
 write_message_transfer_config() {
   cat > "${CONFIG_DIR}/message-transfer.yaml" <<YAML
 Name: message-transfer
@@ -246,7 +255,11 @@ YAML
 
 write_configs() {
   mkdir -p "${CONFIG_DIR}"
-  write_api_config "user-api" "${USER_API_PORT:-8080}" "ObjectStorage:
+  write_api_config "user-api" "${USER_API_PORT:-8080}" "UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT:-9090}
+  Timeout: 5000
+ObjectStorage:
   Driver: ${OBJECT_STORAGE_DRIVER}
   Endpoint: ${OBJECT_STORAGE_ENDPOINT}
   ExternalEndpoint: ${OBJECT_STORAGE_EXTERNAL_ENDPOINT}
@@ -272,6 +285,7 @@ GatewayWS:
   CommandRateLimitBurst: ${GATEWAY_WS_COMMAND_RATE_LIMIT_BURST}"
   write_api_config "groups-api" "${GROUPS_API_PORT:-8085}"
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
+  write_user_rpc_config
   write_auth_rpc_config
   write_message_transfer_config
 }
@@ -351,6 +365,7 @@ main() {
 
   stop_services
   write_configs
+  start_service "user-rpc"
   start_service "user-api"
   start_service "auth-api"
   start_service "friends-api"

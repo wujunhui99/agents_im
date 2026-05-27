@@ -1,0 +1,114 @@
+syntax = "v1"
+
+info (
+	title:   "Account API"
+	desc:    "Account profile service HTTP API; account IDs are Snowflake numeric strings and V0 keeps /users/user_id aliases."
+	author:  "Codex"
+	version: "v0.1.0"
+)
+
+type User {
+	UserID             string `json:"user_id"`
+	Identifier         string `json:"identifier"`
+	Email              string `json:"email"`
+	DisplayName        string `json:"display_name"`
+	Name               string `json:"name"`
+	Gender             string `json:"gender"`
+	BirthDate          string `json:"birth_date"`
+	Region             string `json:"region"`
+	AccountType        string `json:"account_type"`
+	AvatarMediaID      string `json:"avatar_media_id"`
+	AvatarURL          string `json:"avatar_url,optional"`
+	AvatarURLExpiresAt int64  `json:"avatar_url_expires_at,optional"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
+}
+
+type CreateUserReq {
+	Identifier  string `json:"identifier"`
+	Email       string `json:"email,optional"`
+	DisplayName string `json:"display_name,optional"`
+	Name        string `json:"name,optional"`
+	Gender      string `json:"gender,optional"`
+	BirthDate   string `json:"birth_date,optional"`
+	Region      string `json:"region,optional"`
+}
+
+type UpdateMeReq {
+	UserID      string `json:"user_id,optional"`
+	Identifier  string `json:"identifier,optional"`
+	DisplayName string `json:"display_name,optional"`
+	Name        string `json:"name,optional"`
+	Gender      string `json:"gender,optional"`
+	BirthDate   string `json:"birth_date,optional"`
+	Region      string `json:"region,optional"`
+}
+
+type UpdateMeAvatarReq {
+	MediaID string `json:"mediaId"`
+}
+
+type GetMeReq {}
+
+type ExistsReq {
+	Identifier string `form:"identifier"`
+}
+
+type GetUserByIdentifierReq {
+	Identifier string `path:"identifier"`
+}
+
+type UserResp {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Data    User   `json:"data"`
+}
+
+type ExistsData {
+	Identifier string `json:"identifier"`
+	Exists     bool   `json:"exists"`
+}
+
+type ExistsResp {
+	Code    string     `json:"code"`
+	Message string     `json:"message"`
+	Data    ExistsData `json:"data"`
+}
+
+@server (
+	jwt:   Auth
+	group: user
+)
+service user-api {
+	@handler getMe
+	get /me (GetMeReq) returns (UserResp)
+
+	@handler updateMe
+	patch /me (UpdateMeReq) returns (UserResp)
+
+	@handler updateMeAvatar
+	patch /me/avatar (UpdateMeAvatarReq) returns (UserResp)
+}
+
+@server (
+	group: user
+)
+service user-api {
+	@handler createUser
+	post /users (CreateUserReq) returns (UserResp)
+
+	@handler createAccount
+	post /accounts (CreateUserReq) returns (UserResp)
+
+	@handler existsUser
+	get /users/exists (ExistsReq) returns (ExistsResp)
+
+	@handler existsAccount
+	get /accounts/exists (ExistsReq) returns (ExistsResp)
+
+	@handler getUserByIdentifier
+	get /users/:identifier (GetUserByIdentifierReq) returns (UserResp)
+
+	@handler getAccountByIdentifier
+	get /accounts/:identifier (GetUserByIdentifierReq) returns (UserResp)
+}

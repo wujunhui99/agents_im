@@ -4,7 +4,7 @@
 
 ## 背景
 
-Account Service 是账号资料的权威边界。Account 可代表 human user、agent、admin，未来可扩展 service/official accounts。当前 REST 与 RPC transport 仍保留 `user-api` / `user-rpc` / `proto/user.proto` V0 compatibility，旧手写 HTTP mux 注册层和 `internal/rpc` wrapper 已移除；业务行为继续由 `internal/logic` 与 repository 承载。
+Account Service 是账号资料的权威边界。Account 可代表 human user、agent、admin，未来可扩展 service/official accounts。当前 REST 与 RPC transport 仍保留 `user-api` / `user-rpc` V0 compatibility；canonical RPC proto 已迁移到 `service/user/rpc/user.proto`，Go package 输出仍是 `proto/userpb` 以保持 import 兼容。旧手写 HTTP mux 注册层和 `internal/rpc` wrapper 已移除；业务行为继续由 `internal/logic` 与 repository 承载，后续逐步把数据边界收敛到 `service/user/rpc/internal/model`。
 
 术语规则：
 
@@ -57,24 +57,28 @@ HTTP 接口：
 ## 目录结构
 
 ```text
-api/user.api
+service/user/api/user.api              # 新目标位置；当前 user-api 运行入口仍暂用 root-level API scaffold
+service/user/rpc/user.proto            # user-rpc canonical proto source
+service/user/rpc/internal/config
+service/user/rpc/internal/logic
+service/user/rpc/internal/model        # goctl model scaffold for user RPC data boundary
+service/user/rpc/internal/server
+service/user/rpc/internal/svc
+service/user/rpc/userservice
+service/user/rpc/entry
+service/user/rpc/user.v1.go
+proto/userpb                           # generated pb/grpc output for import compatibility
 cmd/user-api/main.go
 cmd/user-rpc/main.go
 etc/user-api.yaml
 etc/user-rpc.yaml
-internal/config
 internal/handler/gozero_routes.go
-internal/handler/user
+internal/handler/user                  # current user-api scaffold; later API migration will move this
 internal/types/types.go
-internal/logic
-internal/model
-internal/repository
-internal/response
-internal/service
-internal/servicecontext/user
-internal/rpcgen/user
-proto/user.proto
-tests/user_service_test.go
+internal/logic                         # shared legacy business logic during migration
+internal/model                         # legacy shared model during migration
+internal/repository                    # legacy repository during migration
+internal/servicecontext/user           # current user-api context; user-rpc uses service/user/rpc/internal/svc
 ```
 
 ## 数据模型

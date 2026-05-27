@@ -66,10 +66,11 @@
 - `.ai-context/zero-skills/references/rest-api-patterns.md`
 - `.ai-context/zero-skills/references/rpc-patterns.md`
 - `.ai-context/zero-skills/references/database-patterns.md`
+- [`docs/design-docs/go-zero-service-layout.md`](./docs/design-docs/go-zero-service-layout.md)
 - [`docs/design-docs/user-auth-friends-groups-boundaries.md`](./docs/design-docs/user-auth-friends-groups-boundaries.md)
 - [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)
 
-常见文件：`api/*.api`、`proto/**/*.proto`、`internal/handler/**`、`internal/logic/**`、`internal/servicecontext/<service>/service_context.go`、`internal/rpcgen/*/internal/svc/service_context.go`、`internal/types/types.go`。
+常见文件：`service/<domain>/api/**`、`service/<domain>/rpc/**`、`api/*.api`、`proto/*pb/**`、`internal/handler/**`、`internal/logic/**`、`internal/servicecontext/<service>/service_context.go`、`internal/types/types.go`。旧 `internal/rpcgen/<domain>` 只作为尚未迁移服务的过渡位置。
 
 ### Frontend React/Vite
 
