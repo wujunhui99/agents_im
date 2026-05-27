@@ -30,6 +30,8 @@ required_files=(
   "docs/exec-plans/active/ci-pipeline.md"
   "service/user/rpc/user.proto"
   "service/user/api/user.api"
+  "service/friends/rpc/friends.proto"
+  "service/friends/api/friends.api"
   "proto/auth.proto"
   "proto/friends.proto"
   "proto/groups.proto"
@@ -37,6 +39,8 @@ required_files=(
   "proto/mail.proto"
   "service/user/rpc/user/user.pb.go"
   "service/user/rpc/user/user_grpc.pb.go"
+  "service/friends/rpc/friends/friends.pb.go"
+  "service/friends/rpc/friends/friends_grpc.pb.go"
   "proto/authpb/auth.pb.go"
   "proto/authpb/auth_grpc.pb.go"
   "proto/friendspb/friends.pb.go"
@@ -49,8 +53,12 @@ required_files=(
   "proto/mailpb/mail_grpc.pb.go"
   "service/user/rpc/user.v1.go"
   "service/user/rpc/internal/server/userserver.go"
+  "service/friends/rpc/friends.v1.go"
+  "service/friends/rpc/internal/server/friendsserver.go"
   "service/user/api/user.go"
   "service/user/api/entry/entry.go"
+  "service/friends/api/friends.go"
+  "service/friends/api/entry/entry.go"
   "service/user/api/internal/config/config.go"
   "service/user/api/internal/handler/routes.go"
   "service/user/api/internal/svc/service_context.go"
@@ -65,6 +73,18 @@ required_files=(
   "service/user/api/internal/logic/user/update_me_logic.go"
   "service/user/api/internal/logic/user/update_me_avatar_logic.go"
   "service/user/api/internal/logic/user/convert.go"
+  "service/friends/api/internal/config/config.go"
+  "service/friends/api/internal/handler/routes.go"
+  "service/friends/api/internal/svc/service_context.go"
+  "service/friends/api/internal/types/types.go"
+  "service/friends/api/internal/logic/friends/add_friend_logic.go"
+  "service/friends/api/internal/logic/friends/delete_friend_logic.go"
+  "service/friends/api/internal/logic/friends/get_friendship_logic.go"
+  "service/friends/api/internal/logic/friends/list_friends_logic.go"
+  "service/friends/api/internal/logic/friends/list_friend_requests_logic.go"
+  "service/friends/api/internal/logic/friends/accept_friend_request_logic.go"
+  "service/friends/api/internal/logic/friends/reject_friend_request_logic.go"
+  "service/friends/api/internal/logic/friends/convert.go"
   "internal/rpcgen/auth/auth.v1.go"
   "internal/rpcgen/auth/internal/server/auth_service_server.go"
   "internal/rpcgen/friends/friends.v1.go"
@@ -926,6 +946,7 @@ fi
 
 rpc_generated_dirs=(
   "service/user/rpc"
+  "service/friends/rpc"
   "internal/rpcgen/auth"
   "internal/rpcgen/friends"
   "internal/rpcgen/groups"
@@ -942,6 +963,7 @@ done
 
 rpc_generated_servers=(
   "service/user/rpc/internal/server/userserver.go:UserServer"
+  "service/friends/rpc/internal/server/friendsserver.go:FriendsServer"
   "internal/rpcgen/auth/internal/server/auth_service_server.go:AuthServiceServer"
   "internal/rpcgen/friends/internal/server/friends_service_server.go:FriendsServiceServer"
   "internal/rpcgen/groups/internal/server/groups_service_server.go:GroupsServiceServer"
@@ -959,6 +981,7 @@ done
 
 rpc_generated_entrypoints=(
   "service/user/rpc/user.v1.go:RegisterUserServer"
+  "service/friends/rpc/friends.v1.go:RegisterFriendsServer"
   "internal/rpcgen/auth/auth.v1.go:RegisterAuthServiceServer"
   "internal/rpcgen/friends/friends.v1.go:RegisterFriendsServiceServer"
   "internal/rpcgen/groups/groups.v1.go:RegisterGroupsServiceServer"
@@ -981,14 +1004,14 @@ done
 
 rpc_entry_patterns=(
   "cmd/user-rpc/main.go:service/user/rpc/entry"
+  "cmd/friends-rpc/main.go:service/friends/rpc/entry"
   "cmd/auth-rpc/main.go:internal/rpcgen/auth/entry"
-  "cmd/friends-rpc/main.go:internal/rpcgen/friends/entry"
   "cmd/groups-rpc/main.go:internal/rpcgen/groups/entry"
   "cmd/message-rpc/main.go:internal/rpcgen/message/entry"
   "cmd/mail-rpc/main.go:internal/rpcgen/mail/entry"
   "service/user/rpc/entry/entry.go:Start bridges cmd/user-rpc"
+  "service/friends/rpc/entry/entry.go:Start bridges cmd/friends-rpc"
   "internal/rpcgen/auth/entry/entry.go:Start bridges cmd/auth-rpc"
-  "internal/rpcgen/friends/entry/entry.go:Start bridges cmd/friends-rpc"
   "internal/rpcgen/groups/entry/entry.go:Start bridges cmd/groups-rpc"
   "internal/rpcgen/message/entry/entry.go:Start bridges cmd/message-rpc"
   "internal/rpcgen/mail/entry/entry.go:Start bridges cmd/mail-rpc"
@@ -1002,7 +1025,9 @@ done
 
 api_entry_patterns=(
   "cmd/user-api/main.go:service/user/api/entry"
+  "cmd/friends-api/main.go:service/friends/api/entry"
   "service/user/api/entry/entry.go:Start bridges cmd/user-api"
+  "service/friends/api/entry/entry.go:Start bridges cmd/friends-api"
 )
 
 for entry_spec in "${api_entry_patterns[@]}"; do
@@ -1016,8 +1041,18 @@ if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstor
   exit 1
 fi
 
+if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/friends)"|DataSource|StorageDriver|New.*Repository' cmd/friends-api service/friends/api --glob '*.go' --glob '!*_test.go'; then
+  echo "friends API entry and service/friends/api must not own data access; use RPC/BFF calls" >&2
+  exit 1
+fi
+
 if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" service/user/api/internal/logic; then
   echo "generated user API logic still contains empty scaffold behavior" >&2
+  exit 1
+fi
+
+if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" service/friends/api/internal/logic; then
+  echo "generated friends API logic still contains empty scaffold behavior" >&2
   exit 1
 fi
 
@@ -1033,6 +1068,7 @@ fi
 
 rpc_logic_markers=(
   "service/user/rpc/internal/logic:UserLogic"
+  "service/friends/rpc/internal/logic:FriendsLogic"
   "internal/rpcgen/auth/internal/logic:AuthLogic"
   "internal/rpcgen/friends/internal/logic:FriendsLogic"
   "internal/rpcgen/groups/internal/logic:GroupsLogic"
@@ -2052,11 +2088,17 @@ for pattern in "${observability_code_patterns[@]}"; do
 done
 
 for api_main in cmd/*-api/main.go; do
-  if [[ "$api_main" == "cmd/user-api/main.go" ]]; then
-    rg -q "TraceMiddlewareFunc" service/user/api/entry/entry.go
-  else
-    rg -q "TraceMiddlewareFunc" "$api_main"
-  fi
+  case "$api_main" in
+    cmd/user-api/main.go)
+      rg -q "TraceMiddlewareFunc" service/user/api/entry/entry.go
+      ;;
+    cmd/friends-api/main.go)
+      rg -q "TraceMiddlewareFunc" service/friends/api/entry/entry.go
+      ;;
+    *)
+      rg -q "TraceMiddlewareFunc" "$api_main"
+      ;;
+  esac
 done
 
 observability_wiring_patterns=(

@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	friendsentry "github.com/wujunhui99/agents_im/internal/rpcgen/friends/entry"
+	friendsentry "github.com/wujunhui99/agents_im/service/friends/rpc/entry"
 )
 
 func main() {
