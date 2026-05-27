@@ -94,4 +94,3 @@ service auth-api {
 	@handler validateToken
 	post /auth/validate (ValidateTokenReq) returns (ValidateTokenResp)
 }
-

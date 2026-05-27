@@ -37,7 +37,6 @@ required_files=(
   "service/groups/rpc/groups.proto"
   "service/groups/api/groups.api"
   "service/agent/api/agent.api"
-  "proto/auth.proto"
   "proto/friends.proto"
   "proto/groups.proto"
   "proto/message.proto"
@@ -50,8 +49,6 @@ required_files=(
   "service/friends/rpc/friends/friends_grpc.pb.go"
   "service/groups/rpc/groups/groups.pb.go"
   "service/groups/rpc/groups/groups_grpc.pb.go"
-  "proto/authpb/auth.pb.go"
-  "proto/authpb/auth_grpc.pb.go"
   "proto/friendspb/friends.pb.go"
   "proto/friendspb/friends_grpc.pb.go"
   "proto/groupspb/groups.pb.go"
@@ -863,7 +860,6 @@ auth_proto_patterns=(
 )
 
 for pattern in "${auth_proto_patterns[@]}"; do
-  rg -q "$pattern" proto/auth.proto
   rg -q "$pattern" service/auth/rpc/auth.proto
 done
 
@@ -1169,8 +1165,6 @@ rpc_generated_proto_files=(
   "service/user/rpc/user/user_grpc.pb.go"
   "service/auth/rpc/auth/auth.pb.go"
   "service/auth/rpc/auth/auth_grpc.pb.go"
-  "proto/authpb/auth.pb.go"
-  "proto/authpb/auth_grpc.pb.go"
   "proto/friendspb/friends.pb.go"
   "proto/friendspb/friends_grpc.pb.go"
   "proto/groupspb/groups.pb.go"
