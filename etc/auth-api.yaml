@@ -13,13 +13,7 @@ Tracing:
 Auth:
   AccessSecret: dev-jwt-secret-change-me
   AccessExpire: 86400
-AdminBootstrap:
-  Identifier: amin
-  Password: ${ADMIN_BOOTSTRAP_PASSWORD}
-  DisplayName: 管理后台管理员
-StorageDriver: memory
-DataSource: ${DATABASE_URL}
-MailRPC:
+AuthRPC:
   Endpoints:
-    - 127.0.0.1:9095
+    - 127.0.0.1:9091
   Timeout: 5000

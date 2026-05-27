@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/service/auth/rpc/auth";
+
+service AuthService {
+  rpc RequestRegistrationEmailCode(RegistrationEmailCodeRequest) returns (RegistrationEmailCodeResponse);
+  rpc Register(RegisterRequest) returns (AuthResponse);
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  rpc ParseToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+}
+
+message RegisterRequest {
+  string identifier = 1;
+  string password = 2;
+  string display_name = 3;
+  string name = 4;
+  string gender = 5;
+  string birth_date = 6;
+  string region = 7;
+  string email = 8;
+  string email_verification_code = 9;
+}
+
+message LoginRequest {
+  string identifier = 1;
+  string password = 2;
+}
+
+message RegistrationEmailCodeRequest {
+  string email = 1;
+}
+
+message RegistrationEmailCodeResponse {
+  string email = 1;
+  int32 expire_minutes = 2;
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message AuthResponse {
+  string user_id = 1;
+  string identifier = 2;
+  string token = 3;
+  string expires_at = 4;
+  string email = 5;
+  string display_name = 6;
+  string name = 7;
+  string gender = 8;
+  string birth_date = 9;
+  string region = 10;
+  string account_type = 11;
+  string avatar_media_id = 12;
+  string avatar_url = 13;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string identifier = 3;
+  string expires_at = 4;
+}

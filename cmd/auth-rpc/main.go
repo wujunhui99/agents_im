@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	authentry "github.com/wujunhui99/agents_im/internal/rpcgen/auth/entry"
+	authentry "github.com/wujunhui99/agents_im/service/auth/rpc/entry"
 )
 
 func main() {

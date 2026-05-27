@@ -1,0 +1,7 @@
+Name: auth-api
+Host: 0.0.0.0
+Port: 8888
+AuthRPC:
+  Endpoints:
+    - 127.0.0.1:9091
+  Timeout: 5000
