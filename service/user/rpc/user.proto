@@ -14,6 +14,7 @@ service UserService {
   rpc ExistsByIdentifier(ExistsByIdentifierRequest) returns (ExistsByIdentifierResponse);
   rpc GetUserByID(GetUserByIDRequest) returns (UserResponse);
   rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UserResponse);
+  rpc UpdateUserAvatar(UpdateUserAvatarRequest) returns (UserResponse);
 }
 
 // User is the V0 transport message for an Account/Profile aggregate. user_id is
@@ -30,6 +31,8 @@ message User {
   string updated_at = 9;
   string account_type = 10;
   string avatar_media_id = 11;
+  string email = 12;
+  string avatar_url = 13;
 }
 
 message CreateUserRequest {
@@ -40,6 +43,7 @@ message CreateUserRequest {
   string birth_date = 5;
   string region = 6;
   string account_type = 7;
+  string email = 8;
 }
 
 message GetUserByIdentifierRequest {
@@ -66,6 +70,14 @@ message UpdateUserProfileRequest {
   optional string gender = 4;
   optional string birth_date = 5;
   optional string region = 6;
+}
+
+message UpdateUserAvatarRequest {
+  string user_id = 1;
+  // avatar_media_id is the uploaded media object to validate and attach as the
+  // profile avatar. The name intentionally matches User.avatar_media_id; HTTP
+  // compatibility may still accept legacy JSON field mediaId at the BFF layer.
+  string avatar_media_id = 2;
 }
 
 message UserResponse {

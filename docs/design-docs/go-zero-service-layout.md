@@ -72,7 +72,7 @@ refactor/hermes/issue-281-user-rpc-service-layout
 refactor/eino/issue-282-friends-rpc-service-layout
 ```
 
-如果还没有 Issue，必须先创建 Issue，再创建分支和提交；开发 PR 必须只关闭一个 Issue。Codex worker 也必须 issue-first：接到迁移任务后先用 `gh issue create` 创建或复用一个明确匹配的 Issue，得到 Issue number 后再建 `refactor/codex/issue-<number>-...` 分支。缺少 GitHub 权限时必须失败并报告 blocker，不能用 `issue-0`、不能假装已有 Issue。
+如果还没有 Issue，必须先创建 Issue，再创建分支和提交；开发 PR 必须只关闭一个 Issue。Codex worker 也必须 issue-first：接到迁移任务后先用 `gh issue create` 创建或复用一个明确匹配的 Issue，得到 Issue number 后再按 `docs/AGENT_GIT_STANDARD.md` 创建仓库认可的 agent 分支；如果当前仓库未允许 `codex` 作为第二路径段，就使用 Controller 指定的可信 agent 分支或明确失败报告 blocker。缺少 GitHub 权限时必须失败并报告 blocker，不能用 `issue-0`、不能假装已有 Issue。
 
 ## Commit 规则
 
@@ -145,6 +145,44 @@ service/<domain>/rpc/entry/entry.go
 <domain>entry.Start(*configFile)
 ```
 
+## goctl 生成 API 的标准流程
+
+迁移 API 时先复制 canonical `.api` 到 service layout，再用 goctl 生成 scaffold。必须先生成到临时目录检查输出，再把安全结构生成/迁移到目标目录：
+
+```bash
+mkdir -p service/user/api
+cp api/user.api service/user/api/user.api
+
+rm -rf /tmp/agents-im-user-api-goctl
+mkdir -p /tmp/agents-im-user-api-goctl
+goctl api go -api service/user/api/user.api -dir /tmp/agents-im-user-api-goctl --style go_zero
+
+goctl api go -api service/user/api/user.api -dir service/user/api --style go_zero
+```
+
+生成后检查：
+
+```bash
+test -f service/user/api/internal/handler/routes.go
+test -f service/user/api/internal/svc/service_context.go
+test -f service/user/api/internal/types/types.go
+test -f service/user/api/user.go
+```
+
+`cmd/<domain>-api/main.go` 不直接 import `service/<domain>/api/internal/*`，因为 Go `internal` 可见性不允许。需要添加桥接包：
+
+```text
+service/<domain>/api/entry/entry.go
+```
+
+然后 `cmd/<domain>-api/main.go` 只调用：
+
+```go
+<domain>entry.Start(*configFile)
+```
+
+API 层是 BFF 边界：可以补 HTTP 鉴权、response envelope、RPC 错误映射、聚合多个 RPC 的逻辑，但不能创建 repository/model/DB/object-storage 依赖。若现有 API 行为需要数据访问，优先补 RPC 能力；如果对应 RPC 不存在且无法在当前 slice 安全补齐，必须 fail closed 并报告 blocker，不能在 API 里保留直接 DB fallback。
+
 ## goctl 生成 model 的标准流程
 
 优先使用 PostgreSQL datasource 生成，目标目录必须在 RPC 内部：
@@ -182,7 +220,22 @@ RPC 迁移最小验证：
 gofmt -w cmd/<domain>-rpc/main.go service/<domain>/rpc proto/<domain>pb/*.go
 
 go test ./cmd/<domain>-rpc ./service/<domain>/rpc/...
+```
 
+API 迁移最小验证：
+
+```bash
+goctl api validate -api service/<domain>/api/<domain>.api
+
+gofmt -w cmd/<domain>-api/main.go service/<domain>/api
+
+go test ./cmd/<domain>-api ./service/<domain>/api/...
+go test ./cmd/<domain>-rpc ./service/<domain>/rpc/...
+```
+
+提交前公共验证：
+
+```bash
 go test ./...
 
 bash scripts/verify-static.sh
@@ -243,9 +296,9 @@ drone build ls wujunhui99/agents_im --branch main --limit 10
 
 3. 对 deploy 相关变更，Drone 绿不等于生产完成；还要验证 k3s rollout、pod imageID、health/API/WS smoke。没有权限时写清楚需要的权限和原因。
 
-## 当前 user RPC 迁移示例
+## 当前 user service 迁移示例
 
-本次 user RPC 的目标是把 canonical RPC source 迁移到：
+当前 user RPC 的 canonical source 位于：
 
 ```text
 service/user/rpc/user.proto
@@ -265,3 +318,17 @@ github.com/wujunhui99/agents_im/proto/userpb
 ```
 
 `cmd/user-rpc/main.go` 只导入 `service/user/rpc/entry`，不再导入旧 `internal/rpcgen/user/entry`。
+
+当前 user API 的 canonical source 位于：
+
+```text
+service/user/api/user.api
+service/user/api/internal/config/config.go
+service/user/api/internal/handler/routes.go
+service/user/api/internal/logic/user/*.go
+service/user/api/internal/svc/service_context.go
+service/user/api/internal/types/types.go
+service/user/api/entry/entry.go
+```
+
+`cmd/user-api/main.go` 只导入 `service/user/api/entry`。`service/user/api/internal/svc.ServiceContext` 只持有 API config 和 `service/user/rpc/userservice.UserService` RPC client；用户 API 逻辑不得 import `internal/repository`、`internal/model`、`internal/objectstorage` 或旧 `internal/servicecontext/user`。

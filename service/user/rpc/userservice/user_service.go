@@ -19,6 +19,7 @@ type (
 	ExistsByIdentifierResponse = userpb.ExistsByIdentifierResponse
 	GetUserByIDRequest         = userpb.GetUserByIDRequest
 	GetUserByIdentifierRequest = userpb.GetUserByIdentifierRequest
+	UpdateUserAvatarRequest    = userpb.UpdateUserAvatarRequest
 	UpdateUserProfileRequest   = userpb.UpdateUserProfileRequest
 	User                       = userpb.User
 	UserResponse               = userpb.UserResponse
@@ -29,6 +30,7 @@ type (
 		ExistsByIdentifier(ctx context.Context, in *ExistsByIdentifierRequest, opts ...grpc.CallOption) (*ExistsByIdentifierResponse, error)
 		GetUserByID(ctx context.Context, in *GetUserByIDRequest, opts ...grpc.CallOption) (*UserResponse, error)
 		UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UserResponse, error)
+		UpdateUserAvatar(ctx context.Context, in *UpdateUserAvatarRequest, opts ...grpc.CallOption) (*UserResponse, error)
 	}
 
 	defaultUserService struct {
@@ -65,4 +67,9 @@ func (m *defaultUserService) GetUserByID(ctx context.Context, in *GetUserByIDReq
 func (m *defaultUserService) UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UserResponse, error) {
 	client := userpb.NewUserServiceClient(m.cli.Conn())
 	return client.UpdateUserProfile(ctx, in, opts...)
+}
+
+func (m *defaultUserService) UpdateUserAvatar(ctx context.Context, in *UpdateUserAvatarRequest, opts ...grpc.CallOption) (*UserResponse, error) {
+	client := userpb.NewUserServiceClient(m.cli.Conn())
+	return client.UpdateUserAvatar(ctx, in, opts...)
 }

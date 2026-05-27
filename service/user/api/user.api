@@ -8,20 +8,20 @@ info (
 )
 
 type User {
-	UserID      string `json:"user_id"`
-	Identifier  string `json:"identifier"`
-	Email       string `json:"email"`
-	DisplayName string `json:"display_name"`
-	Name        string `json:"name"`
-	Gender      string `json:"gender"`
-	BirthDate   string `json:"birth_date"`
-	Region      string `json:"region"`
-	AccountType string `json:"account_type"`
-	AvatarMediaID string `json:"avatar_media_id"`
-	AvatarURL string `json:"avatar_url,optional"`
-	AvatarURLExpiresAt int64 `json:"avatar_url_expires_at,optional"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	UserID             string `json:"user_id"`
+	Identifier         string `json:"identifier"`
+	Email              string `json:"email"`
+	DisplayName        string `json:"display_name"`
+	Name               string `json:"name"`
+	Gender             string `json:"gender"`
+	BirthDate          string `json:"birth_date"`
+	Region             string `json:"region"`
+	AccountType        string `json:"account_type"`
+	AvatarMediaID      string `json:"avatar_media_id"`
+	AvatarURL          string `json:"avatar_url,optional"`
+	AvatarURLExpiresAt int64  `json:"avatar_url_expires_at,optional"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
 }
 
 type CreateUserReq {
@@ -48,8 +48,7 @@ type UpdateMeAvatarReq {
 	MediaID string `json:"mediaId"`
 }
 
-type GetMeReq {
-}
+type GetMeReq {}
 
 type ExistsReq {
 	Identifier string `form:"identifier"`
