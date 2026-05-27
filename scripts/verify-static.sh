@@ -39,7 +39,7 @@ required_files=(
   "proto/friends.proto"
   "proto/groups.proto"
   "proto/message.proto"
-  "proto/mail.proto"
+  "service/mail/rpc/mail.proto"
   "service/user/rpc/user/user.pb.go"
   "service/user/rpc/user/user_grpc.pb.go"
   "service/friends/rpc/friends/friends.pb.go"
@@ -54,8 +54,8 @@ required_files=(
   "proto/groupspb/groups_grpc.pb.go"
   "proto/messagepb/message.pb.go"
   "proto/messagepb/message_grpc.pb.go"
-  "proto/mailpb/mail.pb.go"
-  "proto/mailpb/mail_grpc.pb.go"
+  "service/mail/rpc/mail/mail.pb.go"
+  "service/mail/rpc/mail/mail_grpc.pb.go"
   "service/user/rpc/user.v1.go"
   "service/user/rpc/internal/server/userserver.go"
   "service/friends/rpc/friends.v1.go"
@@ -130,8 +130,8 @@ required_files=(
   "internal/rpcgen/groups/internal/server/groups_service_server.go"
   "internal/rpcgen/message/message.go"
   "internal/rpcgen/message/internal/server/message_service_server.go"
-  "internal/rpcgen/mail/mail.v1.go"
-  "internal/rpcgen/mail/internal/server/mail_service_server.go"
+  "service/mail/rpc/mail.v1.go"
+  "service/mail/rpc/internal/server/mail_service_server.go"
   "cmd/user-api/main.go"
   "cmd/user-rpc/main.go"
   "cmd/auth-api/main.go"
@@ -898,7 +898,7 @@ mail_proto_patterns=(
 )
 
 for pattern in "${mail_proto_patterns[@]}"; do
-  rg -q "$pattern" proto/mail.proto
+  rg -q "$pattern" service/mail/rpc/mail.proto
 done
 
 agent_conversation_hosting_contract_patterns=(
@@ -982,7 +982,7 @@ rpc_generated_dirs=(
   "internal/rpcgen/friends"
   "internal/rpcgen/groups"
   "internal/rpcgen/message"
-  "internal/rpcgen/mail"
+  "service/mail/rpc"
 )
 
 for dir in "${rpc_generated_dirs[@]}"; do
@@ -1000,7 +1000,7 @@ rpc_generated_servers=(
   "internal/rpcgen/friends/internal/server/friends_service_server.go:FriendsServiceServer"
   "internal/rpcgen/groups/internal/server/groups_service_server.go:GroupsServiceServer"
   "internal/rpcgen/message/internal/server/message_service_server.go:MessageServiceServer"
-  "internal/rpcgen/mail/internal/server/mail_service_server.go:MailServiceServer"
+  "service/mail/rpc/internal/server/mail_service_server.go:MailServiceServer"
 )
 
 for server_spec in "${rpc_generated_servers[@]}"; do
@@ -1019,7 +1019,7 @@ rpc_generated_entrypoints=(
   "internal/rpcgen/friends/friends.v1.go:RegisterFriendsServiceServer"
   "internal/rpcgen/groups/groups.v1.go:RegisterGroupsServiceServer"
   "internal/rpcgen/message/message.go:RegisterMessageServiceServer"
-  "internal/rpcgen/mail/mail.v1.go:RegisterMailServiceServer"
+  "service/mail/rpc/mail.v1.go:RegisterMailServiceServer"
 )
 
 for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
@@ -1041,14 +1041,14 @@ rpc_entry_patterns=(
   "cmd/auth-rpc/main.go:internal/rpcgen/auth/entry"
   "cmd/groups-rpc/main.go:service/groups/rpc/entry"
   "cmd/message-rpc/main.go:internal/rpcgen/message/entry"
-  "cmd/mail-rpc/main.go:internal/rpcgen/mail/entry"
+  "cmd/mail-rpc/main.go:service/mail/rpc/entry"
   "service/user/rpc/entry/entry.go:Start bridges cmd/user-rpc"
   "service/friends/rpc/entry/entry.go:Start bridges cmd/friends-rpc"
   "internal/rpcgen/auth/entry/entry.go:Start bridges cmd/auth-rpc"
   "service/groups/rpc/entry/entry.go:Start bridges cmd/groups-rpc"
   "internal/rpcgen/groups/entry/entry.go:Start bridges cmd/groups-rpc"
   "internal/rpcgen/message/entry/entry.go:Start bridges cmd/message-rpc"
-  "internal/rpcgen/mail/entry/entry.go:Start bridges cmd/mail-rpc"
+  "service/mail/rpc/entry/entry.go:Start bridges cmd/mail-rpc"
 )
 
 for entry_spec in "${rpc_entry_patterns[@]}"; do
@@ -1104,12 +1104,12 @@ if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" service/agent
   exit 1
 fi
 
-if rg -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic|auth/repository)"' internal/rpcgen/*/entry --glob '*.go'; then
+if rg -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic|auth/repository)"' internal/rpcgen/*/entry service/*/rpc/entry --glob '*.go'; then
   echo "rpc entry bridges must not own business wiring; keep dependencies behind generated rpc service contexts" >&2
   exit 1
 fi
 
-if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" internal/rpcgen/*/internal/logic service/user/rpc/internal/logic; then
+if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" internal/rpcgen/*/internal/logic service/user/rpc/internal/logic service/mail/rpc/internal/logic; then
   echo "generated rpc logic still contains empty scaffold behavior" >&2
   exit 1
 fi
@@ -1121,7 +1121,7 @@ rpc_logic_markers=(
   "internal/rpcgen/friends/internal/logic:FriendsLogic"
   "internal/rpcgen/groups/internal/logic:GroupsLogic"
   "internal/rpcgen/message/internal/logic:MessageLogic"
-  "internal/rpcgen/mail/internal/logic:MailProvider"
+  "service/mail/rpc/internal/logic:MailProvider"
 )
 
 for logic_spec in "${rpc_logic_markers[@]}"; do
@@ -1146,8 +1146,8 @@ rpc_generated_proto_files=(
   "proto/groupspb/groups_grpc.pb.go"
   "proto/messagepb/message.pb.go"
   "proto/messagepb/message_grpc.pb.go"
-  "proto/mailpb/mail.pb.go"
-  "proto/mailpb/mail_grpc.pb.go"
+  "service/mail/rpc/mail/mail.pb.go"
+  "service/mail/rpc/mail/mail_grpc.pb.go"
 )
 
 for file in "${rpc_generated_proto_files[@]}"; do

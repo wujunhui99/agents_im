@@ -13,7 +13,7 @@ import (
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/config"
-	"github.com/wujunhui99/agents_im/proto/mailpb"
+	mailpb "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
 	"google.golang.org/grpc"
 )
 

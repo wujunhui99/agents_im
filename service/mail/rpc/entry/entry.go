@@ -7,10 +7,10 @@ import (
 
 	appconfig "github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/observability"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/config"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/server"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/internal/svc"
-	"github.com/wujunhui99/agents_im/proto/mailpb"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/server"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
+	mailpb "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -18,8 +18,8 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// Start bridges cmd/mail-rpc to the goctl-generated RPC internals.
-// cmd/mail-rpc cannot import internal/rpcgen/mail/internal/* directly because
+// Start bridges cmd/mail-rpc to the service/mail/rpc goctl-generated RPC internals.
+// cmd/mail-rpc cannot import service/mail/rpc/internal/* directly because
 // of Go internal package visibility.
 func Start(configFile string) {
 	var c config.Config

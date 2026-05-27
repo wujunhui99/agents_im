@@ -3,8 +3,8 @@ package mailadapter
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/rpcgen/mail/mailservice"
-	"github.com/wujunhui99/agents_im/proto/mailpb"
+	mailpb "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/mailservice"
 )
 
 type SendTemplateEmailRequest struct {
