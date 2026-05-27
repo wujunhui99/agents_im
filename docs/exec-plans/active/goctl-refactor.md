@@ -63,7 +63,7 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/user.api -dir .tmp-goc
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/friends.api -dir .tmp-goctl-check/friends --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/groups.api -dir .tmp-goctl-check/groups --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl api go -api api/message.api -dir .tmp-goctl-check/message --style go_zero
-PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/user.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/user --style go_zero
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc service/user/rpc/user.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=service/user/rpc --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/auth.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/auth --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/friends.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/friends --style go_zero
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/groups.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/groups --style go_zero
@@ -99,7 +99,7 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH goctl rpc protoc proto/message.proto --go_ou
   - `proto/groupspb`
   - `proto/messagepb`
 - 已新增正式 goctl zrpc scaffold：
-  - `internal/rpcgen/user`
+  - `service/user/rpc`
   - `internal/rpcgen/auth`
   - `internal/rpcgen/friends`
   - `internal/rpcgen/groups`
@@ -134,17 +134,17 @@ protoc-gen-go-grpc --version
   - `protoc-gen-go-grpc 1.6.1`
 - 正式输出目录：
   - pb：`proto/{userpb,authpb,friendspb,groupspb,messagepb}`
-  - zrpc scaffold：`internal/rpcgen/{user,auth,friends,groups,message}`
+  - zrpc scaffold：`service/user/rpc`、`internal/rpcgen/{auth,friends,groups,message}`
 - 目录策略：
   - 保留 proto 中现有 `option go_package = "github.com/wujunhui99/agents_im/proto/*pb"`。
   - `--go_out=.` / `--go-grpc_out=.` 配合 `--go_opt=module=github.com/wujunhui99/agents_im` 和 `--go-grpc_opt=module=github.com/wujunhui99/agents_im`，把 generated pb 放到 module 内的 `proto/*pb`，避免生成 `github.com/wujunhui99/agents_im/...` 嵌套目录。
-  - `--zrpc_out=internal/rpcgen/<service>` 让每个服务拥有独立 goctl scaffold；cleanup 阶段已删除旧 `internal/rpc`、`internal/auth/rpc`，并将 `cmd/*-rpc` 接到 zrpc generated server entry。
+  - `--zrpc_out=service/user/rpc` for user-rpc and `--zrpc_out=internal/rpcgen/<service>` for not-yet-migrated services; cleanup 阶段已删除旧 `internal/rpc`、`internal/auth/rpc`，并将 `cmd/*-rpc` 接到 zrpc generated server entry。
 
 最终 RPC 生成命令：
 
 ```bash
 export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
-goctl rpc protoc proto/user.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/user --style go_zero
+goctl rpc protoc service/user/rpc/user.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=service/user/rpc --style go_zero
 goctl rpc protoc proto/auth.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/auth --style go_zero
 goctl rpc protoc proto/friends.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/friends --style go_zero
 goctl rpc protoc proto/groups.proto --go_out=. --go_opt=module=github.com/wujunhui99/agents_im --go-grpc_out=. --go-grpc_opt=module=github.com/wujunhui99/agents_im --zrpc_out=internal/rpcgen/groups --style go_zero

@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/config"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/server"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/svc"
 	"github.com/wujunhui99/agents_im/proto/userpb"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/server"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"

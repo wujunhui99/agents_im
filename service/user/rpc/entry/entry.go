@@ -7,10 +7,10 @@ import (
 
 	appconfig "github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/observability"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/config"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/server"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/svc"
 	"github.com/wujunhui99/agents_im/proto/userpb"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/server"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -18,8 +18,8 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// Start bridges cmd/user-rpc to the goctl-generated RPC internals.
-// cmd/user-rpc cannot import internal/rpcgen/user/internal/* directly because
+// Start bridges cmd/user-rpc to the service/user/rpc goctl-generated RPC internals.
+// cmd/user-rpc cannot import service/user/rpc/internal/* directly because
 // of Go internal package visibility.
 func Start(configFile string) {
 	var c config.Config

@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/svc"
 	"github.com/wujunhui99/agents_im/proto/userpb"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/logic"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
 )
 
 type UserServiceServer struct {

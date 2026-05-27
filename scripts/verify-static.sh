@@ -28,7 +28,7 @@ required_files=(
   "docs/references/go-zero/codex-guide.md"
   "docs/exec-plans/active/goctl-refactor.md"
   "docs/exec-plans/active/ci-pipeline.md"
-  "proto/user.proto"
+  "service/user/rpc/user.proto"
   "proto/auth.proto"
   "proto/friends.proto"
   "proto/groups.proto"
@@ -46,8 +46,8 @@ required_files=(
   "proto/messagepb/message_grpc.pb.go"
   "proto/mailpb/mail.pb.go"
   "proto/mailpb/mail_grpc.pb.go"
-  "internal/rpcgen/user/user.v1.go"
-  "internal/rpcgen/user/internal/server/user_service_server.go"
+  "service/user/rpc/user.v1.go"
+  "service/user/rpc/internal/server/user_service_server.go"
   "internal/rpcgen/auth/auth.v1.go"
   "internal/rpcgen/auth/internal/server/auth_service_server.go"
   "internal/rpcgen/friends/friends.v1.go"
@@ -199,7 +199,7 @@ required_files=(
   "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
   "internal/ctxuser/user.go"
-  "internal/rpcgen/user/entry/entry.go"
+  "service/user/rpc/entry/entry.go"
   "internal/rpcgen/auth/entry/entry.go"
   "internal/rpcgen/friends/entry/entry.go"
   "internal/rpcgen/groups/entry/entry.go"
@@ -767,7 +767,7 @@ proto_patterns=(
 )
 
 for pattern in "${proto_patterns[@]}"; do
-  rg -q "$pattern" proto/user.proto
+  rg -q "$pattern" service/user/rpc/user.proto
 done
 
 auth_proto_patterns=(
@@ -906,7 +906,7 @@ if rg -n "CreateMessageIdempotent|insert into messages|insertMessage" internal/a
 fi
 
 rpc_generated_dirs=(
-  "internal/rpcgen/user"
+  "service/user/rpc"
   "internal/rpcgen/auth"
   "internal/rpcgen/friends"
   "internal/rpcgen/groups"
@@ -922,7 +922,7 @@ for dir in "${rpc_generated_dirs[@]}"; do
 done
 
 rpc_generated_servers=(
-  "internal/rpcgen/user/internal/server/user_service_server.go:UserServiceServer"
+  "service/user/rpc/internal/server/user_service_server.go:UserServiceServer"
   "internal/rpcgen/auth/internal/server/auth_service_server.go:AuthServiceServer"
   "internal/rpcgen/friends/internal/server/friends_service_server.go:FriendsServiceServer"
   "internal/rpcgen/groups/internal/server/groups_service_server.go:GroupsServiceServer"
@@ -939,7 +939,7 @@ for server_spec in "${rpc_generated_servers[@]}"; do
 done
 
 rpc_generated_entrypoints=(
-  "internal/rpcgen/user/user.v1.go:RegisterUserServiceServer"
+  "service/user/rpc/user.v1.go:RegisterUserServiceServer"
   "internal/rpcgen/auth/auth.v1.go:RegisterAuthServiceServer"
   "internal/rpcgen/friends/friends.v1.go:RegisterFriendsServiceServer"
   "internal/rpcgen/groups/groups.v1.go:RegisterGroupsServiceServer"
@@ -961,13 +961,13 @@ for cmd_file in cmd/*-rpc/main.go; do
 done
 
 rpc_entry_patterns=(
-  "cmd/user-rpc/main.go:internal/rpcgen/user/entry"
+  "cmd/user-rpc/main.go:service/user/rpc/entry"
   "cmd/auth-rpc/main.go:internal/rpcgen/auth/entry"
   "cmd/friends-rpc/main.go:internal/rpcgen/friends/entry"
   "cmd/groups-rpc/main.go:internal/rpcgen/groups/entry"
   "cmd/message-rpc/main.go:internal/rpcgen/message/entry"
   "cmd/mail-rpc/main.go:internal/rpcgen/mail/entry"
-  "internal/rpcgen/user/entry/entry.go:Start bridges cmd/user-rpc"
+  "service/user/rpc/entry/entry.go:Start bridges cmd/user-rpc"
   "internal/rpcgen/auth/entry/entry.go:Start bridges cmd/auth-rpc"
   "internal/rpcgen/friends/entry/entry.go:Start bridges cmd/friends-rpc"
   "internal/rpcgen/groups/entry/entry.go:Start bridges cmd/groups-rpc"
@@ -986,13 +986,13 @@ if rg -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic
   exit 1
 fi
 
-if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" internal/rpcgen/*/internal/logic; then
+if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" internal/rpcgen/*/internal/logic service/user/rpc/internal/logic; then
   echo "generated rpc logic still contains empty scaffold behavior" >&2
   exit 1
 fi
 
 rpc_logic_markers=(
-  "internal/rpcgen/user/internal/logic:UserLogic"
+  "service/user/rpc/internal/logic:UserLogic"
   "internal/rpcgen/auth/internal/logic:AuthLogic"
   "internal/rpcgen/friends/internal/logic:FriendsLogic"
   "internal/rpcgen/groups/internal/logic:GroupsLogic"
@@ -2285,8 +2285,8 @@ if rg -n "RequestURI|RawQuery|DumpRequest|Authorization|password|token" internal
 fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
-  api/user.api proto/user.proto cmd/user-api cmd/user-rpc \
-  internal/model internal/logic internal/handler internal/rpcgen/user internal/servicecontext; then
+  api/user.api service/user/api/user.api service/user/rpc/user.proto cmd/user-api cmd/user-rpc \
+  internal/model internal/logic internal/handler service/user/rpc internal/servicecontext; then
   echo "forbidden auth secret field found in service source" >&2
   exit 1
 fi

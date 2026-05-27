@@ -6,7 +6,7 @@ import (
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/user/internal/config"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
 )
 
 type ServiceContext struct {
