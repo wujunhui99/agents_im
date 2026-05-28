@@ -23,7 +23,10 @@ import (
 // of Go internal package visibility.
 func Start(configFile string) {
 	var c config.Config
-	conf.MustLoad(configFile, &c)
+	conf.MustLoad(configFile, &c, conf.UseEnv())
+	if c.TokenAuth.AccessSecret == "" {
+		c.TokenAuth.AccessSecret = appconfig.DefaultJWTAuthConfig().AccessSecret
+	}
 	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
 	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
 	if err != nil {
