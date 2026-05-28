@@ -394,10 +394,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		}
 		cfg.Port = port
 	}
-	if value := values["Auth.AccessSecret"]; value != "" {
+	if value := strings.TrimSpace(os.ExpandEnv(values["Auth.AccessSecret"])); value != "" {
 		cfg.Auth.AccessSecret = value
 	}
-	if value := values["Auth.AccessExpire"]; value != "" {
+	if value := strings.TrimSpace(os.ExpandEnv(values["Auth.AccessExpire"])); value != "" {
 		expire, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return cfg, err
@@ -462,10 +462,10 @@ func LoadRPCConfig(path string) (RPCConfig, error) {
 	if value := values["ListenOn"]; value != "" {
 		cfg.ListenOn = value
 	}
-	if value := values["Auth.AccessSecret"]; value != "" {
+	if value := strings.TrimSpace(os.ExpandEnv(values["Auth.AccessSecret"])); value != "" {
 		cfg.Auth.AccessSecret = value
 	}
-	if value := values["Auth.AccessExpire"]; value != "" {
+	if value := strings.TrimSpace(os.ExpandEnv(values["Auth.AccessExpire"])); value != "" {
 		expire, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return cfg, err

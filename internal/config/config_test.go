@@ -39,6 +39,54 @@ AdminBootstrap:
 	}
 }
 
+func TestLoadAPIConfigResolvesAuthSecretFromEnvPlaceholder(t *testing.T) {
+	t.Setenv("JWT_ACCESS_SECRET", "unit-test-shared-jwt-secret")
+	configPath := filepath.Join(t.TempDir(), "api.yaml")
+	if err := os.WriteFile(configPath, []byte(`
+Name: message-api
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: 3600
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if cfg.Auth.AccessSecret != "unit-test-shared-jwt-secret" {
+		t.Fatalf("auth access secret was not resolved from env placeholder")
+	}
+	if cfg.Auth.AccessExpire != 3600 {
+		t.Fatalf("auth access expire = %d, want 3600", cfg.Auth.AccessExpire)
+	}
+}
+
+func TestLoadRPCConfigResolvesAuthSecretFromEnvPlaceholder(t *testing.T) {
+	t.Setenv("JWT_ACCESS_SECRET", "unit-test-shared-rpc-jwt-secret")
+	configPath := filepath.Join(t.TempDir(), "rpc.yaml")
+	if err := os.WriteFile(configPath, []byte(`
+Name: message-rpc
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: 7200
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := LoadRPCConfig(configPath)
+	if err != nil {
+		t.Fatalf("load rpc config: %v", err)
+	}
+	if cfg.Auth.AccessSecret != "unit-test-shared-rpc-jwt-secret" {
+		t.Fatalf("rpc auth access secret was not resolved from env placeholder")
+	}
+	if cfg.Auth.AccessExpire != 7200 {
+		t.Fatalf("rpc auth access expire = %d, want 7200", cfg.Auth.AccessExpire)
+	}
+}
+
 func TestLoadAPIConfigResolvesRedisAndPresenceFromFile(t *testing.T) {
 	t.Setenv("REDIS_PASSWORD", "")
 	t.Setenv("REDIS_DB", "")
