@@ -49,3 +49,38 @@ MailRPC:
 		t.Fatalf("mail rpc config mismatch: %+v", cfg.MailRPC)
 	}
 }
+
+func TestAuthRPCConfigResolvesEnvPlaceholdersForAdminBootstrap(t *testing.T) {
+	t.Setenv("ADMIN_BOOTSTRAP_IDENTIFIER", "admin")
+	t.Setenv("ADMIN_BOOTSTRAP_PASSWORD", "unit-test-admin-password")
+	t.Setenv("ADMIN_BOOTSTRAP_DISPLAY_NAME", "管理后台管理员")
+
+	configPath := filepath.Join(t.TempDir(), "auth-rpc.yaml")
+	if err := os.WriteFile(configPath, []byte(`Name: auth-rpc
+ListenOn: 127.0.0.1:0
+TokenAuth:
+  AccessSecret: test-secret
+  AccessExpire: 86400
+AdminBootstrap:
+  Identifier: ${ADMIN_BOOTSTRAP_IDENTIFIER}
+  Password: ${ADMIN_BOOTSTRAP_PASSWORD}
+  DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME}
+StorageDriver: memory
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	var cfg authconfig.Config
+	conf.MustLoad(configPath, &cfg)
+	cfg.ResolveEnvPlaceholders()
+
+	if cfg.AdminBootstrap.Identifier != "admin" {
+		t.Fatalf("identifier = %q", cfg.AdminBootstrap.Identifier)
+	}
+	if cfg.AdminBootstrap.Password != "unit-test-admin-password" {
+		t.Fatalf("password placeholder was not resolved")
+	}
+	if cfg.AdminBootstrap.DisplayName != "管理后台管理员" {
+		t.Fatalf("display name = %q", cfg.AdminBootstrap.DisplayName)
+	}
+}
