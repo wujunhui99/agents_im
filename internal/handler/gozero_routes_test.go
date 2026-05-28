@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -12,10 +13,13 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/model"
+	"github.com/wujunhui99/agents_im/internal/objectstorage"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
 	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
+	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
@@ -166,6 +170,45 @@ func TestMessageFeedbackJSONRouteUsesApiPrefix(t *testing.T) {
 	}
 }
 
+func TestUserMediaAvatarRouteRedirectsToObjectStorage(t *testing.T) {
+	mediaRepo := repository.NewMemoryMediaRepository()
+	store := objectstorage.NewMemoryStore()
+	const objectKey = "avatar/route-user/med_route_avatar.png"
+	_, err := mediaRepo.CreateMediaObject(context.Background(), model.MediaObject{
+		MediaID:          "med_route_avatar",
+		OwnerUserID:      "route-user",
+		Bucket:           "agents-im-media",
+		ObjectKey:        objectKey,
+		ContentType:      "image/png",
+		SizeBytes:        128,
+		OriginalFilename: "avatar.png",
+		Purpose:          model.MediaPurposeAvatar,
+		Status:           model.MediaStatusReady,
+	})
+	if err != nil {
+		t.Fatalf("seed avatar media: %v", err)
+	}
+	store.PutObjectInfo(objectstorage.ObjectInfo{ObjectKey: objectKey, ContentType: "image/png", SizeBytes: 128})
+
+	router := newRouteTestUserRouter(t, usersvc.NewServiceContextWithMedia(
+		repository.NewMemoryRepository(),
+		mediaRepo,
+		store,
+		"agents-im-media",
+		testRouteJWTAuthConfig(),
+	))
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/media/avatars/med_route_avatar", nil)
+	router.ServeHTTP(resp, req)
+	if resp.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("avatar route status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+	if location := resp.Header().Get("Location"); !strings.Contains(location, url.PathEscape(objectKey)) {
+		t.Fatalf("redirect location = %q, want escaped object key %q", location, url.PathEscape(objectKey))
+	}
+}
+
 func newRouteTestMessageRouter(t *testing.T, serviceContext *messagesvc.ServiceContext) http.Handler {
 	t.Helper()
 
@@ -200,6 +243,25 @@ func newRouteTestGroupsRouter(t *testing.T, serviceContext *groupssvc.ServiceCon
 	serverless, err := rest.NewServerless(server)
 	if err != nil {
 		t.Fatalf("build go-zero test router: %v", err)
+	}
+	return http.HandlerFunc(serverless.Serve)
+}
+
+func newRouteTestUserRouter(t *testing.T, serviceContext *usersvc.ServiceContext) http.Handler {
+	t.Helper()
+
+	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
+	server := rest.MustNewServer(rest.RestConf{
+		ServiceConf: service.ServiceConf{Name: "user-route-test"},
+		Host:        "127.0.0.1",
+		Port:        8888,
+	}, rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
+	t.Cleanup(server.Stop)
+	RegisterUserGoZeroHandlers(server, serviceContext)
+
+	serverless, err := rest.NewServerless(server)
+	if err != nil {
+		t.Fatalf("build user route test router: %v", err)
 	}
 	return http.HandlerFunc(serverless.Serve)
 }

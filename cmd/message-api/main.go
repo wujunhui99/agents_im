@@ -11,6 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/config"
 	"github.com/wujunhui99/agents_im/internal/handler"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/objectstorage"
 	"github.com/wujunhui99/agents_im/internal/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/response"
@@ -53,6 +54,10 @@ func main() {
 	mediaRepo, err := repository.NewMediaRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {
 		log.Fatalf("build media repository: %v", err)
+	}
+	objectStore, err := objectstorage.NewStore(cfg.ObjectStorage)
+	if err != nil {
+		log.Fatalf("build object storage: %v", err)
 	}
 	agentHostingRepo, err := repository.NewAgentConversationHostingRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 	if err != nil {
@@ -112,6 +117,9 @@ func main() {
 	serviceContext.AgentAuditLogic = logic.NewAgentAuditLogic(agentAuditRepo)
 	serviceContext.AgentRegistryRepo = agentRegistryRepo
 	serviceContext.PythonExecutor = pythonExecutor
+	serviceContext.MediaLogic = logic.NewMediaLogic(mediaRepo, objectStore, cfg.ObjectStorage.Bucket)
+	serviceContext.MediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(messageRepo))
+	serviceContext.MessageLogic = logic.NewMessageLogicWithMediaValidator(messageRepo, nil, groupsLogic, serviceContext.MediaLogic)
 	if err := messagesvc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek, cfg.LLMObservability); err != nil {
 		log.Fatalf("configure AI conversation hosting: %v", err)
 	}

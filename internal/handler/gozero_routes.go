@@ -112,6 +112,7 @@ func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *messagesvc.Se
 			componentCheck("message_logic", serverCtx != nil && serverCtx.MessageLogic != nil, "configured"),
 			componentCheck("ai_hosting_logic", serverCtx != nil && serverCtx.AIHostingLogic != nil, "configured"),
 			componentCheck("message_repository", serverCtx != nil && serverCtx.MessageRepo != nil, "configured"),
+			componentCheck("media_logic", serverCtx != nil && serverCtx.MediaLogic != nil, "configured"),
 			componentCheck("feedback_logic", serverCtx != nil && serverCtx.FeedbackLogic != nil, "configured"),
 			componentCheck("feedback_repository", serverCtx != nil && serverCtx.FeedbackRepo != nil, "configured"),
 			componentCheck("ai_hosting_repository", serverCtx != nil && serverCtx.AIHostingRepo != nil, "configured"),
@@ -119,6 +120,7 @@ func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *messagesvc.Se
 		}
 	})
 	addMessageRoutes(server, serverCtx)
+	addMessageMediaRoutes(server, serverCtx)
 }
 
 func RegisterAdminGoZeroHandlers(server *rest.Server, serverCtx *adminsvc.ServiceContext) {
@@ -231,6 +233,16 @@ func addMediaRoutes(server *rest.Server, serverCtx *usersvc.ServiceContext) {
 			Handler: mediahandler.GetDownloadURLHandler(serverCtx),
 		},
 	}), jwtOption(serverCtx))
+}
+
+func addMessageMediaRoutes(server *rest.Server, serverCtx *messagesvc.ServiceContext) {
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodGet,
+			Path:    "/media/avatars/:media_id",
+			Handler: mediahandler.GetAvatarMessageHandler(serverCtx),
+		},
+	})
 }
 
 func addFriendsRoutes(server *rest.Server, serverCtx *friendssvc.ServiceContext) {

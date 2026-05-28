@@ -120,9 +120,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: user-api
+                name: message-api
                 port:
-                  number: 8080
+                  number: 8083
           - path: /agents
             pathType: Prefix
             backend:
