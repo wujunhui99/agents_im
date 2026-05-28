@@ -24,6 +24,7 @@ import (
 func Start(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c)
+	c.ResolveEnvPlaceholders()
 	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
 	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
 	if err != nil {
