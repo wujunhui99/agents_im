@@ -56,25 +56,25 @@ git worktree add \
 
 ### 本地开发布局（junhui Mac）
 
-本地采用「容器目录」布局：容器目录本身不是 git 仓库，主仓库下沉一层，worktree 与主仓库同级、统一放在仓库**之外**：
+本地采用「容器目录」布局：容器目录本身不是 git 仓库，主仓库下沉一层，与独立上游仓库平级。worktree 遵循 **Claude Code 默认**，放在主仓库内的 `.claude/worktrees/`（已在 `.gitignore` 忽略，不会被跟踪）：
 
 ```text
 /Users/junhui/code/project/agents_im/        # 容器目录（非 git 仓库）
 ├── agents_im/                                # 主仓库
-├── open-im-server/                           # 独立上游仓库
-└── worktree/                                 # worktree 统一放这里（仓库之外）
+│   └── .claude/worktrees/                    # worktree 放这里（Claude Code 默认）
+└── open-im-server/                           # 独立上游仓库
 ```
 
-约定：以后新建 worktree 一律放在 `/Users/junhui/code/project/agents_im/worktree/<分支短名>`，**不要**建在主仓库目录内。
+约定：worktree 跟随 Claude Code 默认，统一放在 `<仓库>/.claude/worktrees/`，即 `/Users/junhui/code/project/agents_im/agents_im/.claude/worktrees/`。手动创建示例：
 
 ```bash
 git -C /Users/junhui/code/project/agents_im/agents_im worktree add \
   -b fix/claude/issue-N-task-desc \
-  /Users/junhui/code/project/agents_im/worktree/issue-N-task-desc \
+  /Users/junhui/code/project/agents_im/agents_im/.claude/worktrees/issue-N-task-desc \
   origin/main
 ```
 
-> 注：Claude Code 的 Agent worktree 隔离（`isolation: worktree`）默认仍写入 `<仓库>/.claude/worktrees/`，本约定只约束手动 `git worktree add` 创建的实例。
+> 该路径已在 `.gitignore` 忽略；切勿用 `git add` 把 worktree 目录提交成 gitlink。
 
 
 ## 单个 Agent 的开发流程
