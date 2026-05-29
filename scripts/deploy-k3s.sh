@@ -122,7 +122,9 @@ restart_services() {
   if [[ -n "${RESTART_SERVICES}" ]]; then
     selected_services "${RESTART_SERVICES}" "${RESTARTABLE_DEPLOYMENTS[@]}"
   elif bool_true "${RESTART_ROLLOUT}"; then
-    rollout_services
+    # Restart only app image services (not monitoring infrastructure) so that
+    # every deploy picks up the latest secret values even if the image didn't change.
+    selected_services "" "${IMAGE_DEPLOYMENTS[@]}"
   fi
 }
 
