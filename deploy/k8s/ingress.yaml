@@ -64,44 +64,44 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /admin/llm-traces
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /admin/conversations
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /admin/users
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /api/admin/feedback
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /api/admin/task-reports
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /api/feedback
             pathType: Prefix
             backend:
@@ -179,44 +179,44 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /admin/llm-traces
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /admin/conversations
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /admin/users
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /api/admin/feedback
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /api/admin/task-reports
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: admin-api
                 port:
-                  number: 8083
+                  number: 8088
           - path: /api/feedback
             pathType: Prefix
             backend:
