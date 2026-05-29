@@ -56,21 +56,21 @@ git worktree add \
 
 ### 本地开发布局（junhui Mac）
 
-本地采用「容器目录」布局：容器目录本身不是 git 仓库，主仓库下沉一层，与独立上游仓库平级。worktree 遵循 **Claude Code 默认**，放在主仓库内的 `.claude/worktrees/`（已在 `.gitignore` 忽略，不会被跟踪）：
+主仓库根在 `/Users/junhui/code/project/agents_im`（VSCode 打开 / 开发工作目录就是这里），独立上游仓库 open-im-server 与之平级。worktree 遵循 **Claude Code 默认**，放在主仓库内的 `.claude/worktrees/`（已在 `.gitignore` 忽略，不会被跟踪）：
 
 ```text
-/Users/junhui/code/project/agents_im/        # 容器目录（非 git 仓库）
-├── agents_im/                                # 主仓库
-│   └── .claude/worktrees/                    # worktree 放这里（Claude Code 默认）
-└── open-im-server/                           # 独立上游仓库
+/Users/junhui/code/project/
+├── agents_im/                    # 主仓库（VSCode 打开 / 工作目录）
+│   └── .claude/worktrees/        # worktree 放这里（Claude Code 默认）
+└── open-im-server/               # 独立上游仓库
 ```
 
-约定：worktree 跟随 Claude Code 默认，统一放在 `<仓库>/.claude/worktrees/`，即 `/Users/junhui/code/project/agents_im/agents_im/.claude/worktrees/`。手动创建示例：
+约定：worktree 跟随 Claude Code 默认，统一放在 `<仓库>/.claude/worktrees/`，即 `/Users/junhui/code/project/agents_im/.claude/worktrees/`。手动创建示例：
 
 ```bash
-git -C /Users/junhui/code/project/agents_im/agents_im worktree add \
+git -C /Users/junhui/code/project/agents_im worktree add \
   -b fix/claude/issue-N-task-desc \
-  /Users/junhui/code/project/agents_im/agents_im/.claude/worktrees/issue-N-task-desc \
+  /Users/junhui/code/project/agents_im/.claude/worktrees/issue-N-task-desc \
   origin/main
 ```
 
