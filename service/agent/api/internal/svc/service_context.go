@@ -3,9 +3,9 @@ package svc
 import (
 	"log"
 
-	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"

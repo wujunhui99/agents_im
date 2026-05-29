@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
-	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/config"
-	"github.com/wujunhui99/agents_im/internal/llmobs"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"

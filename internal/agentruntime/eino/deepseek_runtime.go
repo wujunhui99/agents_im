@@ -16,11 +16,11 @@ import (
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	llmdeepseek "github.com/wujunhui99/agents_im/internal/agentruntime/llm/deepseek"
 	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
-	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/config"
-	"github.com/wujunhui99/agents_im/internal/idgen"
-	"github.com/wujunhui99/agents_im/internal/llmobs"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/idgen"
+	"github.com/wujunhui99/agents_im/pkg/llmobs"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 
 type DeepSeekRuntime struct {

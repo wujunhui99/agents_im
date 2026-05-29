@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 )
 
 var (

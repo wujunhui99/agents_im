@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/auth/token"
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/response"
+	"github.com/wujunhui99/agents_im/pkg/response"
 	adminsvc "github.com/wujunhui99/agents_im/internal/servicecontext/admin"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/rest"

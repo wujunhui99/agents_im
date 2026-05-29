@@ -3,13 +3,13 @@ package message
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	einoruntime "github.com/wujunhui99/agents_im/internal/agentruntime/eino"
 	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
-	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/config"
-	"github.com/wujunhui99/agents_im/internal/llmobs"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"

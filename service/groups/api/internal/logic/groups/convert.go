@@ -3,7 +3,7 @@ package groups
 import (
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/types"
 	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"google.golang.org/grpc/codes"

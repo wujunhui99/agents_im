@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"

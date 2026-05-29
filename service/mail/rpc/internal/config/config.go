@@ -2,7 +2,7 @@ package config
 
 import (
 	"github.com/wujunhui99/agents_im/internal/mail"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 

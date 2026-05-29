@@ -9,8 +9,8 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/wujunhui99/agents_im/internal/messaging"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/messaging"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 
 const (

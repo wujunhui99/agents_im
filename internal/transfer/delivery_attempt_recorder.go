@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 
 // MetricsDeliveryAttemptRecorder records live-delivery outcomes as metrics only.

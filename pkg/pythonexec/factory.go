@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 )
 
 func NewExecutorFromConfig(executorConfig config.PythonExecutorConfig, client KubernetesSandboxClient) (Executor, error) {

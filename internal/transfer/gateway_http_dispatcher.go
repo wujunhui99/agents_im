@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 
 const defaultGatewayHTTPDispatcherTimeout = 5 * time.Second

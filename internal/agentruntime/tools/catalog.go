@@ -3,7 +3,7 @@ package tools
 import (
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 )
 
 func NewStaticAdapterCatalog(adapters ...ToolAdapter) AdapterCatalog {

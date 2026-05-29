@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/internal/model"
 )
 

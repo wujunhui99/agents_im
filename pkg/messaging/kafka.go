@@ -8,7 +8,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 
 type KafkaProducerConfig struct {

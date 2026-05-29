@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"

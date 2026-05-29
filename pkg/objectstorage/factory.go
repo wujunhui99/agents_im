@@ -3,7 +3,7 @@ package objectstorage
 import (
 	"fmt"
 
-	appconfig "github.com/wujunhui99/agents_im/internal/config"
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 )
 
 func NewStore(cfg appconfig.ObjectStorageConfig) (ObjectStore, error) {

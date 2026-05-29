@@ -1,8 +1,8 @@
 package config
 
 import (
-	commonconfig "github.com/wujunhui99/agents_im/internal/config"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	commonconfig "github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 

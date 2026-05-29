@@ -3,7 +3,7 @@ package auth
 import (
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/auth/api/internal/types"
 	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"google.golang.org/grpc/codes"

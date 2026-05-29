@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
-	"github.com/wujunhui99/agents_im/internal/llmobs"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/llmobs"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 

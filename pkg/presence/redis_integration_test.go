@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 )
 
 func TestRedisStoreConnectionLifecycle(t *testing.T) {

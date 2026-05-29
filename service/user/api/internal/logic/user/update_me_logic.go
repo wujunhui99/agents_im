@@ -7,8 +7,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/ctxuser"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/types"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/model"
 )
 

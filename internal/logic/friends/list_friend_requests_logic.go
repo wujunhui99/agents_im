@@ -3,8 +3,8 @@ package friends
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/ctxuser"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	"github.com/wujunhui99/agents_im/internal/types"
