@@ -251,6 +251,5 @@ RUN_LIVE_DEEPSEEK_TESTS=1 PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal
 - 前端约定：[`docs/FRONTEND.md`](./docs/FRONTEND.md)
 - 产品规格索引：[`docs/product-specs/index.md`](./docs/product-specs/index.md)
 - 设计文档索引：[`docs/design-docs/index.md`](./docs/design-docs/index.md)
-- 技术债追踪：[`docs/exec-plans/tech-debt-tracker.md`](./docs/exec-plans/tech-debt-tracker.md)
 - Git 工作流：[`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md)
 - 部署说明：[`deploy/README.md`](./deploy/README.md)
