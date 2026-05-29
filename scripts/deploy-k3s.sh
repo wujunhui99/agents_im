@@ -26,6 +26,7 @@ IMAGE_DEPLOYMENTS=(
   gateway-ws
   groups-api
   agent-api
+  admin-api
   message-transfer
   user-rpc
   auth-rpc
