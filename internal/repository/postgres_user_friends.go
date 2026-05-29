@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/idgen"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )

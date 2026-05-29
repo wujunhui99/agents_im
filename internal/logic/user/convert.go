@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 	"github.com/wujunhui99/agents_im/internal/types"

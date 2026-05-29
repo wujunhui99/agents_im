@@ -15,7 +15,7 @@ import (
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"

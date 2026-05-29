@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/ctxuser"
+	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
 	"github.com/wujunhui99/agents_im/internal/types"

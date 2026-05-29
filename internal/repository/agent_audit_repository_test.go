@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
 )
 

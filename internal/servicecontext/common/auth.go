@@ -2,7 +2,7 @@ package common
 
 import (
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 )
 
 type AuthRuntime struct {

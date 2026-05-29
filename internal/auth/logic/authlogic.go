@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	"github.com/wujunhui99/agents_im/internal/auth/model"
 	"github.com/wujunhui99/agents_im/internal/auth/repository"

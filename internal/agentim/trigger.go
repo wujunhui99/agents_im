@@ -1,6 +1,6 @@
 package agentim
 
-import "github.com/wujunhui99/agents_im/internal/apperror"
+import "github.com/wujunhui99/agents_im/pkg/apperror"
 
 func BuildMessageCreatedTriggers(event MessageCreatedEvent, policy TriggerPolicy) ([]AgentTrigger, error) {
 	if err := validateMessageCreatedEvent(event); err != nil {

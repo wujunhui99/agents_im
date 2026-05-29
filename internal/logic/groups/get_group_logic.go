@@ -3,7 +3,7 @@ package groups
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/ctxuser"
+	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	"github.com/wujunhui99/agents_im/internal/types"

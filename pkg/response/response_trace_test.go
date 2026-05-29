@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 
 func TestWriteJSONSuccessKeepsTraceIDsInHeadersOnly(t *testing.T) {

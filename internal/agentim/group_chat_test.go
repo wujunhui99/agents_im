@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )

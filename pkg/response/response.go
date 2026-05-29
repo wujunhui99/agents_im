@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 
 type Envelope struct {

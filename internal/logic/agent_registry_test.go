@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )

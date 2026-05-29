@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/messaging"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/messaging"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 

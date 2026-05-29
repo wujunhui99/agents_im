@@ -9,7 +9,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/wujunhui99/agents_im/internal/messaging"
+	"github.com/wujunhui99/agents_im/pkg/messaging"
 )
 
 func TestEnvelopeFromKafkaMessageMapsAcceptedEvent(t *testing.T) {

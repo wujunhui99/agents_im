@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	appconfig "github.com/wujunhui99/agents_im/internal/config"
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )

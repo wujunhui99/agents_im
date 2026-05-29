@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	appconfig "github.com/wujunhui99/agents_im/internal/config"
-	"github.com/wujunhui99/agents_im/internal/observability"
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/server"

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"gopkg.in/yaml.v3"
 )
 

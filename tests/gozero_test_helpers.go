@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/auth/token"
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/handler"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/response"
+	"github.com/wujunhui99/agents_im/pkg/response"
 	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"

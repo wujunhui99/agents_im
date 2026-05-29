@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	commonconfig "github.com/wujunhui99/agents_im/internal/config"
+	commonconfig "github.com/wujunhui99/agents_im/pkg/config"
 	authconfig "github.com/wujunhui99/agents_im/service/auth/rpc/internal/config"
 	"github.com/zeromicro/go-zero/core/conf"
 )

@@ -3,8 +3,8 @@ package svc
 import (
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/agent/pythonexec"
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 

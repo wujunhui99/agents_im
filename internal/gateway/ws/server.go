@@ -15,15 +15,15 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/observability"
-	"github.com/wujunhui99/agents_im/internal/presence"
+	"github.com/wujunhui99/agents_im/pkg/observability"
+	"github.com/wujunhui99/agents_im/pkg/presence"
 	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
 )
 

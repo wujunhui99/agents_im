@@ -6,8 +6,8 @@ package friends
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
-	"github.com/wujunhui99/agents_im/internal/ctxuser"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/types"
 	friendspb "github.com/wujunhui99/agents_im/service/friends/rpc/friends"

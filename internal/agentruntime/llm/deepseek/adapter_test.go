@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/schema"
-	appconfig "github.com/wujunhui99/agents_im/internal/config"
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 )
 
 func TestNewChatModelFailsWhenAPIKeyMissing(t *testing.T) {

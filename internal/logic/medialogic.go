@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/model"
-	"github.com/wujunhui99/agents_im/internal/objectstorage"
+	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 

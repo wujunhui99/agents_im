@@ -6,7 +6,7 @@ package auth
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/apperror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	business "github.com/wujunhui99/agents_im/internal/auth/logic"
 	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	"github.com/wujunhui99/agents_im/internal/types"

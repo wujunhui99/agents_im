@@ -1,9 +1,9 @@
 package user
 
 import (
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/objectstorage"
+	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
 )

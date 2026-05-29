@@ -6,7 +6,7 @@ package svc
 import (
 	"errors"
 
-	"github.com/wujunhui99/agents_im/internal/observability"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 	"github.com/zeromicro/go-zero/zrpc"

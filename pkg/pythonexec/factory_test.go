@@ -3,7 +3,7 @@ package pythonexec
 import (
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/config"
+	"github.com/wujunhui99/agents_im/pkg/config"
 )
 
 func TestNewExecutorFromConfigDefaultsDisabled(t *testing.T) {

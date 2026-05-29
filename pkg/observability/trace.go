@@ -286,7 +286,7 @@ func StartSpan(ctx context.Context, name string, opts ...oteltrace.SpanStartOpti
 	if name == "" {
 		name = "operation"
 	}
-	ctx, span := otel.Tracer("github.com/wujunhui99/agents_im/internal/observability").Start(ctx, name, opts...)
+	ctx, span := otel.Tracer("github.com/wujunhui99/agents_im/pkg/observability").Start(ctx, name, opts...)
 	if sc := span.SpanContext(); sc.IsValid() {
 		tc := TraceContextFromContext(ctx)
 		ctx = ContextWithTrace(ctx, tc)
