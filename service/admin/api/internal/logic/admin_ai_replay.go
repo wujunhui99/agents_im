@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	msglogic "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
@@ -12,10 +13,10 @@ const adminAIReplayMessageLimit = 500
 
 type AdminAIReplayLogic struct {
 	messages repository.AdminMessageRepository
-	hook     MessageCreatedHook
+	hook     msglogic.MessageCreatedHook
 }
 
-func NewAdminAIReplayLogic(messages repository.AdminMessageRepository, hook MessageCreatedHook) *AdminAIReplayLogic {
+func NewAdminAIReplayLogic(messages repository.AdminMessageRepository, hook msglogic.MessageCreatedHook) *AdminAIReplayLogic {
 	return &AdminAIReplayLogic{messages: messages, hook: hook}
 }
 
@@ -57,7 +58,7 @@ func (l *AdminAIReplayLogic) ReplayAgentMessage(ctx context.Context, req AdminRe
 			trigger = message
 			found = true
 		}
-		if message.TriggerServerMsgID == serverMsgID && message.MessageOrigin == MessageOriginAI {
+		if message.TriggerServerMsgID == serverMsgID && message.MessageOrigin == msglogic.MessageOriginAI {
 			return AdminReplayAgentMessageResponse{
 				ConversationID: conversationID,
 				ServerMsgID:    serverMsgID,
@@ -70,13 +71,13 @@ func (l *AdminAIReplayLogic) ReplayAgentMessage(ctx context.Context, req AdminRe
 	if !found {
 		return AdminReplayAgentMessageResponse{}, apperror.NotFound("message not found in conversation")
 	}
-	if trigger.MessageOrigin != MessageOriginHuman {
+	if trigger.MessageOrigin != msglogic.MessageOriginHuman {
 		return AdminReplayAgentMessageResponse{}, apperror.InvalidArgument("only human messages can be replayed for AI triggering")
 	}
-	if trigger.ChatType != MessageChatTypeSingle || strings.TrimSpace(trigger.ReceiverID) == "" {
+	if trigger.ChatType != msglogic.MessageChatTypeSingle || strings.TrimSpace(trigger.ReceiverID) == "" {
 		return AdminReplayAgentMessageResponse{}, apperror.InvalidArgument("only direct messages to an agent account can be replayed")
 	}
-	if trigger.ContentType != MessageContentTypeText {
+	if trigger.ContentType != msglogic.MessageContentTypeText {
 		return AdminReplayAgentMessageResponse{}, apperror.InvalidArgument("only text messages can be replayed for AI triggering")
 	}
 	if l.hook == nil {
@@ -84,7 +85,7 @@ func (l *AdminAIReplayLogic) ReplayAgentMessage(ctx context.Context, req AdminRe
 	}
 
 	eventID := "admin.replay.message.created:" + trigger.ServerMsgID
-	if err := l.hook.OnMessageCreated(ctx, MessageCreatedHookInput{
+	if err := l.hook.OnMessageCreated(ctx, msglogic.MessageCreatedHookInput{
 		EventID:               eventID,
 		Message:               trigger.Clone(),
 		TargetAgentAccountIDs: []string{trigger.ReceiverID},

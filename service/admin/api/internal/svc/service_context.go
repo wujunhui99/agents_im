@@ -1,8 +1,9 @@
-package admin
+package svc
 
 import (
 	"github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/internal/logic"
+	msglogic "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/service/admin/api/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
 )
@@ -14,7 +15,7 @@ type Dependencies struct {
 	AgentAudits        repository.AdminAgentAuditRepository
 	Feedback           repository.FeedbackRepository
 	TaskReports        repository.TaskReportRepository
-	MessageCreatedHook logic.MessageCreatedHook
+	MessageCreatedHook msglogic.MessageCreatedHook
 }
 
 type ServiceContext struct {

@@ -5,12 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/pkg/ctxuser"
-	adminhandler "github.com/wujunhui99/agents_im/internal/handler/admin"
 	authhandler "github.com/wujunhui99/agents_im/internal/handler/auth"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
@@ -18,9 +15,7 @@ import (
 	messagehandler "github.com/wujunhui99/agents_im/internal/handler/message"
 	userhandler "github.com/wujunhui99/agents_im/internal/handler/user"
 	"github.com/wujunhui99/agents_im/pkg/health"
-	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	adminsvc "github.com/wujunhui99/agents_im/internal/servicecontext/admin"
 	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
@@ -119,10 +114,6 @@ func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *messagesvc.Se
 		}
 	})
 	addMessageRoutes(server, serverCtx)
-}
-
-func RegisterAdminGoZeroHandlers(server *rest.Server, serverCtx *adminsvc.ServiceContext) {
-	addAdminRoutes(server, serverCtx)
 }
 
 func registerGoZeroObservabilityHandlers(server *rest.Server, service string, checks func(*http.Request) []health.Check) {
@@ -363,84 +354,6 @@ func addMessageRoutes(server *rest.Server, serverCtx *messagesvc.ServiceContext)
 	}), jwtOption(serverCtx))
 }
 
-func addAdminRoutes(server *rest.Server, serverCtx *adminsvc.ServiceContext) {
-	routes := []rest.Route{
-		{
-			Method:  http.MethodGet,
-			Path:    "/admin/dashboard",
-			Handler: adminhandler.DashboardHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/admin/llm-traces",
-			Handler: adminhandler.ListLLMTracesHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/admin/llm-traces/:trace_id",
-			Handler: adminhandler.GetLLMTraceHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/api/admin/feedback",
-			Handler: adminhandler.ListFeedbackHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/api/admin/feedback/:feedback_id",
-			Handler: adminhandler.GetFeedbackHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodPatch,
-			Path:    "/api/admin/feedback/:feedback_id",
-			Handler: adminhandler.UpdateFeedbackHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/api/admin/task-reports",
-			Handler: adminhandler.ListTaskReportsHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodPost,
-			Path:    "/api/admin/task-reports",
-			Handler: adminhandler.IngestTaskReportHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/admin/conversations/:conversation_id/messages",
-			Handler: adminhandler.GetConversationMessagesHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodPost,
-			Path:    "/admin/conversations/:conversation_id/messages/:server_msg_id/replay-agent",
-			Handler: adminhandler.ReplayAgentMessageHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/admin/users",
-			Handler: adminhandler.SearchUsersHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/admin/users/:account_id",
-			Handler: adminhandler.GetUserHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/admin/users/:account_id/friends",
-			Handler: adminhandler.GetUserFriendsHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/admin/users/:account_id/conversations",
-			Handler: adminhandler.GetUserConversationsHandler(serverCtx),
-		},
-	}
-	routes = authenticatedRoutes(serverCtx, routes)
-	routes = rest.WithMiddleware(adminOnlyMiddleware(serverCtx), routes...)
-	server.AddRoutes(routes, jwtOption(serverCtx))
-}
-
 func jwtOption(serverCtx authRouteContext) rest.RouteOption {
 	return rest.WithJwt(serverCtx.AuthConfig().AccessSecret)
 }
@@ -465,41 +378,6 @@ func activeSessionMiddleware(serverCtx authRouteContext) rest.Middleware {
 			}
 			if err := authrepo.ValidateActiveSession(r.Context(), activeSessions, claims); err != nil {
 				httpx.ErrorCtx(r.Context(), w, err)
-				return
-			}
-			next(w, r)
-		}
-	}
-}
-
-func adminOnlyMiddleware(serverCtx *adminsvc.ServiceContext) rest.Middleware {
-	auth := config.DefaultJWTAuthConfig()
-	if serverCtx != nil {
-		auth = serverCtx.AuthConfig()
-	}
-	tokenManager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			if serverCtx == nil || serverCtx.Accounts == nil {
-				httpx.ErrorCtx(r.Context(), w, apperror.Internal("admin account repository is not configured"))
-				return
-			}
-			userID, err := ctxuser.UserID(r.Context())
-			if err != nil {
-				claims, tokenErr := tokenManager.Validate(bearerToken(r.Header.Get("Authorization")))
-				if tokenErr != nil {
-					httpx.ErrorCtx(r.Context(), w, tokenErr)
-					return
-				}
-				userID = claims.UserID
-			}
-			account, err := serverCtx.Accounts.GetByID(r.Context(), userID)
-			if err != nil {
-				httpx.ErrorCtx(r.Context(), w, err)
-				return
-			}
-			if account.AccountType != model.AccountTypeAdmin {
-				httpx.ErrorCtx(r.Context(), w, apperror.Forbidden("admin account is required"))
 				return
 			}
 			next(w, r)

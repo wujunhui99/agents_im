@@ -2,7 +2,7 @@ package admin
 
 import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	business "github.com/wujunhui99/agents_im/internal/logic"
+	business "github.com/wujunhui99/agents_im/service/admin/api/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/types"
 )
 
