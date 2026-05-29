@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       user-rpc)         pkg=./service/user/rpc ;; \
       message-rpc)      pkg=./internal/rpcgen/message ;; \
       gateway-ws)       pkg=./service/gateway-ws ;; \
-      admin-api)        pkg=./service/admin/api ;;
+      admin-api)        pkg=./service/admin/api ;; \
       message-api)      pkg=./service/message-api ;; \
       message-transfer) pkg=./service/message-transfer ;; \
       *) echo "unknown SERVICE: $SERVICE" >&2; exit 1 ;; \
