@@ -131,4 +131,4 @@ Implementation is verified by:
 - duplicate-safe `pull_messages` test.
 - missing-seq `pull_messages` test.
 - invalid command error envelope test.
-- required branch verification commands from [`../exec-plans/active/backend-mvp-completion.md`](../exec-plans/active/backend-mvp-completion.md).
+- required branch verification commands (tracked in the corresponding GitHub Issue).

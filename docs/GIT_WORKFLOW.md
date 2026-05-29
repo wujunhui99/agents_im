@@ -81,7 +81,7 @@ git -C /Users/junhui/code/project/agents_im worktree add \
 
 1. 从最新 `origin/main` 创建任务分支和 worktree。
 2. 阅读 `AGENTS.md`、`ARCHITECTURE.md` 以及相关 `docs/` 文档。
-3. 对复杂需求，在 `docs/exec-plans/active/` 创建执行计划。
+3. 对复杂需求，在 GitHub Issue 上创建/认领任务，以 Issue 作为需求与验收标准的单一事实源（见 [`docs/AGENTIC_DEVELOPMENT_WORKFLOW.md`](./AGENTIC_DEVELOPMENT_WORKFLOW.md)）。
 4. 完成功能实现。
 5. 在当前 worktree 内完成自测。
 6. 提交代码并推送 feature 分支。
