@@ -109,7 +109,7 @@ Local `message-transfer` uses the Postgres outbox consumer by default and dispat
 A fast in-process smoke command exists for the core single-machine flow when the external dev environment is unavailable or polluted by stale processes:
 
 ```bash
-PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./cmd/single-machine-e2e
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./test/e2e/single-machine
 ```
 
 It uses real business logic and a real WebSocket gateway test server in one process to validate:

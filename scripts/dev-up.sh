@@ -313,11 +313,35 @@ GatewayWS:
   write_message_transfer_config
 }
 
+# Map deployment name -> go main package path. Entrypoints live in their service
+# directories (cmd/ was removed).
+service_pkg() {
+  case "$1" in
+    agent-api)        echo "./service/agent/api" ;;
+    auth-api)         echo "./service/auth/api" ;;
+    auth-rpc)         echo "./service/auth/rpc" ;;
+    friends-api)      echo "./service/friends/api" ;;
+    friends-rpc)      echo "./service/friends/rpc" ;;
+    groups-api)       echo "./service/groups/api" ;;
+    groups-rpc)       echo "./service/groups/rpc" ;;
+    mail-rpc)         echo "./service/mail/rpc" ;;
+    user-api)         echo "./service/user/api" ;;
+    user-rpc)         echo "./service/user/rpc" ;;
+    message-rpc)      echo "./internal/rpcgen/message" ;;
+    gateway-ws)       echo "./service/gateway-ws" ;;
+    message-api)      echo "./service/message-api" ;;
+    message-transfer) echo "./service/message-transfer" ;;
+    *) echo "unknown service: $1" >&2; return 1 ;;
+  esac
+}
+
 build_service() {
   local name="$1"
+  local pkg
+  pkg="$(service_pkg "${name}")"
   mkdir -p "${BIN_DIR}"
   echo "building ${name}"
-  go build -o "${BIN_DIR}/${name}" "./cmd/${name}"
+  go build -o "${BIN_DIR}/${name}" "${pkg}"
 }
 
 start_service() {

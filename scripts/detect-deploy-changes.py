@@ -72,6 +72,13 @@ API_BACKEND_SERVICES = [
     "agent-api",
 ]
 
+# Non-go-zero services whose main lives directly under service/<name>/ (cmd/ removed).
+FLAT_SERVICE_DIRS = {
+    "service/gateway-ws/": "gateway-ws",
+    "service/message-api/": "message-api",
+    "service/message-transfer/": "message-transfer",
+}
+
 INTERNAL_DOMAIN_SERVICE_PREFIXES = {
     "internal/handler/user/": ["user-api"],
     "internal/handler/auth/": ["auth-api"],
@@ -220,15 +227,12 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         selection.add_web()
         return
 
-    parts = path.split("/")
-    if len(parts) >= 3 and parts[0] == "cmd":
-        service = parts[1]
-        if service in BACKEND_SERVICES:
+    for prefix, service in FLAT_SERVICE_DIRS.items():
+        if path.startswith(prefix):
             selection.add_backend(service)
-        else:
-            selection.add_all_backends()
-        return
+            return
 
+    parts = path.split("/")
     if len(parts) >= 4 and parts[0] == "service":
         domain = parts[1]
         kind = parts[2]

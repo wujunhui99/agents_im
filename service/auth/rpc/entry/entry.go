@@ -18,9 +18,8 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// Start bridges cmd/auth-rpc to the service/auth/rpc goctl-generated RPC internals.
-// cmd/auth-rpc cannot import service/auth/rpc/internal/* directly because
-// of Go internal package visibility.
+// Start launches the auth-rpc service, wiring the goctl-generated RPC internals. It lives in the entry package so the service
+// binary and tests can share one startup path.
 func Start(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c, conf.UseEnv())

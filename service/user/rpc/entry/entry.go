@@ -18,9 +18,8 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// Start bridges cmd/user-rpc to the service/user/rpc goctl-generated RPC internals.
-// cmd/user-rpc cannot import service/user/rpc/internal/* directly because
-// of Go internal package visibility.
+// Start launches the user-rpc service, wiring the goctl-generated RPC internals. It lives in the entry package so the service
+// binary and tests can share one startup path.
 func Start(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c)

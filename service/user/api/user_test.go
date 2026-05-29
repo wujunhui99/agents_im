@@ -7,14 +7,14 @@ import (
 )
 
 func TestMainDelegatesToServiceUserAPIEntry(t *testing.T) {
-	source, err := os.ReadFile("main.go")
+	source, err := os.ReadFile("user.go")
 	if err != nil {
-		t.Fatalf("read main.go: %v", err)
+		t.Fatalf("read user.go: %v", err)
 	}
 	content := string(source)
 
 	if !strings.Contains(content, `service/user/api/entry`) {
-		t.Fatalf("cmd/user-api must delegate to service/user/api/entry")
+		t.Fatalf("user api main must delegate to service/user/api/entry")
 	}
 
 	forbiddenImports := []string{
@@ -26,7 +26,7 @@ func TestMainDelegatesToServiceUserAPIEntry(t *testing.T) {
 	}
 	for _, forbidden := range forbiddenImports {
 		if strings.Contains(content, forbidden) {
-			t.Fatalf("cmd/user-api must not own API data/service wiring; found %q", forbidden)
+			t.Fatalf("user api main must not own API data/service wiring; found %q", forbidden)
 		}
 	}
 }

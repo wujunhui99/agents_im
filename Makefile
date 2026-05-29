@@ -9,7 +9,30 @@ FRONTEND_PID := .dev/pids/frontend.pid
 FRONTEND_LOG := .dev/logs/frontend.log
 FRONTEND_URL := http://127.0.0.1:$(FRONTEND_PORT)
 
-.PHONY: help start stop restart backend-start backend-stop backend-restart frontend-start frontend-stop frontend-restart status test verify
+# ---- go-zero microservices (entrypoints live under service/<...>; cmd/ removed) ----
+BACKEND_SERVICES := agent-api auth-api auth-rpc friends-api friends-rpc \
+	groups-api groups-rpc mail-rpc user-api user-rpc \
+	message-rpc gateway-ws message-api message-transfer
+
+# Deployment name -> go main package path.
+PKG_agent-api        := ./service/agent/api
+PKG_auth-api         := ./service/auth/api
+PKG_auth-rpc         := ./service/auth/rpc
+PKG_friends-api      := ./service/friends/api
+PKG_friends-rpc      := ./service/friends/rpc
+PKG_groups-api       := ./service/groups/api
+PKG_groups-rpc       := ./service/groups/rpc
+PKG_mail-rpc         := ./service/mail/rpc
+PKG_user-api         := ./service/user/api
+PKG_user-rpc         := ./service/user/rpc
+PKG_message-rpc      := ./internal/rpcgen/message
+PKG_gateway-ws       := ./service/gateway-ws
+PKG_message-api      := ./service/message-api
+PKG_message-transfer := ./service/message-transfer
+
+BIN_DIR ?= bin
+
+.PHONY: help start stop restart backend-start backend-stop backend-restart frontend-start frontend-stop frontend-restart status test verify services build-backend
 
 help: ## Show available make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "agents_im local commands:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -76,6 +99,24 @@ status: ## Show local frontend/backend PID files and listening ports.
 	fi
 	@echo; echo "Listening ports:"; \
 	ss -ltnp 2>/dev/null | awk 'NR==1 || /:(8080|8081|8082|8083|8084|8085|8086|5173)\b/' || true
+
+services: ## List backend microservices and their package paths.
+	@$(foreach s,$(BACKEND_SERVICES),printf "  %-18s %s\n" "$(s)" "$(PKG_$(s))";)
+
+run-%: ## Run one service in foreground (go-zero style): make run-auth-rpc
+	@test -n "$(PKG_$*)" || { echo "unknown service: $*"; exit 1; }
+	@echo "go run $(PKG_$*) -f etc/$*.yaml"
+	@go run $(PKG_$*) -f etc/$*.yaml
+
+build-%: ## Build one service binary into $(BIN_DIR): make build-auth-rpc
+	@test -n "$(PKG_$*)" || { echo "unknown service: $*"; exit 1; }
+	@mkdir -p $(BIN_DIR)
+	@echo "building $* -> $(BIN_DIR)/$*"
+	@go build -o $(BIN_DIR)/$* $(PKG_$*)
+
+build-backend: ## Build all backend microservice binaries into $(BIN_DIR).
+	@mkdir -p $(BIN_DIR)
+	@$(foreach s,$(BACKEND_SERVICES),echo "building $(s)"; go build -o $(BIN_DIR)/$(s) $(PKG_$(s)) || exit 1;)
 
 test: ## Run frontend tests, build, lint, and backend Go tests.
 	@npm run frontend:test

@@ -17,9 +17,8 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-// Start bridges cmd/auth-api to the service/auth/api goctl-generated API internals.
-// cmd/auth-api cannot import service/auth/api/internal/* directly because of Go
-// internal package visibility.
+// Start launches the auth-api service, wiring the goctl-generated API internals. It lives in the entry package so the service
+// binary and tests can share one startup path.
 func Start(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c)

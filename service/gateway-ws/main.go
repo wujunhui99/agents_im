@@ -12,18 +12,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/pkg/config"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
-	"github.com/wujunhui99/agents_im/pkg/health"
 	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/pkg/observability"
-	"github.com/wujunhui99/agents_im/pkg/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
+	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/health"
+	"github.com/wujunhui99/agents_im/pkg/observability"
+	"github.com/wujunhui99/agents_im/pkg/presence"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 )
 
 func main() {

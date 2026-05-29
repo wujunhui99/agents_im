@@ -47,13 +47,13 @@ required_files=(
   "proto/messagepb/message_grpc.pb.go"
   "service/mail/rpc/mail/mail.pb.go"
   "service/mail/rpc/mail/mail_grpc.pb.go"
-  "service/user/rpc/user.v1.go"
+  "service/user/rpc/user.go"
   "service/user/rpc/internal/server/userserver.go"
-  "service/auth/rpc/auth.v1.go"
+  "service/auth/rpc/auth.go"
   "service/auth/rpc/internal/server/auth_service_server.go"
-  "service/friends/rpc/friends.v1.go"
+  "service/friends/rpc/friends.go"
   "service/friends/rpc/internal/server/friendsserver.go"
-  "service/groups/rpc/groups.v1.go"
+  "service/groups/rpc/groups.go"
   "service/groups/rpc/internal/server/groupsserver.go"
   "service/user/api/user.go"
   "service/user/api/entry/entry.go"
@@ -128,21 +128,11 @@ required_files=(
   "service/agent/api/internal/logic/agent/convert.go"
   "internal/rpcgen/message/message.go"
   "internal/rpcgen/message/internal/server/message_service_server.go"
-  "service/mail/rpc/mail.v1.go"
+  "service/mail/rpc/mail.go"
   "service/mail/rpc/internal/server/mail_service_server.go"
-  "cmd/user-api/main.go"
-  "cmd/user-rpc/main.go"
-  "cmd/auth-api/main.go"
-  "cmd/auth-rpc/main.go"
-  "cmd/friends-api/main.go"
-  "cmd/friends-rpc/main.go"
-  "cmd/groups-api/main.go"
-  "cmd/groups-rpc/main.go"
-  "cmd/message-api/main.go"
-  "cmd/message-rpc/main.go"
-  "cmd/mail-rpc/main.go"
-  "cmd/gateway-ws/main.go"
-  "cmd/message-transfer/main.go"
+  "service/gateway-ws/main.go"
+  "service/message-api/main.go"
+  "service/message-transfer/main.go"
   "etc/gateway-ws.yaml"
   "etc/message-transfer.yaml"
   "etc/message-rpc.yaml"
@@ -617,14 +607,14 @@ if [[ -d internal/auth/svc ]]; then
   exit 1
 fi
 
-root_svc_import_files="$(rg -l '"github.com/wujunhui99/agents_im/internal/svc"' cmd internal/handler internal/logic internal/gateway tests --glob '*.go' || true)"
+root_svc_import_files="$(rg -l '"github.com/wujunhui99/agents_im/internal/svc"' service/gateway-ws service/message-api service/message-transfer internal/handler internal/logic internal/gateway tests --glob '*.go' || true)"
 if [[ -n "${root_svc_import_files}" ]]; then
   echo "core REST, gateway, and tests must not import legacy root internal/svc:" >&2
   echo "${root_svc_import_files}" >&2
   exit 1
 fi
 
-if rg -n '"os/exec"|exec\.Command|CommandContext\(|"(/bin/bash|/bin/sh|bash|sh|python|python3)"' cmd internal --glob '*.go' --glob '!*_test.go'; then
+if rg -n '"os/exec"|exec\.Command|CommandContext\(|"(/bin/bash|/bin/sh|bash|sh|python|python3)"' service/gateway-ws service/message-api service/message-transfer internal --glob '*.go' --glob '!*_test.go'; then
   echo "production Go code must not directly execute shell or python commands" >&2
   exit 1
 fi
@@ -1003,12 +993,12 @@ for server_spec in "${rpc_generated_servers[@]}"; do
 done
 
 rpc_generated_entrypoints=(
-  "service/user/rpc/user.v1.go:RegisterUserServer"
-  "service/auth/rpc/auth.v1.go:RegisterAuthServiceServer"
-  "service/friends/rpc/friends.v1.go:RegisterFriendsServer"
-  "service/groups/rpc/groups.v1.go:RegisterGroupsServer"
-  "internal/rpcgen/message/message.go:RegisterMessageServiceServer"
-  "service/mail/rpc/mail.v1.go:RegisterMailServiceServer"
+  "service/user/rpc/entry/entry.go:RegisterUserServer"
+  "service/auth/rpc/entry/entry.go:RegisterAuthServiceServer"
+  "service/friends/rpc/entry/entry.go:RegisterFriendsServer"
+  "service/groups/rpc/entry/entry.go:RegisterGroupsServer"
+  "internal/rpcgen/message/entry/entry.go:RegisterMessageServiceServer"
+  "service/mail/rpc/entry/entry.go:RegisterMailServiceServer"
 )
 
 for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
@@ -1017,26 +1007,21 @@ for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
   rg -q "$register_func" "$file"
 done
 
-for cmd_file in cmd/*-rpc/main.go; do
-  if rg -n '"github.com/wujunhui99/agents_im/internal/(auth/)?rpc"' "$cmd_file"; then
-    echo "rpc command imports old handwritten rpc wrapper: $cmd_file" >&2
+for main_file in service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/mail/rpc/mail.go internal/rpcgen/message/message.go; do
+  if rg -n '"github.com/wujunhui99/agents_im/internal/(auth/)?rpc"' "$main_file"; then
+    echo "rpc entrypoint imports old handwritten rpc wrapper: $main_file" >&2
     exit 1
   fi
 done
 
+# RPC entrypoints live in their service dir (cmd/ removed) and delegate to the entry package.
 rpc_entry_patterns=(
-  "cmd/user-rpc/main.go:service/user/rpc/entry"
-  "cmd/friends-rpc/main.go:service/friends/rpc/entry"
-  "cmd/auth-rpc/main.go:service/auth/rpc/entry"
-  "cmd/groups-rpc/main.go:service/groups/rpc/entry"
-  "cmd/message-rpc/main.go:internal/rpcgen/message/entry"
-  "cmd/mail-rpc/main.go:service/mail/rpc/entry"
-  "service/user/rpc/entry/entry.go:Start bridges cmd/user-rpc"
-  "service/friends/rpc/entry/entry.go:Start bridges cmd/friends-rpc"
-  "service/auth/rpc/entry/entry.go:Start bridges cmd/auth-rpc"
-  "service/groups/rpc/entry/entry.go:Start bridges cmd/groups-rpc"
-  "internal/rpcgen/message/entry/entry.go:Start bridges cmd/message-rpc"
-  "service/mail/rpc/entry/entry.go:Start bridges cmd/mail-rpc"
+  "service/user/rpc/user.go:service/user/rpc/entry"
+  "service/friends/rpc/friends.go:service/friends/rpc/entry"
+  "service/auth/rpc/auth.go:service/auth/rpc/entry"
+  "service/groups/rpc/groups.go:service/groups/rpc/entry"
+  "internal/rpcgen/message/message.go:internal/rpcgen/message/entry"
+  "service/mail/rpc/mail.go:service/mail/rpc/entry"
 )
 
 for entry_spec in "${rpc_entry_patterns[@]}"; do
@@ -1045,17 +1030,13 @@ for entry_spec in "${rpc_entry_patterns[@]}"; do
   rg -q "$pattern" "$file"
 done
 
+# API entrypoints live in their service dir and delegate to the entry package.
 api_entry_patterns=(
-  "cmd/user-api/main.go:service/user/api/entry"
-  "cmd/auth-api/main.go:service/auth/api/entry"
-  "cmd/friends-api/main.go:service/friends/api/entry"
-  "cmd/groups-api/main.go:service/groups/api/entry"
-  "service/user/api/entry/entry.go:Start bridges cmd/user-api"
-  "service/auth/api/entry/entry.go:Start bridges cmd/auth-api"
-  "service/friends/api/entry/entry.go:Start bridges cmd/friends-api"
-  "service/groups/api/entry/entry.go:Start bridges cmd/groups-api"
-  "cmd/agent-api/main.go:service/agent/api/entry"
-  "service/agent/api/entry/entry.go:Start bridges cmd/agent-api"
+  "service/user/api/user.go:service/user/api/entry"
+  "service/auth/api/auth.go:service/auth/api/entry"
+  "service/friends/api/friends.go:service/friends/api/entry"
+  "service/groups/api/groups.go:service/groups/api/entry"
+  "service/agent/api/agent.go:service/agent/api/entry"
 )
 
 for entry_spec in "${api_entry_patterns[@]}"; do
@@ -1064,23 +1045,23 @@ for entry_spec in "${api_entry_patterns[@]}"; do
   rg -q "$pattern" "$file"
 done
 
-if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/user)"|DataSource|StorageDriver|New.*Repository' cmd/user-api service/user/api --glob '*.go' --glob '!*_test.go'; then
-  echo "user API entry and service/user/api must not own data access; use RPC/BFF calls" >&2
+if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/user)"|DataSource|StorageDriver|New.*Repository' service/user/api --glob '*.go' --glob '!*_test.go'; then
+  echo "service/user/api must not own data access; use RPC/BFF calls" >&2
   exit 1
 fi
 
-if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|auth/repository|servicecontext/auth)"|DataSource|StorageDriver|New.*Repository' cmd/auth-api service/auth/api --glob '*.go' --glob '!*_test.go'; then
-  echo "auth API entry and service/auth/api must not own data access; use RPC/BFF calls" >&2
+if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|auth/repository|servicecontext/auth)"|DataSource|StorageDriver|New.*Repository' service/auth/api --glob '*.go' --glob '!*_test.go'; then
+  echo "service/auth/api must not own data access; use RPC/BFF calls" >&2
   exit 1
 fi
 
-if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/groups)"|DataSource|StorageDriver|New.*Repository' cmd/groups-api service/groups/api --glob '*.go' --glob '!*_test.go'; then
-  echo "groups API entry and service/groups/api must not own data access; use RPC/BFF calls" >&2
+if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/groups)"|DataSource|StorageDriver|New.*Repository' service/groups/api --glob '*.go' --glob '!*_test.go'; then
+  echo "service/groups/api must not own data access; use RPC/BFF calls" >&2
   exit 1
 fi
 
-if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/friends)"|DataSource|StorageDriver|New.*Repository' cmd/friends-api service/friends/api --glob '*.go' --glob '!*_test.go'; then
-  echo "friends API entry and service/friends/api must not own data access; use RPC/BFF calls" >&2
+if rg -n '"github.com/wujunhui99/agents_im/internal/(repository|model|objectstorage|servicecontext/friends)"|DataSource|StorageDriver|New.*Repository' service/friends/api --glob '*.go' --glob '!*_test.go'; then
+  echo "service/friends/api must not own data access; use RPC/BFF calls" >&2
   exit 1
 fi
 
@@ -1195,7 +1176,7 @@ for pattern in "${websocket_gateway_code_patterns[@]}"; do
   rg -q "$pattern" internal/gateway/ws internal/gateway/contract.go tests/websocket_gateway_test.go
 done
 
-rg -q "gateway-ws" cmd/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
+rg -q "gateway-ws" service/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
 rg -q "AllowQueryToken: true" deploy/k8s/etc/gateway-ws.yaml
 rg -q 'GATEWAY_WS_ALLOW_QUERY_TOKEN: "true"' deploy/k8s/configmap.yaml
 rg -q 'GATEWAY_WS_ALLOWED_ORIGINS: "https://agenticim\.xyz"' deploy/k8s/configmap.yaml
@@ -1336,7 +1317,7 @@ kafka_transfer_config_patterns=(
 )
 
 for pattern in "${kafka_transfer_config_patterns[@]}"; do
-  rg -q "$pattern" pkg/config/config.go pkg/config/config_test.go cmd/message-transfer/main.go etc/message-transfer.yaml
+  rg -q "$pattern" pkg/config/config.go pkg/config/config_test.go service/message-transfer/main.go etc/message-transfer.yaml
 done
 
 kafka_transfer_doc_patterns=(
@@ -1360,7 +1341,7 @@ rg -q "kafka-transfer-consumer.md" ARCHITECTURE.md docs/design-docs/index.md doc
 rg -q "kafka-transfer-consumer" docs/exec-plans/active/kafka-transfer-consumer.md
 
 rg -q "LoadMessageTransferConfig" pkg/config/config.go
-rg -q "message-transfer" cmd/message-transfer/main.go etc/message-transfer.yaml ARCHITECTURE.md
+rg -q "message-transfer" service/message-transfer/main.go etc/message-transfer.yaml ARCHITECTURE.md
 rg -q "message-transfer-worker.md" docs/design-docs/index.md ARCHITECTURE.md
 rg -q "ConsumerGroup|Consumer\\.Group" etc/message-transfer.yaml pkg/config/config.go
 rg -q "Topic|Consumer\\.Topic" etc/message-transfer.yaml pkg/config/config.go
@@ -1748,7 +1729,7 @@ for pattern in "${read_receipt_code_patterns[@]}"; do
 done
 
 rg -q "read-receipts.md" docs/design-docs/index.md docs/product-specs/index.md
-if rg -n "X-User-Id|CurrentUserID|currentUserID" api internal cmd; then
+if rg -n "X-User-Id|CurrentUserID|currentUserID" api internal service/gateway-ws service/message-api service/message-transfer; then
   echo "production API/code still contains header-based current user auth" >&2
   exit 1
 fi
@@ -2015,7 +1996,7 @@ if rg -n 'account_type.*normal|normal.*account_type|`normal`' \
   exit 1
 fi
 
-rg -q "NewGroupsRepositoryForStorage" cmd/message-api/main.go cmd/gateway-ws/main.go internal/rpcgen/message/internal/svc/service_context.go
+rg -q "NewGroupsRepositoryForStorage" service/message-api/main.go service/gateway-ws/main.go internal/rpcgen/message/internal/svc/service_context.go
 rg -q "NewMessageLogicWithMediaValidator" internal/rpcgen/message/internal/svc/service_context.go
 rg -q "NewMessageRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
 pg_persistence_patterns=(
@@ -2040,7 +2021,7 @@ rg -q "StorageDriver" pkg/config/config.go etc/*.yaml
 rg -q "ObjectStorageConfig" pkg/config/config.go
 rg -q "NewStore" pkg/objectstorage/factory.go
 rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/minio.go
-rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go cmd/user-api/main.go cmd/message-api/main.go cmd/gateway-ws/main.go
+rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go service/user/api/user.go service/message-api/main.go service/gateway-ws/main.go
 rg -q "ValidateMessageMedia" internal/logic/medialogic.go internal/logic/messagelogic.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql docs/product-specs/message-chain.md docs/product-specs/frontend-backend-contract.md
 rg -q "PATCH /me/avatar" docs/product-specs/frontend-backend-contract.md
@@ -2147,27 +2128,8 @@ for pattern in "${observability_code_patterns[@]}"; do
   rg -q "$pattern" pkg/health pkg/observability
 done
 
-for api_main in cmd/*-api/main.go; do
-  case "$api_main" in
-    cmd/user-api/main.go)
-      rg -q "TraceMiddlewareFunc" service/user/api/entry/entry.go
-      ;;
-    cmd/auth-api/main.go)
-      rg -q "TraceMiddlewareFunc" service/auth/api/entry/entry.go
-      ;;
-    cmd/friends-api/main.go)
-      rg -q "TraceMiddlewareFunc" service/friends/api/entry/entry.go
-      ;;
-    cmd/groups-api/main.go)
-      rg -q "TraceMiddlewareFunc" service/groups/api/entry/entry.go
-      ;;
-    cmd/agent-api/main.go)
-      rg -q "TraceMiddlewareFunc" service/agent/api/entry/entry.go
-      ;;
-    *)
-      rg -q "TraceMiddlewareFunc" "$api_main"
-      ;;
-  esac
+for api_entry in service/user/api/entry/entry.go service/auth/api/entry/entry.go service/friends/api/entry/entry.go service/groups/api/entry/entry.go service/agent/api/entry/entry.go; do
+  rg -q "TraceMiddlewareFunc" "$api_entry"
 done
 
 observability_wiring_patterns=(
@@ -2178,7 +2140,7 @@ observability_wiring_patterns=(
 )
 
 for pattern in "${observability_wiring_patterns[@]}"; do
-  rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go service/auth/api/entry/entry.go service/friends/api/entry/entry.go service/groups/api/entry/entry.go service/agent/api/entry/entry.go cmd/gateway-ws/main.go cmd/message-transfer/main.go
+  rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go service/auth/api/entry/entry.go service/friends/api/entry/entry.go service/groups/api/entry/entry.go service/agent/api/entry/entry.go service/gateway-ws/main.go service/message-transfer/main.go
 done
 
 observability_metric_hooks=(
@@ -2440,7 +2402,7 @@ if rg -n "RequestURI|RawQuery|DumpRequest|Authorization|password|token" pkg/obse
 fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
-  service/user/api/user.api service/user/rpc/user.proto cmd/user-api cmd/user-rpc \
+  service/user/api/user.api service/user/rpc/user.proto service/user/api/user.go \
   internal/model internal/logic internal/handler service/user/rpc internal/servicecontext; then
   echo "forbidden auth secret field found in service source" >&2
   exit 1

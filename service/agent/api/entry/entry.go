@@ -20,9 +20,8 @@ import (
 
 type ServiceContext = svc.ServiceContext
 
-// Start bridges cmd/agent-api to the service/agent/api goctl-generated API internals.
-// cmd/agent-api cannot import service/agent/api/internal/* directly because of Go
-// internal package visibility.
+// Start launches the agent-api service, wiring the goctl-generated API internals. It lives in the entry package so the service
+// binary and tests can share one startup path.
 func Start(configFile string) {
 	cfg, err := appconfig.LoadAPIConfig(configFile)
 	if err != nil {
