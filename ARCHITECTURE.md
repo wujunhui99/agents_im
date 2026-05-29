@@ -85,7 +85,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 负责 Agent 生命周期、配置组装、运行时能力和工具调用审计。第一版设计见 [`docs/product-specs/agent-system.md`](./docs/product-specs/agent-system.md)、[`docs/design-docs/agent-system-architecture.md`](./docs/design-docs/agent-system-architecture.md) 和 [`docs/exec-plans/active/agent-system-v0.md`](./docs/exec-plans/active/agent-system-v0.md)。核心能力包括：
 
 - 在账号系统中配合 `user` / `agent` / `admin` 账号类型，让 Agent 账号作为 IM 会话成员参与单聊和群聊。
-- 当前 `service/agent/api`（入口 `agent.go`）通过 `service/agent/api/entry` 启动，`service/agent/api/agent.api` 提供 Agent profile 管理基础，配置单独持久化到 `agents` 表；创建 Agent 必须通过 Account Service 资料能力验证绑定账号为 `account_type=agent`，验证不可用时必须失败。当前没有真实 Agent RPC/proto contract，不能创建空 RPC scaffold 冒充服务边界。
+- 当前 `service/agent/api`（入口 `agent.go`，直接装配 `internal/*`）启动，`service/agent/api/agent.api` 提供 Agent profile 管理基础，配置单独持久化到 `agents` 表；创建 Agent 必须通过 Account Service 资料能力验证绑定账号为 `account_type=agent`，验证不可用时必须失败。当前没有真实 Agent RPC/proto contract，不能创建空 RPC scaffold 冒充服务边界。
 - 管理系统提示词、工具、Agent skills 和 Agent 配置，并将元数据持久化在 PostgreSQL。
 - 使用系统提示词、工具和 skills 组装 Agent runtime。
 - 通过 MinIO/S3-compatible object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。

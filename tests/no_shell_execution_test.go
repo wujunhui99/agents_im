@@ -14,7 +14,7 @@ import (
 func TestProductionGoCodeDoesNotExposeShellOrDirectPythonExecution(t *testing.T) {
 	root := repositoryRoot(t)
 	productionRoots := []string{
-		filepath.Join(root, "cmd"),
+		filepath.Join(root, "service"),
 		filepath.Join(root, "internal"),
 	}
 

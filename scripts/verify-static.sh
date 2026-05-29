@@ -56,15 +56,10 @@ required_files=(
   "service/groups/rpc/groups.go"
   "service/groups/rpc/internal/server/groupsserver.go"
   "service/user/api/user.go"
-  "service/user/api/entry/entry.go"
   "service/auth/api/auth.go"
-  "service/auth/api/entry/entry.go"
   "service/friends/api/friends.go"
-  "service/friends/api/entry/entry.go"
   "service/groups/api/groups.go"
-  "service/groups/api/entry/entry.go"
   "service/agent/api/agent.go"
-  "service/agent/api/entry/entry.go"
   "service/user/api/internal/config/config.go"
   "service/user/api/internal/handler/routes.go"
   "service/user/api/internal/svc/service_context.go"
@@ -253,10 +248,10 @@ required_files=(
   "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
   "pkg/ctxuser/user.go"
-  "service/user/rpc/entry/entry.go"
-  "service/auth/rpc/entry/entry.go"
-  "service/groups/rpc/entry/entry.go"
-  "internal/rpcgen/message/entry/entry.go"
+  "service/user/rpc/user.go"
+  "service/auth/rpc/auth.go"
+  "service/groups/rpc/groups.go"
+  "internal/rpcgen/message/message.go"
   "internal/rpcgen/rpcerror/error.go"
   "internal/gateway/contract.go"
   "internal/transfer/event.go"
@@ -992,13 +987,15 @@ for server_spec in "${rpc_generated_servers[@]}"; do
   rg -q "Unimplemented${server_name}" "$file"
 done
 
+# RPC service mains live in their service dir (cmd/ and the entry bridge were removed)
+# and wire the goctl-generated RPC server directly.
 rpc_generated_entrypoints=(
-  "service/user/rpc/entry/entry.go:RegisterUserServer"
-  "service/auth/rpc/entry/entry.go:RegisterAuthServiceServer"
-  "service/friends/rpc/entry/entry.go:RegisterFriendsServer"
-  "service/groups/rpc/entry/entry.go:RegisterGroupsServer"
-  "internal/rpcgen/message/entry/entry.go:RegisterMessageServiceServer"
-  "service/mail/rpc/entry/entry.go:RegisterMailServiceServer"
+  "service/user/rpc/user.go:RegisterUserServer"
+  "service/auth/rpc/auth.go:RegisterAuthServiceServer"
+  "service/friends/rpc/friends.go:RegisterFriendsServer"
+  "service/groups/rpc/groups.go:RegisterGroupsServer"
+  "internal/rpcgen/message/message.go:RegisterMessageServiceServer"
+  "service/mail/rpc/mail.go:RegisterMailServiceServer"
 )
 
 for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
@@ -1014,32 +1011,16 @@ for main_file in service/user/rpc/user.go service/auth/rpc/auth.go service/frien
   fi
 done
 
-# RPC entrypoints live in their service dir (cmd/ removed) and delegate to the entry package.
-rpc_entry_patterns=(
-  "service/user/rpc/user.go:service/user/rpc/entry"
-  "service/friends/rpc/friends.go:service/friends/rpc/entry"
-  "service/auth/rpc/auth.go:service/auth/rpc/entry"
-  "service/groups/rpc/groups.go:service/groups/rpc/entry"
-  "internal/rpcgen/message/message.go:internal/rpcgen/message/entry"
-  "service/mail/rpc/mail.go:service/mail/rpc/entry"
+# API service mains wire the goctl-generated handlers directly.
+api_register_patterns=(
+  "service/user/api/user.go:handler.RegisterHandlers"
+  "service/auth/api/auth.go:handler.RegisterHandlers"
+  "service/friends/api/friends.go:handler.RegisterHandlers"
+  "service/groups/api/groups.go:handler.RegisterHandlers"
+  "service/agent/api/agent.go:handler.RegisterHandlers"
 )
 
-for entry_spec in "${rpc_entry_patterns[@]}"; do
-  file="${entry_spec%%:*}"
-  pattern="${entry_spec##*:}"
-  rg -q "$pattern" "$file"
-done
-
-# API entrypoints live in their service dir and delegate to the entry package.
-api_entry_patterns=(
-  "service/user/api/user.go:service/user/api/entry"
-  "service/auth/api/auth.go:service/auth/api/entry"
-  "service/friends/api/friends.go:service/friends/api/entry"
-  "service/groups/api/groups.go:service/groups/api/entry"
-  "service/agent/api/agent.go:service/agent/api/entry"
-)
-
-for entry_spec in "${api_entry_patterns[@]}"; do
+for entry_spec in "${api_register_patterns[@]}"; do
   file="${entry_spec%%:*}"
   pattern="${entry_spec##*:}"
   rg -q "$pattern" "$file"
@@ -1085,8 +1066,8 @@ if rg -n "todo: add your logic here|return &.*Response\\{\\}, nil" service/agent
   exit 1
 fi
 
-if rg -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic|auth/repository)"' internal/rpcgen/*/entry service/*/rpc/entry --glob '*.go'; then
-  echo "rpc entry bridges must not own business wiring; keep dependencies behind generated rpc service contexts" >&2
+if rg -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic|auth/repository)"' internal/rpcgen/message/message.go service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/mail/rpc/mail.go; then
+  echo "rpc service mains must not own business wiring; keep dependencies behind generated rpc service contexts" >&2
   exit 1
 fi
 
@@ -2128,8 +2109,8 @@ for pattern in "${observability_code_patterns[@]}"; do
   rg -q "$pattern" pkg/health pkg/observability
 done
 
-for api_entry in service/user/api/entry/entry.go service/auth/api/entry/entry.go service/friends/api/entry/entry.go service/groups/api/entry/entry.go service/agent/api/entry/entry.go; do
-  rg -q "TraceMiddlewareFunc" "$api_entry"
+for api_main in service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go; do
+  rg -q "TraceMiddlewareFunc" "$api_main"
 done
 
 observability_wiring_patterns=(
@@ -2140,7 +2121,7 @@ observability_wiring_patterns=(
 )
 
 for pattern in "${observability_wiring_patterns[@]}"; do
-  rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/entry/entry.go service/auth/api/entry/entry.go service/friends/api/entry/entry.go service/groups/api/entry/entry.go service/agent/api/entry/entry.go service/gateway-ws/main.go service/message-transfer/main.go
+  rg -q "$pattern" internal/handler/gozero_routes.go service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/gateway-ws/main.go service/message-transfer/main.go
 done
 
 observability_metric_hooks=(

@@ -2,16 +2,17 @@ package tests
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	agententry "github.com/wujunhui99/agents_im/service/agent/api/entry"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
+
+// The agent API HTTP handler test lives in service/agent/api (package main),
+// because agent wiring is under service/agent/api/internal/* which the external
+// tests package cannot import. These tests cover the agent business logic.
 
 func TestAgentLogicCreateRequiresAgentAccountType(t *testing.T) {
 	ctx := context.Background()
@@ -193,104 +194,6 @@ func TestAgentLogicUpdateListStatusAndArchive(t *testing.T) {
 	}
 	if archived.Status != logic.AgentStatusArchived {
 		t.Fatalf("agent was not archived: %+v", archived)
-	}
-}
-
-func TestAgentHTTPHandlers(t *testing.T) {
-	serviceContext := agententry.NewServiceContextWithAuth(
-		repository.NewMemoryAgentRepository(),
-		testAccountTypeChecker{accountTypes: map[string]string{
-			"usr_agent": logic.AccountTypeAgent,
-			"usr_user":  string(model.AccountTypeUser),
-		}},
-		testJWTAuthConfig(),
-	)
-	mux := newAgentAPIServiceRouter(t, serviceContext)
-	adminBearer := bearerTokenForUser(t, "usr_admin")
-
-	missingTokenResp := httptest.NewRecorder()
-	missingTokenReq := newJSONRequest(http.MethodPost, "/agents", `{"im_user_id":"usr_agent","name":"Support Bot"}`)
-	mux.ServeHTTP(missingTokenResp, missingTokenReq)
-	if missingTokenResp.Code != http.StatusUnauthorized {
-		t.Fatalf("missing token status = %d", missingTokenResp.Code)
-	}
-
-	createResp := httptest.NewRecorder()
-	createReq := newJSONRequest(http.MethodPost, "/agents", `{"im_user_id":"usr_agent","name":"Support Bot","description":"support"}`)
-	createReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(createResp, createReq)
-	if createResp.Code != http.StatusOK {
-		t.Fatalf("create agent status = %d, body = %s", createResp.Code, createResp.Body.String())
-	}
-	assertNoSecretFields(t, createResp.Body.String())
-
-	var created envelope[logic.AgentInfo]
-	decodeEnvelope(t, createResp.Body.Bytes(), &created)
-	if created.Data.AgentID == "" || created.Data.CreatedBy != "usr_admin" {
-		t.Fatalf("unexpected created agent: %+v", created.Data)
-	}
-
-	getResp := httptest.NewRecorder()
-	getReq := httptest.NewRequest(http.MethodGet, "/agents/"+created.Data.AgentID, nil)
-	getReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(getResp, getReq)
-	if getResp.Code != http.StatusOK {
-		t.Fatalf("get agent status = %d, body = %s", getResp.Code, getResp.Body.String())
-	}
-
-	updateResp := httptest.NewRecorder()
-	updateReq := newJSONRequest(http.MethodPatch, "/agents/"+created.Data.AgentID, `{"name":"Renamed Bot"}`)
-	updateReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(updateResp, updateReq)
-	if updateResp.Code != http.StatusOK {
-		t.Fatalf("update agent status = %d, body = %s", updateResp.Code, updateResp.Body.String())
-	}
-
-	statusResp := httptest.NewRecorder()
-	statusReq := newJSONRequest(http.MethodPatch, "/agents/"+created.Data.AgentID+"/status", `{"status":"active"}`)
-	statusReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(statusResp, statusReq)
-	if statusResp.Code != http.StatusOK {
-		t.Fatalf("status update = %d, body = %s", statusResp.Code, statusResp.Body.String())
-	}
-	var activated envelope[logic.AgentInfo]
-	decodeEnvelope(t, statusResp.Body.Bytes(), &activated)
-	if activated.Data.Status != logic.AgentStatusActive {
-		t.Fatalf("unexpected activated agent: %+v", activated.Data)
-	}
-
-	listResp := httptest.NewRecorder()
-	listReq := httptest.NewRequest(http.MethodGet, "/agents?status=active", nil)
-	listReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(listResp, listReq)
-	if listResp.Code != http.StatusOK {
-		t.Fatalf("list status = %d, body = %s", listResp.Code, listResp.Body.String())
-	}
-	var listed envelope[logic.ListAgentsResponse]
-	decodeEnvelope(t, listResp.Body.Bytes(), &listed)
-	if len(listed.Data.Agents) != 1 || listed.Data.Agents[0].AgentID != created.Data.AgentID {
-		t.Fatalf("unexpected list response: %+v", listed.Data.Agents)
-	}
-
-	forbiddenResp := httptest.NewRecorder()
-	forbiddenReq := newJSONRequest(http.MethodPost, "/agents", `{"im_user_id":"usr_user","name":"Wrong Type Bot"}`)
-	forbiddenReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(forbiddenResp, forbiddenReq)
-	if forbiddenResp.Code != http.StatusForbidden {
-		t.Fatalf("user-type account binding status = %d, body = %s", forbiddenResp.Code, forbiddenResp.Body.String())
-	}
-
-	deleteResp := httptest.NewRecorder()
-	deleteReq := httptest.NewRequest(http.MethodDelete, "/agents/"+created.Data.AgentID, nil)
-	deleteReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(deleteResp, deleteReq)
-	if deleteResp.Code != http.StatusOK {
-		t.Fatalf("delete/archive status = %d, body = %s", deleteResp.Code, deleteResp.Body.String())
-	}
-	var archived envelope[logic.AgentInfo]
-	decodeEnvelope(t, deleteResp.Body.Bytes(), &archived)
-	if archived.Data.Status != logic.AgentStatusArchived {
-		t.Fatalf("delete should archive agent: %+v", archived.Data)
 	}
 }
 
