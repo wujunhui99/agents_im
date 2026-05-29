@@ -24,10 +24,8 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
     --exclude='web/dist' \
     -czf - . | tar -xzf - -C /opt/agents-im/repo
 
-  restart_rollout=false
-  if [[ -n "${restart_services}" ]]; then
-    restart_rollout=true
-  fi
+  # Always restart all app services so pods pick up the latest secret values.
+  restart_rollout=true
 
   skip_set_image=true
   if [[ "${build_required}" == "true" ]]; then
@@ -116,10 +114,7 @@ q() {
   printf '%q' "$1"
 }
 
-restart_rollout=false
-if [[ -n "${restart_services}" ]]; then
-  restart_rollout=true
-fi
+restart_rollout=true
 
 skip_set_image=true
 if [[ "${build_required}" == "true" ]]; then
