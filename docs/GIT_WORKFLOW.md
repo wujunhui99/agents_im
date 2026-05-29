@@ -54,6 +54,28 @@ git worktree add \
   origin/main
 ```
 
+### 本地开发布局（junhui Mac）
+
+本地采用「容器目录」布局：容器目录本身不是 git 仓库，主仓库下沉一层，worktree 与主仓库同级、统一放在仓库**之外**：
+
+```text
+/Users/junhui/code/project/agents_im/        # 容器目录（非 git 仓库）
+├── agents_im/                                # 主仓库
+├── open-im-server/                           # 独立上游仓库
+└── worktree/                                 # worktree 统一放这里（仓库之外）
+```
+
+约定：以后新建 worktree 一律放在 `/Users/junhui/code/project/agents_im/worktree/<分支短名>`，**不要**建在主仓库目录内。
+
+```bash
+git -C /Users/junhui/code/project/agents_im/agents_im worktree add \
+  -b fix/claude/issue-N-task-desc \
+  /Users/junhui/code/project/agents_im/worktree/issue-N-task-desc \
+  origin/main
+```
+
+> 注：Claude Code 的 Agent worktree 隔离（`isolation: worktree`）默认仍写入 `<仓库>/.claude/worktrees/`，本约定只约束手动 `git worktree add` 创建的实例。
+
 
 ## 单个 Agent 的开发流程
 
