@@ -39,6 +39,7 @@ func run(configFile string) {
 		c.Auth.AccessSecret = appconfig.DefaultJWTAuthConfig().AccessSecret
 	}
 	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
+	log.Printf("starting %s on port %d", c.Name, c.Port)
 
 	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
 	if err != nil {
