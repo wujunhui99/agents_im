@@ -12,10 +12,6 @@ if git grep -n -I -E "(DEEPSEEK_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY)[[:spac
 fi
 
 required_files=(
-  "api/user.api"
-  "api/auth.api"
-  "api/friends.api"
-  "api/groups.api"
   "api/message.api"
   "api/media.api"
   ".drone.yml"
@@ -37,8 +33,6 @@ required_files=(
   "service/groups/rpc/groups.proto"
   "service/groups/api/groups.api"
   "service/agent/api/agent.api"
-  "proto/friends.proto"
-  "proto/groups.proto"
   "proto/message.proto"
   "service/mail/rpc/mail.proto"
   "service/user/rpc/user/user.pb.go"
@@ -49,10 +43,6 @@ required_files=(
   "service/friends/rpc/friends/friends_grpc.pb.go"
   "service/groups/rpc/groups/groups.pb.go"
   "service/groups/rpc/groups/groups_grpc.pb.go"
-  "proto/friendspb/friends.pb.go"
-  "proto/friendspb/friends_grpc.pb.go"
-  "proto/groupspb/groups.pb.go"
-  "proto/groupspb/groups_grpc.pb.go"
   "proto/messagepb/message.pb.go"
   "proto/messagepb/message_grpc.pb.go"
   "service/mail/rpc/mail/mail.pb.go"
@@ -136,10 +126,6 @@ required_files=(
   "service/agent/api/internal/logic/agent/get_agent_definition_logic.go"
   "service/agent/api/internal/logic/agent/update_agent_definition_logic.go"
   "service/agent/api/internal/logic/agent/convert.go"
-  "internal/rpcgen/friends/friends.v1.go"
-  "internal/rpcgen/friends/internal/server/friends_service_server.go"
-  "internal/rpcgen/groups/groups.v1.go"
-  "internal/rpcgen/groups/internal/server/groups_service_server.go"
   "internal/rpcgen/message/message.go"
   "internal/rpcgen/message/internal/server/message_service_server.go"
   "service/mail/rpc/mail.v1.go"
@@ -213,9 +199,9 @@ required_files=(
   "internal/model/friendship.go"
   "internal/model/group.go"
   "internal/model/media.go"
-  "internal/objectstorage/store.go"
-  "internal/objectstorage/minio.go"
-  "internal/objectstorage/memory.go"
+  "pkg/objectstorage/store.go"
+  "pkg/objectstorage/minio.go"
+  "pkg/objectstorage/memory.go"
   "internal/repository/memory.go"
   "internal/repository/postgres_common.go"
   "internal/repository/postgres_user_friends.go"
@@ -250,17 +236,17 @@ required_files=(
   "internal/servicecontext/groups/service_context.go"
   "internal/servicecontext/message/service_context.go"
   "internal/servicecontext/gateway/service_context.go"
-  "internal/health/health.go"
-  "internal/health/health_test.go"
-  "internal/observability/metrics.go"
-  "internal/observability/metrics_test.go"
-  "internal/observability/trace.go"
-  "internal/observability/trace_test.go"
-  "internal/llmobs/types.go"
-  "internal/llmobs/sink.go"
-  "internal/llmobs/sink_test.go"
-  "internal/llmobs/sanitize.go"
-  "internal/llmobs/eino.go"
+  "pkg/health/health.go"
+  "pkg/health/health_test.go"
+  "pkg/observability/metrics.go"
+  "pkg/observability/metrics_test.go"
+  "pkg/observability/trace.go"
+  "pkg/observability/trace_test.go"
+  "pkg/llmobs/types.go"
+  "pkg/llmobs/sink.go"
+  "pkg/llmobs/sink_test.go"
+  "pkg/llmobs/sanitize.go"
+  "pkg/llmobs/eino.go"
   "internal/agenteval/eval.go"
   "internal/agenteval/python_go_test.go"
   "internal/types/types.go"
@@ -276,12 +262,10 @@ required_files=(
   "internal/handler/auth/validate_token_handler.go"
   "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
-  "internal/ctxuser/user.go"
+  "pkg/ctxuser/user.go"
   "service/user/rpc/entry/entry.go"
   "service/auth/rpc/entry/entry.go"
-  "internal/rpcgen/friends/entry/entry.go"
   "service/groups/rpc/entry/entry.go"
-  "internal/rpcgen/groups/entry/entry.go"
   "internal/rpcgen/message/entry/entry.go"
   "internal/rpcgen/rpcerror/error.go"
   "internal/gateway/contract.go"
@@ -295,26 +279,26 @@ required_files=(
   "internal/transfer/kafka_consumer.go"
   "internal/transfer/kafka_consumer_test.go"
   "internal/transfer/kafka_integration_test.go"
-  "internal/presence/store.go"
-  "internal/presence/memory.go"
-  "internal/presence/redis.go"
-  "internal/presence/memory_test.go"
-  "internal/presence/redis_integration_test.go"
+  "pkg/presence/store.go"
+  "pkg/presence/memory.go"
+  "pkg/presence/redis.go"
+  "pkg/presence/memory_test.go"
+  "pkg/presence/redis_integration_test.go"
   "internal/gateway/ws/connection_manager.go"
   "internal/gateway/ws/server.go"
-  "internal/messaging/event.go"
-  "internal/messaging/producer.go"
-  "internal/messaging/kafka.go"
-  "internal/messaging/event_test.go"
-  "internal/messaging/producer_test.go"
-  "internal/messaging/kafka_integration_test.go"
+  "pkg/messaging/event.go"
+  "pkg/messaging/producer.go"
+  "pkg/messaging/kafka.go"
+  "pkg/messaging/event_test.go"
+  "pkg/messaging/producer_test.go"
+  "pkg/messaging/kafka_integration_test.go"
   "internal/gateway/delivery/delivery.go"
   "internal/gateway/ws/delivery.go"
   "internal/transfer/gateway/dispatcher.go"
   "internal/transfer/gateway/dispatcher_test.go"
   "internal/domain/readreceipt/read_receipt.go"
-  "internal/agent/pythonexec/executor.go"
-  "internal/agent/pythonexec/executor_test.go"
+  "pkg/pythonexec/executor.go"
+  "pkg/pythonexec/executor_test.go"
   "tests/user_service_test.go"
   "tests/auth_service_test.go"
   "tests/friends_service_test.go"
@@ -671,7 +655,6 @@ api_patterns=(
 )
 
 for pattern in "${api_patterns[@]}"; do
-  rg -q "$pattern" api/user.api
   rg -q "$pattern" service/user/api/user.api
 done
 
@@ -682,7 +665,6 @@ auth_api_patterns=(
 )
 
 for pattern in "${auth_api_patterns[@]}"; do
-  rg -q "$pattern" api/auth.api
   rg -q "$pattern" service/auth/api/auth.api
 done
 
@@ -694,7 +676,7 @@ friends_api_patterns=(
 )
 
 for pattern in "${friends_api_patterns[@]}"; do
-  rg -q "$pattern" api/friends.api
+  rg -q "$pattern" service/friends/api/friends.api
 done
 
 groups_api_patterns=(
@@ -706,7 +688,7 @@ groups_api_patterns=(
 )
 
 for pattern in "${groups_api_patterns[@]}"; do
-  rg -q "$pattern" api/groups.api
+  rg -q "$pattern" service/groups/api/groups.api
 done
 
 message_api_patterns=(
@@ -871,7 +853,7 @@ friends_proto_patterns=(
 )
 
 for pattern in "${friends_proto_patterns[@]}"; do
-  rg -q "$pattern" proto/friends.proto
+  rg -q "$pattern" service/friends/rpc/friends.proto
 done
 
 groups_proto_patterns=(
@@ -884,7 +866,7 @@ groups_proto_patterns=(
 )
 
 for pattern in "${groups_proto_patterns[@]}"; do
-  rg -q "$pattern" proto/groups.proto
+  rg -q "$pattern" service/groups/rpc/groups.proto
 done
 
 message_proto_patterns=(
@@ -923,7 +905,7 @@ agent_conversation_hosting_contract_patterns=(
 )
 
 for pattern in "${agent_conversation_hosting_contract_patterns[@]}"; do
-  rg -q "$pattern" proto/message.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go internal/messaging/event.go docs/design-docs/agent-conversation-hosting.md docs/design-docs/message-chain-contract.md docs/product-specs/message-chain.md
+  rg -q "$pattern" proto/message.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go pkg/messaging/event.go docs/design-docs/agent-conversation-hosting.md docs/design-docs/message-chain-contract.md docs/product-specs/message-chain.md
 done
 
 agent_conversation_hosting_camel_patterns=(
@@ -992,8 +974,6 @@ rpc_generated_dirs=(
   "service/auth/rpc"
   "service/friends/rpc"
   "service/groups/rpc"
-  "internal/rpcgen/friends"
-  "internal/rpcgen/groups"
   "internal/rpcgen/message"
   "service/mail/rpc"
 )
@@ -1010,8 +990,6 @@ rpc_generated_servers=(
   "service/auth/rpc/internal/server/auth_service_server.go:AuthServiceServer"
   "service/friends/rpc/internal/server/friendsserver.go:FriendsServer"
   "service/groups/rpc/internal/server/groupsserver.go:GroupsServer"
-  "internal/rpcgen/friends/internal/server/friends_service_server.go:FriendsServiceServer"
-  "internal/rpcgen/groups/internal/server/groups_service_server.go:GroupsServiceServer"
   "internal/rpcgen/message/internal/server/message_service_server.go:MessageServiceServer"
   "service/mail/rpc/internal/server/mail_service_server.go:MailServiceServer"
 )
@@ -1029,8 +1007,6 @@ rpc_generated_entrypoints=(
   "service/auth/rpc/auth.v1.go:RegisterAuthServiceServer"
   "service/friends/rpc/friends.v1.go:RegisterFriendsServer"
   "service/groups/rpc/groups.v1.go:RegisterGroupsServer"
-  "internal/rpcgen/friends/friends.v1.go:RegisterFriendsServiceServer"
-  "internal/rpcgen/groups/groups.v1.go:RegisterGroupsServiceServer"
   "internal/rpcgen/message/message.go:RegisterMessageServiceServer"
   "service/mail/rpc/mail.v1.go:RegisterMailServiceServer"
 )
@@ -1059,7 +1035,6 @@ rpc_entry_patterns=(
   "service/friends/rpc/entry/entry.go:Start bridges cmd/friends-rpc"
   "service/auth/rpc/entry/entry.go:Start bridges cmd/auth-rpc"
   "service/groups/rpc/entry/entry.go:Start bridges cmd/groups-rpc"
-  "internal/rpcgen/groups/entry/entry.go:Start bridges cmd/groups-rpc"
   "internal/rpcgen/message/entry/entry.go:Start bridges cmd/message-rpc"
   "service/mail/rpc/entry/entry.go:Start bridges cmd/mail-rpc"
 )
@@ -1143,8 +1118,6 @@ rpc_logic_markers=(
   "service/user/rpc/internal/logic:UserLogic"
   "service/auth/rpc/internal/logic:AuthLogic"
   "service/friends/rpc/internal/logic:FriendsLogic"
-  "internal/rpcgen/friends/internal/logic:FriendsLogic"
-  "internal/rpcgen/groups/internal/logic:GroupsLogic"
   "internal/rpcgen/message/internal/logic:MessageLogic"
   "service/mail/rpc/internal/logic:MailProvider"
 )
@@ -1165,10 +1138,6 @@ rpc_generated_proto_files=(
   "service/user/rpc/user/user_grpc.pb.go"
   "service/auth/rpc/auth/auth.pb.go"
   "service/auth/rpc/auth/auth_grpc.pb.go"
-  "proto/friendspb/friends.pb.go"
-  "proto/friendspb/friends_grpc.pb.go"
-  "proto/groupspb/groups.pb.go"
-  "proto/groupspb/groups_grpc.pb.go"
   "proto/messagepb/message.pb.go"
   "proto/messagepb/message_grpc.pb.go"
   "service/mail/rpc/mail/mail.pb.go"
@@ -1367,7 +1336,7 @@ kafka_transfer_config_patterns=(
 )
 
 for pattern in "${kafka_transfer_config_patterns[@]}"; do
-  rg -q "$pattern" internal/config/config.go internal/config/config_test.go cmd/message-transfer/main.go etc/message-transfer.yaml
+  rg -q "$pattern" pkg/config/config.go pkg/config/config_test.go cmd/message-transfer/main.go etc/message-transfer.yaml
 done
 
 kafka_transfer_doc_patterns=(
@@ -1390,12 +1359,12 @@ done
 rg -q "kafka-transfer-consumer.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-transfer-worker.md
 rg -q "kafka-transfer-consumer" docs/exec-plans/active/kafka-transfer-consumer.md
 
-rg -q "LoadMessageTransferConfig" internal/config/config.go
+rg -q "LoadMessageTransferConfig" pkg/config/config.go
 rg -q "message-transfer" cmd/message-transfer/main.go etc/message-transfer.yaml ARCHITECTURE.md
 rg -q "message-transfer-worker.md" docs/design-docs/index.md ARCHITECTURE.md
-rg -q "ConsumerGroup|Consumer\\.Group" etc/message-transfer.yaml internal/config/config.go
-rg -q "Topic|Consumer\\.Topic" etc/message-transfer.yaml internal/config/config.go
-rg -q "WorkerID|Worker\\.ID" etc/message-transfer.yaml internal/config/config.go
+rg -q "ConsumerGroup|Consumer\\.Group" etc/message-transfer.yaml pkg/config/config.go
+rg -q "Topic|Consumer\\.Topic" etc/message-transfer.yaml pkg/config/config.go
+rg -q "WorkerID|Worker\\.ID" etc/message-transfer.yaml pkg/config/config.go
 
 gateway_delivery_code_patterns=(
   "type Dispatcher interface"
@@ -1528,7 +1497,7 @@ gateway_presence_routing_code_patterns=(
 )
 
 for pattern in "${gateway_presence_routing_code_patterns[@]}"; do
-  rg -q "$pattern" internal/gateway/ws internal/gateway/delivery internal/presence tests/websocket_gateway_test.go
+  rg -q "$pattern" internal/gateway/ws internal/gateway/delivery pkg/presence tests/websocket_gateway_test.go
 done
 
 gateway_presence_routing_doc_patterns=(
@@ -1656,7 +1625,7 @@ presence_config_patterns=(
 )
 
 for pattern in "${presence_config_patterns[@]}"; do
-  rg -q "$pattern" internal/config/config.go
+  rg -q "$pattern" pkg/config/config.go
 done
 
 kafka_config_patterns=(
@@ -1669,7 +1638,7 @@ kafka_config_patterns=(
 )
 
 for pattern in "${kafka_config_patterns[@]}"; do
-  rg -q "$pattern" internal/config/config.go internal/config/config_test.go
+  rg -q "$pattern" pkg/config/config.go pkg/config/config_test.go
 done
 
 presence_code_patterns=(
@@ -1685,7 +1654,7 @@ presence_code_patterns=(
 )
 
 for pattern in "${presence_code_patterns[@]}"; do
-  rg -q "$pattern" internal/presence
+  rg -q "$pattern" pkg/presence
 done
 
 presence_doc_patterns=(
@@ -1703,7 +1672,7 @@ for pattern in "${presence_doc_patterns[@]}"; do
 done
 
 rg -q "redis-presence.md" ARCHITECTURE.md docs/design-docs/index.md
-rg -q "REDIS_ADDR is required.*skip|t\\.Skip" internal/presence/redis_integration_test.go
+rg -q "REDIS_ADDR is required.*skip|t\\.Skip" pkg/presence/redis_integration_test.go
 
 message_event_schema_patterns=(
   "type MessageEvent struct"
@@ -1720,7 +1689,7 @@ message_event_schema_patterns=(
 )
 
 for pattern in "${message_event_schema_patterns[@]}"; do
-  rg -q "$pattern" internal/messaging/event.go internal/messaging/event_test.go docs/design-docs/kafka-message-events.md
+  rg -q "$pattern" pkg/messaging/event.go pkg/messaging/event_test.go docs/design-docs/kafka-message-events.md
 done
 
 producer_contract_patterns=(
@@ -1735,7 +1704,7 @@ producer_contract_patterns=(
 )
 
 for pattern in "${producer_contract_patterns[@]}"; do
-  rg -q "$pattern" internal/messaging go.mod
+  rg -q "$pattern" pkg/messaging go.mod
 done
 
 kafka_doc_patterns=(
@@ -1863,9 +1832,9 @@ for path in (
 PY
 
 jwt_api_files=(
-  "api/user.api"
-  "api/friends.api"
-  "api/groups.api"
+  "service/user/api/user.api"
+  "service/friends/api/friends.api"
+  "service/groups/api/groups.api"
   "api/message.api"
   "api/media.api"
   "service/agent/api/agent.api"
@@ -1889,10 +1858,10 @@ for file in "${jwt_config_files[@]}"; do
   rg -q "AccessExpire" "$file"
 done
 
-rg -q "type JWTAuthConfig" internal/config/config.go
-rg -q "AccessSecret" internal/config/config.go service/auth/rpc/internal/config/config.go
-rg -q "AccessExpire" internal/config/config.go service/auth/rpc/internal/config/config.go
-rg -q "user_id" internal/auth/token/token.go internal/ctxuser/user.go
+rg -q "type JWTAuthConfig" pkg/config/config.go
+rg -q "AccessSecret" pkg/config/config.go service/auth/rpc/internal/config/config.go
+rg -q "AccessExpire" pkg/config/config.go service/auth/rpc/internal/config/config.go
+rg -q "user_id" internal/auth/token/token.go pkg/ctxuser/user.go
 rg -q "ctxuser\\.UserID" internal/logic/user internal/logic/friends internal/logic/groups internal/logic/message internal/logic/media
 rg -q "sender_id must match authenticated user" internal/logic/message/send_message_logic.go
 
@@ -2067,10 +2036,10 @@ for pattern in "${pg_persistence_patterns[@]}"; do
   rg -q "$pattern" db/migrations/001_init_postgres.sql docs/design-docs/postgres-persistence.md
 done
 
-rg -q "StorageDriver" internal/config/config.go etc/*.yaml
-rg -q "ObjectStorageConfig" internal/config/config.go
-rg -q "NewStore" internal/objectstorage/factory.go
-rg -q "PresignPut" internal/objectstorage/store.go internal/objectstorage/minio.go
+rg -q "StorageDriver" pkg/config/config.go etc/*.yaml
+rg -q "ObjectStorageConfig" pkg/config/config.go
+rg -q "NewStore" pkg/objectstorage/factory.go
+rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/minio.go
 rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go cmd/user-api/main.go cmd/message-api/main.go cmd/gateway-ws/main.go
 rg -q "ValidateMessageMedia" internal/logic/medialogic.go internal/logic/messagelogic.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql docs/product-specs/message-chain.md docs/product-specs/frontend-backend-contract.md
@@ -2175,7 +2144,7 @@ observability_code_patterns=(
 )
 
 for pattern in "${observability_code_patterns[@]}"; do
-  rg -q "$pattern" internal/health internal/observability
+  rg -q "$pattern" pkg/health pkg/observability
 done
 
 for api_main in cmd/*-api/main.go; do
@@ -2227,7 +2196,7 @@ done
 rg -q "Observability:" etc/message-transfer.yaml
 rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
 rg -q "observability-mvp.md" ARCHITECTURE.md docs/design-docs/index.md
-rg -q "agents_im_message_sends_total" docs/design-docs/observability-mvp.md internal/observability/metrics.go
+rg -q "agents_im_message_sends_total" docs/design-docs/observability-mvp.md pkg/observability/metrics.go
 rg -q "trace_id" docs/design-docs/observability-mvp.md internal/gateway/ws/server.go
 
 llm_observability_patterns=(
@@ -2242,7 +2211,7 @@ llm_observability_patterns=(
 )
 
 for pattern in "${llm_observability_patterns[@]}"; do
-  rg -q "$pattern" internal/llmobs internal/agenteval internal/agentim internal/agentruntime/eino internal/config docs/design-docs/llm-observability.md .env.example
+  rg -q "$pattern" pkg/llmobs internal/agenteval internal/agentim internal/agentruntime/eino pkg/config docs/design-docs/llm-observability.md .env.example
 done
 
 rg -q "llm-observability.md" ARCHITECTURE.md docs/design-docs/index.md
@@ -2465,13 +2434,13 @@ for required in ("LANGFUSE_DATABASE_URL", "NEXTAUTH_SECRET", "SALT", "ENCRYPTION
         sys.exit(1)
 PY
 
-if rg -n "RequestURI|RawQuery|DumpRequest|Authorization|password|token" internal/observability; then
+if rg -n "RequestURI|RawQuery|DumpRequest|Authorization|password|token" pkg/observability; then
   echo "observability helpers must not log or inspect secrets, auth headers, bodies, or query strings" >&2
   exit 1
 fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
-  api/user.api service/user/api/user.api service/user/rpc/user.proto cmd/user-api cmd/user-rpc \
+  service/user/api/user.api service/user/rpc/user.proto cmd/user-api cmd/user-rpc \
   internal/model internal/logic internal/handler service/user/rpc internal/servicecontext; then
   echo "forbidden auth secret field found in service source" >&2
   exit 1
