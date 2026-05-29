@@ -15,6 +15,7 @@ BACKEND_SERVICES = [
     "gateway-ws",
     "groups-api",
     "agent-api",
+    "admin-api",
     "message-transfer",
     "user-rpc",
     "auth-rpc",
@@ -52,6 +53,7 @@ API_SERVICES = {
     "groups": "groups-api",
     "message": "message-api",
     "agent": "agent-api",
+    "admin": "admin-api",
 }
 
 PROTO_DOMAINS = {
@@ -85,7 +87,8 @@ INTERNAL_DOMAIN_SERVICE_PREFIXES = {
     "internal/handler/friends/": ["friends-api"],
     "internal/handler/groups/": ["groups-api"],
     "internal/handler/message/": ["message-api"],
-    "internal/handler/admin/": ["message-api"],
+    "internal/handler/admin/": ["admin-api"],
+    "service/admin/": ["admin-api"],
     "internal/logic/user/": ["user-api"],
     "internal/logic/auth/": ["auth-api"],
     "internal/logic/friends/": ["friends-api"],

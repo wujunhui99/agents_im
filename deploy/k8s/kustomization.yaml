@@ -23,6 +23,7 @@ configMapGenerator:
       - etc/message-api.yaml
       - etc/gateway-ws.yaml
       - etc/groups-api.yaml
+      - etc/admin-api.yaml
       - etc/agent-api.yaml
       - etc/message-transfer.yaml
       - etc/user-rpc.yaml

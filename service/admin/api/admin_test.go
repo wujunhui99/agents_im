@@ -1,4 +1,4 @@
-package handler
+package main
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/response"
-	adminsvc "github.com/wujunhui99/agents_im/internal/servicecontext/admin"
+	"github.com/wujunhui99/agents_im/service/admin/api/internal/svc"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
@@ -28,7 +28,7 @@ func TestAdminRoutesRequireAuthenticatedAdminAccount(t *testing.T) {
 	userLogic := logic.NewUserLogic(accountRepo)
 	admin := mustCreateAdminRouteUser(t, ctx, userLogic, "admin_route_admin", model.AccountTypeAdmin)
 	normal := mustCreateAdminRouteUser(t, ctx, userLogic, "admin_route_user", model.AccountTypeUser)
-	serviceContext := adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
+	serviceContext := svc.NewServiceContextWithAuth(svc.Dependencies{
 		Accounts:    accountRepo,
 		Friends:     accountRepo,
 		Messages:    repository.NewMemoryMessageRepository(),
@@ -77,7 +77,7 @@ func TestAdminFeedbackJSONRouteUsesApiPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create feedback: %v", err)
 	}
-	serviceContext := adminsvc.NewServiceContextWithAuth(adminsvc.Dependencies{
+	serviceContext := svc.NewServiceContextWithAuth(svc.Dependencies{
 		Accounts:    accountRepo,
 		Friends:     accountRepo,
 		Messages:    repository.NewMemoryMessageRepository(),
@@ -116,7 +116,7 @@ func TestAdminFeedbackJSONRouteUsesApiPrefix(t *testing.T) {
 	}
 }
 
-func newAdminRouteTestRouter(t *testing.T, serviceContext *adminsvc.ServiceContext) http.Handler {
+func newAdminRouteTestRouter(t *testing.T, serviceContext *svc.ServiceContext) http.Handler {
 	t.Helper()
 
 	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
@@ -126,7 +126,7 @@ func newAdminRouteTestRouter(t *testing.T, serviceContext *adminsvc.ServiceConte
 		Port:        8888,
 	}, rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	t.Cleanup(server.Stop)
-	RegisterAdminGoZeroHandlers(server, serviceContext)
+	registerAdminHandlers(server, serviceContext)
 
 	serverless, err := rest.NewServerless(server)
 	if err != nil {

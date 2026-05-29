@@ -1,0 +1,18 @@
+Name: admin-api
+Host: 0.0.0.0
+Port: 8088
+Tracing:
+  Enabled: true
+  ServiceName: admin-api
+  Environment: ${AGENTS_IM_ENV}
+  OTLPEndpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
+  SamplerRatio: 1.0
+  TraceUIBaseURL: ${AGENTS_IM_TRACE_UI_BASE_URL}
+  Insecure: true
+
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: 86400
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}

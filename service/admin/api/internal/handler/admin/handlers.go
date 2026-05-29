@@ -3,8 +3,8 @@ package admin
 import (
 	"net/http"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
-	adminsvc "github.com/wujunhui99/agents_im/internal/servicecontext/admin"
+	business "github.com/wujunhui99/agents_im/service/admin/api/internal/logic"
+	adminsvc "github.com/wujunhui99/agents_im/service/admin/api/internal/svc"
 	"github.com/wujunhui99/agents_im/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )

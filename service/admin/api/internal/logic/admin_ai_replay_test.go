@@ -4,15 +4,16 @@ import (
 	"context"
 	"testing"
 
+	msglogic "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 
 type recordingMessageCreatedHook struct {
 	calls int
-	last  MessageCreatedHookInput
+	last  msglogic.MessageCreatedHookInput
 }
 
-func (h *recordingMessageCreatedHook) OnMessageCreated(_ context.Context, input MessageCreatedHookInput) error {
+func (h *recordingMessageCreatedHook) OnMessageCreated(_ context.Context, input msglogic.MessageCreatedHookInput) error {
 	h.calls++
 	h.last = input
 	return nil
@@ -27,9 +28,9 @@ func TestAdminAIReplayLogicReplaysDirectHumanMessageToAgent(t *testing.T) {
 	trigger, _, err := messages.CreateMessageIdempotent(ctx, repository.CreateMessageInput{
 		SenderID:    "usr_new_registration",
 		ReceiverID:  "agent_default_assistant_account",
-		ChatType:    MessageChatTypeSingle,
+		ChatType:    msglogic.MessageChatTypeSingle,
 		ClientMsgID: "client-new-user-ai-assistant",
-		ContentType: MessageContentTypeText,
+		ContentType: msglogic.MessageContentTypeText,
 		Content:     "hello",
 	})
 	if err != nil {
@@ -69,9 +70,9 @@ func TestAdminAIReplayLogicSkipsWhenAIResponseAlreadyExists(t *testing.T) {
 	trigger, _, err := messages.CreateMessageIdempotent(ctx, repository.CreateMessageInput{
 		SenderID:    "usr_new_registration",
 		ReceiverID:  "agent_default_assistant_account",
-		ChatType:    MessageChatTypeSingle,
+		ChatType:    msglogic.MessageChatTypeSingle,
 		ClientMsgID: "client-new-user-ai-assistant",
-		ContentType: MessageContentTypeText,
+		ContentType: msglogic.MessageContentTypeText,
 		Content:     "hello",
 	})
 	if err != nil {
@@ -80,11 +81,11 @@ func TestAdminAIReplayLogicSkipsWhenAIResponseAlreadyExists(t *testing.T) {
 	if _, _, err := messages.CreateMessageIdempotent(ctx, repository.CreateMessageInput{
 		SenderID:           "agent_default_assistant_account",
 		ReceiverID:         "usr_new_registration",
-		ChatType:           MessageChatTypeSingle,
+		ChatType:           msglogic.MessageChatTypeSingle,
 		ClientMsgID:        "ai-response",
-		ContentType:        MessageContentTypeText,
+		ContentType:        msglogic.MessageContentTypeText,
 		Content:            "hi",
-		MessageOrigin:      MessageOriginAI,
+		MessageOrigin:      msglogic.MessageOriginAI,
 		TriggerServerMsgID: trigger.ServerMsgID,
 	}); err != nil {
 		t.Fatalf("create AI response: %v", err)
