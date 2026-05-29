@@ -1,4 +1,4 @@
-# Stage 4a — 拆 admin-api（TD-1）
+# Stage 4a — 拆 admin-api（TD-1）✅ 完成 2026-05-29
 
 > 前置：Stage 3 完成  
 > 后置：可与其他 Stage 4 任务并发  
