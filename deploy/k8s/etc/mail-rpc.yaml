@@ -15,4 +15,4 @@ TencentSES:
   Region: ${TENCENT_SES_REGION}
   Endpoint: https://ses.tencentcloudapi.com
   FromEmailAddress: ${TENCENT_SES_FROM_EMAIL}
-  DefaultTemplateID: ${TENCENT_SES_DEFAULT_TEMPLATE_ID}
+  DefaultTemplateID: "${TENCENT_SES_DEFAULT_TEMPLATE_ID}"
