@@ -27,7 +27,7 @@ func main() {
 // run starts the groups-api service: it loads config and serves.
 func run(configFile string) {
 	var c config.Config
-	conf.MustLoad(configFile, &c)
+	conf.MustLoad(configFile, &c, conf.UseEnv())
 	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
 
 	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
