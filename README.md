@@ -29,13 +29,14 @@
 
 ```text
 api/                 go-zero REST API 定义
-cmd/                 服务入口，包括 user/auth/friends/groups/message/agent API、RPC、gateway-ws 等
+service/             各微服务入口与实现（user/auth/friends/groups/agent API、RPC、gateway-ws、message-api、message-transfer），main 在 service/<...> 目录
 config / etc/        本地和服务配置
-internal/            核心业务逻辑、仓储、网关、Agent runtime、transfer worker 等
+internal/            核心业务逻辑、仓储、网关、Agent runtime、transfer worker、message-rpc（internal/rpcgen/message）等
 db/migrations/       PostgreSQL schema 迁移
 proto/               gRPC proto 和生成代码
 scripts/             本地启动、迁移、demo data、静态验证脚本
 tests/               跨服务契约和 MVP smoke 测试
+test/e2e/            单机 e2e 烟测入口（single-machine）
 web/                 React/Vite 前端
 docs/                架构、产品规格、设计文档、执行计划和开发文档
 deploy/              k3s 应用部署清单、生产中间件 Compose、部署说明
@@ -158,7 +159,7 @@ scripts/dev-demo-data.sh
 当 Docker、本地端口或外部服务环境不可用时，可以运行快速单进程 smoke：
 
 ```bash
-PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./cmd/single-machine-e2e
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./test/e2e/single-machine
 ```
 
 该命令会在一个进程内验证：
@@ -196,7 +197,7 @@ npm run frontend:lint
 本地端到端 smoke：
 
 ```bash
-PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./cmd/single-machine-e2e
+PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./test/e2e/single-machine
 ```
 
 ## CI/CD 与部署

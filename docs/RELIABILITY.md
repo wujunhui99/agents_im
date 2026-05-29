@@ -40,7 +40,7 @@ if err != nil {
 
 当前基线已将以下生产启动路径从 `Must*` 初始化迁移为 `New*` + `log.Fatalf(...)`：
 
-- REST/API 服务入口：`cmd/user-api/main.go`、`cmd/friends-api/main.go`、`cmd/auth-api/main.go`、`cmd/agent-api/main.go`、`cmd/groups-api/main.go`、`cmd/message-api/main.go`、`cmd/gateway-ws/main.go`
+- REST/API 服务入口：`service/user/api/user.go`、`service/friends/api/friends.go`、`service/auth/api/auth.go`、`service/agent/api/agent.go`、`service/groups/api/groups.go`、`service/message-api/main.go`、`service/gateway-ws/main.go`
 - RPC service context：`service/user/rpc/internal/svc/service_context.go`、`internal/rpcgen/auth/internal/svc/service_context.go`、`internal/rpcgen/friends/internal/svc/service_context.go`、`internal/rpcgen/groups/internal/svc/service_context.go`、`internal/rpcgen/message/internal/svc/service_context.go`
 - Gateway presence 初始化：`presence.NewStore(cfg.Presence, cfg.Redis)`，Redis presence 配置错误或初始化失败时必须以清晰启动错误退出。
 

@@ -1,16 +1,17 @@
-package entry
+package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	friendspb "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
-	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/config"
-	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/server"
-	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/server"
+	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
+	mailpb "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -18,10 +19,14 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// Start bridges cmd/friends-rpc to the service/friends/rpc goctl-generated RPC internals.
-// cmd/friends-rpc cannot import service/friends/rpc/internal/* directly because
-// of Go internal package visibility.
-func Start(configFile string) {
+func main() {
+	configFile := flag.String("f", "etc/mail-rpc.yaml", "the config file")
+	flag.Parse()
+	run(*configFile)
+}
+
+// run starts the mail-rpc service: it loads config and serves.
+func run(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c, conf.UseEnv())
 	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
@@ -37,7 +42,7 @@ func Start(configFile string) {
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
-		friendspb.RegisterFriendsServer(grpcServer, server.NewFriendsServer(ctx))
+		mailpb.RegisterMailServiceServer(grpcServer, server.NewMailServiceServer(ctx))
 
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
 			reflection.Register(grpcServer)

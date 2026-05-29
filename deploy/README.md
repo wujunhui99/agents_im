@@ -131,7 +131,7 @@ Backend images are built for:
 
 - Docs-only changes (`docs/**`, `README.md`, other Markdown) do not deploy.
 - `web/**`, including web package files and nginx config, builds and deploys only `web`.
-- `cmd/<service>/**` builds and deploys only that backend service.
+- `service/<name>/**` for the non-go-zero services (`gateway-ws`, `message-api`, `message-transfer`) builds and deploys only that service; `internal/rpcgen/message/**` maps to `message-rpc`.
 - `api/<domain>.api` builds the matching API service, for example `api/user.api` -> `user-api`.
 - `service/<domain>/api/**` builds the matching API service, for example `service/agent/api/**` -> `agent-api`.
 - `service/<domain>/rpc/**` builds the matching RPC service when that service exists, for example `service/user/rpc/**` -> `user-rpc`.

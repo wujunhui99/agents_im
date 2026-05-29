@@ -1,6 +1,7 @@
 .codex
 .env
 .dev
+bin/
 
 # Frontend artifacts
 web/node_modules/

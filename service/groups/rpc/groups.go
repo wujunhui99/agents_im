@@ -1,16 +1,17 @@
-package entry
+package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
-	"github.com/wujunhui99/agents_im/service/user/rpc/internal/server"
-	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
+	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/server"
+	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/svc"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -18,10 +19,14 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// Start bridges cmd/user-rpc to the service/user/rpc goctl-generated RPC internals.
-// cmd/user-rpc cannot import service/user/rpc/internal/* directly because
-// of Go internal package visibility.
-func Start(configFile string) {
+func main() {
+	configFile := flag.String("f", "etc/groups-rpc.yaml", "the config file")
+	flag.Parse()
+	run(*configFile)
+}
+
+// run starts the groups-rpc service: it loads config and serves.
+func run(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c, conf.UseEnv())
 	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
@@ -37,7 +42,7 @@ func Start(configFile string) {
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
-		userpb.RegisterUserServer(grpcServer, server.NewUserServer(ctx))
+		groupspb.RegisterGroupsServer(grpcServer, server.NewGroupsServer(ctx))
 
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
 			reflection.Register(grpcServer)

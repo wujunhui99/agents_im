@@ -1,16 +1,17 @@
-package entry
+package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
-	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/config"
-	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/server"
-	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
+	friendspb "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
+	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/server"
+	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/svc"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -18,15 +19,16 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// Start bridges cmd/auth-rpc to the service/auth/rpc goctl-generated RPC internals.
-// cmd/auth-rpc cannot import service/auth/rpc/internal/* directly because
-// of Go internal package visibility.
-func Start(configFile string) {
+func main() {
+	configFile := flag.String("f", "etc/friends-rpc.yaml", "the config file")
+	flag.Parse()
+	run(*configFile)
+}
+
+// run starts the friends-rpc service: it loads config and serves.
+func run(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c, conf.UseEnv())
-	if c.TokenAuth.AccessSecret == "" {
-		c.TokenAuth.AccessSecret = appconfig.DefaultJWTAuthConfig().AccessSecret
-	}
 	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
 	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
 	if err != nil {
@@ -40,7 +42,7 @@ func Start(configFile string) {
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
-		authpb.RegisterAuthServiceServer(grpcServer, server.NewAuthServiceServer(ctx))
+		friendspb.RegisterFriendsServer(grpcServer, server.NewFriendsServer(ctx))
 
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
 			reflection.Register(grpcServer)

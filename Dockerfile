@@ -7,9 +7,29 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 ARG SERVICE
 RUN test -n "$SERVICE"
+# Map deployment name -> go-zero main package path. Entrypoints live in their
+# service directories (cmd/ was removed); deploy still passes SERVICE=<name>.
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o /out/service "./cmd/${SERVICE}"
+    set -eu; \
+    case "$SERVICE" in \
+      agent-api)        pkg=./service/agent/api ;; \
+      auth-api)         pkg=./service/auth/api ;; \
+      auth-rpc)         pkg=./service/auth/rpc ;; \
+      friends-api)      pkg=./service/friends/api ;; \
+      friends-rpc)      pkg=./service/friends/rpc ;; \
+      groups-api)       pkg=./service/groups/api ;; \
+      groups-rpc)       pkg=./service/groups/rpc ;; \
+      mail-rpc)         pkg=./service/mail/rpc ;; \
+      user-api)         pkg=./service/user/api ;; \
+      user-rpc)         pkg=./service/user/rpc ;; \
+      message-rpc)      pkg=./internal/rpcgen/message ;; \
+      gateway-ws)       pkg=./service/gateway-ws ;; \
+      message-api)      pkg=./service/message-api ;; \
+      message-transfer) pkg=./service/message-transfer ;; \
+      *) echo "unknown SERVICE: $SERVICE" >&2; exit 1 ;; \
+    esac; \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o /out/service "$pkg"
 
 FROM alpine:3.22 AS backend
 RUN apk add --no-cache ca-certificates tzdata
