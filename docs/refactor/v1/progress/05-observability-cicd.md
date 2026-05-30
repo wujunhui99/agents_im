@@ -22,7 +22,7 @@
 | OB-7 | tracing 配置改 ConfigMap 注入 env，删 30 份 yaml 的 Tracing block | P1 | ✅ | PR #358 / issue #357 | 2026-05-30 |
 | OB-5 | 业务 metrics 切 `prometheus/client_golang` | P1 | ✅ | PR #360 / issue #359 | 2026-05-30 |
 | OB-6 | 统一 `/metrics` 路径（业务已统一；prometheus 自身路径由 route-prefix 决定） | P1 | ✅ | PR #360 / issue #359 | 2026-05-30 |
-| OB-12 | LLM observability sink 异步化（channel + 后台 batch） | P1 | ⬜ | — | — |
+| OB-12 | LLM observability sink 异步化（channel + 后台 worker + drop 计数） | P1 | ✅ | PR #362 / issue #361 | 2026-05-30 |
 | OB-4 | Prometheus 改 k8s service discovery | P1 | ⬜ | — | — |
 | OB-13 | PR CI 加 `frontend-verification` | P1 | ⬜ | — | — |
 | OB-16 | ready check audit 表（每服务列探测依赖） | P1 | ⬜ | — | — |
