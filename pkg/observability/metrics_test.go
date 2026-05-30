@@ -1,23 +1,23 @@
 package observability
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-func TestRegistryWritesPrometheusText(t *testing.T) {
-	registry := NewRegistry()
-	registry.IncCounter(MetricMessageSends, Labels{"status": "accepted", "chat_type": "single"}, 1)
-	registry.IncCounter(MetricDeliveryAttempts, Labels{"status": "delivered"}, 2)
-	registry.IncCounter(MetricTransferEvents, Labels{"result": "failed"}, 1)
-	registry.SetGauge(MetricWebSocketCurrent, nil, 3)
+func TestMetricsHandlerExposesPrometheusText(t *testing.T) {
+	RecordMessageSend("accepted", "single")
+	RecordDeliveryAttempt("delivered")
+	RecordDeliveryAttempt("delivered")
+	RecordTransferEvent("failed")
+	SetWebSocketConnections(3)
 
-	var out strings.Builder
-	if err := registry.WritePrometheus(&out); err != nil {
-		t.Fatalf("write prometheus metrics: %v", err)
-	}
+	rec := httptest.NewRecorder()
+	MetricsHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 
-	body := out.String()
+	body := rec.Body.String()
 	for _, expected := range []string{
 		"# TYPE agents_im_message_sends_total counter",
 		`agents_im_message_sends_total{chat_type="single",status="accepted"} 1`,
