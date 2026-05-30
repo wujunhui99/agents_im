@@ -17,3 +17,7 @@ web/coverage/
 !/secret/README.md
 !/secret/*.example
 .claude/worktrees/
+
+# Python bytecode
+__pycache__/
+*.pyc
