@@ -20,8 +20,8 @@
 | OB-10 | 移除 GHA 时代 Telegram 死脚本 | P0 | ✅ | PR #353 / issue #352 | 2026-05-30 |
 | OB-17 | 删 `.drone.yml` 并发硬编码，由脚本默认值 3 控制 | P0 | ✅ | PR #355 / issue #354 | 2026-05-30 |
 | OB-7 | tracing 配置改 ConfigMap 注入 env，删 30 份 yaml 的 Tracing block | P1 | ✅ | PR #358 / issue #357 | 2026-05-30 |
-| OB-5 | 业务 metrics 切 `prometheus/client_golang` | P1 | ⬜ | — | — |
-| OB-6 | 统一 `/metrics` 路径（随 OB-5） | P1 | ⬜ | — | — |
+| OB-5 | 业务 metrics 切 `prometheus/client_golang` | P1 | ✅ | PR #360 / issue #359 | 2026-05-30 |
+| OB-6 | 统一 `/metrics` 路径（业务已统一；prometheus 自身路径由 route-prefix 决定） | P1 | ✅ | PR #360 / issue #359 | 2026-05-30 |
 | OB-12 | LLM observability sink 异步化（channel + 后台 batch） | P1 | ⬜ | — | — |
 | OB-4 | Prometheus 改 k8s service discovery | P1 | ⬜ | — | — |
 | OB-13 | PR CI 加 `frontend-verification` | P1 | ⬜ | — | — |
