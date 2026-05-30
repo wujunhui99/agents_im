@@ -297,7 +297,7 @@ fi
 
 ### 1. ConfigMap 修改后必须确认 Pod 已使用新配置
 
-只看 GitHub Actions 成功不够，需要确认运行中 Pod 真的拿到了新 config/image。
+只看 Drone CI 成功不够，需要确认运行中 Pod 真的拿到了新 config/image。
 
 检查：
 
@@ -354,9 +354,9 @@ https://agenticim.xyz/ws
 
 这个 endpoint 仅给集群内 `message-transfer` 调用。当前生产通过 localhost 调用，不经过 Ingress。不要把 internal delivery endpoint 暴露给浏览器或公开 API。
 
-### 5. 发布时必须同时看 Actions 和 k3s 状态
+### 5. 发布时必须同时看 Drone CI 和 k3s 状态
 
-GitHub Actions 成功只说明 pipeline 结束；仍需看：
+Drone CI 成功只说明 pipeline 结束；仍需看：
 
 ```bash
 gh run list --branch main --limit 5

@@ -6,17 +6,17 @@ This document records deployment/k3s issues that have already happened in this p
 
 - Repository: `agents_im`
 - Kubernetes namespace: `agents-im`
-- Production deploy path: GitHub Actions `Deploy to k3s` workflow plus `scripts/deploy-k3s.sh`
+- Production deploy path: Drone CI `deploy-main` pipeline (`.drone.yml`, `https://drone.agenticim.xyz`) plus `scripts/deploy-k3s.sh` (GitHub Actions is retired)
 - Secrets and server connection details must never be copied into docs or chat. Use `[REDACTED]` for DSNs, tokens, hosts, credentials, keys, and connection strings.
 
 ## Release verification checklist
 
 Before reporting success, verify all three layers:
 
-1. GitHub Actions
+1. Drone CI
    - Check the exact `main` commit SHA.
-   - Check both `CI` and `Deploy to k3s` runs for that SHA.
-   - If a run fails or hangs, inspect the job/step logs; do not infer success from local tests.
+   - Check the `deploy-main` pipeline build for that SHA at `https://drone.agenticim.xyz`.
+   - If a build fails or hangs, inspect the step logs; do not infer success from local tests.
 2. k3s runtime
    - Run `kubectl -n agents-im get deploy,pods -o wide`.
    - Every deployment should show `READY 1/1` and every pod should be `Running`.
@@ -25,9 +25,9 @@ Before reporting success, verify all three layers:
    - Use the real public URL and real API paths.
    - If PostgreSQL was cleared, old test accounts and friendships may not exist; recreate test data through supported flows before E2E.
 
-## Pitfall: GitHub Actions green is not enough
+## Pitfall: CI green is not enough
 
-A deploy workflow can complete image build/apply steps while runtime pods still fail or remain unavailable. Always check k3s after Actions:
+A deploy pipeline can complete image build/apply steps while runtime pods still fail or remain unavailable. Always check k3s after the Drone deploy:
 
 ```bash
 kubectl -n agents-im get deploy,pods -o wide

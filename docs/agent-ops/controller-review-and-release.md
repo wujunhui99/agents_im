@@ -56,9 +56,9 @@ Do not accept a worker handoff only because the process exited successfully.
 
 ### Deployment / CI
 
-- Merging a feature PR to `develop` is not production release.
-- For production behavior, create/merge `develop -> main` promotion and verify the deployed SHA.
-- GitHub Actions may not be the active deploy path; check Drone/k3s/project docs.
+- Merging a feature PR to `main` is not yet a verified production release; confirm the deployed SHA.
+- The `develop` integration branch has been removed; all changes go via task-branch PR + GitHub Merge Queue into `main`, which triggers the Drone deploy.
+- Drone CI (not GitHub Actions) is the active deploy path; check Drone/k3s/project docs.
 - CI green is not runtime green. Verify rollout, image tags, pod readiness, and live HTTP/API/WS smoke when relevant.
 - `kubectl apply` does not prune deleted resources by default; removed domains/resources require explicit cleanup plus old-endpoint smoke.
 
