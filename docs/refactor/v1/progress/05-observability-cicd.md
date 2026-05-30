@@ -19,7 +19,7 @@
 | OB-1 | CI 单轨：文档同步为 Drone，清除 GHA 失真 | P0 | ✅ | PR #351 | 2026-05-30 |
 | OB-10 | 移除 GHA 时代 Telegram 死脚本 | P0 | ✅ | PR #353 / issue #352 | 2026-05-30 |
 | OB-17 | 删 `.drone.yml` 并发硬编码，由脚本默认值 3 控制 | P0 | ✅ | PR #355 / issue #354 | 2026-05-30 |
-| OB-7 | tracing 配置改 ConfigMap 注入 env，删 14 份 yaml 的 Tracing block | P1 | ⬜ | — | — |
+| OB-7 | tracing 配置改 ConfigMap 注入 env，删 30 份 yaml 的 Tracing block | P1 | ✅ | PR #358 / issue #357 | 2026-05-30 |
 | OB-5 | 业务 metrics 切 `prometheus/client_golang` | P1 | ⬜ | — | — |
 | OB-6 | 统一 `/metrics` 路径（随 OB-5） | P1 | ⬜ | — | — |
 | OB-12 | LLM observability sink 异步化（channel + 后台 batch） | P1 | ⬜ | — | — |

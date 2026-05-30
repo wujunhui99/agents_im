@@ -1,12 +1,4 @@
 Name: message-transfer
-Tracing:
-  Enabled: false
-  ServiceName: message-transfer
-  Environment: local
-  Protocol: grpc
-  SamplerRatio: 1.0
-  TraceUIBaseURL: http://localhost:3000
-  Insecure: true
 
 WorkerID: ${HOSTNAME}
 DryRun: true

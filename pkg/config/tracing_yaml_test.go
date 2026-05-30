@@ -8,22 +8,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestTracingYAMLCoverageForAllBackendServices(t *testing.T) {
-	expected := []string{
-		"agent-api", "auth-api", "friends-api", "gateway-ws", "groups-api", "message-api", "message-transfer", "user-api",
-		"auth-rpc", "friends-rpc", "groups-rpc", "mail-rpc", "message-rpc", "user-rpc",
-	}
-	for _, dir := range []struct {
-		path          string
-		wantEnabled   bool
-		wantEndpoint  string
-		localSafeMode bool
-	}{
-		{path: "../../deploy/k8s/etc", wantEnabled: true, wantEndpoint: "${AGENTS_IM_OTLP_ENDPOINT}"},
-		{path: "../../etc", wantEnabled: false, localSafeMode: true},
-	} {
-		for _, serviceName := range expected {
-			configPath := filepath.Join(dir.path, serviceName+".yaml")
+// OB-7: tracing 配置统一由 ConfigMap 注入的 env var 驱动（AGENTS_IM_TRACING_*，
+// 见 deploy/k8s/configmap.yaml 与 TestProductionTracingConfigMapPointsAtOTelCollectorForTempo）。
+// service yaml 不再保留 Tracing block，避免 14+ 份重复漂移；ResolveTracingConfig env 优先，
+// go-zero config 的 Tracing 字段为 ,optional，缺省即由 env/默认值解析。
+func TestServiceYAMLHasNoTracingBlock(t *testing.T) {
+	for _, dir := range []string{"../../etc", "../../deploy/k8s/etc"} {
+		matches, err := filepath.Glob(filepath.Join(dir, "*.yaml"))
+		if err != nil {
+			t.Fatalf("glob %s: %v", dir, err)
+		}
+		if len(matches) == 0 {
+			t.Fatalf("no yaml files found under %s", dir)
+		}
+		for _, configPath := range matches {
 			content, err := os.ReadFile(configPath)
 			if err != nil {
 				t.Fatalf("read %s: %v", configPath, err)
@@ -32,25 +30,8 @@ func TestTracingYAMLCoverageForAllBackendServices(t *testing.T) {
 			if err := yaml.Unmarshal(content, &doc); err != nil {
 				t.Fatalf("parse %s: %v", configPath, err)
 			}
-			tracing, ok := doc["Tracing"].(map[string]any)
-			if !ok {
-				t.Fatalf("%s missing Tracing block", configPath)
-			}
-			if got, _ := tracing["ServiceName"].(string); got != serviceName {
-				t.Fatalf("%s Tracing.ServiceName = %q, want %q", configPath, got, serviceName)
-			}
-			if got, _ := tracing["Enabled"].(bool); got != dir.wantEnabled {
-				t.Fatalf("%s Tracing.Enabled = %v, want %v", configPath, got, dir.wantEnabled)
-			}
-			if dir.wantEndpoint != "" {
-				if got, _ := tracing["OTLPEndpoint"].(string); got != dir.wantEndpoint {
-					t.Fatalf("%s Tracing.OTLPEndpoint = %q, want %q", configPath, got, dir.wantEndpoint)
-				}
-			}
-			if dir.localSafeMode {
-				if got, _ := tracing["OTLPEndpoint"].(string); got != "" {
-					t.Fatalf("%s local Tracing.OTLPEndpoint should be empty unless explicitly enabled, got %q", configPath, got)
-				}
+			if _, ok := doc["Tracing"]; ok {
+				t.Fatalf("%s still contains a Tracing block; tracing is configured via ConfigMap env (AGENTS_IM_TRACING_*), not per-service yaml", configPath)
 			}
 		}
 	}

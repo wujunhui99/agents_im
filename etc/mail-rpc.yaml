@@ -1,13 +1,5 @@
 Name: mail-rpc
 ListenOn: 0.0.0.0:9095
-Tracing:
-  Enabled: false
-  ServiceName: mail-rpc
-  Environment: local
-  Protocol: grpc
-  SamplerRatio: 1.0
-  TraceUIBaseURL: http://localhost:3000
-  Insecure: true
 
 TencentSES:
   SecretID: ${TENCENT_SES_SECRET_ID}
