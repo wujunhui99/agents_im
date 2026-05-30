@@ -11,7 +11,7 @@
 | **P0 速赢** | OB-1 · OB-10 · OB-17 | ✅ 完成（2026-05-30） |
 | **P1 纯后端重构** | OB-7 · OB-5(+OB-6) · OB-12 · OB-4 · OB-13 · OB-16 · OB-8 | ✅ 完成（2026-05-30） |
 | **P2 GitOps/CD** | OB-14/15（+OB-9） | 🟡 Argo CD 已接管 prod；Drone→gitops 流（OB-9）待做 |
-| **P3 中间件入 k8s** | OB-3 · OB-11 · OB-2 · hostNetwork→ClusterIP | 🟡 Redis+MinIO+**PostgreSQL 已迁**；Redpanda **确认无用→删除中**；只读从库/OB-11/OB-2/其余待做 |
+| **P3 中间件入 k8s** | OB-3 · OB-11 · OB-2 · hostNetwork→ClusterIP | 🟡 Redis+MinIO+**PostgreSQL 已迁**；**Redpanda 已删（确认无用）**；只读从库/OB-11/OB-2/其余待做 |
 
 ## 逐条进度
 
@@ -31,7 +31,7 @@
 | OB-15 | Argo CD 已装并接管 `agents-im`（Application `agents-im` Synced/Healthy） | P2 | ✅ | gitops 引导 | 2026-05-30 |
 | OB-14 | gitops 仓库 + Argo Application + auto-sync ✅；**Drone PR+label 改 gitops + webhook 待做** | P2 | 🟡 | repo `agents_im-gitops` | 部分 2026-05-30 |
 | OB-9 | Drone 仍挂 admin kubeconfig 直接 kubectl 部署；待 Drone→gitops 后摘除 | P2 | ⬜ | — | — |
-| OB-3 | 中间件入 k8s：**Redis ✅ / MinIO ✅ / PostgreSQL ✅**（主库已迁+切端点，docker 主/从已停留作回滚）；只读从库重建待做；Redpanda **确认无用→删除**（非迁移） | P3 | 🟡 | gitops manifests | PG 2026-05-30 |
+| OB-3 | 中间件入 k8s：**Redis ✅ / MinIO ✅ / PostgreSQL ✅**（主库已迁+切端点，docker 主/从已停留作回滚）；只读从库重建待做；**Redpanda ✅ 已删**（确认无用，非迁移，PR #375 + 容器/卷已删） | P3 | 🟡 | gitops manifests | PG/Redpanda 2026-05-30 |
 | OB-11 | Langfuse 独立 PG | P3 | ⬜ | — | — |
 | OB-2 | Loki/Tempo 后端切 MinIO（k8s MinIO 已就绪，可做） | P3 | ⬜ | — | — |
 | OB-— | hostNetwork → ClusterIP | P3 | ⬜ | — | — |
@@ -49,7 +49,7 @@
 
 ### 当前总体状态（2026-05-30）
 - **Argo CD GitOps 已上线**并接管 `agents-im` 命名空间（Synced/Healthy）。改集群期望态 = 改 gitops 仓库并 push。
-- **中间件**：Redis、MinIO、**PostgreSQL** 已入 k8s（GitOps 管理），对应 docker 实例已 `stop`（未 `rm`，可回滚）；**仅 Redpanda 仍在 docker**（已确认代码层无用，待删）。
+- **中间件**：Redis、MinIO、**PostgreSQL** 已入 k8s（GitOps 管理），对应 docker 实例已 `stop`（未 `rm`，可回滚）；**Redpanda 已彻底删除**（确认代码层无用：container `rm` + volume `rm`，无回滚需要）。
 - App 健康，pod 无异常重启（28 pods Ready，Argo Synced/Healthy）。节点 7.8G 内存 / 可用约 2.9G，4 核，storageclass `local-path`。
 
 ### 访问与工具（执行前必读）
@@ -92,7 +92,7 @@
   - **未做（后续）**：k8s 内重建只读从库（streaming replication + 独立 Service，OB-3 长期保留给 owner 查询）——按 owner 决策本次只迁主库，从库后续再做；备份目录与 docker 实例均可回滚。
 
 ### 之后（按序）
-- **~~Redpanda 入 k8s~~ → 删除**：已确认代码层无用（prod `message-transfer` 用 `Driver: outbox` 读 `message_outbox`，从不走 kafka driver；`outboxpublisher.New` producer 路径仅测试调用；topic `message.events.v1` high-watermark=0、零 consumer group、零连接）。处理：删 Go kafka 代码(`pkg/messaging`、`internal/transfer/kafka_consumer*`、outboxpublisher producer 路径、config `KafkaConfig`)+ `KAFKA_*` 配置 + docker-compose redpanda + docker 容器（issue→worktree→PR→CI 流程）。
+- **~~Redpanda 入 k8s~~ → ✅ 已删除（2026-05-30）**：确认代码层无用（prod `message-transfer` 用 `Driver: outbox` 读 `message_outbox`，从不走 kafka driver；`outboxpublisher.New` producer 路径仅测试调用；topic `message.events.v1` high-watermark=0、零 consumer group、零连接）。已删：Go kafka 代码(`pkg/messaging/{kafka,producer}.go`、`internal/transfer/kafka_consumer*`、`outboxpublisher.Publisher`、config `KafkaConfig`/`KAFKA_*`/`TransferConsumerKafka`，保留 live 的 `MessageEventFromOutbox`/`MessageEventFromMessagingEvent`) + `segmentio/kafka-go` 依赖 + docker-compose redpanda + `KAFKA_*` configmap（gitops `285f728`）+ docker 容器与卷（`rm`）。代码 PR **#375**（agents_im），文档已同步（ARCHITECTURE/README/DEVELOPMENT/RELIABILITY；3 份 kafka design-doc 加弃用横幅）。注：main 上 `verify-static.sh`/`gofmt` 有与本次无关的预存失败，未在此修复。
 - **OB-11 Langfuse 独立 PG**：给 langfuse 单独 k8s PG 实例（`LANGFUSE_DATABASE_URL`），与业务 PG 隔离。
 - **OB-2 Loki/Tempo 后端切 MinIO**：k8s MinIO 已就绪；改 loki/tempo 配置 storage 后端为 S3/MinIO + 建对应 bucket。
 - **OB-9 / P2-5 Drone→gitops PR+label**：Drone `deploy-main` 改为「构建镜像 → 改 gitops repo `images:` tag（PR+label 自动合）」，删 `kubectl` 部署 + `/etc/rancher/k3s` kubeconfig 挂载；**完成后把 Argo `selfHeal` 开回 `true`，并开 `prune=true`**。
