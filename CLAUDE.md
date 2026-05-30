@@ -6,6 +6,8 @@ Claude Code 专属指令，与 `AGENTS.md` 并列加载，后者约束优先。
 
 **交付顺序**：创建 issue → 从 `main` 加 git worktree（在其中建 issue 对应分支）→ 提交 → PR → 立即 merge → Drone CI → 回归测试，部署成功才算完成。
 
+**纯文档改动**：免 issue、免 worktree、免 CI/回归——直走 分支（`docs/claude/<short-desc>`，从 `main` 切，直接在主 checkout）→ commit → PR → merge。
+
 - 分支：`fix/claude/<issue-N>-<short-desc>`，从 `main` 切出
 - worktree：放仓库内 `.claude/worktrees/<branch>`，`git worktree add -b <branch> .claude/worktrees/<branch> main`
 - Drone token：`secret/drone_token`，服务器：`https://drone.agenticim.xyz`
