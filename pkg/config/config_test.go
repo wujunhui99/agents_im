@@ -99,9 +99,6 @@ func TestLoadAPIConfigResolvesRedisAndPresenceFromFile(t *testing.T) {
 	t.Setenv("GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS", "")
 	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND", "")
 	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST", "")
-	t.Setenv("KAFKA_BROKERS", "")
-	t.Setenv("KAFKA_MESSAGE_EVENTS_TOPIC", "")
-	t.Setenv("KAFKA_CONSUMER_GROUP", "")
 
 	configPath := filepath.Join(t.TempDir(), "api.yaml")
 	err := os.WriteFile(configPath, []byte(`
@@ -125,10 +122,6 @@ GatewayWS:
   HeartbeatTimeoutSeconds: 40
   CommandRateLimitPerSecond: 7
   CommandRateLimitBurst: 9
-Kafka:
-  Brokers: redpanda:9092,localhost:19092
-  MessageEventsTopic: message.events.test
-  ConsumerGroup: message-transfer-test
 MailRPC:
   Endpoints: 127.0.0.1:9095,mail-rpc:9095
   Timeout: 5000
@@ -158,12 +151,6 @@ MailRPC:
 	}
 	if cfg.GatewayWS.CommandRateLimitPerSecond != 7 || cfg.GatewayWS.CommandRateLimitBurst != 9 {
 		t.Fatalf("gateway websocket rate limit config mismatch: %+v", cfg.GatewayWS)
-	}
-	if len(cfg.Kafka.Brokers) != 2 || cfg.Kafka.Brokers[0] != "redpanda:9092" || cfg.Kafka.Brokers[1] != "localhost:19092" {
-		t.Fatalf("kafka brokers mismatch: %+v", cfg.Kafka.Brokers)
-	}
-	if cfg.Kafka.MessageEventsTopic != "message.events.test" || cfg.Kafka.ConsumerGroup != "message-transfer-test" {
-		t.Fatalf("kafka config mismatch: %+v", cfg.Kafka)
 	}
 	if len(cfg.MailRPC.Endpoints) != 2 || cfg.MailRPC.Endpoints[0] != "127.0.0.1:9095" || cfg.MailRPC.Endpoints[1] != "mail-rpc:9095" {
 		t.Fatalf("mail rpc endpoints mismatch: %+v", cfg.MailRPC.Endpoints)
@@ -875,9 +862,6 @@ func TestResolveRedisAndPresenceConfigFromEnv(t *testing.T) {
 	t.Setenv("PRESENCE_DRIVER", "redis")
 	t.Setenv("PRESENCE_TTL_SECONDS", "75")
 	t.Setenv("PRESENCE_KEY_PREFIX", "agents_im:env_presence")
-	t.Setenv("KAFKA_BROKERS", "localhost:19092,redpanda:9092")
-	t.Setenv("KAFKA_MESSAGE_EVENTS_TOPIC", "message.events.env")
-	t.Setenv("KAFKA_CONSUMER_GROUP", "push-worker-env")
 
 	redisConfig, err := ResolveRedisConfig(RedisConfig{})
 	if err != nil {
@@ -895,13 +879,6 @@ func TestResolveRedisAndPresenceConfigFromEnv(t *testing.T) {
 		t.Fatalf("presence env config mismatch: %+v", presenceConfig)
 	}
 
-	kafkaConfig := ResolveKafkaConfig(KafkaConfig{})
-	if len(kafkaConfig.Brokers) != 2 || kafkaConfig.Brokers[0] != "localhost:19092" || kafkaConfig.Brokers[1] != "redpanda:9092" {
-		t.Fatalf("kafka env brokers mismatch: %+v", kafkaConfig.Brokers)
-	}
-	if kafkaConfig.MessageEventsTopic != "message.events.env" || kafkaConfig.ConsumerGroup != "push-worker-env" {
-		t.Fatalf("kafka env config mismatch: %+v", kafkaConfig)
-	}
 }
 
 func TestLoadMessageTransferConfig(t *testing.T) {
@@ -952,48 +929,6 @@ Observability:
 	}
 	if !cfg.Observability.Enabled || cfg.Observability.Host != "127.0.0.1" || cfg.Observability.Port != 18085 {
 		t.Fatalf("observability config mismatch: %+v", cfg.Observability)
-	}
-}
-
-func TestLoadMessageTransferConfigMapsKafkaSettings(t *testing.T) {
-	t.Setenv("KAFKA_BROKERS", "")
-	t.Setenv("KAFKA_MESSAGE_EVENTS_TOPIC", "")
-	t.Setenv("KAFKA_CONSUMER_GROUP", "")
-	t.Setenv("MESSAGE_TRANSFER_TOPIC", "")
-	t.Setenv("MESSAGE_TRANSFER_CONSUMER_GROUP", "")
-	t.Setenv("MESSAGE_TRANSFER_CONSUMER_DRIVER", "")
-
-	configPath := filepath.Join(t.TempDir(), "message-transfer.yaml")
-	err := os.WriteFile(configPath, []byte(`
-Name: message-transfer-kafka-test
-Consumer:
-  Driver: kafka
-Dispatcher:
-  Driver: noop
-Kafka:
-  Brokers: redpanda:9092, localhost:19092
-  MessageEventsTopic: message.events.test
-  ConsumerGroup: message-transfer-test
-`), 0o600)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := LoadMessageTransferConfig(configPath)
-	if err != nil {
-		t.Fatalf("load message transfer config: %v", err)
-	}
-	if cfg.Consumer.Driver != TransferConsumerKafka {
-		t.Fatalf("consumer driver = %q, want kafka", cfg.Consumer.Driver)
-	}
-	if len(cfg.Kafka.Brokers) != 2 || cfg.Kafka.Brokers[0] != "redpanda:9092" || cfg.Kafka.Brokers[1] != "localhost:19092" {
-		t.Fatalf("kafka brokers mismatch: %+v", cfg.Kafka.Brokers)
-	}
-	if cfg.Consumer.Topic != "message.events.test" || cfg.Consumer.Group != "message-transfer-test" {
-		t.Fatalf("consumer topic/group should map from kafka config: %+v", cfg.Consumer)
-	}
-	if cfg.Kafka.MessageEventsTopic != "message.events.test" || cfg.Kafka.ConsumerGroup != "message-transfer-test" {
-		t.Fatalf("kafka config mismatch: %+v", cfg.Kafka)
 	}
 }
 

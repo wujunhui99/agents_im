@@ -261,9 +261,6 @@ required_files=(
   "internal/transfer/memory.go"
   "internal/transfer/worker.go"
   "internal/transfer/worker_test.go"
-  "internal/transfer/kafka_consumer.go"
-  "internal/transfer/kafka_consumer_test.go"
-  "internal/transfer/kafka_integration_test.go"
   "pkg/presence/store.go"
   "pkg/presence/memory.go"
   "pkg/presence/redis.go"
@@ -272,11 +269,7 @@ required_files=(
   "internal/gateway/ws/connection_manager.go"
   "internal/gateway/ws/server.go"
   "pkg/messaging/event.go"
-  "pkg/messaging/producer.go"
-  "pkg/messaging/kafka.go"
   "pkg/messaging/event_test.go"
-  "pkg/messaging/producer_test.go"
-  "pkg/messaging/kafka_integration_test.go"
   "internal/gateway/delivery/delivery.go"
   "internal/gateway/ws/delivery.go"
   "internal/transfer/gateway/dispatcher.go"
@@ -317,11 +310,9 @@ required_files=(
   "docs/design-docs/message-outbox.md"
   "docs/design-docs/gateway-message-contract.md"
   "docs/design-docs/redis-presence.md"
-  "docs/design-docs/kafka-message-events.md"
   "docs/design-docs/websocket-gateway.md"
   "docs/design-docs/websocket-reconnect-sync.md"
   "docs/design-docs/message-transfer-worker.md"
-  "docs/design-docs/kafka-transfer-consumer.md"
   "docs/design-docs/gateway-push-delivery.md"
   "docs/design-docs/transfer-gateway-dispatcher.md"
   "docs/design-docs/message-delivery-reliability.md"
@@ -388,9 +379,7 @@ required_files=(
   "docs/exec-plans/completed/remove-handwritten-compat.md"
   "docs/exec-plans/active/jwt-auth-middleware.md"
   "docs/exec-plans/completed/websocket-gateway.md"
-  "docs/exec-plans/active/kafka-redpanda-compose.md"
   "docs/exec-plans/active/message-transfer-worker.md"
-  "docs/exec-plans/active/kafka-transfer-consumer.md"
   "docs/exec-plans/completed/gateway-push-delivery.md"
   "docs/exec-plans/completed/transfer-gateway-dispatcher.md"
   "docs/exec-plans/completed/gateway-presence-routing.md"
@@ -763,7 +752,7 @@ done
 development_doc_patterns=(
   "scripts/dev-up.sh"
   "scripts/dev-demo-data.sh"
-  "docker compose up -d postgres redis redpanda minio"
+  "docker compose up -d postgres redis minio"
   "bash scripts/migrate-postgres.sh"
   "go test ./..."
 )
@@ -773,7 +762,7 @@ for pattern in "${development_doc_patterns[@]}"; do
 done
 
 dev_script_patterns=(
-  "docker compose up -d postgres redis redpanda minio"
+  "docker compose up -d postgres redis minio"
   "bash scripts/migrate-postgres.sh"
   "StorageDriver: postgres"
   "ObjectStorage:"
@@ -1134,7 +1123,6 @@ websocket_gateway_patterns=(
   "ConnectionManager"
   "PresenceReporter"
   "Redis Presence"
-  "Kafka fanout"
   "Push worker"
 )
 
@@ -1253,73 +1241,10 @@ for pattern in "${message_transfer_doc_patterns[@]}"; do
   rg -q "$pattern" docs/design-docs/message-transfer-worker.md docs/exec-plans/active/message-transfer-worker.md
 done
 
-kafka_transfer_consumer_code_patterns=(
-  "type KafkaEventConsumerConfig struct"
-  "type KafkaEventConsumer struct"
-  "func NewKafkaEventConsumer"
-  "func EnvelopeFromKafkaMessage"
-  "messaging.UnmarshalMessageEvent"
-  "DefaultMessageEventsTopic"
-  "EventTypeMessageAccepted"
-  "FetchMessage"
-  "CommitMessages"
-  "func \\(c \\*KafkaEventConsumer\\) MarkSuccessful"
-  "func \\(c \\*KafkaEventConsumer\\) MarkRetry"
-  "func \\(c \\*KafkaEventConsumer\\) MarkFailed"
-)
 
-for pattern in "${kafka_transfer_consumer_code_patterns[@]}"; do
-  rg -q "$pattern" internal/transfer/kafka_consumer.go internal/transfer/kafka_consumer_test.go
-done
 
-kafka_transfer_consumer_test_patterns=(
-  "TestEnvelopeFromKafkaMessageMapsAcceptedEvent"
-  "TestEnvelopeFromKafkaMessageRejectsInvalidEvents"
-  "TestKafkaEventConsumerConstructorDoesNotRequireLiveBroker"
-  "TestKafkaEventConsumerReceiveAndAckSemantics"
-  "TestKafkaEventConsumerConsumesRedpandaEvent"
-  "KAFKA_REDPANDA_INTEGRATION"
-  "KAFKA_BROKERS"
-  "t\\.Skip"
-)
 
-for pattern in "${kafka_transfer_consumer_test_patterns[@]}"; do
-  rg -q "$pattern" internal/transfer/kafka_consumer_test.go internal/transfer/kafka_integration_test.go
-done
 
-kafka_transfer_config_patterns=(
-  "TransferConsumerKafka"
-  "MESSAGE_TRANSFER_CONSUMER_DRIVER"
-  "Kafka\\s+KafkaConfig"
-  "cfg.Kafka = kafkaConfigFromValues"
-  "NewKafkaEventConsumer"
-  "KAFKA_MESSAGE_EVENTS_TOPIC"
-  "KAFKA_CONSUMER_GROUP"
-)
-
-for pattern in "${kafka_transfer_config_patterns[@]}"; do
-  rg -q "$pattern" pkg/config/config.go pkg/config/config_test.go service/message-transfer/main.go etc/message-transfer.yaml
-done
-
-kafka_transfer_doc_patterns=(
-  "message.events.v1"
-  "message.accepted"
-  "messaging.MessageEvent"
-  "transfer.Envelope"
-  "MarkSuccessful"
-  "MarkRetry"
-  "MarkFailed"
-  "CommitMessages"
-  "KAFKA_REDPANDA_INTEGRATION"
-  "KAFKA_BROKERS"
-)
-
-for pattern in "${kafka_transfer_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/kafka-transfer-consumer.md docs/exec-plans/active/kafka-transfer-consumer.md
-done
-
-rg -q "kafka-transfer-consumer.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-transfer-worker.md
-rg -q "kafka-transfer-consumer" docs/exec-plans/active/kafka-transfer-consumer.md
 
 rg -q "LoadMessageTransferConfig" pkg/config/config.go
 rg -q "message-transfer" service/message-transfer/main.go etc/message-transfer.yaml ARCHITECTURE.md
@@ -1504,19 +1429,6 @@ for pattern in "${redis_compose_patterns[@]}"; do
   rg -q "$pattern" docker-compose.yml
 done
 
-redpanda_compose_patterns=(
-  "^  redpanda:"
-  "docker.redpanda.com/redpandadata/redpanda"
-  "agents-im-redpanda"
-  "kafka-addr"
-  "advertise-kafka-addr"
-  "REDPANDA_KAFKA_PORT"
-  "agents_im_redpanda_data"
-)
-
-for pattern in "${redpanda_compose_patterns[@]}"; do
-  rg -q "$pattern" docker-compose.yml
-done
 
 minio_compose_patterns=(
   "^  minio:"
@@ -1546,17 +1458,6 @@ for pattern in "${redis_env_patterns[@]}"; do
   rg -q "$pattern" .env.example
 done
 
-kafka_env_patterns=(
-  "KAFKA_BROKERS"
-  "KAFKA_MESSAGE_EVENTS_TOPIC"
-  "KAFKA_CONSUMER_GROUP"
-  "REDPANDA_KAFKA_PORT"
-  "REDPANDA_ADMIN_PORT"
-)
-
-for pattern in "${kafka_env_patterns[@]}"; do
-  rg -q "$pattern" .env.example
-done
 
 object_storage_env_patterns=(
   "MINIO_ROOT_USER"
@@ -1590,18 +1491,6 @@ for pattern in "${presence_config_patterns[@]}"; do
   rg -q "$pattern" pkg/config/config.go
 done
 
-kafka_config_patterns=(
-  "type KafkaConfig"
-  "DefaultKafkaConfig"
-  "ResolveKafkaConfig"
-  "KAFKA_BROKERS"
-  "KAFKA_MESSAGE_EVENTS_TOPIC"
-  "KAFKA_CONSUMER_GROUP"
-)
-
-for pattern in "${kafka_config_patterns[@]}"; do
-  rg -q "$pattern" pkg/config/config.go pkg/config/config_test.go
-done
 
 presence_code_patterns=(
   "type PresenceStore interface"
@@ -1651,42 +1540,11 @@ message_event_schema_patterns=(
 )
 
 for pattern in "${message_event_schema_patterns[@]}"; do
-  rg -q "$pattern" pkg/messaging/event.go pkg/messaging/event_test.go docs/design-docs/kafka-message-events.md
+  rg -q "$pattern" pkg/messaging/event.go pkg/messaging/event_test.go
 done
 
-producer_contract_patterns=(
-  "type Producer interface"
-  "NewNoopProducer"
-  "NewInMemoryProducer"
-  "NewKafkaProducer"
-  "ParseBrokerList"
-  "segmentio/kafka-go"
-  "KAFKA_REDPANDA_INTEGRATION"
-  "t\\.Skip"
-)
 
-for pattern in "${producer_contract_patterns[@]}"; do
-  rg -q "$pattern" pkg/messaging go.mod
-done
 
-kafka_doc_patterns=(
-  "message.events.v1"
-  "conversation_id"
-  "at-least-once"
-  "outbox"
-  "Message Transfer"
-  "Gateway"
-  "Push"
-  "KAFKA_BROKERS"
-  "Redpanda"
-)
-
-for pattern in "${kafka_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/kafka-message-events.md docs/exec-plans/active/kafka-redpanda-compose.md
-done
-
-rg -q "kafka-message-events.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-chain-contract.md
-rg -q "kafka-redpanda-compose" docs/exec-plans/active/kafka-redpanda-compose.md
 read_receipt_patterns=(
   "has_read_seq"
   "unread_count"
@@ -2057,42 +1915,22 @@ done
 rg -q "message-outbox.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/postgres-persistence.md
 rg -q "message-outbox" docs/exec-plans/active/message-outbox.md
 
+# Outbox -> messaging.MessageEvent conversion is the live V1 fanout path consumed
+# by message-transfer (the former Kafka publisher was removed as unused).
 outbox_publisher_code_patterns=(
   "package outboxpublisher"
-  "type Publisher struct"
-  "repository.OutboxRepository"
-  "messaging.Producer"
-  "PollPending"
   "MessageEventFromOutbox"
+  "messaging.MessageEvent"
   "EventTypeMessageAccepted"
-  "DefaultMessageEventsTopic"
-  "MarkPublished"
-  "MarkFailed"
 )
 
 for pattern in "${outbox_publisher_code_patterns[@]}"; do
   rg -q "$pattern" internal/outboxpublisher
 done
 
-outbox_publisher_doc_patterns=(
-  "outbox-kafka-publisher.md"
-  "message.events.v1"
-  "message.accepted"
-  "at-least-once"
-  "event_id"
-  "conversation_id"
-  "MarkPublished"
-  "MarkFailed"
-)
-
-for pattern in "${outbox_publisher_doc_patterns[@]}"; do
-  rg -q "$pattern" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/outbox-kafka-publisher.md docs/exec-plans/active/outbox-kafka-publisher.md
-done
-
-rg -q "TestPublisherPublishesMessageCreatedOutboxEvent" internal/outboxpublisher/publisher_test.go
-rg -q "TestPublisherMarksPublishErrorRetryable" internal/outboxpublisher/publisher_test.go
-rg -q "TestPublisherMarksMalformedPayloadFailedForRetry" internal/outboxpublisher/publisher_test.go
-rg -q "TestPublisherStopsOnContextCancellationWithoutMarkingFailed" internal/outboxpublisher/publisher_test.go
+rg -q "TestMessageEventFromOutboxBuildsAcceptedEvent" internal/outboxpublisher/message_event_test.go
+rg -q "TestMessageEventFromOutboxIncludesAISenderInSingleChatReceiverIDs" internal/outboxpublisher/message_event_test.go
+rg -q "TestMessageEventFromOutboxRejectsMalformedPayload" internal/outboxpublisher/message_event_test.go
 
 observability_code_patterns=(
   "StatusReady"

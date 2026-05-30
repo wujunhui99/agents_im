@@ -26,7 +26,6 @@ type APIConfig struct {
 	DataSource       string
 	Redis            RedisConfig
 	Presence         PresenceConfig
-	Kafka            KafkaConfig
 	Tracing          observability.TracingConfig
 	DeepSeek         DeepSeekConfig
 	LLMObservability LLMObservabilityConfig
@@ -50,7 +49,6 @@ type RPCConfig struct {
 	DataSource    string
 	Redis         RedisConfig
 	Presence      PresenceConfig
-	Kafka         KafkaConfig
 	Tracing       observability.TracingConfig
 	MailRPC       zrpc.RpcClientConf
 }
@@ -79,12 +77,6 @@ type GatewayWSConfig struct {
 	HeartbeatTimeoutSeconds   int64
 	CommandRateLimitPerSecond int
 	CommandRateLimitBurst     int
-}
-
-type KafkaConfig struct {
-	Brokers            []string
-	MessageEventsTopic string
-	ConsumerGroup      string
 }
 
 type DeepSeekConfig struct {
@@ -142,7 +134,6 @@ type MessageTransferConfig struct {
 	DryRun        bool
 	StorageDriver string
 	DataSource    string
-	Kafka         KafkaConfig
 	Tracing       observability.TracingConfig
 	Consumer      TransferConsumerConfig
 	Dispatcher    TransferDispatcherConfig
@@ -181,7 +172,6 @@ const (
 	PresenceDriverMemory            = "memory"
 	PresenceDriverRedis             = "redis"
 	TransferConsumerMemory          = "memory"
-	TransferConsumerKafka           = "kafka"
 	TransferConsumerOutbox          = "outbox"
 	TransferDispatcherNoop          = "noop"
 	TransferDispatcherGateway       = "gateway"
@@ -201,13 +191,10 @@ const (
 	defaultGatewayWSHeartbeatSeconds   = 75
 	defaultGatewayWSCommandRate        = 20
 	defaultGatewayWSCommandBurst       = 40
-	defaultKafkaBroker                 = "localhost:19092"
-	defaultKafkaMessageEventsTopic     = "message.events.v1"
-	defaultKafkaConsumerGroup          = "message-transfer-worker"
 	defaultObjectStorageBucket         = "agents-im-media"
 	defaultObjectStorageRegion         = "us-east-1"
-	defaultTransferTopic               = defaultKafkaMessageEventsTopic
-	defaultTransferGroup               = defaultKafkaConsumerGroup
+	defaultTransferTopic               = "message.events.v1"
+	defaultTransferGroup               = "message-transfer-worker"
 	defaultTransferPollIntervalMillis  = 100
 	defaultTransferRetryBackoffMillis  = 1000
 	defaultTransferMaxAttempts         = 5
@@ -237,7 +224,6 @@ func DefaultAPIConfig() APIConfig {
 		StorageDriver:    StorageDriverMemory,
 		Redis:            DefaultRedisConfig(),
 		Presence:         DefaultPresenceConfig(),
-		Kafka:            DefaultKafkaConfig(),
 		Tracing:          observability.TracingConfig{},
 		DeepSeek:         DefaultDeepSeekConfig(),
 		LLMObservability: DefaultLLMObservabilityConfig(),
@@ -255,7 +241,6 @@ func DefaultRPCConfig() RPCConfig {
 		StorageDriver: StorageDriverMemory,
 		Redis:         DefaultRedisConfig(),
 		Presence:      DefaultPresenceConfig(),
-		Kafka:         DefaultKafkaConfig(),
 		Tracing:       observability.TracingConfig{},
 	}
 }
@@ -297,14 +282,6 @@ func DefaultGatewayWSConfig() GatewayWSConfig {
 		HeartbeatTimeoutSeconds:   defaultGatewayWSHeartbeatSeconds,
 		CommandRateLimitPerSecond: defaultGatewayWSCommandRate,
 		CommandRateLimitBurst:     defaultGatewayWSCommandBurst,
-	}
-}
-
-func DefaultKafkaConfig() KafkaConfig {
-	return KafkaConfig{
-		Brokers:            []string{defaultKafkaBroker},
-		MessageEventsTopic: defaultKafkaMessageEventsTopic,
-		ConsumerGroup:      defaultKafkaConsumerGroup,
 	}
 }
 
@@ -351,7 +328,6 @@ func DefaultMessageTransferConfig() MessageTransferConfig {
 		WorkerID:      defaultWorkerID(),
 		DryRun:        true,
 		StorageDriver: StorageDriverMemory,
-		Kafka:         DefaultKafkaConfig(),
 		Tracing:       observability.TracingConfig{},
 		Consumer: TransferConsumerConfig{
 			Driver: TransferConsumerMemory,
@@ -423,7 +399,6 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
-	cfg.Kafka = kafkaConfigFromValues(values)
 	cfg.Tracing, err = tracingConfigFromValues(values, cfg.Tracing, cfg.Name)
 	if err != nil {
 		return cfg, err
@@ -486,7 +461,6 @@ func LoadRPCConfig(path string) (RPCConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
-	cfg.Kafka = kafkaConfigFromValues(values)
 	cfg.Tracing, err = tracingConfigFromValues(values, cfg.Tracing, cfg.Name)
 	if err != nil {
 		return cfg, err
@@ -516,7 +490,6 @@ func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
 		cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
 	}
 	cfg.DataSource = ResolveDataSource(values["DataSource"])
-	cfg.Kafka = kafkaConfigFromValues(values)
 	cfg.Tracing, err = tracingConfigFromValues(values, cfg.Tracing, cfg.Name)
 	if err != nil {
 		return cfg, err
@@ -647,8 +620,6 @@ func ResolveTransferConsumerDriver(value string) string {
 		value = strings.ToLower(strings.TrimSpace(os.Getenv("MESSAGE_TRANSFER_CONSUMER_DRIVER")))
 	}
 	switch value {
-	case TransferConsumerKafka, "redpanda":
-		return TransferConsumerKafka
 	case TransferConsumerOutbox, "postgres_outbox", "postgres-outbox":
 		return TransferConsumerOutbox
 	default:
@@ -674,13 +645,12 @@ func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConf
 	cfg.WorkerID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.WorkerID)), os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), defaultWorkerID())
 	cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
 	cfg.DataSource = ResolveDataSource(cfg.DataSource)
-	cfg.Kafka = ResolveKafkaConfig(cfg.Kafka)
 	if tracing, err := observability.ResolveTracingConfig(cfg.Tracing, cfg.Name); err == nil {
 		cfg.Tracing = tracing
 	}
 	cfg.Consumer.Driver = ResolveTransferConsumerDriver(cfg.Consumer.Driver)
-	cfg.Consumer.Topic = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Topic)), os.Getenv("MESSAGE_TRANSFER_TOPIC"), cfg.Kafka.MessageEventsTopic, defaultTransferTopic)
-	cfg.Consumer.Group = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Group)), os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"), cfg.Kafka.ConsumerGroup, defaultTransferGroup)
+	cfg.Consumer.Topic = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Topic)), os.Getenv("MESSAGE_TRANSFER_TOPIC"), defaultTransferTopic)
+	cfg.Consumer.Group = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Consumer.Group)), os.Getenv("MESSAGE_TRANSFER_CONSUMER_GROUP"), defaultTransferGroup)
 	cfg.Dispatcher.Driver = ResolveTransferDispatcherDriver(cfg.Dispatcher.Driver)
 	cfg.Dispatcher.GatewayEndpoint = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Dispatcher.GatewayEndpoint)), os.Getenv("MESSAGE_TRANSFER_GATEWAY_ENDPOINT"))
 	if cfg.Worker.PollIntervalMillis <= 0 {
@@ -827,22 +797,6 @@ func ResolveGatewayWSConfig(cfg GatewayWSConfig) (GatewayWSConfig, error) {
 	}
 	cfg.CommandRateLimitBurst = commandBurst
 	return cfg, nil
-}
-
-func ResolveKafkaConfig(cfg KafkaConfig) KafkaConfig {
-	brokers := brokerListFromValue(strings.Join(cfg.Brokers, ","))
-	if len(brokers) == 0 {
-		brokers = brokerListFromValue(firstNonEmpty(os.Getenv("KAFKA_BROKERS"), os.Getenv("AGENTS_IM_KAFKA_BROKERS")))
-	}
-	if len(brokers) == 0 {
-		brokers = []string{defaultKafkaBroker}
-	}
-
-	return KafkaConfig{
-		Brokers:            brokers,
-		MessageEventsTopic: firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.MessageEventsTopic)), os.Getenv("KAFKA_MESSAGE_EVENTS_TOPIC"), os.Getenv("AGENTS_IM_KAFKA_MESSAGE_EVENTS_TOPIC"), defaultKafkaMessageEventsTopic),
-		ConsumerGroup:      firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.ConsumerGroup)), os.Getenv("KAFKA_CONSUMER_GROUP"), os.Getenv("AGENTS_IM_KAFKA_CONSUMER_GROUP"), defaultKafkaConsumerGroup),
-	}
 }
 
 func ResolveDeepSeekConfig(cfg DeepSeekConfig) DeepSeekConfig {
@@ -1207,15 +1161,6 @@ func gatewayWSConfigFromValues(values map[string]string) (GatewayWSConfig, error
 		cfg.CommandRateLimitBurst = burst
 	}
 	return ResolveGatewayWSConfig(cfg)
-}
-
-func kafkaConfigFromValues(values map[string]string) KafkaConfig {
-	cfg := KafkaConfig{
-		Brokers:            brokerListFromValue(firstNonEmpty(values["Kafka.Brokers"], values["KafkaBrokers"])),
-		MessageEventsTopic: firstNonEmpty(values["Kafka.MessageEventsTopic"], values["KafkaMessageEventsTopic"]),
-		ConsumerGroup:      firstNonEmpty(values["Kafka.ConsumerGroup"], values["KafkaConsumerGroup"]),
-	}
-	return ResolveKafkaConfig(cfg)
 }
 
 func tracingConfigFromValues(values map[string]string, current observability.TracingConfig, serviceName string) (observability.TracingConfig, error) {

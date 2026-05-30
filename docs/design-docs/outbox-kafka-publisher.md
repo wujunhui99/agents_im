@@ -1,6 +1,8 @@
 # Outbox Kafka Publisher
 
-Status: Implemented for publisher module
+> ⚠️ **已弃用（2026-05-30）**：向 Kafka 发布 outbox 事件的 `outboxpublisher.Publisher` + `messaging.Producer` 在 V1 从未接线，已移除。仅保留 `outboxpublisher.MessageEventFromOutbox`（outbox 行→`messaging.MessageEvent` 转换），由 message-transfer 的 outbox consumer 直接使用。本文保留为历史设计记录。
+
+Status: Superseded (Kafka publisher removed; conversion helper retained)
 Owner: Messaging infrastructure
 Related docs:
 - [`message-outbox.md`](./message-outbox.md)

@@ -71,7 +71,7 @@ When Docker middleware is already running, or when middleware is managed externa
 scripts/dev-up.sh --services-only
 ```
 
-This mode skips Docker middleware startup and PostgreSQL migrations, rebuilds host binaries, and restarts only the REST APIs plus WebSocket gateway. It is useful for local E2E debugging when Postgres/Redis/Redpanda are already available.
+This mode skips Docker middleware startup and PostgreSQL migrations, rebuilds host binaries, and restarts only the REST APIs plus WebSocket gateway. It is useful for local E2E debugging when Postgres/Redis are already available.
 
 Each service port can be overridden for single-machine debugging, especially when default ports are occupied by stale/root-owned processes:
 
@@ -123,7 +123,7 @@ It uses real business logic and a real WebSocket gateway test server in one proc
 7. send `send_message` over WebSocket;
 8. assert Alice receives ACK and Bob receives live `message_received` push.
 
-This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, Redpanda, and MinIO when the environment is clean.
+This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, and MinIO when the environment is clean.
 
 ### Local E2E Debug Notes
 
@@ -153,7 +153,6 @@ Environment note from the debug session: on one local machine, default ports `80
 | Agent API | `http://127.0.0.1:8086` |
 | PostgreSQL | `localhost:5432` |
 | Redis | `localhost:6379` |
-| Redpanda Kafka | `localhost:19092` |
 | MinIO API | `http://localhost:9000` |
 | MinIO Console | `http://localhost:9001` |
 
@@ -198,7 +197,7 @@ The script prints demo IDs and a conversation ID. It does not print tokens or pa
 When you only need database middleware:
 
 ```bash
-docker compose up -d postgres redis redpanda minio
+docker compose up -d postgres redis minio
 bash scripts/migrate-postgres.sh
 ```
 
