@@ -11,7 +11,7 @@
 | **P0 速赢** | OB-1 · OB-10 · OB-17 | ✅ 完成（2026-05-30） |
 | **P1 纯后端重构** | OB-7 · OB-5(+OB-6) · OB-12 · OB-4 · OB-13 · OB-16 · OB-8 | ✅ 完成（2026-05-30） |
 | **P2 GitOps/CD** | OB-14/15（+OB-9） | 🟡 Argo CD 已接管 prod；Drone→gitops 流（OB-9）待做 |
-| **P3 中间件入 k8s** | OB-3 · OB-11 · OB-2 · hostNetwork→ClusterIP | 🟡 Redis+MinIO 已迁；PG/Redpanda/其余待做 |
+| **P3 中间件入 k8s** | OB-3 · OB-11 · OB-2 · hostNetwork→ClusterIP | 🟡 Redis+MinIO+**PostgreSQL 已迁**；Redpanda **确认无用→删除中**；只读从库/OB-11/OB-2/其余待做 |
 
 ## 逐条进度
 
@@ -31,7 +31,7 @@
 | OB-15 | Argo CD 已装并接管 `agents-im`（Application `agents-im` Synced/Healthy） | P2 | ✅ | gitops 引导 | 2026-05-30 |
 | OB-14 | gitops 仓库 + Argo Application + auto-sync ✅；**Drone PR+label 改 gitops + webhook 待做** | P2 | 🟡 | repo `agents_im-gitops` | 部分 2026-05-30 |
 | OB-9 | Drone 仍挂 admin kubeconfig 直接 kubectl 部署；待 Drone→gitops 后摘除 | P2 | ⬜ | — | — |
-| OB-3 | 中间件入 k8s：**Redis ✅ / MinIO ✅**；PostgreSQL(+只读从库)、Redpanda、关 docker **待做** | P3 | 🟡 | gitops manifests | 部分 2026-05-30 |
+| OB-3 | 中间件入 k8s：**Redis ✅ / MinIO ✅ / PostgreSQL ✅**（主库已迁+切端点，docker 主/从已停留作回滚）；只读从库重建待做；Redpanda **确认无用→删除**（非迁移） | P3 | 🟡 | gitops manifests | PG 2026-05-30 |
 | OB-11 | Langfuse 独立 PG | P3 | ⬜ | — | — |
 | OB-2 | Loki/Tempo 后端切 MinIO（k8s MinIO 已就绪，可做） | P3 | ⬜ | — | — |
 | OB-— | hostNetwork → ClusterIP | P3 | ⬜ | — | — |
@@ -49,8 +49,8 @@
 
 ### 当前总体状态（2026-05-30）
 - **Argo CD GitOps 已上线**并接管 `agents-im` 命名空间（Synced/Healthy）。改集群期望态 = 改 gitops 仓库并 push。
-- **中间件**：Redis、MinIO 已入 k8s（GitOps 管理），对应 docker 实例已 `stop`（未 `rm`，可回滚）；**PostgreSQL(primary+replica)、Redpanda 仍在 docker**。
-- App 健康，pod 无异常重启。节点 7.8G 内存 / 可用约 2.9G，4 核，storageclass `local-path`。
+- **中间件**：Redis、MinIO、**PostgreSQL** 已入 k8s（GitOps 管理），对应 docker 实例已 `stop`（未 `rm`，可回滚）；**仅 Redpanda 仍在 docker**（已确认代码层无用，待删）。
+- App 健康，pod 无异常重启（28 pods Ready，Argo Synced/Healthy）。节点 7.8G 内存 / 可用约 2.9G，4 核，storageclass `local-path`。
 
 ### 访问与工具（执行前必读）
 - **Drone token**：`secret/drone_token`，是 **`.env` 格式**（含 `DRONE_SERVER=` + `DRONE_TOKEN=`），不是裸 token。取值：`grep '^DRONE_TOKEN=' secret/drone_token | cut -d= -f2-`。查构建：`curl -H "Authorization: Bearer $T" https://drone.agenticim.xyz/api/repos/wujunhui99/agents_im/builds`。
@@ -83,18 +83,16 @@
 ### 已完成（均可回滚）
 - **Redis**：k8s StatefulSet（复用 `agents-im-secrets.REDIS_PASSWORD` 作 requirepass）；`REDIS_ADDR`(configmap)→`redis.agents-im.svc.cluster.local:6379`；docker `agents-im-redis` 已 stop。仅 ~3 个 ephemeral key，未迁数据。
 - **MinIO**：k8s StatefulSet（root 凭据来自 secret）；`mc mirror` 34 对象（33MiB）已校验一致。**双切换**：内部 `OBJECT_STORAGE_ENDPOINT`(在 **secret**)→`minio.agents-im.svc.cluster.local:9000`；外部 ingress `/agents-im-media`（presigned URL）经 svc `agents-im-minio`（已 repoint：selector→`app: minio`，targetPort→9000）直达 k8s minio。socat `agents-im-minio-proxy` 已 `replicas: 0` 退役。docker `agents-im-minio` 已 stop。
-
-### 下一步：PostgreSQL（最高风险，务必备份优先）
-docker 有 `agents-im-postgres`(primary, 127.0.0.1:5432) + `agents-im-postgres-replica`（流复制 + SSL，`/opt/agents-im/middleware/postgres-replica-certs`）。`DATABASE_URL`、`LANGFUSE_DATABASE_URL` 在 `agents-im-secrets`，DSN 指 127.0.0.1:5432。
-1. **先 `pg_dump`/`pg_dumpall` 全量备份**到节点文件，并验证可恢复（**不可省**）。
-2. gitops 加 PG StatefulSet（`postgres:16-alpine` + PVC + Service `postgres`；库名/用户/密码须与现有 DSN 一致，凭据从 secret）。
-3. 迁数据：一次性 Job `psql` restore dump 到 k8s PG；**校验关键表行数与 docker 一致**。
-4. 切 `DATABASE_URL`(secret) → `postgres.agents-im.svc.cluster.local:5432/<db>`（保留库名/用户/密码）；`rollout restart` 所有用 DB 的服务（几乎全部 api/rpc + message-transfer）；验证读写。
-5. **重建只读从库**（OB-3 长期保留给 owner 查询）：k8s 内起 streaming replication replica + 独立 Service。
-6. `docker stop` postgres + postgres-replica（保留可回滚）。
+- **PostgreSQL ✅（2026-05-30）**：k8s StatefulSet `postgres`（`postgres:16-alpine`，gitops `manifests/postgres.yaml`，5Gi local-path PVC，凭据 `agents-im-secrets.POSTGRES_USER/PASSWORD/DB`——新加 3 个 key）。
+  - **备份优先**：`pg_dumpall --globals-only` + `pg_dump -Fc agents_im/langfuse` 到 `/opt/agents-im/backups/pg-<ts>/`，已校验 TOC + 30/42 表 + 3 roles。
+  - **迁数据**：globals(roles `readonly_user`/`replicator`) + `agents_im`(12MB) + `langfuse`(11MB) 经 `kubectl exec ... pg_restore` 还原；切换前再做一次 fresh dump+restore；**逐表 `count(*)` 校验 30 表与 docker 完全一致**。
+  - **切端点**：`DATABASE_URL` + `LANGFUSE_DATABASE_URL`(均在 **secret**) host→`postgres.agents-im.svc.cluster.local:5432`（保留 user/pass/db/sslmode）；`rollout restart` 全部 16 个 DB 消费者。验证 docker PG 0 app 连接、k8s PG 可写主库(`pg_is_in_recovery=f`)、写读 round-trip OK、28 pods Ready。
+  - **副作用修复**：langfuse 重启后因 k8s `redis` Service 自动注入 `REDIS_PORT=tcp://…` 致启动校验失败（NaN）；在 gitops `langfuse.yaml` 显式设 `REDIS_HOST/REDIS_PORT/REDIS_AUTH` 覆盖，已恢复 Ready。
+  - **停旧**：`docker stop agents-im-postgres agents-im-postgres-replica`（未 rm，可回滚）。
+  - **未做（后续）**：k8s 内重建只读从库（streaming replication + 独立 Service，OB-3 长期保留给 owner 查询）——按 owner 决策本次只迁主库，从库后续再做；备份目录与 docker 实例均可回滚。
 
 ### 之后（按序）
-- **Redpanda 入 k8s**：StatefulSet；`advertise-kafka-addr` 改 svc DNS；切 `KAFKA_BROKERS` 端点；低峰做（in-flight 事件可能丢）。
+- **~~Redpanda 入 k8s~~ → 删除**：已确认代码层无用（prod `message-transfer` 用 `Driver: outbox` 读 `message_outbox`，从不走 kafka driver；`outboxpublisher.New` producer 路径仅测试调用；topic `message.events.v1` high-watermark=0、零 consumer group、零连接）。处理：删 Go kafka 代码(`pkg/messaging`、`internal/transfer/kafka_consumer*`、outboxpublisher producer 路径、config `KafkaConfig`)+ `KAFKA_*` 配置 + docker-compose redpanda + docker 容器（issue→worktree→PR→CI 流程）。
 - **OB-11 Langfuse 独立 PG**：给 langfuse 单独 k8s PG 实例（`LANGFUSE_DATABASE_URL`），与业务 PG 隔离。
 - **OB-2 Loki/Tempo 后端切 MinIO**：k8s MinIO 已就绪；改 loki/tempo 配置 storage 后端为 S3/MinIO + 建对应 bucket。
 - **OB-9 / P2-5 Drone→gitops PR+label**：Drone `deploy-main` 改为「构建镜像 → 改 gitops repo `images:` tag（PR+label 自动合）」，删 `kubectl` 部署 + `/etc/rancher/k3s` kubeconfig 挂载；**完成后把 Argo `selfHeal` 开回 `true`，并开 `prune=true`**。
