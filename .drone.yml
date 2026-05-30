@@ -25,6 +25,24 @@ steps:
       - bash scripts/ci/verify-pr-issue-link.sh
       - bash scripts/ci/drone-backend-verify.sh
 
+  # Runs only when web-owned files change (Drone changeset filter). The deploy
+  # detector (detect-deploy-changes.py) is unsuitable here: it is scoped to
+  # main/devops refs and returns web_required=false for PR source branches.
+  - name: frontend-verification
+    image: node:20-bookworm-slim
+    commands:
+      - npm --prefix web ci
+      - npm --prefix web run lint
+      - npm --prefix web run test:run
+      - npm --prefix web run build
+    when:
+      paths:
+        include:
+          - web/**
+          - package.json
+          - package-lock.json
+          - .drone.yml
+
   - name: postgres-integration
     image: golang:1.24-bookworm
     environment:
