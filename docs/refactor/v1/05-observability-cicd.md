@@ -41,7 +41,7 @@
   - `verification`（PR）：backend verify、postgres integration、telegram notify；
   - `devops-lab`（push to `devops` 分支）：image build benchmark；
   - `deploy-main`（push to `main`）：detect → build → deploy → notify。
-- GitHub Actions（`.github/workflows/`）：还有 `ci.yml` 和 `deploy.yml`（ARCHITECTURE.md 提到过）。
+- GitHub Actions：**已废弃**，`.github/workflows/` 下已无任何 workflow（只剩 `ISSUE_TEMPLATE/` 与 `markdown-link-check.json`）；`ARCHITECTURE.md` 等文档仍残留 GHA 描述待清理（见 OB-1）。
 
 ---
 
@@ -56,6 +56,8 @@
 - 哪个是真相？哪个是历史遗留？
 
 > 修复：选定一个（建议保留 Drone，因为它跑在自有 k3s 节点上、能直接 kubectl）。删掉另一个；同步 ARCHITECTURE.md 与 AGENTS.md 与 CLAUDE.md。
+>
+> **决定（2026-05-30）**：只保留 Drone。GHA 已在代码层删除，剩 `ARCHITECTURE.md` / `AGENTS.md` / `RELIABILITY.md` 等文档同步（纯文档活，P0）。
 
 ### OB-2 🚨 Loki / Tempo / Langfuse 全部用 local filesystem，无备份
 - Loki `storage.filesystem`；
@@ -165,6 +167,8 @@ volumes:
 意味着 **drone runner 能拿 k3s admin kubeconfig**。如果 drone runner 容器被攻破，整个 k3s 被接管。
 
 > 修复方向：drone runner 用专门的 ServiceAccount + RoleBinding（agents-im namespace only），不挂 admin kubeconfig。
+>
+> **决定（2026-05-30）**：不单独做。随 OB-14/15 迁 Argo CD 自然消解——Drone 改为只 build 镜像 + 按 PR+label 改 gitops 仓库，不再持有 kubeconfig；OB-9 风险随之消失。优先级最后。
 
 ### OB-10 ⚠️ Drone telegram_bot_token / GHCR_TOKEN 是 drone secret
 没问题，但：
@@ -196,6 +200,8 @@ const langfuseExportTimeout = 10 * time.Second
 当前只有"main → 生产 k3s"一个环境。没有 staging。意味着 main 合入到部署只有 GitHub Merge Queue 这一道闸门。
 
 > 修复：至少加一个 `develop` 分支 → staging 环境（哪怕同 k3s 不同 namespace）。但这是 P2，不阻塞当前重构。
+>
+> **决定（2026-05-30）**：不加 `develop` 分支。采用 Argo CD GitOps：拆独立 gitops 仓库供 Argo CD 监控；Drone CI 按 **PR + label** 改 gitops 仓库；Argo CD 经 **webhook** 接收代码仓库变化自动部署。与 OB-15 同一 epic。
 
 ### OB-15 🟡 `__IMAGE_TAG_REQUIRED__` placeholder
 所有 `deploy/k8s/deployments.yaml` 用 `:__IMAGE_TAG_REQUIRED__`，部署时 deploy-k3s.sh 用 sed 替换 commit SHA。
@@ -213,6 +219,8 @@ const langfuseExportTimeout = 10 * time.Second
 `DRONE_IMAGE_BUILD_PARALLELISM=3` 写在 yaml 里硬编码。当前服务 14 个，并发 3 = 慢；未来加 push、admin-api 后会更慢。
 
 > 修复：动态调整或挪到 secret/env。
+>
+> **决定（2026-05-30）**：保持并发=3（runner 4 核，再高 context switch / OOM）；`DRONE_IMAGE_BUILD_PARALLELISM` 从 `.drone.yml` 硬编码挪到 **repo env**——它不是机密，无须放 secret。
 
 ---
 
@@ -258,7 +266,7 @@ const langfuseExportTimeout = 10 * time.Second
 2. 业务 deployment 改 `hostNetwork: false`，用 ClusterIP；
 3. Loki/Tempo 后端改 MinIO；
 4. Prometheus 用 k8s SD；
-5. CI 单轨：Drone 或 GHA 二选一；
+5. CI 单轨：**Drone**（GHA 已移除）；部署经 Argo CD GitOps（gitops 仓库 + webhook）；
 6. LLM observability 异步；
 7. metrics 改 prom client_golang。
 
@@ -329,7 +337,7 @@ const langfuseExportTimeout = 10 * time.Second
 - GHA 要把 kubeconfig 作为 secret，安全面更大；
 - 项目所有人已熟悉 Drone。
 
-**删 `.github/workflows/deploy.yml`**，保留 `.github/workflows/ci.yml` 只跑 PR check（lint、test、build），但 PR check 也可以挪到 Drone。
+**GHA 已全部移除**（`.github/workflows/` 无 workflow），PR check 与部署均在 Drone。后续部署经 OB-14/15 迁 Argo CD GitOps（Drone 只 build + 改 gitops 仓库，不再 kubectl）。
 
 ### 6.2 Drone pipeline 拆分
 ```
@@ -389,18 +397,38 @@ deploy-main (main push)
 
 ---
 
-## 8. 收敛 epic（按依赖排序）
+## 8. 决策与执行路线（2026-05-30 与 owner 确认）
 
-1. **OB-1 CI 单轨化**：选 Drone，删 GHA deploy.yml。文档同步。
-2. **OB-7 tracing config 改 env**：减少 14 份 yaml 同步成本。
-3. **OB-5 metrics 切 prom client_golang**：纯重构、不改语义。
-4. **OB-12 LLM observability 异步**：sink 加 queue。
-5. **OB-4 Prometheus k8s SD**：删硬编码 target。
-6. **OB-13 PR CI 加 frontend**。
-7. **OB-16 ready check audit**。
-8. **OB-3 hostNetwork → ClusterIP**：依赖 OB-large（中间件入 k8s），单独 epic。
-9. **OB-2 Loki/Tempo 后端切 MinIO**。
-10. **OB-9 Drone runner 权限收敛**：单独安全 epic。
+### 8.1 逐条决策
+
+| 编号 | 决策 |
+|------|------|
+| OB-1 | 只保留 Drone CI；GitHub Actions 已废弃（代码层 `.github/workflows/` 已删），剩文档同步。|
+| OB-2 | Loki/Tempo 后端切 MinIO（排在 MinIO 入 k8s 之后）。|
+| OB-3 | 中间件入 k8s + 数据迁移；保留一个**长期** k8s 内 PG 只读从库（streaming replication，独立 Service）供 owner 查询；灰度确认后关闭 docker 中间件（Redis / Redpanda / MinIO + 旧主库）。|
+| OB-4 | 改用 k8s service discovery。|
+| OB-5 | 替换为 `github.com/prometheus/client_golang/prometheus`。|
+| OB-6 | 统一暴露在 `/metrics`。|
+| OB-7 | tracing 配置改 ConfigMap 注入 env var。|
+| OB-8 | `detect-deploy-changes.py` 拆 CLI + 加 test。|
+| OB-9 | **不单独做**；随 OB-14/15 迁 Argo CD 自然解决（Drone 不再持 kubeconfig）。优先级最后。|
+| OB-10 | telegram 通知单轨（Drone）。|
+| OB-11 | Langfuse 独立 PG（k8s statefulset）。|
+| OB-12 | LLM observability sink 异步化（channel + 后台 batch）。|
+| OB-13 | PR CI 加 `frontend-verification`。|
+| OB-14 | 不加 `develop` 分支；Argo CD GitOps：拆独立 gitops 仓库供 Argo CD 监控，Drone 按 PR+label 改 gitops 仓库，Argo CD 经 webhook 自动部署。|
+| OB-15 | 迁移到 Argo CD（与 OB-14 同一 epic）。|
+| OB-16 | 写 ready check audit 表（每服务列探测了哪些依赖）。|
+| OB-17 | 保持并发=3；`DRONE_IMAGE_BUILD_PARALLELISM` 挪到 **repo env**（非 secret）。|
+
+### 8.2 分阶段路线（按风险 / 依赖排序）
+
+| 阶段 | 内容 | 形态 | 风险 |
+|------|------|------|------|
+| **P0 速赢** | OB-1 文档同步、OB-10 收尾、OB-17 并发改 repo env | 纯文档 / 配置 PR | 极低 |
+| **P1 纯后端重构** | OB-7 · OB-5（+OB-6）· OB-12 · OB-4 · OB-13 · OB-16 · OB-8 | 每条独立 issue→worktree→PR，CI 兜底 | 低 |
+| **P2 GitOps/CD** | OB-14/15 引入 Argo CD（**在中间件入 k8s 之前**，先托管现状 manifests）+ 拆 gitops 仓库 + Drone PR+label 改 gitops + webhook；OB-9 在此解决 | 独立 epic | 中高 |
+| **P3 中间件入 k8s** | OB-3（含 k8s 长期只读从库 + 数据迁移 + 关 docker）· OB-11 · OB-2 · hostNetwork→ClusterIP；全部走 P2 的 GitOps | 大 epic，需维护窗口，保留旧 docker 回滚 | 高 |
 
 ---
 
