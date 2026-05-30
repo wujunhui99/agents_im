@@ -53,6 +53,7 @@ if ((${#go_files[@]} > 0)); then
 fi
 
 go test ./...
+python3 -m unittest discover -s tests/ci -t tests/ci -p 'test_*.py'
 bash scripts/verify-static.sh
 docker compose config
 

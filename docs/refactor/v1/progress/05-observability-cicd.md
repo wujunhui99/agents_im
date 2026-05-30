@@ -8,7 +8,7 @@
 | 阶段 | 范围 | 状态 |
 |------|------|------|
 | **P0 速赢** | OB-1 · OB-10 · OB-17 | ✅ 完成（2026-05-30） |
-| **P1 纯后端重构** | OB-7 · OB-5(+OB-6) · OB-12 · OB-4 · OB-13 · OB-16 · OB-8 | 🟡 进行中 |
+| **P1 纯后端重构** | OB-7 · OB-5(+OB-6) · OB-12 · OB-4 · OB-13 · OB-16 · OB-8 | ✅ 完成（2026-05-30） |
 | **P2 GitOps/CD** | OB-14/15（+OB-9） | ⬜ 未开始 |
 | **P3 中间件入 k8s** | OB-3 · OB-11 · OB-2 · hostNetwork→ClusterIP | ⬜ 未开始 |
 
@@ -26,7 +26,7 @@
 | OB-4 | Prometheus 改 k8s service discovery（注解+relabel+RBAC，顺带补 admin-api） | P1 | ✅ | PR #364 / issue #363 | 2026-05-30 |
 | OB-13 | PR CI 加 `frontend-verification`（when.paths 门控 web 改动） | P1 | ✅ | PR #366 / issue #365 | 2026-05-30 |
 | OB-16 | ready check audit 表（[readyz-audit.md](../../observability/readyz-audit.md)；发现 readyz 仅装配检查不探测依赖） | P1 | ✅ | PR #367 | 2026-05-30 |
-| OB-8 | `detect-deploy-changes` 拆 CLI + 加 test | P1 | ⬜ | — | — |
+| OB-8 | `detect-deploy-changes` 单元测试 + 接入 CI（CLI 本已具备） | P1 | ✅ | PR #369 / issue #368 | 2026-05-30 |
 | OB-14 | Argo CD GitOps：拆 gitops 仓库 + Drone PR+label 改 gitops + webhook | P2 | ⬜ | — | — |
 | OB-15 | 迁移到 Argo CD（同 OB-14 epic） | P2 | ⬜ | — | — |
 | OB-9 | Drone runner 不挂 admin kubeconfig（随 OB-14/15 消解） | P2 | ⬜ | — | — |
