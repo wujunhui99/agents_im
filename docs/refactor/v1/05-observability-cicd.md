@@ -220,7 +220,7 @@ const langfuseExportTimeout = 10 * time.Second
 
 > 修复：动态调整或挪到 secret/env。
 >
-> **决定（2026-05-30）**：保持并发=3（runner 4 核，再高 context switch / OOM）；`DRONE_IMAGE_BUILD_PARALLELISM` 从 `.drone.yml` 硬编码挪到 **repo env**——它不是机密，无须放 secret。
+> **决定（2026-05-30）**：保持并发=3（runner 4 核，再高 context switch / OOM）。Drone OSS 无 GitHub 式 repo 明文变量（只有 secret），而 `scripts/ci/drone-build-images.sh` 已是 `${DRONE_IMAGE_BUILD_PARALLELISM:-3}`——故**删除 `.drone.yml` 两处硬编码**，并发由脚本默认值 3 控制（非 secret、不在 pipeline 硬编码）；如需调整改脚本默认或注入该 env（见 issue #354 / PR）。
 
 ---
 
@@ -419,13 +419,13 @@ deploy-main (main push)
 | OB-14 | 不加 `develop` 分支；Argo CD GitOps：拆独立 gitops 仓库供 Argo CD 监控，Drone 按 PR+label 改 gitops 仓库，Argo CD 经 webhook 自动部署。|
 | OB-15 | 迁移到 Argo CD（与 OB-14 同一 epic）。|
 | OB-16 | 写 ready check audit 表（每服务列探测了哪些依赖）。|
-| OB-17 | 保持并发=3；`DRONE_IMAGE_BUILD_PARALLELISM` 挪到 **repo env**（非 secret）。|
+| OB-17 | 保持并发=3；删 `.drone.yml` 硬编码，由 `drone-build-images.sh` 的 `DRONE_IMAGE_BUILD_PARALLELISM` 默认值 3 控制（Drone 无 repo 明文变量；非 secret）。|
 
 ### 8.2 分阶段路线（按风险 / 依赖排序）
 
 | 阶段 | 内容 | 形态 | 风险 |
 |------|------|------|------|
-| **P0 速赢** | OB-1 文档同步、OB-10 收尾、OB-17 并发改 repo env | 纯文档 / 配置 PR | 极低 |
+| **P0 速赢** | OB-1 文档同步、OB-10 收尾、OB-17 删并发硬编码 | 纯文档 / 配置 PR | 极低 |
 | **P1 纯后端重构** | OB-7 · OB-5（+OB-6）· OB-12 · OB-4 · OB-13 · OB-16 · OB-8 | 每条独立 issue→worktree→PR，CI 兜底 | 低 |
 | **P2 GitOps/CD** | OB-14/15 引入 Argo CD（**在中间件入 k8s 之前**，先托管现状 manifests）+ 拆 gitops 仓库 + Drone PR+label 改 gitops + webhook；OB-9 在此解决 | 独立 epic | 中高 |
 | **P3 中间件入 k8s** | OB-3（含 k8s 长期只读从库 + 数据迁移 + 关 docker）· OB-11 · OB-2 · hostNetwork→ClusterIP；全部走 P2 的 GitOps | 大 epic，需维护窗口，保留旧 docker 回滚 | 高 |
