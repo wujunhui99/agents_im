@@ -12,5 +12,5 @@
 
 | 分析文档 | 追踪文档 | 状态 |
 |----------|----------|------|
-| [`05-observability-cicd.md`](../05-observability-cicd.md) | [`05-observability-cicd.md`](./05-observability-cicd.md) | 🟡 P0 完成，P1 进行中 |
+| [`05-observability-cicd.md`](../05-observability-cicd.md) | [`05-observability-cicd.md`](./05-observability-cicd.md) | 🟡 P0/P1 完成；P2 Argo CD 已上线；P3 中间件 Redis+MinIO 已迁，PG/Redpanda 待续（见追踪文档 §交接） |
 | 其余 `00`–`04`、`06`–`08` | 待按需创建 | ⬜ |
