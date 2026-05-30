@@ -16,6 +16,7 @@ const (
 	MetricWebSocketCurrent = "agents_im_websocket_connections"
 	MetricWebSocketEvents  = "agents_im_websocket_connection_events_total"
 	MetricHTTPRequests     = "agents_im_http_requests_total"
+	MetricLLMObsDropped    = "agents_im_llmobs_events_dropped_total"
 
 	defaultUnknownLabelValue = "unknown"
 )
@@ -55,6 +56,11 @@ var (
 		Name: MetricHTTPRequests,
 		Help: "HTTP requests by method, path, and status code.",
 	}, []string{"method", "path", "status"})
+
+	llmObsDropped = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: MetricLLMObsDropped,
+		Help: "LLM observability events dropped due to async sink backpressure, by backend.",
+	}, []string{"backend"})
 )
 
 func init() {
@@ -65,7 +71,12 @@ func init() {
 		websocketConnections,
 		websocketEvents,
 		httpRequests,
+		llmObsDropped,
 	)
+}
+
+func RecordLLMObservabilityDrop(backend string) {
+	llmObsDropped.WithLabelValues(labelValue(backend)).Inc()
 }
 
 func MetricsHandler() http.HandlerFunc {

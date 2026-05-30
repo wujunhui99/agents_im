@@ -128,6 +128,11 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	if err != nil {
 		return err
 	}
+	// OB-12: keep remote (Langfuse) export off the agent run path — enqueue in the
+	// foreground and export in a background worker, dropping on backpressure.
+	if _, ok := llmObsSink.(*llmobs.LangfuseSink); ok {
+		llmObsSink = llmobs.NewAsyncSink(llmObsSink, llmObsConfig.Backend, 0)
+	}
 	toolProvider, err := newConversationAIHostingToolProviderWithAgentCreate(opts.AgentRegistry, opts.PythonExecutor, opts.AgentCreate)
 	if err != nil {
 		return err
