@@ -10,7 +10,7 @@
 - 群聊与群成员管理
 - 单聊 / 群聊消息存储、会话 seq、已读状态
 - WebSocket 长连接、心跳、消息发送、离线补偿和在线推送
-- PostgreSQL transactional outbox 与 Kafka/Redpanda 消息事件基础
+- PostgreSQL transactional outbox 消息事件基础（fanout 直读 outbox，无独立消息中间件）
 - Redis presence 在线状态基础
 - Agent profile 管理、Agent-IM 写回契约、Eino/DeepSeek runtime adapter 基线
 - React/Vite 前端四 tab 方向：消息、联系人、发现、我的
@@ -20,7 +20,7 @@
 - 后端：Go、go-zero、gRPC、WebSocket
 - 前端：React、Vite、TypeScript、Vitest
 - 存储：PostgreSQL、Redis
-- 消息：Kafka-compatible Redpanda
+- 消息：PostgreSQL transactional outbox（无独立消息中间件）
 - Agent：CloudWeGo Eino、DeepSeek ChatModel adapter
 - 可观测性：Prometheus text metrics、trace/request id 基础
 - CI/CD：Drone、GHCR、k3s、Docker Compose
@@ -63,7 +63,7 @@ export PATH=/tmp/go/bin:$HOME/go/bin:$PATH
 
 ### 2. 启动本地后端
 
-启动 PostgreSQL、Redis、Redpanda、MinIO，执行迁移，构建并启动 REST API 与 WebSocket Gateway：
+启动 PostgreSQL、Redis、MinIO，执行迁移，构建并启动 REST API 与 WebSocket Gateway：
 
 ```bash
 scripts/dev-up.sh
@@ -127,7 +127,6 @@ make verify
 | Frontend dev server | `http://127.0.0.1:5173` |
 | PostgreSQL | `localhost:5432` |
 | Redis | `localhost:6379` |
-| Redpanda Kafka | `localhost:19092` |
 
 如果默认端口被占用，可用环境变量覆盖端口并指定独立状态目录：
 
@@ -208,7 +207,7 @@ PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./test/e2e/single-machine
 - `.drone.yml` `postgres-integration`：使用独立 `postgres:16-alpine` service 跑 migration 与 integration tests，避免触碰生产数据库。
 - `.drone.yml` `deploy-main`：`main` 分支 push 后先由 `scripts/ci/drone-detect-deploy.sh` / `scripts/detect-deploy-changes.py` 判断变更类型和受影响镜像；业务/镜像相关变更只构建受影响后端服务或 web 镜像，推送到 GHCR，再通过 SSH 把部署文件同步到服务器并运行 `scripts/deploy-k3s.sh`。纯 `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh`、`.drone.yml` 或 `scripts/ci/**` 配置变更走 config-only deploy：跳过镜像构建、middleware 启动、数据库迁移和 `kubectl set image`，仅应用 manifests 并重启/等待受影响服务。
 
-当前生产部署采用混合单机模型：k3s 承载 Go API/RPC/worker 和 web UI，Docker Compose 承载 PostgreSQL、Redis、Redpanda、MinIO。首次部署服务器需先执行 `scripts/bootstrap-server.sh` 创建 `/opt/agents-im/middleware/.env`、启动中间件并创建 k3s `agents-im-secrets`；真实 secret 只保存在服务器/k3s 或 Drone secrets，不提交到仓库，也不放进 CI 日志。
+当前生产部署采用混合单机模型：k3s 承载 Go API/RPC/worker、web UI 及中间件 PostgreSQL、Redis、MinIO（GitOps 管理）。首次部署服务器需先执行 `scripts/bootstrap-server.sh` 创建 `/opt/agents-im/middleware/.env`、启动中间件并创建 k3s `agents-im-secrets`；真实 secret 只保存在服务器/k3s 或 Drone secrets，不提交到仓库，也不放进 CI 日志。
 
 部署入口与必需 Drone Secrets 见 [`deploy/README.md`](./deploy/README.md)。
 

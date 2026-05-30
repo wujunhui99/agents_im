@@ -252,13 +252,6 @@ DataSource: ${DATABASE_URL}
 
 Consumer:
   Driver: ${MESSAGE_TRANSFER_CONSUMER_DRIVER}
-  Topic: ${KAFKA_MESSAGE_EVENTS_TOPIC:-message.events.v1}
-  Group: ${KAFKA_CONSUMER_GROUP:-message-transfer-worker}
-
-Kafka:
-  Brokers: ${KAFKA_BROKERS:-localhost:19092}
-  MessageEventsTopic: ${KAFKA_MESSAGE_EVENTS_TOPIC:-message.events.v1}
-  ConsumerGroup: ${KAFKA_CONSUMER_GROUP:-message-transfer-worker}
 
 Dispatcher:
   Driver: ${MESSAGE_TRANSFER_DISPATCHER_DRIVER}
@@ -392,7 +385,7 @@ main() {
 
   if [[ "${WITH_MIDDLEWARE}" -eq 1 ]]; then
     require_command docker
-    docker compose up -d postgres redis redpanda minio
+    docker compose up -d postgres redis minio
     wait_for_postgres
     require_command curl
     wait_for_minio

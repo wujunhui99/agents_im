@@ -1,6 +1,8 @@
 # Kafka Transfer Consumer
 
-Status: Implemented for Kafka consumer branch
+> ⚠️ **已弃用（2026-05-30）**：Kafka consumer 分支在 V1 未启用（生产用 `Consumer.Driver: outbox`），`internal/transfer/kafka_consumer.go` 等已移除。message-transfer 现直读 PostgreSQL `message_outbox`，见 [`message-transfer-worker.md`](./message-transfer-worker.md)。本文保留为历史设计记录。
+
+Status: Superseded (Kafka consumer branch removed)
 Owner: Message Transfer
 Related docs:
 - [`kafka-message-events.md`](./kafka-message-events.md)

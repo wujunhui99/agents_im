@@ -87,12 +87,6 @@ func main() {
 
 func buildConsumer(cfg config.MessageTransferConfig) (transfer.EventConsumer, error) {
 	switch cfg.Consumer.Driver {
-	case config.TransferConsumerKafka:
-		return transfer.NewKafkaEventConsumer(transfer.KafkaEventConsumerConfig{
-			Brokers: cfg.Kafka.Brokers,
-			Topic:   cfg.Consumer.Topic,
-			GroupID: cfg.Consumer.Group,
-		})
 	case config.TransferConsumerOutbox:
 		repo, err := repository.NewOutboxRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
 		if err != nil {

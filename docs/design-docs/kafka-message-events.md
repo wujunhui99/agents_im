@@ -1,6 +1,8 @@
 # Kafka Message Events
 
-Status: Accepted  
+> ⚠️ **已弃用（2026-05-30）**：Redpanda/Kafka 事件总线在 V1 实际未使用，相关 broker 与 Go 代码（`pkg/messaging/kafka.go`、`internal/transfer/kafka_consumer.go`、`KafkaConfig`、`KAFKA_*`）已移除。生产 fanout 直读 PostgreSQL `message_outbox`（见 [`message-outbox.md`](./message-outbox.md)、[`message-transfer-worker.md`](./message-transfer-worker.md)）。本文保留为历史设计记录。
+
+Status: Superseded (broker removed; outbox-only fanout)  
 Owner: IM backend / Messaging infrastructure  
 Related docs:
 - [`message-chain-contract.md`](./message-chain-contract.md)

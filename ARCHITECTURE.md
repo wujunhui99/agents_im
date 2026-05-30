@@ -52,17 +52,17 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 ### Message Service
 
-负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为后续 Kafka、Message Transfer、Push 服务提供可靠事件源。这里的 `user_id` 是 V0 account id alias。当前文本、图片、文件消息均通过同一消息链路写入；图片/文件消息必须引用已就绪、归发送者所有的 `media_objects` 记录。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md) 和 [`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
+负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为 Message Transfer、Push 服务提供可靠事件源。这里的 `user_id` 是 V0 account id alias。当前文本、图片、文件消息均通过同一消息链路写入；图片/文件消息必须引用已就绪、归发送者所有的 `media_objects` 记录。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md) 和 [`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
 
 ### Media Service Surface
 
 第一阶段不新增独立 `media-api` 进程；媒体上传意图、上传完成校验、下载 URL 和头像绑定作为受保护 REST 路由挂在 `user-api` 上。`user-api` 负责创建私有对象存储 bucket、生成后端控制的 object key、签发上传/下载 URL，并把媒体元数据写入 PostgreSQL `media_objects`。Message API/RPC/Gateway 只验证媒体元数据的 owner、purpose、status、content type 和 size，不直接访问对象存储。
 
-负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为后续 Kafka、Message Transfer、Push 服务提供可靠事件源。这里的 `user_id` 是 V0 account id alias。消息持久化包含 `message_origin=human|ai|system`；Agent/AI 写回消息还记录 `agent_account_id`、`trigger_server_msg_id`、`agent_run_id` 和递归策略。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)、[`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md) 和 [`docs/design-docs/agent-conversation-hosting.md`](./docs/design-docs/agent-conversation-hosting.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
+负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为 Message Transfer、Push 服务提供可靠事件源。这里的 `user_id` 是 V0 account id alias。消息持久化包含 `message_origin=human|ai|system`；Agent/AI 写回消息还记录 `agent_account_id`、`trigger_server_msg_id`、`agent_run_id` 和递归策略。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)、[`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md) 和 [`docs/design-docs/agent-conversation-hosting.md`](./docs/design-docs/agent-conversation-hosting.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
 
 ### Message Transfer Worker
 
-负责消费 Message Outbox 或 Kafka/Redpanda 中的 `message.accepted` 事件，并通过 Delivery Dispatcher 触发在线投递、离线推送或后续 delivery ACK 流程。第一阶段提供独立入口 `service/message-transfer`；默认可使用 in-memory consumer/noop dispatcher，不依赖真实 Kafka、Redpanda、PostgreSQL outbox 或 Gateway fanout。Kafka consumer adapter 消费 `message.events.v1`，将 canonical `messaging.MessageEvent` 映射为 worker `Envelope`，成功处理后提交 offset，retry/failed hook 保留给后续 retry topic 或 dead-letter policy。当前已提供 `internal/transfer/gateway` 适配器，将 Transfer worker 的 `DeliveryDispatcher` 接口桥接到 Gateway `delivery.Dispatcher` 契约，用于本进程内 Gateway 投递集成测试和后续共址 wiring；它不实现远程 Gateway 网络调用或 Redis 跨实例路由。MVP 投递可靠性通过 `delivery_attempts` 记录 `accepted`、`published`、`delivered`、`offline`、`failed`，其中 `delivered` 不等于已读；Worker 不拥有消息历史、会话 seq 或已读状态，这些仍由 Message Service 和 PostgreSQL 权威维护。设计见 [`docs/design-docs/message-transfer-worker.md`](./docs/design-docs/message-transfer-worker.md)、[`docs/design-docs/kafka-transfer-consumer.md`](./docs/design-docs/kafka-transfer-consumer.md)、[`docs/design-docs/transfer-gateway-dispatcher.md`](./docs/design-docs/transfer-gateway-dispatcher.md) 和 [`docs/design-docs/message-delivery-reliability.md`](./docs/design-docs/message-delivery-reliability.md)。
+负责消费 PostgreSQL `message_outbox` 中的 `message.accepted` 事件，并通过 Delivery Dispatcher 触发在线投递、离线推送或后续 delivery ACK 流程。第一阶段提供独立入口 `service/message-transfer`；默认可使用 in-memory consumer/noop dispatcher，不依赖 PostgreSQL outbox 或 Gateway fanout。生产用 outbox consumer（`Consumer.Driver: outbox`）轮询 `message_outbox` 行，经 `outboxpublisher.MessageEventFromOutbox` 转为 canonical `messaging.MessageEvent` 再映射为 worker `Envelope`。当前已提供 `internal/transfer/gateway` 适配器，将 Transfer worker 的 `DeliveryDispatcher` 接口桥接到 Gateway `delivery.Dispatcher` 契约，用于本进程内 Gateway 投递集成测试和后续共址 wiring；它不实现远程 Gateway 网络调用或 Redis 跨实例路由。MVP 投递可靠性通过 `delivery_attempts` 记录 `accepted`、`published`、`delivered`、`offline`、`failed`，其中 `delivered` 不等于已读；Worker 不拥有消息历史、会话 seq 或已读状态，这些仍由 Message Service 和 PostgreSQL 权威维护。设计见 [`docs/design-docs/message-transfer-worker.md`](./docs/design-docs/message-transfer-worker.md)、[`docs/design-docs/transfer-gateway-dispatcher.md`](./docs/design-docs/transfer-gateway-dispatcher.md) 和 [`docs/design-docs/message-delivery-reliability.md`](./docs/design-docs/message-delivery-reliability.md)。
 
 ### IM Core Service
 
@@ -78,7 +78,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - 在线状态维护
 - 消息下发与重试
 
-在线状态和连接元数据通过 Redis presence 层保存为短期运行状态，设计见 [`docs/design-docs/redis-presence.md`](./docs/design-docs/redis-presence.md)。第一阶段已提供独立入口 `service/gateway-ws`，通过 `GET /ws` 建立 WebSocket 连接；Handshake 使用与 HTTP API 一致的 JWT 配置，优先支持 `Authorization: Bearer <token>`，`token` query param 仅在 `GatewayWS.AllowQueryToken=true` 时启用；浏览器 `Origin` 由 `GatewayWS.AllowedOrigins` 精确匹配，未配置时只允许 same-origin。连接通过内存 connection manager 按 `user_id`（account id alias）注册多端 `connection_id`，并同步写入 `PresenceStore`。Gateway command router 支持 `heartbeat`、`send_message`、`pull_messages`、`get_conversation_seqs`、`mark_conversation_read`，并调用现有 Message Service 业务逻辑/仓储契约完成消息写入、拉取、seq 查询和已读推进；heartbeat 和 WebSocket pong 会刷新 presence/last-seen，服务端按配置发送 ping 并按连接执行命令限流。Frontend reconnect sync 使用稳定 WebSocket ACK error envelope，并通过 `get_conversation_seqs`、`pull_messages`、`mark_conversation_read` 补偿缺失消息，产品契约见 [`docs/product-specs/frontend-sync-contract.md`](./docs/product-specs/frontend-sync-contract.md)，设计见 [`docs/design-docs/websocket-reconnect-sync.md`](./docs/design-docs/websocket-reconnect-sync.md)。Gateway push delivery 第一阶段提供 `internal/gateway/delivery.Dispatcher` 契约和本进程内 WebSocket fanout，可向在线连接主动下发 `message_received` / `message_delivered` event；delivery dispatcher 会先查询 presence route metadata，再执行本进程内 fanout，offline/routed/failed recipient 均返回明确状态。Gateway 不拥有消息历史、会话 seq 或已读状态；这些数据仍由 Message Service 和 PostgreSQL 权威维护。后续 Message Transfer worker 将消费 outbox/Kafka 事件并调用 dispatcher，Redis Presence route metadata 用于跨实例路由，delivery ACK 留给后续链路补齐。设计见 [`docs/design-docs/websocket-gateway.md`](./docs/design-docs/websocket-gateway.md)、[`docs/design-docs/gateway-push-delivery.md`](./docs/design-docs/gateway-push-delivery.md) 和 [`docs/design-docs/gateway-presence-routing.md`](./docs/design-docs/gateway-presence-routing.md)。
+在线状态和连接元数据通过 Redis presence 层保存为短期运行状态，设计见 [`docs/design-docs/redis-presence.md`](./docs/design-docs/redis-presence.md)。第一阶段已提供独立入口 `service/gateway-ws`，通过 `GET /ws` 建立 WebSocket 连接；Handshake 使用与 HTTP API 一致的 JWT 配置，优先支持 `Authorization: Bearer <token>`，`token` query param 仅在 `GatewayWS.AllowQueryToken=true` 时启用；浏览器 `Origin` 由 `GatewayWS.AllowedOrigins` 精确匹配，未配置时只允许 same-origin。连接通过内存 connection manager 按 `user_id`（account id alias）注册多端 `connection_id`，并同步写入 `PresenceStore`。Gateway command router 支持 `heartbeat`、`send_message`、`pull_messages`、`get_conversation_seqs`、`mark_conversation_read`，并调用现有 Message Service 业务逻辑/仓储契约完成消息写入、拉取、seq 查询和已读推进；heartbeat 和 WebSocket pong 会刷新 presence/last-seen，服务端按配置发送 ping 并按连接执行命令限流。Frontend reconnect sync 使用稳定 WebSocket ACK error envelope，并通过 `get_conversation_seqs`、`pull_messages`、`mark_conversation_read` 补偿缺失消息，产品契约见 [`docs/product-specs/frontend-sync-contract.md`](./docs/product-specs/frontend-sync-contract.md)，设计见 [`docs/design-docs/websocket-reconnect-sync.md`](./docs/design-docs/websocket-reconnect-sync.md)。Gateway push delivery 第一阶段提供 `internal/gateway/delivery.Dispatcher` 契约和本进程内 WebSocket fanout，可向在线连接主动下发 `message_received` / `message_delivered` event；delivery dispatcher 会先查询 presence route metadata，再执行本进程内 fanout，offline/routed/failed recipient 均返回明确状态。Gateway 不拥有消息历史、会话 seq 或已读状态；这些数据仍由 Message Service 和 PostgreSQL 权威维护。后续 Message Transfer worker 将消费 outbox 事件并调用 dispatcher，Redis Presence route metadata 用于跨实例路由，delivery ACK 留给后续链路补齐。设计见 [`docs/design-docs/websocket-gateway.md`](./docs/design-docs/websocket-gateway.md)、[`docs/design-docs/gateway-push-delivery.md`](./docs/design-docs/gateway-push-delivery.md) 和 [`docs/design-docs/gateway-presence-routing.md`](./docs/design-docs/gateway-presence-routing.md)。
 
 ### Agent Service
 
@@ -107,7 +107,9 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 ### Message Pipeline
 
-基于 Kafka-compatible Redpanda 本地开发环境、`message.events.v1` 事件契约和 PostgreSQL transactional outbox 实现消息异步解耦与削峰，支撑 Message Transfer worker、Gateway fanout 和 Push 链路。Message Service 当前仍同步写 PostgreSQL，并在同一 transaction 内写入 `message_outbox` 的 `message.created` 事件；因此同步 ACK 只表示消息已被 Message Service 接受和持久化，不表示收件端已送达。Outbox Kafka Publisher 将 pending outbox rows 转换为 `message.accepted` 并通过 `messaging.Producer` 发布，采用 at-least-once 语义。事件 topic、schema、producer abstraction 与投递语义见 [`docs/design-docs/kafka-message-events.md`](./docs/design-docs/kafka-message-events.md)，outbox 设计见 [`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md)，publisher 设计见 [`docs/design-docs/outbox-kafka-publisher.md`](./docs/design-docs/outbox-kafka-publisher.md)。
+基于 PostgreSQL transactional outbox 实现消息异步解耦与削峰，支撑 Message Transfer worker、Gateway fanout 和 Push 链路。Message Service 同步写 PostgreSQL，并在同一 transaction 内写入 `message_outbox` 的 `message.created` 事件；因此同步 ACK 只表示消息已被 Message Service 接受和持久化，不表示收件端已送达。Message Transfer worker 直接轮询 `message_outbox`（at-least-once），经 `outboxpublisher.MessageEventFromOutbox` 转为 `message.accepted` 的 canonical `messaging.MessageEvent`，无需独立消息中间件。outbox 设计见 [`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md)。
+
+> 早期设计曾规划 Kafka/Redpanda 事件总线（`message.events.v1`），但 V1 实际未使用，相关 broker 与代码已移除；历史设计见 `docs/design-docs/kafka-message-events.md`、`kafka-transfer-consumer.md`、`outbox-kafka-publisher.md`（已标注弃用）。
 
 ### Storage Layer
 
@@ -137,7 +139,7 @@ LLM observability is separate from system metrics/tracing. AI Hosting emits run/
 - deploy pipeline 先执行 `detect changes`（`scripts/ci/drone-detect-deploy.sh`）：业务/镜像相关变更输出受影响后端服务列表和 `web_required`；纯 `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh` 等变更进入 config-only deploy；文档/Markdown-only 变更不部署。
 - 后端每个 Go API/RPC/worker 按动态服务矩阵构建独立镜像，web UI 仅在 web-owned 路径变更时构建独立镜像；镜像推送到 GHCR，并只打不可变 commit SHA tag。
 - k3s 运行应用工作负载，包括所有 Go API、RPC、Message Transfer worker、Gateway WebSocket 和 web UI。
-- Docker Compose 运行服务器中间件 PostgreSQL、Redis、Redpanda、MinIO；中间件配置位于 `/opt/agents-im/middleware/.env`，不进入 Git。
+- 服务器中间件 PostgreSQL、Redis、MinIO 已迁入 k3s（GitOps 管理）；本地开发用 Docker Compose 起 PostgreSQL、Redis、MinIO。消息链路不再依赖独立消息中间件——Redpanda/Kafka 经确认在 V1 未使用并已移除，fanout 直读 PostgreSQL `message_outbox`。
 - `scripts/bootstrap-server.sh` 负责首次服务器初始化：写中间件 `.env`、启动 middleware、创建 k3s `agents-im-secrets`，并可创建 `ghcr-pull-secret`。
 - `scripts/deploy-k3s.sh` 负责常规发布：启动/确认中间件、从 k3s secret 读取 `DATABASE_URL` 执行 PostgreSQL migration、刷新 GHCR pull secret、应用已渲染且保留不可变镜像 tag 的 `deploy/k8s` manifests 并等待相关 rollout。选择性镜像发布通过 `IMAGE_SERVICES` 只更新已构建服务的镜像 tag；config-only deploy 会跳过镜像更新、middleware 和 migration，只对受影响 deployment 执行 `rollout restart` / `rollout status`。
 
@@ -153,7 +155,7 @@ LLM observability is separate from system metrics/tracing. AI Hosting emits run/
 4. Message Service 在同一 PostgreSQL transaction 内写入 `message_outbox` 的 `message.created` 事件。
 5. Gateway 返回 command ACK。第一阶段 ACK 只表示消息业务命令完成，不表示收件端在线送达。
 6. Gateway 当前可通过 in-memory dispatcher 向本实例在线连接主动下发 server push event。
-7. Message Transfer Worker 后续从 Message Outbox 或 Kafka/Redpanda 消费消息事件，并调度 Gateway/Push 投递。
+7. Message Transfer Worker 从 PostgreSQL `message_outbox` 消费消息事件，并调度 Gateway/Push 投递。
 8. 跨进程 Gateway fanout、Redis Presence 路由、Push worker 和 delivery ACK 由后续链路继续补齐。
 
 ### Agent 响应消息
@@ -177,7 +179,7 @@ LLM observability is separate from system metrics/tracing. AI Hosting emits run/
 
 - 完整 Eino runtime orchestration、工具调用编排和 IM 写回 worker wiring 仍待细化；当前已落地 Eino DeepSeek 模型 adapter、工具解析契约和 Agent-IM runner seam。
 - 服务拆分粒度与代码仓库结构。
-- Kafka topic 设计与消息 schema 第一版见 [`docs/design-docs/kafka-message-events.md`](./docs/design-docs/kafka-message-events.md)，后续需随 outbox/transfer/push 实现继续细化。
+- 消息事件 schema 见 `pkg/messaging/event.go`（`messaging.MessageEvent`）；早期 Kafka topic 设计为历史参考，broker 已移除。
 - PostgreSQL 表结构和迁移方案。
 - Agent 工具权限模型第一版见 `docs/design-docs/agent-system-architecture.md`，后续需随 MCP、MinIO skill 和 Python Executor 实现继续细化。
 

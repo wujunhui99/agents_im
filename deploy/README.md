@@ -3,7 +3,7 @@
 This project uses a hybrid single-server deployment:
 
 - k3s manages application workloads: all Go APIs/RPCs/workers and the web UI.
-- Docker Compose manages middleware: PostgreSQL, Redis, Redpanda, and MinIO.
+- Middleware (PostgreSQL, Redis, MinIO) runs in k3s under GitOps; local dev uses Docker Compose for PostgreSQL, Redis, and MinIO. Message fanout reads PostgreSQL `message_outbox` directly — no separate message broker.
 - Drone builds images, pushes them to GHCR, copies deployment files to the server, and runs `scripts/deploy-k3s.sh` remotely.
 
 ## Server bootstrap
