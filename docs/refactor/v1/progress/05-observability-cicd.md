@@ -25,7 +25,7 @@
 | OB-12 | LLM observability sink 异步化（channel + 后台 worker + drop 计数） | P1 | ✅ | PR #362 / issue #361 | 2026-05-30 |
 | OB-4 | Prometheus 改 k8s service discovery（注解+relabel+RBAC，顺带补 admin-api） | P1 | ✅ | PR #364 / issue #363 | 2026-05-30 |
 | OB-13 | PR CI 加 `frontend-verification`（when.paths 门控 web 改动） | P1 | ✅ | PR #366 / issue #365 | 2026-05-30 |
-| OB-16 | ready check audit 表（每服务列探测依赖） | P1 | ⬜ | — | — |
+| OB-16 | ready check audit 表（[readyz-audit.md](../../observability/readyz-audit.md)；发现 readyz 仅装配检查不探测依赖） | P1 | ✅ | PR #367 | 2026-05-30 |
 | OB-8 | `detect-deploy-changes` 拆 CLI + 加 test | P1 | ⬜ | — | — |
 | OB-14 | Argo CD GitOps：拆 gitops 仓库 + Drone PR+label 改 gitops + webhook | P2 | ⬜ | — | — |
 | OB-15 | 迁移到 Argo CD（同 OB-14 epic） | P2 | ⬜ | — | — |
