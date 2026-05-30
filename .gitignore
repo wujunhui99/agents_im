@@ -16,3 +16,4 @@ web/coverage/
 !/secret/.gitignore
 !/secret/README.md
 !/secret/*.example
+.claude/worktrees/
