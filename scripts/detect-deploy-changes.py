@@ -165,6 +165,15 @@ def is_doc_only(path: str) -> bool:
     return path.startswith("docs/") or name == "README.md" or name.endswith(".md")
 
 
+def is_meta_dotpath(path: str) -> bool:
+    # Top-level dotfiles / dotdirs (e.g. .claude/, .hermes/, .ai-context/, .gitignore)
+    # are tooling/meta and never affect the deployed app, so they must not trigger
+    # build or deploy. Genuine CI dotfiles (.drone.yml, .github/workflows/deploy.yml,
+    # .dockerignore) are matched by the explicit deploy rules in classify_path before
+    # this check is reached.
+    return path.startswith(".")
+
+
 def service_from_yaml(path: str, prefix: str) -> str | None:
     if not path.startswith(prefix) or not path.endswith(".yaml"):
         return None
@@ -279,6 +288,11 @@ def classify_path(path: str, selection: DeploySelection) -> None:
 
     if path in {"go.mod", "go.sum", "Dockerfile", ".dockerignore"}:
         selection.add_all_backends()
+        return
+
+    if is_meta_dotpath(path):
+        # Reached only for dot-paths not claimed by the explicit deploy rules above
+        # (.drone.yml, .github/workflows/deploy.yml, .dockerignore). Meta/tooling only.
         return
 
     exact_services = INTERNAL_EXACT_SERVICE_PATHS.get(path)
