@@ -3,15 +3,6 @@ WorkerID: ${HOSTNAME}
 DryRun: false
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
-Tracing:
-  Enabled: true
-  ServiceName: message-transfer
-  Environment: ${AGENTS_IM_ENV}
-  OTLPEndpoint: ${AGENTS_IM_OTLP_ENDPOINT}
-  Protocol: ${AGENTS_IM_OTLP_PROTOCOL}
-  SamplerRatio: 1.0
-  TraceUIBaseURL: ${AGENTS_IM_TRACE_UI_BASE_URL}
-  Insecure: true
 
 Consumer:
   # Production live push consumes durable message_outbox rows written by message-api.

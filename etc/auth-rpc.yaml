@@ -1,13 +1,5 @@
 Name: auth-rpc
 ListenOn: 0.0.0.0:9091
-Tracing:
-  Enabled: false
-  ServiceName: auth-rpc
-  Environment: local
-  Protocol: grpc
-  SamplerRatio: 1.0
-  TraceUIBaseURL: http://localhost:3000
-  Insecure: true
 
 TokenAuth:
   AccessSecret: dev-jwt-secret-change-me

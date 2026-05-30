@@ -1,13 +1,5 @@
 Name: groups-rpc
 ListenOn: 0.0.0.0:9093
-Tracing:
-  Enabled: false
-  ServiceName: groups-rpc
-  Environment: local
-  Protocol: grpc
-  SamplerRatio: 1.0
-  TraceUIBaseURL: http://localhost:3000
-  Insecure: true
 
 StorageDriver: memory
 DataSource: ${DATABASE_URL}
