@@ -7,7 +7,7 @@
 | 架构文档 | 3/5 | 5/5 | 服务边界和主要部署拓扑已有记录；跨集群/多实例部署仍待细化 |
 | 产品规格 | 2/5 | 5/5 | 需要补充完整用户故事和验收标准 |
 | 执行计划 | 3/5 | 5/5 | 已有多项 completed 计划和 CI/CD 计划；后续需持续归档 active 计划 |
-| 测试策略 | 3/5 | 5/5 | 已有 GitHub Actions backend verification、PostgreSQL integration job、静态检查和本地复现命令；前端/端到端发布门禁仍待加强 |
+| 测试策略 | 3/5 | 5/5 | 已有 Drone CI backend verification、PostgreSQL integration job、静态检查和本地复现命令；前端/端到端发布门禁仍待加强 |
 | 可观测性 | 2/5 | 5/5 | 指标、日志字段和 tracing 规范待细化 |
 | 安全 | 1/5 | 5/5 | Agent 工具权限和数据隔离待设计 |
 

@@ -131,10 +131,10 @@ LLM observability is separate from system metrics/tracing. AI Hosting emits run/
 
 ### Deployment / CI-CD
 
-生产发布采用 GitHub Actions + GHCR + k3s + Docker Compose 的混合单机模型：
+生产发布采用 Drone CI + GHCR + k3s + Docker Compose 的混合单机模型（GitHub Actions 已废弃，唯一 CI/部署链路是 Drone）：
 
-- GitHub Actions `.github/workflows/deploy.yml` 只从 `main` 分支 push 或手动 `workflow_dispatch` 发布；build/deploy job 额外检查 `github.ref == 'refs/heads/main'`，因此手动触发非 `main` ref 会 no-op。feature 分支先通过 `.github/workflows/ci.yml` 合入 `develop`，再由经过验证的 `develop` 合入 `main`。
-- deploy workflow 先执行 `detect-changes`：业务/镜像相关变更输出受影响后端服务列表和 `web_required`；纯 `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh` 或 deploy workflow 配置变更进入 config-only deploy；文档/Markdown-only 变更不部署。手动 `workflow_dispatch` 在 `main` 上保持完整构建部署语义。
+- Drone CI（`.drone.yml`，服务器 `https://drone.agenticim.xyz`）承担 verify 与 deploy：`verification` pipeline 在 PR 上跑 backend verify + PostgreSQL integration；`deploy-main` pipeline 在 `main` push 时执行 detect → build → deploy → notify。已取消 `develop` 集成分支，所有变更经任务分支 PR + GitHub Merge Queue 合入 `main` 后才触发部署（见 `AGENTS.md`）。
+- deploy pipeline 先执行 `detect changes`（`scripts/ci/drone-detect-deploy.sh`）：业务/镜像相关变更输出受影响后端服务列表和 `web_required`；纯 `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh` 等变更进入 config-only deploy；文档/Markdown-only 变更不部署。
 - 后端每个 Go API/RPC/worker 按动态服务矩阵构建独立镜像，web UI 仅在 web-owned 路径变更时构建独立镜像；镜像推送到 GHCR，并只打不可变 commit SHA tag。
 - k3s 运行应用工作负载，包括所有 Go API、RPC、Message Transfer worker、Gateway WebSocket 和 web UI。
 - Docker Compose 运行服务器中间件 PostgreSQL、Redis、Redpanda、MinIO；中间件配置位于 `/opt/agents-im/middleware/.env`，不进入 Git。
@@ -181,4 +181,4 @@ LLM observability is separate from system metrics/tracing. AI Hosting emits run/
 - PostgreSQL 表结构和迁移方案。
 - Agent 工具权限模型第一版见 `docs/design-docs/agent-system-architecture.md`，后续需随 MCP、MinIO skill 和 Python Executor 实现继续细化。
 
-- `docs/deployment-k3s-pitfalls.md` — k3s/GitHub Actions deployment pitfalls and runbook.
+- `docs/deployment-k3s-pitfalls.md` — k3s/Drone deployment pitfalls and runbook.
