@@ -4,6 +4,30 @@ metadata:
   name: prometheus
   namespace: agents-im
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-pod-discovery
+  namespace: agents-im
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "endpoints", "services"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-pod-discovery
+  namespace: agents-im
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-pod-discovery
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: agents-im
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -27,18 +51,36 @@ data:
         static_configs:
           - targets: ["node-exporter.agents-im.svc.cluster.local:9100"]
 
-      - job_name: agents-im-http-services
-        metrics_path: /metrics
-        static_configs:
-          - targets:
-              - user-api.agents-im.svc.cluster.local:8080
-              - auth-api.agents-im.svc.cluster.local:8081
-              - friends-api.agents-im.svc.cluster.local:8082
-              - message-api.agents-im.svc.cluster.local:8083
-              - gateway-ws.agents-im.svc.cluster.local:8084
-              - groups-api.agents-im.svc.cluster.local:8085
-              - agent-api.agents-im.svc.cluster.local:8086
-              - message-transfer.agents-im.svc.cluster.local:8087
+      # Auto-discover agents-im pods that opt in via prometheus.io/scrape
+      # annotations (OB-4). Adding a new service only needs the annotations on
+      # its pod template — no edit here.
+      - job_name: agents-im-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [agents-im]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: replace
+            target_label: app
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
