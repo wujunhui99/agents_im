@@ -32,6 +32,8 @@ configMapGenerator:
       - etc/groups-rpc.yaml
       - etc/message-rpc.yaml
       - etc/mail-rpc.yaml
+      - etc/media-rpc.yaml
+      - etc/media-api.yaml
 generatorOptions:
   disableNameSuffixHash: true
 patches:
