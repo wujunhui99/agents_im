@@ -5,19 +5,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/auth/token"
 	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/pkg/response"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/rest"
@@ -166,48 +163,6 @@ func TestMessageFeedbackJSONRouteUsesApiPrefix(t *testing.T) {
 	}
 	if envelope.Code != "OK" || envelope.Data.FeedbackID == "" || envelope.Data.Status != "new" {
 		t.Fatalf("unexpected feedback envelope: %+v", envelope)
-	}
-}
-
-func TestMessageMediaAvatarRouteRedirectsToObjectStorage(t *testing.T) {
-	mediaRepo := repository.NewMemoryMediaRepository()
-	store := objectstorage.NewMemoryStore()
-	const objectKey = "avatar/route-user/med_route_avatar.png"
-	if _, err := mediaRepo.CreateMediaObject(context.Background(), model.MediaObject{
-		MediaID:          "med_route_avatar",
-		OwnerUserID:      "route-user",
-		Bucket:           "agents-im-media",
-		ObjectKey:        objectKey,
-		ContentType:      "image/png",
-		SizeBytes:        128,
-		OriginalFilename: "avatar.png",
-		Purpose:          model.MediaPurposeAvatar,
-		Status:           model.MediaStatusReady,
-	}); err != nil {
-		t.Fatalf("seed avatar media: %v", err)
-	}
-	store.PutObjectInfo(objectstorage.ObjectInfo{ObjectKey: objectKey, ContentType: "image/png", SizeBytes: 128})
-
-	serviceContext := messagesvc.NewServiceContextWithFeedback(
-		repository.NewMemoryMessageRepository(),
-		mediaRepo,
-		repository.NewMemoryFeedbackRepository(),
-		nil,
-		nil,
-		testRouteJWTAuthConfig(),
-	)
-	serviceContext.MediaLogic.WithObjectStore(store, "agents-im-media")
-	router := newRouteTestMessageRouter(t, serviceContext)
-
-	resp := httptest.NewRecorder()
-	// Public: no Authorization header, like a browser <img> request.
-	req := httptest.NewRequest(http.MethodGet, "/media/avatars/med_route_avatar", nil)
-	router.ServeHTTP(resp, req)
-	if resp.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("avatar route status = %d, body = %s", resp.Code, resp.Body.String())
-	}
-	if location := resp.Header().Get("Location"); !strings.Contains(location, url.PathEscape(objectKey)) {
-		t.Fatalf("redirect location = %q, want escaped object key %q", location, url.PathEscape(objectKey))
 	}
 }
 

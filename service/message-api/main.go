@@ -12,7 +12,6 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/pkg/response"
@@ -120,13 +119,6 @@ func main() {
 	} else {
 		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", config.ResolveStorageDriver(cfg.StorageDriver))
 	}
-	// Wire object storage so public avatar display (/media/avatars/:id) can presign
-	// download URLs. message-api owns the media/object-storage access path.
-	objectStore, err := objectstorage.NewStore(cfg.ObjectStorage)
-	if err != nil {
-		log.Fatalf("build object storage: %v", err)
-	}
-	serviceContext.MediaLogic.WithObjectStore(objectStore, cfg.ObjectStorage.Bucket)
 
 	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
