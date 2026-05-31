@@ -38,11 +38,10 @@
 - **后果**：msg-api 进程要装载 admin 整条链；admin 改动会触发 msg-api 重启；admin 不能独立部署/扩容。
 - **修复**：拆出独立服务 `service/admin/api`（admin-api）；msg-api 只保留 message 路由。
 
-### TD-2 ⚠️ `internal/handler/gozero_routes.go` 是单体路由聚合器
-此文件至今同时为 auth/user/friends/groups/admin/media/message 注册 go-zero 路由（见 `RegisterAuthGoZeroHandlers`、`RegisterUserGoZeroHandlers` 等）。已迁服务的 main（`service/<domain>/api/<domain>.go`）只注册自己的路由，但仍有调用者（msg-api）通过这里启动多域路由。
+### TD-2 ✅ `internal/handler/gozero_routes.go` 已收敛为 message-only
+历史：此文件曾同时为 auth/user/friends/groups/admin/media/message 注册 go-zero 路由。已迁服务的 main（`service/<domain>/api/<domain>.go`）只注册自己的路由，但 msg-api 仍通过这里启动多域路由。
 
-- **后果**：删除任何一域的"单体路由"都会牵动这个文件，迁移迟迟收尾不掉。
-- **修复**：让 msg-api 在迁完后只在 `service/msg/api` 的 main 注册自己的路由，删 `gozero_routes.go` 里非 message/admin 的注册函数。
+> ✅ 已修复（#389）：user/auth/friends/groups 的 `RegisterXGoZeroHandlers` 与 `addXRoutes` 仅测试用，已连同 `internal/handler/{user,auth,friends,groups}`、`internal/logic/{user,auth,friends,groups}`、`internal/servicecontext/{user,auth,friends,groups}` 一并删除；`gozero_routes.go` 现仅保留 `RegisterMessageGoZeroHandlers`（msg-api live 路径）。message-rpc/message-api/message-transfer 仍骑在 monolith `internal/*` 上，属「干掉两套加载体系」更大议题（见 #336）。
 
 ### TD-3 ⚠️ message / gateway / transfer 三大主路径根本没进 `service/`
 按照 `ARCHITECTURE.md`，这三个是核心消息链路。但代码主体仍在 `internal/`，意味着：
