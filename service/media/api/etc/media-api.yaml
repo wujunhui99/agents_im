@@ -1,0 +1,11 @@
+Name: media-api
+Host: 0.0.0.0
+Port: 8089
+
+Auth:
+  AccessSecret: dev-jwt-secret-change-me
+  AccessExpire: 86400
+MediaRPC:
+  Endpoints:
+    - 127.0.0.1:9096
+  Timeout: 5000
