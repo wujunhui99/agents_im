@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,9 +9,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/auth/token"
-	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/response"
@@ -20,112 +17,6 @@ import (
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
-
-func TestGroupsReadRoutesRequireJWTAndMembership(t *testing.T) {
-	ctx := context.Background()
-	auth := testRouteJWTAuthConfig()
-	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
-	creator := mustCreateRouteTestUser(t, userLogic, "route_creator")
-	member := mustCreateRouteTestUser(t, userLogic, "route_member")
-	outsider := mustCreateRouteTestUser(t, userLogic, "route_outsider")
-
-	serviceContext := groupssvc.NewServiceContextWithAuth(
-		repository.NewMemoryGroupsRepository(),
-		logic.NewUserLogicExistenceChecker(userLogic),
-		auth,
-	)
-	group, err := serviceContext.GroupsLogic.CreateGroup(ctx, logic.CreateGroupRequest{
-		CreatorUserID: creator.UserID,
-		Name:          "Route ACL",
-	})
-	if err != nil {
-		t.Fatalf("create group: %v", err)
-	}
-	if _, err := serviceContext.GroupsLogic.JoinGroup(ctx, logic.JoinGroupRequest{
-		GroupID: group.GroupID,
-		UserID:  member.UserID,
-	}); err != nil {
-		t.Fatalf("join member: %v", err)
-	}
-
-	router := newRouteTestGroupsRouter(t, serviceContext)
-
-	for _, target := range []string{
-		"/groups/" + group.GroupID,
-		"/groups/" + group.GroupID + "/members",
-	} {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, target, nil)
-		router.ServeHTTP(resp, req)
-		if resp.Code != http.StatusUnauthorized {
-			t.Fatalf("unauthenticated %s status = %d, body = %s", target, resp.Code, resp.Body.String())
-		}
-
-		resp = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodGet, target, nil)
-		req.Header.Set("Authorization", routeTestBearerTokenForUser(t, auth, outsider.UserID))
-		router.ServeHTTP(resp, req)
-		if resp.Code != http.StatusForbidden {
-			t.Fatalf("outsider %s status = %d, body = %s", target, resp.Code, resp.Body.String())
-		}
-
-		resp = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodGet, target, nil)
-		req.Header.Set("Authorization", routeTestBearerTokenForUser(t, auth, member.UserID))
-		router.ServeHTTP(resp, req)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("member %s status = %d, body = %s", target, resp.Code, resp.Body.String())
-		}
-	}
-}
-
-func TestGroupsAddMemberRouteRequiresOwnerForOtherUsers(t *testing.T) {
-	ctx := context.Background()
-	auth := testRouteJWTAuthConfig()
-	userLogic := logic.NewUserLogic(repository.NewMemoryRepository())
-	creator := mustCreateRouteTestUser(t, userLogic, "route_add_creator")
-	member := mustCreateRouteTestUser(t, userLogic, "route_add_member")
-	invitee := mustCreateRouteTestUser(t, userLogic, "route_add_invitee")
-
-	serviceContext := groupssvc.NewServiceContextWithAuth(
-		repository.NewMemoryGroupsRepository(),
-		logic.NewUserLogicExistenceChecker(userLogic),
-		auth,
-	)
-	group, err := serviceContext.GroupsLogic.CreateGroup(ctx, logic.CreateGroupRequest{
-		CreatorUserID: creator.UserID,
-		Name:          "Route Add ACL",
-	})
-	if err != nil {
-		t.Fatalf("create group: %v", err)
-	}
-	if _, err := serviceContext.GroupsLogic.JoinGroup(ctx, logic.JoinGroupRequest{
-		GroupID: group.GroupID,
-		UserID:  member.UserID,
-	}); err != nil {
-		t.Fatalf("join member: %v", err)
-	}
-
-	router := newRouteTestGroupsRouter(t, serviceContext)
-	target := "/groups/" + group.GroupID + "/members"
-	body := `{"user_id":"` + invitee.UserID + `"}`
-
-	memberResp := httptest.NewRecorder()
-	memberReq := newRouteTestJSONRequest(http.MethodPost, target, body)
-	memberReq.Header.Set("Authorization", routeTestBearerTokenForUser(t, auth, member.UserID))
-	router.ServeHTTP(memberResp, memberReq)
-	if memberResp.Code != http.StatusForbidden {
-		t.Fatalf("member add status = %d, body = %s", memberResp.Code, memberResp.Body.String())
-	}
-
-	ownerResp := httptest.NewRecorder()
-	ownerReq := newRouteTestJSONRequest(http.MethodPost, target, body)
-	ownerReq.Header.Set("Authorization", routeTestBearerTokenForUser(t, auth, creator.UserID))
-	router.ServeHTTP(ownerResp, ownerReq)
-	if ownerResp.Code != http.StatusOK {
-		t.Fatalf("owner add status = %d, body = %s", ownerResp.Code, ownerResp.Body.String())
-	}
-}
 
 func TestMessageFeedbackJSONRouteUsesApiPrefix(t *testing.T) {
 	auth := testRouteJWTAuthConfig()
@@ -183,35 +74,6 @@ func newRouteTestMessageRouter(t *testing.T, serviceContext *messagesvc.ServiceC
 		t.Fatalf("build message route test router: %v", err)
 	}
 	return http.HandlerFunc(serverless.Serve)
-}
-
-func newRouteTestGroupsRouter(t *testing.T, serviceContext *groupssvc.ServiceContext) http.Handler {
-	t.Helper()
-
-	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
-	server := rest.MustNewServer(rest.RestConf{
-		ServiceConf: service.ServiceConf{Name: "groups-route-test"},
-		Host:        "127.0.0.1",
-		Port:        8888,
-	}, rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
-	t.Cleanup(server.Stop)
-	RegisterGroupsGoZeroHandlers(server, serviceContext)
-
-	serverless, err := rest.NewServerless(server)
-	if err != nil {
-		t.Fatalf("build go-zero test router: %v", err)
-	}
-	return http.HandlerFunc(serverless.Serve)
-}
-
-func mustCreateRouteTestUser(t *testing.T, userLogic *logic.UserLogic, identifier string) logic.UserProfile {
-	t.Helper()
-
-	user, err := userLogic.CreateUser(context.Background(), logic.CreateUserRequest{Identifier: identifier})
-	if err != nil {
-		t.Fatalf("create user %q: %v", identifier, err)
-	}
-	return user
 }
 
 func testRouteJWTAuthConfig() config.JWTAuthConfig {

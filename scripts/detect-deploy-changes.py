@@ -84,29 +84,21 @@ FLAT_SERVICE_DIRS = {
     "service/message-transfer/": "message-transfer",
 }
 
+# Only the message domain still rides the monolith internal/* tree (message-api /
+# message-transfer). user/auth/friends/groups moved to service/<domain>/api and their
+# legacy internal/{handler,logic,servicecontext}/<domain> scaffolding was deleted (#389).
 INTERNAL_DOMAIN_SERVICE_PREFIXES = {
-    "internal/handler/user/": ["user-api"],
-    "internal/handler/auth/": ["auth-api"],
-    "internal/handler/friends/": ["friends-api"],
-    "internal/handler/groups/": ["groups-api"],
     "internal/handler/message/": ["message-api"],
     "internal/handler/admin/": ["admin-api"],
     "service/admin/": ["admin-api"],
-    "internal/logic/user/": ["user-api"],
-    "internal/logic/auth/": ["auth-api"],
-    "internal/logic/friends/": ["friends-api"],
-    "internal/logic/groups/": ["groups-api"],
     "internal/logic/message/": ["message-api", "message-transfer"],
-    "internal/servicecontext/user/": ["user-api"],
-    "internal/servicecontext/auth/": ["auth-api"],
-    "internal/servicecontext/friends/": ["friends-api"],
-    "internal/servicecontext/groups/": ["groups-api"],
     "internal/servicecontext/message/": ["message-api", "message-transfer"],
 }
 
 INTERNAL_EXACT_SERVICE_PATHS = {
-    "internal/handler/gozero_routes.go": API_BACKEND_SERVICES,
-    "internal/handler/gozero_routes_test.go": API_BACKEND_SERVICES,
+    # gozero_routes.go now only registers message handlers (RegisterMessageGoZeroHandlers).
+    "internal/handler/gozero_routes.go": ["message-api"],
+    "internal/handler/gozero_routes_test.go": ["message-api"],
     "internal/handler/admin_routes_test.go": ["message-api"],
 }
 
