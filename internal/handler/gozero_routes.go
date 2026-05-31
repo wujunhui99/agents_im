@@ -10,7 +10,6 @@ import (
 	authhandler "github.com/wujunhui99/agents_im/internal/handler/auth"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
-	mediahandler "github.com/wujunhui99/agents_im/internal/handler/media"
 	messagehandler "github.com/wujunhui99/agents_im/internal/handler/message"
 	userhandler "github.com/wujunhui99/agents_im/internal/handler/user"
 	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
@@ -71,11 +70,9 @@ func RegisterUserGoZeroHandlers(server *rest.Server, serverCtx *usersvc.ServiceC
 			componentCheck("account_logic", serverCtx != nil && serverCtx.AccountLogic != nil, "configured"),
 			componentCheck("user_logic", serverCtx != nil && serverCtx.UserLogic != nil, "configured"),
 			componentCheck("repository", serverCtx != nil && serverCtx.Repo != nil, "configured"),
-			componentCheck("media_logic", serverCtx != nil && serverCtx.MediaLogic != nil, "configured"),
 		}
 	})
 	addUserRoutes(server, serverCtx)
-	addMediaRoutes(server, serverCtx)
 }
 
 func RegisterFriendsGoZeroHandlers(server *rest.Server, serverCtx *friendssvc.ServiceContext) {
@@ -194,34 +191,6 @@ func addUserRoutes(server *rest.Server, serverCtx *usersvc.ServiceContext) {
 			Handler: userhandler.GetAccountByIdentifierHandler(serverCtx),
 		},
 	})
-}
-
-func addMediaRoutes(server *rest.Server, serverCtx *usersvc.ServiceContext) {
-	server.AddRoutes([]rest.Route{
-		{
-			Method:  http.MethodGet,
-			Path:    "/media/avatars/:media_id",
-			Handler: mediahandler.GetAvatarHandler(serverCtx),
-		},
-	})
-
-	server.AddRoutes(authenticatedRoutes(serverCtx, []rest.Route{
-		{
-			Method:  http.MethodPost,
-			Path:    "/media/uploads",
-			Handler: mediahandler.CreateUploadIntentHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodPost,
-			Path:    "/media/uploads/:media_id/complete",
-			Handler: mediahandler.CompleteUploadHandler(serverCtx),
-		},
-		{
-			Method:  http.MethodGet,
-			Path:    "/media/:media_id/download-url",
-			Handler: mediahandler.GetDownloadURLHandler(serverCtx),
-		},
-	}), jwtOption(serverCtx))
 }
 
 func addFriendsRoutes(server *rest.Server, serverCtx *friendssvc.ServiceContext) {
@@ -352,16 +321,6 @@ func addMessageRoutes(server *rest.Server, serverCtx *messagesvc.ServiceContext)
 			Handler: messagehandler.UpdateConversationAIHostingHandler(serverCtx),
 		},
 	}), jwtOption(serverCtx))
-
-	// Public avatar display: browsers load <img src="/media/avatars/:id"> without
-	// auth; redirect to a short-lived presigned object-storage URL.
-	server.AddRoutes([]rest.Route{
-		{
-			Method:  http.MethodGet,
-			Path:    "/media/avatars/:media_id",
-			Handler: mediahandler.GetAvatarMessageHandler(serverCtx),
-		},
-	})
 }
 
 func jwtOption(serverCtx authRouteContext) rest.RouteOption {
