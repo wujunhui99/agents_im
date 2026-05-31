@@ -4,6 +4,7 @@ import (
 	"context"
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/media/rpc/media"
 
@@ -31,7 +32,7 @@ func (l *GetDownloadURLLogic) GetDownloadURL(in *media.GetDownloadURLRequest) (*
 		MediaID:         in.GetMediaId(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, rpcerror.ToStatus(err)
 	}
 	return &media.GetDownloadURLResponse{
 		MediaId:     resp.MediaID,

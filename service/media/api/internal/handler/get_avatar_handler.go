@@ -22,7 +22,7 @@ func GetAvatarHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			MediaId: req.MediaID,
 		})
 		if err != nil {
-			httpx.ErrorCtx(r.Context(), w, err)
+			httpx.ErrorCtx(r.Context(), w, apiError(err))
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")

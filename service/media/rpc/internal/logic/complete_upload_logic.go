@@ -4,6 +4,7 @@ import (
 	"context"
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/media/rpc/media"
 
@@ -30,7 +31,7 @@ func (l *CompleteUploadLogic) CompleteUpload(in *media.CompleteUploadRequest) (*
 		MediaID:     in.GetMediaId(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, rpcerror.ToStatus(err)
 	}
 	return &media.CompleteUploadResponse{
 		Media: mediaObjectToPB(resp.Media),
