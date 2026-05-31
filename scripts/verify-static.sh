@@ -2155,7 +2155,7 @@ if "agents-im-observability-basic-auth@kubernetescrd" not in metrics_middlewares
     sys.exit(1)
 
 ms_media_expectations = {
-    "/media": ("user-api", 8080),
+    "/media": ("media-api", 8089),
     "/agents-im-media": ("agents-im-minio", 9000),
 }
 for path, expected_backend in ms_media_expectations.items():
