@@ -7,20 +7,20 @@ import (
 
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/token"
-	"github.com/wujunhui99/agents_im/pkg/config"
 	authhandler "github.com/wujunhui99/agents_im/internal/handler/auth"
 	friendshandler "github.com/wujunhui99/agents_im/internal/handler/friends"
 	groupshandler "github.com/wujunhui99/agents_im/internal/handler/groups"
 	mediahandler "github.com/wujunhui99/agents_im/internal/handler/media"
 	messagehandler "github.com/wujunhui99/agents_im/internal/handler/message"
 	userhandler "github.com/wujunhui99/agents_im/internal/handler/user"
-	"github.com/wujunhui99/agents_im/pkg/health"
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	authsvc "github.com/wujunhui99/agents_im/internal/servicecontext/auth"
 	friendssvc "github.com/wujunhui99/agents_im/internal/servicecontext/friends"
 	groupssvc "github.com/wujunhui99/agents_im/internal/servicecontext/groups"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	usersvc "github.com/wujunhui99/agents_im/internal/servicecontext/user"
+	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/health"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
@@ -352,6 +352,16 @@ func addMessageRoutes(server *rest.Server, serverCtx *messagesvc.ServiceContext)
 			Handler: messagehandler.UpdateConversationAIHostingHandler(serverCtx),
 		},
 	}), jwtOption(serverCtx))
+
+	// Public avatar display: browsers load <img src="/media/avatars/:id"> without
+	// auth; redirect to a short-lived presigned object-storage URL.
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodGet,
+			Path:    "/media/avatars/:media_id",
+			Handler: mediahandler.GetAvatarMessageHandler(serverCtx),
+		},
+	})
 }
 
 func jwtOption(serverCtx authRouteContext) rest.RouteOption {

@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/model"
-	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 )
 
 const (
@@ -128,6 +128,19 @@ func NewMediaLogic(repo repository.MediaRepository, store objectstorage.ObjectSt
 		now:    time.Now,
 		newID:  newMediaID,
 	}
+}
+
+// WithObjectStore attaches an object store + bucket to an existing MediaLogic.
+// Used by services that construct the MediaLogic before object storage is wired
+// (e.g. message-api), so avatar/download presigning works against live storage.
+func (l *MediaLogic) WithObjectStore(store objectstorage.ObjectStore, bucket string) *MediaLogic {
+	if l != nil {
+		l.store = store
+		if trimmed := strings.TrimSpace(bucket); trimmed != "" {
+			l.bucket = trimmed
+		}
+	}
+	return l
 }
 
 func (l *MediaLogic) WithAttachmentAccessChecker(checker MediaAttachmentAccessChecker) *MediaLogic {
