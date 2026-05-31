@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package media.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/service/media/rpc/media";
+
+// Media owns the object-storage lifecycle (avatar/attachment upload, completion,
+// download/display presigned URLs). Validation of media ownership/status is done
+// locally by callers (user-rpc set-avatar, message send) against the shared
+// media_objects table; media-rpc owns all writes + the object store.
+service Media {
+  rpc CreateUploadIntent(CreateUploadIntentRequest) returns (CreateUploadIntentResponse);
+  rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
+  rpc GetDownloadURL(GetDownloadURLRequest) returns (GetDownloadURLResponse);
+  rpc GetAvatarDisplayURL(GetAvatarDisplayURLRequest) returns (GetDownloadURLResponse);
+}
+
+message MediaObject {
+  string media_id = 1;
+  string owner_user_id = 2;
+  string bucket = 3;
+  string object_key = 4;
+  string sha256 = 5;
+  string content_type = 6;
+  int64 size_bytes = 7;
+  int32 width = 8;
+  int32 height = 9;
+  string original_filename = 10;
+  string purpose = 11;
+  string status = 12;
+  string created_at = 13;
+  string updated_at = 14;
+}
+
+message CreateUploadIntentRequest {
+  string owner_user_id = 1;
+  string purpose = 2;
+  string filename = 3;
+  string content_type = 4;
+  int64 size_bytes = 5;
+  string sha256 = 6;
+  int32 width = 7;
+  int32 height = 8;
+}
+
+message CreateUploadIntentResponse {
+  string media_id = 1;
+  string object_key = 2;
+  string upload_url = 3;
+  int64 expires_at = 4;
+}
+
+message CompleteUploadRequest {
+  string owner_user_id = 1;
+  string media_id = 2;
+}
+
+message CompleteUploadResponse {
+  MediaObject media = 1;
+}
+
+message GetDownloadURLRequest {
+  string owner_user_id = 1;
+  string requester_user_id = 2;
+  string media_id = 3;
+}
+
+message GetDownloadURLResponse {
+  string media_id = 1;
+  string download_url = 2;
+  int64 expires_at = 3;
+}
+
+message GetAvatarDisplayURLRequest {
+  string media_id = 1;
+}
