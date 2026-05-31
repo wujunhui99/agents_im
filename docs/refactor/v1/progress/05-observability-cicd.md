@@ -40,7 +40,7 @@
 
 - **P0 实现要点**：GHA 已在代码层废弃，OB-1 仅文档同步；Drone OSS 无 GitHub 式 repo 明文变量，OB-17 删硬编码后由 `scripts/ci/drone-build-images.sh` 的 `${DRONE_IMAGE_BUILD_PARALLELISM:-3}` 默认值控制。
 - **CI 核验**：Drone 不向 GitHub PR 回报状态检查，需在 Drone UI（`https://drone.agenticim.xyz`）核验；项目 norm 为 PR → 立即 merge → Drone 构建（merge 后）。
-- **CD 部署清单漂移（2026-05-31，PR #385）**：`scripts/deploy-k3s.sh` 的 `IMAGE_DEPLOYMENTS` 与 `scripts/detect-deploy-changes.py` 的 `BACKEND_SERVICES` 是**两份独立服务清单**。media 服务拆分（#381）只更新了后者 → `deploy-main` 报 `unknown deployment service: media-api`（build 239 红）。更隐蔽的是：media Deployment 带 `__IMAGE_TAG_REQUIRED__` 占位镜像，未登记进 `IMAGE_DEPLOYMENTS` 就拿不到 image override，渲染阶段占位符残留触发 `refusing to apply unsafe images`，使 **main 的每次部署都失败**（不限改动 media 的提交）。#385 补齐两清单对齐后恢复（build 240 绿）。**教训**：OB-8 的 `detect-deploy-changes` 单测覆盖不到 `deploy-k3s.sh` 的平行清单；新增后端服务须同步改这两处，已在 `test-deploy-k3s.sh` 的 fake kustomize 加占位符 Deployment 作回归守卫。
+- **CD 部署清单漂移（2026-05-31，#385，build 239→240）**：`deploy-k3s.sh` 的 `IMAGE_DEPLOYMENTS` 与 `detect-deploy-changes.py` 的 `BACKEND_SERVICES` 是**两份独立清单**。media 拆分（#381）只改后者，两个症状：① `deploy-main` 报 `unknown deployment service: media-api`；② 更隐蔽——media Deployment 的 `__IMAGE_TAG_REQUIRED__` 占位镜像因未登记拿不到 image override，残留触发 `refusing to apply unsafe images`，致 **main 每次部署都红**（不限 media 改动）。**规则**：新增后端服务须同步改这两处（OB-8 的 detect-deploy 单测覆盖不到 deploy-k3s 平行清单）；已在 `test-deploy-k3s.sh` fake kustomize 加占位符 Deployment 作回归守卫。
 
 ---
 
