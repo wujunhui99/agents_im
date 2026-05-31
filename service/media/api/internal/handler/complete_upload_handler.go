@@ -29,7 +29,7 @@ func CompleteUploadHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			MediaId:     req.MediaID,
 		})
 		if err != nil {
-			httpx.ErrorCtx(r.Context(), w, err)
+			httpx.ErrorCtx(r.Context(), w, apiError(err))
 			return
 		}
 		httpx.OkJsonCtx(r.Context(), w, &types.CompleteMediaUploadResp{

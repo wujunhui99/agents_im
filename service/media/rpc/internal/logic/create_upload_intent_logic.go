@@ -4,6 +4,7 @@ import (
 	"context"
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/media/rpc/media"
 
@@ -36,7 +37,7 @@ func (l *CreateUploadIntentLogic) CreateUploadIntent(in *media.CreateUploadInten
 		Height:      in.GetHeight(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, rpcerror.ToStatus(err)
 	}
 	return &media.CreateUploadIntentResponse{
 		MediaId:   resp.MediaID,

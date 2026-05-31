@@ -36,7 +36,7 @@ func CreateUploadIntentHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			Height:      req.Height,
 		})
 		if err != nil {
-			httpx.ErrorCtx(r.Context(), w, err)
+			httpx.ErrorCtx(r.Context(), w, apiError(err))
 			return
 		}
 		httpx.OkJsonCtx(r.Context(), w, &types.CreateMediaUploadResp{

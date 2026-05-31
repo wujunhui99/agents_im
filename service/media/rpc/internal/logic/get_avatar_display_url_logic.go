@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 
+	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/media/rpc/media"
 
@@ -26,7 +27,7 @@ func NewGetAvatarDisplayURLLogic(ctx context.Context, svcCtx *svc.ServiceContext
 func (l *GetAvatarDisplayURLLogic) GetAvatarDisplayURL(in *media.GetAvatarDisplayURLRequest) (*media.GetDownloadURLResponse, error) {
 	resp, err := l.svcCtx.MediaLogic.GetAvatarDisplayURL(l.ctx, in.GetMediaId())
 	if err != nil {
-		return nil, err
+		return nil, rpcerror.ToStatus(err)
 	}
 	return &media.GetDownloadURLResponse{
 		MediaId:     resp.MediaID,
