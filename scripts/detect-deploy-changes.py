@@ -23,6 +23,8 @@ BACKEND_SERVICES = [
     "groups-rpc",
     "message-rpc",
     "mail-rpc",
+    "media-api",
+    "media-rpc",
 ]
 
 ALL_IMAGE_SERVICES = [*BACKEND_SERVICES, "web"]
@@ -54,6 +56,7 @@ API_SERVICES = {
     "message": "message-api",
     "agent": "agent-api",
     "admin": "admin-api",
+    "media": "media-api",
 }
 
 PROTO_DOMAINS = {

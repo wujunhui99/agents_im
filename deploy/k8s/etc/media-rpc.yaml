@@ -1,0 +1,5 @@
+Name: media-rpc
+ListenOn: 0.0.0.0:9096
+
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
