@@ -34,6 +34,8 @@ IMAGE_DEPLOYMENTS=(
   groups-rpc
   message-rpc
   mail-rpc
+  media-api
+  media-rpc
   web
 )
 

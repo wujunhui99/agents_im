@@ -115,6 +115,18 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: media-rpc
+  namespace: agents-im
+spec:
+  template:
+    spec:
+      containers:
+        - image: ghcr.io/wujunhui99/agents_im/media-rpc:__IMAGE_TAG_REQUIRED__
+          name: media-rpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: agents-im-minio-proxy
   namespace: agents-im
 spec:
@@ -217,7 +229,7 @@ DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --ref refs/heads/main \
   db/migrations/202605260001_example.sql)"
 if ! grep -Fq "migration_required=true" <<<"${DETECT_OUTPUT}" || \
-  ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"message-api\",\"gateway-ws\",\"groups-api\",\"agent-api\",\"message-transfer\",\"user-rpc\",\"auth-rpc\",\"friends-rpc\",\"groups-rpc\",\"message-rpc\",\"mail-rpc\"]'" <<<"${DETECT_OUTPUT}"; then
+  ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"message-api\",\"gateway-ws\",\"groups-api\",\"agent-api\",\"admin-api\",\"message-transfer\",\"user-rpc\",\"auth-rpc\",\"friends-rpc\",\"groups-rpc\",\"message-rpc\",\"mail-rpc\",\"media-api\",\"media-rpc\"]'" <<<"${DETECT_OUTPUT}"; then
   echo "expected executable migration changes to require migrations and rebuild all backends" >&2
   printf '%s\n' "${DETECT_OUTPUT}" >&2
   exit 1
