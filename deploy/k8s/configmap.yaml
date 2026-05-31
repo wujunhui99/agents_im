@@ -5,7 +5,7 @@ metadata:
   namespace: agents-im
 data:
   AGENTS_IM_ENV: "production"
-  REDIS_ADDR: "127.0.0.1:6379"
+  REDIS_ADDR: "redis.agents-im.svc.cluster.local:6379"
   REDIS_DB: "0"
   AGENTS_IM_TRACING_ENABLED: "true"
   AGENTS_IM_OTLP_ENDPOINT: "otel-collector.agents-im.svc.cluster.local:4317"

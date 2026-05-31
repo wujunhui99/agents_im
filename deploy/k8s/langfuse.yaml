@@ -45,6 +45,19 @@ spec:
                 secretKeyRef:
                   name: agents-im-secrets
                   key: ENCRYPTION_KEY
+            # Explicit Redis wiring. The in-namespace `redis` Service makes
+            # Kubernetes auto-inject REDIS_PORT=tcp://<ip>:6379, which langfuse
+            # parses as a numeric port and rejects (NaN). These override it and
+            # point langfuse at the k8s Redis StatefulSet.
+            - name: REDIS_HOST
+              value: redis.agents-im.svc.cluster.local
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: agents-im-secrets
+                  key: REDIS_PASSWORD
             - name: TELEMETRY_ENABLED
               value: "false"
             - name: LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES

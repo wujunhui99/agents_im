@@ -797,7 +797,9 @@ metadata:
   name: agents-im-minio-proxy
   namespace: agents-im
 spec:
-  replicas: 1
+  # Retired: MinIO migrated into k8s; agents-im-minio Service now targets app: minio.
+  # Kept at replicas 0 so Drone apply stays idempotent with the migrated state.
+  replicas: 0
   selector:
     matchLabels:
       app: agents-im-minio-proxy
