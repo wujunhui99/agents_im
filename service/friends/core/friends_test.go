@@ -1,4 +1,4 @@
-package logic
+package core
 
 import (
 	"context"
@@ -12,8 +12,8 @@ type friendsLogicUserLookup struct {
 	users map[string]UserProfile
 }
 
-func (l friendsLogicUserLookup) GetUserByID(_ context.Context, req GetUserByIDRequest) (UserProfile, error) {
-	if user, ok := l.users[req.UserID]; ok {
+func (l friendsLogicUserLookup) GetUserByID(_ context.Context, userID string) (UserProfile, error) {
+	if user, ok := l.users[userID]; ok {
 		return user, nil
 	}
 	return UserProfile{}, nil

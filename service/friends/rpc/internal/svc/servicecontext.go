@@ -3,15 +3,14 @@ package svc
 import (
 	"log"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/service/friends/core"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/config"
 )
 
 type ServiceContext struct {
 	Config       config.Config
-	FriendsLogic *business.FriendsLogic
-	UserLogic    *business.UserLogic
+	FriendsLogic *core.FriendsLogic
 	Repo         repository.Repository
 }
 
@@ -20,11 +19,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		log.Fatalf("build friends repository: %v", err)
 	}
-	userLogic := business.NewUserLogic(repo)
 	return &ServiceContext{
 		Config:       c,
-		FriendsLogic: business.NewFriendsLogic(repo, userLogic),
-		UserLogic:    userLogic,
+		FriendsLogic: core.NewFriendsLogic(repo, core.NewAccountRepoUserLookup(repo)),
 		Repo:         repo,
 	}
 }

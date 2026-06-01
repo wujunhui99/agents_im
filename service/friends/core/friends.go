@@ -1,16 +1,84 @@
-package logic
+package core
 
 import (
 	"context"
 	"strings"
+	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
+// UserLookup resolves a friend's profile. It is satisfied transitionally by
+// AccountRepoUserLookup (direct account-repo read); once the user domain is
+// behind user-rpc it can be backed by an RPC client instead.
 type UserLookup interface {
-	GetUserByID(ctx context.Context, req GetUserByIDRequest) (UserProfile, error)
+	GetUserByID(ctx context.Context, userID string) (UserProfile, error)
+}
+
+// UserProfile is the subset of the user account profile that friends needs to
+// enrich friendship views. Mirrors the user domain's profile shape.
+type UserProfile struct {
+	AccountID     string
+	UserID        string
+	Identifier    string
+	Email         string
+	DisplayName   string
+	Name          string
+	Gender        string
+	BirthDate     string
+	Region        string
+	AccountType   string
+	AvatarMediaID string
+	AvatarURL     string
+	CreatedAt     string
+	UpdatedAt     string
+}
+
+// AccountRepoUserLookup adapts an account repository to UserLookup by reading
+// the account directly. Transitional: replace with a user-rpc client when the
+// user domain is extracted (Epic #394).
+type AccountRepoUserLookup struct {
+	accounts repository.AccountRepository
+}
+
+func NewAccountRepoUserLookup(accounts repository.AccountRepository) AccountRepoUserLookup {
+	return AccountRepoUserLookup{accounts: accounts}
+}
+
+func (l AccountRepoUserLookup) GetUserByID(ctx context.Context, userID string) (UserProfile, error) {
+	if l.accounts == nil {
+		return UserProfile{}, apperror.Internal("account repository is not configured")
+	}
+	user, err := l.accounts.GetByID(ctx, userID)
+	if err != nil {
+		return UserProfile{}, err
+	}
+	user = user.Clone()
+	return UserProfile{
+		AccountID:     user.AccountID,
+		UserID:        user.UserID,
+		Identifier:    user.Identifier,
+		Email:         user.Email,
+		DisplayName:   user.DisplayName,
+		Name:          user.Name,
+		Gender:        user.Gender,
+		BirthDate:     user.BirthDate,
+		Region:        user.Region,
+		AccountType:   string(user.AccountType),
+		AvatarMediaID: user.AvatarMediaID,
+		AvatarURL:     user.AvatarURL,
+		CreatedAt:     formatTime(user.CreatedAt),
+		UpdatedAt:     formatTime(user.UpdatedAt),
+	}, nil
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }
 
 type FriendsLogic struct {
@@ -287,7 +355,7 @@ func (l *FriendsLogic) lookupFriendProfile(ctx context.Context, userID string) (
 	if l.users == nil {
 		return UserProfile{}, apperror.Internal("user lookup is not configured")
 	}
-	return l.users.GetUserByID(ctx, GetUserByIDRequest{UserID: userID})
+	return l.users.GetUserByID(ctx, userID)
 }
 
 func (l *FriendsLogic) ensureUserExists(ctx context.Context, userID string) error {

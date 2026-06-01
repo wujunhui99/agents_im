@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
@@ -22,6 +22,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
 	"github.com/wujunhui99/agents_im/pkg/config"
+	friendscore "github.com/wujunhui99/agents_im/service/friends/core"
 )
 
 func main() {
@@ -50,8 +51,8 @@ func main() {
 	bob, err := authLogic.Register(ctx, authlogic.RegisterRequest{Identifier: unique("bob"), Email: bobEmail, EmailVerificationCode: "123456", Password: "password123", DisplayName: "Bob E2E"})
 	must("register bob", err)
 
-	friendsLogic := logic.NewFriendsLogic(userRepo, userLogic)
-	_, err = friendsLogic.AddFriend(ctx, logic.AddFriendRequest{UserID: alice.UserID, FriendID: bob.UserID})
+	friendsLogic := friendscore.NewFriendsLogic(userRepo, friendscore.NewAccountRepoUserLookup(userRepo))
+	_, err = friendsLogic.AddFriend(ctx, friendscore.AddFriendRequest{UserID: alice.UserID, FriendID: bob.UserID})
 	must("add friend", err)
 
 	messageRepo := repository.NewMemoryMessageRepository()
