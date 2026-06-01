@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/common/share/model"
+	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/mediavalidate"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
@@ -17,8 +18,8 @@ func TestUpdateUserAvatarValidatesMediaAndUpdatesProfile(t *testing.T) {
 	mediaRepo := repository.NewMemoryMediaRepository()
 	userLogic := business.NewUserLogic(accountRepo)
 	svcCtx := &svc.ServiceContext{
-		UserLogic:  userLogic,
-		MediaLogic: business.NewMediaLogic(mediaRepo, nil, ""),
+		UserLogic:       userLogic,
+		AvatarValidator: mediavalidate.NewAvatarValidator(mediaRepo),
 	}
 
 	profile, err := userLogic.CreateUser(ctx, business.CreateUserRequest{

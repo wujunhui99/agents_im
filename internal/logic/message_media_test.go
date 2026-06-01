@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/common/share/model"
+	"github.com/wujunhui99/agents_im/internal/mediavalidate"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
 func TestMessageMediaValidation(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
 	mediaRepo := repository.NewMemoryMediaRepository()
-	mediaLogic := NewMediaLogic(mediaRepo, nil, "agents-im-media")
+	mediaLogic := mediavalidate.NewMessageValidator(mediaRepo)
 	messageLogic := NewMessageLogicWithMediaValidator(messageRepo, nil, nil, mediaLogic)
 
 	image := createMediaForTest(t, mediaRepo, model.MediaObject{
@@ -190,7 +191,7 @@ func TestMessageMediaValidationEnforcesMessageSizeLimits(t *testing.T) {
 			ctx := context.Background()
 			messageRepo := repository.NewMemoryMessageRepository()
 			mediaRepo := repository.NewMemoryMediaRepository()
-			mediaLogic := NewMediaLogic(mediaRepo, nil, "agents-im-media")
+			mediaLogic := mediavalidate.NewMessageValidator(mediaRepo)
 			messageLogic := NewMessageLogicWithMediaValidator(messageRepo, nil, nil, mediaLogic)
 			media := createMediaForTest(t, mediaRepo, tc.media)
 
@@ -228,4 +229,13 @@ func TestTextMessagesContinueWithoutMediaValidator(t *testing.T) {
 		Content:     `{"mediaId":"med_missing"}`,
 	})
 	assertLogicAppCode(t, err, apperror.CodeInternal)
+}
+
+func createMediaForTest(t *testing.T, repo repository.MediaRepository, media model.MediaObject) model.MediaObject {
+	t.Helper()
+	created, err := repo.CreateMediaObject(context.Background(), media)
+	if err != nil {
+		t.Fatalf("create media fixture: %v", err)
+	}
+	return created
 }

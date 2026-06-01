@@ -3,7 +3,7 @@ package svc
 import (
 	"log"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
+	business "github.com/wujunhui99/agents_im/service/media/core"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/objectstorage"

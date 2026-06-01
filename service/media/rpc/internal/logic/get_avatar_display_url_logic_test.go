@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
+	business "github.com/wujunhui99/agents_im/service/media/core"
 	"github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/objectstorage"

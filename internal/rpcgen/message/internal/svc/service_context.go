@@ -4,6 +4,7 @@ import (
 	"log"
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/mediavalidate"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/message/internal/config"
 )
@@ -31,7 +32,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
 	return &ServiceContext{
 		Config:       c,
-		MessageLogic: business.NewMessageLogicWithMediaValidator(messageRepo, nil, groupsLogic, business.NewMediaLogic(mediaRepo, nil, "")),
+		MessageLogic: business.NewMessageLogicWithMediaValidator(messageRepo, nil, groupsLogic, mediavalidate.NewMessageValidator(mediaRepo)),
 		MessageRepo:  messageRepo,
 		OutboxRepo:   outboxRepositoryFromMessageRepo(messageRepo),
 	}

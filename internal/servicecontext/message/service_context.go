@@ -3,16 +3,17 @@ package message
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	einoruntime "github.com/wujunhui99/agents_im/internal/agentruntime/eino"
 	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
+	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/mediavalidate"
+	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
-	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 )
 
 type ServiceContext struct {
@@ -20,7 +21,6 @@ type ServiceContext struct {
 	MessageLogic      *logic.MessageLogic
 	AgentMessageHook  logic.MessageCreatedHook
 	AIHostingLogic    *logic.ConversationAIHostingLogic
-	MediaLogic        *logic.MediaLogic
 	FeedbackLogic     *logic.FeedbackLogic
 	MessageRepo       repository.MessageRepository
 	MediaRepo         repository.MediaRepository
@@ -61,16 +61,14 @@ func NewServiceContextWithMedia(repo repository.MessageRepository, mediaRepo rep
 }
 
 func NewServiceContextWithFeedback(repo repository.MessageRepository, mediaRepo repository.MediaRepository, feedbackRepo repository.FeedbackRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
-	mediaLogic := logic.NewMediaLogic(mediaRepo, nil, config.DefaultObjectStorageConfig().Bucket)
-	mediaLogic.WithAttachmentAccessChecker(logic.NewMessageMediaAccessChecker(repo))
+	mediaValidator := mediavalidate.NewMessageValidator(mediaRepo)
 	agentHostingRepo := repository.NewMemoryAgentConversationHostingRepository()
 	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{
 		AuthRuntime:      common.NewAuthRuntime(auth),
-		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaLogic),
+		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaValidator),
 		AIHostingLogic:   logic.NewConversationAIHostingLogic(aiHostingRepo),
-		MediaLogic:       mediaLogic,
 		FeedbackLogic:    logic.NewFeedbackLogic(feedbackRepo),
 		MessageRepo:      repo,
 		MediaRepo:        mediaRepo,
