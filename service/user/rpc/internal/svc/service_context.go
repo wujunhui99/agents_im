@@ -5,15 +5,16 @@ import (
 	"log"
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/mediavalidate"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
 )
 
 type ServiceContext struct {
-	Config     config.Config
-	UserLogic  *business.UserLogic
-	MediaLogic *business.MediaLogic
-	Repo       repository.Repository
+	Config          config.Config
+	UserLogic       *business.UserLogic
+	AvatarValidator *mediavalidate.AvatarValidator
+	Repo            repository.Repository
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -40,9 +41,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		log.Fatalf("backfill default assistant: %v", err)
 	}
 	return &ServiceContext{
-		Config:     c,
-		UserLogic:  userLogic,
-		MediaLogic: business.NewMediaLogic(mediaRepo, nil, ""),
-		Repo:       repo,
+		Config:          c,
+		UserLogic:       userLogic,
+		AvatarValidator: mediavalidate.NewAvatarValidator(mediaRepo),
+		Repo:            repo,
 	}
 }

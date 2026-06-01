@@ -1,10 +1,9 @@
-package logic
+package core
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"path"
 	"regexp"
@@ -97,19 +96,6 @@ type MediaObject struct {
 	Status           string `json:"status"`
 	CreatedAt        string `json:"createdAt"`
 	UpdatedAt        string `json:"updatedAt"`
-}
-
-type messageImageContent struct {
-	MediaID string `json:"mediaId"`
-	Width   int32  `json:"width,omitempty"`
-	Height  int32  `json:"height,omitempty"`
-}
-
-type messageFileContent struct {
-	MediaID     string `json:"mediaId"`
-	Filename    string `json:"filename"`
-	SizeBytes   int64  `json:"sizeBytes"`
-	ContentType string `json:"contentType"`
 }
 
 type MediaAttachmentAccessChecker interface {
@@ -361,69 +347,6 @@ func validateAvatarMediaObject(media model.MediaObject) error {
 		return apperror.InvalidArgument("avatar media exceeds size limit")
 	}
 	return nil
-}
-
-func (l *MediaLogic) ValidateMessageMedia(ctx context.Context, ownerUserID string, contentType string, content string) error {
-	switch normalizeContentType(contentType) {
-	case MessageContentTypeImage:
-		var body messageImageContent
-		if err := json.Unmarshal([]byte(content), &body); err != nil {
-			return apperror.InvalidArgument("image content must be a JSON object")
-		}
-		media, err := l.mediaForOwner(ctx, ownerUserID, body.MediaID)
-		if err != nil {
-			return err
-		}
-		if media.Purpose != model.MediaPurposeMessageImage {
-			return apperror.InvalidArgument("image media purpose is invalid")
-		}
-		if media.Status != model.MediaStatusReady {
-			return apperror.InvalidArgument("image media is not ready")
-		}
-		if !isAllowedImageContentType(media.ContentType) {
-			return apperror.InvalidArgument("image media content_type must be an allowed image type")
-		}
-		if media.SizeBytes > MediaMaxImageBytes {
-			return apperror.InvalidArgument("image media exceeds size limit")
-		}
-		return nil
-	case MessageContentTypeFile:
-		var body messageFileContent
-		if err := json.Unmarshal([]byte(content), &body); err != nil {
-			return apperror.InvalidArgument("file content must be a JSON object")
-		}
-		filename, err := normalizeOriginalFilename(body.Filename)
-		if err != nil {
-			return err
-		}
-		_ = filename
-		body.ContentType = normalizeContentType(body.ContentType)
-		if body.SizeBytes <= 0 {
-			return apperror.InvalidArgument("file sizeBytes must be positive")
-		}
-		media, err := l.mediaForOwner(ctx, ownerUserID, body.MediaID)
-		if err != nil {
-			return err
-		}
-		if media.Purpose != model.MediaPurposeMessageFile {
-			return apperror.InvalidArgument("file media purpose is invalid")
-		}
-		if media.Status != model.MediaStatusReady {
-			return apperror.InvalidArgument("file media is not ready")
-		}
-		if !isAllowedFileContentType(media.ContentType) {
-			return apperror.InvalidArgument("file media content_type is not allowed")
-		}
-		if body.ContentType != media.ContentType || body.SizeBytes != media.SizeBytes {
-			return apperror.InvalidArgument("file content metadata does not match media object")
-		}
-		if media.SizeBytes > MediaMaxFileBytes {
-			return apperror.InvalidArgument("file media exceeds size limit")
-		}
-		return nil
-	default:
-		return apperror.InvalidArgument("content_type must be image or file")
-	}
 }
 
 func (l *MediaLogic) mediaForOwner(ctx context.Context, ownerUserID string, mediaID string) (model.MediaObject, error) {
@@ -682,4 +605,11 @@ func toMediaObject(media model.MediaObject) MediaObject {
 		CreatedAt:        formatTime(media.CreatedAt),
 		UpdatedAt:        formatTime(media.UpdatedAt),
 	}
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }
