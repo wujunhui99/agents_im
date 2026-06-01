@@ -7,7 +7,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
-	"github.com/wujunhui99/agents_im/internal/types"
+	"github.com/wujunhui99/agents_im/common/share/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 

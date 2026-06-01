@@ -16,7 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/auth/token"
+	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"

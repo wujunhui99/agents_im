@@ -8,7 +8,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	"github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
+	"github.com/wujunhui99/agents_im/common/share/agentaudit"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/model"
 	"github.com/wujunhui99/agents_im/internal/repository"

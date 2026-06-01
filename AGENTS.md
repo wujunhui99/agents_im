@@ -70,7 +70,7 @@
 - [`docs/design-docs/user-auth-friends-groups-boundaries.md`](./docs/design-docs/user-auth-friends-groups-boundaries.md)
 - [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)
 
-常见文件：`service/<domain>/api/**`、`service/<domain>/rpc/**`、`api/*.api`、`proto/*pb/**`、`internal/handler/**`、`internal/logic/**`、`internal/servicecontext/<service>/service_context.go`、`internal/types/types.go`。旧 `internal/rpcgen/<domain>` 只作为尚未迁移服务的过渡位置。
+常见文件：`service/<domain>/api/**`、`service/<domain>/rpc/**`、`api/*.api`、`proto/*pb/**`、`internal/handler/**`、`internal/logic/**`、`internal/servicecontext/<service>/service_context.go`、`common/share/types/types.go`。共享叶子包（错误映射 `common/share/rpcerror`、agent 审计 `common/share/agentaudit`、token 解析 `common/share/auth/token`）已迁出 internal。旧 `internal/rpcgen/<domain>` 只作为尚未迁移服务的过渡位置。
 
 ### Frontend React/Vite
 
