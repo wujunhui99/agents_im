@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/common/share/agentaudit"
-	"github.com/wujunhui99/agents_im/internal/model"
+	"github.com/wujunhui99/agents_im/common/share/model"
 )
 
 type AccountSearchFilter struct {

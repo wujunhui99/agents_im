@@ -1,6 +1,6 @@
 package repository
 
-import "github.com/wujunhui99/agents_im/internal/model"
+import "github.com/wujunhui99/agents_im/common/share/model"
 
 const (
 	accountTypeDBAdmin int16 = 0
