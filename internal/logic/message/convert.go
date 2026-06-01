@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/types"
+	"github.com/wujunhui99/agents_im/common/share/types"
 )
 
 func splitCommaQuery(value string) []string {

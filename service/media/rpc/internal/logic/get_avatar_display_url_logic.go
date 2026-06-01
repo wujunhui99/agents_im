@@ -3,7 +3,7 @@ package logic
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
+	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/media/rpc/media"
 

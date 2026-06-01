@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	"github.com/wujunhui99/agents_im/internal/domain/agentaudit"
+	"github.com/wujunhui99/agents_im/common/share/agentaudit"
 	"github.com/wujunhui99/agents_im/internal/repository"
 )
 

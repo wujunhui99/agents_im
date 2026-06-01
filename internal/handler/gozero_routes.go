@@ -6,7 +6,7 @@ import (
 	"time"
 
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/auth/token"
+	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	messagehandler "github.com/wujunhui99/agents_im/internal/handler/message"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/wujunhui99/agents_im/pkg/config"

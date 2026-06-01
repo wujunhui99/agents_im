@@ -9,7 +9,7 @@ import (
 	"time"
 
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/auth/token"
+	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	agent "github.com/wujunhui99/agents_im/service/agent/api/internal/handler/agent"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"

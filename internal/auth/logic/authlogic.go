@@ -14,7 +14,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	"github.com/wujunhui99/agents_im/internal/auth/model"
 	"github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/auth/token"
+	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	"github.com/zeromicro/go-zero/core/logx"
 )

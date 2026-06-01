@@ -9,7 +9,7 @@ import (
 	business "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/auth/token"
+	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
 	userrepo "github.com/wujunhui99/agents_im/internal/repository"

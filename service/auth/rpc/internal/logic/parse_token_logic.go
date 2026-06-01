@@ -4,7 +4,7 @@ import (
 	"context"
 
 	business "github.com/wujunhui99/agents_im/internal/auth/logic"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
+	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
 

@@ -5,7 +5,7 @@ import (
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/message/internal/svc"
-	"github.com/wujunhui99/agents_im/internal/rpcgen/rpcerror"
+	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	"github.com/wujunhui99/agents_im/proto/messagepb"
 
 	"github.com/zeromicro/go-zero/core/logx"

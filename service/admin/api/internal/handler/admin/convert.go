@@ -3,7 +3,7 @@ package admin
 import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	business "github.com/wujunhui99/agents_im/service/admin/api/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/types"
+	"github.com/wujunhui99/agents_im/common/share/types"
 )
 
 func adminDashboardResp(data business.AdminDashboardResponse) *types.AdminDashboardResp {
