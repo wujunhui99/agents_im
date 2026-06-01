@@ -12,7 +12,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/model"
+	"github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/config"

@@ -11,7 +11,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	"github.com/wujunhui99/agents_im/internal/model"
+	"github.com/wujunhui99/agents_im/common/share/model"
 )
 
 const (
