@@ -41,22 +41,21 @@ HTTP 接口：
 ## 目录结构
 
 ```text
-api/friends.api
-cmd/friends-api/main.go
-cmd/friends-rpc/main.go
-etc/friends-api.yaml
-etc/friends-rpc.yaml
-internal/handler/friends routes
-internal/logic/friendslogic.go
-internal/model/friendship.go
-internal/repository/friendship repository
-internal/servicecontext/friends
-internal/rpcgen/friends
-proto/friends.proto
-tests/friends_service_test.go
+service/friends/api/friends.go                  # friends-api 入口（package main）
+service/friends/api/friends.api
+service/friends/api/etc/friends-api.yaml
+service/friends/api/internal/{config,handler,logic,svc,types}
+service/friends/rpc/friends.go                  # friends-rpc 入口（package main）
+service/friends/rpc/friends.proto
+service/friends/rpc/etc/friends-rpc.yaml
+service/friends/rpc/internal/{config,logic,server,svc}
+service/friends/rpc/{friends,friendsclient}     # goctl 生成的 pb / client
+service/friends/core/friends.go                 # 业务逻辑（退役自 internal/logic，#402）
+common/share/model/friendship.go                # 数据模型（迁出 internal/model，#397）
+internal/repository/postgres_user_friends.go    # 数据层（暂留 internal/repository）
 ```
 
-当前 worktree 的 `internal/apperror`、`internal/response`、`internal/config` 作为服务内共享基础包复用；REST 侧依赖通过 `internal/servicecontext/friends` 注入，RPC 侧继续使用 `internal/rpcgen/friends/internal/svc`。
+业务逻辑集中在 `service/friends/core`，被 friends-rpc 的 `internal/svc` 注入；REST/RPC 的共享基础包（错误映射、auth/token 等）已迁出顶层 `internal`，落在 `common/share/*`。
 
 ## 数据模型
 
@@ -97,7 +96,7 @@ type UserLookup interface {
 }
 ```
 
-第一阶段本地测试使用已有 `UserLogic` 适配该接口；生产化时替换为 `user-rpc` client，调用 `GetUserByID` 校验：
+当前由 `core.AccountRepoUserLookup` 适配该接口（直读 `repository.AccountRepository`，过渡方案，#402）；user 域 RPC 化后替换为 `user-rpc` client，调用 `GetUserByID` 校验：
 
 - 当前 JWT 用户存在。
 - `POST /friends` 的目标用户存在。
