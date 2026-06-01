@@ -3,7 +3,7 @@ package logic
 import (
 	"context"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
+	business "github.com/wujunhui99/agents_im/service/friends/core"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	friends "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/svc"
