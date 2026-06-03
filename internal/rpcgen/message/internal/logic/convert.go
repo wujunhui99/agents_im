@@ -2,7 +2,7 @@ package logic
 
 import (
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/proto/messagepb"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/message/messagepb"
 )
 
 func toMessage(message business.Message) *messagepb.Message {

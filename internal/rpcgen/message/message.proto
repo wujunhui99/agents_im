@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package message;
 
-option go_package = "github.com/wujunhui99/agents_im/proto/messagepb";
+option go_package = "github.com/wujunhui99/agents_im/internal/rpcgen/message/messagepb";
 
 service MessageService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);

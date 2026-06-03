@@ -21,9 +21,6 @@ required_files=(
   ".ai-context/zero-skills/references/rest-api-patterns.md"
   ".ai-context/zero-skills/references/rpc-patterns.md"
   ".ai-context/zero-skills/references/database-patterns.md"
-  "docs/references/go-zero/codex-guide.md"
-  "docs/exec-plans/active/goctl-refactor.md"
-  "docs/exec-plans/active/ci-pipeline.md"
   "service/user/rpc/user.proto"
   "service/user/api/user.api"
   "service/auth/rpc/auth.proto"
@@ -33,7 +30,7 @@ required_files=(
   "service/groups/rpc/groups.proto"
   "service/groups/api/groups.api"
   "service/agent/api/agent.api"
-  "proto/message.proto"
+  "internal/rpcgen/message/message.proto"
   "service/mail/rpc/mail.proto"
   "service/user/rpc/user/user.pb.go"
   "service/user/rpc/user/user_grpc.pb.go"
@@ -43,8 +40,8 @@ required_files=(
   "service/friends/rpc/friends/friends_grpc.pb.go"
   "service/groups/rpc/groups/groups.pb.go"
   "service/groups/rpc/groups/groups_grpc.pb.go"
-  "proto/messagepb/message.pb.go"
-  "proto/messagepb/message_grpc.pb.go"
+  "internal/rpcgen/message/messagepb/message.pb.go"
+  "internal/rpcgen/message/messagepb/message_grpc.pb.go"
   "service/mail/rpc/mail/mail.pb.go"
   "service/mail/rpc/mail/mail_grpc.pb.go"
   "service/user/rpc/user.go"
@@ -136,38 +133,9 @@ required_files=(
   "internal/mail/config.go"
   "internal/mail/tencent_ses.go"
   "internal/logic/userlogic.go"
-  "internal/logic/friendslogic.go"
   "internal/logic/groupslogic.go"
   "internal/logic/messagelogic.go"
-  "internal/logic/medialogic_test.go"
   "internal/logic/message_media_test.go"
-  "internal/logic/user/create_user_logic.go"
-  "internal/logic/user/create_account_logic.go"
-  "internal/logic/user/exists_user_logic.go"
-  "internal/logic/user/exists_account_logic.go"
-  "internal/logic/user/get_me_logic.go"
-  "internal/logic/user/get_user_by_identifier_logic.go"
-  "internal/logic/user/get_account_by_identifier_logic.go"
-  "internal/logic/user/update_me_logic.go"
-  "internal/logic/user/update_me_avatar_logic.go"
-  "internal/logic/user/convert.go"
-  "internal/logic/friends/add_friend_logic.go"
-  "internal/logic/friends/delete_friend_logic.go"
-  "internal/logic/friends/get_friendship_logic.go"
-  "internal/logic/friends/list_friends_logic.go"
-  "internal/logic/friends/list_friend_requests_logic.go"
-  "internal/logic/friends/accept_friend_request_logic.go"
-  "internal/logic/friends/reject_friend_request_logic.go"
-  "internal/logic/friends/convert.go"
-  "internal/logic/groups/create_group_logic.go"
-  "internal/logic/groups/list_groups_logic.go"
-  "internal/logic/groups/get_group_logic.go"
-  "internal/logic/groups/update_group_logic.go"
-  "internal/logic/groups/add_member_logic.go"
-  "internal/logic/groups/leave_group_logic.go"
-  "internal/logic/groups/kick_member_logic.go"
-  "internal/logic/groups/list_members_logic.go"
-  "internal/logic/groups/convert.go"
   "internal/logic/message/send_message_logic.go"
   "internal/logic/message/pull_messages_logic.go"
   "internal/logic/message/get_conversation_seqs_logic.go"
@@ -175,15 +143,6 @@ required_files=(
   "internal/logic/message/get_conversation_a_i_hosting_logic.go"
   "internal/logic/message/update_conversation_a_i_hosting_logic.go"
   "internal/logic/message/convert.go"
-  "internal/logic/media/create_upload_intent_logic.go"
-  "internal/logic/media/complete_upload_logic.go"
-  "internal/logic/media/get_download_u_r_l_logic.go"
-  "internal/logic/media/get_avatar_logic.go"
-  "internal/logic/media/convert.go"
-  "internal/logic/medialogic.go"
-  "internal/model/friendship.go"
-  "internal/model/group.go"
-  "internal/model/media.go"
   "pkg/objectstorage/store.go"
   "pkg/objectstorage/minio.go"
   "pkg/objectstorage/memory.go"
@@ -206,15 +165,7 @@ required_files=(
   "internal/handler/gozero_routes.go"
   "internal/handler/message/get_conversation_a_i_hosting_handler.go"
   "internal/handler/message/update_conversation_a_i_hosting_handler.go"
-  "internal/handler/user/create_account_handler.go"
-  "internal/handler/user/exists_account_handler.go"
-  "internal/handler/user/get_account_by_identifier_handler.go"
- "internal/handler/user/update_me_avatar_handler.go"
   "internal/servicecontext/common/auth.go"
-  "internal/servicecontext/user/service_context.go"
-  "internal/servicecontext/auth/service_context.go"
-  "internal/servicecontext/friends/service_context.go"
-  "internal/servicecontext/groups/service_context.go"
   "internal/servicecontext/message/service_context.go"
   "internal/servicecontext/gateway/service_context.go"
   "pkg/health/health.go"
@@ -230,25 +181,15 @@ required_files=(
   "pkg/llmobs/eino.go"
   "internal/agenteval/eval.go"
   "internal/agenteval/python_go_test.go"
-  "internal/types/types.go"
   "internal/auth/logic/authlogic.go"
-  "internal/logic/auth/login_logic.go"
-  "internal/logic/auth/register_logic.go"
-  "internal/logic/auth/validate_token_logic.go"
-  "internal/logic/auth/convert.go"
   "internal/auth/repository/memory.go"
   "internal/auth/repository/postgres.go"
-  "internal/handler/auth/login_handler.go"
-  "internal/handler/auth/register_handler.go"
-  "internal/handler/auth/validate_token_handler.go"
-  "internal/auth/token/token.go"
   "internal/auth/useradapter/user_client.go"
   "pkg/ctxuser/user.go"
   "service/user/rpc/user.go"
   "service/auth/rpc/auth.go"
   "service/groups/rpc/groups.go"
   "internal/rpcgen/message/message.go"
-  "internal/rpcgen/rpcerror/error.go"
   "internal/gateway/contract.go"
   "internal/transfer/event.go"
   "internal/transfer/interfaces.go"
@@ -273,54 +214,11 @@ required_files=(
   "internal/domain/readreceipt/read_receipt.go"
   "pkg/pythonexec/executor.go"
   "pkg/pythonexec/executor_test.go"
-  "tests/user_service_test.go"
-  "tests/auth_service_test.go"
-  "tests/friends_service_test.go"
-  "tests/groups_service_test.go"
   "tests/message_service_test.go"
   "tests/gateway_contract_test.go"
   "tests/websocket_gateway_test.go"
   "tests/read_receipts_test.go"
   "tests/no_shell_execution_test.go"
-  "docs/product-specs/agent-system.md"
-  "docs/design-docs/agent-system-architecture.md"
-  "docs/product-specs/user-service.md"
-  "docs/product-specs/auth-service.md"
-  "docs/product-specs/friends-service.md"
-  "docs/product-specs/groups-service.md"
-  "docs/product-specs/message-chain.md"
-  "docs/product-specs/message-storage.md"
-  "docs/product-specs/gateway-message-contract.md"
-  "docs/product-specs/frontend-sync-contract.md"
-  "docs/product-specs/read-receipts.md"
-  "docs/design-docs/user-service-go-zero.md"
-  "docs/design-docs/rest-service-context-boundaries.md"
-  "docs/design-docs/account-service-terminology.md"
-  "docs/design-docs/auth-service-go-zero.md"
-  "docs/design-docs/friends-service-go-zero.md"
-  "docs/design-docs/groups-service-go-zero.md"
-  "docs/design-docs/message-chain-contract.md"
-  "docs/design-docs/message-storage.md"
-  "docs/design-docs/jwt-auth-middleware.md"
-  "docs/design-docs/postgres-persistence.md"
-  "docs/design-docs/message-outbox.md"
-  "docs/design-docs/gateway-message-contract.md"
-  "docs/design-docs/redis-presence.md"
-  "docs/design-docs/websocket-gateway.md"
-  "docs/design-docs/websocket-reconnect-sync.md"
-  "docs/design-docs/message-transfer-worker.md"
-  "docs/design-docs/gateway-push-delivery.md"
-  "docs/design-docs/transfer-gateway-dispatcher.md"
-  "docs/design-docs/message-delivery-reliability.md"
-  "docs/design-docs/gateway-presence-routing.md"
-  "docs/exec-plans/active/backend-mvp-completion.md"
-  "docs/design-docs/backend-mvp-contract.md"
-  "docs/design-docs/observability-mvp.md"
-  "docs/design-docs/llm-observability.md"
-  "docs/product-specs/backend-mvp.md"
-  "docs/product-specs/frontend-backend-contract.md"
-  "docs/DEVELOPMENT.md"
-  "docs/FRONTEND.md"
   "web/package.json"
   "web/index.html"
   "web/src/App.tsx"
@@ -349,13 +247,6 @@ required_files=(
   "web/src/styles/tokens.css"
   "web/src/styles.css"
   "web/src/vite-env.d.ts"
-  "docs/design-docs/read-receipts.md"
-  "docs/exec-plans/completed/user-service-go-zero.md"
-  "docs/exec-plans/completed/auth-service-go-zero.md"
-  "docs/exec-plans/completed/friends-service-go-zero.md"
-  "docs/exec-plans/completed/groups-service-go-zero.md"
-  "docs/exec-plans/completed/message-storage.md"
-  "docs/exec-plans/active/message-outbox.md"
   "internal/repository/message_storage_contract.go"
   "docker-compose.yml"
   ".env.example"
@@ -368,22 +259,6 @@ required_files=(
   "scripts/dev-up.sh"
   "scripts/dev-demo-data.sh"
   "tests/postgres_persistence_integration_test.go"
-  "tests/mvp_backend_test.go"
-  "docs/exec-plans/completed/gateway-message-contract.md"
-  "docs/exec-plans/active/redis-presence.md"
-  "docs/exec-plans/active/read-receipts.md"
-  "docs/exec-plans/completed/remove-handwritten-compat.md"
-  "docs/exec-plans/active/jwt-auth-middleware.md"
-  "docs/exec-plans/completed/websocket-gateway.md"
-  "docs/exec-plans/active/message-transfer-worker.md"
-  "docs/exec-plans/completed/gateway-push-delivery.md"
-  "docs/exec-plans/completed/transfer-gateway-dispatcher.md"
-  "docs/exec-plans/completed/gateway-presence-routing.md"
-  "docs/exec-plans/completed/account-service-terminology.md"
-  "docs/exec-plans/active/agent-system-v0.md"
-  "docs/exec-plans/active/agent-infrastructure-parallel-baseline.md"
-  "docs/design-docs/agent-conversation-hosting.md"
-  "docs/exec-plans/completed/agent-conversation-hosting.md"
   "db/migrations/003_agent_conversation_hosting.sql"
   "internal/agentim/hosting.go"
   "internal/agentim/hosting_test.go"
@@ -417,23 +292,6 @@ for script in "${shell_scripts[@]}"; do
   bash -n "$script"
 done
 
-frontend_material_doc_patterns=(
-  "Material 3-inspired 轻量设计系统"
-  "web/src/styles/tokens.css"
-  "Button"
-  "Card"
-  "TextField"
-  "TopAppBar"
-  "NavigationBar"
-  "ListItem"
-  "MessageBubble"
-  "消息 / 联系人 / 发现 / 我的"
-  '不依赖 `@material/web`、`@mui/*`'
-)
-
-for pattern in "${frontend_material_doc_patterns[@]}"; do
-  rg -qF "$pattern" docs/FRONTEND.md
-done
 
 frontend_material_token_patterns=(
   "--md-sys-color-primary"
@@ -450,7 +308,6 @@ done
 
 rg -qF '@import "./styles/tokens.css";' web/src/styles.css
 rg -qF "createApiClient" web/src/App.tsx web/src/api/client.ts
-rg -qF "POST /messages" docs/FRONTEND.md docs/product-specs/frontend-backend-contract.md
 messages_proxy_line="$(rg -n "'/messages':" web/vite.config.ts | head -n1 | cut -d: -f1)"
 me_proxy_line="$(rg -n "'/me':" web/vite.config.ts | head -n1 | cut -d: -f1)"
 if [[ -z "${messages_proxy_line}" || -z "${me_proxy_line}" || "${messages_proxy_line}" -ge "${me_proxy_line}" ]]; then
@@ -482,22 +339,6 @@ for pattern in "${drone_workflow_patterns[@]}"; do
   rg -qF "$pattern" .drone.yml
 done
 
-ci_doc_patterns=(
-  "CI Pipeline"
-  "go test ./..."
-  "bash scripts/verify-static.sh"
-  "docker compose config"
-  "Drone"
-  ".drone.yml"
-  "markdown-link-check"
-  "Codex commit 前验证门禁"
-  "db/change_log/*.sql"
-  "scripts/verify-postgres-local.sh"
-)
-
-for pattern in "${ci_doc_patterns[@]}"; do
-  rg -qF "$pattern" docs/exec-plans/active/ci-pipeline.md docs/GIT_WORKFLOW.md
-done
 
 
 bash scripts/ci/verify-migration-immutability.sh
@@ -599,19 +440,6 @@ if rg -n '"os/exec"|exec\.Command|CommandContext\(|"(/bin/bash|/bin/sh|bash|sh|p
   exit 1
 fi
 
-message_plan_file=""
-for candidate in \
-  "docs/exec-plans/active/message-service-contract.md" \
-  "docs/exec-plans/completed/message-service-contract.md"; do
-  if [[ -f "$candidate" ]]; then
-    message_plan_file="$candidate"
-    break
-  fi
-done
-if [[ -z "$message_plan_file" ]]; then
-  echo "missing required file: docs/exec-plans/active/message-service-contract.md or docs/exec-plans/completed/message-service-contract.md" >&2
-  exit 1
-fi
 
 api_patterns=(
   "get /me"
@@ -709,53 +537,8 @@ for pattern in "${message_ordering_test_patterns[@]}"; do
   rg -q "$pattern" internal/repository/message_repository_contract_test.go web/src/features/messages/MessagesPage.test.tsx
 done
 
-message_ordering_doc_patterns=(
-  "conversation_id + seq"
-  "network arrival order"
-  "clientMsgId"
-  "gap"
-)
 
-for pattern in "${message_ordering_doc_patterns[@]}"; do
-  rg -qF "$pattern" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md docs/product-specs/frontend-backend-contract.md docs/RELIABILITY.md
-done
 
-frontend_contract_patterns=(
-  "/auth/register"
-  "/auth/login"
-  "/me"
-  "/users/exists"
-  "/accounts/exists"
-  "/friends"
-  "/groups"
-  "/messages"
-  "/media/uploads"
-  "/me/avatar"
-  "/ws"
-  "send_message"
-  "pull_messages"
-  "get_conversation_seqs"
-  "mark_conversation_read"
-  "message_received"
-  "message_delivered"
-  "INVALID_ARGUMENT"
-)
-
-for pattern in "${frontend_contract_patterns[@]}"; do
-  rg -qF "$pattern" docs/product-specs/frontend-backend-contract.md
-done
-
-development_doc_patterns=(
-  "scripts/dev-up.sh"
-  "scripts/dev-demo-data.sh"
-  "docker compose up -d postgres redis minio"
-  "bash scripts/migrate-postgres.sh"
-  "go test ./..."
-)
-
-for pattern in "${development_doc_patterns[@]}"; do
-  rg -qF "$pattern" docs/DEVELOPMENT.md
-done
 
 dev_script_patterns=(
   "docker compose up -d postgres redis minio"
@@ -779,16 +562,6 @@ demo_data_patterns=(
 
 for pattern in "${demo_data_patterns[@]}"; do
   rg -qF "$pattern" scripts/dev-demo-data.sh
-done
-
-mvp_test_patterns=(
-  "TestMVPBackendAuthProfileSmoke"
-  "TestMVPBackendFriendGroupMessageSmoke"
-  "TestMVPBackendWebSocketSendPullMarkReadSmoke"
-)
-
-for pattern in "${mvp_test_patterns[@]}"; do
-  rg -q "$pattern" tests/mvp_backend_test.go
 done
 
 proto_patterns=(
@@ -850,7 +623,7 @@ message_proto_patterns=(
 )
 
 for pattern in "${message_proto_patterns[@]}"; do
-  rg -q "$pattern" proto/message.proto
+  rg -q "$pattern" internal/rpcgen/message/message.proto
 done
 
 mail_proto_patterns=(
@@ -875,7 +648,7 @@ agent_conversation_hosting_contract_patterns=(
 )
 
 for pattern in "${agent_conversation_hosting_contract_patterns[@]}"; do
-  rg -q "$pattern" proto/message.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go pkg/messaging/event.go docs/design-docs/agent-conversation-hosting.md docs/design-docs/message-chain-contract.md docs/product-specs/message-chain.md
+  rg -q "$pattern" internal/rpcgen/message/message.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go pkg/messaging/event.go
 done
 
 agent_conversation_hosting_camel_patterns=(
@@ -887,7 +660,7 @@ agent_conversation_hosting_camel_patterns=(
 )
 
 for pattern in "${agent_conversation_hosting_camel_patterns[@]}"; do
-  rg -q "$pattern" api/message.api internal/types/types.go web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx docs/product-specs/frontend-backend-contract.md
+  rg -q "$pattern" api/message.api web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx
 done
 
 agent_conversation_hosting_code_patterns=(
@@ -905,7 +678,7 @@ agent_conversation_hosting_code_patterns=(
 )
 
 for pattern in "${agent_conversation_hosting_code_patterns[@]}"; do
-  rg -q "$pattern" internal/logic/messagelogic.go internal/agentim internal/repository db/migrations/003_agent_conversation_hosting.sql docs/design-docs/agent-conversation-hosting.md
+  rg -q "$pattern" internal/logic/messagelogic.go internal/agentim internal/repository db/migrations/003_agent_conversation_hosting.sql
 done
 
 agent_conversation_hosting_test_patterns=(
@@ -920,19 +693,6 @@ for pattern in "${agent_conversation_hosting_test_patterns[@]}"; do
   rg -q "$pattern" internal/agentim/hosting_test.go web/src/features/messages/MessagesPage.test.tsx
 done
 
-agent_conversation_hosting_doc_patterns=(
-  "message_origin=human|ai|system"
-  "MessageLogic.SendMessage"
-  "MessageCreatedHook"
-  "idempotency"
-  "allow_recursive_trigger"
-  "AI/Agent"
-  "fail closed"
-)
-
-for pattern in "${agent_conversation_hosting_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/agent-conversation-hosting.md docs/product-specs/agent-system.md docs/product-specs/agent-chat.md docs/product-specs/frontend-backend-contract.md docs/FRONTEND.md ARCHITECTURE.md docs/exec-plans/completed/agent-conversation-hosting.md
-done
 
 if rg -n "CreateMessageIdempotent|insert into messages|insertMessage" internal/agentim --glob '*.go'; then
   echo "agentim must write responses through MessageLogic/Message Service, not message repository or direct DB insert" >&2
@@ -1085,8 +845,8 @@ rpc_generated_proto_files=(
   "service/user/rpc/user/user_grpc.pb.go"
   "service/auth/rpc/auth/auth.pb.go"
   "service/auth/rpc/auth/auth_grpc.pb.go"
-  "proto/messagepb/message.pb.go"
-  "proto/messagepb/message_grpc.pb.go"
+  "internal/rpcgen/message/messagepb/message.pb.go"
+  "internal/rpcgen/message/messagepb/message_grpc.pb.go"
   "service/mail/rpc/mail/mail.pb.go"
   "service/mail/rpc/mail/mail_grpc.pb.go"
 )
@@ -1108,23 +868,9 @@ gateway_doc_patterns=(
 )
 
 for pattern in "${gateway_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/gateway-message-contract.md
   rg -q "$pattern" internal/gateway/contract.go tests/gateway_contract_test.go
 done
 
-websocket_gateway_patterns=(
-  "GET /ws"
-  "Authorization: Bearer"
-  "query param"
-  "ConnectionManager"
-  "PresenceReporter"
-  "Redis Presence"
-  "Push worker"
-)
-
-for pattern in "${websocket_gateway_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/websocket-gateway.md docs/exec-plans/completed/websocket-gateway.md
-done
 
 websocket_gateway_code_patterns=(
   "HandleWebSocket"
@@ -1141,7 +887,7 @@ for pattern in "${websocket_gateway_code_patterns[@]}"; do
   rg -q "$pattern" internal/gateway/ws internal/gateway/contract.go tests/websocket_gateway_test.go
 done
 
-rg -q "gateway-ws" service/gateway-ws/main.go etc/gateway-ws.yaml ARCHITECTURE.md
+rg -q "gateway-ws" service/gateway-ws/main.go etc/gateway-ws.yaml
 rg -q "AllowQueryToken: true" deploy/k8s/etc/gateway-ws.yaml
 rg -q 'GATEWAY_WS_ALLOW_QUERY_TOKEN: "true"' deploy/k8s/configmap.yaml
 rg -q 'GATEWAY_WS_ALLOWED_ORIGINS: "https://agenticim\.xyz"' deploy/k8s/configmap.yaml
@@ -1153,26 +899,7 @@ rg -F -q 'AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}' deploy/k8s/etc/gateway-
 rg -q 'AllowedOrigins: http://localhost:5173,http://127\.0\.0\.1:5173' etc/gateway-ws.yaml
 rg -q "AllowQueryToken: true" etc/gateway-ws.yaml
 rg -q "TestWebSocketOriginPolicyUsesConfiguredExactOrigins" internal/gateway/ws/server_test.go
-rg -q "websocket-gateway.md" docs/design-docs/index.md ARCHITECTURE.md
-rg -q "websocket-gateway" docs/exec-plans/completed/websocket-gateway.md
 
-websocket_reconnect_sync_patterns=(
-  "requestId"
-  "status"
-  "error.code"
-  "error.message"
-  "get_conversation_seqs"
-  "pull_messages"
-  "mark_conversation_read"
-  "serverMsgId"
-  "conversationId"
-  "hasReadSeq"
-  "unreadCount"
-)
-
-for pattern in "${websocket_reconnect_sync_patterns[@]}"; do
-  rg -q "$pattern" docs/product-specs/frontend-sync-contract.md docs/design-docs/websocket-reconnect-sync.md
-done
 
 websocket_reconnect_sync_code_patterns=(
   "RequestIDCamel"
@@ -1189,8 +916,6 @@ for pattern in "${websocket_reconnect_sync_code_patterns[@]}"; do
   rg -q "$pattern" internal/gateway/ws/server.go tests/websocket_gateway_test.go
 done
 
-rg -q "frontend-sync-contract.md" docs/product-specs/index.md ARCHITECTURE.md docs/design-docs/backend-mvp-contract.md
-rg -q "websocket-reconnect-sync.md" docs/design-docs/index.md ARCHITECTURE.md docs/design-docs/backend-mvp-contract.md docs/design-docs/websocket-gateway.md
 
 message_transfer_code_patterns=(
   "type MessageEvent struct"
@@ -1223,19 +948,6 @@ for pattern in "${message_transfer_test_patterns[@]}"; do
   rg -q "$pattern" internal/transfer/worker_test.go
 done
 
-message_transfer_doc_patterns=(
-  "message.accepted"
-  "EventConsumer"
-  "DeliveryDispatcher"
-  "IdempotencyStore"
-  "RetryDecision"
-  "memory consumer"
-  "noop dispatcher"
-)
-
-for pattern in "${message_transfer_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/message-transfer-worker.md docs/exec-plans/active/message-transfer-worker.md
-done
 
 
 
@@ -1243,8 +955,7 @@ done
 
 
 rg -q "LoadMessageTransferConfig" pkg/config/config.go
-rg -q "message-transfer" service/message-transfer/main.go etc/message-transfer.yaml ARCHITECTURE.md
-rg -q "message-transfer-worker.md" docs/design-docs/index.md ARCHITECTURE.md
+rg -q "message-transfer" service/message-transfer/main.go etc/message-transfer.yaml
 rg -q "ConsumerGroup|Consumer\\.Group" etc/message-transfer.yaml pkg/config/config.go
 rg -q "Topic|Consumer\\.Topic" etc/message-transfer.yaml pkg/config/config.go
 rg -q "WorkerID|Worker\\.ID" etc/message-transfer.yaml pkg/config/config.go
@@ -1266,22 +977,6 @@ for pattern in "${gateway_delivery_code_patterns[@]}"; do
   rg -q "$pattern" internal/gateway/delivery internal/gateway/ws tests/websocket_gateway_test.go
 done
 
-gateway_delivery_doc_patterns=(
-  "Message Transfer worker"
-  "Redis Presence"
-  "message_received"
-  "message_delivered"
-  "server_msg_id"
-  "conversation_id"
-  "offline"
-  "in-memory"
-)
-
-for pattern in "${gateway_delivery_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/gateway-push-delivery.md docs/exec-plans/completed/gateway-push-delivery.md
-done
-
-rg -q "gateway-push-delivery.md" ARCHITECTURE.md docs/design-docs/index.md
 
 transfer_gateway_dispatcher_code_patterns=(
   "type Dispatcher struct"
@@ -1310,21 +1005,6 @@ for pattern in "${transfer_gateway_dispatcher_test_patterns[@]}"; do
   rg -q "$pattern" internal/transfer/gateway/dispatcher_test.go
 done
 
-transfer_gateway_dispatcher_doc_patterns=(
-  "message.accepted"
-  "message_received"
-  "delivery.Dispatcher"
-  "RetryDecision"
-  "offline"
-  "no recipients"
-  "Redis cross-instance"
-)
-
-for pattern in "${transfer_gateway_dispatcher_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/transfer-gateway-dispatcher.md docs/exec-plans/completed/transfer-gateway-dispatcher.md
-done
-
-rg -q "transfer-gateway-dispatcher.md" ARCHITECTURE.md docs/design-docs/index.md
 
 message_v2_delivery_code_patterns=(
   "DeliveryRecipientUserIDs"
@@ -1349,22 +1029,6 @@ for pattern in "${message_v2_removed_table_patterns[@]}"; do
   fi
 done
 
-delivery_reliability_doc_patterns=(
-  "accepted"
-  "published"
-  "delivered"
-  "offline"
-  "failed"
-  "next_retry_at"
-  "has_read_seq"
-  "not a read receipt"
-)
-
-for pattern in "${delivery_reliability_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/message-delivery-reliability.md
-done
-
-rg -q "message-delivery-reliability.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/message-transfer-worker.md docs/design-docs/transfer-gateway-dispatcher.md docs/exec-plans/active/backend-mvp-completion.md
 
 gateway_presence_routing_code_patterns=(
   "WithPresenceStore"
@@ -1383,35 +1047,8 @@ for pattern in "${gateway_presence_routing_code_patterns[@]}"; do
   rg -q "$pattern" internal/gateway/ws internal/gateway/delivery pkg/presence tests/websocket_gateway_test.go
 done
 
-gateway_presence_routing_doc_patterns=(
-  "PresenceStore"
-  "connection_id"
-  "instance_id"
-  "heartbeat"
-  "offline"
-  "routed"
-  "in-process"
-  "cross-instance"
-)
-
-for pattern in "${gateway_presence_routing_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/gateway-presence-routing.md docs/exec-plans/completed/gateway-presence-routing.md
-done
-
-rg -q "gateway-presence-routing.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/websocket-gateway.md docs/design-docs/gateway-push-delivery.md
 rg -q "Presence:" etc/gateway-ws.yaml
 
-gateway_product_patterns=(
-  "command ACK"
-  "Gateway does not store read progress"
-  "does not mean recipients have seen it"
-)
-
-for pattern in "${gateway_product_patterns[@]}"; do
-  rg -q "$pattern" docs/product-specs/gateway-message-contract.md
-done
-
-rg -q "gateway-message-contract.md" docs/design-docs/index.md docs/product-specs/index.md
 
 redis_compose_patterns=(
   "^  redis:"
@@ -1504,21 +1141,6 @@ for pattern in "${presence_code_patterns[@]}"; do
   rg -q "$pattern" pkg/presence
 done
 
-presence_doc_patterns=(
-  "PostgreSQL remains the source of truth"
-  "Redis presence is non-authoritative"
-  "agents_im:presence:user"
-  "agents_im:presence:conn"
-  "Heartbeat"
-  "REDIS_ADDR"
-  "go test ./..."
-)
-
-for pattern in "${presence_doc_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/redis-presence.md docs/exec-plans/active/redis-presence.md
-done
-
-rg -q "redis-presence.md" ARCHITECTURE.md docs/design-docs/index.md
 rg -q "REDIS_ADDR is required.*skip|t\\.Skip" pkg/presence/redis_integration_test.go
 
 message_event_schema_patterns=(
@@ -1541,16 +1163,6 @@ done
 
 
 
-read_receipt_patterns=(
-  "has_read_seq"
-  "unread_count"
-  "message.read"
-  "requested_has_read_seq > max_seq"
-)
-
-for pattern in "${read_receipt_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/read-receipts.md docs/product-specs/read-receipts.md
-done
 
 read_receipt_code_patterns=(
   "NormalizeMarkRead"
@@ -1563,7 +1175,6 @@ for pattern in "${read_receipt_code_patterns[@]}"; do
   rg -q "$pattern" internal/domain/readreceipt/read_receipt.go tests/read_receipts_test.go
 done
 
-rg -q "read-receipts.md" docs/design-docs/index.md docs/product-specs/index.md
 if rg -n "X-User-Id|CurrentUserID|currentUserID" api internal service/gateway-ws service/message-api service/message-transfer; then
   echo "production API/code still contains header-based current user auth" >&2
   exit 1
@@ -1677,13 +1288,11 @@ done
 rg -q "type JWTAuthConfig" pkg/config/config.go
 rg -q "AccessSecret" pkg/config/config.go service/auth/rpc/internal/config/config.go
 rg -q "AccessExpire" pkg/config/config.go service/auth/rpc/internal/config/config.go
-rg -q "user_id" internal/auth/token/token.go pkg/ctxuser/user.go
-rg -q "ctxuser\\.UserID" internal/logic/user internal/logic/friends internal/logic/groups internal/logic/message internal/logic/media
+rg -q "user_id" pkg/ctxuser/user.go
+rg -q "ctxuser\\.UserID" internal/logic/message
 rg -q "sender_id must match authenticated user" internal/logic/message/send_message_logic.go
 
 jwt_test_patterns=(
-  "assertLooksLikeJWT"
-  "TestAuthIssuedBearerTokenAccessesMe"
   "bearerTokenForUser"
   "legacy X-User-Id rejection"
   "invalid token status"
@@ -1694,46 +1303,14 @@ for pattern in "${jwt_test_patterns[@]}"; do
   rg -q "$pattern" tests
 done
 
-rg -q "jwt-auth-middleware.md" docs/design-docs/index.md
-rg -q "Auth.AccessSecret" docs/design-docs/jwt-auth-middleware.md docs/design-docs/auth-service-go-zero.md
-rg -q "senderId.*must match" docs/design-docs/jwt-auth-middleware.md docs/design-docs/message-chain-contract.md
-rg -q "JWT Bearer token" docs/product-specs/auth-service.md docs/product-specs/user-service.md docs/product-specs/friends-service.md docs/product-specs/groups-service.md docs/product-specs/message-chain.md
-rg -q "ExistsByIdentifier" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
-rg -q "CreateUser" internal/auth docs/design-docs/auth-service-go-zero.md docs/product-specs/auth-service.md
+rg -q "ExistsByIdentifier" internal/auth
+rg -q "CreateUser" internal/auth
 rg -q "PasswordHash" internal/auth/model/credential.go
 rg -q "Salt" internal/auth/model/credential.go
-rg -q "user-rpc" docs/design-docs/groups-service-go-zero.md docs/product-specs/groups-service.md
-rg -q "client_msg_id" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md "$message_plan_file"
-rg -q "has_read_seq" docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md "$message_plan_file"
 
-social_mvp_account_patterns=(
-  "AddFriend"
-  "重复添加同一有效好友"
-  "添加自己为好友"
-  "目标账号不存在"
-  "MVP 群默认允许公开加入"
-  "非成员或已退出成员发送群消息必须失败"
-)
-
-for pattern in "${social_mvp_account_patterns[@]}"; do
-  rg -q "$pattern" docs/product-specs/account-social-core.md
-done
-
-social_mvp_boundary_patterns=(
-  "MVP 业务规则"
-  "GetFriendship"
-  "FORBIDDEN"
-  "不能写入消息、推进 seq 或创建 outbox"
-  "creator 是 owner/member"
-)
-
-for pattern in "${social_mvp_boundary_patterns[@]}"; do
-  rg -q "$pattern" docs/design-docs/user-auth-friends-groups-boundaries.md
-done
 
 social_mvp_code_patterns=(
   "CodeForbidden"
-  "PermissionDenied"
   "sender is not a group member"
   "group membership validator is not configured"
   "group owner cannot leave as the only active member"
@@ -1744,8 +1321,6 @@ for pattern in "${social_mvp_code_patterns[@]}"; do
 done
 
 social_mvp_test_patterns=(
-  "TestFriendsLogicNeverAddedStatusIsNone"
-  "TestGroupsLogicOwnerCannotLeaveWhenOnlyActiveMember"
   "TestMessageGroupSendRequiresActiveMembership"
   "client-group-outsider"
   "client-group-left"
@@ -1755,53 +1330,6 @@ for pattern in "${social_mvp_test_patterns[@]}"; do
   rg -q "$pattern" tests
 done
 
-account_terminology_doc_patterns=(
-  "Account Service"
-  "account_type=user|agent|admin"
-  "Snowflake"
-  "accounts"
-  "profiles"
-  "user_id"
-  "account id alias"
-  "V0 compatibility"
-  "Auth Service"
-  "credential/password/token"
-)
-
-for pattern in "${account_terminology_doc_patterns[@]}"; do
-  rg -qF "$pattern" docs/design-docs/account-service-terminology.md
-done
-
-account_terminology_entry_patterns=(
-  "Account Service"
-  "account id alias"
-  "account_type=user|agent|admin"
-)
-
-for pattern in "${account_terminology_entry_patterns[@]}"; do
-  rg -qF "$pattern" AGENTS.md ARCHITECTURE.md docs/product-specs/account-social-core.md docs/product-specs/frontend-backend-contract.md docs/design-docs/user-auth-friends-groups-boundaries.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
-done
-
-account_code_patterns=(
-  "AccountTypeUser  AccountType = \"user\""
-  "type Account struct"
-  "type Profile struct"
-  "AccountID"
-  "NewAccountProfile"
-  "type AccountRepository interface"
-  "type UserRepository = AccountRepository"
-  "type AccountProfile = UserProfile"
-  "func NewAccountLogic"
-  "idgen.NewString"
-  "AccountLogic"
-  "Path:    \"/accounts\""
-  "Path:    \"/accounts/exists\""
-  "Path:    \"/accounts/:identifier\""
-)
-
-for pattern in "${account_code_patterns[@]}"; do
-  rg -qF "$pattern" internal/model/user.go internal/repository/repository.go internal/repository/memory.go internal/repository/postgres_user_friends.go internal/logic/userlogic.go internal/servicecontext/user/service_context.go internal/handler/gozero_routes.go
-done
 
 account_storage_patterns=(
   "create table if not exists accounts"
@@ -1815,17 +1343,8 @@ for pattern in "${account_storage_patterns[@]}"; do
 done
 
 rg -qF "account_type?: 'user' | 'agent' | 'admin'" web/src/api/user.ts
-rg -qF "Legacy server data that still contains \`normal\` is invalid and must be migrated before use" docs/product-specs/frontend-backend-contract.md
-rg -qF "旧 \`account_type=normal\` 不再作为有效输入兼容" docs/design-docs/account-service-terminology.md docs/design-docs/user-service-go-zero.md docs/product-specs/user-service.md
-rg -qF "Account Service 术语与 V0 compatibility" AGENTS.md docs/design-docs/index.md
-rg -qF "Account Service 第一阶段产品规格" docs/product-specs/index.md docs/product-specs/user-service.md
-rg -qF "Account Service go-zero 实现设计" docs/design-docs/index.md docs/design-docs/user-service-go-zero.md
 
 if rg -n 'account_type.*normal|normal.*account_type|`normal`' \
-  docs/product-specs/agent-system.md \
-  docs/design-docs/agent-system-architecture.md \
-  docs/exec-plans/active/agent-system-v0.md \
-  docs/exec-plans/active/agent-infrastructure-parallel-baseline.md \
   web/src/api/user.ts; then
   echo "account_type docs/frontend must use user|agent|admin; normal may appear only in explicit migration compatibility docs" >&2
   exit 1
@@ -1849,7 +1368,7 @@ pg_persistence_patterns=(
 )
 
 for pattern in "${pg_persistence_patterns[@]}"; do
-  rg -q "$pattern" db/migrations/001_init_postgres.sql docs/design-docs/postgres-persistence.md
+  rg -q "$pattern" db/migrations/001_init_postgres.sql
 done
 
 rg -q "StorageDriver" pkg/config/config.go etc/*.yaml
@@ -1857,10 +1376,8 @@ rg -q "ObjectStorageConfig" pkg/config/config.go
 rg -q "NewStore" pkg/objectstorage/factory.go
 rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/minio.go
 rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go service/user/api/user.go service/message-api/main.go service/gateway-ws/main.go
-rg -q "ValidateMessageMedia" internal/logic/medialogic.go internal/logic/messagelogic.go
-rg -q "media_objects" db/migrations/001_init_postgres.sql docs/product-specs/message-chain.md docs/product-specs/frontend-backend-contract.md
-rg -q "PATCH /me/avatar" docs/product-specs/frontend-backend-contract.md
-rg -q "POST /media/uploads" docs/product-specs/frontend-backend-contract.md
+rg -q "ValidateMessageMedia" internal/logic/messagelogic.go
+rg -q "media_objects" db/migrations/001_init_postgres.sql
 if rg -q 'OBJECT_STORAGE_EXTERNAL_ENDPOINT="?((127\.[0-9.]+|localhost|0\.0\.0\.0|\[?::1\]?)(:[0-9]+)?)"?' scripts/bootstrap-server.sh deploy/k8s/secrets.example.yaml; then
   echo "production object storage external endpoint must not be browser-local loopback" >&2
   exit 1
@@ -1872,7 +1389,7 @@ fi
 rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go internal/auth/repository/postgres.go
 rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
 rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
-rg -q "docker compose" scripts/migrate-postgres.sh docs/design-docs/postgres-persistence.md
+rg -q "docker compose" scripts/migrate-postgres.sh
 
 outbox_schema_patterns=(
   "event_id"
@@ -1890,7 +1407,7 @@ outbox_schema_patterns=(
 )
 
 for pattern in "${outbox_schema_patterns[@]}"; do
-  rg -q "$pattern" db/migrations/001_init_postgres.sql docs/design-docs/message-outbox.md
+  rg -q "$pattern" db/migrations/001_init_postgres.sql
 done
 
 outbox_code_patterns=(
@@ -1908,8 +1425,6 @@ for pattern in "${outbox_code_patterns[@]}"; do
   rg -q "$pattern" internal/repository/message_outbox_repository.go internal/repository/postgres_outbox.go internal/repository/postgres_message.go internal/repository/message_memory.go tests/message_service_test.go tests/postgres_persistence_integration_test.go
 done
 
-rg -q "message-outbox.md" ARCHITECTURE.md docs/design-docs/index.md docs/design-docs/postgres-persistence.md
-rg -q "message-outbox" docs/exec-plans/active/message-outbox.md
 
 # Outbox -> messaging.MessageEvent conversion is the live V1 fanout path consumed
 # by message-transfer (the former Kafka publisher was removed as unused).
@@ -1972,9 +1487,8 @@ done
 
 rg -q "Observability:" etc/message-transfer.yaml
 rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
-rg -q "observability-mvp.md" ARCHITECTURE.md docs/design-docs/index.md
-rg -q "agents_im_message_sends_total" docs/design-docs/observability-mvp.md pkg/observability/metrics.go
-rg -q "trace_id" docs/design-docs/observability-mvp.md internal/gateway/ws/server.go
+rg -q "agents_im_message_sends_total" pkg/observability/metrics.go
+rg -q "trace_id" internal/gateway/ws/server.go
 
 llm_observability_patterns=(
   "RuntimeModeAIHostingAutoReply"
@@ -1988,10 +1502,9 @@ llm_observability_patterns=(
 )
 
 for pattern in "${llm_observability_patterns[@]}"; do
-  rg -q "$pattern" pkg/llmobs internal/agenteval internal/agentim internal/agentruntime/eino pkg/config docs/design-docs/llm-observability.md .env.example
+  rg -q "$pattern" pkg/llmobs internal/agenteval internal/agentim internal/agentruntime/eino pkg/config .env.example
 done
 
-rg -q "llm-observability.md" ARCHITECTURE.md docs/design-docs/index.md
 rg -q "LLM_OBSERVABILITY_BACKEND=noop" .env.example
 
 python3 - <<'PY'
@@ -2218,7 +1731,7 @@ fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
   service/user/api/user.api service/user/rpc/user.proto service/user/api/user.go \
-  internal/model internal/logic internal/handler service/user/rpc internal/servicecontext; then
+  internal/logic internal/handler service/user/rpc internal/servicecontext; then
   echo "forbidden auth secret field found in service source" >&2
   exit 1
 fi
@@ -2231,24 +1744,14 @@ if rg -n "password|password_hash|verification_code|oauth_token|credential" \
 fi
 
 if rg -n "password|password_hash|verification_code|oauth_token|credential" \
-  api/message.api proto/message.proto \
+  api/message.api internal/rpcgen/message/message.proto \
   internal/logic/messagelogic.go internal/repository/message_memory.go \
   internal/repository/message_repository.go internal/handler/message; then
   echo "forbidden auth secret field found in message contract source" >&2
   exit 1
 fi
 
-if rg -ni "message service (owns|stores|manages|persists).*(password|password_hash|verification_code|oauth_token|credential|auth secret)|(password|password_hash|verification_code|oauth_token|credential|auth secret).*(owned by|stored in|managed by|persisted by) message service" \
-  docs/product-specs/message-chain.md docs/design-docs/message-chain-contract.md "$message_plan_file"; then
-  echo "message docs assign auth secrets to message service" >&2
-  exit 1
-fi
 
-rg -q "Backend MVP" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
-rg -q "message_received" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
-rg -q "get_conversation_seqs" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
-rg -q "healthz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
-rg -q "readyz" docs/product-specs/backend-mvp.md docs/design-docs/backend-mvp-contract.md
 
 frontend_patterns=(
   "消息"

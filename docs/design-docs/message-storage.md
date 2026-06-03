@@ -27,7 +27,7 @@ The storage layer must preserve these invariants:
 - Define unique constraints required for idempotency, message identity, and per-conversation ordering.
 - Define sequence allocation and transaction boundaries for send, pull, and mark-as-read.
 - Define Redis keys that can be introduced later without changing repository behavior.
-- Keep the storage contract independent from `api/message.api`, `proto/message.proto`, and HTTP handler implementation.
+- Keep the storage contract independent from `api/message.api`, `internal/rpcgen/message/message.proto`, and HTTP handler implementation.
 
 ## Non-goals
 
