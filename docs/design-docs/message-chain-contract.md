@@ -200,7 +200,7 @@ The exact helper should be central, not duplicated across handlers.
 
 ## RPC contract
 
-Use `proto/message.proto` for service-to-service and future gateway integration.
+Use `internal/rpcgen/message/message.proto` for service-to-service and future gateway integration.
 
 Suggested proto package:
 
@@ -209,7 +209,7 @@ syntax = "proto3";
 
 package message;
 
-option go_package = "github.com/wujunhui99/agents_im/proto/messagepb";
+option go_package = "github.com/wujunhui99/agents_im/internal/rpcgen/message/messagepb";
 
 service MessageService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
@@ -647,7 +647,7 @@ For phase 1 this can be repository-based once conversations are created by send 
 This contract enables these branches to be developed in parallel:
 
 1. `feature/message-service-contract`
-   - `proto/message.proto`
+   - `internal/rpcgen/message/message.proto`
    - `api/message.api`
    - message logic skeleton
    - memory repository and tests

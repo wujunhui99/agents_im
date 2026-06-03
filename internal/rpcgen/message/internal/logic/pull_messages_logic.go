@@ -3,10 +3,10 @@ package logic
 import (
 	"context"
 
+	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/message/internal/svc"
-	"github.com/wujunhui99/agents_im/common/share/rpcerror"
-	"github.com/wujunhui99/agents_im/proto/messagepb"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/message/messagepb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

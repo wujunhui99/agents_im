@@ -9,7 +9,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/rpcgen/message/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/rpcgen/message/internal/svc"
-	"github.com/wujunhui99/agents_im/proto/messagepb"
+	"github.com/wujunhui99/agents_im/internal/rpcgen/message/messagepb"
 )
 
 type MessageServiceServer struct {
