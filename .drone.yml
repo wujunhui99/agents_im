@@ -177,6 +177,16 @@ steps:
       - name: docker_sock
         path: /var/run/docker.sock
 
+  - name: prune images
+    image: docker.io/library/docker:29-cli
+    depends_on:
+      - build images
+    commands:
+      - docker image prune -af --filter "until=24h"
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+
   - name: deploy
     image: alpine:3.20
     depends_on:
