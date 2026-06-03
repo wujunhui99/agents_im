@@ -196,12 +196,8 @@ const langfuseExportTimeout = 10 * time.Second
 
 > 修复：加 `frontend-verification` step，按 `detect-deploy-changes.py` 判断 web 受影响才跑。
 
-### OB-14 ⚠️ 部署不分环境
-当前只有"main → 生产 k3s"一个环境。没有 staging。意味着 main 合入到部署只有 GitHub Merge Queue 这一道闸门。
-
-> 修复：至少加一个 `develop` 分支 → staging 环境（哪怕同 k3s 不同 namespace）。但这是 P2，不阻塞当前重构。
->
-> **决定（2026-05-30）**：不加 `develop` 分支。采用 Argo CD GitOps：拆独立 gitops 仓库供 Argo CD 监控；Drone CI 按 **PR + label** 改 gitops 仓库；Argo CD 经 **webhook** 接收代码仓库变化自动部署。与 OB-15 同一 epic。
+### OB-14 ⚠️ 部署不分环境 → 移至 v2
+环境分离（staging/prod）需求已**推迟到 v2 重构**实现，详见 [`docs/refactor/v2/05-observability-cicd.md`](../v2/05-observability-cicd.md)。Argo CD GitOps 已在 v1 落地接管 prod；环境分离在其之上做。
 
 ### OB-15 🟡 `__IMAGE_TAG_REQUIRED__` placeholder
 所有 `deploy/k8s/deployments.yaml` 用 `:__IMAGE_TAG_REQUIRED__`，部署时 deploy-k3s.sh 用 sed 替换 commit SHA。
