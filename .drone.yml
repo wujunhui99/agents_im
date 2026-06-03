@@ -177,16 +177,6 @@ steps:
       - name: docker_sock
         path: /var/run/docker.sock
 
-  - name: prune images
-    image: docker.io/library/docker:29-cli
-    depends_on:
-      - build images
-    commands:
-      - docker image prune -af --filter "until=24h"
-    volumes:
-      - name: docker_sock
-        path: /var/run/docker.sock
-
   - name: deploy
     image: alpine:3.20
     depends_on:
@@ -236,6 +226,25 @@ steps:
         from_secret: telegram_chat_id
     commands:
       - python scripts/ci/drone-telegram-notify.py "$DRONE_BUILD_STATUS"
+    when:
+      status:
+        - success
+        - failure
+
+  # Terminal step: prunes the shared host daemon used by the Drone runner to
+  # spawn step containers. Must depend on the last step (notify telegram) so it
+  # never runs concurrently with another step's container startup — a parallel
+  # `docker image prune` races containerd lease GC and breaks step creation
+  # ("lease does not exist"). until=4h keeps recently-pulled step images.
+  - name: prune images
+    image: docker.io/library/docker:29-cli
+    depends_on:
+      - notify telegram
+    commands:
+      - docker image prune -af --filter "until=4h"
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
     when:
       status:
         - success
