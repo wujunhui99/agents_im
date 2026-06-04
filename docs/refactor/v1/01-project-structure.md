@@ -160,7 +160,8 @@ agents_im/
 │   ├── messaging/                         # ← 原 internal/messaging（Kafka producer/consumer）
 │   ├── presence/                          # ← 原 internal/presence（Redis online 状态查询，D4）
 │   ├── objectstorage/                     # ← 原 internal/objectstorage（MinIO/S3）
-│   └── pythonexec/                        # ← 原 internal/agent/pythonexec
+│   ├── pythonexec/                        # ← 原 internal/agent/pythonexec
+│   └── jwtauth/                           # 无状态 JWT 验签 + 读共享 Redis `user_active_sessions:{uid}` 比对 jti（D14；非 auth 业务，纯鉴权基础设施）
 │
 ├── etc/                           # 部署 yaml（唯一部署事实，TD-8）
 ├── Makefile                       # 启动/构建/清单入口（run-<svc> / build-backend，BACKEND_SERVICES + PKG_<svc>）

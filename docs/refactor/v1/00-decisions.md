@@ -135,6 +135,23 @@
 - **来源**：本轮 Claude × 用户讨论（2026-06-04）。
 - **影响文档**：01（TD-7、§3 约束、§4 step 16、§5）、02（list 聚合描述、AU-2）、04（AG-3 / AG-6 数据层）、06（XC-1）。
 
+### D14 — 鉴权模型：无状态 JWT + Redis 活跃会话表（按设备类型单活）
+
+- **auth 只负责登录 / 注册 / 登出业务**，不承担每请求校验。
+- **JWT 无状态**：仅签名 + `exp` 本地校验，不查库、不调 RPC。JWT 携带两个**签名** claim：标准注册 claim **`jti`**（UUID v4）+ **设备类型 `platform`**（mobile / web / desktop…）。
+- **活跃会话存 Redis HASH**：key `user_active_sessions:{uid}`（**中性命名**——这是被所有服务读的**共享身份缓存，不属于 auth 域**，auth 只是写入方；故不用 `auth:` 前缀）。
+  - field = 设备类型；value = JSON `{"jti":"<uuid v4>","login_at":<ts>,"ip":"1.2.3.4","device_name":"iPhone 15"}`。
+  - HASH 结构天然支持**多设备登录**（按类型各一台：mobile + web + desktop 并存）；同类型再次登录覆盖该 field → **踢掉同类型旧设备**。
+- **登录**（auth-rpc）：定设备类型 → 生成 UUID v4 jti → `HSET user_active_sessions:{uid} <platform> = {jti,login_at,ip,device_name}` → 签发带 `jti`+`platform` 的 JWT。
+- **登出**（auth-rpc）：`HDEL <platform>`（当前设备）或 `DEL`（全设备）。
+- **每请求校验收口到 `pkg/jwtauth`**（不调 auth-rpc，零 RPC 跳）：① 本地验签 + 验 `exp`；② 从**已验签的** JWT 取 `jti`+`platform`（platform 必须来自签名 claim，**不能信请求头**）→ `HGET user_active_sessions:{uid} <platform>` → 比对 jti，不一致 / 缺失 → 401。
+- **TTL**：key 级 TTL，登录时刷新为最长 token 有效期；安全由本地 `exp` 校验 + jti 比对保证（Redis 滞留 field 不会放行已过期 token，仅占内存）。
+- **消费方迁移**：原 7 处 in-process 依赖 `internal/auth/repository.ActiveSessionRepository` 的鉴权点（agent-api / message-api / gateway-ws / admin-api + internal 的 adminbootstrap / gateway/ws / servicecontext/common）改 import `pkg/jwtauth` + 共享 Redis；`internal/auth` 删除后不再依赖 auth 代码。
+- **边界**：`user_active_sessions:{uid}` 由 auth **写**、各服务经 `pkg/jwtauth` **读**（共享身份缓存，key 结构与读写逻辑由 `pkg/jwtauth` 收口）。比"每请求调 auth-rpc"更快，且 auth-rpc 不在每请求关键路径上。
+- **待定（实现期）**：refresh token 是否引入及 refresh 时 jti 沿用 / 轮换；`platform` 取值集合与归一化。
+- **来源**：本轮 Claude × 用户讨论（2026-06-04）。
+- **影响文档**：01（`pkg/jwtauth` 入 pkg 清单）、02（auth 段：`AuthRuntime` / `ActiveSessionRepository` 退役，鉴权改 `pkg/jwtauth`）。
+
 ---
 
 ## 2. 已被本文件覆盖 / 失效的旧表述
@@ -258,6 +275,7 @@
 | D11 重构执行策略（分支/原地重建/不重写） | ✅ 引用（§4 执行轨） | n/a | n/a | n/a | n/a | n/a | n/a |
 | D12 RPC 间一律不互调（含不经 adapter） | ✅ 引用（§3 约束/§6 验收 E） | ✅ 原始（收紧 CP-3） | n/a | n/a | n/a | n/a | n/a |
 | D13 纯 goctl model，废 repository 层 | ✅ 修复（TD-7/§4/§5/§3） | ✅ 引用（聚合描述） | n/a | ✅ 修复（AG-3/AG-6） | n/a | ✅ 修复（XC-1） | n/a |
+| D14 无状态 JWT + Redis 单活 jti | ✅ 引用（pkg/jwtauth） | ✅ 修复（auth 鉴权段） | n/a | n/a | n/a | n/a | n/a |
 
 `✅ 原始决策`：该决策的来源文档。
 `✅ 修复`：本次同步通过修改对齐。
