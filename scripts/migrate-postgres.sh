@@ -105,6 +105,8 @@ if ((${#migrations[@]} == 0)); then
   exit 1
 fi
 
+applied_count=0
+skipped_count=0
 for migration in "${migrations[@]}"; do
   version="$(basename "${migration}")"
   checksum="$(sha256sum "${migration}" | awk '{print $1}')"
@@ -117,6 +119,7 @@ for migration in "${migrations[@]}"; do
       if migration_is_legacy_applied "${version}" "${applied_checksum}"; then
         echo "migration ${version}: legacy-adopted; trusting previously applied SQL and updating checksum"
         psql_exec -c "update schema_migrations set checksum = ${checksum_sql}, applied_at = now() where version = ${version_sql};"
+        skipped_count=$((skipped_count + 1))
         continue
       else
         cat >&2 <<MSG
@@ -130,6 +133,7 @@ MSG
       fi
     else
       echo "migration ${version}: already applied"
+      skipped_count=$((skipped_count + 1))
       continue
     fi
   fi
@@ -137,4 +141,7 @@ MSG
   echo "migration ${version}: applying"
   apply_migration_file "${migration}"
   psql_exec -c "insert into schema_migrations (version, checksum) values (${version_sql}, ${checksum_sql}) on conflict (version) do update set checksum = excluded.checksum, applied_at = now();"
+  applied_count=$((applied_count + 1))
 done
+
+echo "migrations complete: ${applied_count} applied, ${skipped_count} already up to date"

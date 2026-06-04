@@ -12,4 +12,9 @@ UserRPC:
   Endpoints:
     - 127.0.0.1:9090
   Timeout: 5000
-# tracing: go-zero 自带 Telemetry。本地默认不配（Endpoint 空 = 关闭）；生产见 deploy/k8s/etc/。
+# go-zero 自带 tracing：本地上报到 docker-compose 的 tempo（OTLP gRPC）；生产见 deploy/k8s/etc/。
+Telemetry:
+  Name: groups-api
+  Endpoint: 127.0.0.1:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc

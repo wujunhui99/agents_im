@@ -110,6 +110,13 @@ load_env() {
   export DATABASE_URL="${DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable}"
   export JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-dev-jwt-secret-change-me}"
   export JWT_ACCESS_EXPIRE="${JWT_ACCESS_EXPIRE:-86400}"
+  # 本地追踪上报到 docker-compose 的 tempo，贴近生产（生产由 ConfigMap 注入同名 env）。
+  # pkg/observability 系服务读 AGENTS_IM_* env；groups 走 go-zero 原生 Telemetry（见其 yaml）。
+  export TEMPO_OTLP_GRPC_PORT="${TEMPO_OTLP_GRPC_PORT:-4317}"
+  export AGENTS_IM_TRACING_ENABLED="${AGENTS_IM_TRACING_ENABLED:-true}"
+  export AGENTS_IM_OTLP_ENDPOINT="${AGENTS_IM_OTLP_ENDPOINT:-127.0.0.1:${TEMPO_OTLP_GRPC_PORT}}"
+  export AGENTS_IM_OTLP_PROTOCOL="${AGENTS_IM_OTLP_PROTOCOL:-grpc}"
+  export AGENTS_IM_TRACING_SAMPLER_RATIO="${AGENTS_IM_TRACING_SAMPLER_RATIO:-1.0}"
   export PRESENCE_DRIVER="${PRESENCE_DRIVER:-memory}"
   export FRONTEND_PORT="${FRONTEND_PORT:-5173}"
   export GATEWAY_WS_ALLOWED_ORIGINS="${GATEWAY_WS_ALLOWED_ORIGINS:-http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT}}"
@@ -247,6 +254,11 @@ write_groups_rpc_config() {
 Name: groups-rpc
 ListenOn: 127.0.0.1:${GROUPS_RPC_PORT:-9093}
 DataSource: ${DATABASE_URL}
+Telemetry:
+  Name: groups-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
 YAML
 }
 
@@ -314,7 +326,12 @@ GatewayWS:
 UserRPC:
   Endpoints:
     - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000"
+  Timeout: 5000
+Telemetry:
+  Name: groups-api
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc"
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
   write_user_rpc_config
   write_groups_rpc_config
@@ -401,7 +418,7 @@ main() {
 
   if [[ "${WITH_MIDDLEWARE}" -eq 1 ]]; then
     require_command docker
-    docker compose up -d postgres redis minio
+    docker compose up -d postgres redis minio tempo
     wait_for_postgres
     require_command curl
     wait_for_minio
