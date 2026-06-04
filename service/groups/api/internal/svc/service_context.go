@@ -6,7 +6,6 @@ package svc
 import (
 	"errors"
 
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
@@ -31,11 +30,12 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	if !hasRPCClientConfig(c.UserRPC) {
 		return nil, ErrUserRPCConfigRequired
 	}
-	groupsCli, err := zrpc.NewClient(c.GroupsRPC, zrpc.WithUnaryClientInterceptor(observability.GRPCUnaryClientInterceptor()))
+	// zrpc 客户端内置 otel tracing 拦截器（go-zero 自带 Telemetry），无需额外注入。
+	groupsCli, err := zrpc.NewClient(c.GroupsRPC)
 	if err != nil {
 		return nil, err
 	}
-	userCli, err := zrpc.NewClient(c.UserRPC, zrpc.WithUnaryClientInterceptor(observability.GRPCUnaryClientInterceptor()))
+	userCli, err := zrpc.NewClient(c.UserRPC)
 	if err != nil {
 		return nil, err
 	}

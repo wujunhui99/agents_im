@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"log"
 	"net/http"
 
-	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/health"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/pkg/response"
@@ -28,18 +26,8 @@ func main() {
 func run(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c, conf.UseEnv())
-	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
 
-	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
-	if err != nil {
-		log.Fatalf("init tracing: %v", err)
-	}
-	defer func() {
-		if err := observability.ShutdownTracing(shutdownTracing); err != nil {
-			log.Printf("shutdown tracing: %v", err)
-		}
-	}()
-
+	// tracing 由 go-zero 自带 Telemetry（yaml 配置）驱动：rest 内置 otel 中间件 + ServiceConf 启动 trace agent。
 	serviceContext, err := svc.NewServiceContext(c)
 	if err != nil {
 		log.Fatalf("build groups api service context: %v", err)
@@ -48,7 +36,6 @@ func run(configFile string) {
 	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(c.RestConf, rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()
-	server.Use(observability.TraceMiddlewareFunc)
 	registerObservabilityHandlers(server, serviceContext)
 	handler.RegisterHandlers(server, serviceContext)
 

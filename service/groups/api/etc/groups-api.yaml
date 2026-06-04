@@ -12,11 +12,4 @@ UserRPC:
   Endpoints:
     - 127.0.0.1:9090
   Timeout: 5000
-Tracing:
-  Enabled: false
-  ServiceName: groups-api
-  Environment: local
-  Protocol: grpc
-  SamplerRatio: 1.0
-  TraceUIBaseURL: http://localhost:3000
-  Insecure: true
+# tracing: go-zero 自带 Telemetry。本地默认不配（Endpoint 空 = 关闭）；生产见 deploy/k8s/etc/。
