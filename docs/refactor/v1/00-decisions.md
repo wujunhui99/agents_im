@@ -105,6 +105,36 @@
 - 来源：01 §3 + §4（Stage 1~5）。
 - **影响文档**：01 全文、02（CP-4 引用 internal/domain 改为 service domain）、03（pkg/messaging）、04（pkg/pythonexec、pkg/llmobs）、05（pkg/observability、metric 路径）、06（XC-1 repository 平铺最终归宿）、07（pkg/idgen 用于 server_msg_id 生成）。
 
+### D11 — 重构执行策略：长期分支 / 逐服务原地重建 / 搬运不重写
+
+- **长期重构分支**：所有重构改动进一条专用 refactor 分支，**中途不跑 Drone CI、不逐步回归**，允许过程中其它服务暂时编译断。**合回 `main` 前**必须本地 `go build ./... && go test ./...` 整体绿，并跑一次完整 CI + 回归——这是"搬运中没丢东西"的唯一机械验证，不可省。
+- **逐服务原地重建（≠ 清空 `service/`）**：重建某服务时只重写它的 `rpc/internal/{config,svc,logic,model}`（model 由 goctl 生成，见 D10 / 01 TD-11），其它服务不动、照常编译。**不要一次性清空整个 `service/`**——那会删掉服务间 RPC 契约（pb stub），导致所有 RPC client 编译不过、全盘瘫痪、无法逐个验证。
+- **proto 契约随服务下沉，不另存顶层 `proto/`**（对齐 D10）：迁某服务时把 `proto/<domain>.proto` **逐个 `git mv` 到 `service/<domain>/rpc/<domain>.proto`** 并就地 `goctl rpc protoc` 重生成 pb；`proto/` 搬空后删除整个目录。契约**不丢，只换位置**——下沉后的 proto/pb 仍是其它服务 RPC client 依赖的单源。
+- **搬运不重写**：域逻辑从旧 `internal/logic` 等**移动 / 移植**（git 全程可回溯），**禁止从零重写**。问题是代码"放错位置"不是"写错了"；重写会丢失已验证的校验 / ACL / 边界与历史 bug 修复，成本与风险都远高于 `git mv` + 改 import。
+- **RPC 契约解耦 → 任意顺序可重建**：跨域只依赖对方 proto 契约（svc 注入对方 rpc client，见 D12），故各服务可独立、任意顺序重建；半成品服务通过 RPC 调用尚未重建的旧服务（旧服务仍在运行）。这正是"改一个域不连锁改其它域逻辑"的根因——服务间只认 proto，不认代码。
+- **顶层 `internal/` 最后删**：每个服务脱钩后清自己用到的 internal 子树；顶层 `internal/` 留到最后一个服务脱钩后统一删除（对齐 01 §4 Stage 5）。
+- **起点**：auth（自包含，仅跨到 user）。
+- **来源**：本轮 Claude × 用户讨论（2026-06-04）。
+- **影响文档**：01（§4 收敛路径作为宏观清理目标，本 D11 给出"逐服务原地重建"的执行轨）。
+
+### D12 — 跨域调用边界收紧：RPC 间一律不互调（含不经 adapter）
+
+- **锁定 CP-3 为最严口径**：`rpc` 之间**一律不相互调用**，**也不经** `service/<domain>/rpc/internal/<other>adapter/` **间接调**；`rpc/internal` 不持有任何他域 rpc client。
+- **跨域组合全部上移 API / BFF 层**：`service/<domain>/api` 自由 import 任意 rpc client 做聚合 / 编排。
+- **取代（旧表述作废）**：02 CP-3 的"需要时显式建立 `<other>adapter`"逃生口、AU-3 的 `adapter/user.go` / `adapter/mail.go`、01 §3 约束里的"或新增 `service/<domain>/rpc/internal/<other>adapter/`"。
+- **直接后果（建 auth 时落实）**：① 注册流程 auth 不再在 rpc 内调 user-rpc 建 account → 由 **auth-api 编排**（先 user-rpc 建 account，再 auth-rpc 建 credential）；② 发验证码邮件不在 auth-rpc 内调 mail-rpc → 由 **auth-api 编排**或走异步事件。
+- **来源**：本轮 Claude × 用户讨论（2026-06-04），收紧 02 CP-3 的"建议"为锁定决策。
+- **影响文档**：02（CP-3 修复、AU-3；FR-6 / §group list 聚合本就与此一致）、01（§3 约束、§6 验收 E）。
+
+### D13 — 数据访问层：纯 goctl model，废除 repository 抽象层
+
+- **数据访问 = goctl model**：每个域的数据访问由 `goctl model pg` 从 `db/migrations`（PostgreSQL）生成，落 `service/<domain>/rpc/internal/model/`（对齐 D10 / 01 TD-11）；自定义查询写在 model 的非生成文件（`<table>model.go` custom 区）。
+- **不再设 repository 抽象层**：废除 `internal/repository` 风格的手写 repository（含 `{memory,postgres}` 双实现）。`svc.ServiceContext` 持有 model（+ DB conn / redis cache），`logic` 经 `svcCtx` 直接调 model。
+- **测试**：放弃 memory-repo 单测 seam；数据层测试用 goctl model + sqlmock 或容器 / 嵌入 PostgreSQL；纯业务规则（校验 / ACL）测试不碰 DB，对 model 接口打桩。
+- **取代（旧表述作废）**：01 TD-7 / §5 / §4 step 16 中"repository 下沉到 `service/<domain>/rpc/internal/repository/{memory,postgres}/`"、D10 映射"`internal/repository → service/<domain>/rpc/internal/repository/`"、06 XC-1 repository 归宿——全部改为 `service/<domain>/rpc/internal/model/`，**无 repository 层**。
+- **来源**：本轮 Claude × 用户讨论（2026-06-04）。
+- **影响文档**：01（TD-7、§3 约束、§4 step 16、§5）、02（list 聚合描述、AU-2）、04（AG-3 / AG-6 数据层）、06（XC-1）。
+
 ---
 
 ## 2. 已被本文件覆盖 / 失效的旧表述
@@ -126,6 +156,12 @@
 | 01   | TD-4           | "proto/ 与 `service/<domain>/rpc/<domain>.proto` 双源" | D10（单源到 service，删顶层 proto/） |
 | 01   | TD-11 / TD-12  | 把 model/rpcgen 收敛到 `internal/`                  | D10（顶层 internal 整体退役）        |
 | D8 来源描述    | 引用 `internal/presence` `internal/observability`   | D10（改为 `pkg/...`）                |
+| 02   | CP-3 行 74      | "需要时显式建立 `service/<domain>/rpc/internal/<other>adapter/`" | D12（一律禁止，含不经 adapter）       |
+| 02   | AU-3 / §144~145 | `adapter/user.go`、`adapter/mail.go`（rpc 内持他域 client） | D12（跨域编排上移 API 层）             |
+| 01   | §3 约束 行 182  | "或新增 `service/<domain>/rpc/internal/<other>adapter/`" | D12（删除该逃生口）                   |
+| 01   | TD-7 / §4 step16 / §5 | repository 下沉到 `…/rpc/internal/repository/{memory,postgres}/` | D13（改为 `…/rpc/internal/model/`，无 repository 层） |
+| 01   | §3 约束         | "`service/<domain>/rpc` 独占该 domain 的 DB model、repository、proto" | D13（去掉 repository，留 model + proto） |
+| 06   | XC-1            | repository 平铺最终归宿                              | D13（归 `…/rpc/internal/model/`） |
 
 下面 §3 给出每条具体修复 PR 的可执行 diff 指引。
 
@@ -178,7 +214,7 @@
   - `internal/gateway` → `service/msggateway/internal`
   - `internal/transfer` → `service/msgtransfer/internal`
   - `internal/outboxpublisher` → 删除（D1）
-  - `internal/repository` → 按域分散到 `service/<domain>/rpc/internal/repository/`
+  - `internal/repository` → 按域分散到 `service/<domain>/rpc/internal/model/`（**纯 goctl model，无 repository 层**，D13）
   - `internal/logic/<domain>` → `service/<domain>/{api,rpc}/internal/logic/`
   - `internal/handler/<domain>` → `service/<domain>/api/internal/handler/`
   - `internal/servicecontext/<domain>` → `service/<domain>/<api|rpc>/internal/svc/`
@@ -188,6 +224,18 @@
   - `internal/domain/<X>` → `service/<X>/rpc/internal/domain/`
   - `internal/adminbootstrap` → `service/admin/api/internal/bootstrap`
 - 文档间引用如"见 D8 ... `internal/...`"统一改为 `pkg/...`；当前 D8 描述已就地更新（见 §1）。
+
+### 3.7 D11 / D12 配套修改
+
+- **01-project-structure.md**：§3 约束"跨域 RPC 互调禁止…或新增 `<other>adapter/`"删去 adapter 逃生口，改为"跨域只由 API 层 import RPC client 编排（D12）"；§4 收敛路径开头加一行指明执行采用 D11"逐服务原地重建"轨。
+- **02-microservices.md**：CP-3 的"建议"升级为引用 D12（一律禁止，含不经 adapter）；AU-3 收敛清单删 `adapter/user.go`、`adapter/mail.go`，注册 / 发信编排上移 auth-api。
+- D11 为纯过程决策，不改 01~07 的目标布局，仅约束"怎么落地"。
+
+### 3.8 D13 配套修改
+
+- **01-project-structure.md**：TD-7 修复目标、§4 step 16、§5 命名矩阵中所有"repository → `…/rpc/internal/repository/{memory,postgres}/`"改为"`…/rpc/internal/model/`（goctl 生成，无 repository 层）"；§3 约束"rpc 独占 DB model、repository、proto"删去 repository。
+- **06-cross-cutting.md**：XC-1 repository 归宿改为 model；memory/postgres 双实现项移除。
+- 数据层测试策略改为 goctl model + sqlmock / 容器 PG（见 D13）。
 
 ---
 
@@ -207,6 +255,9 @@
 | D8 msggateway 纯连接层        | ✅            | n/a            | ✅ 原始决策   | ✅ 引用       | ✅            | n/a           | n/a    |
 | D9 phase 顺序                 | ✅            | ✅            | ✅ 原始决策   | ✅            | ✅            | ✅            | ✅     |
 | D10 顶层 internal/api/proto 退役 | ✅ 原始决策 | ✅ 修复（§3.6 + 路径约定） | ✅ 修复（§3.6 + 路径约定） | ✅ 修复（§3.6 + 路径约定） | ✅ 引用（路径约定） | ✅ 引用（路径约定） | ✅ 引用（路径约定） |
+| D11 重构执行策略（分支/原地重建/不重写） | ✅ 引用（§4 执行轨） | n/a | n/a | n/a | n/a | n/a | n/a |
+| D12 RPC 间一律不互调（含不经 adapter） | ✅ 引用（§3 约束/§6 验收 E） | ✅ 原始（收紧 CP-3） | n/a | n/a | n/a | n/a | n/a |
+| D13 纯 goctl model，废 repository 层 | ✅ 修复（TD-7/§4/§5/§3） | ✅ 引用（聚合描述） | n/a | ✅ 修复（AG-3/AG-6） | n/a | ✅ 修复（XC-1） | n/a |
 
 `✅ 原始决策`：该决策的来源文档。
 `✅ 修复`：本次同步通过修改对齐。

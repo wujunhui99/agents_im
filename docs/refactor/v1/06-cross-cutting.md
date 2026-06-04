@@ -6,7 +6,7 @@
 >
 > **路径约定**：本文中 `internal/apperror/`、`internal/response/`、`internal/ctxuser/`、`internal/idgen/`、`internal/config/`、`internal/objectstorage/`、`internal/repository/` 等是**当前真实位置**的事实描述。按 00-decisions **D10**，重构后：
 > - 跨服务基础设施（apperror / response / ctxuser / idgen / config / objectstorage）→ `pkg/<name>/`
-> - 按域 repository → `service/<domain>/rpc/internal/repository/{memory,postgres}/`
+> - 按域数据访问 → `service/<domain>/rpc/internal/model/`（goctl model，**无 repository 层**，00-decisions **D13**）
 > - 顶层 `internal/` 整体退役。
 >
 > 本文 §1 / §10 中的修复方向以此 D10 落点为准。
@@ -87,7 +87,7 @@ internal/repository/
 >   taskreport/...
 >   deliveryattempt/...
 > ```
-> 或者更彻底，跟随文档 01 把每个域的 repo 搬进 `service/<domain>/rpc/internal/repository/`，internal/repository 退役。
+> 或者更彻底，跟随文档 01 / D13 把每个域的数据访问改为 goctl model 落 `service/<domain>/rpc/internal/model/`（无 repository 层），internal/repository 退役。
 
 ### XC-3 ⚠️ `schema_v2_enums.go` + `message_enums.go` 在 repo 层
 枚举本应在 domain 层（`internal/domain/<dom>/`），现在塞在 repository 包里，让 repository 又当持久化又当 type system。

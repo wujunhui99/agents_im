@@ -118,7 +118,7 @@ var forbiddenIdentifierFragments = []string{ ..., "py"+"thon", }
 
 5 个 agent 相关 repo 全部散落在 `internal/repository/` 平铺一层，每个都有 in-memory + postgres 两种实现。
 
-> 修复：搬进 `service/agent/rpc/internal/repository/{agent,registry,audit,hosting,convhosting}/`；in-memory 实现保留给单测用，但放进 `_test.go` 文件或独立 testfixture 包。
+> 修复（D13）：改为 goctl model 落 `service/agent/rpc/internal/model/`（agent / registry / audit / hosting / convhosting 各表），**无 repository 层**；数据层测试用 sqlmock / 容器 PG，业务规则测试对 model 接口打桩。
 
 ### AG-7 ⚠️ LLM observability 与 system tracing 双链路
 - `internal/llmobs/`：写 Langfuse（业务可观测：run/generation/tool_call 摘要）；
@@ -310,7 +310,7 @@ msg-rpc.SendMessage()
 2. **AG-5 forbidden 黑名单加注释 + config-driven**。
 3. **AG-1 建 service/agent/rpc**：定义 proto、生成代码、初始化 svc/server。
 4. **AG-2/AG-3 拆 internal/agentim**：搬到 `service/agent/rpc/internal/{trigger,orchestrator,hosting,imadapter,audit}/`。
-5. **AG-6 搬 repo**：agent_* repo 全部下沉 service/agent/rpc/internal/repository。
+5. **AG-6 数据层改 model**（D13）：agent_* 表全部改 goctl model 落 `service/agent/rpc/internal/model/`，废 repository 层。
 6. **AG-9 LLM provider 抽象**：`service/agent/rpc/internal/runtime/llm/{factory.go, deepseek, openai, anthropic}`（00-decisions D10）。
 7. **AG-10 agent-api 改 BFF only**：删 PythonExecutor、AgentLogic 在 api svc 的依赖，全部走 agent-rpc。
 8. **AG-13 default assistant seed 改 ensure**：从 migration 抽出。
