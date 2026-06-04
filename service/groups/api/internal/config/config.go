@@ -17,4 +17,6 @@ type Config struct {
 	}
 	Tracing   observability.TracingConfig `json:",optional"`
 	GroupsRPC zrpc.RpcClientConf
+	// UserRPC：BFF 聚合用，补全群成员资料 + 建群/加成员前校验用户存在。
+	UserRPC zrpc.RpcClientConf
 }

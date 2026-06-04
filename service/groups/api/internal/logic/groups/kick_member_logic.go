@@ -29,5 +29,9 @@ func (l *KickMemberLogic) KickMember(req *types.KickMemberReq) (*types.MemberRes
 	if err != nil {
 		return nil, apiError(err)
 	}
-	return memberResp(resp), nil
+	member, err := hydrateMember(l.ctx, l.svcCtx, resp.GetMember())
+	if err != nil {
+		return nil, err
+	}
+	return memberRespWith(member, resp.GetAlreadyMember()), nil
 }

@@ -3,7 +3,6 @@ package logic
 import (
 	"context"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	groups "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/svc"
@@ -22,9 +21,27 @@ func NewGetGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetGroup
 }
 
 func (l *GetGroupLogic) GetGroup(in *groups.GetGroupRequest) (*groups.GroupResponse, error) {
-	result, err := l.svcCtx.GroupsLogic.GetGroup(l.ctx, business.GetGroupRequest{GroupID: in.GetGroupId(), RequesterUserID: in.GetRequesterUserId()})
+	groupID, err := validateRequiredID(in.GetGroupId(), "group_id")
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	return &groups.GroupResponse{Group: toGroup(result)}, nil
+	requesterUserID, err := validateOptionalID(in.GetRequesterUserId(), "requester_user_id")
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+
+	group, err := l.svcCtx.GroupsModel.FindOne(l.ctx, groupID)
+	if err != nil {
+		return nil, rpcerror.ToStatus(notFoundAs(err, "group not found"))
+	}
+
+	role := ""
+	if requesterUserID != "" {
+		member, err := activeMember(l.ctx, l.svcCtx.GroupMembersModel, groupID, requesterUserID)
+		if err != nil {
+			return nil, rpcerror.ToStatus(err)
+		}
+		role = memberRoleToString(member.Role)
+	}
+	return &groups.GroupResponse{Group: toGroup(group, role)}, nil
 }

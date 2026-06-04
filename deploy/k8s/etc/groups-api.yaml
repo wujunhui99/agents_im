@@ -8,3 +8,7 @@ Auth:
 GroupsRPC:
   Target: dns:///groups-rpc:9103
   Timeout: 5000
+UserRPC:
+  Endpoints:
+    - user-rpc:9090
+  Timeout: 5000

@@ -3,8 +3,8 @@ package logic
 import (
 	"context"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	groups "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/svc"
 
@@ -22,13 +22,29 @@ func NewListMembersLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListM
 }
 
 func (l *ListMembersLogic) ListMembers(in *groups.ListMembersRequest) (*groups.ListMembersResponse, error) {
-	result, err := l.svcCtx.GroupsLogic.ListMembers(l.ctx, business.ListMembersRequest{GroupID: in.GetGroupId(), RequesterUserID: in.GetRequesterUserId()})
+	groupID, err := validateRequiredID(in.GetGroupId(), "group_id")
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	items := make([]*groups.GroupMember, 0, len(result.Members))
-	for _, item := range result.Members {
-		items = append(items, toGroupMember(item))
+	requesterUserID, err := validateOptionalID(in.GetRequesterUserId(), "requester_user_id")
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
 	}
-	return &groups.ListMembersResponse{GroupId: result.GroupID, Members: items}, nil
+
+	if _, err := l.svcCtx.GroupsModel.FindOne(l.ctx, groupID); err != nil {
+		return nil, rpcerror.ToStatus(notFoundAs(err, "group not found"))
+	}
+	members, err := l.svcCtx.GroupMembersModel.FindActiveByGroup(l.ctx, groupID)
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	if requesterUserID != "" && !containsActiveMember(members, requesterUserID) {
+		return nil, rpcerror.ToStatus(apperror.Forbidden("requester is not a group member"))
+	}
+
+	items := make([]*groups.GroupMember, 0, len(members))
+	for _, m := range members {
+		items = append(items, toGroupMember(m))
+	}
+	return &groups.ListMembersResponse{GroupId: groupID, Members: items}, nil
 }

@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	zrpc.RpcServerConf
-	StorageDriver string                      `json:",default=memory,options=memory|postgres|postgresql"`
-	DataSource    string                      `json:",optional"`
-	Tracing       observability.TracingConfig `json:",optional"`
+	// groups-rpc 已转为 Postgres-only，数据层走 goctl model，不再支持 memory driver。
+	DataSource string                      `json:",optional"`
+	Tracing    observability.TracingConfig `json:",optional"`
 }

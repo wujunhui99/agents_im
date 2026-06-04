@@ -8,6 +8,10 @@ GroupsRPC:
   Endpoints:
     - 127.0.0.1:9093
   Timeout: 5000
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:9090
+  Timeout: 5000
 Tracing:
   Enabled: false
   ServiceName: groups-api
