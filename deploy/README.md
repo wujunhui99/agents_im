@@ -125,6 +125,14 @@ Backend images are built for:
 
 `deploy-k3s.sh` starts middleware Compose, runs PostgreSQL migrations from the server-side k3s secret `DATABASE_URL`, renders `deploy/k8s` with safe immutable application image tags, applies the rendered resources, sets selected deployment images to the current commit SHA tag, and waits only for selected image updates plus explicit config restarts. Deployment manifests intentionally contain placeholder image tags in Git; deploy-time rendering replaces placeholders with either the selected `${IMAGE_TAG}` or the currently deployed image for non-selected services before `kubectl apply`. When `SKIP_SET_IMAGE=false` and `IMAGE_SERVICES` is empty, the script keeps the manual full-deployment behavior by updating every known deployment image to `${IMAGE_TAG}`. Mutable image tags are refused: callers must provide a non-empty immutable `IMAGE_TAG`.
 
+### Database migrations during deploy
+
+Schema migrations run **before** the rollout, and only when needed.
+
+- **Trigger**: `detect-deploy-changes.py` sets `migration_required=true` only when the diff touches `db/migrations/*.sql` or `scripts/migrate-postgres.sh` (these also rebuild all backends). A pending migration that is **not** in the current diff is not auto-applied — re-touch one of those paths to re-run. CI-orchestration scripts (`scripts/ci/drone-deploy.sh`, `.drone.yml`) are intentionally **not** migration triggers.
+- **Where it runs**: in the Drone local-runner path (`DRONE_DEPLOY_LOCAL=1`), `scripts/ci/drone-deploy.sh` runs migrations, then calls `deploy-k3s.sh` with `SKIP_MIGRATIONS=true`. The `.drone.yml` deploy step installs `docker-cli`/`postgresql-client` only when a migration is required — gated by `grep "^migration_required=true$" .drone-deploy.env` (a sourced shell var does not survive the runner's separate per-command shells).
+- **Connecting to k3s Postgres**: PostgreSQL runs in k3s (Service `postgres`, ClusterIP). The migration runs as a `postgres:16-alpine` container with `--network host`, with the app `DATABASE_URL` host rewritten to the `postgres` Service ClusterIP (`kubectl -n agents-im get svc postgres -o jsonpath='{.spec.clusterIP}'`); the node's kube-proxy routes the ClusterIP. `migrate-postgres.sh` is idempotent — it skips already-applied versions via `schema_migrations`.
+
 ### Selective image builds
 
 `detect-changes` uses these first-version ownership rules:
