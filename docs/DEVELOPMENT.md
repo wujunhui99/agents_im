@@ -155,6 +155,9 @@ Environment note from the debug session: on one local machine, default ports `80
 | Redis | `localhost:6379` |
 | MinIO API | `http://localhost:9000` |
 | MinIO Console | `http://localhost:9001` |
+| Tempo (OTLP gRPC / HTTP UI) | `localhost:4317` / `http://localhost:3200` |
+
+`scripts/dev-up.sh` also starts Tempo (`grafana/tempo`, same image as prod) as the local tracing backend and exports `AGENTS_IM_OTLP_ENDPOINT=127.0.0.1:4317` so local services report traces just like production. Services using `pkg/observability` read that env; goctl-native services (e.g. `groups`) carry a `Telemetry` block in their generated config. Config lives in `deploy/local/tempo.yaml`.
 
 `scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and writes `ObjectStorage` config into the generated `user-api` config. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
 
