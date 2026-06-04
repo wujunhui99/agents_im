@@ -73,7 +73,7 @@ auth、user、friends、groups、message、gateway、admin 在 `internal/service
 所有域的 repository（账户、消息、群组、agent、媒体、conversation_ai_hosting、agent_hosting、agent_registry、feedback、task_report、delivery_attempt 等）扔在一层。`memory.go`、`postgres_*.go`、`*_memory.go` 命名风格分裂。`message_outbox_repository.go` / `postgres_outbox.go` 也在其中——根据 00-decisions **D1**，outbox 整体弃用，Stage 1 步骤 3 删除。
 
 - **后果**：repository 边界不清，跨域随便互引；schema 迁移时不知道改谁。
-- **修复**：按 00-decisions **D10**，全部下沉到 `service/<domain>/rpc/internal/repository/{memory,postgres}/`；顶层 `internal/repository/` 在 Stage 4 步骤 16 一并删除（**不再保留**）。
+- **修复**：按 00-decisions **D13**，数据访问改为 goctl model 落 `service/<domain>/rpc/internal/model/`（**纯 goctl model，废除手写 repository 层**）；顶层 `internal/repository/` 在 Stage 4 步骤 16 一并删除（**不再保留**）。
 
 ### TD-8 🟡 `etc/` 平铺 14 个 yaml，与 `service/<domain>/{api,rpc}/etc/` 重复
 迁完的服务还有两份 yaml：仓库根 `etc/auth-api.yaml` 是启动时实际读的（`make run-auth-api` → `go run ./service/auth/api -f etc/auth-api.yaml`）；但 `service/auth/api/etc/auth-api.yaml` 也存在。
@@ -127,7 +127,7 @@ agents_im/
 │   │       ├── authclient/                # 生成的 client（见 §5 命名统一）
 │   │       ├── auth/                      # 生成的 pb.go
 │   │       ├── etc/
-│   │       └── internal/{config,logic,server,svc,credential,token,verification,adapter}/
+│   │       └── internal/{config,logic,server,svc,model,credential,token,verification}/  # 无 repository、无 adapter（D12/D13）
 │   ├── user/{api,rpc}/...
 │   ├── friends/{api,rpc}/...
 │   ├── groups/{api,rpc}/...
@@ -177,15 +177,17 @@ agents_im/
 > - **顶层不存在** `internal/` / `api/` / `proto/` / `rpcgen/` / `cmd/`。
 > - **无 `entry/` 子包**：入口即 `service/<domain>/<api|rpc>/<domain>.go`（goctl 生成的 `package main`），由 `Makefile` 驱动启动/构建。
 > - `pkg/` 内不允许 import `service/...`（单向依赖：`service → pkg`，禁反向）。
-> - `service/<domain>/rpc` 独占该 domain 的 DB model、repository、proto 源文件。
+> - `service/<domain>/rpc` 独占该 domain 的 DB model（goctl 生成，**无 repository 层**，D13）与 proto 源文件。
 > - `service/<domain>/api` 只做 BFF：参数校验、鉴权、调 RPC 聚合；不允许操作 DB；持有 `.api` 源文件。
-> - 跨域 RPC 互调禁止（02 CP-3）；需要时由 API 层编排或新增 `service/<domain>/rpc/internal/<other>adapter/`。
+> - 跨域 RPC 互调禁止（00-decisions **D12**）：`rpc` 间一律不互调、也不经 `<other>adapter` 间接调；跨域组合只由 API 层 import RPC client 编排。
 > - 删除 `internal/types/`、`internal/model/`、`internal/rpcgen/`、`internal/servicecontext/`、`internal/handler/` 整体目录。
 > - 删除 `internal/outboxpublisher/`、`internal/repository/{message_outbox,postgres_outbox}.go`（00-decisions D1）。
 
 ---
 
 ## 4. 收敛路径（按"血压最低 → 最高"排序，每步独立可合并）
+
+> **执行轨（00-decisions D11）**：本节 Stage 1~5 是宏观清理目标；落地采用**长期 refactor 分支 + 逐服务原地重建**——保留 proto/pb 契约，一次只重写一个服务的 `rpc/internal/{config,svc,logic,model}`，其它服务照常编译，顶层 `internal/` 留到最后统一删。**搬运不重写**（域逻辑 `git mv` / 移植，禁止从零重写）。中途不跑 CI，合回 main 前 `go build ./... && go test ./...` 整体绿并跑一次完整 CI + 回归。起点：auth。
 
 ### Stage 1 — 删除明显残骸（不动业务逻辑）
 1. **删 `internal/rpcgen/{friends,groups}`**：已迁服务走 `service/<domain>/rpc/<domain>service/`，grep 验证后删。
@@ -229,7 +231,7 @@ agents_im/
 13. **建 service/msggateway**：搬 `internal/gateway/`；按 03 §7 砍业务依赖（00-decisions D8）。
 14. **建 service/msgtransfer 与 service/push**：搬 `internal/transfer/`；按 03 §3.1 拆出 push（00-decisions D3）。
 15. **拆 internal/agent 残部**（04 §3）：`internal/agentim/`、`internal/agentruntime/`、`internal/agenteval/`、`internal/auth/`、`internal/logic/agent*` → 全部进入 `service/agent/rpc/internal/{trigger,orchestrator,hosting,imadapter,audit,runtime,eval}/`。
-16. **internal/repository 按域拆**：前面每搬一个 service 就拆走一部分；最终 `internal/repository/` 整目录删除。
+16. **internal/repository 按域拆为 goctl model**（D13）：每搬一个 service，就用 `goctl model pg` 从 `db/migrations` 生成该域 model 落 `service/<domain>/rpc/internal/model/`（自定义查询写 custom 区），**不保留 repository 抽象**；最终 `internal/repository/` 整目录删除。
 
 ### Stage 5 — 收尾验证
 17. `internal/` 顶层目录被删除（`ls internal/ 2>/dev/null` 无输出）。
@@ -245,7 +247,7 @@ agents_im/
 | `xxxlogic.go` vs `xxx_logic.go` 混用                          | 风格不一（02 CP-2）               | 统一 snake_case：`xxx_logic.go`，goctl 加 `--style=goZero` |
 | `authservice/` `mailservice/` vs `friendsclient/` `groupsclient/` `userclient/` | proto 里 service 名两种命名 → 生成目录两种命名 | 统一 service 名为简洁形式：`service Auth`/`service Mail`（去 `Service` 后缀），goctl 自动加 `client` 后缀 → 全部产出 `xxxclient/` |
 | `friendslogic.go groupslogic.go medialogic.go messagelogic.go userlogic.go` | 单文件巨石                       | 拆到 `service/<domain>/<api\|rpc>/internal/logic/<action>_logic.go` |
-| `internal/repository/postgres_*.go` 和 `*_memory.go` 混排    | 不能一眼区分 driver               | 拆到 `service/<domain>/rpc/internal/repository/{memory,postgres}/` |
+| `internal/repository/postgres_*.go` 和 `*_memory.go` 混排    | 手写双实现，goctl 不管理           | 改为 goctl model 落 `service/<domain>/rpc/internal/model/`，废 repository 层（D13） |
 | `internal/agent/`、`internal/agentim/`、`internal/agentruntime/`、`internal/agenteval/` | 4 个 agent 前缀彼此关系不清     | 见 04 §3 重新切分                      |
 | 顶层 `proto/`、`api/`                                          | 与 `service/<domain>/` 双源       | Stage 3 步骤 7/8：单源下沉到 service  |
 | `internal/types/` 几乎空                                      | 没用上                            | Stage 1 步骤 4：删除                  |
