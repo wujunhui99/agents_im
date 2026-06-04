@@ -105,6 +105,7 @@ if ((${#migrations[@]} == 0)); then
   exit 1
 fi
 
+echo "scanning ${#migrations[@]} migration(s) in ${MIGRATIONS_DIR} (mode: $([[ "${HOST_PSQL}" -eq 1 ]] && echo host-psql || echo docker-compose))"
 applied_count=0
 skipped_count=0
 for migration in "${migrations[@]}"; do

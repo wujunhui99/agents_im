@@ -45,11 +45,9 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
   fi
 
   if [[ "${skip_migrations}" != "true" ]]; then
-    migration_network="${DRONE_LOCAL_MIGRATION_NETWORK:-middleware_default}"
-    migration_host="${DRONE_LOCAL_MIGRATION_HOST:-postgres}"
     migration_port="${DRONE_LOCAL_MIGRATION_PORT:-5432}"
-    echo "Running database migrations through Docker network ${migration_network}."
-    database_url="$(kubectl --kubeconfig "${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}" -n agents-im get secret agents-im-secrets -o jsonpath='{.data.DATABASE_URL}' | base64 -d)"
+    kubeconfig="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
+    database_url="$(kubectl --kubeconfig "${kubeconfig}" -n agents-im get secret agents-im-secrets -o jsonpath='{.data.DATABASE_URL}' | base64 -d)"
     if [[ -z "${database_url}" ]]; then
       echo "DATABASE_URL is missing in agents-im/agents-im-secrets" >&2
       exit 1
@@ -61,9 +59,17 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
       echo "DATABASE_URL format is unsupported for local Drone migration rewrite" >&2
       exit 1
     fi
+    # PostgreSQL 已迁 k3s（DSN host 是集群内 DNS，docker 解析不了）。改写为 postgres Service 的
+    # ClusterIP，迁移容器用 --network host —— node 的 kube-proxy 可路由 ClusterIP。
+    migration_host="${DRONE_LOCAL_MIGRATION_HOST:-$(kubectl --kubeconfig "${kubeconfig}" -n agents-im get svc postgres -o jsonpath='{.spec.clusterIP}')}"
+    if [[ -z "${migration_host}" ]]; then
+      echo "could not resolve postgres ClusterIP in agents-im namespace" >&2
+      exit 1
+    fi
+    echo "Running database migrations against k3s postgres ${migration_host}:${migration_port} (host network)."
     migration_database_url="${dsn_prefix}@${migration_host}:${migration_port}/${dsn_path}"
     docker run --rm \
-      --network "${migration_network}" \
+      --network host \
       -v "${PWD}:/repo" \
       -w /repo \
       -e DATABASE_URL="${migration_database_url}" \
