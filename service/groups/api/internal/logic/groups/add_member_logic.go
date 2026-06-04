@@ -2,6 +2,7 @@ package groups
 
 import (
 	"context"
+	"strings"
 
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/svc"
@@ -25,9 +26,21 @@ func (l *AddMemberLogic) AddMember(req *types.AddMemberReq) (*types.MemberResp, 
 	if err != nil {
 		return nil, err
 	}
+	// 建成员前校验 operator 与目标用户存在（目标为空时 rpc 默认取 operator）。
+	ids := []string{userID}
+	if strings.TrimSpace(req.UserID) != "" {
+		ids = append(ids, req.UserID)
+	}
+	if err := ensureUsersExist(l.ctx, l.svcCtx, ids...); err != nil {
+		return nil, err
+	}
 	resp, err := l.svcCtx.GroupsRPC.AddMember(l.ctx, &groupspb.AddMemberRequest{GroupId: req.GroupID, OperatorUserId: userID, UserId: req.UserID})
 	if err != nil {
 		return nil, apiError(err)
 	}
-	return memberResp(resp), nil
+	member, err := hydrateMember(l.ctx, l.svcCtx, resp.GetMember())
+	if err != nil {
+		return nil, err
+	}
+	return memberRespWith(member, resp.GetAlreadyMember()), nil
 }

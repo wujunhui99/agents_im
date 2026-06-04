@@ -8,3 +8,13 @@ Auth:
 GroupsRPC:
   Target: dns:///groups-rpc:9103
   Timeout: 5000
+UserRPC:
+  Endpoints:
+    - user-rpc:9090
+  Timeout: 5000
+# go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。
+Telemetry:
+  Name: groups-api
+  Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

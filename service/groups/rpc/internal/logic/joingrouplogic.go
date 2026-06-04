@@ -3,7 +3,6 @@ package logic
 import (
 	"context"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	groups "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/svc"
@@ -22,9 +21,23 @@ func NewJoinGroupLogic(ctx context.Context, svcCtx *svc.ServiceContext) *JoinGro
 }
 
 func (l *JoinGroupLogic) JoinGroup(in *groups.JoinGroupRequest) (*groups.MemberResponse, error) {
-	result, err := l.svcCtx.GroupsLogic.JoinGroup(l.ctx, business.JoinGroupRequest{GroupID: in.GetGroupId(), UserID: in.GetUserId()})
+	groupID, err := validateRequiredID(in.GetGroupId(), "group_id")
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	return toMemberResponse(result), nil
+	userID, err := validateRequiredID(in.GetUserId(), "user_id")
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+
+	group, err := l.svcCtx.GroupsModel.FindOne(l.ctx, groupID)
+	if err != nil {
+		return nil, rpcerror.ToStatus(notFoundAs(err, "group not found"))
+	}
+
+	resp, err := addActiveMember(l.ctx, l.svcCtx.GroupMembersModel, group, userID)
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return resp, nil
 }

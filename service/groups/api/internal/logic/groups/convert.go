@@ -32,11 +32,9 @@ func toGroup(group *groupspb.Group) types.Group {
 	}
 }
 
-func memberResp(resp *groupspb.MemberResponse) *types.MemberResp {
-	if resp == nil {
-		resp = &groupspb.MemberResponse{}
-	}
-	return &types.MemberResp{Code: string(apperror.CodeOK), Message: "ok", Data: types.MemberData{Member: toGroupMember(resp.GetMember()), AlreadyMember: resp.GetAlreadyMember()}}
+// memberRespWith 用已补全资料的成员构造响应（资料由 BFF 聚合 user-rpc 得到）。
+func memberRespWith(member types.GroupMember, alreadyMember bool) *types.MemberResp {
+	return &types.MemberResp{Code: string(apperror.CodeOK), Message: "ok", Data: types.MemberData{Member: member, AlreadyMember: alreadyMember}}
 }
 
 func toGroupMember(member *groupspb.GroupMember) types.GroupMember {

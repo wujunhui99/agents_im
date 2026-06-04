@@ -1,34 +1,22 @@
 package svc
 
 import (
-	"log"
-
-	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/model"
+	"github.com/zeromicro/go-zero/core/stores/postgres"
 )
 
 type ServiceContext struct {
-	Config      config.Config
-	GroupsLogic *business.GroupsLogic
-	UserLogic   *business.UserLogic
-	GroupsRepo  repository.GroupsRepository
+	Config            config.Config
+	GroupsModel       model.GroupsModel
+	GroupMembersModel model.GroupMembersModel
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	userRepo, err := repository.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
-	if err != nil {
-		log.Fatalf("build user repository: %v", err)
-	}
-	groupsRepo, err := repository.NewGroupsRepositoryForStorage(c.StorageDriver, c.DataSource)
-	if err != nil {
-		log.Fatalf("build groups repository: %v", err)
-	}
-	userLogic := business.NewUserLogic(userRepo)
+	conn := postgres.New(c.DataSource)
 	return &ServiceContext{
-		Config:      c,
-		GroupsLogic: business.NewGroupsLogic(groupsRepo, business.NewUserLogicExistenceChecker(userLogic)),
-		UserLogic:   userLogic,
-		GroupsRepo:  groupsRepo,
+		Config:            c,
+		GroupsModel:       model.NewGroupsModel(conn),
+		GroupMembersModel: model.NewGroupMembersModel(conn),
 	}
 }

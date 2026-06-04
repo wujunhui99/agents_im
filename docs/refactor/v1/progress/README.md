@@ -12,5 +12,6 @@
 
 | 分析文档 | 追踪文档 | 状态 |
 |----------|----------|------|
+| [`01-project-structure.md`](../01-project-structure.md) / [`02-microservices.md`](../02-microservices.md) | [`02-microservices.md`](./02-microservices.md) | 🟡 groups-rpc 已脱 internal（goctl model + BFF 聚合，PR #415）；其余域待续（见追踪文档 §复刻 Playbook） |
 | [`05-observability-cicd.md`](../05-observability-cicd.md) | [`05-observability-cicd.md`](./05-observability-cicd.md) | 🟡 P0/P1 完成；P2 Argo CD 已上线；P3 中间件 Redis+MinIO 已迁，PG/Redpanda 待续（见追踪文档 §交接） |
-| 其余 `00`–`04`、`06`–`08` | 待按需创建 | ⬜ |
+| 其余 `00`、`03`–`04`、`06`–`08` | 待按需创建 | ⬜ |

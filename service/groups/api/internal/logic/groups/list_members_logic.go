@@ -30,9 +30,9 @@ func (l *ListMembersLogic) ListMembers(req *types.ListMembersReq) (*types.ListMe
 	if err != nil {
 		return nil, apiError(err)
 	}
-	items := make([]types.GroupMember, 0, len(resp.GetMembers()))
-	for _, item := range resp.GetMembers() {
-		items = append(items, toGroupMember(item))
+	items, err := hydrateMembers(l.ctx, l.svcCtx, resp.GetMembers())
+	if err != nil {
+		return nil, err
 	}
 	return &types.ListMembersResp{Code: string(apperror.CodeOK), Message: "ok", Data: types.ListMembersData{GroupID: resp.GetGroupId(), Members: items}}, nil
 }

@@ -25,6 +25,10 @@ func (l *CreateGroupLogic) CreateGroup(req *types.CreateGroupReq) (*types.GroupR
 	if err != nil {
 		return nil, err
 	}
+	// 跨域用户存在性校验上移 BFF：建群前确认 creator 与所有成员存在。
+	if err := ensureUsersExist(l.ctx, l.svcCtx, append([]string{userID}, req.MemberUserIDs...)...); err != nil {
+		return nil, err
+	}
 	resp, err := l.svcCtx.GroupsRPC.CreateGroup(l.ctx, &groupspb.CreateGroupRequest{CreatorUserId: userID, Name: req.Name, Description: req.Description, MemberUserIds: req.MemberUserIDs})
 	if err != nil {
 		return nil, apiError(err)

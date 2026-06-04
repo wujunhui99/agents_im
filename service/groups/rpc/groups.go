@@ -1,13 +1,9 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
-	"log"
 
-	appconfig "github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/server"
@@ -26,19 +22,10 @@ func main() {
 }
 
 // run starts the groups-rpc service: it loads config and serves.
+// tracing 由 go-zero 自带 Telemetry（yaml 配置）驱动：zrpc 内置 otel 拦截器 + ServiceConf 启动 trace agent。
 func run(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c, conf.UseEnv())
-	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
-	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
-	if err != nil {
-		log.Fatalf("init tracing: %v", err)
-	}
-	defer func() {
-		if err := observability.ShutdownTracing(shutdownTracing); err != nil {
-			log.Printf("shutdown tracing: %v", err)
-		}
-	}()
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
@@ -49,7 +36,6 @@ func run(configFile string) {
 		}
 	})
 	defer s.Stop()
-	s.AddUnaryInterceptors(observability.GRPCUnaryServerInterceptor())
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
 	s.Start()

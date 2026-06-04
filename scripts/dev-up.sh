@@ -242,6 +242,14 @@ DataSource: ${DATABASE_URL}
 YAML
 }
 
+write_groups_rpc_config() {
+  cat > "${CONFIG_DIR}/groups-rpc.yaml" <<YAML
+Name: groups-rpc
+ListenOn: 127.0.0.1:${GROUPS_RPC_PORT:-9093}
+DataSource: ${DATABASE_URL}
+YAML
+}
+
 write_message_transfer_config() {
   cat > "${CONFIG_DIR}/message-transfer.yaml" <<YAML
 Name: message-transfer
@@ -299,9 +307,17 @@ GatewayWS:
   HeartbeatTimeoutSeconds: ${GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS}
   CommandRateLimitPerSecond: ${GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND}
   CommandRateLimitBurst: ${GATEWAY_WS_COMMAND_RATE_LIMIT_BURST}"
-  write_api_config "groups-api" "${GROUPS_API_PORT:-8085}"
+  write_api_config "groups-api" "${GROUPS_API_PORT:-8085}" "GroupsRPC:
+  Endpoints:
+    - 127.0.0.1:${GROUPS_RPC_PORT:-9093}
+  Timeout: 5000
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT:-9090}
+  Timeout: 5000"
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
   write_user_rpc_config
+  write_groups_rpc_config
   write_auth_rpc_config
   write_message_transfer_config
 }
@@ -406,6 +422,7 @@ main() {
   stop_services
   write_configs
   start_service "user-rpc"
+  start_service "groups-rpc"
   start_service "auth-rpc"
   start_service "user-api"
   start_service "auth-api"
