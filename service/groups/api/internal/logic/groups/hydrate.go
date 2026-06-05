@@ -3,16 +3,13 @@ package groups
 import (
 	"context"
 	"strings"
-	"sync"
 
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/types"
 	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 )
-
-// hydrateConcurrency 限制并发补全成员资料的协程数。
-const hydrateConcurrency = 16
 
 // hydrateMember 用 user-rpc 补全单个成员的资料字段（identifier/display_name/name/avatar）。
 func hydrateMember(ctx context.Context, svcCtx *svc.ServiceContext, member *groupspb.GroupMember) (types.GroupMember, error) {
@@ -28,38 +25,46 @@ func hydrateMember(ctx context.Context, svcCtx *svc.ServiceContext, member *grou
 	return m, nil
 }
 
-// hydrateMembers 并发补全成员列表资料。同群成员 account_id 唯一，按下标并发写，无需去重。
+// hydrateMembers 批量补全成员列表资料：一次 user-rpc.GetUsersByIDs 取代 N 次 GetUserByID。
+// 账号已注销的成员（profile 缺失）按空资料降级返回，不阻断整列表。
 func hydrateMembers(ctx context.Context, svcCtx *svc.ServiceContext, members []*groupspb.GroupMember) ([]types.GroupMember, error) {
-	items := make([]types.GroupMember, len(members))
-	sem := make(chan struct{}, hydrateConcurrency)
-	var (
-		wg       sync.WaitGroup
-		mu       sync.Mutex
-		firstErr error
-	)
-	for i, member := range members {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(i int, member *groupspb.GroupMember) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			hm, err := hydrateMember(ctx, svcCtx, member)
-			if err != nil {
-				mu.Lock()
-				if firstErr == nil {
-					firstErr = err
-				}
-				mu.Unlock()
-				return
-			}
-			items[i] = hm
-		}(i, member)
+	ids := make([]string, 0, len(members))
+	for _, member := range members {
+		if member != nil && member.GetUserId() != "" {
+			ids = append(ids, member.GetUserId())
+		}
 	}
-	wg.Wait()
-	if firstErr != nil {
-		return nil, firstErr
+
+	profiles, err := fetchProfiles(ctx, svcCtx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]types.GroupMember, len(members))
+	for i, member := range members {
+		m := toGroupMember(member)
+		if member != nil {
+			applyProfile(&m, profiles[member.GetUserId()])
+		}
+		items[i] = m
 	}
 	return items, nil
+}
+
+// fetchProfiles 批量取用户资料，按 user_id 索引；缺失的 id 不在返回 map 中。
+func fetchProfiles(ctx context.Context, svcCtx *svc.ServiceContext, userIDs []string) (map[string]*userpb.UserEntity, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
+	}
+	resp, err := svcCtx.UserRPC.GetUsersByIDs(ctx, &userpb.GetUsersByIDsRequest{UserIds: userIDs})
+	if err != nil {
+		return nil, apiError(err)
+	}
+	profiles := make(map[string]*userpb.UserEntity, len(resp.GetUsers()))
+	for _, u := range resp.GetUsers() {
+		profiles[u.GetUserId()] = u
+	}
+	return profiles, nil
 }
 
 func applyProfile(m *types.GroupMember, u *userpb.UserEntity) {
@@ -82,8 +87,9 @@ func humanReadableName(u *userpb.UserEntity) string {
 	return strings.TrimSpace(u.GetUserId())
 }
 
-// ensureUsersExist 建群/加成员前校验用户存在（user-rpc）。任一不存在即返回对应错误。
+// ensureUsersExist 建群/加成员前校验用户存在（user-rpc 批量）。任一不存在即返回 NotFound。
 func ensureUsersExist(ctx context.Context, svcCtx *svc.ServiceContext, userIDs ...string) error {
+	ids := make([]string, 0, len(userIDs))
 	seen := make(map[string]struct{}, len(userIDs))
 	for _, id := range userIDs {
 		id = strings.TrimSpace(id)
@@ -94,8 +100,19 @@ func ensureUsersExist(ctx context.Context, svcCtx *svc.ServiceContext, userIDs .
 			continue
 		}
 		seen[id] = struct{}{}
-		if _, err := svcCtx.UserRPC.GetUserByID(ctx, &userpb.GetUserByIDRequest{UserId: id}); err != nil {
-			return apiError(err)
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	profiles, err := fetchProfiles(ctx, svcCtx, ids)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if _, ok := profiles[id]; !ok {
+			return apperror.NotFound("account not found")
 		}
 	}
 	return nil

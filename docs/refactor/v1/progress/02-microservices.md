@@ -72,16 +72,6 @@
 `deploy/k8s/etc/`（生产/k8s，服务名 `user-rpc:9090`）· `etc/` + `service/groups/*/etc/`（本地，`127.0.0.1:9090`）。
 `scripts/dev-up.sh` 补了 groups-rpc 配置生成 + groups-api 的 GroupsRPC/UserRPC + 启动 groups-rpc。
 
-## 剩余 / 后续
-
-- **groups 收尾**：message 迁移后删 `internal/logic/groupslogic*.go` + `internal/repository/*groups*` + schema_v2_enums 中 groups 部分。
-- **user/friends/auth**：把 rpc 数据层从 `internal/repository` 切到各自 `rpc/internal/model`（user 的 goctl model 已生成待接线）；friends 已用 `core` 模式，可继续或改 goctl。
-- **user-rpc 批量接口（N+1 优化）**：BFF 补全成员资料（`service/groups/api/internal/logic/groups/hydrate.go`）目前对每个成员**并发发一次** `GetUserByID`——N 成员 = N 次 gRPC + user-rpc N 条单行 SQL；`ensureUsersExist`（建群/加成员存在性校验）是**同一个 N+1**。计划给 user-rpc 加 `GetUsersByIDs`（repeated user_id → repeated UserEntity）：1 次 gRPC + 1 条 `WHERE id IN (...)`，`hydrate.go` 的并发 + semaphore + mutex 可整段删掉，换"一把捞 + map 回填"。
-  - **选型 = 路线一（先解 N+1，不动 internal）**：批量查实现先加在 monolith `internal/logic` + repo（`ListByIDs`），最快解掉 N+1。**这是临时债，与去 internal 目标相反**，记两点结构问题：
-    1. **跨域数据访问边界**：groups 本身**没有**直查 user 库——它走 user-rpc 的 gRPC（符合"域间只过 owner rpc"），✅ 这点没问题。真正的问题在 **user 域的数据层仍寄居 `internal/logic`**（`service/user/rpc/.../get_user_by_i_d_logic.go` 委托 `internal/logic.UserLogic` → repo，见上方逐域进度表 user 行：`is_dep_internal=是`）。owner rpc 还没把自己的数据层收回 `service/user/rpc`，批量方法加在 internal 只是延续这个状态，**并非 groups 越界查库**。
-    2. **internal 终将退役**：终态是删顶层 `internal/`、各域真相只留 `service/<domain>`（见 §目标）。所以 `GetUsersByIDs` 的数据层实现，待 user-rpc 脱 internal（切 goctl model，user 的 model 已生成待接线）时**要跟着迁回 `service/user/rpc/internal/model`**——退役 user 域时勿漏此方法。
-- 顶层 `internal/` 完全退役以 message/gateway/transfer/admin（07-message-rpc-redesign）为最后一公里。
-
 ## 复刻 Playbook（下一个域照做）
 
 1. **选路线**：该域是否被 message monolith in-process 消费？
@@ -94,3 +84,15 @@
 6. **改了就改文档**：更新本进度表 + dev-up/部署配置；monolith 仍依赖的部分注明"待 X 迁移后删"。
 
 [retire-internal-domain]: ../../../.claude/skills/retire-internal-domain/SKILL.md
+
+## 剩余 / 后续
+
+> 退役欠下的尾巴，按域记一笔；新域重构完在此追加 `### <域>`。
+> **全局收尾**：顶层 `internal/` 完全退役以 message/gateway/transfer/admin（07-message-rpc-redesign）为最后一公里；user/friends/auth 把 rpc 数据层从 `internal/repository` 切到各自 `rpc/internal/model`（user 的 goctl model 已生成待接线，friends 已用 `core` 模式）。
+
+### groups
+
+- **monolith 清理**（待 message 迁移）：删 `internal/logic/groupslogic*.go` + `internal/repository/*groups*` + `schema_v2_enums.go` 中 groups 部分。
+- **user-rpc 批量接口已落（#423）**：BFF `hydrate.go`/`ensureUsersExist` 改用 `user-rpc.GetUsersByIDs`（1 次 gRPC + `WHERE id IN`），N+1 已解。遗留两笔债：
+  1. 批量查实现先落在 `internal/logic.GetUsersByIDs` + repo `ListByIDs`（路线一，临时债）；待 user-rpc 脱 internal 时跟着迁回 `service/user/rpc/internal/model`，勿漏。
+  2. `service/user/rpc/userclient/user.go`、`internal/server/userserver.go` 的 `GetUsersByIDs` 是**手工补的**（goctl 全量 scaffold 的路径/命名 `user_server.go`/`user_client/` 与本仓库现有 `userserver.go`/`userclient/` 不符，只取了 `.pb.go`）。下次对 `user.proto` 跑 goctl 重生成前：先确认 proto 已含该 rpc，再用 goctl 由 proto 生成校正手工部分。

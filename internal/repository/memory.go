@@ -112,6 +112,27 @@ func (r *MemoryRepository) GetByID(_ context.Context, userID string) (model.User
 	return user.Clone(), nil
 }
 
+func (r *MemoryRepository) ListByIDs(_ context.Context, accountIDs []string) ([]model.User, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	users := make([]model.User, 0, len(accountIDs))
+	seen := make(map[string]struct{}, len(accountIDs))
+	for _, id := range accountIDs {
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		if user, exists := r.byID[id]; exists {
+			users = append(users, user.Clone())
+		}
+	}
+	return users, nil
+}
+
 func (r *MemoryRepository) SearchAccounts(_ context.Context, filter AccountSearchFilter) ([]model.User, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
