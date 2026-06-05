@@ -17,7 +17,7 @@
 |----|------------|-----------|-------------------|------|
 | auth | service ✅ | internal/auth | 是 | ⚠️ 结构已迁，数据层未脱 internal |
 | user | service ✅ | **internal/repository**（goctl model 已生成于 `user/rpc/internal/model` 但**未接线**，是死代码）| 是 | ⚠️ 同上 |
-| friends | `service/friends/core`（[retire-internal-domain] 模式）| internal/repository | 部分 | 🟡 |
+| friends | `service/friends/core`（core+过渡包模式）| internal/repository | 部分 | 🟡 |
 | **groups** | **`service/groups/rpc/internal/logic` 自包含** | **`service/groups/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ 本 PR #415 |
 | message/gateway/transfer/admin | 仍在 internal | internal | 是 | ❌ keystone，最后做 |
 
@@ -26,7 +26,7 @@
 ## groups-rpc 本次操作（PR #415，issue #415）
 
 **两种退役路线**——本仓库现存两套，选型见 Playbook：
-- friends/media 用的 `service/<domain>/core` + `internal/<domain>validate` 过渡包（[retire-internal-domain] skill）；
+- friends/media 用的 `service/<domain>/core` + `internal/<domain>validate` 过渡包；
 - **groups 用的 goctl model + BFF 聚合**（本文档），rpc 完全自包含，不给 monolith 提供过渡包。
 
 做的事（标准 go-zero 改 config/svc/logic + 数据层换 goctl model）：
@@ -74,16 +74,9 @@
 
 ## 复刻 Playbook（下一个域照做）
 
-1. **选路线**：该域是否被 message monolith in-process 消费？
-   - 否 → 用 **goctl + BFF**（groups 这套，最干净，rpc 完全自包含）。
-   - 是且暂不能动 monolith → 用 `core` + 过渡包（[retire-internal-domain] skill），或保留 internal 旧逻辑给 monolith、新 rpc 走 goctl（groups 选了后者）。
-2. **goctl model**：本地临时 PG 还原 schema → `goctl model pg datasource`。复合主键先加自增 `id`（迁移 + change_log，向后兼容 monolith）。
-3. **custom 文件补领域查询/事务**；事务边界放 Logic（model 只给 `Transact`/`WithSession`）；`*_gen.go` 不动。
-4. **config/svc/logic** 三件套切到 model；跨域数据（user/media…）**上移 BFF 聚合**，rpc 不互调。
-5. 输入只 `validate` 不 `normalize`；logic 依赖 model 接口 → fake 单测。
-6. **改了就改文档**：更新本进度表 + dev-up/部署配置；monolith 仍依赖的部分注明"待 X 迁移后删"。
+完整步骤、坑、goctl 用法、验收清单见 **[`refactor-domain-to-service` skill]**（已从本文档抽出、含本轮 N+1→批量接口与 goctl scaffold 坑）。本文档只保留 groups 的逐域记录与 §剩余/后续。
 
-[retire-internal-domain]: ../../../.claude/skills/retire-internal-domain/SKILL.md
+[`refactor-domain-to-service` skill]: ../../../.claude/skills/refactor-domain-to-service/SKILL.md
 
 ## 剩余 / 后续
 
