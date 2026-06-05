@@ -7,6 +7,7 @@
 
 | 文档 | 内容 |
 |------|------|
+| [`01-third-service-naming.md`](./01-third-service-naming.md) | third 服务命名对齐：`mailservice` → `thirdclient`（#429 推迟）|
 | [`05-observability-cicd.md`](./05-observability-cicd.md) | 部署环境分离（OB-14，从 v1 迁入）|
 
 ## 收录规则

@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       friends-rpc)      pkg=./service/friends/rpc ;; \
       groups-api)       pkg=./service/groups/api ;; \
       groups-rpc)       pkg=./service/groups/rpc ;; \
-      mail-rpc)         pkg=./service/mail/rpc ;; \
+      third-rpc)         pkg=./service/third/rpc ;; \
       user-api)         pkg=./service/user/api ;; \
       user-rpc)         pkg=./service/user/rpc ;; \
       media-api)        pkg=./service/media/api ;; \

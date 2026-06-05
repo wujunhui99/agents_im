@@ -5,32 +5,32 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/mail"
-	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
-	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
-	mailpb "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
+	mailprovider "github.com/wujunhui99/agents_im/service/third/rpc/internal/provider"
+	"github.com/wujunhui99/agents_im/service/third/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/third/rpc/internal/svc"
+	mailpb "github.com/wujunhui99/agents_im/service/third/rpc/mail"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type recordingMailProvider struct {
-	req  mail.TemplateEmailRequest
-	resp mail.TemplateEmailResponse
+	req  mailprovider.TemplateEmailRequest
+	resp mailprovider.TemplateEmailResponse
 	err  error
 }
 
-func (p *recordingMailProvider) SendTemplateEmail(ctx context.Context, req mail.TemplateEmailRequest) (mail.TemplateEmailResponse, error) {
+func (p *recordingMailProvider) SendTemplateEmail(ctx context.Context, req mailprovider.TemplateEmailRequest) (mailprovider.TemplateEmailResponse, error) {
 	p.req = req
 	return p.resp, p.err
 }
 
 func TestSendTemplateEmailLogicCallsProviderAndReturnsProviderIDs(t *testing.T) {
 	provider := &recordingMailProvider{
-		resp: mail.TemplateEmailResponse{
+		resp: mailprovider.TemplateEmailResponse{
 			Provider:          "tencent_ses",
 			ProviderRequestID: "req-123",
 			ProviderMessageID: "msg-456",
-			Status:            mail.SendStatusAccepted,
+			Status:            mailprovider.SendStatusAccepted,
 		},
 	}
 	logic := NewSendTemplateEmailLogic(context.Background(), &svc.ServiceContext{
@@ -51,7 +51,7 @@ func TestSendTemplateEmailLogicCallsProviderAndReturnsProviderIDs(t *testing.T) 
 	if err != nil {
 		t.Fatalf("send template email: %v", err)
 	}
-	if resp.GetProviderRequestId() != "req-123" || resp.GetProviderMessageId() != "msg-456" || resp.GetStatus() != string(mail.SendStatusAccepted) {
+	if resp.GetProviderRequestId() != "req-123" || resp.GetProviderMessageId() != "msg-456" || resp.GetStatus() != string(mailprovider.SendStatusAccepted) {
 		t.Fatalf("unexpected rpc response: %+v", resp)
 	}
 	if provider.req.TemplateData["code"] != "123456" {
@@ -67,7 +67,7 @@ func TestSendTemplateEmailLogicCallsProviderAndReturnsProviderIDs(t *testing.T) 
 
 func TestSendTemplateEmailLogicReturnsProviderErrorAsGRPCError(t *testing.T) {
 	provider := &recordingMailProvider{
-		err: &mail.ProviderError{
+		err: &mailprovider.ProviderError{
 			Provider:  "tencent_ses",
 			Code:      "FailedOperation.TemplateUnavailable",
 			Message:   "template unavailable",

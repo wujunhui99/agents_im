@@ -30,7 +30,7 @@
 | friends-rpc | ⚪ | 无 HTTP `/readyz` | ⚪ | PG | ❌ |
 | groups-rpc | ⚪ | 无 HTTP `/readyz` | ⚪ | PG | ❌ |
 | message-rpc | ⚪ | 无 HTTP `/readyz` | ⚪ | PG、Kafka | ❌ |
-| mail-rpc | ⚪ | 无 HTTP `/readyz` | ⚪ | SMTP/外部 | ❌ |
+| third-rpc | ⚪ | 无 HTTP `/readyz` | ⚪ | SMTP/外部 | ❌ |
 
 ## 缺口与建议（后续 issue）
 

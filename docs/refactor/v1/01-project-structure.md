@@ -19,7 +19,7 @@
 | user     | `internal/logic/user/`、`internal/handler/user/`、`internal/servicecontext/user/` | `service/user/{api,rpc}/...`     | `service/user/{api,rpc}` | ✅ 已迁 |
 | friends  | `internal/logic/friends/`、`internal/handler/friends/`、`internal/servicecontext/friends/`、`internal/rpcgen/friends` | `service/friends/{api,rpc}/...`  | `service/friends/{api,rpc}` | ⚠️ 双轨在跑 |
 | groups   | `internal/logic/groups/`、`internal/handler/groups/`、`internal/servicecontext/groups/`、`internal/rpcgen/groups` | `service/groups/{api,rpc}/...`   | `service/groups/{api,rpc}`   | ⚠️ 双轨在跑 |
-| mail     | `internal/mail/`（provider + tencent_ses）           | `service/mail/rpc/...`           | `service/mail/rpc`      | ⚠️ provider 还在 internal |
+| third (含 mail) | `service/third/rpc/internal/provider/`（provider + tencent_ses，已脱 internal） | `service/third/rpc/...`           | `service/third/rpc`      | ✅ 已迁（mail 折入新服务 third，#429）|
 | agent    | `internal/agent/`（pythonexec）、`internal/agentim/`、`internal/agentruntime/`、`internal/logic/agentlogic*` | `service/agent/api/...`          | `service/agent/api`     | 🟡 只迁了 API，业务逻辑还在 internal |
 | message  | `internal/logic/message/`、`internal/handler/message/`、`internal/servicecontext/message/`、`internal/rpcgen/message` | **不存在** `service/msg/`    | 过渡态扁平 `service/message-api`；message-rpc 寄生 `internal/rpcgen/message` | ❌ 未迁 |
 | gateway  | `internal/gateway/{ws,delivery}`、`internal/servicecontext/gateway/` | **不存在** `service/msggateway/`    | 过渡态扁平 `service/gateway-ws`    | ❌ 未迁 |
@@ -52,7 +52,7 @@
 
 ### TD-4 ⚠️ `proto/` 与 `service/<domain>/rpc/<domain>.proto` 双源
 - `proto/friends.proto`、`proto/groups.proto`、`proto/message.proto` 存活；
-- 同时 `service/friends/rpc/friends.proto`、`service/groups/rpc/groups.proto`、`service/auth/rpc/auth.proto`、`service/user/rpc/user.proto`、`service/mail/rpc/mail.proto`、`service/agent/rpc/agent.proto`（如存在）也存活；
+- 同时 `service/friends/rpc/friends.proto`、`service/groups/rpc/groups.proto`、`service/auth/rpc/auth.proto`、`service/user/rpc/user.proto`、`service/third/rpc/mail.proto`、`service/agent/rpc/agent.proto`（如存在）也存活；
 - `internal/rpcgen/{friends,groups,message,rpcerror}` 仍在使用。
 
 go-zero 服务迁移指南要求 proto 跟着 service 走（00-decisions **D10**）。Stage 3 步骤 7：proto 单源到 `service/<domain>/rpc/<domain>.proto`，删除顶层 `proto/`；同步顶层 `api/` 也下沉到 `service/<domain>/api/<domain>.api`（步骤 8）。
@@ -83,7 +83,7 @@ auth、user、friends、groups、message、gateway、admin 在 `internal/service
 
 ### TD-9 🟡 入口装配风格分裂
 入口统一在 `service/<domain>/<api|rpc>/<domain>.go`（goctl 生成的 `package main`，无 `cmd/`、无 `entry/`），但装配风格两套：
-- auth-api / user-api / friends-api / groups-api / mail-rpc / agent-api → goctl 标准 main，只 `conf.MustLoad` + 注册 handler，干净；
+- auth-api / user-api / friends-api / groups-api / third-rpc / agent-api → goctl 标准 main，只 `conf.MustLoad` + 注册 handler，干净；
 - message-api / gateway-ws / message-transfer（过渡态扁平目录）→ 仍在 main 里手动装配 60+ 行依赖（repo、logic、agentim、authrepo、observability、httpx errors…）。
 
 应当全部收敛到 goctl 标准 main，并把过渡态扁平目录迁入 `service/<domain>/<api|rpc>/`（msg-api/msg-rpc/msggateway/msgtransfer）。
@@ -223,7 +223,7 @@ agents_im/
 9. **`internal/handler/gozero_routes.go` 退役**：把每个 `RegisterXxxGoZeroHandlers` 拆到对应 `service/<domain>/api/internal/handler/routes.go`；删 `internal/handler/`。
 
 ### Stage 4 — 业务 service 落位（最大改动）
-10. **`internal/mail/` → `service/mail/rpc/internal/provider/`**：provider 实现搬过去（02 CP-8）。
+10. ✅ **`internal/mail/` → `service/third/rpc/internal/provider/`**：mail 折入新服务 **third**（第三方接入层），provider 实现已搬过去脱离 internal（#429；原计划 02 CP-8 落点 service/mail，实际合并为 third 以减少微服务数量）。
 11. **拆 admin-api**（TD-1，收益最大）：
     - 建 `service/admin/api`（goctl main 即入口），Makefile 注册 admin-api（`BACKEND_SERVICES` + `PKG_admin-api`）；
     - 搬：`internal/handler/admin`、`internal/logic/admin*`、`internal/adminbootstrap`、`internal/servicecontext/admin`；

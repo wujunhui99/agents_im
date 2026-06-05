@@ -745,25 +745,25 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mail-rpc
+  name: third-rpc
   namespace: agents-im
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mail-rpc
+      app: third-rpc
   template:
     metadata:
       labels:
-        app: mail-rpc
+        app: third-rpc
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
-        - name: mail-rpc
-          image: ghcr.io/wujunhui99/agents_im/mail-rpc:__IMAGE_TAG_REQUIRED__
+        - name: third-rpc
+          image: ghcr.io/wujunhui99/agents_im/third-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/mail-rpc.yaml"]
+          args: ["-f", "/config/third-rpc.yaml"]
           envFrom:
             - configMapRef:
                 name: agents-im-config

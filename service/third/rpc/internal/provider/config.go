@@ -1,4 +1,4 @@
-package mail
+package mailprovider
 
 import (
 	"errors"

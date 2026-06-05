@@ -127,10 +127,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: mail-rpc
+  name: third-rpc
   namespace: agents-im
 spec:
-  selector: { app: mail-rpc }
+  selector: { app: third-rpc }
   ports: [{ name: grpc, port: 9095, targetPort: 9095 }]
 ---
 apiVersion: v1

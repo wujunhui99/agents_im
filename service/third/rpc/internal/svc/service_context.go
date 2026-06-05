@@ -3,18 +3,18 @@ package svc
 import (
 	"log"
 
-	"github.com/wujunhui99/agents_im/internal/mail"
-	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
+	mailprovider "github.com/wujunhui99/agents_im/service/third/rpc/internal/provider"
+	"github.com/wujunhui99/agents_im/service/third/rpc/internal/config"
 )
 
 type ServiceContext struct {
 	Config            config.Config
-	MailProvider      mail.TemplateEmailSender
+	MailProvider      mailprovider.TemplateEmailSender
 	DefaultTemplateID uint64
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	provider, err := mail.NewTencentSESProvider(c.TencentSES, nil)
+	provider, err := mailprovider.NewTencentSESProvider(c.TencentSES, nil)
 	if err != nil {
 		log.Fatalf("build mail provider: %v", err)
 	}

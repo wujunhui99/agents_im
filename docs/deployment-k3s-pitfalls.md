@@ -112,10 +112,10 @@ Config-only changes can still affect runtime because ConfigMaps/Secrets and depl
 ```yaml
 MailRPC:
   Endpoints:
-    - <mail-rpc-service-endpoint>
+    - <third-rpc-service-endpoint>
 ```
 
-Do not use scalar syntax such as `Endpoints: <mail-rpc-service-endpoint>`. The static verification gate rejects scalar `MailRPC.Endpoints` in auth-rpc configs so the email-code path does not boot without a configured mail client.
+Do not use scalar syntax such as `Endpoints: <third-rpc-service-endpoint>`. The static verification gate rejects scalar `MailRPC.Endpoints` in auth-rpc configs so the email-code path does not boot without a configured mail client.
 
 ## Pitfall: hostNetwork concentrates failures on one node
 

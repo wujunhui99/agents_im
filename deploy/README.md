@@ -121,7 +121,7 @@ Backend images are built for:
 
 - API services: `user-api`, `auth-api`, `friends-api`, `message-api`, `gateway-ws`, `groups-api`, `agent-api`
 - Worker: `message-transfer`
-- RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`, `mail-rpc`
+- RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`, `third-rpc`
 
 `deploy-k3s.sh` starts middleware Compose, runs PostgreSQL migrations from the server-side k3s secret `DATABASE_URL`, renders `deploy/k8s` with safe immutable application image tags, applies the rendered resources, sets selected deployment images to the current commit SHA tag, and waits only for selected image updates plus explicit config restarts. Deployment manifests intentionally contain placeholder image tags in Git; deploy-time rendering replaces placeholders with either the selected `${IMAGE_TAG}` or the currently deployed image for non-selected services before `kubectl apply`. When `SKIP_SET_IMAGE=false` and `IMAGE_SERVICES` is empty, the script keeps the manual full-deployment behavior by updating every known deployment image to `${IMAGE_TAG}`. Mutable image tags are refused: callers must provide a non-empty immutable `IMAGE_TAG`.
 
@@ -153,7 +153,7 @@ The backend image list is stable and ordered:
 
 - API services: `user-api`, `auth-api`, `friends-api`, `message-api`, `gateway-ws`, `groups-api`, `agent-api`
 - Worker: `message-transfer`
-- RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`, `mail-rpc`
+- RPC services: `user-rpc`, `auth-rpc`, `friends-rpc`, `groups-rpc`, `message-rpc`, `third-rpc`
 
 ### Config-only deploy
 
@@ -263,7 +263,7 @@ RPC ports currently include:
 - `friends-rpc`: `9092`
 - `groups-rpc`: `9103` (`9093` is avoided because it is occupied by server SSH/systemd socket)
 - `message-rpc`: `9094`
-- `mail-rpc`: `9095`
+- `third-rpc`: `9095`
 
 ## Object storage
 

@@ -123,7 +123,7 @@ GatewayWS:
   CommandRateLimitPerSecond: 7
   CommandRateLimitBurst: 9
 MailRPC:
-  Endpoints: 127.0.0.1:9095,mail-rpc:9095
+  Endpoints: 127.0.0.1:9095,third-rpc:9095
   Timeout: 5000
 `), 0o600)
 	if err != nil {
@@ -152,7 +152,7 @@ MailRPC:
 	if cfg.GatewayWS.CommandRateLimitPerSecond != 7 || cfg.GatewayWS.CommandRateLimitBurst != 9 {
 		t.Fatalf("gateway websocket rate limit config mismatch: %+v", cfg.GatewayWS)
 	}
-	if len(cfg.MailRPC.Endpoints) != 2 || cfg.MailRPC.Endpoints[0] != "127.0.0.1:9095" || cfg.MailRPC.Endpoints[1] != "mail-rpc:9095" {
+	if len(cfg.MailRPC.Endpoints) != 2 || cfg.MailRPC.Endpoints[0] != "127.0.0.1:9095" || cfg.MailRPC.Endpoints[1] != "third-rpc:9095" {
 		t.Fatalf("mail rpc endpoints mismatch: %+v", cfg.MailRPC.Endpoints)
 	}
 	if cfg.MailRPC.Timeout != 5000 {
@@ -259,7 +259,7 @@ Port: 18081
 MailRPC:
   Endpoints:
     - 127.0.0.1:19095
-    - mail-rpc:9095
+    - third-rpc:9095
   Timeout: 5000
 `), 0o600)
 	if err != nil {
@@ -288,7 +288,7 @@ ListenOn: 127.0.0.1:19091
 MailRPC:
   Endpoints:
     - 127.0.0.1:19095
-    - mail-rpc:9095
+    - third-rpc:9095
   Timeout: 5000
 `), 0o600)
 	if err != nil {
