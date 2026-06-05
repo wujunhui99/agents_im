@@ -19,6 +19,8 @@ type (
 	ExistsByIdentifierResponse = user.ExistsByIdentifierResponse
 	GetUserByIDRequest         = user.GetUserByIDRequest
 	GetUserByIdentifierRequest = user.GetUserByIdentifierRequest
+	GetUsersByIDsRequest       = user.GetUsersByIDsRequest
+	GetUsersByIDsResponse      = user.GetUsersByIDsResponse
 	UpdateUserAvatarRequest    = user.UpdateUserAvatarRequest
 	UpdateUserProfileRequest   = user.UpdateUserProfileRequest
 	UserEntity                 = user.UserEntity
@@ -29,6 +31,7 @@ type (
 		GetUserByIdentifier(ctx context.Context, in *GetUserByIdentifierRequest, opts ...grpc.CallOption) (*UserResponse, error)
 		ExistsByIdentifier(ctx context.Context, in *ExistsByIdentifierRequest, opts ...grpc.CallOption) (*ExistsByIdentifierResponse, error)
 		GetUserByID(ctx context.Context, in *GetUserByIDRequest, opts ...grpc.CallOption) (*UserResponse, error)
+		GetUsersByIDs(ctx context.Context, in *GetUsersByIDsRequest, opts ...grpc.CallOption) (*GetUsersByIDsResponse, error)
 		UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UserResponse, error)
 		UpdateUserAvatar(ctx context.Context, in *UpdateUserAvatarRequest, opts ...grpc.CallOption) (*UserResponse, error)
 	}
@@ -62,6 +65,11 @@ func (m *defaultUser) ExistsByIdentifier(ctx context.Context, in *ExistsByIdenti
 func (m *defaultUser) GetUserByID(ctx context.Context, in *GetUserByIDRequest, opts ...grpc.CallOption) (*UserResponse, error) {
 	client := user.NewUserClient(m.cli.Conn())
 	return client.GetUserByID(ctx, in, opts...)
+}
+
+func (m *defaultUser) GetUsersByIDs(ctx context.Context, in *GetUsersByIDsRequest, opts ...grpc.CallOption) (*GetUsersByIDsResponse, error) {
+	client := user.NewUserClient(m.cli.Conn())
+	return client.GetUsersByIDs(ctx, in, opts...)
 }
 
 func (m *defaultUser) UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UserResponse, error) {

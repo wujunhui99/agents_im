@@ -167,6 +167,38 @@ func (r *PostgresRepository) GetByID(ctx context.Context, userID string) (model.
 	return row.user(), nil
 }
 
+func (r *PostgresRepository) ListByIDs(ctx context.Context, accountIDs []string) ([]model.User, error) {
+	placeholders := make([]string, 0, len(accountIDs))
+	args := make([]any, 0, len(accountIDs))
+	seen := make(map[string]struct{}, len(accountIDs))
+	for _, id := range accountIDs {
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		args = append(args, id)
+		placeholders = append(placeholders, "$"+itoa(len(args)))
+	}
+	if len(args) == 0 {
+		return nil, nil
+	}
+
+	query := accountProfileSelectPrefix + "where a.account_id in (" + strings.Join(placeholders, ",") + ")"
+	var rows []postgresAccountProfileRow
+	if err := r.conn.QueryRowsCtx(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+
+	users := make([]model.User, 0, len(rows))
+	for _, row := range rows {
+		users = append(users, row.user())
+	}
+	return users, nil
+}
+
 func (r *PostgresRepository) ListByAccountType(ctx context.Context, accountType model.AccountType) ([]model.User, error) {
 	var rows []postgresAccountProfileRow
 	err := r.conn.QueryRowsCtx(ctx, &rows, `
@@ -214,7 +246,7 @@ returning account_id
 	return r.GetByID(ctx, accountID)
 }
 
-const accountProfileByIDQuery = `
+const accountProfileSelectPrefix = `
 select
   a.account_id, a.identifier, a.account_type, a.email_normalized, a.email_verified_at,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
@@ -222,8 +254,9 @@ select
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
 from accounts a
 join profiles p on p.account_id = a.account_id
-where a.account_id = $1
 `
+
+const accountProfileByIDQuery = accountProfileSelectPrefix + `where a.account_id = $1`
 
 func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID string, patch ProfilePatch) (model.User, error) {
 	setters := make([]string, 0, 5)

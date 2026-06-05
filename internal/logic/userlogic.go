@@ -95,6 +95,10 @@ type GetUserByIDRequest struct {
 
 type GetAccountByIDRequest = GetUserByIDRequest
 
+type GetUsersByIDsRequest struct {
+	UserIDs []string `json:"user_ids"`
+}
+
 type UpdateUserProfileRequest struct {
 	UserID      string  `json:"user_id"`
 	DisplayName *string `json:"display_name,omitempty"`
@@ -213,6 +217,38 @@ func (l *UserLogic) GetUserByID(ctx context.Context, req GetUserByIDRequest) (Us
 
 func (l *UserLogic) GetAccountByID(ctx context.Context, req GetAccountByIDRequest) (AccountProfile, error) {
 	return l.GetUserByID(ctx, req)
+}
+
+// GetUsersByIDs 批量获取用户资料：去重后一条 WHERE id IN (...)。
+// 不存在的 id 静默跳过，返回找到的子集（不保证顺序）；调用方按需比对缺失。
+func (l *UserLogic) GetUsersByIDs(ctx context.Context, req GetUsersByIDsRequest) ([]UserProfile, error) {
+	ids := make([]string, 0, len(req.UserIDs))
+	seen := make(map[string]struct{}, len(req.UserIDs))
+	for _, id := range req.UserIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	users, err := l.repo.ListByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	profiles := make([]UserProfile, 0, len(users))
+	for _, user := range users {
+		profiles = append(profiles, toProfile(user))
+	}
+	return profiles, nil
 }
 
 func (l *UserLogic) UpdateUserProfile(ctx context.Context, req UpdateUserProfileRequest) (UserProfile, error) {

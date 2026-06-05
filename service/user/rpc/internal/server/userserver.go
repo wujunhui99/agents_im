@@ -43,6 +43,11 @@ func (s *UserServer) GetUserByID(ctx context.Context, in *user.GetUserByIDReques
 	return l.GetUserByID(in)
 }
 
+func (s *UserServer) GetUsersByIDs(ctx context.Context, in *user.GetUsersByIDsRequest) (*user.GetUsersByIDsResponse, error) {
+	l := logic.NewGetUsersByIDsLogic(ctx, s.svcCtx)
+	return l.GetUsersByIDs(in)
+}
+
 func (s *UserServer) UpdateUserProfile(ctx context.Context, in *user.UpdateUserProfileRequest) (*user.UserResponse, error) {
 	l := logic.NewUpdateUserProfileLogic(ctx, s.svcCtx)
 	return l.UpdateUserProfile(in)

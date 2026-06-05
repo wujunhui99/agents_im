@@ -13,6 +13,9 @@ service User {
   rpc GetUserByIdentifier(GetUserByIdentifierRequest) returns (UserResponse);
   rpc ExistsByIdentifier(ExistsByIdentifierRequest) returns (ExistsByIdentifierResponse);
   rpc GetUserByID(GetUserByIDRequest) returns (UserResponse);
+  // GetUsersByIDs 批量获取用户资料：一条 WHERE id IN (...) 取代 N 次 GetUserByID。
+  // 不存在的 id 静默跳过（返回找到的子集，不报错），调用方按需比对缺失。
+  rpc GetUsersByIDs(GetUsersByIDsRequest) returns (GetUsersByIDsResponse);
   rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UserResponse);
   rpc UpdateUserAvatar(UpdateUserAvatarRequest) returns (UserResponse);
 }
@@ -61,6 +64,14 @@ message ExistsByIdentifierResponse {
 
 message GetUserByIDRequest {
   string user_id = 1;
+}
+
+message GetUsersByIDsRequest {
+  repeated string user_ids = 1;
+}
+
+message GetUsersByIDsResponse {
+  repeated UserEntity users = 1;
 }
 
 message UpdateUserProfileRequest {

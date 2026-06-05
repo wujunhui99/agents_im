@@ -21,6 +21,8 @@ type AccountRepository interface {
 	GetByIdentifier(ctx context.Context, identifier string) (model.User, error)
 	ExistsByIdentifier(ctx context.Context, identifier string) (bool, error)
 	GetByID(ctx context.Context, accountID string) (model.User, error)
+	// ListByIDs 批量获取账号资料；不存在的 id 静默跳过，返回找到的子集（不保证顺序）。
+	ListByIDs(ctx context.Context, accountIDs []string) ([]model.User, error)
 	ListByAccountType(ctx context.Context, accountType model.AccountType) ([]model.User, error)
 	RenameIdentifier(ctx context.Context, fromIdentifier string, toIdentifier string) (model.User, error)
 	UpdateProfile(ctx context.Context, accountID string, patch AccountProfilePatch) (model.User, error)
