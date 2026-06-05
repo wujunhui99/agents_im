@@ -42,5 +42,12 @@ func (l *ListFriendRequestsLogic) ListFriendRequests(req *types.ListFriendsReq) 
 	if err != nil {
 		return nil, err
 	}
+	// incoming 展示发起方(user_id)资料，outgoing 展示对方(friend_id)资料。
+	if err := hydrateFriendships(l.ctx, l.svcCtx, incoming, peerIsRequester); err != nil {
+		return nil, err
+	}
+	if err := hydrateFriendships(l.ctx, l.svcCtx, outgoing, peerIsFriend); err != nil {
+		return nil, err
+	}
 	return &types.ListFriendRequestsResp{Code: string(apperror.CodeOK), Message: "ok", Data: types.ListFriendRequestsData{Incoming: incoming, Outgoing: outgoing}}, nil
 }

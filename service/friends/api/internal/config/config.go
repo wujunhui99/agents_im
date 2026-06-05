@@ -17,4 +17,6 @@ type Config struct {
 	}
 	Tracing    observability.TracingConfig `json:",optional"`
 	FriendsRPC zrpc.RpcClientConf
+	// UserRPC：BFF 聚合用，补全好友资料（friends rpc 不再跨域读用户表）。
+	UserRPC zrpc.RpcClientConf
 }

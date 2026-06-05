@@ -1,5 +1,5 @@
 Name: friends-rpc
 ListenOn: 0.0.0.0:9092
 
-StorageDriver: postgres
+# friends-rpc 数据层走 goctl model（Postgres-only），不再有 StorageDriver。
 DataSource: ${DATABASE_URL}

@@ -9,27 +9,40 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
+	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
-var ErrFriendsRPCConfigRequired = errors.New("friends rpc client config is required")
+var (
+	ErrFriendsRPCConfigRequired = errors.New("friends rpc client config is required")
+	ErrUserRPCConfigRequired    = errors.New("user rpc client config is required")
+)
 
 type ServiceContext struct {
 	Config     config.Config
 	FriendsRPC friendsclient.Friends
+	UserRPC    userclient.User
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	if !hasRPCClientConfig(c.FriendsRPC) {
 		return nil, ErrFriendsRPCConfigRequired
 	}
+	if !hasRPCClientConfig(c.UserRPC) {
+		return nil, ErrUserRPCConfigRequired
+	}
 	cli, err := zrpc.NewClient(c.FriendsRPC, zrpc.WithUnaryClientInterceptor(observability.GRPCUnaryClientInterceptor()))
+	if err != nil {
+		return nil, err
+	}
+	userCli, err := zrpc.NewClient(c.UserRPC, zrpc.WithUnaryClientInterceptor(observability.GRPCUnaryClientInterceptor()))
 	if err != nil {
 		return nil, err
 	}
 	return &ServiceContext{
 		Config:     c,
 		FriendsRPC: friendsclient.NewFriends(cli),
+		UserRPC:    userclient.NewUser(userCli),
 	}, nil
 }
 

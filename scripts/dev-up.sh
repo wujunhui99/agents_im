@@ -262,6 +262,14 @@ Telemetry:
 YAML
 }
 
+write_friends_rpc_config() {
+  cat > "${CONFIG_DIR}/friends-rpc.yaml" <<YAML
+Name: friends-rpc
+ListenOn: 127.0.0.1:${FRIENDS_RPC_PORT:-9092}
+DataSource: ${DATABASE_URL}
+YAML
+}
+
 write_message_transfer_config() {
   cat > "${CONFIG_DIR}/message-transfer.yaml" <<YAML
 Name: message-transfer
@@ -306,7 +314,14 @@ ObjectStorage:
   AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
   SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}"
   write_auth_api_config
-  write_api_config "friends-api" "${FRIENDS_API_PORT:-8082}"
+  write_api_config "friends-api" "${FRIENDS_API_PORT:-8082}" "FriendsRPC:
+  Endpoints:
+    - 127.0.0.1:${FRIENDS_RPC_PORT:-9092}
+  Timeout: 5000
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT:-9090}
+  Timeout: 5000"
   write_api_config "message-api" "${MESSAGE_API_PORT:-8083}"
   write_api_config "gateway-ws" "${GATEWAY_WS_PORT:-8084}" "Presence:
   Driver: ${PRESENCE_DRIVER}
@@ -335,6 +350,7 @@ Telemetry:
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
   write_user_rpc_config
   write_groups_rpc_config
+  write_friends_rpc_config
   write_auth_rpc_config
   write_message_transfer_config
 }
@@ -440,6 +456,7 @@ main() {
   write_configs
   start_service "user-rpc"
   start_service "groups-rpc"
+  start_service "friends-rpc"
   start_service "auth-rpc"
   start_service "user-api"
   start_service "auth-api"

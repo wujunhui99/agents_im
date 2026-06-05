@@ -48,14 +48,16 @@ service/friends/api/internal/{config,handler,logic,svc,types}
 service/friends/rpc/friends.go                  # friends-rpc 入口（package main）
 service/friends/rpc/friends.proto
 service/friends/rpc/etc/friends-rpc.yaml
-service/friends/rpc/internal/{config,logic,server,svc}
+service/friends/rpc/internal/{config,logic,model,server,svc}  # 业务逻辑 + goctl 数据层
 service/friends/rpc/{friends,friendsclient}     # goctl 生成的 pb / client
-service/friends/core/friends.go                 # 业务逻辑（退役自 internal/logic，#402）
-common/share/model/friendship.go                # 数据模型（迁出 internal/model，#397）
-internal/repository/postgres_user_friends.go    # 数据层（暂留 internal/repository）
+common/share/model/friendship.go                # 共享数据模型（迁出 internal/model，#397）
+internal/repository/postgres_user_friends.go    # 旧好友数据层（暂留喂 monolith，#426 待删）
 ```
 
-业务逻辑集中在 `service/friends/core`，被 friends-rpc 的 `internal/svc` 注入；REST/RPC 的共享基础包（错误映射、auth/token 等）已迁出顶层 `internal`，落在 `common/share/*`。
+业务逻辑与好友状态机集中在 `service/friends/rpc/internal/logic`，经 `internal/svc` 注入 goctl 数据层
+`service/friends/rpc/internal/model`（`friendships` 表，#426 退役 `core`）；friends-rpc 不再依赖
+`internal/repository`。跨域好友资料由 friends-api(BFF) 聚合 user-rpc 补全。REST/RPC 的共享基础包
+（错误映射、auth/token 等）落在 `common/share/*`。
 
 ## 数据模型
 
@@ -73,36 +75,20 @@ internal/repository/postgres_user_friends.go    # 数据层（暂留 internal/re
 - `deleted`：曾经存在但已删除，当前不是好友。
 - `none`：没有关系记录，当前不是好友。
 
-第一阶段 repository 使用内存实现，通过接口隔离：
+friends-rpc 数据层用 goctl model（`service/friends/rpc/internal/model`，#426）落 PostgreSQL `friendships` 表：
+双向单向行 + `(account_id, friend_account_id)` 唯一约束（迁移 `018` 加自增代理 PK 以适配 goctl），
+事务边界在 Logic 层（model 暴露 `Transact` + `WithSession`）保证双向状态一致。
 
-```go
-type FriendshipRepository interface {
-    AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
-    DeleteFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
-    ListFriends(ctx context.Context, userID string) ([]model.Friendship, error)
-    GetFriendship(ctx context.Context, userID string, friendID string) (model.Friendship, error)
-}
-```
+## user-rpc 依赖（BFF 聚合）
 
-后续 PostgreSQL 表建议使用规范化双向关系或有序 pair 唯一索引，并通过事务保证双向状态一致。
+friends-rpc 只维护好友关系本身，不读账号表、不调其它 rpc；跨域用户资料在 friends-api(BFF) 聚合：
 
-## user-rpc 依赖
+- friends-api 持 `UserRPC` client，列表用批量 `GetUsersByIDs` 补全好友资料（无 N+1），单条用 `GetUserByID`。
+- `Friendship.friend`（proto 字段保留）由 BFF 填充：好友列表 / accept / reject 展示 `friend_id` 的资料，
+  收到的请求（incoming）展示发起方 `user_id` 的资料。
+- 账号已注销（profile 缺失）按空资料降级，不阻断整列表。
 
-friends logic 只依赖窄接口：
-
-```go
-type UserLookup interface {
-    GetUserByID(ctx context.Context, req GetUserByIDRequest) (UserProfile, error)
-}
-```
-
-当前由 `core.AccountRepoUserLookup` 适配该接口（直读 `repository.AccountRepository`，过渡方案，#402）；user 域 RPC 化后替换为 `user-rpc` client，调用 `GetUserByID` 校验：
-
-- 当前 JWT 用户存在。
-- `POST /friends` 的目标用户存在。
-- `GET /friends/{user_id}` 的目标用户存在。
-
-friends 不保存 `identifier`、`display_name` 等权威资料；如后续列表需要展示公开资料，应由 API 聚合调用 `user-rpc` 或由客户端按需查询。
+friends 不保存 `identifier`、`display_name` 等权威资料。
 
 ## 错误处理
 
