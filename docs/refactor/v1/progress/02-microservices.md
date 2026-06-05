@@ -76,7 +76,10 @@
 
 - **groups 收尾**：message 迁移后删 `internal/logic/groupslogic*.go` + `internal/repository/*groups*` + schema_v2_enums 中 groups 部分。
 - **user/friends/auth**：把 rpc 数据层从 `internal/repository` 切到各自 `rpc/internal/model`（user 的 goctl model 已生成待接线）；friends 已用 `core` 模式，可继续或改 goctl。
-- **user-rpc 批量接口**：BFF 补全成员资料目前是并发 N 次 `GetUserByID`，后续给 user-rpc 加批量获取优化 ListMembers。
+- **user-rpc 批量接口（N+1 优化）**：BFF 补全成员资料（`service/groups/api/internal/logic/groups/hydrate.go`）目前对每个成员**并发发一次** `GetUserByID`——N 成员 = N 次 gRPC + user-rpc N 条单行 SQL；`ensureUsersExist`（建群/加成员存在性校验）是**同一个 N+1**。计划给 user-rpc 加 `GetUsersByIDs`（repeated user_id → repeated UserEntity）：1 次 gRPC + 1 条 `WHERE id IN (...)`，`hydrate.go` 的并发 + semaphore + mutex 可整段删掉，换"一把捞 + map 回填"。
+  - **选型 = 路线一（先解 N+1，不动 internal）**：批量查实现先加在 monolith `internal/logic` + repo（`ListByIDs`），最快解掉 N+1。**这是临时债，与去 internal 目标相反**，记两点结构问题：
+    1. **跨域数据访问边界**：groups 本身**没有**直查 user 库——它走 user-rpc 的 gRPC（符合"域间只过 owner rpc"），✅ 这点没问题。真正的问题在 **user 域的数据层仍寄居 `internal/logic`**（`service/user/rpc/.../get_user_by_i_d_logic.go` 委托 `internal/logic.UserLogic` → repo，见上方逐域进度表 user 行：`is_dep_internal=是`）。owner rpc 还没把自己的数据层收回 `service/user/rpc`，批量方法加在 internal 只是延续这个状态，**并非 groups 越界查库**。
+    2. **internal 终将退役**：终态是删顶层 `internal/`、各域真相只留 `service/<domain>`（见 §目标）。所以 `GetUsersByIDs` 的数据层实现，待 user-rpc 脱 internal（切 goctl model，user 的 model 已生成待接线）时**要跟着迁回 `service/user/rpc/internal/model`**——退役 user 域时勿漏此方法。
 - 顶层 `internal/` 完全退役以 message/gateway/transfer/admin（07-message-rpc-redesign）为最后一公里。
 
 ## 复刻 Playbook（下一个域照做）
