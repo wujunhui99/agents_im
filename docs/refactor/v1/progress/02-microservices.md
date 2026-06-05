@@ -20,6 +20,7 @@
 | **friends** | **`service/friends/rpc/internal/logic` 自包含** | **`service/friends/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ #426（goctl+BFF，删 `core`）|
 | **groups** | **`service/groups/rpc/internal/logic` 自包含** | **`service/groups/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ #415 |
 | **third (mail)** | **`service/third/rpc/internal/logic`（SES 发信，无 DB）** | **provider 库 `service/third/rpc/internal/provider`（mail 无表，无 goctl model）** | **否（已脱）** | ✅ #429（mail 折入新服务 third）|
+| **media** | **`service/media/rpc/internal/logic` 自包含（删 `core`）** | **`service/media/rpc/internal/model`（goctl）** | **部分**（仅下载鉴权跨域读 accounts/message，keystone 阻塞）| ✅ #433（goctl，写入脱 internal）|
 | message/gateway/transfer/admin | 仍在 internal | internal | 是 | ❌ keystone，最后做 |
 
 > groups 是**第一个真正切断 rpc 数据层对 internal 依赖**的域，作为后续域的参考实现；
@@ -30,8 +31,8 @@
 ## groups-rpc 本次操作（PR #415，issue #415）
 
 **两种退役路线**——本仓库现存两套，选型见 Playbook：
-- media 用的 `service/<domain>/core` + `internal/<domain>validate` 过渡包（friends 原走此路，#426 已切到下一条）；
-- **groups/friends 用的 goctl model + BFF 聚合**（本文档），rpc 完全自包含，不给 monolith 提供过渡包。
+- 旧路线 `service/<domain>/core` + `internal/<domain>validate` 过渡包（friends 原走此路 #426、media #433 均已切到下一条；`internal/mediavalidate` 作 keystone shim 暂留喂 message monolith + user-rpc 头像校验）；
+- **groups/friends/media 用的 goctl model + BFF 聚合**（本文档），rpc 数据层走 goctl，不给 monolith 提供数据层过渡包。
 
 做的事（标准 go-zero 改 config/svc/logic + 数据层换 goctl model）：
 
@@ -85,7 +86,7 @@
 ## 剩余 / 后续
 
 > 退役欠下的尾巴，按域记一笔；新域重构完在此追加 `### <域>`。
-> **全局收尾**：顶层 `internal/` 完全退役以 message/gateway/transfer/admin（07-message-rpc-redesign）为最后一公里；user/auth 把 rpc 数据层从 `internal/repository` 切到各自 `rpc/internal/model`（user 的 goctl model 已生成待接线）。friends/groups rpc 已脱 internal（friends #426、groups #415）。
+> **全局收尾**：顶层 `internal/` 完全退役以 message/gateway/transfer/admin（07-message-rpc-redesign）为最后一公里；user/auth 把 rpc 数据层从 `internal/repository` 切到各自 `rpc/internal/model`（user 的 goctl model 已生成待接线）。friends/groups rpc 已脱 internal（friends #426、groups #415）；media 写入数据层已脱（#433，下载鉴权跨域读 keystone 暂留）。
 
 ### friends（#426）
 
@@ -102,15 +103,23 @@ mail 是**特例**：不是 god-package 退役，它只依赖 `internal/mail`（
 - 为何**只折 mail、不折 media**（A 方案）：见下 `### media`。
 - **client 包命名 `mailservice`**（goctl 按 proto `service MailService` 生成,与 `authservice` 同族,非异常）：重命名为 `thirdclient` 会破坏 wire 契约,推迟到 v2 → [`../../v2/01-third-service-naming.md`](../../v2/01-third-service-naming.md)。
 
-### media（A 方案：保持独立，待改造）
+### media（#433：goctl+BFF 改造完成）
 
-媒体 **不并入 third**，按 A 方案独立做去 internal 改造。判断依据（设计权衡，存档备查）：
+media 已按 goctl+BFF 主线退役 `service/media/core`，**写入数据层**落 `service/media/rpc/internal/model`（goctl），脱 `internal/repository`：
 
-- **本质不同**：mail 是真·第三方适配器（薄壳包 SES）；media 是**有自己 DB 领域的领域服务**（media 对象、upload intent、附件访问鉴权），只是「用了」对象存储。按「用了外部存储就算第三方」的逻辑每个连 Postgres 的服务都成第三方 → "third" 会退化成按基础设施分类的杂物抽屉（下次 SMS/支付全往里堆 → 分布式单体）。
-- **伸缩/故障域不同**：media 是数据面（上传/下载字节流、头像服务，自带 ingress `media-api` `/media` 4 路由）；mail 在登录/注册验证码关键路径。合进一个进程 → 一次 media 上传风暴可能拖垮发验证码。该独立伸缩、独立挂。
-- **难度不对称**：mail 去依赖 = 搬一个 provider 库（本 #429，1 PR）；media 去依赖 = 退 `internal/repository`，且 `service/media` 用了 **3 个 repo**（`MediaRepository` + 跨域 `AccountRepository`/`MessageRepository`），属 goctl model + BFF 聚合的多 PR epic（复刻 groups/friends playbook：goctl model 落 `service/media/rpc/internal/model`，头像/附件等跨域数据上移 media-api(BFF) 聚合 user-rpc、附件鉴权调 message 域）。绑成一个改造单元只会让简单的被难的拖住。
+- **删 `service/media/core`**，`MediaLogic` 业务规则折入 `service/media/rpc/internal/logic`（`media_rules.go` 共享校验/int↔string 映射/对象 key 生成/下载鉴权 + 4 个 endpoint logic）；config 转 **Postgres-only**（去 `StorageDriver`，两份 etc 同改）；输入只 validate 不 normalize；logic 依 model **接口** + fake 单测（`media_logic_test.go`，无需 PG）。
+- **`media_objects` 数据层 goctl model**：`media_id` 单主键无复合键坑、无需迁移；custom `CreateMediaObject`/`UpdateStatus`（带 `returning`）只写业务列，`conversation_id`/`storage_provider`/`expires_at` 交 DB 默认；`sha256`/`width`/`height` 仍落 `metadata` JSON（与旧 repo 一致，**当前只写不回读**）；purpose/status 整型常量在 `model/vars.go` 单一来源。
 
-> 结论：减少微服务数量的动机成立，但合并对象应是「多个薄第三方适配器」（mail，未来 SMS/push 可归 third），而非「薄适配器 + 重领域服务」。media 仍走独立 goctl+BFF 改造。
+**keystone 阻塞暂留（待 message-rpc 落地后删 / BFF 化）**：
+- media-rpc **下载鉴权**（管理员判定读 accounts、消息附件可见性读 message）仍经 `svcCtx.Accounts`/`AttachmentAccess` 读 `internal/repository`——**无 message-rpc 可 BFF 化**，故这两笔跨域读没上移；media-api 仍是纯 `mediaclient` 透传 BFF（未加 `UserRPC`）。media-rpc 因此**部分仍依赖 internal**（仅此二者）。
+- `internal/mediavalidate` + `internal/repository` 的 media 数据层保留：喂 **message monolith**（发信附件校验）+ **user-rpc 头像校验**。message 迁移后这些连同下载鉴权一并删。
+- 删了 core 耦合的 `internal/logic/media_download_access_test.go`（集成 MessageLogic + media core）；media-rpc 下载鉴权改由 `media_logic_test.go` 以 fake accounts/attachment checker 覆盖 owner/admin/附件参与者/forbidden 四路。
+- **dev-up.sh 仍未起 media-rpc/media-api**（pre-existing，与本次数据层改造正交，未在本 PR 补）——本地起媒体链路需手动配置，留作后续配套。
+
+> 下方为「为何 media 不并入 third（A 方案保持独立）」的设计权衡，存档备查：
+> - **本质不同**：mail 是真·第三方适配器（薄壳包 SES）；media 是**有自己 DB 领域的领域服务**（media 对象、upload intent、附件访问鉴权），只是「用了」对象存储。按「用了外部存储就算第三方」的逻辑每个连 Postgres 的服务都成第三方 → "third" 会退化成按基础设施分类的杂物抽屉。
+> - **伸缩/故障域不同**：media 是数据面（上传/下载字节流、头像服务，自带 ingress `media-api` `/media` 4 路由）；mail 在登录/注册验证码关键路径。该独立伸缩、独立挂。
+> - **难度不对称**：mail 去依赖 = 搬一个 provider 库（1 PR）；media 去依赖 = 退 `internal/repository` 且用了 3 个 repo（`MediaRepository` + 跨域 `AccountRepository`/`MessageRepository`），属 goctl model 改造（本 #433）。
 
 ### groups
 

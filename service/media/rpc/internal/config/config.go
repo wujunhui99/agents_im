@@ -8,7 +8,7 @@ import (
 
 type Config struct {
 	zrpc.RpcServerConf
-	StorageDriver string                        `json:",default=memory,options=memory|postgres|postgresql"`
+	// media-rpc 已转 Postgres-only：media_objects 数据层走 goctl model，不再支持 memory driver。
 	DataSource    string                        `json:",optional"`
 	ObjectStorage appconfig.ObjectStorageConfig `json:",optional"`
 	Tracing       observability.TracingConfig   `json:",optional"`
