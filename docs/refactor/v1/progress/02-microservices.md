@@ -100,6 +100,7 @@ mail 是**特例**：不是 god-package 退役，它只依赖 `internal/mail`（
 - **wire 契约不变**：proto 仍 `package mail.v1` / `service MailService`，只迁 go 落点；auth 经 `mailadapter` 拨号端点 `MailRPC.Endpoints` 由 `mail-rpc:9095` → `third-rpc:9095`（**auth 配置键仍叫 `MailRPC`**——语义是「mail 能力」，未改键名以缩小爆炸半径）。
 - **cosmetic 尾巴**：`service/third/rpc/mail/mail.pb.go` 内嵌 descriptor 的 `go_package`/`source` 字符串仍是 `service/mail/rpc/...`。原因：`mail`→`third` 长度不同，sed 改字符串会破坏 descriptor 的长度前缀（已踩坑→还原）；且本地 `protoc-gen-go` v1.35.2 比仓库 v1.36.11 旧，regen 会把结构体格式降级（183 行不一致）。**功能零影响**（wire 包是 `mail.v1`，测试绿）。待下次用 v1.36.11 对 `service/third/rpc/mail.proto` regen 时一并修正。
 - 为何**只折 mail、不折 media**（A 方案）：见下 `### media`。
+- **client 包命名 `mailservice`**（goctl 按 proto `service MailService` 生成,与 `authservice` 同族,非异常）：重命名为 `thirdclient` 会破坏 wire 契约,推迟到 v2 → [`../../v2/01-third-service-naming.md`](../../v2/01-third-service-naming.md)。
 
 ### media（A 方案：保持独立，待改造）
 
