@@ -38,5 +38,8 @@ func (l *ListFriendsLogic) ListFriends(req *types.ListFriendsReq) (resp *types.L
 	if err != nil {
 		return nil, err
 	}
+	if err := hydrateFriendships(l.ctx, l.svcCtx, friends, peerIsFriend); err != nil {
+		return nil, err
+	}
 	return &types.ListFriendsResp{Code: string(apperror.CodeOK), Message: "ok", Data: types.ListFriendsData{Friends: friends}}, nil
 }

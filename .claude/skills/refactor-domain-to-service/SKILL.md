@@ -38,7 +38,7 @@ description: 把一个业务域从顶层 internal monolith（god-package interna
 该域是否被 message monolith in-process 消费？
 - **否** → **goctl + BFF**（本 skill 主线，最干净，rpc 完全自包含，不给 monolith 留过渡包）。
 - **是且暂不能动 monolith** → 保留 internal 旧逻辑喂 monolith、新 rpc 走 goctl 自包含（groups 选此）；
-  或老路 `service/<domain>/core` + `internal/<domain>validate` 过渡包（media/friends 用过，可继续）。
+  或老路 `service/<domain>/core` + `internal/<domain>validate` 过渡包（media 用过；friends 曾用，#426 已改 goctl+BFF）。
 
 ## goctl + BFF 主线步骤
 
@@ -108,5 +108,5 @@ worktree 占用导致 gh 报 “main already used by worktree” 属正常，mer
 | 域 | 路线 | owner 落点 | 数据层 | PR | 备注 |
 |----|------|-----------|--------|----|------|
 | media | core + 过渡包 | `service/media/core` | internal/repository | #401 | `internal/mediavalidate` 给 message/user |
-| friends | core + 过渡包 | `service/friends/core` | internal/repository | #402 | `core.AccountRepoUserLookup`，未被 monolith 消费 |
 | groups | **goctl + BFF** | `service/groups/rpc/internal/logic` | **`service/groups/rpc/internal/model`（goctl）** | #415/#416 | 首个 rpc 数据层脱 internal；BFF 聚合 user-rpc；批量接口 #423 |
+| friends | **goctl + BFF** | `service/friends/rpc/internal/logic` | **`service/friends/rpc/internal/model`（goctl）** | #426 | 由 core 退役改造；`friendships` 加代理 PK（迁移 018）；BFF 聚合 user-rpc 批量 `GetUsersByIDs`；internal/repository 好友方法暂留喂 monolith |

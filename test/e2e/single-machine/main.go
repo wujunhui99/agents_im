@@ -22,7 +22,6 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
 	"github.com/wujunhui99/agents_im/pkg/config"
-	friendscore "github.com/wujunhui99/agents_im/service/friends/core"
 )
 
 func main() {
@@ -51,8 +50,7 @@ func main() {
 	bob, err := authLogic.Register(ctx, authlogic.RegisterRequest{Identifier: unique("bob"), Email: bobEmail, EmailVerificationCode: "123456", Password: "password123", DisplayName: "Bob E2E"})
 	must("register bob", err)
 
-	friendsLogic := friendscore.NewFriendsLogic(userRepo, friendscore.NewAccountRepoUserLookup(userRepo))
-	_, err = friendsLogic.AddFriend(ctx, friendscore.AddFriendRequest{UserID: alice.UserID, FriendID: bob.UserID})
+	_, _, err = userRepo.AddFriend(ctx, alice.UserID, bob.UserID)
 	must("add friend", err)
 
 	messageRepo := repository.NewMemoryMessageRepository()

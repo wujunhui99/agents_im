@@ -38,5 +38,8 @@ func (l *RejectFriendRequestLogic) RejectFriendRequest(req *types.FriendPathReq)
 	if err != nil {
 		return nil, err
 	}
+	if err := hydrateFriendship(l.ctx, l.svcCtx, &friendship, peerIsFriend); err != nil {
+		return nil, err
+	}
 	return &types.FriendRequestDecisionResp{Code: string(apperror.CodeOK), Message: "ok", Data: types.FriendRequestDecisionData{Friendship: friendship, Updated: result.GetUpdated()}}, nil
 }

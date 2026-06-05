@@ -9,3 +9,7 @@ FriendsRPC:
   Endpoints:
     - 127.0.0.1:9092
   Timeout: 5000
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:9090
+  Timeout: 5000

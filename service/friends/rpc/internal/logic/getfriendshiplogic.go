@@ -2,10 +2,11 @@ package logic
 
 import (
 	"context"
+	"errors"
 
-	business "github.com/wujunhui99/agents_im/service/friends/core"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	friends "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
+	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -21,10 +22,30 @@ func NewGetFriendshipLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Get
 	return &GetFriendshipLogic{ctx: ctx, svcCtx: svcCtx, Logger: logx.WithContext(ctx)}
 }
 
+// GetFriendship 查询 user_id 视角下与 friend_id 的关系：命中正向行直接返回；
+// 仅有反向 pending（对方发来未处理的请求）则合成一条 pending；都没有则返回 none。
 func (l *GetFriendshipLogic) GetFriendship(in *friends.GetFriendshipRequest) (*friends.GetFriendshipResponse, error) {
-	result, err := l.svcCtx.FriendsLogic.GetFriendship(l.ctx, business.GetFriendshipRequest{UserID: in.GetUserId(), FriendID: in.GetFriendId()})
+	userID, friendID, err := validateFriendshipPair(in.GetUserId(), in.GetFriendId())
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	return &friends.GetFriendshipResponse{Friendship: toFriendship(result.Friendship)}, nil
+
+	row, err := l.svcCtx.FriendshipModel.FindOneByAccountIdFriendAccountId(l.ctx, userID, friendID)
+	if err == nil {
+		return &friends.GetFriendshipResponse{Friendship: toFriendship(row)}, nil
+	}
+	if !errors.Is(err, model.ErrNotFound) {
+		return nil, rpcerror.ToStatus(err)
+	}
+
+	reverse, reverseErr := l.svcCtx.FriendshipModel.FindOneByAccountIdFriendAccountId(l.ctx, friendID, userID)
+	if reverseErr == nil && reverse.Status == model.FriendshipStatusPending {
+		view := friendshipView(userID, friendID, model.FriendshipStatusPending, reverse.CreatedAt, reverse.UpdatedAt)
+		return &friends.GetFriendshipResponse{Friendship: view}, nil
+	}
+	if reverseErr != nil && !errors.Is(reverseErr, model.ErrNotFound) {
+		return nil, rpcerror.ToStatus(reverseErr)
+	}
+
+	return &friends.GetFriendshipResponse{Friendship: noneFriendship(userID, friendID)}, nil
 }

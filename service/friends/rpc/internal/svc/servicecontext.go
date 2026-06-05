@@ -1,27 +1,20 @@
 package svc
 
 import (
-	"log"
-
-	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/service/friends/core"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/model"
+	"github.com/zeromicro/go-zero/core/stores/postgres"
 )
 
 type ServiceContext struct {
-	Config       config.Config
-	FriendsLogic *core.FriendsLogic
-	Repo         repository.Repository
+	Config          config.Config
+	FriendshipModel model.FriendshipsModel
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	repo, err := repository.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
-	if err != nil {
-		log.Fatalf("build friends repository: %v", err)
-	}
+	conn := postgres.New(c.DataSource)
 	return &ServiceContext{
-		Config:       c,
-		FriendsLogic: core.NewFriendsLogic(repo, core.NewAccountRepoUserLookup(repo)),
-		Repo:         repo,
+		Config:          c,
+		FriendshipModel: model.NewFriendshipsModel(conn),
 	}
 }

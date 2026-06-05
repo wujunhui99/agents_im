@@ -1,38 +1,46 @@
 package logic
 
 import (
-	business "github.com/wujunhui99/agents_im/service/friends/core"
+	"time"
+
 	friends "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
+	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/model"
 )
 
-func toFriendship(view business.FriendshipView) *friends.Friendship {
-	friendship := &friends.Friendship{
-		UserId:    view.UserID,
-		FriendId:  view.FriendID,
-		Status:    view.Status,
-		IsFriend:  view.IsFriend,
-		CreatedAt: view.CreatedAt,
-		UpdatedAt: view.UpdatedAt,
+// toFriendship 把一条 friendships 行转为 rpc Friendship。
+// 跨域好友资料（FriendProfile）由 api(BFF) 聚合 user-rpc 补全，rpc 不再返回。
+func toFriendship(row *model.Friendships) *friends.Friendship {
+	if row == nil {
+		return nil
 	}
-	if view.Friend != nil {
-		friendship.Friend = toFriendProfile(*view.Friend)
-	}
-	return friendship
+	return friendshipView(row.AccountId, row.FriendAccountId, row.Status, row.CreatedAt, row.UpdatedAt)
 }
 
-func toFriendProfile(profile business.UserProfile) *friends.FriendProfile {
-	return &friends.FriendProfile{
-		UserId:        profile.UserID,
-		Identifier:    profile.Identifier,
-		DisplayName:   profile.DisplayName,
-		Name:          profile.Name,
-		Gender:        profile.Gender,
-		BirthDate:     profile.BirthDate,
-		Region:        profile.Region,
-		AccountType:   profile.AccountType,
-		AvatarMediaId: profile.AvatarMediaID,
-		AvatarUrl:     profile.AvatarURL,
-		CreatedAt:     profile.CreatedAt,
-		UpdatedAt:     profile.UpdatedAt,
+// friendshipView 构造一条 Friendship 视图。
+func friendshipView(userID, friendID string, status int64, createdAt, updatedAt time.Time) *friends.Friendship {
+	return &friends.Friendship{
+		UserId:    userID,
+		FriendId:  friendID,
+		Status:    statusToString(status),
+		IsFriend:  status == model.FriendshipStatusAccepted,
+		CreatedAt: formatTime(createdAt),
+		UpdatedAt: formatTime(updatedAt),
 	}
+}
+
+// noneFriendship 构造一条逻辑“无关系”视图（GetFriendship 未命中任何行时返回）。
+func noneFriendship(userID, friendID string) *friends.Friendship {
+	return &friends.Friendship{
+		UserId:   userID,
+		FriendId: friendID,
+		Status:   friendshipStatusNone,
+		IsFriend: false,
+	}
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }

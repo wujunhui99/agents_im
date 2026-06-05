@@ -824,7 +824,7 @@ fi
 rpc_logic_markers=(
   "service/user/rpc/internal/logic:UserLogic"
   "service/auth/rpc/internal/logic:AuthLogic"
-  "service/friends/rpc/internal/logic:FriendsLogic"
+  "service/friends/rpc/internal/logic:FriendshipModel"
   "internal/rpcgen/message/internal/logic:MessageLogic"
   "service/mail/rpc/internal/logic:MailProvider"
 )
@@ -1458,7 +1458,8 @@ for pattern in "${observability_code_patterns[@]}"; do
   rg -q "$pattern" pkg/health pkg/observability
 done
 
-for api_main in service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go; do
+# groups-api 已迁到 go-zero 原生 Telemetry，不再用 observability.TraceMiddlewareFunc（其余 api 仍用）。
+for api_main in service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/agent/api/agent.go; do
   rg -q "TraceMiddlewareFunc" "$api_main"
 done
 

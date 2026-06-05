@@ -9,5 +9,4 @@ Tracing:
   TraceUIBaseURL: http://localhost:3000
   Insecure: true
 
-StorageDriver: memory
 DataSource: ${DATABASE_URL}

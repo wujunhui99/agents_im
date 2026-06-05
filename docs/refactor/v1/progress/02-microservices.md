@@ -17,17 +17,20 @@
 |----|------------|-----------|-------------------|------|
 | auth | service ✅ | internal/auth | 是 | ⚠️ 结构已迁，数据层未脱 internal |
 | user | service ✅ | **internal/repository**（goctl model 已生成于 `user/rpc/internal/model` 但**未接线**，是死代码）| 是 | ⚠️ 同上 |
-| friends | `service/friends/core`（core+过渡包模式）| internal/repository | 部分 | 🟡 |
-| **groups** | **`service/groups/rpc/internal/logic` 自包含** | **`service/groups/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ 本 PR #415 |
+| **friends** | **`service/friends/rpc/internal/logic` 自包含** | **`service/friends/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ #426（goctl+BFF，删 `core`）|
+| **groups** | **`service/groups/rpc/internal/logic` 自包含** | **`service/groups/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ #415 |
 | message/gateway/transfer/admin | 仍在 internal | internal | 是 | ❌ keystone，最后做 |
 
-> groups 是**第一个真正切断 rpc 数据层对 internal 依赖**的域，作为后续域的参考实现。
+> groups 是**第一个真正切断 rpc 数据层对 internal 依赖**的域，作为后续域的参考实现；
+> friends 照此复刻（#426）：`friendships` 加自增代理 PK（迁移 `018`）→ goctl model → 状态机搬进 rpc/logic →
+> 好友资料移到 friends api(BFF) 聚合 user-rpc（批量 `GetUsersByIDs`），删除 `service/friends/core`。
+> friends 的 internal/repository friendship 方法暂留（monolith `default_assistant`/`agent_definition` 仍用 `EnsureAcceptedFriendship`），待 message 迁移后删。
 
 ## groups-rpc 本次操作（PR #415，issue #415）
 
 **两种退役路线**——本仓库现存两套，选型见 Playbook：
-- friends/media 用的 `service/<domain>/core` + `internal/<domain>validate` 过渡包；
-- **groups 用的 goctl model + BFF 聚合**（本文档），rpc 完全自包含，不给 monolith 提供过渡包。
+- media 用的 `service/<domain>/core` + `internal/<domain>validate` 过渡包（friends 原走此路，#426 已切到下一条）；
+- **groups/friends 用的 goctl model + BFF 聚合**（本文档），rpc 完全自包含，不给 monolith 提供过渡包。
 
 做的事（标准 go-zero 改 config/svc/logic + 数据层换 goctl model）：
 
@@ -81,7 +84,13 @@
 ## 剩余 / 后续
 
 > 退役欠下的尾巴，按域记一笔；新域重构完在此追加 `### <域>`。
-> **全局收尾**：顶层 `internal/` 完全退役以 message/gateway/transfer/admin（07-message-rpc-redesign）为最后一公里；user/friends/auth 把 rpc 数据层从 `internal/repository` 切到各自 `rpc/internal/model`（user 的 goctl model 已生成待接线，friends 已用 `core` 模式）。
+> **全局收尾**：顶层 `internal/` 完全退役以 message/gateway/transfer/admin（07-message-rpc-redesign）为最后一公里；user/auth 把 rpc 数据层从 `internal/repository` 切到各自 `rpc/internal/model`（user 的 goctl model 已生成待接线）。friends/groups rpc 已脱 internal（friends #426、groups #415）。
+
+### friends（#426）
+
+- **internal/repository friendship 方法暂留**：monolith `internal/logic/default_assistant.go`、`agent_definition.go` 仍调 `EnsureAcceptedFriendship`，故 `postgres_user_friends.go` 的好友方法保留，待 message 迁移后删。
+- friends rpc 不再返回 `Friendship.friend` 资料（proto 字段保留留空），由 friends api(BFF) 聚合 user-rpc 补全；proto 未重生成。
+- 修正：旧 `core` 把 outgoing 好友请求列表的 `friend` 错填成请求者自己，BFF 改为正确指向对方（friend_id）。
 
 ### groups
 

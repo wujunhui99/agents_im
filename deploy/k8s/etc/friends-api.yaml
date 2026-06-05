@@ -8,3 +8,8 @@ Auth:
 FriendsRPC:
   Target: dns:///friends-rpc:9092
   Timeout: 5000
+# UserRPC：BFF 聚合用，补全好友资料（friends rpc 不再跨域读用户表）。
+UserRPC:
+  Endpoints:
+    - user-rpc:9090
+  Timeout: 5000
