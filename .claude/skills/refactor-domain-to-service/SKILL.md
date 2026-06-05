@@ -76,6 +76,7 @@ goctl model pg datasource -url <本地临时PG> -table "<t1>,<t2>" -dir service/
 - **hydrate 的 peer 语义按端点定**：同一 rpc 在不同端点返回的关系视角不同（如“收到的请求”行是 requester→me），
   BFF 要按端点选对要展示的那一端 id；顺手核对旧 `core` 有没有填错（friends 旧 core 把 outgoing 请求资料误填成自己，#426 修）。
 - **存在性校验也上移 BFF**：rpc 不再读 accounts，建关系前校验对端用户存在改用 user-rpc（批量）；缺 profile 的列表项按空资料降级，不阻断整列表。
+- **跨域鉴权读暂留 owner rpc（无 peer rpc 可 BFF 时）**：当跨域读是**访问控制**（非展示资料）且对端域还没 rpc 可调，BFF 化无处落——此读可作 keystone-blocked 例外暂留在 owner rpc 直读 `internal/repository`（用接口注入 svcCtx 便于 fake 单测），文档注明“待 peer rpc 落地后 BFF 化”。media #433：下载鉴权（accounts 管理员 + message 附件可见性）即此例外，故 media-rpc **写入脱 internal 但仍部分依赖**，media-api 仍是纯透传 BFF 未加 UserRPC。
 
 ### 5. 输入只 validate 不 normalize
 去掉后端规范化（`TrimSpace` 等，由客户端保证）；**保留校验**（required + 长度上限 + 集合大小上限，防脏数据/DoS）。
@@ -131,6 +132,6 @@ worktree 占用导致 gh 报 “main already used by worktree” 属正常，mer
 ## 已迁移域（更新此表）
 | 域 | 路线 | owner 落点 | 数据层 | PR | 备注 |
 |----|------|-----------|--------|----|------|
-| media | core + 过渡包 | `service/media/core` | internal/repository | #401 | `internal/mediavalidate` 给 message/user |
+| media | **goctl + BFF** | `service/media/rpc/internal/logic`（删 `core`）| **`service/media/rpc/internal/model`（goctl）** | #401→#433 | #433 写入脱 internal；下载鉴权（accounts 管理员 + message 附件可见性）**无 message-rpc 可 BFF 化**仍读 internal/repository（部分仍依赖）；`internal/mediavalidate` 留喂 message monolith + user-rpc 头像校验 |
 | groups | **goctl + BFF** | `service/groups/rpc/internal/logic` | **`service/groups/rpc/internal/model`（goctl）** | #415/#416 | 首个 rpc 数据层脱 internal；BFF 聚合 user-rpc；批量接口 #423 |
 | friends | **goctl + BFF** | `service/friends/rpc/internal/logic` | **`service/friends/rpc/internal/model`（goctl）** | #426 | 由 core 退役改造；`friendships` 加代理 PK（迁移 018）；BFF 聚合 user-rpc 批量 `GetUsersByIDs`；internal/repository 好友方法暂留喂 monolith |

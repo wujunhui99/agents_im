@@ -2,10 +2,10 @@
 // callers that still read the shared media store directly: the message monolith
 // (attachment validation on the send path) and user-rpc (avatar validation).
 //
-// The authoritative media logic lives in service/media/core (owned by media-rpc).
-// This package is a deliberate, minimal shim so those callers do not depend on
-// internal/logic; it is removed once the message monolith (Epic #394 Phase 6)
-// and the user/media data layers move behind media-rpc.
+// The authoritative media logic lives in media-rpc (service/media/rpc/internal/logic,
+// goctl model). This package is a deliberate, minimal shim so those callers do not
+// depend on internal/logic; it is removed once the message monolith (Epic #394
+// Phase 6) and the user/media data layers move behind media-rpc.
 package mediavalidate
 
 import (
