@@ -5,9 +5,9 @@ import (
 	"errors"
 	"strings"
 
-	mailprovider "github.com/wujunhui99/agents_im/internal/mail"
-	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
-	mailpb "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
+	mailprovider "github.com/wujunhui99/agents_im/service/third/rpc/internal/provider"
+	"github.com/wujunhui99/agents_im/service/third/rpc/internal/svc"
+	mailpb "github.com/wujunhui99/agents_im/service/third/rpc/mail"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"

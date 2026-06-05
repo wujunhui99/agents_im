@@ -8,10 +8,10 @@ import (
 
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
-	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/server"
-	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
-	mailpb "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
+	"github.com/wujunhui99/agents_im/service/third/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/third/rpc/internal/server"
+	"github.com/wujunhui99/agents_im/service/third/rpc/internal/svc"
+	mailpb "github.com/wujunhui99/agents_im/service/third/rpc/mail"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -20,12 +20,12 @@ import (
 )
 
 func main() {
-	configFile := flag.String("f", "etc/mail-rpc.yaml", "the config file")
+	configFile := flag.String("f", "etc/third-rpc.yaml", "the config file")
 	flag.Parse()
 	run(*configFile)
 }
 
-// run starts the mail-rpc service: it loads config and serves.
+// run starts the third-rpc service (third-party integrations: mail/SES): it loads config and serves.
 func run(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c, conf.UseEnv())

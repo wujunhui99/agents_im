@@ -7,7 +7,7 @@ package mailservice
 import (
 	"context"
 
-	mail "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
+	mail "github.com/wujunhui99/agents_im/service/third/rpc/mail"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

@@ -44,7 +44,7 @@ bash .claude/skills/fix-api/scripts/check-secret-missing-vars.sh
 ```
 有缺失 → patch secret 后重启所有 app pod：
 ```bash
-ssh -p 9093 root@207.57.131.50 "kubectl rollout restart deployment/user-api deployment/groups-api deployment/auth-api deployment/auth-rpc deployment/message-api deployment/friends-api deployment/gateway-ws deployment/agent-api deployment/mail-rpc deployment/user-rpc deployment/groups-rpc deployment/friends-rpc deployment/message-rpc deployment/message-transfer -n agents-im"
+ssh -p 9093 root@207.57.131.50 "kubectl rollout restart deployment/user-api deployment/groups-api deployment/auth-api deployment/auth-rpc deployment/message-api deployment/friends-api deployment/gateway-ws deployment/agent-api deployment/third-rpc deployment/user-rpc deployment/groups-rpc deployment/friends-rpc deployment/message-rpc deployment/message-transfer -n agents-im"
 ```
 
 有相似漏洞 → 同一 PR 修，body 列明受影响服务。

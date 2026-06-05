@@ -19,6 +19,7 @@
 | user | service ✅ | **internal/repository**（goctl model 已生成于 `user/rpc/internal/model` 但**未接线**，是死代码）| 是 | ⚠️ 同上 |
 | **friends** | **`service/friends/rpc/internal/logic` 自包含** | **`service/friends/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ #426（goctl+BFF，删 `core`）|
 | **groups** | **`service/groups/rpc/internal/logic` 自包含** | **`service/groups/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ #415 |
+| **third (mail)** | **`service/third/rpc/internal/logic`（SES 发信，无 DB）** | **provider 库 `service/third/rpc/internal/provider`（mail 无表，无 goctl model）** | **否（已脱）** | ✅ #429（mail 折入新服务 third）|
 | message/gateway/transfer/admin | 仍在 internal | internal | 是 | ❌ keystone，最后做 |
 
 > groups 是**第一个真正切断 rpc 数据层对 internal 依赖**的域，作为后续域的参考实现；
@@ -91,6 +92,24 @@
 - **internal/repository friendship 方法暂留**：monolith `internal/logic/default_assistant.go`、`agent_definition.go` 仍调 `EnsureAcceptedFriendship`，故 `postgres_user_friends.go` 的好友方法保留，待 message 迁移后删。
 - friends rpc 不再返回 `Friendship.friend` 资料（proto 字段保留留空），由 friends api(BFF) 聚合 user-rpc 补全；proto 未重生成。
 - 修正：旧 `core` 把 outgoing 好友请求列表的 `friend` 错填成请求者自己，BFF 改为正确指向对方（friend_id）。
+
+### third（mail，#429）
+
+mail 是**特例**：不是 god-package 退役，它只依赖 `internal/mail`（干净的 Tencent SES provider 库，无 DB、无 `internal/logic`/`internal/repository`）。本次 = **新建第三方接入层服务 `third`，把 `service/mail` 折入、provider 库一并搬进 `service/third/rpc/internal/provider`（包改名 `mailprovider`），断开对顶层 `internal/` 的依赖**；部署单元 `mail-rpc` → `third-rpc`（Dockerfile / k8s / drone build / dev-up / detect-deploy / test-deploy）。
+
+- **wire 契约不变**：proto 仍 `package mail.v1` / `service MailService`，只迁 go 落点；auth 经 `mailadapter` 拨号端点 `MailRPC.Endpoints` 由 `mail-rpc:9095` → `third-rpc:9095`（**auth 配置键仍叫 `MailRPC`**——语义是「mail 能力」，未改键名以缩小爆炸半径）。
+- **cosmetic 尾巴**：`service/third/rpc/mail/mail.pb.go` 内嵌 descriptor 的 `go_package`/`source` 字符串仍是 `service/mail/rpc/...`。原因：`mail`→`third` 长度不同，sed 改字符串会破坏 descriptor 的长度前缀（已踩坑→还原）；且本地 `protoc-gen-go` v1.35.2 比仓库 v1.36.11 旧，regen 会把结构体格式降级（183 行不一致）。**功能零影响**（wire 包是 `mail.v1`，测试绿）。待下次用 v1.36.11 对 `service/third/rpc/mail.proto` regen 时一并修正。
+- 为何**只折 mail、不折 media**（A 方案）：见下 `### media`。
+
+### media（A 方案：保持独立，待改造）
+
+媒体 **不并入 third**，按 A 方案独立做去 internal 改造。判断依据（设计权衡，存档备查）：
+
+- **本质不同**：mail 是真·第三方适配器（薄壳包 SES）；media 是**有自己 DB 领域的领域服务**（media 对象、upload intent、附件访问鉴权），只是「用了」对象存储。按「用了外部存储就算第三方」的逻辑每个连 Postgres 的服务都成第三方 → "third" 会退化成按基础设施分类的杂物抽屉（下次 SMS/支付全往里堆 → 分布式单体）。
+- **伸缩/故障域不同**：media 是数据面（上传/下载字节流、头像服务，自带 ingress `media-api` `/media` 4 路由）；mail 在登录/注册验证码关键路径。合进一个进程 → 一次 media 上传风暴可能拖垮发验证码。该独立伸缩、独立挂。
+- **难度不对称**：mail 去依赖 = 搬一个 provider 库（本 #429，1 PR）；media 去依赖 = 退 `internal/repository`，且 `service/media` 用了 **3 个 repo**（`MediaRepository` + 跨域 `AccountRepository`/`MessageRepository`），属 goctl model + BFF 聚合的多 PR epic（复刻 groups/friends playbook：goctl model 落 `service/media/rpc/internal/model`，头像/附件等跨域数据上移 media-api(BFF) 聚合 user-rpc、附件鉴权调 message 域）。绑成一个改造单元只会让简单的被难的拖住。
+
+> 结论：减少微服务数量的动机成立，但合并对象应是「多个薄第三方适配器」（mail，未来 SMS/push 可归 third），而非「薄适配器 + 重领域服务」。media 仍走独立 goctl+BFF 改造。
 
 ### groups
 

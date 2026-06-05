@@ -71,7 +71,7 @@
 
 ### `POST /auth/register/email-code`
 
-注册前请求邮箱验证码。Auth 生成 6 位数字验证码，只保存验证码哈希与过期/尝试元数据，并通过内部 `mail-rpc` 调用 `SendTemplateEmail` 发送模板邮件；Auth 不直接调用腾讯云 SES。
+注册前请求邮箱验证码。Auth 生成 6 位数字验证码，只保存验证码哈希与过期/尝试元数据，并通过内部 `third-rpc` 调用 `SendTemplateEmail` 发送模板邮件；Auth 不直接调用腾讯云 SES。
 
 请求：
 

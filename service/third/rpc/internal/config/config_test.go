@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	mailconfig "github.com/wujunhui99/agents_im/service/mail/rpc/internal/config"
+	mailconfig "github.com/wujunhui99/agents_im/service/third/rpc/internal/config"
 	"github.com/zeromicro/go-zero/core/conf"
 )
 
@@ -16,8 +16,8 @@ func TestMailRPCConfigLoadsTencentSESSettings(t *testing.T) {
 	t.Setenv("TENCENT_SES_FROM_EMAIL", "noreply@agenticim.xyz")
 	t.Setenv("TENCENT_SES_DEFAULT_TEMPLATE_ID", "177952")
 
-	configPath := filepath.Join(t.TempDir(), "mail-rpc.yaml")
-	content := []byte(`Name: mail-rpc
+	configPath := filepath.Join(t.TempDir(), "third-rpc.yaml")
+	content := []byte(`Name: third-rpc
 ListenOn: 127.0.0.1:19095
 TencentSES:
   SecretID: ${TENCENT_SES_SECRET_ID}

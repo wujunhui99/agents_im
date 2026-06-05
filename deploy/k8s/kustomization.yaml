@@ -31,7 +31,7 @@ configMapGenerator:
       - etc/friends-rpc.yaml
       - etc/groups-rpc.yaml
       - etc/message-rpc.yaml
-      - etc/mail-rpc.yaml
+      - etc/third-rpc.yaml
       - etc/media-rpc.yaml
       - etc/media-api.yaml
 generatorOptions:

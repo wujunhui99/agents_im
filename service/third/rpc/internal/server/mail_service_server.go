@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/logic"
-	"github.com/wujunhui99/agents_im/service/mail/rpc/internal/svc"
-	mail "github.com/wujunhui99/agents_im/service/mail/rpc/mail"
+	"github.com/wujunhui99/agents_im/service/third/rpc/internal/logic"
+	"github.com/wujunhui99/agents_im/service/third/rpc/internal/svc"
+	mail "github.com/wujunhui99/agents_im/service/third/rpc/mail"
 )
 
 type MailServiceServer struct {

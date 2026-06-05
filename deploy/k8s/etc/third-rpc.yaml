@@ -1,10 +1,9 @@
-Name: mail-rpc
+Name: third-rpc
 ListenOn: 0.0.0.0:9095
-
 TencentSES:
   SecretID: ${TENCENT_SES_SECRET_ID}
   SecretKey: ${TENCENT_SES_SECRET_KEY}
   Region: ${TENCENT_SES_REGION}
   Endpoint: https://ses.tencentcloudapi.com
   FromEmailAddress: ${TENCENT_SES_FROM_EMAIL}
-  DefaultTemplateID: ${TENCENT_SES_DEFAULT_TEMPLATE_ID}
+  DefaultTemplateID: "${TENCENT_SES_DEFAULT_TEMPLATE_ID}"

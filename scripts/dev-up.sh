@@ -366,7 +366,7 @@ service_pkg() {
     friends-rpc)      echo "./service/friends/rpc" ;;
     groups-api)       echo "./service/groups/api" ;;
     groups-rpc)       echo "./service/groups/rpc" ;;
-    mail-rpc)         echo "./service/mail/rpc" ;;
+    third-rpc)         echo "./service/third/rpc" ;;
     user-api)         echo "./service/user/api" ;;
     user-rpc)         echo "./service/user/rpc" ;;
     message-rpc)      echo "./internal/rpcgen/message" ;;
