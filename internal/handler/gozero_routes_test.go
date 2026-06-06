@@ -87,7 +87,7 @@ func routeTestBearerTokenForUser(t *testing.T, auth config.JWTAuthConfig, userID
 	t.Helper()
 
 	manager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
-	rawToken, _, err := manager.Issue(userID, userID)
+	rawToken, _, err := manager.Issue(userID, userID, "", "")
 	if err != nil {
 		t.Fatalf("issue test jwt: %v", err)
 	}

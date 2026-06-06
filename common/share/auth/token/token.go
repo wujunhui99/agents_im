@@ -2,27 +2,28 @@ package token
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
 type Claims struct {
 	UserID     string
 	Identifier string
-	SessionID  string
+	JTI        string
+	Device     string
+	LoginIP    string
 	IssuedAt   time.Time
 	ExpiresAt  time.Time
 }
 
 type Manager interface {
-	Issue(userID string, identifier string) (string, Claims, error)
+	Issue(userID string, identifier string, device string, loginIP string) (string, Claims, error)
 	Parse(raw string) (Claims, error)
 	Validate(raw string) (Claims, error)
 }
@@ -56,7 +57,7 @@ func NewHMACTokenManagerWithClock(secret string, ttl time.Duration, now func() t
 	return manager
 }
 
-func (m *HMACTokenManager) Issue(userID string, identifier string) (string, Claims, error) {
+func (m *HMACTokenManager) Issue(userID string, identifier string, device string, loginIP string) (string, Claims, error) {
 	userID = strings.TrimSpace(userID)
 	identifier = strings.TrimSpace(identifier)
 	if userID == "" {
@@ -67,14 +68,12 @@ func (m *HMACTokenManager) Issue(userID string, identifier string) (string, Clai
 	}
 
 	issuedAt := m.now().UTC()
-	sessionID, err := newSessionID()
-	if err != nil {
-		return "", Claims{}, err
-	}
 	claims := Claims{
 		UserID:     userID,
 		Identifier: identifier,
-		SessionID:  sessionID,
+		JTI:        uuid.NewString(),
+		Device:     strings.TrimSpace(device),
+		LoginIP:    strings.TrimSpace(loginIP),
 		IssuedAt:   issuedAt,
 		ExpiresAt:  issuedAt.Add(m.ttl),
 	}
@@ -84,9 +83,13 @@ func (m *HMACTokenManager) Issue(userID string, identifier string) (string, Clai
 		return "", Claims{}, err
 	}
 	payloadSegment, err := encodeJSON(tokenPayload{
+		Subject:    claims.UserID,
 		UserID:     claims.UserID,
 		Identifier: claims.Identifier,
-		SessionID:  claims.SessionID,
+		JTI:        claims.JTI,
+		SessionID:  claims.JTI,
+		Device:     claims.Device,
+		LoginIP:    claims.LoginIP,
 		IssuedAt:   claims.IssuedAt.Unix(),
 		ExpiresAt:  claims.ExpiresAt.Unix(),
 	})
@@ -132,14 +135,16 @@ func (m *HMACTokenManager) Parse(raw string) (Claims, error) {
 	if err := decodeJSON(parts[1], &payload); err != nil {
 		return Claims{}, apperror.Unauthenticated("token payload is invalid")
 	}
-	if strings.TrimSpace(payload.UserID) == "" || strings.TrimSpace(payload.Identifier) == "" || payload.ExpiresAt <= 0 {
+	if strings.TrimSpace(payload.Subject) == "" || strings.TrimSpace(payload.Identifier) == "" || payload.ExpiresAt <= 0 {
 		return Claims{}, apperror.Unauthenticated("token payload is invalid")
 	}
 
 	return Claims{
-		UserID:     payload.UserID,
+		UserID:     payload.Subject,
 		Identifier: payload.Identifier,
-		SessionID:  payload.SessionID,
+		JTI:        payload.JTI,
+		Device:     payload.Device,
+		LoginIP:    payload.LoginIP,
 		IssuedAt:   time.Unix(payload.IssuedAt, 0).UTC(),
 		ExpiresAt:  time.Unix(payload.ExpiresAt, 0).UTC(),
 	}, nil
@@ -164,9 +169,17 @@ type tokenHeader struct {
 }
 
 type tokenPayload struct {
+	// sub and jti are the standard JWT claims. go-zero's jwt middleware strips the
+	// registered claims (sub/jti/iat/exp/...) from the request context, so each
+	// value the DeviceAuth middleware / handlers need is mirrored under a
+	// non-registered key (user_id / session_id / device_type) that go-zero copies.
+	Subject    string `json:"sub"`
 	UserID     string `json:"user_id"`
 	Identifier string `json:"identifier"`
-	SessionID  string `json:"sid,omitempty"`
+	JTI        string `json:"jti"`
+	SessionID  string `json:"session_id"`
+	Device     string `json:"device_type,omitempty"`
+	LoginIP    string `json:"login_ip,omitempty"`
 	IssuedAt   int64  `json:"iat"`
 	ExpiresAt  int64  `json:"exp"`
 }
@@ -191,12 +204,4 @@ func sign(signingInput string, secret []byte) []byte {
 	mac := hmac.New(sha256.New, secret)
 	_, _ = mac.Write([]byte(signingInput))
 	return mac.Sum(nil)
-}
-
-func newSessionID() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", apperror.Internal("session id generation failed")
-	}
-	return "sid_" + hex.EncodeToString(b[:]), nil
 }

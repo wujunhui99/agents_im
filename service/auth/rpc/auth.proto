@@ -22,11 +22,15 @@ message RegisterRequest {
   string region = 7;
   string email = 8;
   string email_verification_code = 9;
+  string device = 10;
+  string login_ip = 11;
 }
 
 message LoginRequest {
   string identifier = 1;
   string password = 2;
+  string device = 3;
+  string login_ip = 4;
 }
 
 message RegistrationEmailCodeRequest {

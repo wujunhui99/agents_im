@@ -14,23 +14,26 @@ import (
 
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
-		[]rest.Route{
-			{
-				Method:  http.MethodGet,
-				Path:    "/me",
-				Handler: user.GetMeHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodPatch,
-				Path:    "/me",
-				Handler: user.UpdateMeHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodPatch,
-				Path:    "/me/avatar",
-				Handler: user.UpdateMeAvatarHandler(serverCtx),
-			},
-		},
+		rest.WithMiddlewares(
+			[]rest.Middleware{serverCtx.DeviceAuth},
+			[]rest.Route{
+				{
+					Method:  http.MethodGet,
+					Path:    "/me",
+					Handler: user.GetMeHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPatch,
+					Path:    "/me",
+					Handler: user.UpdateMeHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPatch,
+					Path:    "/me/avatar",
+					Handler: user.UpdateMeAvatarHandler(serverCtx),
+				},
+			}...,
+		),
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
 	)
 

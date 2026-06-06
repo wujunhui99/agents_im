@@ -6,9 +6,11 @@ package svc
 import (
 	"errors"
 
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
+	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
@@ -18,9 +20,10 @@ var (
 )
 
 type ServiceContext struct {
-	Config    config.Config
-	GroupsRPC groupsclient.Groups
-	UserRPC   userclient.User
+	Config     config.Config
+	GroupsRPC  groupsclient.Groups
+	UserRPC    userclient.User
+	DeviceAuth rest.Middleware
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
@@ -40,9 +43,10 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		return nil, err
 	}
 	return &ServiceContext{
-		Config:    c,
-		GroupsRPC: groupsclient.NewGroups(groupsCli),
-		UserRPC:   userclient.NewUser(userCli),
+		Config:     c,
+		GroupsRPC:  groupsclient.NewGroups(groupsCli),
+		UserRPC:    userclient.NewUser(userCli),
+		DeviceAuth: middleware.NewDeviceAuthMiddleware(middleware.NewRedisSessionStore(c.Redis)).Handle,
 	}, nil
 }
 

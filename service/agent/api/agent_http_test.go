@@ -152,7 +152,7 @@ func bearerTokenForUser(t *testing.T, userID string) string {
 	t.Helper()
 	auth := testJWTAuthConfig()
 	manager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
-	rawToken, _, err := manager.Issue(userID, userID)
+	rawToken, _, err := manager.Issue(userID, userID, "", "")
 	if err != nil {
 		t.Fatalf("issue test jwt: %v", err)
 	}

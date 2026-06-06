@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
@@ -108,12 +108,6 @@ func run(configFile string) {
 			Feedback:    postgresFeedbackRepo,
 			TaskReports: postgresTaskReportRepo,
 		}, auth)
-
-		authRepo, err := authrepo.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
-		if err != nil {
-			log.Fatalf("build auth repository: %v", err)
-		}
-		serviceContext.AuthSessions = authRepo
 	} else {
 		memoryAccountRepo, ok := accountRepo.(*repository.MemoryRepository)
 		if !ok {
@@ -143,8 +137,8 @@ func run(configFile string) {
 			Feedback:    memoryFeedbackRepo,
 			TaskReports: memoryTaskReportRepo,
 		}, auth)
-		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", appconfig.ResolveStorageDriver(c.StorageDriver))
 	}
+	serviceContext.Sessions = middleware.NewRedisSessionStore(c.Redis)
 
 	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(c.RestConf, rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
@@ -259,7 +253,7 @@ func registerAdminHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 }
 
 func authenticatedRoutes(serverCtx *svc.ServiceContext, routes []rest.Route) []rest.Route {
-	if serverCtx == nil || serverCtx.ActiveSessionRepository() == nil {
+	if serverCtx == nil || serverCtx.SessionStore() == nil {
 		return routes
 	}
 	return rest.WithMiddleware(activeSessionMiddleware(serverCtx), routes...)
@@ -267,7 +261,7 @@ func authenticatedRoutes(serverCtx *svc.ServiceContext, routes []rest.Route) []r
 
 func activeSessionMiddleware(serverCtx *svc.ServiceContext) rest.Middleware {
 	auth := serverCtx.AuthConfig()
-	activeSessions := serverCtx.ActiveSessionRepository()
+	sessions := serverCtx.SessionStore()
 	tokenManager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -276,7 +270,7 @@ func activeSessionMiddleware(serverCtx *svc.ServiceContext) rest.Middleware {
 				httpx.ErrorCtx(r.Context(), w, err)
 				return
 			}
-			if err := authrepo.ValidateActiveSession(r.Context(), activeSessions, claims); err != nil {
+			if err := sessions.Validate(r.Context(), claims.UserID, claims.Device, claims.JTI); err != nil {
 				httpx.ErrorCtx(r.Context(), w, err)
 				return
 			}

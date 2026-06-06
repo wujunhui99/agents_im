@@ -6,17 +6,20 @@ package svc
 import (
 	"errors"
 
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
+	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
 var ErrUserRPCConfigRequired = errors.New("user rpc client config is required")
 
 type ServiceContext struct {
-	Config  config.Config
-	UserRPC userclient.User
+	Config     config.Config
+	UserRPC    userclient.User
+	DeviceAuth rest.Middleware
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
@@ -28,8 +31,9 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		return nil, err
 	}
 	return &ServiceContext{
-		Config:  c,
-		UserRPC: userclient.NewUser(cli),
+		Config:     c,
+		UserRPC:    userclient.NewUser(cli),
+		DeviceAuth: middleware.NewDeviceAuthMiddleware(middleware.NewRedisSessionStore(c.Redis)).Handle,
 	}, nil
 }
 

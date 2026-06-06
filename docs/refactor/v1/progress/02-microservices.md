@@ -15,7 +15,7 @@
 
 | 域 | rpc 业务逻辑 | rpc 数据层 | 是否仍依赖 internal | 状态 |
 |----|------------|-----------|-------------------|------|
-| auth | service ✅ | internal/auth | 是 | ⚠️ 结构已迁，数据层未脱 internal |
+| auth | service ✅ | internal/auth | 是 | ⚠️ 结构已迁，数据层未脱 internal；活跃会话改 jti+Redis（#435）|
 | user | service ✅ | **internal/repository**（goctl model 已生成于 `user/rpc/internal/model` 但**未接线**，是死代码）| 是 | ⚠️ 同上 |
 | **friends** | **`service/friends/rpc/internal/logic` 自包含** | **`service/friends/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ #426（goctl+BFF，删 `core`）|
 | **groups** | **`service/groups/rpc/internal/logic` 自包含** | **`service/groups/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ #415 |
@@ -87,6 +87,20 @@
 
 > 退役欠下的尾巴，按域记一笔；新域重构完在此追加 `### <域>`。
 > **全局收尾**：顶层 `internal/` 完全退役以 message/gateway/transfer/admin（07-message-rpc-redesign）为最后一公里；user/auth 把 rpc 数据层从 `internal/repository` 切到各自 `rpc/internal/model`（user 的 goctl model 已生成待接线）。friends/groups rpc 已脱 internal（friends #426、groups #415）；media 写入数据层已脱（#433，下载鉴权跨域读 keystone 暂留）。
+
+### auth — 活跃会话 jti + Redis + 共享 DeviceAuth 中间件（#435）
+
+特性改造（非 goctl 数据层退役）：登录态从 Postgres `active_sessions`（按 userID 单 session）切到 **Redis 按 (user, device) 粒度**，多设备各一活跃 session。
+
+- **token**（`common/share/auth/token`）：HS256 payload 切标准 JWT —— `sub`/`jti`(UUID v4)/`iat`/`exp`/`device_type`/`login_ip` + `identifier`。**硬切**，旧 token 全失效。
+- **go-zero 坑（关键）**：go-zero `jwt:Auth` 中间件（`rest/handler/authhandler.go`）会**丢弃注册声明** `sub/jti/iat/exp/...`，不放进 request context。故 token 额外镜像非注册声明 `user_id`(=sub)、`session_id`(=jti)，让 `pkg/ctxuser`（读 `user_id`）与 DeviceAuth 中间件（读 `user_id`/`session_id`/`device_type`）能从 context 取到值。
+- **共享会话存储 + 中间件**：`common/middleware`（包名 `middleware`）—— `active_session_store.go`(go-redis/v9，HASH `user_active_sessions:{userID}` field=device_type→jti，与 presence 同 client/同 `config.RedisConfig`，YAML 仍 `Addr/Password/DB`)、`active_session_store_memory.go`(测试/内存)、`deviceauthmiddleware.go`(store-only 构造，从 context 读声明校验 Redis)。
+- **挂载**：4 个 `jwt:Auth` api（user/agent/groups/friends）`@server` 加 `middleware: DeviceAuth`，svcCtx 注册 `DeviceAuth`。
+- **登录写 Redis**：`internal/auth/logic` 的 `issueToken` 注入 `SessionStore` 替代 Postgres `SetActiveSession`；auth-rpc proto `LoginRequest`/`RegisterRequest` 加 `device`/`login_ip`，api 从请求体取 device、`X-Forwarded-For`/`RemoteAddr` 取 IP。
+- **5 处 inline 校验同步迁 Redis**（必须，否则不写 Postgres 后全锁死）：gateway-ws 握手/心跳、monolith `gozero_routes.go`、`admin.go`、agent `routes.go`、`AuthLogic.ValidateToken`。`AuthRuntime` 持 `SessionStore`。
+- **剩余 / 后续**：
+  - Postgres `active_sessions` 表 + `internal/auth/repository` 的 `SetActiveSession`/`GetActiveSession`/`model.ActiveSession` 现已无生产调用，成死代码，待清理（保留表，未删）。
+  - credentials / email_verification 的 goctl model 全量迁移 + BFF（auth 数据层彻底脱 internal）仍未做，拆独立 PR（keystone-blocked：gateway-ws/message-api/monolith/admin/agent 仍 inline 解析 token）。
 
 ### friends（#426）
 

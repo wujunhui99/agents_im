@@ -9,6 +9,7 @@ import (
 	business "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
@@ -64,6 +65,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Config: c,
 		AuthLogic: business.NewAuthLogicWithOptions(authRepo, useradapter.NewLogicClient(userLogic), business.NewPasswordHasher(), token.NewHMACTokenManager(c.TokenAuth.AccessSecret, time.Duration(c.TokenAuth.AccessExpire)*time.Second), business.AuthOptions{
 			VerificationRepo: authRepo,
+			Sessions:         middleware.NewRedisSessionStore(c.Redis),
 			Mailer:           mailer,
 		}),
 		AuthRepo:  authRepo,

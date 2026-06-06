@@ -94,6 +94,8 @@ load_env() {
   export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-agents_im_dev_password}"
   export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
   export REDIS_PASSWORD="${REDIS_PASSWORD:-agents_im_redis_dev_password}"
+  export REDIS_ADDR="${REDIS_ADDR:-localhost:6379}"
+  export REDIS_DB="${REDIS_DB:-0}"
   export MINIO_ROOT_USER="${MINIO_ROOT_USER:-agents_im_minio}"
   export MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-agents_im_minio_dev_password}"
   export MINIO_API_PORT="${MINIO_API_PORT:-9000}"
@@ -201,6 +203,10 @@ Auth:
   AccessExpire: ${JWT_ACCESS_EXPIRE}
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}
 ${extra}
 YAML
 }
@@ -218,6 +224,10 @@ AdminBootstrap:
   DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME:-管理后台管理员}
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}
 MailRPC:
   Endpoints:
     - 127.0.0.1:${MAIL_RPC_PORT:-9095}

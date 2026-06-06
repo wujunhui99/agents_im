@@ -36,6 +36,8 @@ func (l *RegisterLogic) Register(in *auth.RegisterRequest) (*auth.AuthResponse, 
 		Gender:                in.GetGender(),
 		BirthDate:             in.GetBirthDate(),
 		Region:                in.GetRegion(),
+		Device:                in.GetDevice(),
+		LoginIP:               in.GetLoginIp(),
 	})
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)

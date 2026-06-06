@@ -22,3 +22,8 @@ LLMObservability:
     SecretKey: ${LANGFUSE_SECRET_KEY}
 PythonExecutor:
   Backend: disabled
+
+Redis:
+  Addr: localhost:6379
+  Password: ""
+  DB: 0

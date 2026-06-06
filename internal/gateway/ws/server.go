@@ -16,7 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
@@ -39,7 +39,7 @@ const (
 type Server struct {
 	auth           config.JWTAuthConfig
 	tokenManager   token.Manager
-	activeSessions authrepo.ActiveSessionRepository
+	sessions       middleware.SessionStore
 	messageLogic   *logic.MessageLogic
 	connections    *ConnectionManager
 	dispatcher     delivery.Dispatcher
@@ -63,7 +63,8 @@ type Connection struct {
 	UserAgent   string
 	DeviceID    string
 	Platform    string
-	SessionID   string
+	JTI         string
+	Device      string
 	ConnectedAt time.Time
 	TraceID     string
 	RequestID   string
@@ -159,9 +160,9 @@ func WithTokenManager(manager token.Manager) ServerOption {
 	}
 }
 
-func WithActiveSessionRepository(repo authrepo.ActiveSessionRepository) ServerOption {
+func WithSessionStore(store middleware.SessionStore) ServerOption {
 	return func(s *Server) {
-		s.activeSessions = repo
+		s.sessions = store
 	}
 }
 
@@ -265,7 +266,8 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		UserAgent:   r.UserAgent(),
 		DeviceID:    strings.TrimSpace(r.Header.Get("X-Device-ID")),
 		Platform:    clientPlatform(r),
-		SessionID:   claims.SessionID,
+		JTI:         claims.JTI,
+		Device:      claims.Device,
 		ConnectedAt: now,
 		TraceID:     traceContext.TraceID,
 		RequestID:   traceContext.RequestID,
@@ -417,17 +419,17 @@ func (s *Server) authenticate(r *http.Request) (token.Claims, error) {
 	if strings.TrimSpace(claims.UserID) == "" {
 		return token.Claims{}, apperror.Unauthenticated("authenticated user is required")
 	}
-	if err := s.validateActiveSession(r.Context(), claims); err != nil {
+	if err := s.validateActiveSession(r.Context(), claims.UserID, claims.Device, claims.JTI); err != nil {
 		return token.Claims{}, err
 	}
 	return claims, nil
 }
 
-func (s *Server) validateActiveSession(ctx context.Context, claims token.Claims) error {
-	if s.activeSessions == nil {
+func (s *Server) validateActiveSession(ctx context.Context, userID, device, jti string) error {
+	if s.sessions == nil {
 		return nil
 	}
-	return authrepo.ValidateActiveSession(ctx, s.activeSessions, claims)
+	return s.sessions.Validate(ctx, userID, device, jti)
 }
 
 func (s *Server) readLoop(ctx context.Context, conn *Connection) {
@@ -448,7 +450,7 @@ func (s *Server) readLoop(ctx context.Context, conn *Connection) {
 		if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
 			continue
 		}
-		if err := s.validateActiveSession(ctx, token.Claims{UserID: conn.UserID, SessionID: conn.SessionID}); err != nil {
+		if err := s.validateActiveSession(ctx, conn.UserID, conn.Device, conn.JTI); err != nil {
 			_ = conn.closeWithCode(CloseCodeSessionInvalid, "session invalid")
 			return
 		}

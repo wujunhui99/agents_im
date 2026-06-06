@@ -4,6 +4,7 @@
 package config
 
 import (
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 )
@@ -15,6 +16,7 @@ type Config struct {
 		AccessExpire int64
 	}
 	// tracing 用 go-zero 自带 Telemetry（在 RestConf.ServiceConf 内，由 yaml 配置），不再用 pkg/observability。
+	Redis     appconfig.RedisConfig `json:",optional"`
 	GroupsRPC zrpc.RpcClientConf
 	// UserRPC：BFF 聚合用，补全群成员资料 + 建群/加成员前校验用户存在。
 	UserRPC zrpc.RpcClientConf

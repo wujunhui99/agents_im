@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	messagehandler "github.com/wujunhui99/agents_im/internal/handler/message"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
@@ -18,7 +18,7 @@ import (
 
 type authRouteContext interface {
 	AuthConfig() config.JWTAuthConfig
-	ActiveSessionRepository() authrepo.ActiveSessionRepository
+	SessionStore() middleware.SessionStore
 }
 
 func RegisterMessageGoZeroHandlers(server *rest.Server, serverCtx *messagesvc.ServiceContext) {
@@ -114,7 +114,7 @@ func jwtOption(serverCtx authRouteContext) rest.RouteOption {
 }
 
 func authenticatedRoutes(serverCtx authRouteContext, routes []rest.Route) []rest.Route {
-	if serverCtx == nil || serverCtx.ActiveSessionRepository() == nil {
+	if serverCtx == nil || serverCtx.SessionStore() == nil {
 		return routes
 	}
 	return rest.WithMiddleware(activeSessionMiddleware(serverCtx), routes...)
@@ -122,7 +122,7 @@ func authenticatedRoutes(serverCtx authRouteContext, routes []rest.Route) []rest
 
 func activeSessionMiddleware(serverCtx authRouteContext) rest.Middleware {
 	auth := serverCtx.AuthConfig()
-	activeSessions := serverCtx.ActiveSessionRepository()
+	sessions := serverCtx.SessionStore()
 	tokenManager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +131,7 @@ func activeSessionMiddleware(serverCtx authRouteContext) rest.Middleware {
 				httpx.ErrorCtx(r.Context(), w, err)
 				return
 			}
-			if err := authrepo.ValidateActiveSession(r.Context(), activeSessions, claims); err != nil {
+			if err := sessions.Validate(r.Context(), claims.UserID, claims.Device, claims.JTI); err != nil {
 				httpx.ErrorCtx(r.Context(), w, err)
 				return
 			}

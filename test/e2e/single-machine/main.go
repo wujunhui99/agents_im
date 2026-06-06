@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
@@ -32,8 +33,10 @@ func main() {
 	userRepo := repository.NewMemoryRepository()
 	userLogic := logic.NewUserLogic(userRepo)
 	authRepository := authrepo.NewMemoryRepository()
+	sessionStore := middleware.NewMemorySessionStore()
 	authLogic := authlogic.NewAuthLogicWithOptions(authRepository, useradapter.NewLogicClient(userLogic), nil, tokenManager, authlogic.AuthOptions{
 		VerificationRepo:          authRepository,
+		Sessions:                  sessionStore,
 		Mailer:                    e2eRegistrationMailer{},
 		RegistrationCodeGenerator: func() (string, error) { return "123456", nil },
 		RegistrationSendCooldown:  time.Nanosecond,
@@ -72,7 +75,7 @@ func main() {
 
 	wsServer := gatewayws.NewServer(
 		gatewaysvc.NewServiceContext(messageLogic, testAuth(authSecret)),
-		gatewayws.WithActiveSessionRepository(authRepository),
+		gatewayws.WithSessionStore(sessionStore),
 	)
 	httpServer := httptest.NewServer(wsServer)
 	defer httpServer.Close()

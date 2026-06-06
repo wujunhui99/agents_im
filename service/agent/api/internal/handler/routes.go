@@ -5,17 +5,12 @@ package handler
 
 import (
 	"net/http"
-	"strings"
-	"time"
 
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	agent "github.com/wujunhui99/agents_im/service/agent/api/internal/handler/agent"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
-	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
@@ -68,46 +63,13 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	)
 }
 
-type authRouteContext interface {
-	AuthConfig() config.JWTAuthConfig
-	ActiveSessionRepository() authrepo.ActiveSessionRepository
-}
-
-func authenticatedRoutes(serverCtx authRouteContext, routes []rest.Route) []rest.Route {
-	if serverCtx == nil || serverCtx.ActiveSessionRepository() == nil {
+// authenticatedRoutes wraps routes with the shared DeviceAuth middleware, which
+// rejects tokens whose jti is no longer the active session for their (user, device).
+// The middleware reads sub/jti/device claims injected by rest.WithJwt, so it must
+// run after it. A nil session store (test/memory wiring) disables the check.
+func authenticatedRoutes(serverCtx *svc.ServiceContext, routes []rest.Route) []rest.Route {
+	if serverCtx == nil || serverCtx.SessionStore() == nil {
 		return routes
 	}
-	return rest.WithMiddleware(activeSessionMiddleware(serverCtx), routes...)
-}
-
-func activeSessionMiddleware(serverCtx authRouteContext) rest.Middleware {
-	auth := serverCtx.AuthConfig()
-	activeSessions := serverCtx.ActiveSessionRepository()
-	tokenManager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			claims, err := tokenManager.Validate(bearerToken(r.Header.Get("Authorization")))
-			if err != nil {
-				httpx.ErrorCtx(r.Context(), w, err)
-				return
-			}
-			if err := authrepo.ValidateActiveSession(r.Context(), activeSessions, claims); err != nil {
-				httpx.ErrorCtx(r.Context(), w, err)
-				return
-			}
-			next(w, r)
-		}
-	}
-}
-
-func bearerToken(headerValue string) string {
-	headerValue = strings.TrimSpace(headerValue)
-	if headerValue == "" {
-		return ""
-	}
-	parts := strings.Fields(headerValue)
-	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
-		return strings.TrimSpace(parts[1])
-	}
-	return ""
+	return rest.WithMiddleware(middleware.NewDeviceAuthMiddleware(serverCtx.SessionStore()).Handle, routes...)
 }

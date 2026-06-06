@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/wujunhui99/agents_im/internal/agentim"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/internal/handler"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
@@ -110,15 +110,7 @@ func main() {
 	if err := messagesvc.ConfigureConversationAIHosting(serviceContext, cfg.DeepSeek, cfg.LLMObservability); err != nil {
 		log.Fatalf("configure AI conversation hosting: %v", err)
 	}
-	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
-		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
-		if err != nil {
-			log.Fatalf("build auth repository: %v", err)
-		}
-		serviceContext.AuthSessions = authRepo
-	} else {
-		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", config.ResolveStorageDriver(cfg.StorageDriver))
-	}
+	serviceContext.Sessions = middleware.NewRedisSessionStore(cfg.Redis)
 
 	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(config.ToRestConf(cfg), rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))

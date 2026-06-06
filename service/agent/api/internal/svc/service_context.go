@@ -1,10 +1,8 @@
 package svc
 
 import (
-	"log"
-
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
@@ -66,15 +64,7 @@ func NewServiceContextFromConfig(c apiconfig.Config) (*ServiceContext, error) {
 	serviceContext.Config = c
 	serviceContext.ConfigureAgentAssembly(userRepo, userRepo, agentRegistryRepo)
 
-	if config.ResolveStorageDriver(c.StorageDriver) == config.StorageDriverPostgres {
-		authSessions, err := authrepo.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
-		if err != nil {
-			return nil, err
-		}
-		serviceContext.AuthSessions = authSessions
-	} else {
-		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", config.ResolveStorageDriver(c.StorageDriver))
-	}
+	serviceContext.Sessions = middleware.NewRedisSessionStore(c.Redis)
 
 	return serviceContext, nil
 }

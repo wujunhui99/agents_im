@@ -110,8 +110,9 @@ type ListGroupsResp {
 }
 
 @server (
-	jwt:   Auth
-	group: groups
+	jwt:        Auth
+	middleware: DeviceAuth
+	group:      groups
 )
 service groups-api {
 	@handler createGroup

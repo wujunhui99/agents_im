@@ -4,6 +4,7 @@
 package config
 
 import (
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -16,6 +17,7 @@ type Config struct {
 		AccessExpire int64
 	}
 	Tracing    observability.TracingConfig `json:",optional"`
+	Redis      appconfig.RedisConfig       `json:",optional"`
 	FriendsRPC zrpc.RpcClientConf
 	// UserRPC：BFF 聚合用，补全好友资料（friends rpc 不再跨域读用户表）。
 	UserRPC zrpc.RpcClientConf

@@ -28,6 +28,7 @@ type AuthResp struct {
 type LoginReq struct {
 	Identifier string `json:"identifier"`
 	Password   string `json:"password"`
+	Device     string `json:"device,optional"`
 }
 
 type RegisterReq struct {
@@ -40,6 +41,7 @@ type RegisterReq struct {
 	Gender                string `json:"gender,optional"`
 	BirthDate             string `json:"birth_date,optional"`
 	Region                string `json:"region,optional"`
+	Device                string `json:"device,optional"`
 }
 
 type RegistrationEmailCodeData struct {
