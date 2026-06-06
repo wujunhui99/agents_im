@@ -19,8 +19,7 @@ Do not accept a worker handoff only because the process exited successfully.
 
 - Prefer generated goctl REST/RPC scaffold over hand-written compatibility layers when the task is a go-zero/goctl refactor.
 - Keep service boundaries consistent with `docs/design-docs/user-auth-friends-groups-boundaries.md` and message docs.
-- DB changes must use `db/migrations` as the executable SQL source of truth.
-- `db/change_log` is for human/audit notes, not duplicate executable SQL.
+- DB changes must use `db/migrations` as the single executable SQL source of truth (published migrations are immutable; add the next-numbered file).
 - Repository SQL changes should have PostgreSQL verification when possible; if local PG/Docker is unavailable, state that clearly.
 
 ### Message / WebSocket

@@ -210,7 +210,7 @@ Rules:
 - Limit verification attempts per code.
 - Consume atomically during registration.
 - Keep uniqueness/enumeration behavior generic.
-- Use DB migrations plus `db/change_log/*.sql` for schema changes.
+- Use `db/migrations/*.sql` for schema changes.
 
 ### Rate limiting
 

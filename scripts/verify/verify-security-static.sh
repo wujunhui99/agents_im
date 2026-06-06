@@ -15,11 +15,10 @@ if git grep -n -I -E "(DEEPSEEK_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY)[[:spac
   exit 1
 fi
 
-# db/change_log SQL must not carry secrets, DSNs, tokens, or private keys.
-# (Source of truth for schema is db/migrations/*.sql; change_log is Markdown/audit
-# notes per AGENTS.md — no executable-SQL mandate here.)
-if find db/change_log -maxdepth 1 -type f -name '*.sql' -print0 | xargs -0 -r rg -n "(postgres://|mysql://|password=|passwd=|token=|secret=|AKIA|BEGIN RSA PRIVATE KEY|BEGIN OPENSSH PRIVATE KEY)"; then
-  echo "db/change_log SQL must not contain secrets, DSNs, tokens, or private keys" >&2
+# db/migrations SQL (the single schema source of truth) must not carry secrets,
+# DSNs, tokens, or private keys.
+if find db/migrations -maxdepth 1 -type f -name '*.sql' -print0 | xargs -0 -r rg -n "(postgres://|mysql://|password=|passwd=|token=|secret=|AKIA|BEGIN RSA PRIVATE KEY|BEGIN OPENSSH PRIVATE KEY)"; then
+  echo "db/migrations SQL must not contain secrets, DSNs, tokens, or private keys" >&2
   exit 1
 fi
 

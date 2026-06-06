@@ -78,13 +78,14 @@ goctl model pg datasource -url <本地临时PG> -table "<t1>,<t2>" -dir service/
 - **存在性校验也上移 BFF**：rpc 不再读 accounts，建关系前校验对端用户存在改用 user-rpc（批量）；缺 profile 的列表项按空资料降级，不阻断整列表。
 - **跨域鉴权读暂留 owner rpc（无 peer rpc 可 BFF 时）**：当跨域读是**访问控制**（非展示资料）且对端域还没 rpc 可调，BFF 化无处落——此读可作 keystone-blocked 例外暂留在 owner rpc 直读 `internal/repository`（用接口注入 svcCtx 便于 fake 单测），文档注明“待 peer rpc 落地后 BFF 化”。media #433：下载鉴权（accounts 管理员 + message 附件可见性）即此例外，故 media-rpc **写入脱 internal 但仍部分依赖**，media-api 仍是纯透传 BFF 未加 UserRPC。
 
-### 5. 输入只 validate 不 normalize
-去掉后端规范化（`TrimSpace` 等，由客户端保证）；**保留校验**（required + 长度上限 + 集合大小上限，防脏数据/DoS）。
-函数 `normalize*` → `validate*`。
-
-### 6. （可选）tracing 切 go-zero 原生 Telemetry
+### 5. tracing 切 go-zero 原生 Telemetry
 去 `pkg/observability` tracing 接线，改 go-zero 内置 otel（zrpc/rest 默认拦截器 + `ServiceConf.Telemetry`）；
 endpoint 经 yaml `Telemetry.Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}`。metrics 仍用 `observability.MetricsHandler`。
+（原标「可选」导致历次迁移普遍漏切——这是必做步骤，别跳。）
+
+### 6. 输入只 validate 不 normalize（仅当原代码有 normalize）
+去掉后端规范化（`TrimSpace` 等，由客户端保证）；**保留校验**（required + 长度上限 + 集合大小上限，防脏数据/DoS）。
+函数 `normalize*` → `validate*`。**若该域原本就无 normalize，则无可去除、跳过此步**（别为了对齐硬塞 validate）。
 
 ## goctl rpc protoc 改 proto 的坑（重要）
 
@@ -123,7 +124,8 @@ worktree 占用导致 gh 报 “main already used by worktree” 属正常，mer
 - [ ] 该域 rpc `internal/{config,svc,logic}` 无 `internal/logic`、`internal/repository` import
 - [ ] 数据层在 `service/<domain>/rpc/internal/model`（goctl + custom），`*_gen.go` 未手改
 - [ ] 跨域数据在 api(BFF) 聚合，rpc 之间不互调；列表补全用批量接口无 N+1
-- [ ] 输入 `validate` 不 `normalize`；logic 依 model 接口 + fake 单测
+- [ ] tracing 切 go-zero 原生 Telemetry（去 `pkg/observability` 接线，必做）
+- [ ] 输入 `validate` 不 `normalize`（仅当原有 normalize）；logic 依 model 接口 + fake 单测
 - [ ] monolith 仍消费的部分保留并注明“待 message 迁移后删”
 - [ ] 配套改动清单逐项过：配置 3 份去 `StorageDriver`/加 client、`dev-up.sh`、`verify-static.sh` marker、e2e
 - [ ] build/vet/test 全绿；diff 无无关 gofmt 噪音；Drone CI 绿 + prod 冒烟
