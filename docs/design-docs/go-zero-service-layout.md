@@ -1,6 +1,6 @@
 # go-zero service layout migration guide
 
-本指南是 agents_im 后续 go-zero 服务渐进重构的执行手册。Codex/Hermes 后续迁移其他服务时必须先读本文件，再读 `.ai-context/zero-skills/SKILL.md`、`.ai-context/zero-skills/references/goctl-commands.md`、`.ai-context/zero-skills/references/rest-api-patterns.md`、`.ai-context/zero-skills/references/rpc-patterns.md`、`.ai-context/zero-skills/references/database-patterns.md`。
+本指南是 agents_im 后续 go-zero 服务渐进重构的执行手册。迁移其他服务时先读本文件，再读 `.claude/skills/refactor-domain-to-service/SKILL.md`（goctl 数据层 + BFF 聚合的复刻 playbook）。
 
 ## 目标结构
 

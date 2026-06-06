@@ -60,7 +60,6 @@ docker compose config
 mapfile -t md_files < <(
   find . -name "*.md" \
     -not -path "./.git/*" \
-    -not -path "./.ai-context/*" \
     -not -path "./docs/references/*" \
     -print
 )

@@ -161,7 +161,7 @@ def is_doc_only(path: str) -> bool:
 
 
 def is_meta_dotpath(path: str) -> bool:
-    # Top-level dotfiles / dotdirs (e.g. .claude/, .hermes/, .ai-context/, .gitignore)
+    # Top-level dotfiles / dotdirs (e.g. .claude/, .github/, .gitignore)
     # are tooling/meta and never affect the deployed app, so they must not trigger
     # build or deploy. Genuine CI dotfiles (.drone.yml, .github/workflows/deploy.yml,
     # .dockerignore) are matched by the explicit deploy rules in classify_path before

@@ -26,8 +26,8 @@ If the prompt does not explicitly allow push or PR creation, Codex should not pu
 
 1. Read `AGENTS.md` first.
 2. Read task-specific docs before editing.
-3. For go-zero work, read the `.ai-context/zero-skills/` references and `docs/references/go-zero/` mirrors.
-4. For frontend work, read `.ai-context/frontend-skills/`, `docs/FRONTEND.md`, and `docs/product-specs/frontend-backend-contract.md`.
+3. For go-zero work, read `docs/design-docs/go-zero-service-layout.md` and the `.claude/skills/refactor-domain-to-service/` skill.
+4. For frontend work, read `.claude/skills/frontend-skills/`, `docs/FRONTEND.md`, and `docs/product-specs/frontend-backend-contract.md`.
 5. For deployment/observability work, read `deploy/README.md`, `docs/GIT_WORKFLOW.md`, `docs/RELIABILITY.md`, `.drone.yml`, and relevant scripts under `scripts/ci/`.
 6. Never invent a fake implementation or silent fallback.
 7. Never expose secrets, tokens, DSNs, cookies, server SSH details, or real credentials. Use `[REDACTED]` in notes.

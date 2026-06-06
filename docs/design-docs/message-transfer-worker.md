@@ -153,7 +153,7 @@ gofmt -w $(find . -name "*.go" -print)
 go test ./...
 bash scripts/verify-static.sh
 docker compose config
-npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./.ai-context/*" -not -path "./docs/references/*" -print)
+npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./docs/references/*" -print)
 ```
 
 Current tests live in [`../../internal/transfer/worker_test.go`](../../internal/transfer/worker_test.go) and cover successful consume/dispatch, duplicate idempotency behavior, retryable failure, and context cancellation.

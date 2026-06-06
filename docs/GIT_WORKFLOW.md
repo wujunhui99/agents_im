@@ -178,7 +178,7 @@ CI 是 PR 进入 GitHub Merge Queue 和合并到 `main` 的质量门禁；CD 只
 - `bash scripts/verify-static.sh`，检查仓库关键文件、接口、文档、Drone workflow 约束，并调用 `scripts/ci/verify-migration-immutability.sh` 禁止 PR 修改历史 migration。
 - `scripts/ci/drone-telegram-notify.py` 在 success / failure 都发送 Telegram 通知；开发 PR 和 `main` push 从分支第二段、main merge source branch、subject `[agent]`、`Agent:` trailer、author email 解析负责 Agent，在群里 @ 对应 bot；归因冲突会在通知中展示 warning。`devops` push 是 CI/CD lane，固定 @ Eino。
 - `docker compose config`，验证 Compose 配置可解析。
-- Markdown link check，排除 `docs/references/` 和 `.ai-context/`，并忽略外部 HTTP/HTTPS 链接波动。
+- Markdown link check，排除 `docs/references/`，并忽略外部 HTTP/HTTPS 链接波动。
 
 `postgres-integration` 使用 Drone `postgres:16-alpine` service，设置 `DATABASE_URL` 指向该隔离 service，执行 `bash scripts/migrate-postgres.sh --host-psql` 后运行：
 
@@ -194,7 +194,7 @@ gofmt -l $(git ls-files '*.go')
 go test ./...
 bash scripts/verify-static.sh
 docker compose config
-npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./.ai-context/*" -not -path "./docs/references/*" -print)
+npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./docs/references/*" -print)
 ```
 
 如需本地复现 PostgreSQL integration job，先启动或准备专用本机/测试 PostgreSQL，再运行：

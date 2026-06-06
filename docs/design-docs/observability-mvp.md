@@ -113,4 +113,4 @@ Latest validation on 2026-04-29:
 - `go test ./...`: passed
 - `bash scripts/verify-static.sh`: `static verification passed`
 - `docker compose config`: passed and rendered config successfully
-- markdown link check excluding `.ai-context/` and `docs/references/`: passed
+- markdown link check excluding `docs/references/`: passed
