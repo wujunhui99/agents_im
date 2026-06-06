@@ -3,7 +3,7 @@
 > 目标：识别仓库当前的目录"双轨制"、迁移残留、命名混乱，给出**一套统一的目标布局**和**逐步收敛路径**。
 >
 > 范围：根目录 + `service/` + `internal/` + `api/` + `proto/` + `etc/` + `db/` + `deploy/` + `docs/`。
-> 不动：`web/`、`tests/`、`secret/`、`.ai-context/`（这些边界清晰、问题不大）。
+> 不动：`web/`、`tests/`、`secret/`（这些边界清晰、问题不大）。
 >
 > **入口约定**：无顶层 `cmd/`、无 `entry/` 子包——每个服务的 `package main` 就是 goctl 生成的 `service/<domain>/<api|rpc>/<domain>.go`；启动/构建/服务清单全由根 `Makefile`（`run-<svc>` / `build-<svc>` / `build-backend`，`BACKEND_SERVICES` + `PKG_<svc>` 映射包路径）驱动；非服务 main（如 e2e）放 `test/e2e/<name>/`。
 
@@ -291,5 +291,5 @@ for s in $(make -s services | awk '{print $2}'); do test -n "$(grep -rl '^packag
 
 - `web/`：前端独立，跟后端解耦，不在这次重构范围。
 - `tests/`：可以保留集成测试单独目录，不强制下沉到各 service。
-- `secret/`、`scripts/`、`.ai-context/`、`.hermes/`、`.github/`：基础设施类，不动。
+- `secret/`、`scripts/`、`.github/`：基础设施类，不动。
 - `docs/`：本次只新增 `docs/refactor/`，旧 design-docs 不动；后续 design-docs 应被这次重构的结论替代。

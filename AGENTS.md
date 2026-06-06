@@ -61,11 +61,7 @@
 
 读：
 
-- `.ai-context/zero-skills/SKILL.md`
-- `.ai-context/zero-skills/references/goctl-commands.md`
-- `.ai-context/zero-skills/references/rest-api-patterns.md`
-- `.ai-context/zero-skills/references/rpc-patterns.md`
-- `.ai-context/zero-skills/references/database-patterns.md`
+- [`.claude/skills/refactor-domain-to-service/SKILL.md`](./.claude/skills/refactor-domain-to-service/SKILL.md)（重构/迁移微服务域）
 - [`docs/design-docs/go-zero-service-layout.md`](./docs/design-docs/go-zero-service-layout.md)
 - [`docs/design-docs/user-auth-friends-groups-boundaries.md`](./docs/design-docs/user-auth-friends-groups-boundaries.md)
 - [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)
@@ -76,8 +72,8 @@
 
 读：
 
-- `.ai-context/frontend-skills/SKILL.md`
-- `.ai-context/frontend-skills/references/react-vite-patterns.md`
+- [`.claude/skills/frontend-skills/SKILL.md`](./.claude/skills/frontend-skills/SKILL.md)
+- `.claude/skills/frontend-skills/references/react-vite-patterns.md`
 - [`docs/FRONTEND.md`](./docs/FRONTEND.md)
 - [`docs/product-specs/frontend-backend-contract.md`](./docs/product-specs/frontend-backend-contract.md)
 

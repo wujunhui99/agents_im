@@ -1,6 +1,11 @@
+---
+name: frontend-skills
+description: WeChat 风格 React IM 前端（web/，React+TS+Vite+Vitest）开发知识包。改 Agents IM 前端 UI/交互、加页面或组件、写前端测试、对接 REST/WebSocket 契约前先读。
+---
+
 # Frontend Skill: WeChat-style React IM UI
 
-Use this knowledge pack before Codex works on the Agents IM frontend.
+改动 Agents IM 前端（`web/`）前先读本知识包。
 
 ## Product direction
 

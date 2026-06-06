@@ -109,7 +109,7 @@ gofmt -w $(find . -name "*.go" -print)
 go test ./...
 bash scripts/verify-static.sh
 docker compose config
-npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./.ai-context/*" -not -path "./docs/references/*" -print)
+npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./docs/references/*" -print)
 ```
 
 Targeted tests cover accepted/published attempt transitions, delivered/offline/failed Transfer recordings, retry scheduling, and terminal max-attempt failure behavior.
