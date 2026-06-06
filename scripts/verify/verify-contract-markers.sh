@@ -245,8 +245,9 @@ rg -q "TestMessageEventFromOutboxRejectsMalformedPayload" internal/outboxpublish
 assert_present "-q" pkg/health pkg/observability -- \
   "StatusReady" "ReadinessHandler" "MetricMessageSends" "MetricDeliveryAttempts" "MetricTransferEvents" \
   "MetricWebSocketCurrent" "TraceMiddleware" "HeaderTraceID"
-# groups-api migrated to go-zero native Telemetry; the other api mains still use observability.TraceMiddlewareFunc.
-for api_main in service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/agent/api/agent.go; do
+# user/auth/friends/groups api migrated to go-zero native Telemetry (yaml ServiceConf.Telemetry);
+# agent-api still uses observability.TraceMiddlewareFunc.
+for api_main in service/agent/api/agent.go; do
   rg -q "TraceMiddlewareFunc" "$api_main"
 done
 assert_present "-q" internal/handler/gozero_routes.go service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/gateway-ws/main.go service/message-transfer/main.go -- \

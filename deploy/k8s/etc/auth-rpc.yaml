@@ -19,3 +19,10 @@ SessionRedis:
   Addr: ${REDIS_ADDR}
   Password: ${REDIS_PASSWORD}
   DB: ${REDIS_DB}
+
+# go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。
+Telemetry:
+  Name: auth-rpc
+  Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

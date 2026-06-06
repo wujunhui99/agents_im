@@ -7,7 +7,6 @@ import (
 	"errors"
 
 	"github.com/wujunhui99/agents_im/common/middleware"
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 	"github.com/zeromicro/go-zero/rest"
@@ -26,7 +25,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	if !hasRPCClientConfig(c.UserRPC) {
 		return nil, ErrUserRPCConfigRequired
 	}
-	cli, err := zrpc.NewClient(c.UserRPC, zrpc.WithUnaryClientInterceptor(observability.GRPCUnaryClientInterceptor()))
+	cli, err := zrpc.NewClient(c.UserRPC)
 	if err != nil {
 		return nil, err
 	}

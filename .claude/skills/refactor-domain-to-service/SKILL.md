@@ -81,7 +81,13 @@ goctl model pg datasource -url <本地临时PG> -table "<t1>,<t2>" -dir service/
 ### 5. tracing 切 go-zero 原生 Telemetry
 去 `pkg/observability` tracing 接线，改 go-zero 内置 otel（zrpc/rest 默认拦截器 + `ServiceConf.Telemetry`）；
 endpoint 经 yaml `Telemetry.Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}`。metrics 仍用 `observability.MetricsHandler`。
-（原标「可选」导致历次迁移普遍漏切——这是必做步骤，别跳。）
+（原标「可选」导致历次迁移普遍漏切——这是必做步骤，别跳。#443 已把存量 service 全切干净，参考其干净版。）
+- **删全 4 处接线**：config 删 `Tracing observability.TracingConfig` 字段 + observability import；main 删
+  `InitServiceTracing/ShutdownTracing`、rest `server.Use(observability.TraceMiddlewareFunc)`、rpc `s.AddUnaryInterceptors(observability.GRPCUnaryServerInterceptor())`、
+  桥接行 `c.Telemetry = appconfig.GoZeroTelemetryConfig(...)`；**svc** 的 `zrpc.NewClient(c.X, zrpc.WithUnaryClientInterceptor(observability.GRPCUnaryClientInterceptor()))` 去拦截器。
+  连带删 `context`/`log`/`appconfig`/`observability` 变孤儿的 import（api main 因 MetricsHandler 留 observability）。
+- **yaml 三处都加 `Telemetry` 块**：deploy/k8s/etc 用 `${AGENTS_IM_OTLP_ENDPOINT}`（空则关闭）；本地 etc 与 dev-up 生成块用 `127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}`；删旧 `Tracing:` 块。
+- **改 `scripts/verify/verify-contract-markers.sh`**：它断言各 api main 含 `TraceMiddlewareFunc`，切原生后必须把该 api 从断言列表移除，否则 CI 红。
 
 ### 6. 输入只 validate 不 normalize（仅当原代码有 normalize）
 去掉后端规范化（`TrimSpace` 等，由客户端保证）；**保留校验**（required + 长度上限 + 集合大小上限，防脏数据/DoS）。

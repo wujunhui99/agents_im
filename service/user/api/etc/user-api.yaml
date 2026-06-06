@@ -1,15 +1,6 @@
 Name: user-api
 Host: 0.0.0.0
 Port: 8080
-Tracing:
-  Enabled: false
-  ServiceName: user-api
-  Environment: local
-  Protocol: grpc
-  SamplerRatio: 1.0
-  TraceUIBaseURL: http://localhost:3000
-  Insecure: true
-
 Auth:
   AccessSecret: dev-jwt-secret-change-me
   AccessExpire: 86400

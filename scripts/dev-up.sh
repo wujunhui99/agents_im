@@ -232,6 +232,11 @@ MailRPC:
   Endpoints:
     - 127.0.0.1:${MAIL_RPC_PORT:-9095}
   Timeout: 5000
+Telemetry:
+  Name: auth-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
 YAML
 }
 
@@ -247,6 +252,11 @@ AuthRPC:
   Endpoints:
     - 127.0.0.1:${AUTH_RPC_PORT:-9091}
   Timeout: 5000
+Telemetry:
+  Name: auth-api
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
 YAML
 }
 
@@ -256,6 +266,11 @@ Name: user-rpc
 ListenOn: 127.0.0.1:${USER_RPC_PORT:-9090}
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
+Telemetry:
+  Name: user-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
 YAML
 }
 
@@ -277,6 +292,11 @@ write_friends_rpc_config() {
 Name: friends-rpc
 ListenOn: 127.0.0.1:${FRIENDS_RPC_PORT:-9092}
 DataSource: ${DATABASE_URL}
+Telemetry:
+  Name: friends-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
 YAML
 }
 
@@ -322,7 +342,12 @@ ObjectStorage:
   UseSSL: ${OBJECT_STORAGE_USE_SSL}
   ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
   AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
-  SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}"
+  SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+Telemetry:
+  Name: user-api
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc"
   write_auth_api_config
   write_api_config "friends-api" "${FRIENDS_API_PORT:-8082}" "FriendsRPC:
   Endpoints:
@@ -331,7 +356,12 @@ ObjectStorage:
 UserRPC:
   Endpoints:
     - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000"
+  Timeout: 5000
+Telemetry:
+  Name: friends-api
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc"
   write_api_config "message-api" "${MESSAGE_API_PORT:-8083}"
   write_api_config "gateway-ws" "${GATEWAY_WS_PORT:-8084}" "Presence:
   Driver: ${PRESENCE_DRIVER}

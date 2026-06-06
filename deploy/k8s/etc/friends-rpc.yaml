@@ -3,3 +3,10 @@ ListenOn: 0.0.0.0:9092
 
 # friends-rpc 数据层走 goctl model（Postgres-only），不再有 StorageDriver。
 DataSource: ${DATABASE_URL}
+
+# go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。
+Telemetry:
+  Name: friends-rpc
+  Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

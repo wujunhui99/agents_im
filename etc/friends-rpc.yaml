@@ -2,3 +2,9 @@ Name: friends-rpc
 ListenOn: 0.0.0.0:9092
 
 DataSource: ${DATABASE_URL}
+
+Telemetry:
+  Name: friends-rpc
+  Endpoint: 127.0.0.1:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc
