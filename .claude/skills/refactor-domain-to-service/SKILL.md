@@ -95,14 +95,23 @@ endpoint 经 yaml `Telemetry.Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}`。metrics 仍
 
 ## goctl rpc protoc 改 proto 的坑（重要）
 
-`goctl rpc protoc user.proto --go_out=. --go-grpc_out=. --zrpc_out=. --style go_zero` 的全量 scaffold
-**路径/命名可能与本仓库现状不符**：会把 `.pb.go` 生成进嵌套 `github.com/...` 目录、server 出 `user_server.go`
-（仓库是 `userserver.go`）、client 出 `user_client/`（仓库是 `userclient/`）。安全做法：
-- **只取 `.pb.go` + `_grpc.pb.go`** 覆盖现有 `<svc>/<pkg>/` 下的两个文件（内容正确，仅 `status.Error`↔`Errorf` 等生成器版本漂移）；
-- **server/client 手工补**新方法（dispatch + interface + impl），照现有文件命名；
-- 新 logic stub 修正 import path（goctl 写的是嵌套 path），改成 `userpb "…/service/<svc>/<pkg>"`；
-- 删掉 scaffold 的 `github.com/`、`user_client/`、`user_server.go`、多余 `etc/*.yaml`。
-- 手工补的部分在 §剩余/后续 记 TODO，下次跑 goctl 前先确认 proto 已含该 rpc 再由 goctl 校正。
+**根因 + 解法：用 `paths=source_relative`。** proto 的 `option go_package` 是完整 import path（正确做法），
+但默认 `--go_out=.` 会照该路径在执行目录下建 `./github.com/.../xxx.pb.go` 垃圾嵌套目录（一直靠手删，不可持续）。
+加 `paths=source_relative` 让 protoc 按源码相对位置生成，彻底根治：
+
+```bash
+# 在 proto 所在目录 service/<svc>/rpc/<pkg>/ 执行
+goctl rpc protoc <pkg>.proto \
+  --go_out=paths=source_relative:. \
+  --go-grpc_out=paths=source_relative:. \
+  --zrpc_out=.
+```
+`go_package` 完整路径仍用于 package 声明 + 跨服务 import，引用不受影响；**勿**把它改成相对路径。
+
+仍要 cherry-pick（goctl 全量 scaffold 会盖手写代码）：
+- **只认 `.pb.go` + `_grpc.pb.go`**（内容权威，仅 `status.Error`↔`Errorf` 生成器漂移）；server/client/logic 的新方法
+  **手工补**（dispatch+interface+impl），别让 scaffold 覆盖手写业务。
+- **照该服务自己的命名风格**（仓库不统一：user/groups/friends=`userserver.go`+`userclient/`；media/auth/third=`media_server.go`+`mediaclient/`），别引入第二种致重复符号。手工补的记 §剩余/后续 TODO。
 
 ## 配套改动清单（删 core / 转 Postgres-only / BFF 必改，易漏）
 代码外的配套散落多处，少改一处就本地/CI 不一致：
