@@ -108,8 +108,9 @@ type FriendRequestDecisionResp {
 }
 
 @server (
-	jwt:   Auth
-	group: friends
+	jwt:        Auth
+	middleware: DeviceAuth
+	group:      friends
 )
 service friends-api {
 	@handler addFriend

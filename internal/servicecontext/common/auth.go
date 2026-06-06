@@ -1,13 +1,13 @@
 package common
 
 import (
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/pkg/config"
 )
 
 type AuthRuntime struct {
-	Auth         config.JWTAuthConfig
-	AuthSessions authrepo.ActiveSessionRepository
+	Auth     config.JWTAuthConfig
+	Sessions middleware.SessionStore
 }
 
 func NewAuthRuntime(auth config.JWTAuthConfig) AuthRuntime {
@@ -29,6 +29,8 @@ func (r AuthRuntime) AuthConfig() config.JWTAuthConfig {
 	return r.Auth
 }
 
-func (r AuthRuntime) ActiveSessionRepository() authrepo.ActiveSessionRepository {
-	return r.AuthSessions
+// SessionStore returns the Redis-backed active-session store used to enforce
+// single active session per (user, device). Nil disables shared validation.
+func (r AuthRuntime) SessionStore() middleware.SessionStore {
+	return r.Sessions
 }

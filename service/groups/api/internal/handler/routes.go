@@ -14,48 +14,51 @@ import (
 
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
-		[]rest.Route{
-			{
-				Method:  http.MethodPost,
-				Path:    "/groups",
-				Handler: groups.CreateGroupHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/groups",
-				Handler: groups.ListGroupsHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/groups/:group_id",
-				Handler: groups.GetGroupHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodPatch,
-				Path:    "/groups/:group_id",
-				Handler: groups.UpdateGroupHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodPost,
-				Path:    "/groups/:group_id/members",
-				Handler: groups.AddMemberHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/groups/:group_id/members",
-				Handler: groups.ListMembersHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodDelete,
-				Path:    "/groups/:group_id/members/:user_id",
-				Handler: groups.KickMemberHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodDelete,
-				Path:    "/groups/:group_id/members/me",
-				Handler: groups.LeaveGroupHandler(serverCtx),
-			},
-		},
+		rest.WithMiddlewares(
+			[]rest.Middleware{serverCtx.DeviceAuth},
+			[]rest.Route{
+				{
+					Method:  http.MethodPost,
+					Path:    "/groups",
+					Handler: groups.CreateGroupHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/groups",
+					Handler: groups.ListGroupsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/groups/:group_id",
+					Handler: groups.GetGroupHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPatch,
+					Path:    "/groups/:group_id",
+					Handler: groups.UpdateGroupHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/groups/:group_id/members",
+					Handler: groups.AddMemberHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/groups/:group_id/members",
+					Handler: groups.ListMembersHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodDelete,
+					Path:    "/groups/:group_id/members/:user_id",
+					Handler: groups.KickMemberHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodDelete,
+					Path:    "/groups/:group_id/members/me",
+					Handler: groups.LeaveGroupHandler(serverCtx),
+				},
+			}...,
+		),
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
 	)
 }

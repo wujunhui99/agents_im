@@ -14,3 +14,8 @@ MailRPC:
   Endpoints:
     - 127.0.0.1:9095
   Timeout: 5000
+
+Redis:
+  Addr: localhost:6379
+  Password: ""
+  DB: 0

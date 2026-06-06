@@ -38,6 +38,8 @@ func (l *RegisterLogic) Register(req *types.RegisterReq) (resp *types.AuthResp, 
 		Gender:                req.Gender,
 		BirthDate:             req.BirthDate,
 		Region:                req.Region,
+		Device:                req.Device,
+		LoginIp:               clientIP(l.ctx),
 	})
 	if err != nil {
 		return nil, apiError(err)

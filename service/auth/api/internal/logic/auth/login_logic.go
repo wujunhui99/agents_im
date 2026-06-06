@@ -31,6 +31,8 @@ func (l *LoginLogic) Login(req *types.LoginReq) (resp *types.AuthResp, err error
 	result, err := l.svcCtx.AuthRPC.Login(l.ctx, &authpb.LoginRequest{
 		Identifier: req.Identifier,
 		Password:   req.Password,
+		Device:     req.Device,
+		LoginIp:    clientIP(l.ctx),
 	})
 	if err != nil {
 		return nil, apiError(err)

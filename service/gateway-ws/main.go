@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/agentim"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
@@ -126,15 +126,7 @@ func main() {
 		gatewayws.WithInstanceID(gatewayInstanceID()),
 		gatewayws.WithGatewayWSConfig(cfg.GatewayWS),
 	)
-	if config.ResolveStorageDriver(cfg.StorageDriver) == config.StorageDriverPostgres {
-		authRepo, err := authrepo.NewRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
-		if err != nil {
-			log.Fatalf("build auth repository: %v", err)
-		}
-		gatewayws.WithActiveSessionRepository(authRepo)(wsServer)
-	} else {
-		log.Printf("active session shared validation disabled for storage driver %q; use postgres for single-device enforcement across services", config.ResolveStorageDriver(cfg.StorageDriver))
-	}
+	gatewayws.WithSessionStore(middleware.NewRedisSessionStore(cfg.Redis))(wsServer)
 
 	mux := http.NewServeMux()
 	mux.Handle("/ws", wsServer)

@@ -10,6 +10,9 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
+// UserIDClaim is a custom (non-registered) claim. go-zero's jwt middleware strips
+// the registered claims (sub/jti/iat/exp/...) from the request context, so the
+// user id is mirrored here under a non-registered key to survive into handlers.
 const UserIDClaim = "user_id"
 
 func UserID(ctx context.Context) (string, error) {

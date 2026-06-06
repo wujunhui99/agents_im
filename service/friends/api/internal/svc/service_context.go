@@ -6,10 +6,12 @@ package svc
 import (
 	"errors"
 
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
+	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
@@ -22,6 +24,7 @@ type ServiceContext struct {
 	Config     config.Config
 	FriendsRPC friendsclient.Friends
 	UserRPC    userclient.User
+	DeviceAuth rest.Middleware
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
@@ -43,6 +46,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		Config:     c,
 		FriendsRPC: friendsclient.NewFriends(cli),
 		UserRPC:    userclient.NewUser(userCli),
+		DeviceAuth: middleware.NewDeviceAuthMiddleware(middleware.NewRedisSessionStore(c.Redis)).Handle,
 	}, nil
 }
 

@@ -13,3 +13,8 @@ UserRPC:
   Endpoints:
     - user-rpc:9090
   Timeout: 5000
+
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}

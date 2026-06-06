@@ -7,3 +7,8 @@ Auth:
   AccessExpire: 86400
 StorageDriver: memory
 DataSource: ${DATABASE_URL}
+
+Redis:
+  Addr: localhost:6379
+  Password: ""
+  DB: 0

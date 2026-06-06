@@ -18,3 +18,8 @@ Telemetry:
   Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}
   Sampler: 1.0
   Batcher: otlpgrpc
+
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}

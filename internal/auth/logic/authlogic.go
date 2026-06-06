@@ -14,6 +14,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	"github.com/wujunhui99/agents_im/internal/auth/model"
 	"github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -26,6 +27,7 @@ type AuthLogic struct {
 	hasher                  PasswordHasher
 	codeHasher              PasswordHasher
 	tokens                  token.Manager
+	sessions                middleware.SessionStore
 	mailer                  mailadapter.Client
 	registrationCodeGen     func() (string, error)
 	clock                   func() time.Time
@@ -40,6 +42,7 @@ func NewAuthLogic(repo repository.CredentialRepository, users useradapter.UserCl
 
 type AuthOptions struct {
 	VerificationRepo          repository.EmailVerificationRepository
+	Sessions                  middleware.SessionStore
 	Mailer                    mailadapter.Client
 	CodeHasher                PasswordHasher
 	RegistrationCodeGenerator func() (string, error)
@@ -77,6 +80,10 @@ func NewAuthLogicWithOptions(repo repository.CredentialRepository, users userada
 	if maxAttempts <= 0 {
 		maxAttempts = 5
 	}
+	sessions := opts.Sessions
+	if sessions == nil {
+		sessions = middleware.NewMemorySessionStore()
+	}
 	return &AuthLogic{
 		repo:                    repo,
 		verificationRepo:        opts.VerificationRepo,
@@ -84,6 +91,7 @@ func NewAuthLogicWithOptions(repo repository.CredentialRepository, users userada
 		hasher:                  hasher,
 		codeHasher:              codeHasher,
 		tokens:                  tokens,
+		sessions:                sessions,
 		mailer:                  opts.Mailer,
 		registrationCodeGen:     codeGen,
 		clock:                   clock,
@@ -103,6 +111,8 @@ type RegisterRequest struct {
 	Gender                string `json:"gender"`
 	BirthDate             string `json:"birth_date"`
 	Region                string `json:"region"`
+	Device                string `json:"device"`
+	LoginIP               string `json:"login_ip"`
 }
 
 type RegistrationEmailCodeRequest struct {
@@ -117,6 +127,8 @@ type RegistrationEmailCodeResponse struct {
 type LoginRequest struct {
 	Identifier string `json:"identifier"`
 	Password   string `json:"password"`
+	Device     string `json:"device"`
+	LoginIP    string `json:"login_ip"`
 }
 
 type ValidateTokenRequest struct {
@@ -205,7 +217,7 @@ func (l *AuthLogic) Register(ctx context.Context, req RegisterRequest) (AuthResp
 		return AuthResponse{}, err
 	}
 
-	return l.issueToken(ctx, profile)
+	return l.issueToken(ctx, profile, req.Device, req.LoginIP)
 }
 
 func (l *AuthLogic) RequestRegistrationEmailCode(ctx context.Context, req RegistrationEmailCodeRequest) (RegistrationEmailCodeResponse, error) {
@@ -304,7 +316,7 @@ func (l *AuthLogic) Login(ctx context.Context, req LoginRequest) (AuthResponse, 
 		return AuthResponse{}, err
 	}
 
-	return l.issueToken(ctx, profile)
+	return l.issueToken(ctx, profile, req.Device, req.LoginIP)
 }
 
 func (l *AuthLogic) ValidateToken(ctx context.Context, req ValidateTokenRequest) (ValidateTokenResponse, error) {
@@ -312,7 +324,7 @@ func (l *AuthLogic) ValidateToken(ctx context.Context, req ValidateTokenRequest)
 	if err != nil {
 		return ValidateTokenResponse{}, err
 	}
-	if err := repository.ValidateActiveSession(ctx, l.repo, claims); err != nil {
+	if err := l.sessions.Validate(ctx, claims.UserID, claims.Device, claims.JTI); err != nil {
 		return ValidateTokenResponse{}, err
 	}
 
@@ -380,17 +392,13 @@ func (l *AuthLogic) consumeRegistrationEmailCode(ctx context.Context, email stri
 	return consumed.ConsumedAt, nil
 }
 
-func (l *AuthLogic) issueToken(ctx context.Context, profile useradapter.UserProfile) (AuthResponse, error) {
-	rawToken, claims, err := l.tokens.Issue(profile.UserID, profile.Identifier)
+func (l *AuthLogic) issueToken(ctx context.Context, profile useradapter.UserProfile, device string, loginIP string) (AuthResponse, error) {
+	rawToken, claims, err := l.tokens.Issue(profile.UserID, profile.Identifier, device, loginIP)
 	if err != nil {
 		return AuthResponse{}, err
 	}
-	if err := l.repo.SetActiveSession(ctx, model.ActiveSession{
-		UserID:    claims.UserID,
-		SessionID: claims.SessionID,
-		IssuedAt:  claims.IssuedAt,
-		ExpiresAt: claims.ExpiresAt,
-	}); err != nil {
+	ttl := claims.ExpiresAt.Sub(claims.IssuedAt)
+	if err := l.sessions.SetActive(ctx, claims.UserID, claims.Device, claims.JTI, ttl); err != nil {
 		return AuthResponse{}, err
 	}
 

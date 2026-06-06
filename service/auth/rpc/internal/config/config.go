@@ -12,6 +12,7 @@ type Config struct {
 	AdminBootstrap commonconfig.AdminBootstrapConfig `json:",optional"`
 	StorageDriver  string                            `json:",default=memory,options=memory|postgres|postgresql"`
 	DataSource     string                            `json:",optional"`
+	Redis          commonconfig.RedisConfig          `json:",optional"`
 	Tracing        observability.TracingConfig       `json:",optional"`
 	MailRPC        zrpc.RpcClientConf                `json:",optional"`
 }

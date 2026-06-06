@@ -14,8 +14,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
@@ -116,34 +115,23 @@ func TestWebSocketQueryTokenAuthCanBeEnabled(t *testing.T) {
 func TestWebSocketHandshakeRejectsInactiveSessionToken(t *testing.T) {
 	auth := testAuthConfig()
 	manager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
-	sessionRepo := authrepo.NewMemoryRepository()
+	sessionStore := middleware.NewMemorySessionStore()
 	userID := "usr_ws_active_session"
-	if _, err := sessionRepo.Create(context.Background(), authmodel.Credential{
-		Identifier:   userID,
-		UserID:       userID,
-		PasswordHash: "hash",
-		HashVersion:  authmodel.PasswordHashVersionBcrypt,
-	}); err != nil {
-		t.Fatalf("create auth credential: %v", err)
-	}
-	inactiveToken, _, err := manager.Issue(userID, userID)
+	const device = "web"
+	inactiveToken, _, err := manager.Issue(userID, userID, device, "")
 	if err != nil {
 		t.Fatalf("issue inactive token: %v", err)
 	}
-	activeToken, activeClaims, err := manager.Issue(userID, userID)
+	activeToken, activeClaims, err := manager.Issue(userID, userID, device, "")
 	if err != nil {
 		t.Fatalf("issue active token: %v", err)
 	}
-	if err := sessionRepo.SetActiveSession(context.Background(), authmodel.ActiveSession{
-		UserID:    activeClaims.UserID,
-		SessionID: activeClaims.SessionID,
-		IssuedAt:  activeClaims.IssuedAt,
-		ExpiresAt: activeClaims.ExpiresAt,
-	}); err != nil {
+	// Only the active token's jti is registered, so the inactive one must be rejected.
+	if err := sessionStore.SetActive(context.Background(), activeClaims.UserID, activeClaims.Device, activeClaims.JTI, time.Hour); err != nil {
 		t.Fatalf("store active session: %v", err)
 	}
 
-	_, server, cleanup := newWSTestServer(t, WithTokenManager(manager), WithActiveSessionRepository(sessionRepo))
+	_, server, cleanup := newWSTestServer(t, WithTokenManager(manager), WithSessionStore(sessionStore))
 	defer cleanup()
 
 	inactiveConn, inactiveResp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), bearerHeader(inactiveToken))
@@ -516,7 +504,7 @@ func rawTokenForUser(t *testing.T, userID string) string {
 
 	auth := testAuthConfig()
 	manager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
-	rawToken, _, err := manager.Issue(userID, userID)
+	rawToken, _, err := manager.Issue(userID, userID, "", "")
 	if err != nil {
 		t.Fatalf("issue jwt for websocket test: %v", err)
 	}

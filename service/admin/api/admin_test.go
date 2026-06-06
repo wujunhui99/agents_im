@@ -160,7 +160,7 @@ func adminRouteBearerTokenForUser(t *testing.T, auth config.JWTAuthConfig, userI
 	t.Helper()
 
 	manager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
-	rawToken, _, err := manager.Issue(userID, userID)
+	rawToken, _, err := manager.Issue(userID, userID, "", "")
 	if err != nil {
 		t.Fatalf("issue admin route test jwt: %v", err)
 	}

@@ -7,3 +7,8 @@ Auth:
   AccessExpire: 86400
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
+
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}

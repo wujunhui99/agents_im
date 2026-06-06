@@ -14,43 +14,46 @@ import (
 
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
-		[]rest.Route{
-			{
-				Method:  http.MethodPost,
-				Path:    "/friends",
-				Handler: friends.AddFriendHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/friends",
-				Handler: friends.ListFriendsHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodDelete,
-				Path:    "/friends/:user_id",
-				Handler: friends.DeleteFriendHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/friends/:user_id",
-				Handler: friends.GetFriendshipHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/friends/requests",
-				Handler: friends.ListFriendRequestsHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodPost,
-				Path:    "/friends/requests/:user_id/accept",
-				Handler: friends.AcceptFriendRequestHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodPost,
-				Path:    "/friends/requests/:user_id/reject",
-				Handler: friends.RejectFriendRequestHandler(serverCtx),
-			},
-		},
+		rest.WithMiddlewares(
+			[]rest.Middleware{serverCtx.DeviceAuth},
+			[]rest.Route{
+				{
+					Method:  http.MethodPost,
+					Path:    "/friends",
+					Handler: friends.AddFriendHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/friends",
+					Handler: friends.ListFriendsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodDelete,
+					Path:    "/friends/:user_id",
+					Handler: friends.DeleteFriendHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/friends/:user_id",
+					Handler: friends.GetFriendshipHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/friends/requests",
+					Handler: friends.ListFriendRequestsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/friends/requests/:user_id/accept",
+					Handler: friends.AcceptFriendRequestHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/friends/requests/:user_id/reject",
+					Handler: friends.RejectFriendRequestHandler(serverCtx),
+				},
+			}...,
+		),
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
 	)
 }
