@@ -64,8 +64,12 @@
    `pkg/observability` tracing 接线（`InitServiceTracing`/Trace 拦截器/中间件）；改由 go-zero 内置 otel（zrpc/rest 默认拦截器
    + `ServiceConf.Telemetry` 启动 trace agent）。生产 endpoint 经 yaml `Telemetry.Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}`
    读 ConfigMap 注入的 env（`deploy/k8s/etc/`）；本地经 docker-compose 的 tempo + dev-up 生成的 `Telemetry` 块上报
-   （见 [`DEVELOPMENT.md`](../../../DEVELOPMENT.md) 与 `deploy/local/tempo.yaml`）。**注意：metrics 仍用 `observability.MetricsHandler`，未动**；
-   其余 13 个服务仍走 observability tracing，groups 是首个切原生（如需统一是独立迁移）。
+   （见 [`DEVELOPMENT.md`](../../../DEVELOPMENT.md) 与 `deploy/local/tempo.yaml`）。**注意：metrics 仍用 `observability.MetricsHandler`，未动**。
+   **统一切换已完成（#443）**：groups 后，凡持有 `Tracing observability.TracingConfig` 字段的 service 均已切原生 Telemetry——
+   auth(api+rpc)、user(api+rpc)、admin(api)、third(rpc)、friends(api+rpc)、media(api+rpc)（删字段 + 删旧 tracer/拦截器/中间件 +
+   svc client 去 `GRPCUnaryClientInterceptor` + yaml 加 `Telemetry` 块 + dev-up/deploy-k8s/verify-contract-markers 同步）。
+   **仍未切**：agent-api 及 message monolith 系（message-api/gateway-ws/message-transfer）走 **共享 `pkg/config.APIConfig.Tracing`**
+   经 `ToRestConf`→`GoZeroTelemetryConfig` 桥接 + 旧 `InitServiceTracing` 重复埋点——它们无独立 config 字段，统一需动共享结构，留后续。
    交付遇到的 CD 坑（#418/#420，详见 [`deploy/README.md` §Database migrations during deploy](../../../../deploy/README.md)）：Drone 迁移门控须 grep 文件、
    迁移须连 k3s postgres ClusterIP（`--network host`），均已修。
 

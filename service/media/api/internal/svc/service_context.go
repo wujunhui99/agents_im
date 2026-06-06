@@ -3,7 +3,6 @@ package svc
 import (
 	"errors"
 
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -20,7 +19,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	if !hasRPCClientConfig(c.MediaRPC) {
 		return nil, ErrMediaRPCConfigRequired
 	}
-	cli, err := zrpc.NewClient(c.MediaRPC, zrpc.WithUnaryClientInterceptor(observability.GRPCUnaryClientInterceptor()))
+	cli, err := zrpc.NewClient(c.MediaRPC)
 	if err != nil {
 		return nil, err
 	}

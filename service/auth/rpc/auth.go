@@ -1,13 +1,10 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
-	"log"
 
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/server"
@@ -32,16 +29,6 @@ func run(configFile string) {
 	if c.TokenAuth.AccessSecret == "" {
 		c.TokenAuth.AccessSecret = appconfig.DefaultJWTAuthConfig().AccessSecret
 	}
-	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
-	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
-	if err != nil {
-		log.Fatalf("init tracing: %v", err)
-	}
-	defer func() {
-		if err := observability.ShutdownTracing(shutdownTracing); err != nil {
-			log.Printf("shutdown tracing: %v", err)
-		}
-	}()
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
@@ -52,7 +39,6 @@ func run(configFile string) {
 		}
 	})
 	defer s.Stop()
-	s.AddUnaryInterceptors(observability.GRPCUnaryServerInterceptor())
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
 	s.Start()

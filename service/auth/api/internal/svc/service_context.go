@@ -6,7 +6,6 @@ package svc
 import (
 	"errors"
 
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/auth/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/authservice"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -23,7 +22,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	if !hasRPCClientConfig(c.AuthRPC) {
 		return nil, ErrAuthRPCConfigRequired
 	}
-	cli, err := zrpc.NewClient(c.AuthRPC, zrpc.WithUnaryClientInterceptor(observability.GRPCUnaryClientInterceptor()))
+	cli, err := zrpc.NewClient(c.AuthRPC)
 	if err != nil {
 		return nil, err
 	}

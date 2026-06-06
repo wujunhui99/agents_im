@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"log"
 	"net/http"
@@ -31,17 +30,6 @@ func run(configFile string) {
 	if c.Auth.AccessSecret == "" {
 		c.Auth.AccessSecret = appconfig.DefaultJWTAuthConfig().AccessSecret
 	}
-	c.Telemetry = appconfig.GoZeroTelemetryConfig(c.Tracing, c.Name)
-
-	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
-	if err != nil {
-		log.Fatalf("init tracing: %v", err)
-	}
-	defer func() {
-		if err := observability.ShutdownTracing(shutdownTracing); err != nil {
-			log.Printf("shutdown tracing: %v", err)
-		}
-	}()
 
 	serviceContext, err := svc.NewServiceContext(c)
 	if err != nil {
@@ -51,7 +39,6 @@ func run(configFile string) {
 	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 	server := rest.MustNewServer(c.RestConf, rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()
-	server.Use(observability.TraceMiddlewareFunc)
 	registerObservabilityHandlers(server, serviceContext)
 	handler.RegisterHandlers(server, serviceContext)
 

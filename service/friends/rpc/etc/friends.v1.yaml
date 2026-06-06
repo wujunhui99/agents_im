@@ -1,12 +1,3 @@
 Name: friends-rpc
 ListenOn: 0.0.0.0:9092
-Tracing:
-  Enabled: false
-  ServiceName: friends-rpc
-  Environment: local
-  Protocol: grpc
-  SamplerRatio: 1.0
-  TraceUIBaseURL: http://localhost:3000
-  Insecure: true
-
 DataSource: ${DATABASE_URL}

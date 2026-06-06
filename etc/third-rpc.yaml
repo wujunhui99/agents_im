@@ -8,3 +8,9 @@ TencentSES:
   Endpoint: https://ses.tencentcloudapi.com
   FromEmailAddress: ${TENCENT_SES_FROM_EMAIL}
   DefaultTemplateID: ${TENCENT_SES_DEFAULT_TEMPLATE_ID}
+
+Telemetry:
+  Name: third-rpc
+  Endpoint: 127.0.0.1:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc

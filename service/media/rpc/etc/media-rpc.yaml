@@ -2,3 +2,9 @@ Name: media-rpc
 ListenOn: 0.0.0.0:9096
 
 DataSource: ${DATABASE_URL}
+
+Telemetry:
+  Name: media-rpc
+  Endpoint: 127.0.0.1:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc

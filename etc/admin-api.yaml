@@ -12,3 +12,9 @@ Redis:
   Addr: localhost:6379
   Password: ""
   DB: 0
+
+Telemetry:
+  Name: admin-api
+  Endpoint: 127.0.0.1:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc

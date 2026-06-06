@@ -5,7 +5,6 @@ package config
 
 import (
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 )
@@ -16,7 +15,7 @@ type Config struct {
 		AccessSecret string
 		AccessExpire int64
 	}
-	Tracing observability.TracingConfig `json:",optional"`
-	Redis   appconfig.RedisConfig       `json:",optional"`
+	// tracing 用 go-zero 自带 Telemetry（ServiceConf 内，由 yaml 配置），不再用 pkg/observability。
+	Redis   appconfig.RedisConfig `json:",optional"`
 	UserRPC zrpc.RpcClientConf
 }
