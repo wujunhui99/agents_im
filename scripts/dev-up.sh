@@ -224,7 +224,7 @@ AdminBootstrap:
   DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME:-管理后台管理员}
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
-Redis:
+SessionRedis:
   Addr: ${REDIS_ADDR}
   Password: ${REDIS_PASSWORD}
   DB: ${REDIS_DB}

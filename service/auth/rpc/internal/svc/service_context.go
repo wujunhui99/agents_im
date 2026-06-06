@@ -65,7 +65,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Config: c,
 		AuthLogic: business.NewAuthLogicWithOptions(authRepo, useradapter.NewLogicClient(userLogic), business.NewPasswordHasher(), token.NewHMACTokenManager(c.TokenAuth.AccessSecret, time.Duration(c.TokenAuth.AccessExpire)*time.Second), business.AuthOptions{
 			VerificationRepo: authRepo,
-			Sessions:         middleware.NewRedisSessionStore(c.Redis),
+			Sessions:         middleware.NewRedisSessionStore(c.SessionRedis),
 			Mailer:           mailer,
 		}),
 		AuthRepo:  authRepo,
