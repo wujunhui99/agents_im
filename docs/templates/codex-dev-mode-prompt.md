@@ -25,7 +25,7 @@ Development rules:
 - Do not use mock/fallback fake success for real product paths.
 - Add focused regression tests before or with the fix.
 - Run the issue's Test Plan and repository verification commands relevant to changed files before commit. Minimum: `gofmt`, `git diff --check`, `go test ./...`, `bash scripts/verify-static.sh`; add frontend tests/build for `web/`; add `AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh` for DB/repository SQL changes when a test DSN is available.
-- DB schema/data changes require executable `db/change_log/*.sql`; paired `.md` is review context, SQL is the source of truth.
+- DB schema/data changes require the next-numbered executable `db/migrations/*.sql`; it is the single source of truth (published migrations are immutable).
 - Open a PR linked with `Closes #<ISSUE_NUMBER>`.
 - Comment execution results on the issue using the template in docs/AGENTIC_DEVELOPMENT_WORKFLOW.md.
 - Update Project fields: Status = Dev Done, Branch, PR, Codex Run ID as applicable.

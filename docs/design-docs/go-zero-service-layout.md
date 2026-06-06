@@ -199,7 +199,7 @@ goctl model pg datasource \
 注意：
 
 - `DATABASE_URL` 不能提交、不能打印到日志、不能写进文档。输出里统一写 `[REDACTED]`。
-- 数据库 schema 事实源是 `db/migrations/*.sql`；不要在 `db/change_log/` 新增可执行 SQL。
+- 数据库 schema 事实源是 `db/migrations/*.sql`；新增改动加下一号 migration。
 - 如果本地没有可用 PostgreSQL，但任务只是在做结构迁移，可以临时用从 migration 提取的 DDL 生成 scaffold；最终 PR 前必须说明这是 DDL fallback，并尽量用真实 PostgreSQL datasource 重新生成或验证。
 - 生成的 model 包默认只属于对应 RPC，API 不得 import `service/<domain>/rpc/internal/model`。
 

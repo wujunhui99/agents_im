@@ -33,7 +33,7 @@
 - Controller 必须复核 Codex 的 diff、测试和分支状态，不能只信自述。Codex 完成后，Hermes 第一轮验收先看 `git diff`/业务逻辑是否偏离需求，再跑/核验测试；review 通过后将 PR 加入 GitHub Merge Queue。
 - Hermes 在 Issue 评论验证结果后再关闭；Issue 关闭必须等 PR 经 Merge Queue 合并到 `main`，并完成必要的部署/runtime 验证。
 - Codex commit 前验证门禁：按改动范围运行 gofmt、git diff --check、go test ./...、scripts/verify-static.sh；web 改动加前端测试/build；DB/repository SQL 改动加 PostgreSQL integration。
-- 数据库 schema/data 变更必须新增 `db/migrations/*.sql` 作为唯一可执行 SQL 事实源；`db/change_log/` 只放 Markdown 人类/audit 说明，不再新增重复可执行 SQL。
+- 数据库 schema/data 变更必须新增 `db/migrations/*.sql`，它是唯一可执行 SQL 事实源；已发布 migration 不可变，改动需新增下一号。
 
 ## 快速导航
 

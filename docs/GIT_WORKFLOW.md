@@ -131,17 +131,16 @@ AGENTS_IM_CONFIRM_TRUNCATE=1 scripts/verify-postgres-local.sh
 
 脚本读取 `DATABASE_URL` 或 `AGENTS_IM_POSTGRES_DSN`，只允许专用本机/测试 PostgreSQL；integration test 可能 truncate 测试表。无法运行某项验证时，必须报告 blocker，不能假装通过。
 
-## 数据库 change_log 门禁
+## 数据库 migration 门禁
 
-只有数据库 schema/data migration 行为变化时才需要新增 change log；纯应用代码、前端、普通文档不需要。
+`db/migrations/*.sql` 是数据库 schema/data 的唯一可执行事实源。
 
 要求：
 
 - 修改已有 `db/migrations/*.sql`：禁止；已发布 migration 不可变，必须新增下一号 migration。`scripts/ci/verify-migration-immutability.sh` 会阻止 PR 修改、删除、重命名或 type-change 历史 migration。
 - 新增 `db/migrations/*.sql`：允许；仍必须通过 PostgreSQL integration，从空库执行全量 migration，并在 deploy 时只应用生产库尚未记录的新 migration。
 - 修改 `db/schema/`、repository SQL 或 PG integration test：需要配套新增 migration 或明确说明不涉及生产 schema。
-- SQL 不得包含 secret、DSN、密码、token、server 连接信息。
-- `scripts/verify-static.sh` 会在检测到 `db/migrations/`、`db/schema/`、`internal/repository/postgres_*.go` 或 PG integration test 改动时，要求存在非模板 `db/change_log/*.sql`；同时禁止修改/删除/重命名已有 `db/migrations/*.sql`。
+- SQL 不得包含 secret、DSN、密码、token、server 连接信息（`scripts/verify/verify-security-static.sh` 扫描 `db/migrations/*.sql`）。
 
 ## CI Checks
 
