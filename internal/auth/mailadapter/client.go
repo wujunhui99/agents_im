@@ -4,7 +4,7 @@ import (
 	"context"
 
 	mailpb "github.com/wujunhui99/agents_im/service/third/rpc/mail"
-	"github.com/wujunhui99/agents_im/service/third/rpc/mailservice"
+	"github.com/wujunhui99/agents_im/service/third/rpc/mailclient"
 )
 
 type SendTemplateEmailRequest struct {
@@ -22,10 +22,10 @@ type Client interface {
 }
 
 type RPCClient struct {
-	client mailservice.MailService
+	client mailclient.Mail
 }
 
-func NewRPCClient(client mailservice.MailService) *RPCClient {
+func NewRPCClient(client mailclient.Mail) *RPCClient {
 	return &RPCClient{client: client}
 }
 

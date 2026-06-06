@@ -80,7 +80,7 @@ MailRPC:
 }
 
 type recordingMailRPCServer struct {
-	mailpb.UnimplementedMailServiceServer
+	mailpb.UnimplementedMailServer
 
 	mu       sync.Mutex
 	captured []*mailpb.SendTemplateEmailRequest
@@ -113,7 +113,7 @@ func startRecordingMailRPCServer(t *testing.T) (string, *recordingMailRPCServer)
 	}
 	server := grpc.NewServer()
 	recorder := &recordingMailRPCServer{}
-	mailpb.RegisterMailServiceServer(server, recorder)
+	mailpb.RegisterMailServer(server, recorder)
 	go func() {
 		_ = server.Serve(listener)
 	}()

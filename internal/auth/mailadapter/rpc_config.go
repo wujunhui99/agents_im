@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	"github.com/wujunhui99/agents_im/service/third/rpc/mailservice"
+	"github.com/wujunhui99/agents_im/service/third/rpc/mailclient"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
@@ -18,7 +18,7 @@ func NewOptionalRPCClient(conf zrpc.RpcClientConf) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewRPCClient(mailservice.NewMailService(cli)), nil
+	return NewRPCClient(mailclient.NewMail(cli)), nil
 }
 
 func NewRequiredRPCClient(conf zrpc.RpcClientConf) (Client, error) {

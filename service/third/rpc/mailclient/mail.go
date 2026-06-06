@@ -2,12 +2,12 @@
 // goctl 1.10.1
 // Source: mail.proto
 
-package mailservice
+package mailclient
 
 import (
 	"context"
 
-	mail "github.com/wujunhui99/agents_im/service/third/rpc/mail"
+	"github.com/wujunhui99/agents_im/service/third/rpc/mail"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
@@ -17,22 +17,22 @@ type (
 	SendTemplateEmailRequest  = mail.SendTemplateEmailRequest
 	SendTemplateEmailResponse = mail.SendTemplateEmailResponse
 
-	MailService interface {
+	Mail interface {
 		SendTemplateEmail(ctx context.Context, in *SendTemplateEmailRequest, opts ...grpc.CallOption) (*SendTemplateEmailResponse, error)
 	}
 
-	defaultMailService struct {
+	defaultMail struct {
 		cli zrpc.Client
 	}
 )
 
-func NewMailService(cli zrpc.Client) MailService {
-	return &defaultMailService{
+func NewMail(cli zrpc.Client) Mail {
+	return &defaultMail{
 		cli: cli,
 	}
 }
 
-func (m *defaultMailService) SendTemplateEmail(ctx context.Context, in *SendTemplateEmailRequest, opts ...grpc.CallOption) (*SendTemplateEmailResponse, error) {
-	client := mail.NewMailServiceClient(m.cli.Conn())
+func (m *defaultMail) SendTemplateEmail(ctx context.Context, in *SendTemplateEmailRequest, opts ...grpc.CallOption) (*SendTemplateEmailResponse, error) {
+	client := mail.NewMailClient(m.cli.Conn())
 	return client.SendTemplateEmail(ctx, in, opts...)
 }

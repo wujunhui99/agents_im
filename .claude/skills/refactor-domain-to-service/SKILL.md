@@ -95,23 +95,24 @@ endpoint 经 yaml `Telemetry.Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}`。metrics 仍
 
 ## goctl rpc protoc 改 proto 的坑（重要）
 
-**根因 + 解法：用 `paths=source_relative`。** proto 的 `option go_package` 是完整 import path（正确做法），
-但默认 `--go_out=.` 会照该路径在执行目录下建 `./github.com/.../xxx.pb.go` 垃圾嵌套目录（一直靠手删，不可持续）。
-加 `paths=source_relative` 让 protoc 按源码相对位置生成，彻底根治：
+**从仓库根目录跑、`-I .`,让 descriptor 名=仓库相对路径。** descriptor `name`(烤进 `.pb.go` rawDesc)必须全局唯一,
+短名如 `auth.proto` 会撞 `proto: file "auth.proto" is already registered` panic。仓库约定是全路径名(看 groups/friends pb 头 `// source: service/.../x.proto`):
 
 ```bash
-# 在 proto 所在目录 service/<svc>/rpc/<pkg>/ 执行
-goctl rpc protoc <pkg>.proto \
-  --go_out=paths=source_relative:. \
-  --go-grpc_out=paths=source_relative:. \
-  --zrpc_out=.
+# 仓库根目录执行;-I . 决定 descriptor 名为 service/<svc>/rpc/<pkg>.proto
+goctl rpc protoc service/<svc>/rpc/<pkg>.proto -I . --go_out=. --go-grpc_out=. --zrpc_out=<tmp>
 ```
-`go_package` 完整路径仍用于 package 声明 + 跨服务 import，引用不受影响；**勿**把它改成相对路径。
+工具链钉死仓库版本(goctl 1.10.1 装不上时从 `/tmp` 外 `go install ...go-zero/tools/goctl@v1.10.1`;protoc-gen-go 1.36.11/go-grpc 1.6.1)。
 
-仍要 cherry-pick（goctl 全量 scaffold 会盖手写代码）：
-- **只认 `.pb.go` + `_grpc.pb.go`**（内容权威，仅 `status.Error`↔`Errorf` 生成器漂移）；server/client/logic 的新方法
-  **手工补**（dispatch+interface+impl），别让 scaffold 覆盖手写业务。
-- **照该服务自己的命名风格**（仓库不统一：user/groups/friends=`userserver.go`+`userclient/`；media/auth/third=`media_server.go`+`mediaclient/`），别引入第二种致重复符号。手工补的记 §剩余/后续 TODO。
+它仍在根下生成 `./github.com/...` 垃圾树——但**那份 pb 的 descriptor 名是对的(全路径)**:
+- 从 `./github.com/.../<pkg>/` 取 `.pb.go`+`_grpc.pb.go` 覆盖 `service/<svc>/rpc/<pkg>/` 两文件,再 `rm -rf ./github.com`。
+- 新 client/server stub 的 import 常被写成**双 `github.com` 前缀**(`agents_im/github.com/wujunhui99/agents_im/.../<pkg>`),改回单段。
+- `go_package` 完整路径不变;**勿**改成相对路径。
+
+cherry-pick(goctl scaffold 会盖手写代码):
+- **只取 pb/grpc + 新 client 包/server dispatcher**;logic/svc/config **不取**(goctl 跳过既有文件;改 service 名不动 message 类型,logic 引用的 `<pkg>.XxxRequest` 不变,业务零改动)。
+- **照该服务自己命名风格**(仓库不统一:user/groups/friends=`*server.go`+`*client/`)。
+- **改 proto `service` 名**=改 gRPC wire 名(滚动发布有 `Unimplemented` 错配窗口,先发 rpc 再发 api)+stub 目录/符号(`authservice/`→`authclient/`、`RegisterAuthServiceServer`→`RegisterAuthServer`):必须 regen(descriptor 烤死不能手改),删旧名孤儿目录/文件,且**同步改 `scripts/verify-static.sh`(必备文件清单)+`scripts/verify/verify-contract-markers.sh`(generated server/entrypoint 断言)**。
 
 ## 配套改动清单（删 core / 转 Postgres-only / BFF 必改，易漏）
 代码外的配套散落多处，少改一处就本地/CI 不一致：

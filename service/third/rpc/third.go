@@ -28,7 +28,7 @@ func run(configFile string) {
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
-		mailpb.RegisterMailServiceServer(grpcServer, server.NewMailServiceServer(ctx))
+		mailpb.RegisterMailServer(grpcServer, server.NewMailServer(ctx))
 
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
 			reflection.Register(grpcServer)

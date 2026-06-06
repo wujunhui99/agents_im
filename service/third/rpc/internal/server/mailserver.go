@@ -9,21 +9,21 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/third/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/third/rpc/internal/svc"
-	mail "github.com/wujunhui99/agents_im/service/third/rpc/mail"
+	"github.com/wujunhui99/agents_im/service/third/rpc/mail"
 )
 
-type MailServiceServer struct {
+type MailServer struct {
 	svcCtx *svc.ServiceContext
-	mail.UnimplementedMailServiceServer
+	mail.UnimplementedMailServer
 }
 
-func NewMailServiceServer(svcCtx *svc.ServiceContext) *MailServiceServer {
-	return &MailServiceServer{
+func NewMailServer(svcCtx *svc.ServiceContext) *MailServer {
+	return &MailServer{
 		svcCtx: svcCtx,
 	}
 }
 
-func (s *MailServiceServer) SendTemplateEmail(ctx context.Context, in *mail.SendTemplateEmailRequest) (*mail.SendTemplateEmailResponse, error) {
+func (s *MailServer) SendTemplateEmail(ctx context.Context, in *mail.SendTemplateEmailRequest) (*mail.SendTemplateEmailResponse, error) {
 	l := logic.NewSendTemplateEmailLogic(ctx, s.svcCtx)
 	return l.SendTemplateEmail(in)
 }
