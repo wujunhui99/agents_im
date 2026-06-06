@@ -15,7 +15,7 @@ MailRPC:
     - third-rpc:9095
   Timeout: 5000
 
-Redis:
+SessionRedis:
   Addr: ${REDIS_ADDR}
   Password: ${REDIS_PASSWORD}
   DB: ${REDIS_DB}
