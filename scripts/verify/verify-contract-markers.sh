@@ -43,7 +43,7 @@ assert_present "-q" internal/rpcgen/message/message.proto -- \
   "service MessageService" "rpc SendMessage" "rpc PullMessages" "rpc GetConversationSeqs" \
   "rpc MarkConversationAsRead" "message Message" "message ConversationSeqState"
 assert_present "-q" service/third/rpc/mail.proto -- \
-  "service MailService" "rpc SendTemplateEmail" "repeated string recipients" \
+  "service Mail" "rpc SendTemplateEmail" "repeated string recipients" \
   "map<string, string> template_data" "string provider_request_id" "string provider_message_id"
 
 # --- agent conversation hosting contract ---
@@ -64,11 +64,11 @@ forbid_match "agentim must write responses through MessageLogic/Message Service,
 # --- generated rpc/proto artifacts present and correct ---
 rpc_generated_servers=(
   "service/user/rpc/internal/server/userserver.go:UserServer"
-  "service/auth/rpc/internal/server/auth_service_server.go:AuthServiceServer"
+  "service/auth/rpc/internal/server/authserver.go:AuthServer"
   "service/friends/rpc/internal/server/friendsserver.go:FriendsServer"
   "service/groups/rpc/internal/server/groupsserver.go:GroupsServer"
   "internal/rpcgen/message/internal/server/message_service_server.go:MessageServiceServer"
-  "service/third/rpc/internal/server/mail_service_server.go:MailServiceServer"
+  "service/third/rpc/internal/server/mailserver.go:MailServer"
 )
 for server_spec in "${rpc_generated_servers[@]}"; do
   file="${server_spec%%:*}"
@@ -80,11 +80,11 @@ done
 
 rpc_generated_entrypoints=(
   "service/user/rpc/user.go:RegisterUserServer"
-  "service/auth/rpc/auth.go:RegisterAuthServiceServer"
+  "service/auth/rpc/auth.go:RegisterAuthServer"
   "service/friends/rpc/friends.go:RegisterFriendsServer"
   "service/groups/rpc/groups.go:RegisterGroupsServer"
   "internal/rpcgen/message/message.go:RegisterMessageServiceServer"
-  "service/third/rpc/third.go:RegisterMailServiceServer"
+  "service/third/rpc/third.go:RegisterMailServer"
 )
 for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
   rg -q "${entrypoint_spec##*:}" "${entrypoint_spec%%:*}"

@@ -32,7 +32,7 @@ func run(configFile string) {
 	ctx := svc.NewServiceContext(c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
-		authpb.RegisterAuthServiceServer(grpcServer, server.NewAuthServiceServer(ctx))
+		authpb.RegisterAuthServer(grpcServer, server.NewAuthServer(ctx))
 
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
 			reflection.Register(grpcServer)

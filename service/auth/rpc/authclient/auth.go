@@ -2,12 +2,12 @@
 // goctl 1.10.1
 // Source: auth.proto
 
-package authservice
+package authclient
 
 import (
 	"context"
 
-	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
+	"github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
@@ -22,7 +22,7 @@ type (
 	ValidateTokenRequest          = auth.ValidateTokenRequest
 	ValidateTokenResponse         = auth.ValidateTokenResponse
 
-	AuthService interface {
+	Auth interface {
 		RequestRegistrationEmailCode(ctx context.Context, in *RegistrationEmailCodeRequest, opts ...grpc.CallOption) (*RegistrationEmailCodeResponse, error)
 		Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 		Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error)
@@ -30,38 +30,38 @@ type (
 		ParseToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error)
 	}
 
-	defaultAuthService struct {
+	defaultAuth struct {
 		cli zrpc.Client
 	}
 )
 
-func NewAuthService(cli zrpc.Client) AuthService {
-	return &defaultAuthService{
+func NewAuth(cli zrpc.Client) Auth {
+	return &defaultAuth{
 		cli: cli,
 	}
 }
 
-func (m *defaultAuthService) RequestRegistrationEmailCode(ctx context.Context, in *RegistrationEmailCodeRequest, opts ...grpc.CallOption) (*RegistrationEmailCodeResponse, error) {
-	client := auth.NewAuthServiceClient(m.cli.Conn())
+func (m *defaultAuth) RequestRegistrationEmailCode(ctx context.Context, in *RegistrationEmailCodeRequest, opts ...grpc.CallOption) (*RegistrationEmailCodeResponse, error) {
+	client := auth.NewAuthClient(m.cli.Conn())
 	return client.RequestRegistrationEmailCode(ctx, in, opts...)
 }
 
-func (m *defaultAuthService) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
-	client := auth.NewAuthServiceClient(m.cli.Conn())
+func (m *defaultAuth) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	client := auth.NewAuthClient(m.cli.Conn())
 	return client.Register(ctx, in, opts...)
 }
 
-func (m *defaultAuthService) Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
-	client := auth.NewAuthServiceClient(m.cli.Conn())
+func (m *defaultAuth) Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	client := auth.NewAuthClient(m.cli.Conn())
 	return client.Login(ctx, in, opts...)
 }
 
-func (m *defaultAuthService) ValidateToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error) {
-	client := auth.NewAuthServiceClient(m.cli.Conn())
+func (m *defaultAuth) ValidateToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error) {
+	client := auth.NewAuthClient(m.cli.Conn())
 	return client.ValidateToken(ctx, in, opts...)
 }
 
-func (m *defaultAuthService) ParseToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error) {
-	client := auth.NewAuthServiceClient(m.cli.Conn())
+func (m *defaultAuth) ParseToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error) {
+	client := auth.NewAuthClient(m.cli.Conn())
 	return client.ParseToken(ctx, in, opts...)
 }

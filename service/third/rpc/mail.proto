@@ -4,7 +4,7 @@ package mail.v1;
 
 option go_package = "github.com/wujunhui99/agents_im/service/third/rpc/mail";
 
-service MailService {
+service Mail {
   rpc SendTemplateEmail(SendTemplateEmailRequest) returns (SendTemplateEmailResponse);
 }
 

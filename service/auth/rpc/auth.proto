@@ -4,7 +4,7 @@ package auth.v1;
 
 option go_package = "github.com/wujunhui99/agents_im/service/auth/rpc/auth";
 
-service AuthService {
+service Auth {
   rpc RequestRegistrationEmailCode(RegistrationEmailCodeRequest) returns (RegistrationEmailCodeResponse);
   rpc Register(RegisterRequest) returns (AuthResponse);
   rpc Login(LoginRequest) returns (AuthResponse);

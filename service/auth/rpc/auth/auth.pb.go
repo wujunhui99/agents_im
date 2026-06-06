@@ -623,8 +623,8 @@ const file_service_auth_rpc_auth_proto_rawDesc = "" +
 	"identifier\x18\x03 \x01(\tR\n" +
 	"identifier\x12\x1d\n" +
 	"\n" +
-	"expires_at\x18\x04 \x01(\tR\texpiresAt2\x8d\x03\n" +
-	"\vAuthService\x12m\n" +
+	"expires_at\x18\x04 \x01(\tR\texpiresAt2\x86\x03\n" +
+	"\x04Auth\x12m\n" +
 	"\x1cRequestRegistrationEmailCode\x12%.auth.v1.RegistrationEmailCodeRequest\x1a&.auth.v1.RegistrationEmailCodeResponse\x12;\n" +
 	"\bRegister\x12\x18.auth.v1.RegisterRequest\x1a\x15.auth.v1.AuthResponse\x125\n" +
 	"\x05Login\x12\x15.auth.v1.LoginRequest\x1a\x15.auth.v1.AuthResponse\x12N\n" +
@@ -655,16 +655,16 @@ var file_service_auth_rpc_auth_proto_goTypes = []any{
 	(*ValidateTokenResponse)(nil),         // 6: auth.v1.ValidateTokenResponse
 }
 var file_service_auth_rpc_auth_proto_depIdxs = []int32{
-	2, // 0: auth.v1.AuthService.RequestRegistrationEmailCode:input_type -> auth.v1.RegistrationEmailCodeRequest
-	0, // 1: auth.v1.AuthService.Register:input_type -> auth.v1.RegisterRequest
-	1, // 2: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
-	4, // 3: auth.v1.AuthService.ValidateToken:input_type -> auth.v1.ValidateTokenRequest
-	4, // 4: auth.v1.AuthService.ParseToken:input_type -> auth.v1.ValidateTokenRequest
-	3, // 5: auth.v1.AuthService.RequestRegistrationEmailCode:output_type -> auth.v1.RegistrationEmailCodeResponse
-	5, // 6: auth.v1.AuthService.Register:output_type -> auth.v1.AuthResponse
-	5, // 7: auth.v1.AuthService.Login:output_type -> auth.v1.AuthResponse
-	6, // 8: auth.v1.AuthService.ValidateToken:output_type -> auth.v1.ValidateTokenResponse
-	6, // 9: auth.v1.AuthService.ParseToken:output_type -> auth.v1.ValidateTokenResponse
+	2, // 0: auth.v1.Auth.RequestRegistrationEmailCode:input_type -> auth.v1.RegistrationEmailCodeRequest
+	0, // 1: auth.v1.Auth.Register:input_type -> auth.v1.RegisterRequest
+	1, // 2: auth.v1.Auth.Login:input_type -> auth.v1.LoginRequest
+	4, // 3: auth.v1.Auth.ValidateToken:input_type -> auth.v1.ValidateTokenRequest
+	4, // 4: auth.v1.Auth.ParseToken:input_type -> auth.v1.ValidateTokenRequest
+	3, // 5: auth.v1.Auth.RequestRegistrationEmailCode:output_type -> auth.v1.RegistrationEmailCodeResponse
+	5, // 6: auth.v1.Auth.Register:output_type -> auth.v1.AuthResponse
+	5, // 7: auth.v1.Auth.Login:output_type -> auth.v1.AuthResponse
+	6, // 8: auth.v1.Auth.ValidateToken:output_type -> auth.v1.ValidateTokenResponse
+	6, // 9: auth.v1.Auth.ParseToken:output_type -> auth.v1.ValidateTokenResponse
 	5, // [5:10] is the sub-list for method output_type
 	0, // [0:5] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name

@@ -7,7 +7,7 @@ import (
 	"github.com/wujunhui99/agents_im/service/auth/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/auth/api/internal/types"
 	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
-	"github.com/wujunhui99/agents_im/service/auth/rpc/authservice"
+	"github.com/wujunhui99/agents_im/service/auth/rpc/authclient"
 	"google.golang.org/grpc"
 )
 
@@ -88,7 +88,7 @@ func TestValidateTokenCallsAuthRPC(t *testing.T) {
 }
 
 type recordingAuthRPC struct {
-	authservice.AuthService
+	authclient.Auth
 
 	registerReq  *authpb.RegisterRequest
 	authResp     *authpb.AuthResponse

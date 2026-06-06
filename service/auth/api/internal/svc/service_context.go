@@ -7,7 +7,7 @@ import (
 	"errors"
 
 	"github.com/wujunhui99/agents_im/service/auth/api/internal/config"
-	"github.com/wujunhui99/agents_im/service/auth/rpc/authservice"
+	"github.com/wujunhui99/agents_im/service/auth/rpc/authclient"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
@@ -15,7 +15,7 @@ var ErrAuthRPCConfigRequired = errors.New("auth rpc client config is required")
 
 type ServiceContext struct {
 	Config  config.Config
-	AuthRPC authservice.AuthService
+	AuthRPC authclient.Auth
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
@@ -28,7 +28,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	}
 	return &ServiceContext{
 		Config:  c,
-		AuthRPC: authservice.NewAuthService(cli),
+		AuthRPC: authclient.NewAuth(cli),
 	}, nil
 }
 
