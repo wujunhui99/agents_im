@@ -5,8 +5,11 @@ Port: 8088
 Auth:
   AccessSecret: dev-jwt-secret-change-me
   AccessExpire: 86400
-StorageDriver: memory
-DataSource: ${DATABASE_URL}
+# admin-api 改纯 BFF：所有 DB 访问走 admin-rpc，不再有 StorageDriver/DataSource。
+AdminRPC:
+  Endpoints:
+    - 127.0.0.1:9097
+  Timeout: 5000
 
 Redis:
   Addr: localhost:6379

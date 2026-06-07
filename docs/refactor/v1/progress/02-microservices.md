@@ -21,7 +21,8 @@
 | **groups** | **`service/groups/rpc/internal/logic` 自包含** | **`service/groups/rpc/internal/model`（goctl）** | **否（rpc 已脱）** | ✅ #415 |
 | **third (mail)** | **`service/third/rpc/internal/logic`（SES 发信，无 DB）** | **provider 库 `service/third/rpc/internal/provider`（mail 无表，无 goctl model）** | **否（已脱）** | ✅ #429（mail 折入新服务 third）|
 | **media** | **`service/media/rpc/internal/logic` 自包含（删 `core`）** | **`service/media/rpc/internal/model`（goctl）** | **部分**（仅下载鉴权跨域读 accounts/message，keystone 阻塞）| ✅ #433（goctl，写入脱 internal）|
-| message/gateway/transfer/admin | 仍在 internal | internal | 是 | ❌ keystone，最后做 |
+| **admin** | **`service/admin/rpc/internal/logic` 自包含（admin 域唯一碰 DB 的服务）** | **`task_reports` 走 `service/admin/rpc/internal/model`（goctl）；accounts/friendships/messages/agent_audits/feedback 跨域只读暂经 internal/repository** | **部分**（messages/AI-replay = message keystone、agent_audits 无 owning rpc、feedback 由 monolith 创建）| ✅ #448（goctl+BFF，admin-api 改纯 BFF 调 admin-rpc）|
+| message/gateway/transfer | 仍在 internal | internal | 是 | ❌ keystone，最后做 |
 
 > groups 是**第一个真正切断 rpc 数据层对 internal 依赖**的域，作为后续域的参考实现；
 > friends 照此复刻（#426）：`friendships` 加自增代理 PK（迁移 `018`）→ goctl model → 状态机搬进 rpc/logic →
@@ -105,6 +106,17 @@
 - **剩余 / 后续**：
   - Postgres `active_sessions` 表 + `internal/auth/repository` 的 `SetActiveSession`/`GetActiveSession`/`model.ActiveSession` 现已无生产调用，成死代码，待清理（保留表，未删）。
   - credentials / email_verification 的 goctl model 全量迁移 + BFF（auth 数据层彻底脱 internal）仍未做，拆独立 PR（keystone-blocked：gateway-ws/message-api/monolith/admin/agent 仍 inline 解析 token）。
+
+### admin（#448）
+
+admin 此前**没有 rpc**，`admin-api` 直接 import `internal/repository` 操作 DB。本次新建 `service/admin/rpc`（proto service 名 `Admin`，无 `Service` 后缀，延续 #446），作为 admin 域**唯一碰 DB 的服务**；`admin-api` 改**纯 BFF**，删 `internal/repository`，只调 admin-rpc client。
+
+- **数据层**：`task_reports` 是 admin 独占表 → goctl model `service/admin/rpc/internal/model`（custom 文件保留 outcome 过滤 list + JSONB/`ON CONFLICT` upsert，`*_gen.go` 不动；exported `WithSession`+`Transact` 供 logic 控事务）。其余跨域只读（accounts/friendships/messages/agent_audits/feedback）暂经 admin-rpc 内 `internal/repository` 直读（**keystone 例外**：messages/AI-replay = message monolith、agent_audits 无 owning rpc、feedback 由 monolith 创建），文档注明待相关域 rpc 落地后 BFF 化。
+- **pb ↔ goctl 行映射在 logic**：去掉中间"领域视图"结构体，model 只出 goctl `TaskReports`，`TaskReports↔pb`（JSONB↔[]string、`sql.Null*`↔标量、时间↔RFC3339Nano）转换收在 rpc logic；task_report 时间戳顺手统一成 RFC3339Nano（旧 `::text` PG 文本格式的轻微输出变化）。
+- **admin-api 经 goctl 从 `service/admin/api/admin.api` 生成**（snake_case handler + `// Code scaffolded by goctl. Safe to edit.`）；`@server` 用 `jwt: Auth` + `middleware: DeviceAuth`（照 friends 走共享 `common/middleware`，删 goctl 空壳 stub）；admin 账号闸（原 `adminOnly`）合进 svc 的 DeviceAuth 链，经 admin-rpc `GetUserDetail` 校验，不再读 DB。
+- **AI-replay `MessageCreatedHook`**：独立 admin 二进制中本就未接线（prod nil/休眠），admin-rpc 沿用同样 nil 行为，无功能回归——待 message-rpc 落地后真正可用。
+- **新增可部署单元 `admin-rpc:9097`**：Dockerfile / Makefile-无（admin 域本就不在 make 本地清单）/ drone-build-images / deploy-k3s / detect-deploy-changes / deployments+services / kustomization / dev-up / test-deploy 期望串 / verify-static + verify-contract-markers 清单全部补 admin-rpc。
+- **剩余 / 后续**：跨域只读待 message-rpc / agent(audit)-rpc 落地后从 admin-rpc 的 internal/repository 迁为 BFF 聚合或 owner rpc 接口；旧 `service/admin/api/internal/logic` 的 `AdminLogic`/`AdminAIReplayLogic` 已随 admin-api 重生成删除（业务真相搬进 admin-rpc；admin 本就不被 monolith in-process 消费，无过渡包）。
 
 ### friends（#426）
 

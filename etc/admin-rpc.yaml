@@ -1,0 +1,12 @@
+Name: admin-rpc
+ListenOn: 0.0.0.0:9097
+
+# admin-rpc 数据层：task_reports 走 goctl model（Postgres-only）；
+# accounts/friendships/messages/agent_audits/feedback 跨域只读经 internal/repository。
+DataSource: ${DATABASE_URL}
+
+Telemetry:
+  Name: admin-rpc
+  Endpoint: 127.0.0.1:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc

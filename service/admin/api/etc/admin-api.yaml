@@ -1,0 +1,15 @@
+Name: admin-api
+Host: 0.0.0.0
+Port: 8088
+Auth:
+  AccessSecret: dev-jwt-secret-change-me
+  AccessExpire: 86400
+AdminRPC:
+  Endpoints:
+    - 127.0.0.1:9097
+  Timeout: 5000
+
+Redis:
+  Addr: localhost:6379
+  Password: ""
+  DB: 0
