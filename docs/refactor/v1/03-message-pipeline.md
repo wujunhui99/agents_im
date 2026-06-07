@@ -2,6 +2,8 @@
 
 > **重写说明（2026-05-29）**：上一版基于"保留 outbox + 推 push 服务"的中间方案。在阅读 `open-im-server/internal/{rpc/msg,msgtransfer,push,msggateway}/` 实际代码后，全部改为对齐 OpenIM 实现。**outbox 弃用**——理由见 §3。
 >
+> **补充（2026-06-07）**：复核 open-im-server 代码确认链路无误（`message_handler.go`/`send.go`/`online_history_msg_handler.go`/`push_handler.go`）；新增 §0.1（与 `internal/` 退役的关系、当前→目标命名映射、关联 `refactor-domain-to-service` skill）与 §7.2「上行 ACK 同步透传」说明。
+>
 > 阅读基础：`open-im-server/` 已 clone 在 `/Users/junhui/code/project/agents_im/open-im-server/`。
 >
 > **路径约定**：本文 `internal/rpc/msg/...`、`internal/msgtransfer/...`、`internal/push/...`、`internal/msggateway/...` 均指 **OpenIM 仓库**源码路径（参考用）；`internal/outboxpublisher/`、`internal/transfer/`、`internal/repository/postgres_outbox.go` 等指 **agents_im 当前**真实位置（Phase 0 删除）。按 00-decisions **D10**，agents_im 重构后剩余的 messaging / presence / idgen / observability 等基础设施位于 `pkg/<name>/`；msg-rpc / transfer / push / gateway 业务代码位于 `service/<svc>/internal/...`。
@@ -19,6 +21,30 @@
 | push 路由模型                                | **广播**到所有 gateway 实例（service discovery），每个 gateway 查本地连接表 | OpenIM `internal/push/onlinepusher.go:70` |
 | 离线 push                                    | 二段式：push 消费 toPush，online 失败的 user 再 produce 到 toOfflinePush；独立 consumer 调 FCM/APNs/Getui/JPush | OpenIM `internal/push/push.go:80~135` |
 | Kafka topics                                 | `toRedis`（msg-rpc→transfer）、`toMongo`（transfer→transfer）、`toPush`（transfer→push）、`toOfflinePush`（push→push） | OpenIM `config/kafka.yml` |
+
+---
+
+## 0.1 与 `internal/` 退役的关系（keystone）
+
+本文是**传输链路设计**；消息域同时是顶层 `internal/` 退役的**最后一公里**（见 [`progress/02-microservices.md`](./progress/02-microservices.md) §全局收尾）。链路改造与去 internal 在同一批 PR 内做，遵循 [`refactor-domain-to-service` skill] 的 goctl + BFF 主线：
+
+- **数据层退役**：msg-rpc 走 **goctl model**（`service/msg/rpc/internal/model`，对 `messages` / `conversations` 表），删掉对 `internal/repository` 的依赖；复合主键表先加自增代理 PK 再 `goctl model pg`，事务边界留在 Logic。
+- **跨域数据上移 BFF**：msg-rpc 只返回自有字段；发送者昵称/头像等跨域字段由 `service/msg/api`(BFF) 聚合 user-rpc（批量接口防 N+1），**rpc 之间不互调**。
+- **keystone 解锁**：`internal/rpcgen/message` 当前 in-process 构造几乎所有域的 `*Logic`（groups/friends/user/...）。这些域的旧 `internal/logic` 代码**必须等 message 迁移完成才能删**——message 是删空 `internal/` 的前置。
+- **RPC 面**：msg-rpc 承担消息域全部 RPC（MVP 10 个，见 [`07-message-rpc-redesign.md`](./07-message-rpc-redesign.md)），本文聚焦其中 `SendMessage` 的「只发 Kafka」改造与下行 push 链路。
+- **net-new 部署单元**：`push` 是新可部署单元，需按 skill「配套改动清单」把 binary 串进 Dockerfile / drone-build / deploy-k3s / detect-deploy / deployments+services / kustomization / verify 全链。
+
+**当前 → 目标 命名映射**（现仓库仍是旧名，target 名与本文/用户口径一致）：
+
+| 现状（repo）                       | 目标（本文）                        | 变化 |
+|-----------------------------------|-------------------------------------|------|
+| `service/gateway-ws`              | `service/msggateway`                | 改名 + 砍业务依赖（纯连接层）|
+| `service/message-api` + monolith  | `service/msg/api` + `service/msg/rpc` | api 转纯/聚合 BFF；rpc 从 monolith 抽出 + goctl 数据层 |
+| `service/message-transfer`        | `service/msgtransfer`               | 改名 + batcher / Redis seq Malloc |
+| （无）                             | `service/push`                      | 新建可部署单元 |
+| `internal/outboxpublisher` 等      | 删除                                | Phase 0（§9）|
+
+[`refactor-domain-to-service` skill]: ../../../.claude/skills/refactor-domain-to-service/SKILL.md
 
 ---
 
@@ -497,6 +523,8 @@ command 路由：
 - `mark_conversation_read` → 调 msg-rpc gRPC MarkRead；
 - `get_conversation_seqs` → 调 msg-rpc gRPC GetMaxSeqs；
 - `heartbeat` → 本地刷新 last-seen。
+
+**上行 ACK 是同步透传**（用户强调的「收到即回已发送」）：gateway 的 `send_message` handler 同步调 msg-rpc `SendMessage`，把返回的 `SendMsgResp{server_msg_id, client_msg_id, send_time}`（**无 seq**）原样回写 websocket，即客户端看到的「已发送」状态。gateway 本身**不碰 DB、不分配 seq、不做业务校验**（业务校验在 msg-rpc，对齐 OpenIM `msggateway/message_handler.go:GrpcHandler.SendMessage`——它只 `Unmarshal → 调 MsgClient.SendMsg → Marshal 回写`）。该 ACK 只代表「Kafka 已接受」，**不代表持久化、不代表已分配 seq**；seq 与「送达对端」由后续 push event 异步带回（§4.3、§10）。
 
 msg-rpc 拿到读类请求（pull / seqs / mark_read）后，**仍然走 Redis 优先 + PG 兜底**，不需要新走 Kafka。Kafka 只是写路径。
 
