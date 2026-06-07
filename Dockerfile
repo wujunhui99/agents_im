@@ -28,6 +28,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       message-rpc)      pkg=./internal/rpcgen/message ;; \
       gateway-ws)       pkg=./service/gateway-ws ;; \
       admin-api)        pkg=./service/admin/api ;; \
+      admin-rpc)        pkg=./service/admin/rpc ;; \
       message-api)      pkg=./service/message-api ;; \
       message-transfer) pkg=./service/message-transfer ;; \
       *) echo "unknown SERVICE: $SERVICE" >&2; exit 1 ;; \
@@ -41,7 +42,7 @@ ARG SERVICE
 RUN test -n "$SERVICE"
 COPY --from=backend-builder /out/service /app/service
 COPY etc /app/etc
-EXPOSE 8080 8081 8082 8083 8084 8085 8086 8088 9090 9091 9092 9093 9094 9095
+EXPOSE 8080 8081 8082 8083 8084 8085 8086 8088 9090 9091 9092 9093 9094 9095 9097
 ENTRYPOINT ["/app/service"]
 
 FROM node:22-alpine AS web-builder

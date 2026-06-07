@@ -1,8 +1,12 @@
+// Code scaffolded by goctl. Safe to edit.
+// goctl 1.10.1
+
 package config
 
 import (
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/zeromicro/go-zero/rest"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
 type Config struct {
@@ -12,7 +16,7 @@ type Config struct {
 		AccessExpire int64
 	}
 	// tracing 用 go-zero 自带 Telemetry（ServiceConf 内，由 yaml 配置），不再用 pkg/observability。
-	StorageDriver string                `json:",optional"`
-	DataSource    string                `json:",optional"`
-	Redis         appconfig.RedisConfig `json:",optional"`
+	Redis appconfig.RedisConfig `json:",optional"`
+	// AdminRPC：admin-api 改纯 BFF 后，所有 DB 访问都走 admin-rpc（admin 域唯一碰 DB 的服务）。
+	AdminRPC zrpc.RpcClientConf
 }

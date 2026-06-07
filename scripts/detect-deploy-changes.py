@@ -25,6 +25,7 @@ BACKEND_SERVICES = [
     "third-rpc",
     "media-api",
     "media-rpc",
+    "admin-rpc",
 ]
 
 ALL_IMAGE_SERVICES = [*BACKEND_SERVICES, "web"]
@@ -90,7 +91,9 @@ FLAT_SERVICE_DIRS = {
 INTERNAL_DOMAIN_SERVICE_PREFIXES = {
     "internal/handler/message/": ["message-api"],
     "internal/handler/admin/": ["admin-api"],
-    "service/admin/": ["admin-api"],
+    # service/admin/{api,rpc}/** 由 service/<domain>/<kind> 通用规则精确路由；
+    # 这里兜底任何 service/admin/ 顶层散文件，两者都重建。
+    "service/admin/": ["admin-api", "admin-rpc"],
     "internal/logic/message/": ["message-api", "message-transfer"],
     "internal/servicecontext/message/": ["message-api", "message-transfer"],
 }

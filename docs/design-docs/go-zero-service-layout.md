@@ -100,6 +100,16 @@ Coding-Tool: Hermes Agent
 
 Codex worker 提交时 `Agent:` 按实际 agent 名称填写，`Coding-Tool:` 可写 `Codex CLI`。
 
+## proto 文件命名规则（重要）
+
+新建/修改 rpc proto 一律遵守：
+
+- **package**：`<domain>.v1`（如 `admin.v1`、`auth.v1`）。
+- **go_package**：完整 module 路径 `github.com/wujunhui99/agents_im/service/<domain>/rpc/<domain>`，**勿改成相对路径**。
+- **service 名**：域名 PascalCase，**不加 `Service` 后缀**（`Admin`、`Auth`，#446 已把 `AuthService→Auth` 统一）。service 名 = gRPC wire 名 + client 目录/符号（`<domain>client/`、`Register<Name>Server`），改名必须 **regen**（descriptor 烤进 pb 不能手改），并同步删旧名孤儿、改 `verify-static.sh` / `verify-contract-markers.sh` 清单。
+- **message 名**：贴域语义；跨域字段（用户资料/媒体等）保留在 proto 但 rpc 留空，由 api(BFF) 聚合填充——不重生成 pb。
+- **生成命令从仓库根跑、`-I .`**：让 descriptor `name` = 仓库相对全路径（`service/<domain>/rpc/<domain>.proto`），唯一化；短名（`admin.proto`）会撞 `proto: file "admin.proto" is already registered` panic。工具链钉死：goctl 1.10.1、protoc-gen-go 1.36.11、protoc-gen-go-grpc 1.6.1。
+
 ## goctl 生成 RPC 的标准流程
 
 以 `<domain>=user` 为例：

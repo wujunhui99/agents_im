@@ -36,6 +36,7 @@ IMAGE_DEPLOYMENTS=(
   third-rpc
   media-api
   media-rpc
+  admin-rpc
   web
 )
 

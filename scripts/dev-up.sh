@@ -300,6 +300,19 @@ Telemetry:
 YAML
 }
 
+write_admin_rpc_config() {
+  cat > "${CONFIG_DIR}/admin-rpc.yaml" <<YAML
+Name: admin-rpc
+ListenOn: 127.0.0.1:${ADMIN_RPC_PORT:-9097}
+DataSource: ${DATABASE_URL}
+Telemetry:
+  Name: admin-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
+YAML
+}
+
 write_message_transfer_config() {
   cat > "${CONFIG_DIR}/message-transfer.yaml" <<YAML
 Name: message-transfer
@@ -388,9 +401,19 @@ Telemetry:
   Sampler: 1.0
   Batcher: otlpgrpc"
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
+  write_api_config "admin-api" "${ADMIN_API_PORT:-8088}" "AdminRPC:
+  Endpoints:
+    - 127.0.0.1:${ADMIN_RPC_PORT:-9097}
+  Timeout: 5000
+Telemetry:
+  Name: admin-api
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc"
   write_user_rpc_config
   write_groups_rpc_config
   write_friends_rpc_config
+  write_admin_rpc_config
   write_auth_rpc_config
   write_message_transfer_config
 }
@@ -404,6 +427,8 @@ service_pkg() {
     auth-rpc)         echo "./service/auth/rpc" ;;
     friends-api)      echo "./service/friends/api" ;;
     friends-rpc)      echo "./service/friends/rpc" ;;
+    admin-api)        echo "./service/admin/api" ;;
+    admin-rpc)        echo "./service/admin/rpc" ;;
     groups-api)       echo "./service/groups/api" ;;
     groups-rpc)       echo "./service/groups/rpc" ;;
     third-rpc)         echo "./service/third/rpc" ;;
@@ -497,6 +522,7 @@ main() {
   start_service "user-rpc"
   start_service "groups-rpc"
   start_service "friends-rpc"
+  start_service "admin-rpc"
   start_service "auth-rpc"
   start_service "user-api"
   start_service "auth-api"
@@ -506,6 +532,7 @@ main() {
   start_service "message-transfer"
   start_service "groups-api"
   start_service "agent-api"
+  start_service "admin-api"
 
   wait_http "user-api" "http://127.0.0.1:${USER_API_PORT:-8080}/healthz"
   wait_http "auth-api" "http://127.0.0.1:${AUTH_API_PORT:-8081}/healthz"
@@ -517,6 +544,7 @@ main() {
   fi
   wait_http "groups-api" "http://127.0.0.1:${GROUPS_API_PORT:-8085}/healthz"
   wait_http "agent-api" "http://127.0.0.1:${AGENT_API_PORT:-8086}/healthz"
+  wait_http "admin-api" "http://127.0.0.1:${ADMIN_API_PORT:-8088}/healthz"
 
   echo "local backend is ready"
 }

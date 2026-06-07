@@ -1,0 +1,333 @@
+syntax = "proto3";
+
+package admin.v1;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/wujunhui99/agents_im/service/admin/rpc/admin";
+
+// Admin 是 admin 域唯一碰 DB 的 rpc 服务。task_reports 走自有 goctl 数据层;
+// accounts/friendships/messages/agent_audits/feedback 为跨域只读,暂经 internal/repository,
+// 待相关域 rpc 落地后迁移(见 service/admin/rpc 文档与进度文档)。
+service Admin {
+  rpc GetDashboard(DashboardRequest) returns (DashboardResponse);
+  rpc GetConversationMessages(ConversationMessagesRequest) returns (ConversationMessagesResponse);
+  rpc SearchUsers(UserSearchRequest) returns (UserSearchResponse);
+  rpc GetUserDetail(UserDetailRequest) returns (UserDetailResponse);
+  rpc GetUserFriends(UserFriendsRequest) returns (UserFriendsResponse);
+  rpc GetUserConversations(UserConversationsRequest) returns (UserConversationsResponse);
+  rpc ListLLMTraces(LLMTraceListRequest) returns (LLMTraceListResponse);
+  rpc GetLLMTraceDetail(LLMTraceDetailRequest) returns (LLMTraceDetailResponse);
+  rpc ListFeedback(FeedbackListRequest) returns (FeedbackListResponse);
+  rpc GetFeedback(FeedbackDetailRequest) returns (FeedbackDetailResponse);
+  rpc UpdateFeedback(FeedbackUpdateRequest) returns (FeedbackUpdateResponse);
+  rpc ListTaskReports(TaskReportListRequest) returns (TaskReportListResponse);
+  rpc UpsertTaskReport(TaskReportUpsertRequest) returns (TaskReportDetailResponse);
+  rpc ReplayAgentMessage(ReplayAgentMessageRequest) returns (ReplayAgentMessageResponse);
+}
+
+message AdminUser {
+  string user_id = 1;
+  string account_id = 2;
+  string identifier = 3;
+  string display_name = 4;
+  string name = 5;
+  string gender = 6;
+  string birth_date = 7;
+  string region = 8;
+  string account_type = 9;
+  string avatar_media_id = 10;
+  string avatar_url = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}
+
+message AdminMessage {
+  string server_msg_id = 1;
+  string client_msg_id = 2;
+  string conversation_id = 3;
+  int64 seq = 4;
+  string sender_id = 5;
+  string receiver_id = 6;
+  string group_id = 7;
+  string chat_type = 8;
+  string content_type = 9;
+  string content = 10;
+  string message_origin = 11;
+  string agent_account_id = 12;
+  string trigger_server_msg_id = 13;
+  string agent_run_id = 14;
+  bool allow_recursive_trigger = 15;
+  int64 send_time = 16;
+  int64 created_at = 17;
+}
+
+message AdminConversation {
+  string conversation_id = 1;
+  int64 max_seq = 2;
+  int64 has_read_seq = 3;
+  int64 unread_count = 4;
+  int64 max_seq_time = 5;
+  AdminMessage last_message = 6;
+}
+
+message AdminFriend {
+  string user_id = 1;
+  string friend_id = 2;
+  string status = 3;
+  bool is_friend = 4;
+  AdminUser friend = 5;
+  string created_at = 6;
+  string updated_at = 7;
+}
+
+message AdminFeedback {
+  string feedback_id = 1;
+  string user_id = 2;
+  string category = 3;
+  string status = 4;
+  string title = 5;
+  string content = 6;
+  string contact = 7;
+  string page_url = 8;
+  string user_agent = 9;
+  google.protobuf.Struct client_meta = 10;
+  string admin_note = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}
+
+message AdminTaskReport {
+  string task_id = 1;
+  string agent = 2;
+  string codex_session_id = 3;
+  int64 issue_number = 4;
+  string issue_url = 5;
+  string repo = 6;
+  string branch = 7;
+  string worktree = 8;
+  string commit = 9;
+  string outcome = 10;
+  string started_at = 11;
+  string ended_at = 12;
+  int64 duration_seconds = 13;
+  int64 tokens_used = 14;
+  string pr_url = 15;
+  repeated string evidence = 16;
+  repeated string blockers = 17;
+  repeated string major_time_sinks = 18;
+  string would_more_permission_help = 19;
+  repeated string candidate_permissions = 20;
+  string permission_reason = 21;
+  repeated string pitfalls_or_lessons = 22;
+  string notes = 23;
+  string recorded_at = 24;
+}
+
+message AdminLLMTrace {
+  string trace_id = 1;
+  string trace_url = 2;
+  string run_id = 3;
+  string agent_id = 4;
+  string conversation_id = 5;
+  string trigger_message_id = 6;
+  string response_message_id = 7;
+  string requesting_user_id = 8;
+  string status = 9;
+  string provider = 10;
+  string model = 11;
+  string prompt_hash = 12;
+  string prompt_version = 13;
+  int64 latency_ms = 14;
+  int64 total_tokens = 15;
+  string error_code = 16;
+  string error_message = 17;
+  string started_at = 18;
+  string finished_at = 19;
+  string created_at = 20;
+}
+
+message AdminAgentToolCall {
+  string tool_call_id = 1;
+  string run_id = 2;
+  string tool_name = 3;
+  string status = 4;
+  int64 duration_ms = 5;
+  string error_code = 6;
+  string error_message = 7;
+  string started_at = 8;
+  string finished_at = 9;
+  string created_at = 10;
+}
+
+message AdminAgentFileRead {
+  string file_read_id = 1;
+  string run_id = 2;
+  string skill_id = 3;
+  string file_id = 4;
+  string status = 5;
+  int64 byte_count = 6;
+  string error_code = 7;
+  string error_message = 8;
+  string started_at = 9;
+  string finished_at = 10;
+  string created_at = 11;
+}
+
+message AdminAgentPythonExec {
+  string python_exec_id = 1;
+  string run_id = 2;
+  string status = 3;
+  string error_code = 4;
+  string error_message = 5;
+  string started_at = 6;
+  string finished_at = 7;
+  string created_at = 8;
+}
+
+message AdminDashboardTotals {
+  int64 users = 1;
+  int64 conversations = 2;
+  int64 messages = 3;
+  int64 ai_runs = 4;
+  int64 failed_ai_runs = 5;
+}
+
+message DashboardRequest {
+  int32 limit = 1;
+}
+
+message DashboardResponse {
+  AdminDashboardTotals totals = 1;
+  repeated AdminLLMTrace recent_traces = 2;
+  repeated AdminConversation recent_conversations = 3;
+}
+
+message ConversationMessagesRequest {
+  string conversation_id = 1;
+  int64 from_seq = 2;
+  int64 to_seq = 3;
+  int32 limit = 4;
+  string order = 5;
+}
+
+message ConversationMessagesResponse {
+  string conversation_id = 1;
+  repeated AdminMessage messages = 2;
+  bool is_end = 3;
+  int64 next_seq = 4;
+}
+
+message UserSearchRequest {
+  string query = 1;
+  int32 limit = 2;
+}
+
+message UserSearchResponse {
+  repeated AdminUser users = 1;
+}
+
+message UserDetailRequest {
+  string account_id = 1;
+}
+
+message UserDetailResponse {
+  AdminUser user = 1;
+}
+
+message UserFriendsRequest {
+  string account_id = 1;
+}
+
+message UserFriendsResponse {
+  repeated AdminFriend friends = 1;
+}
+
+message UserConversationsRequest {
+  string account_id = 1;
+}
+
+message UserConversationsResponse {
+  repeated AdminConversation conversations = 1;
+}
+
+message LLMTraceListRequest {
+  string status = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message LLMTraceListResponse {
+  repeated AdminLLMTrace traces = 1;
+}
+
+message LLMTraceDetailRequest {
+  string trace_id = 1;
+}
+
+message LLMTraceDetailResponse {
+  AdminLLMTrace trace = 1;
+  repeated AdminAgentToolCall tool_calls = 2;
+  repeated AdminAgentFileRead file_reads = 3;
+  repeated AdminAgentPythonExec python_execs = 4;
+}
+
+message FeedbackListRequest {
+  string status = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message FeedbackListResponse {
+  repeated AdminFeedback items = 1;
+}
+
+message FeedbackDetailRequest {
+  string feedback_id = 1;
+}
+
+message FeedbackDetailResponse {
+  AdminFeedback feedback = 1;
+}
+
+message FeedbackUpdateRequest {
+  string feedback_id = 1;
+  string status = 2;
+  string admin_note = 3;
+}
+
+message FeedbackUpdateResponse {
+  AdminFeedback feedback = 1;
+}
+
+message TaskReportListRequest {
+  string outcome = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message TaskReportListResponse {
+  repeated AdminTaskReport items = 1;
+}
+
+message TaskReportUpsertRequest {
+  AdminTaskReport report = 1;
+}
+
+message TaskReportDetailResponse {
+  AdminTaskReport report = 1;
+}
+
+message ReplayAgentMessageRequest {
+  string conversation_id = 1;
+  string server_msg_id = 2;
+}
+
+message ReplayAgentMessageResponse {
+  string conversation_id = 1;
+  string server_msg_id = 2;
+  bool triggered = 3;
+  bool skipped = 4;
+  string reason = 5;
+  AdminMessage message = 6;
+}

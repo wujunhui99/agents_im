@@ -5,8 +5,10 @@ Port: 8088
 Auth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
-StorageDriver: postgres
-DataSource: ${DATABASE_URL}
+# admin-api 改纯 BFF：所有 DB 访问走 admin-rpc，不再有 StorageDriver/DataSource。
+AdminRPC:
+  Target: dns:///admin-rpc:9097
+  Timeout: 5000
 
 Redis:
   Addr: ${REDIS_ADDR}

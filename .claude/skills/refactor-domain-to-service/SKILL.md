@@ -35,6 +35,10 @@ description: 把一个业务域从顶层 internal monolith（god-package interna
 
 ## 路线选择
 
+该域**当前是否已有 rpc**？
+- **没有 rpc（如 admin #448，api 直读 internal/repository）** → 先判断**该域是否操作 DB**：有 DB 操作才建 rpc（**只有 rpc 碰 DB**，api 改纯 BFF）；纯转发无 DB 操作的域不必建 rpc。建 rpc 后照下方主线走。
+- **已有 rpc** → 按下方"是否被 monolith 消费"决定数据层退役路线。
+
 该域是否被 message monolith in-process 消费？
 - **否** → **goctl + BFF**（本 skill 主线，最干净，rpc 完全自包含，不给 monolith 留过渡包）。
 - **是且暂不能动 monolith** → 保留 internal 旧逻辑喂 monolith、新 rpc 走 goctl 自包含（groups 选此）；
@@ -154,3 +158,4 @@ worktree 占用导致 gh 报 “main already used by worktree” 属正常，mer
 | groups | **goctl + BFF** | `service/groups/rpc/internal/logic` | **`service/groups/rpc/internal/model`（goctl）** | #415/#416 | 首个 rpc 数据层脱 internal；BFF 聚合 user-rpc；批量接口 #423 |
 | friends | **goctl + BFF** | `service/friends/rpc/internal/logic` | **`service/friends/rpc/internal/model`（goctl）** | #426 | 由 core 退役改造；`friendships` 加代理 PK（迁移 018）；BFF 聚合 user-rpc 批量 `GetUsersByIDs`；internal/repository 好友方法暂留喂 monolith |
 | auth | **特性改造（非数据层退役）** | `internal/auth/logic`（仍 keystone）| 未迁（credentials/email_verification 仍 internal）| #435 | 活跃会话 jti+Redis、共享 `common/middleware.DeviceAuth`（store-only，从 context 读 `user_id`/`session_id`/`device_type`）；**go-zero `jwt:Auth` 丢弃 sub/jti 注册声明** → token 镜像非注册声明；goctl 数据层迁移待独立 PR |
+| admin | **从零建 rpc + goctl + BFF** | `service/admin/rpc/internal/logic`（admin 域唯一碰 DB）| **`task_reports` goctl `service/admin/rpc/internal/model`；跨域只读暂 internal/repository** | #448 | admin 原**无 rpc**，api 直读 DB；新建 admin-rpc（proto `Admin` 无 Service 后缀）后 api 改纯 BFF。task_reports 独占→goctl；accounts/friendships/messages/agent_audits/feedback 跨域只读 = keystone 例外暂留 internal/repository；**model 只出 goctl 行，pb↔行映射放 logic（不要第三个领域结构体）**；AI-replay hook 独立二进制本就 nil（无回归）；admin 账号闸合进 svc DeviceAuth 链经 `GetUserDetail` 校验 |
