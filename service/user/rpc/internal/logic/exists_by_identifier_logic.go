@@ -3,7 +3,6 @@ package logic
 import (
 	"context"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
@@ -26,14 +25,16 @@ func NewExistsByIdentifierLogic(ctx context.Context, svcCtx *svc.ServiceContext)
 }
 
 func (l *ExistsByIdentifierLogic) ExistsByIdentifier(in *userpb.ExistsByIdentifierRequest) (*userpb.ExistsByIdentifierResponse, error) {
-	result, err := l.svcCtx.UserLogic.ExistsByIdentifier(l.ctx, business.ExistsByIdentifierRequest{
-		Identifier: in.GetIdentifier(),
-	})
+	identifier, err := validateIdentifier(in.GetIdentifier())
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	exists, err := l.svcCtx.Accounts.ExistsByIdentifier(l.ctx, identifier)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
 	return &userpb.ExistsByIdentifierResponse{
-		Identifier: result.Identifier,
-		Exists:     result.Exists,
+		Identifier: identifier,
+		Exists:     exists,
 	}, nil
 }

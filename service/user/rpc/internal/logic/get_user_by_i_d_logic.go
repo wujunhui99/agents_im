@@ -2,9 +2,10 @@ package logic
 
 import (
 	"context"
+	"strings"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 
@@ -26,11 +27,13 @@ func NewGetUserByIDLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetUs
 }
 
 func (l *GetUserByIDLogic) GetUserByID(in *userpb.GetUserByIDRequest) (*userpb.UserResponse, error) {
-	profile, err := l.svcCtx.UserLogic.GetUserByID(l.ctx, business.GetUserByIDRequest{
-		UserID: in.GetUserId(),
-	})
-	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+	userID := strings.TrimSpace(in.GetUserId())
+	if userID == "" {
+		return nil, rpcerror.ToStatus(apperror.InvalidArgument("user_id is required"))
 	}
-	return toUserResponse(profile), nil
+	ap, err := l.svcCtx.Accounts.FindAccountProfileByID(l.ctx, userID)
+	if err != nil {
+		return nil, rpcerror.ToStatus(mapReadError(err))
+	}
+	return toUserResponse(ap), nil
 }

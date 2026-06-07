@@ -264,7 +264,6 @@ write_user_rpc_config() {
   cat > "${CONFIG_DIR}/user-rpc.yaml" <<YAML
 Name: user-rpc
 ListenOn: 127.0.0.1:${USER_RPC_PORT:-9090}
-StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 Telemetry:
   Name: user-rpc

@@ -3,7 +3,6 @@ package logic
 import (
 	"context"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
@@ -26,11 +25,13 @@ func NewGetUserByIdentifierLogic(ctx context.Context, svcCtx *svc.ServiceContext
 }
 
 func (l *GetUserByIdentifierLogic) GetUserByIdentifier(in *userpb.GetUserByIdentifierRequest) (*userpb.UserResponse, error) {
-	profile, err := l.svcCtx.UserLogic.GetUserByIdentifier(l.ctx, business.GetUserByIdentifierRequest{
-		Identifier: in.GetIdentifier(),
-	})
+	identifier, err := validateIdentifier(in.GetIdentifier())
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	return toUserResponse(profile), nil
+	ap, err := l.svcCtx.Accounts.FindAccountProfileByIdentifier(l.ctx, identifier)
+	if err != nil {
+		return nil, rpcerror.ToStatus(mapReadError(err))
+	}
+	return toUserResponse(ap), nil
 }
