@@ -1,0 +1,207 @@
+syntax = "proto3";
+
+package msg.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/service/msg/rpc/msg";
+
+// Msg 是消息域 RPC（07-message-rpc-redesign §3.1）。
+// Phase 0：SendMessage / PullMessages / GetConversationsSeqState / MarkConversationAsRead 已实现（行为对齐旧 message-rpc，
+// 仍 PG 写 + seq 分配 + outbox，不动 Kafka）；其余 RPC 先留 stub（返回 Unimplemented），按 07 §8 分阶段落地。
+service Msg {
+  // 写
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc AppendStreamMessage(AppendStreamMessageRequest) returns (AppendStreamMessageResponse); // stub: Agent 流式回写
+
+  // 拉历史
+  rpc PullMessages(PullMessagesRequest) returns (PullMessagesResponse);
+  rpc GetLastMessageByConvs(GetLastMessageByConvsRequest) returns (GetLastMessageByConvsResponse); // stub: 侧边栏
+
+  // seq 同步
+  rpc GetConversationsSeqState(GetConversationsSeqStateRequest) returns (GetConversationsSeqStateResponse);
+  rpc GetMaxSeqs(GetMaxSeqsRequest) returns (GetMaxSeqsResponse);             // stub
+  rpc GetHasReadSeqs(GetHasReadSeqsRequest) returns (GetHasReadSeqsResponse); // stub
+
+  // 已读
+  rpc MarkConversationAsRead(MarkConversationAsReadRequest) returns (MarkConversationAsReadResponse);
+
+  // 撤回 / 删除 / 清空（stub）
+  rpc RevokeMessage(RevokeMessageRequest) returns (RevokeMessageResponse);
+  rpc DeleteMessages(DeleteMessagesRequest) returns (DeleteMessagesResponse);
+  rpc ClearConversationMessages(ClearConversationMessagesRequest) returns (ClearConversationMessagesResponse);
+
+  // 时间（stub）
+  rpc GetServerTime(GetServerTimeRequest) returns (GetServerTimeResponse);
+}
+
+message Message {
+  string server_msg_id = 1;
+  string client_msg_id = 2;
+  string conversation_id = 3;
+  int64 seq = 4;
+  string sender_id = 5;
+  string receiver_id = 6;
+  string group_id = 7;
+  string chat_type = 8;
+  string content_type = 9;
+  string content = 10;
+  string message_origin = 11;
+  string agent_account_id = 12;
+  string trigger_server_msg_id = 13;
+  string agent_run_id = 14;
+  bool allow_recursive_trigger = 15;
+  int64 send_time = 16;
+  int64 created_at = 17;
+}
+
+message ConversationSeqState {
+  string conversation_id = 1;
+  int64 max_seq = 2;
+  int64 has_read_seq = 3;
+  int64 unread_count = 4;
+  int64 max_seq_time = 5;
+  Message last_message = 6;
+}
+
+// ---- SendMessage ----
+message SendMessageRequest {
+  string sender_id = 1;
+  string receiver_id = 2;
+  string group_id = 3;
+  string chat_type = 4;
+  string client_msg_id = 5;
+  string content_type = 6;
+  string content = 7;
+  string message_origin = 8;
+  string agent_account_id = 9;
+  string trigger_server_msg_id = 10;
+  string agent_run_id = 11;
+  bool allow_recursive_trigger = 12;
+}
+
+message SendMessageResponse {
+  Message message = 1;
+  bool deduplicated = 2;
+}
+
+// ---- PullMessages ----
+message PullMessagesRequest {
+  string user_id = 1;
+  string conversation_id = 2;
+  int64 from_seq = 3;
+  int64 to_seq = 4;
+  int32 limit = 5;
+  string order = 6;
+}
+
+message PullMessagesResponse {
+  repeated Message messages = 1;
+  bool is_end = 2;
+  int64 next_seq = 3;
+}
+
+// ---- GetConversationsSeqState (旧 GetConversationSeqs) ----
+message GetConversationsSeqStateRequest {
+  string user_id = 1;
+  repeated string conversation_ids = 2;
+}
+
+message GetConversationsSeqStateResponse {
+  repeated ConversationSeqState states = 1;
+}
+
+// ---- MarkConversationAsRead ----
+message MarkConversationAsReadRequest {
+  string user_id = 1;
+  string conversation_id = 2;
+  int64 has_read_seq = 3;
+}
+
+message MarkConversationAsReadResponse {
+  string conversation_id = 1;
+  int64 has_read_seq = 2;
+  int64 max_seq = 3;
+  int64 unread_count = 4;
+  bool updated = 5;
+}
+
+// ---- AppendStreamMessage (stub) ----
+message AppendStreamMessageRequest {
+  string conversation_id = 1;
+  string server_msg_id = 2;
+  string agent_run_id = 3;
+  string delta = 4;
+  bool finished = 5;
+}
+
+message AppendStreamMessageResponse {
+  Message message = 1;
+}
+
+// ---- GetLastMessageByConvs (stub) ----
+message GetLastMessageByConvsRequest {
+  string user_id = 1;
+  repeated string conversation_ids = 2;
+}
+
+message GetLastMessageByConvsResponse {
+  map<string, Message> last_messages = 1;
+}
+
+// ---- GetMaxSeqs (stub) ----
+message GetMaxSeqsRequest {
+  string user_id = 1;
+  repeated string conversation_ids = 2;
+}
+
+message GetMaxSeqsResponse {
+  map<string, int64> max_seqs = 1;
+}
+
+// ---- GetHasReadSeqs (stub) ----
+message GetHasReadSeqsRequest {
+  string user_id = 1;
+  repeated string conversation_ids = 2;
+}
+
+message GetHasReadSeqsResponse {
+  map<string, int64> has_read_seqs = 1;
+}
+
+// ---- RevokeMessage (stub) ----
+message RevokeMessageRequest {
+  string user_id = 1;
+  string conversation_id = 2;
+  string server_msg_id = 3;
+}
+
+message RevokeMessageResponse {
+  bool revoked = 1;
+}
+
+// ---- DeleteMessages (stub) ----
+message DeleteMessagesRequest {
+  string user_id = 1;
+  string conversation_id = 2;
+  repeated string server_msg_ids = 3;
+}
+
+message DeleteMessagesResponse {
+  int32 deleted_count = 1;
+}
+
+// ---- ClearConversationMessages (stub) ----
+message ClearConversationMessagesRequest {
+  string user_id = 1;
+  string conversation_id = 2;
+}
+
+message ClearConversationMessagesResponse {
+  bool cleared = 1;
+}
+
+// ---- GetServerTime (stub) ----
+message GetServerTimeRequest {}
+
+message GetServerTimeResponse {
+  int64 server_time = 1;
+}

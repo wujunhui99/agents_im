@@ -1,0 +1,10 @@
+Name: msg-rpc
+ListenOn: 0.0.0.0:9094
+
+DataSource: ${DATABASE_URL}
+# go-zero 自带 tracing：本地上报到 docker-compose 的 tempo（OTLP gRPC）。
+Telemetry:
+  Name: msg-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
