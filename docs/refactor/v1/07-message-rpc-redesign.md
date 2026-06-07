@@ -6,6 +6,8 @@
 >
 > 关联：00-decisions D1/D2/D5/D6/D8/**D10**、03 §3.1/§4、04 §4.2。
 >
+> **实施顺序：07 先于 03**——03 传输链路依赖 msg/rpc 的接口面（§3.1）与 `SendMessage → MsgToMQ` 改造（§4.2）。先定 msg-rpc 边界（本文），再接 gateway→transfer→push 链路（03）。
+>
 > **路径约定**：本文出现的 `internal/rpc/msg/...`、`internal/push/...`、`internal/msgtransfer/...` 均指 **OpenIM 仓库**的源码路径（参考用）；`internal/handler/message/`、`internal/logic/message/` 等指 **agents_im 当前**的真实路径（重构前）。按 00-decisions D10，agents_im 重构后这些代码全部落到 `service/msg/{api,rpc}/internal/...`（业务）、`pkg/<name>/`（infra，如 `pkg/idgen` 用于 `server_msg_id` 生成）。
 
 ---
@@ -246,10 +248,10 @@ func (m *msgServer) SendMessage(ctx, req) (resp, error) {
     //    - 注意：**不分配 seq**（seq 是 transfer 的责任，00-decisions D2）
     msgData := m.encapsulate(req)
 
-    // 6. 发 Kafka（00-decisions D1/D6）
-    key := conversationKey(req)  // = conversation_id
-    payload, _ := proto.Marshal(msgData)
-    if err := m.producer.Publish(ctx, "msg.toTransfer.v1", key, payload); err != nil {
+    // 6. 发 Kafka：唯一写路径，封装成 MsgToMQ（对齐 OpenIM send.go → MsgDatabase.MsgToMQ）
+    //    MsgToMQ(ctx, key, msgData) 内部 = proto.Marshal(msgData) + producer.SendMessage(key, data)
+    //    key = conversation_id（分区键，保证同会话顺序）；**无 PG 写、无 outbox、无 seq 分配**
+    if err := m.msgDatabase.MsgToMQ(ctx, conversationKey(req), msgData); err != nil {
         return nil, err
     }
 
@@ -264,6 +266,8 @@ func (m *msgServer) SendMessage(ctx, req) (resp, error) {
     }, nil
 }
 ```
+
+> **`MsgToMQ` 是 msg-rpc 新模型下的唯一写原语**：旧版在 PG 事务里写 messages + outbox + 推进 max_seq；新版整条写路径坍缩成一次 `MsgToMQ`（Kafka publish）。持久化、seq、push 全部下沉 msgtransfer（03 §1.1/§5）。因此 msg-rpc 数据层（`service/msg/rpc/internal/model`）只在**读路径**碰 DB（PullMessages 的 PG 兜底），写路径无 DB。
 
 ### 4.3 ACK 语义变化（重要）
 
@@ -397,12 +401,8 @@ OpenIM `callback.go` 7 个 webhook 钩子：
 
 ---
 
-## 10. 一致性钩子（务必同步检查）
+## 10. 一致性钩子（同步状态）
 
-按 00-decisions §4 矩阵，本文新增的事实**不与任何 D 决策冲突**，但需要在以下文档加锚点：
-
-- **00-decisions**：考虑新增 D10 "msg-rpc 接口范围以 07 文档为准（10 个 RPC）"；
-- **03-message-pipeline §3.1** 描述 msg-rpc "仅 publish 到 msg.toTransfer.v1" → 改为 "按 07 文档承担消息域全部 RPC，SendMessage 仅发 Kafka 是其中之一"；
-- **04-agent §3.1** Agent runtime 写回 IM 走 msg-rpc.SendMessage → 还要确认 stream 模式走 AppendStreamMessage。
-
-具体 edits 我可以一并应用到这些文档，需要的话告诉我（一句话即可）。
+- **00-decisions D10**：msg-rpc 接口范围以本文为准（10 个 RPC）——已落。
+- **03-message-pipeline**：§0.1 已注明 msg-rpc 承担消息域全部 RPC，`SendMessage → MsgToMQ` 只是其中之一——已落。
+- **04-agent §3.1**：Agent runtime 写回 IM 走 msg-rpc.SendMessage，stream 模式走 AppendStreamMessage（§2.1）——待 04 确认。
