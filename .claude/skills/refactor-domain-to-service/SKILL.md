@@ -158,11 +158,6 @@ worktree 占用导致 gh 报 “main already used by worktree” 属正常，mer
 - [ ] build/vet/test 全绿；diff 无无关 gofmt 噪音；Drone CI 绿 + prod 冒烟
 - [ ] 同 PR 更新 `docs/refactor/v1/progress/02-microservices.md`
 
-## 已迁移域（更新此表）
-| 域 | 路线 | owner 落点 | 数据层 | PR | 备注 |
-|----|------|-----------|--------|----|------|
-| media | **goctl + BFF** | `service/media/rpc/internal/logic`（删 `core`）| **`service/media/rpc/internal/model`（goctl）** | #401→#433 | #433 写入脱 internal；下载鉴权（accounts 管理员 + message 附件可见性）**无 message-rpc 可 BFF 化**仍读 internal/repository（部分仍依赖）；`internal/mediavalidate` 留喂 message monolith + user-rpc 头像校验 |
-| groups | **goctl + BFF** | `service/groups/rpc/internal/logic` | **`service/groups/rpc/internal/model`（goctl）** | #415/#416 | 首个 rpc 数据层脱 internal；BFF 聚合 user-rpc；批量接口 #423 |
-| friends | **goctl + BFF** | `service/friends/rpc/internal/logic` | **`service/friends/rpc/internal/model`（goctl）** | #426 | 由 core 退役改造；`friendships` 加代理 PK（迁移 018）；BFF 聚合 user-rpc 批量 `GetUsersByIDs`；internal/repository 好友方法暂留喂 monolith |
-| auth | **特性改造（非数据层退役）** | `internal/auth/logic`（仍 keystone）| 未迁（credentials/email_verification 仍 internal）| #435 | 活跃会话 jti+Redis、共享 `common/middleware.DeviceAuth`（store-only，从 context 读 `user_id`/`session_id`/`device_type`）；**go-zero `jwt:Auth` 丢弃 sub/jti 注册声明** → token 镜像非注册声明；goctl 数据层迁移待独立 PR |
-| admin | **从零建 rpc + goctl + BFF** | `service/admin/rpc/internal/logic`（admin 域唯一碰 DB）| **`task_reports` goctl `service/admin/rpc/internal/model`；跨域只读暂 internal/repository** | #448 | admin 原**无 rpc**，api 直读 DB；新建 admin-rpc（proto `Admin` 无 Service 后缀）后 api 改纯 BFF。task_reports 独占→goctl；accounts/friendships/messages/agent_audits/feedback 跨域只读 = keystone 例外暂留 internal/repository；**model 只出 goctl 行，pb↔行映射放 logic（不要第三个领域结构体）**；AI-replay hook 独立二进制本就 nil（无回归）；admin 账号闸合进 svc DeviceAuth 链经 `GetUserDetail` 校验 |
+## 完成后：登记迁移台账
+逐域迁移台账**只在** [`docs/refactor/v1/progress/02-microservices.md`](../../../docs/refactor/v1/progress/02-microservices.md) 的「已迁移域 · 剩余/后续」表维护（**不在本 skill 留表**，避免双份漂移）。
+重构完同 PR 在该表追加本域一行：`域 | 路线 | owner 落点 | 数据层 | PR | 剩余/后续`。
