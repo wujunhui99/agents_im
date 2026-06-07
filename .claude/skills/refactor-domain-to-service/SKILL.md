@@ -127,6 +127,13 @@ cherry-pick(goctl scaffold 会盖手写代码):
   （friends 之前根本没起 friends-rpc 且 api 无 rpc 配置，是潜在断点——顺手补。）
 - **`scripts/verify-static.sh`**：`rpc_logic_markers` 检查每域 `svcCtx.<Marker>`，删 core 后把旧 `<Domain>Logic` 改成新 `<Domain>Model`，否则 CI 红。
 - **e2e/test**：原来注入 `core.*Logic` 的（如 `test/e2e/single-machine`）改直接调 `repository`。
+- **net-new 可部署单元**（仅当该域原**无 rpc**，如 admin #448 新建 `<svc>-rpc:90NN`；已有 rpc 的域跳过）：
+  代码外还要把新 binary 串进部署/CI 全链，少一处 prod 起不来或 CI 红——
+  `Dockerfile`（加 build target）、`scripts/ci/drone-build-images.sh`、`scripts/deploy-k3s.sh`、
+  `scripts/detect-deploy-changes.py`（backend_services 列表）、`deploy/k8s/deployments.yaml`+`services.yaml`、
+  `deploy/k8s/kustomization.yaml`（configmap）、`scripts/dev-up.sh`、`scripts/test-deploy-k3s.sh`（期望串）、
+  `scripts/verify-static.sh` + `scripts/verify/verify-contract-markers.sh`（清单）全部补 `<svc>-rpc`。
+  验证：CI detect-changes 日志里 `backend_services`/`rollout_services` 应含新服务，deploy 步骤应 `verified image service=<svc>-rpc ... ready=True`。
 
 ## 交付（按 CLAUDE.md 工作流）
 issue → worktree（`.claude/worktrees/<branch>`，从 main）→ commit → PR → merge（`--delete-branch`；本地 main 被
@@ -147,7 +154,7 @@ worktree 占用导致 gh 报 “main already used by worktree” 属正常，mer
 - [ ] tracing 切 go-zero 原生 Telemetry（去 `pkg/observability` 接线，必做）
 - [ ] 输入 `validate` 不 `normalize`（仅当原有 normalize）；logic 依 model 接口 + fake 单测
 - [ ] monolith 仍消费的部分保留并注明“待 message 迁移后删”
-- [ ] 配套改动清单逐项过：配置 3 份去 `StorageDriver`/加 client、`dev-up.sh`、`verify-static.sh` marker、e2e
+- [ ] 配套改动清单逐项过：配置 3 份去 `StorageDriver`/加 client、`dev-up.sh`、`verify-static.sh` marker、e2e；net-new rpc 域另过部署/CI 全链（Dockerfile/drone-build/deploy-k3s/detect-deploy/deployments+services/kustomization/test-deploy/verify-contract-markers）
 - [ ] build/vet/test 全绿；diff 无无关 gofmt 噪音；Drone CI 绿 + prod 冒烟
 - [ ] 同 PR 更新 `docs/refactor/v1/progress/02-microservices.md`
 
