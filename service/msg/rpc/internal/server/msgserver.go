@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 )
 
 type MsgServer struct {

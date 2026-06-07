@@ -31,10 +31,10 @@ type (
 
 	// UpsertConversationParams 描述会话的不变属性（用于首次创建行）。
 	UpsertConversationParams struct {
-		ChatType      string
-		SingleUserA   string
-		SingleUserB   string
-		GroupID       string
+		ChatType    string
+		SingleUserA string
+		SingleUserB string
+		GroupID     string
 	}
 
 	customConversationThreadsModel struct {

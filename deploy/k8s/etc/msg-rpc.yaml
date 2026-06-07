@@ -1,0 +1,10 @@
+Name: msg-rpc
+ListenOn: 0.0.0.0:9098
+
+DataSource: ${DATABASE_URL}
+# go-zero 自带 tracing：endpoint 由 OTLP collector 注入（空则关闭）。
+Telemetry:
+  Name: msg-rpc
+  Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 
-	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/svc"
+	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"

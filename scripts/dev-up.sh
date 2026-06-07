@@ -286,6 +286,19 @@ Telemetry:
 YAML
 }
 
+write_msg_rpc_config() {
+  cat > "${CONFIG_DIR}/msg-rpc.yaml" <<YAML
+Name: msg-rpc
+ListenOn: 127.0.0.1:${MSG_RPC_PORT:-9098}
+DataSource: ${DATABASE_URL}
+Telemetry:
+  Name: msg-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
+YAML
+}
+
 write_friends_rpc_config() {
   cat > "${CONFIG_DIR}/friends-rpc.yaml" <<YAML
 Name: friends-rpc
@@ -411,6 +424,7 @@ Telemetry:
   Batcher: otlpgrpc"
   write_user_rpc_config
   write_groups_rpc_config
+  write_msg_rpc_config
   write_friends_rpc_config
   write_admin_rpc_config
   write_auth_rpc_config
@@ -434,6 +448,7 @@ service_pkg() {
     user-api)         echo "./service/user/api" ;;
     user-rpc)         echo "./service/user/rpc" ;;
     message-rpc)      echo "./internal/rpcgen/message" ;;
+    msg-rpc)          echo "./service/msg/rpc" ;;
     gateway-ws)       echo "./service/gateway-ws" ;;
     message-api)      echo "./service/message-api" ;;
     message-transfer) echo "./service/message-transfer" ;;
@@ -520,6 +535,7 @@ main() {
   write_configs
   start_service "user-rpc"
   start_service "groups-rpc"
+  start_service "msg-rpc"
   start_service "friends-rpc"
   start_service "admin-rpc"
   start_service "auth-rpc"

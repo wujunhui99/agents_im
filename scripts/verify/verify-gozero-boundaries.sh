@@ -53,6 +53,7 @@ rpc_generated_dirs=(
   "service/friends/rpc"
   "service/groups/rpc"
   "internal/rpcgen/message"
+  "service/msg/rpc"
   "service/third/rpc"
 )
 for dir in "${rpc_generated_dirs[@]}"; do
@@ -107,6 +108,7 @@ rpc_logic_markers=(
   "service/auth/rpc/internal/logic:AuthLogic"
   "service/friends/rpc/internal/logic:FriendshipModel"
   "internal/rpcgen/message/internal/logic:MessageLogic"
+  "service/msg/rpc/internal/logic:Messages"
   "service/third/rpc/internal/logic:MailProvider"
 )
 for logic_spec in "${rpc_logic_markers[@]}"; do

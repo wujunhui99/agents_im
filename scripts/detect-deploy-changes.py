@@ -22,6 +22,7 @@ BACKEND_SERVICES = [
     "friends-rpc",
     "groups-rpc",
     "message-rpc",
+    "msg-rpc",
     "third-rpc",
     "media-api",
     "media-rpc",
