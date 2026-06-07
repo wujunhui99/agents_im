@@ -2,7 +2,7 @@
 
 > **重写说明（2026-05-29）**：上一版基于"保留 outbox + 推 push 服务"的中间方案。在阅读 `open-im-server/internal/{rpc/msg,msgtransfer,push,msggateway}/` 实际代码后，全部改为对齐 OpenIM 实现。**outbox 弃用**——理由见 §3。
 >
-> **补充（2026-06-07）**：复核 open-im-server 代码确认链路无误（`message_handler.go`/`send.go`/`online_history_msg_handler.go`/`push_handler.go`）；新增 §0.1（与 `internal/` 退役的关系、当前→目标命名映射、关联 `refactor-domain-to-service` skill）与 §7.2「上行 ACK 同步透传」说明。
+> **补充（2026-06-07）**：复核 open-im-server 代码确认链路无误（`message_handler.go`/`send.go`/`online_history_msg_handler.go`/`push_handler.go`）；新增 §0.1（与 `internal/` 退役的关系、当前→目标命名映射、关联 `refactor-domain-to-service` skill）与 §7.2「上行 ACK 同步透传 / `msg_incr`」说明。
 >
 > 阅读基础：`open-im-server/` 已 clone 在 `/Users/junhui/code/project/agents_im/open-im-server/`。
 >
@@ -21,6 +21,7 @@
 | push 路由模型                                | **广播**到所有 gateway 实例（service discovery），每个 gateway 查本地连接表 | OpenIM `internal/push/onlinepusher.go:70` |
 | 离线 push                                    | 二段式：push 消费 toPush，online 失败的 user 再 produce 到 toOfflinePush；独立 consumer 调 FCM/APNs/Getui/JPush | OpenIM `internal/push/push.go:80~135` |
 | Kafka topics                                 | `toRedis`（msg-rpc→transfer）、`toMongo`（transfer→transfer）、`toPush`（transfer→push）、`toOfflinePush`（push→push） | OpenIM `config/kafka.yml` |
+| WS ACK 匹配                                  | 每个上行 WS command 带 `msg_incr`（OpenIM JSON 名 `msgIncr`，string），gateway 原样回传；只做请求-响应匹配 | OpenIM `internal/msggateway/message_handler.go:43` |
 
 ---
 
@@ -386,8 +387,16 @@ Kafka producer 配置：
 
 > ⚠️ **API 契约变化**：当前客户端期望 SendMessage 同步返回 `seq`。重构后 seq 是异步的——客户端通过 push event `message_received`（针对自己也推一份）拿到自己发的消息的 seq。这与 OpenIM SDK 行为一致：本地先以 client_msg_id 占位渲染，收到 server push 后用 server_msg_id + seq 替换。
 
-### 4.3 幂等
-client_msg_id + sender_id 是天然幂等键。msgtransfer 在分配 seq 之前要查 Redis `msg:dedup:{client_msg_id}`，存在则跳过分配、复用旧 seq。dedup key TTL 7 天。
+### 4.3 幂等（去重在客户端，对齐 OpenIM）
+
+服务端**不做** client_msg_id 去重——这是 OpenIM 的成熟做法（核对 `internal/rpc/msg/`、`internal/msgtransfer/` 无任何 dedup 逻辑）：
+
+- `server_msg_id = MD5(time + send_id + rand)`（OpenIM `verify.go:GetMsgID`），**与 client_msg_id 无关**；同一 client_msg_id 重发 → 服务端生成新 server_msg_id + 新 seq，当成新消息。
+- 服务端只保证：**server_msg_id 全局唯一** + **seq 会话内单调**。交付语义是 **at-least-once**。
+- **去重由客户端/前端做**：client_msg_id 是客户端生成的幂等键，本地库以它做唯一索引。一条消息客户端会看到多次（ACK、自己发的 push 回显、重连 pull），每次按 client_msg_id 比对——已存在则更新（补 server_msg_id/seq/status），否则插入；排序用 seq。
+- 超时重发产生的极少量存储孤儿（同 client_msg_id、不同 seq）by-design 接受，用户无感。
+
+> ❌ 早期版本曾设计 msgtransfer 查 Redis `msg:dedup:{client_msg_id}` 复用旧 seq —— **已弃用**：要额外存 client_msg_id→seq 映射，复杂度高、收益低（客户端去重无法省），且不对齐 OpenIM。
 
 ---
 
@@ -525,7 +534,13 @@ command 路由：
 - `get_conversation_seqs` → 调 msg-rpc gRPC GetMaxSeqs；
 - `heartbeat` → 本地刷新 last-seen。
 
-**上行 ACK 是同步透传**（用户强调的「收到即回已发送」）：gateway 的 `send_message` handler 同步调 msg-rpc `SendMessage`，把返回的 `SendMsgResp{server_msg_id, client_msg_id, send_time}`（**无 seq**）原样回写 websocket，即客户端看到的「已发送」状态。gateway 本身**不碰 DB、不分配 seq、不做业务校验**（业务校验在 msg-rpc，对齐 OpenIM `msggateway/message_handler.go:GrpcHandler.SendMessage`——它只 `Unmarshal → 调 MsgClient.SendMsg → Marshal 回写`）。该 ACK 只代表「Kafka 已接受」，**不代表持久化、不代表已分配 seq**；seq 与「送达对端」由后续 push event 异步带回（§4.3、§10）。
+**上行 ACK 是同步透传**（用户强调的「收到即回已发送」）：gateway 的 `send_message` handler 同步调 msg-rpc `SendMessage`，把返回的 `SendMsgResp{server_msg_id, client_msg_id, send_time}`（**无 seq**）写回 websocket，即客户端看到的「已发送」状态。gateway 本身**不碰 DB、不分配 seq、不做业务校验**（业务校验在 msg-rpc，对齐 OpenIM `msggateway/message_handler.go:GrpcHandler.SendMessage`——它只 `Unmarshal → 调 MsgClient.SendMsg → Marshal 回写`）。该 ACK 只代表「Kafka 已接受」，**不代表持久化、不代表已分配 seq**；seq 与「送达对端」由后续 push event 异步带回（§4.3、§10）。
+
+ACK 外层必须带请求级 `msg_incr`（OpenIM 字段名 `MsgIncr` / JSON `msgIncr`；agents_im 可用 `msg_incr` 或把现有 `request_id` 作为 alias）。它由客户端生成，OpenIM SDK 实际格式是 `userID + "_" + OperationIDGenerator()`，其中 `OperationIDGenerator()` 是纳秒时间戳加随机数。gateway 不生成、不解释、不查重、不持久化，只在 WS response envelope 原样回传，SDK 用它唤醒对应的等待 channel；客户端负责保证 in-flight `msg_incr` 唯一。
+
+`msg_incr` 不是消息 ID：它不入库、不进 msg-rpc proto、不参与 seq，也不能用 `conversation_id` 替代。原因是同一会话可并发发送多条消息，response 可能乱序；而且 WS command 不只有发消息，`pull_messages`、`mark_read`、`get_seqs` 也需要同一套请求-响应匹配。`client_msg_id` 只适合消息业务层，`msg_incr` 属于 WS 传输包络。
+
+服务端侧明确**不做去重**：`msg_incr` 不是幂等键，重复 `msg_incr` 不会阻止请求进入 msg-rpc；`client_msg_id` 也不在 msg-rpc/msgtransfer 查重。重复发送的容忍与合并由客户端本地库按 `client_msg_id` / `server_msg_id` 处理。
 
 msg-rpc 拿到读类请求（pull / seqs / mark_read）后，**仍然走 Redis 优先 + PG 兜底**，不需要新走 Kafka。Kafka 只是写路径。
 
@@ -561,10 +576,10 @@ OpenIM 的 msggateway 本地维护 `userMap`（`user_map.go`），不依赖 Redi
 | msggateway 实例挂             | 该实例上的 conn 断；客户端重连其它实例；presence TTL 60s 自动清理 |
 
 ### 8.3 幂等
-- client_msg_id 在 Redis dedup key（7d TTL）；
-- server_msg_id（Snowflake）在 msg-rpc 生成，保证全局唯一；
-- push 重发对客户端是 by-design 可接受（客户端按 server_msg_id 去重）；
-- offline push 重发要看第三方通道，FCM 自带 message_id 去重。
+- **去重在客户端**：client_msg_id 是客户端幂等键，本地库唯一索引去重（详见 §4.3）；服务端不做 client_msg_id 去重，是 at-least-once。
+- server_msg_id（MD5/Snowflake）在 msg-rpc 生成，保证全局唯一；
+- push 重发对客户端可接受（客户端按 client_msg_id / server_msg_id 去重）；
+- offline push 重发看第三方通道，FCM 自带 message_id 去重。
 
 ---
 

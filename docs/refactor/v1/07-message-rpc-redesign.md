@@ -184,6 +184,8 @@ service MessageService {
 
 合计 **10 个 RPC**（vs OpenIM 40+，vs 现状 4）。
 
+`MsgIncr` / `msg_incr` 不进入 msg-rpc proto。它是 WebSocket envelope 的请求级 correlation id，由客户端生成、gateway 原样回传，用来匹配 ACK；msg-rpc 只处理消息业务字段。
+
 ### 3.2 与现状的差异概览
 
 | RPC                          | 状态     | 改动幅度 |
@@ -277,12 +279,23 @@ func (m *msgServer) SendMessage(ctx, req) (resp, error) {
 | `client_msg_id`   | ✅     | ✅     | 透传 |
 | `send_time`       | ✅     | ✅     | msg-rpc 设置 |
 | `seq`             | ✅     | **❌** | 删除（transfer 异步分配） |
-| `deduplicated`    | ✅     | ❌     | 改由 transfer 端用 client_msg_id 去重；ACK 不再告诉客户端 |
+| `deduplicated`    | ✅     | ❌     | 服务端不再按 client_msg_id 去重；客户端本地去重 |
+| `msg_incr` / `MsgIncr` | 未明确 | ✅（WS envelope） | 请求级 correlation id；不属于 SendMessageResp |
+
+`MsgIncr` 语义：
+- 类型是 string。OpenIM SDK 实际生成 `userID + "_" + OperationIDGenerator()`，不是 int。
+- gateway 只校验必填并原样回传；SDK 用 `msgIncr -> channel` 找到这次请求的等待者。
+- 服务端不查重、不持久化 `MsgIncr`，重复值不作为幂等信号；客户端负责保证 in-flight 唯一。
+- 不能用 `conversation_id` 替代：同一会话可并发发送多条消息，ACK 可能乱序；且 `pull_messages` / `mark_read` / `get_seqs` 等 WS command 没有发送消息语义。
+- 不能只用 `client_msg_id` 替代：它只存在于发消息业务层，WS envelope 在反序列化业务 Data 前就需要先路由响应。
+
+服务端侧去重策略：**不做**。`MsgIncr` 不去重，`client_msg_id` 也不由 msg-rpc/msgtransfer 去重；重复 ACK、发送回显、重连补偿由客户端本地库按 `client_msg_id` / `server_msg_id` 合并。
 
 **前端配合**：
-1. 客户端用 `client_msg_id` 占位渲染（OpenIM SDK 标准做法）；
-2. 收到 ACK → 用 `server_msg_id + send_time` 替换占位状态为 "sent"；
-3. 收到 push event（`message_received`）→ 拿到 `seq`，更新本地存储并按 seq 排序。
+1. 每个 WS command 生成一个 `msg_incr`，发送前注册等待回调；
+2. 收到 ACK envelope → 先用 `msg_incr` 找到对应请求；
+3. 对 `send_message`，再用 `server_msg_id + send_time` 替换 `client_msg_id` 占位状态为 "sent"；
+4. 收到 push event（`message_received`）→ 拿到 `seq`，更新本地存储并按 seq 排序。
 
 ### 4.4 校验逻辑保留
 
