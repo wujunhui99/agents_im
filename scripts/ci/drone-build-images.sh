@@ -58,7 +58,7 @@ docker buildx inspect --bootstrap >/dev/null
 echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
 if [[ "${force_all_images}" == "true" ]]; then
-  image_services_space="user-api auth-api friends-api message-api gateway-ws groups-api agent-api admin-api message-transfer user-rpc auth-rpc friends-rpc groups-rpc message-rpc third-rpc media-api media-rpc admin-rpc web"
+  image_services_space="user-api auth-api friends-api message-api gateway-ws groups-api agent-api admin-api message-transfer user-rpc auth-rpc friends-rpc groups-rpc message-rpc msg-rpc third-rpc media-api media-rpc admin-rpc web"
   echo "DRONE_IMAGE_BUILD_FORCE_ALL=true; overriding selected image services for performance measurement."
 fi
 

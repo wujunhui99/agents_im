@@ -69,6 +69,7 @@ rpc_generated_servers=(
   "service/groups/rpc/internal/server/groupsserver.go:GroupsServer"
   "service/admin/rpc/internal/server/adminserver.go:AdminServer"
   "internal/rpcgen/message/internal/server/message_service_server.go:MessageServiceServer"
+  "service/msg/rpc/internal/server/msgserver.go:MsgServer"
   "service/third/rpc/internal/server/mailserver.go:MailServer"
 )
 for server_spec in "${rpc_generated_servers[@]}"; do
@@ -86,6 +87,7 @@ rpc_generated_entrypoints=(
   "service/groups/rpc/groups.go:RegisterGroupsServer"
   "service/admin/rpc/admin.go:RegisterAdminServer"
   "internal/rpcgen/message/message.go:RegisterMessageServiceServer"
+  "service/msg/rpc/msg.go:RegisterMsgServer"
   "service/third/rpc/third.go:RegisterMailServer"
 )
 for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
@@ -111,6 +113,8 @@ rpc_generated_proto_files=(
   "service/auth/rpc/auth/auth_grpc.pb.go"
   "internal/rpcgen/message/messagepb/message.pb.go"
   "internal/rpcgen/message/messagepb/message_grpc.pb.go"
+  "service/msg/rpc/msg/msg.pb.go"
+  "service/msg/rpc/msg/msg_grpc.pb.go"
   "service/third/rpc/mail/mail.pb.go"
   "service/third/rpc/mail/mail_grpc.pb.go"
   "service/admin/rpc/admin/admin.pb.go"
