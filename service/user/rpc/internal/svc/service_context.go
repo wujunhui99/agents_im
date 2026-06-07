@@ -8,42 +8,59 @@ import (
 	"github.com/wujunhui99/agents_im/internal/mediavalidate"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
+
+	"github.com/zeromicro/go-zero/core/stores/postgres"
 )
 
+// DefaultAssistantProvisioner 是「新用户开通默认助手」的 keystone 跨域写接口（agent 域）。
+// 无 agent-rpc 可 BFF，暂由 internal/logic 实现注入，仍读/写 internal/repository；
+// 待 agent/message 迁移后删（见 docs/refactor/v1/progress/02-microservices.md）。
+type DefaultAssistantProvisioner interface {
+	EnsureForUser(ctx context.Context, accountID string) error
+}
+
+// AvatarValidator 是「头像 media 存在/类型校验」的 keystone 跨域读接口（media 域）。
+// media-rpc 设计为调用方本地校验 media_objects，暂由 internal/mediavalidate 实现注入，
+// 仍读 internal/repository；待 message 迁移后删。
+type AvatarValidator interface {
+	ValidateAvatarMedia(ctx context.Context, ownerUserID string, mediaID string) error
+}
+
 type ServiceContext struct {
-	Config          config.Config
-	UserLogic       *business.UserLogic
-	AvatarValidator *mediavalidate.AvatarValidator
-	Repo            repository.Repository
+	Config   config.Config
+	Accounts model.AccountsModel
+	Profiles model.ProfilesModel
+
+	// keystone 跨域例外（仍依赖 internal），见各接口注释。
+	Assistant       DefaultAssistantProvisioner
+	AvatarValidator AvatarValidator
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	repo, err := repository.NewRepositoryForStorage(c.StorageDriver, c.DataSource)
+	conn := postgres.New(c.DataSource)
+
+	// keystone：默认助手开通（agent 域写）。沿用 internal god-repository（account/agent/registry 同一实现）。
+	repo, err := repository.NewPostgresRepository(c.DataSource)
 	if err != nil {
-		log.Fatalf("build user repository: %v", err)
+		log.Fatalf("build account repository: %v", err)
 	}
-	agentRepo, err := repository.NewAgentRepositoryForStorage(c.StorageDriver, c.DataSource)
-	if err != nil {
-		log.Fatalf("build agent repository: %v", err)
+	provisioner := business.NewDefaultAssistantProvisioner(repo, repo, repo)
+	if _, err := provisioner.Backfill(context.Background()); err != nil {
+		log.Fatalf("backfill default assistant: %v", err)
 	}
-	agentRegistryRepo, err := repository.NewAgentRegistryRepositoryForStorage(c.StorageDriver, c.DataSource)
-	if err != nil {
-		log.Fatalf("build agent registry repository: %v", err)
-	}
-	mediaRepo, err := repository.NewMediaRepositoryForStorage(c.StorageDriver, c.DataSource)
+
+	// keystone：头像 media 校验（media 域读）。
+	mediaRepo, err := repository.NewPostgresMediaRepository(c.DataSource)
 	if err != nil {
 		log.Fatalf("build media repository: %v", err)
 	}
-	userLogic := business.NewUserLogic(repo)
-	defaultAssistant := business.NewDefaultAssistantProvisioner(repo, agentRepo, agentRegistryRepo)
-	userLogic.WithDefaultAssistantProvisioner(defaultAssistant)
-	if _, err := defaultAssistant.Backfill(context.Background()); err != nil {
-		log.Fatalf("backfill default assistant: %v", err)
-	}
+
 	return &ServiceContext{
 		Config:          c,
-		UserLogic:       userLogic,
+		Accounts:        model.NewAccountsModel(conn),
+		Profiles:        model.NewProfilesModel(conn),
+		Assistant:       provisioner,
 		AvatarValidator: mediavalidate.NewAvatarValidator(mediaRepo),
-		Repo:            repo,
 	}
 }

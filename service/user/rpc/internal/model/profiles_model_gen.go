@@ -17,10 +17,10 @@ import (
 )
 
 var (
-	profilesFieldNames          = builder.RawFieldNames(&Profiles{})
+	profilesFieldNames          = builder.RawFieldNames(&Profiles{}, true)
 	profilesRows                = strings.Join(profilesFieldNames, ",")
-	profilesRowsExpectAutoSet   = strings.Join(stringx.Remove(profilesFieldNames, "`create_at`", "`create_time`", "`created_at`", "`update_at`", "`update_time`", "`updated_at`"), ",")
-	profilesRowsWithPlaceHolder = strings.Join(stringx.Remove(profilesFieldNames, "`account_id`", "`create_at`", "`create_time`", "`created_at`", "`update_at`", "`update_time`", "`updated_at`"), "=?,") + "=?"
+	profilesRowsExpectAutoSet   = strings.Join(stringx.Remove(profilesFieldNames, "create_at", "create_time", "created_at", "update_at", "update_time", "updated_at"), ",")
+	profilesRowsWithPlaceHolder = builder.PostgreSqlJoin(stringx.Remove(profilesFieldNames, "account_id", "create_at", "create_time", "created_at", "update_at", "update_time", "updated_at"))
 )
 
 type (
@@ -46,24 +46,25 @@ type (
 		AvatarMediaId string       `db:"avatar_media_id"`
 		CreatedAt     time.Time    `db:"created_at"`
 		UpdatedAt     time.Time    `db:"updated_at"`
+		AvatarUrl     string       `db:"avatar_url"`
 	}
 )
 
 func newProfilesModel(conn sqlx.SqlConn) *defaultProfilesModel {
 	return &defaultProfilesModel{
 		conn:  conn,
-		table: "`profiles`",
+		table: `"public"."profiles"`,
 	}
 }
 
 func (m *defaultProfilesModel) Delete(ctx context.Context, accountId string) error {
-	query := fmt.Sprintf("delete from %s where `account_id` = ?", m.table)
+	query := fmt.Sprintf("delete from %s where account_id = $1", m.table)
 	_, err := m.conn.ExecCtx(ctx, query, accountId)
 	return err
 }
 
 func (m *defaultProfilesModel) FindOne(ctx context.Context, accountId string) (*Profiles, error) {
-	query := fmt.Sprintf("select %s from %s where `account_id` = ? limit 1", profilesRows, m.table)
+	query := fmt.Sprintf("select %s from %s where account_id = $1 limit 1", profilesRows, m.table)
 	var resp Profiles
 	err := m.conn.QueryRowCtx(ctx, &resp, query, accountId)
 	switch err {
@@ -77,14 +78,14 @@ func (m *defaultProfilesModel) FindOne(ctx context.Context, accountId string) (*
 }
 
 func (m *defaultProfilesModel) Insert(ctx context.Context, data *Profiles) (sql.Result, error) {
-	query := fmt.Sprintf("insert into %s (%s) values (?, ?, ?, ?, ?, ?, ?)", m.table, profilesRowsExpectAutoSet)
-	ret, err := m.conn.ExecCtx(ctx, query, data.AccountId, data.DisplayName, data.Name, data.Gender, data.BirthDate, data.Region, data.AvatarMediaId)
+	query := fmt.Sprintf("insert into %s (%s) values ($1, $2, $3, $4, $5, $6, $7, $8)", m.table, profilesRowsExpectAutoSet)
+	ret, err := m.conn.ExecCtx(ctx, query, data.AccountId, data.DisplayName, data.Name, data.Gender, data.BirthDate, data.Region, data.AvatarMediaId, data.AvatarUrl)
 	return ret, err
 }
 
 func (m *defaultProfilesModel) Update(ctx context.Context, data *Profiles) error {
-	query := fmt.Sprintf("update %s set %s where `account_id` = ?", m.table, profilesRowsWithPlaceHolder)
-	_, err := m.conn.ExecCtx(ctx, query, data.DisplayName, data.Name, data.Gender, data.BirthDate, data.Region, data.AvatarMediaId, data.AccountId)
+	query := fmt.Sprintf("update %s set %s where account_id = $1", m.table, profilesRowsWithPlaceHolder)
+	_, err := m.conn.ExecCtx(ctx, query, data.AccountId, data.DisplayName, data.Name, data.Gender, data.BirthDate, data.Region, data.AvatarMediaId, data.AvatarUrl)
 	return err
 }
 

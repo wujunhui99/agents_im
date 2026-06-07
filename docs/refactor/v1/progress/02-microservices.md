@@ -23,7 +23,7 @@
 | media | 部分 | ✅ #433 写入脱；下载鉴权 keystone 暂留 |
 | admin | 部分 | ✅ #448 task_reports 脱；跨域只读 keystone 暂留 |
 | auth | 是 | ⚠️ 结构已迁、数据层未脱；会话改 Redis（#435）|
-| user | 是 | ⚠️ goctl model 已生成待接线 |
+| user | 部分 | ✅ #452 数据层脱；助手开通/头像校验 keystone 暂留 |
 | message/gateway/transfer | 是 | ❌ keystone，最后做 |
 
 ## groups-rpc 本次操作（PR #415，issue #415）
@@ -88,7 +88,7 @@
 ## 已迁移域 · 剩余/后续
 
 > 逐域迁移台账，一域一行：路线 / owner 落点 / 数据层 / PR / 退役欠下的尾巴。新域完成后追加一行，只此一处（不在 skill 维护）。
-> **全局收尾**：顶层 `internal/` 完全退役以 message/gateway/transfer（[`07-message-rpc-redesign`](../07-message-rpc-redesign.md)）为最后一公里；user/auth 数据层从 `internal/repository` 切到各自 `rpc/internal/model`（user goctl model 已生成待接线）。
+> **全局收尾**：顶层 `internal/` 完全退役以 message/gateway/transfer（[`07-message-rpc-redesign`](../07-message-rpc-redesign.md)）为最后一公里；auth 数据层（credentials/email_verification）从 `internal/repository` 切到 `rpc/internal/model` 待独立 PR；user 数据层已脱（#452），仅剩助手开通/头像校验两处 keystone 跨域例外随 agent/message 迁移后删。
 
 | 域 | 路线 | owner 落点 | 数据层 | PR | 剩余 / 后续 |
 |----|------|-----------|--------|----|-----------|
@@ -98,6 +98,7 @@
 | media | goctl+BFF（删 `core`）| `service/media/rpc/internal/logic` | `service/media/rpc/internal/model`（goctl）| #401→#433 | **部分仍依赖 internal**：下载鉴权（读 accounts/message）无 message-rpc 可 BFF 化，仍读 internal/repository。`internal/mediavalidate`+media 数据层喂 monolith 发信校验+user-rpc 头像，message 迁移后连同下载鉴权删。dev-up 未起 media-rpc/api。〔不并入 third 的 A 方案见表下〕|
 | auth | 特性改造（非数据层退役）| `internal/auth/logic`（仍 keystone）| 未迁（credentials/email_verification 仍 internal）| #435 | 活跃会话 Postgres→Redis 按 (user,device)；共享 `DeviceAuth` 挂 4 个 `jwt:Auth` api。go-zero 坑：`jwt:Auth` 丢注册声明→token 镜像 `user_id`/`session_id`。5 处 inline 校验迁 Redis。`active_sessions` 表+方法成死代码待清。credentials/email_verification goctl+BFF 待独立 PR（keystone-blocked）。|
 | admin | 从零建 rpc+goctl+BFF | `service/admin/rpc/internal/logic`（唯一碰 DB；proto `Admin`）| `task_reports` goctl model；跨域只读暂 internal/repository | #448 | 跨域只读（accounts/friendships/messages/agent_audits/feedback）= keystone 例外，待相关 rpc 落地 BFF 化。pb↔行映射在 logic（无第三结构体）。admin 账号闸合进 `DeviceAuth` 经 `GetUserDetail`。AI-replay hook 本就 nil（无回归）。新增部署单元 `admin-rpc:9097`。旧 `AdminLogic`/`AdminAIReplayLogic` 随重生成删除。|
+| user | goctl+BFF（被依赖最多域）| `service/user/rpc/internal/logic` | `accounts`/`profiles` goctl model（事务编排在 Logic，model 仅 `WithSession`+`Transact`+单一原语；regen 顺带修旧 gen 的 MySQL 方言）| #452 | **部分仍依赖 internal**：①默认助手开通（agent 域写，无 agent-rpc 可 BFF）经 `svc.DefaultAssistantProvisioner` 接口注入、实现仍 `internal/logic`；②头像校验（media 域读，media-rpc 设计为调用方本地校验）经 `svc.AvatarValidator` 接口注入、实现仍 `internal/mediavalidate`。二者随 agent/message 迁移删。monolith 消费者（adminbootstrap/useradapter/同包 groups·agent logic）仍用 `internal/logic.UserLogic`，故 `internal/logic/userlogic.go`+`postgres_user_friends.go` account/profile 部分+`schema_v2_enums.go` 保留。logic 依 model 接口 + fake model 单测。user-api 仍纯 BFF（user 是被 hydrate 的源，无跨域聚合）。|
 
 > **存档：media 为何不并入 third（A 方案保持独立）**
 > - **本质不同**：mail 是真·第三方适配器（薄壳包 SES）；media 是有自己 DB 领域的领域服务（media 对象、upload intent、附件鉴权），只是「用了」对象存储——否则每个连 Postgres 的服务都成第三方，"third" 退化成杂物抽屉。

@@ -17,10 +17,10 @@ import (
 )
 
 var (
-	accountsFieldNames          = builder.RawFieldNames(&Accounts{})
+	accountsFieldNames          = builder.RawFieldNames(&Accounts{}, true)
 	accountsRows                = strings.Join(accountsFieldNames, ",")
-	accountsRowsExpectAutoSet   = strings.Join(stringx.Remove(accountsFieldNames, "`create_at`", "`create_time`", "`created_at`", "`update_at`", "`update_time`", "`updated_at`"), ",")
-	accountsRowsWithPlaceHolder = strings.Join(stringx.Remove(accountsFieldNames, "`account_id`", "`create_at`", "`create_time`", "`created_at`", "`update_at`", "`update_time`", "`updated_at`"), "=?,") + "=?"
+	accountsRowsExpectAutoSet   = strings.Join(stringx.Remove(accountsFieldNames, "create_at", "create_time", "created_at", "update_at", "update_time", "updated_at"), ",")
+	accountsRowsWithPlaceHolder = builder.PostgreSqlJoin(stringx.Remove(accountsFieldNames, "account_id", "create_at", "create_time", "created_at", "update_at", "update_time", "updated_at"))
 )
 
 type (
@@ -42,28 +42,28 @@ type (
 		AccountId       string       `db:"account_id"`
 		Identifier      string       `db:"identifier"`
 		AccountType     int64        `db:"account_type"`
-		EmailNormalized string       `db:"email_normalized"`
-		EmailVerifiedAt sql.NullTime `db:"email_verified_at"`
 		CreatedAt       time.Time    `db:"created_at"`
 		UpdatedAt       time.Time    `db:"updated_at"`
+		EmailNormalized string       `db:"email_normalized"`
+		EmailVerifiedAt sql.NullTime `db:"email_verified_at"`
 	}
 )
 
 func newAccountsModel(conn sqlx.SqlConn) *defaultAccountsModel {
 	return &defaultAccountsModel{
 		conn:  conn,
-		table: "`accounts`",
+		table: `"public"."accounts"`,
 	}
 }
 
 func (m *defaultAccountsModel) Delete(ctx context.Context, accountId string) error {
-	query := fmt.Sprintf("delete from %s where `account_id` = ?", m.table)
+	query := fmt.Sprintf("delete from %s where account_id = $1", m.table)
 	_, err := m.conn.ExecCtx(ctx, query, accountId)
 	return err
 }
 
 func (m *defaultAccountsModel) FindOne(ctx context.Context, accountId string) (*Accounts, error) {
-	query := fmt.Sprintf("select %s from %s where `account_id` = ? limit 1", accountsRows, m.table)
+	query := fmt.Sprintf("select %s from %s where account_id = $1 limit 1", accountsRows, m.table)
 	var resp Accounts
 	err := m.conn.QueryRowCtx(ctx, &resp, query, accountId)
 	switch err {
@@ -78,7 +78,7 @@ func (m *defaultAccountsModel) FindOne(ctx context.Context, accountId string) (*
 
 func (m *defaultAccountsModel) FindOneByEmailNormalized(ctx context.Context, emailNormalized string) (*Accounts, error) {
 	var resp Accounts
-	query := fmt.Sprintf("select %s from %s where `email_normalized` = ? limit 1", accountsRows, m.table)
+	query := fmt.Sprintf("select %s from %s where email_normalized = $1 limit 1", accountsRows, m.table)
 	err := m.conn.QueryRowCtx(ctx, &resp, query, emailNormalized)
 	switch err {
 	case nil:
@@ -92,7 +92,7 @@ func (m *defaultAccountsModel) FindOneByEmailNormalized(ctx context.Context, ema
 
 func (m *defaultAccountsModel) FindOneByIdentifier(ctx context.Context, identifier string) (*Accounts, error) {
 	var resp Accounts
-	query := fmt.Sprintf("select %s from %s where `identifier` = ? limit 1", accountsRows, m.table)
+	query := fmt.Sprintf("select %s from %s where identifier = $1 limit 1", accountsRows, m.table)
 	err := m.conn.QueryRowCtx(ctx, &resp, query, identifier)
 	switch err {
 	case nil:
@@ -105,14 +105,14 @@ func (m *defaultAccountsModel) FindOneByIdentifier(ctx context.Context, identifi
 }
 
 func (m *defaultAccountsModel) Insert(ctx context.Context, data *Accounts) (sql.Result, error) {
-	query := fmt.Sprintf("insert into %s (%s) values (?, ?, ?, ?, ?)", m.table, accountsRowsExpectAutoSet)
+	query := fmt.Sprintf("insert into %s (%s) values ($1, $2, $3, $4, $5)", m.table, accountsRowsExpectAutoSet)
 	ret, err := m.conn.ExecCtx(ctx, query, data.AccountId, data.Identifier, data.AccountType, data.EmailNormalized, data.EmailVerifiedAt)
 	return ret, err
 }
 
 func (m *defaultAccountsModel) Update(ctx context.Context, newData *Accounts) error {
-	query := fmt.Sprintf("update %s set %s where `account_id` = ?", m.table, accountsRowsWithPlaceHolder)
-	_, err := m.conn.ExecCtx(ctx, query, newData.Identifier, newData.AccountType, newData.EmailNormalized, newData.EmailVerifiedAt, newData.AccountId)
+	query := fmt.Sprintf("update %s set %s where account_id = $1", m.table, accountsRowsWithPlaceHolder)
+	_, err := m.conn.ExecCtx(ctx, query, newData.AccountId, newData.Identifier, newData.AccountType, newData.EmailNormalized, newData.EmailVerifiedAt)
 	return err
 }
 
