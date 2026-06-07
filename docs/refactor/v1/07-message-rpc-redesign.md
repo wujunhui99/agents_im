@@ -403,6 +403,7 @@ OpenIM `callback.go` 7 个 webhook 钩子：
 
 ## 10. 一致性钩子（同步状态）
 
+- **Phase 0 落地（#457 PR1）**：`service/msg/rpc` 已建——proto-first 10-RPC 接口面 + goctl 数据层（脱 `internal/repository`，迁移 019 给 `user_conversation_states` 加代理 PK），4 个 RPC（SendMessage/PullMessages/GetConversationsSeqState/MarkConversationAsRead）行为对齐旧实现（仍 PG 写 + seq 分配 + outbox，**未动 Kafka/§4.2 MsgToMQ**），新增 RPC 返回 Unimplemented。additive 部署（msg-rpc:9098，dormant `internal/rpcgen/message` 暂留）。跨域 inline 鉴权（群/媒体）作 keystone 例外暂依赖 internal。**待 PR2**：msg-api BFF + 切流 + 退休 message-api/rpcgen/message；gateway-ws 仍 in-process。详见 [progress/02-microservices.md](progress/02-microservices.md) msg 行。
 - **00-decisions D10**：msg-rpc 接口范围以本文为准（10 个 RPC）——已落。
 - **03-message-pipeline**：§0.1 已注明 msg-rpc 承担消息域全部 RPC，`SendMessage → MsgToMQ` 只是其中之一——已落。
 - **04-agent §3.1**：Agent runtime 写回 IM 走 msg-rpc.SendMessage，stream 模式走 AppendStreamMessage（§2.1）——待 04 确认。
