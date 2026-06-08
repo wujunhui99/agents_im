@@ -27,6 +27,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       media-rpc)        pkg=./service/media/rpc ;; \
       message-rpc)      pkg=./internal/rpcgen/message ;; \
       msg-rpc)          pkg=./service/msg/rpc ;; \
+      msg-api)          pkg=./service/msg/api ;; \
       gateway-ws)       pkg=./service/gateway-ws ;; \
       admin-api)        pkg=./service/admin/api ;; \
       admin-rpc)        pkg=./service/admin/rpc ;; \

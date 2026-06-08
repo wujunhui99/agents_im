@@ -21,6 +21,7 @@ configMapGenerator:
       - etc/auth-api.yaml
       - etc/friends-api.yaml
       - etc/message-api.yaml
+      - etc/msg-api.yaml
       - etc/gateway-ws.yaml
       - etc/groups-api.yaml
       - etc/admin-api.yaml

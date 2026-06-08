@@ -412,6 +412,15 @@ Telemetry:
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
   Sampler: 1.0
   Batcher: otlpgrpc"
+  write_api_config "msg-api" "${MSG_API_PORT:-8090}" "MsgRPC:
+  Endpoints:
+    - 127.0.0.1:${MSG_RPC_PORT:-9098}
+  Timeout: 5000
+Telemetry:
+  Name: msg-api
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc"
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
   write_api_config "admin-api" "${ADMIN_API_PORT:-8088}" "AdminRPC:
   Endpoints:
@@ -449,6 +458,7 @@ service_pkg() {
     user-rpc)         echo "./service/user/rpc" ;;
     message-rpc)      echo "./internal/rpcgen/message" ;;
     msg-rpc)          echo "./service/msg/rpc" ;;
+    msg-api)          echo "./service/msg/api" ;;
     gateway-ws)       echo "./service/gateway-ws" ;;
     message-api)      echo "./service/message-api" ;;
     message-transfer) echo "./service/message-transfer" ;;
@@ -543,6 +553,7 @@ main() {
   start_service "auth-api"
   start_service "friends-api"
   start_service "message-api"
+  start_service "msg-api"
   start_service "gateway-ws"
   start_service "message-transfer"
   start_service "groups-api"
@@ -553,6 +564,7 @@ main() {
   wait_http "auth-api" "http://127.0.0.1:${AUTH_API_PORT:-8081}/healthz"
   wait_http "friends-api" "http://127.0.0.1:${FRIENDS_API_PORT:-8082}/healthz"
   wait_http "message-api" "http://127.0.0.1:${MESSAGE_API_PORT:-8083}/healthz"
+  wait_http "msg-api" "http://127.0.0.1:${MSG_API_PORT:-8090}/healthz"
   wait_http "gateway-ws" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
   if [[ "${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}" == "true" ]]; then
     wait_http "message-transfer" "http://127.0.0.1:${MESSAGE_TRANSFER_OBSERVABILITY_PORT}/healthz"

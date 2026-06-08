@@ -101,6 +101,7 @@ api_register_patterns=(
   "service/groups/api/groups.go:handler.RegisterHandlers"
   "service/agent/api/agent.go:handler.RegisterHandlers"
   "service/admin/api/admin.go:handler.RegisterHandlers"
+  "service/msg/api/msg.go:handler.RegisterHandlers"
 )
 for entry_spec in "${api_register_patterns[@]}"; do
   rg -q "${entry_spec##*:}" "${entry_spec%%:*}"
@@ -259,7 +260,7 @@ assert_present "-q" pkg/health pkg/observability -- \
 for api_main in service/agent/api/agent.go; do
   rg -q "TraceMiddlewareFunc" "$api_main"
 done
-assert_present "-q" internal/handler/gozero_routes.go service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/gateway-ws/main.go service/message-transfer/main.go -- \
+assert_present "-q" internal/handler/gozero_routes.go service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/gateway-ws/main.go service/message-transfer/main.go -- \
   "/readyz" "/metrics" "ReadinessHandler" "MetricsHandler"
 assert_present "-q" internal/logic/messagelogic.go internal/gateway/ws internal/transfer/worker.go -- \
   "RecordMessageSend" "RecordDeliveryAttempt" "RecordTransferEvent" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"
