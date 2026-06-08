@@ -12,6 +12,7 @@ BACKEND_SERVICES = [
     "auth-api",
     "friends-api",
     "message-api",
+    "msg-api",
     "gateway-ws",
     "groups-api",
     "agent-api",
@@ -56,6 +57,7 @@ API_SERVICES = {
     "friends": "friends-api",
     "groups": "groups-api",
     "message": "message-api",
+    "msg": "msg-api",
     "agent": "agent-api",
     "admin": "admin-api",
     "media": "media-api",
@@ -75,6 +77,7 @@ API_BACKEND_SERVICES = [
     "auth-api",
     "friends-api",
     "message-api",
+    "msg-api",
     "groups-api",
     "agent-api",
 ]

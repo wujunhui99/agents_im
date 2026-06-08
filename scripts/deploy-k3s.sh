@@ -23,6 +23,7 @@ IMAGE_DEPLOYMENTS=(
   auth-api
   friends-api
   message-api
+  msg-api
   gateway-ws
   groups-api
   agent-api
