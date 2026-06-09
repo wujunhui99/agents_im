@@ -236,7 +236,7 @@ RUN_LIVE_DEEPSEEK_TESTS=1 PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal
 
 - 禁止用假实现、假成功、静默 fallback 冒充真实能力。
 - 失败必须可见；能明确失败就不要隐藏错误。
-- 复杂变更先写计划，完成后记录验证结果。
+- 复杂变更先写清 GitHub Issue；需要长期上下文时更新对应产品规格、设计文档或运行手册。
 - 新增或修改重要行为时，同步更新相关文档。
 - 后端行为变更至少跑 Go 测试和静态验证。
 - 前端联调变更同时检查前后端契约、dev 启动脚本和 MVP smoke 测试。

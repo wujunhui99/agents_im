@@ -11,8 +11,9 @@ FRONTEND_URL := http://127.0.0.1:$(FRONTEND_PORT)
 
 # ---- go-zero microservices (entrypoints live under service/<...>; cmd/ removed) ----
 BACKEND_SERVICES := agent-api auth-api auth-rpc friends-api friends-rpc \
-	groups-api groups-rpc mail-rpc user-api user-rpc \
-	message-rpc msg-rpc msg-api gateway-ws message-api message-transfer
+	groups-api groups-rpc user-api user-rpc \
+	message-rpc msg-rpc msg-api third-rpc gateway-ws message-api message-transfer \
+	admin-api admin-rpc media-api media-rpc
 
 # Deployment name -> go main package path.
 PKG_agent-api        := ./service/agent/api
@@ -22,15 +23,24 @@ PKG_friends-api      := ./service/friends/api
 PKG_friends-rpc      := ./service/friends/rpc
 PKG_groups-api       := ./service/groups/api
 PKG_groups-rpc       := ./service/groups/rpc
-PKG_mail-rpc         := ./service/mail/rpc
 PKG_user-api         := ./service/user/api
 PKG_user-rpc         := ./service/user/rpc
 PKG_message-rpc      := ./internal/rpcgen/message
 PKG_msg-rpc          := ./service/msg/rpc
 PKG_msg-api          := ./service/msg/api
+PKG_third-rpc        := ./service/third/rpc
 PKG_gateway-ws       := ./service/gateway-ws
 PKG_message-api      := ./service/message-api
 PKG_message-transfer := ./service/message-transfer
+PKG_admin-api        := ./service/admin/api
+PKG_admin-rpc        := ./service/admin/rpc
+PKG_media-api        := ./service/media/api
+PKG_media-rpc        := ./service/media/rpc
+
+CFG_media-api        := service/media/api/etc/media-api.yaml
+CFG_media-rpc        := service/media/rpc/etc/media-rpc.yaml
+
+config_for = $(if $(CFG_$(1)),$(CFG_$(1)),etc/$(1).yaml)
 
 BIN_DIR ?= bin
 
@@ -100,15 +110,16 @@ status: ## Show local frontend/backend PID files and listening ports.
 		echo "  none"; \
 	fi
 	@echo; echo "Listening ports:"; \
-	ss -ltnp 2>/dev/null | awk 'NR==1 || /:(8080|8081|8082|8083|8084|8085|8086|5173)\b/' || true
+	ss -ltnp 2>/dev/null | awk 'NR==1 || /:(8080|8081|8082|8083|8084|8085|8086|8087|8088|8089|5173)\b/' || true
 
 services: ## List backend microservices and their package paths.
 	@$(foreach s,$(BACKEND_SERVICES),printf "  %-18s %s\n" "$(s)" "$(PKG_$(s))";)
 
 run-%: ## Run one service in foreground (go-zero style): make run-auth-rpc
 	@test -n "$(PKG_$*)" || { echo "unknown service: $*"; exit 1; }
-	@echo "go run $(PKG_$*) -f etc/$*.yaml"
-	@go run $(PKG_$*) -f etc/$*.yaml
+	@cfg="$(call config_for,$*)"; \
+	echo "go run $(PKG_$*) -f $$cfg"; \
+	go run $(PKG_$*) -f "$$cfg"
 
 build-%: ## Build one service binary into $(BIN_DIR): make build-auth-rpc
 	@test -n "$(PKG_$*)" || { echo "unknown service: $*"; exit 1; }

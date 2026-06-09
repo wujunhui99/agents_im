@@ -1,5 +1,7 @@
 # ARCHITECTURE.md
 
+适用场景：需要理解系统边界、核心模块、数据流或跨服务影响面时先读本文。
+
 本文档提供项目的顶层架构地图，帮助人类和 AI Agent 快速理解系统边界、核心模块和关键数据流。
 
 ## 系统目标
@@ -54,11 +56,9 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为 Message Transfer、Push 服务提供可靠事件源。这里的 `user_id` 是 V0 account id alias。当前文本、图片、文件消息均通过同一消息链路写入；图片/文件消息必须引用已就绪、归发送者所有的 `media_objects` 记录。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md) 和 [`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
 
-### Media Service Surface
+### Media Service
 
-第一阶段不新增独立 `media-api` 进程；媒体上传意图、上传完成校验、下载 URL 和头像绑定作为受保护 REST 路由挂在 `user-api` 上。`user-api` 负责创建私有对象存储 bucket、生成后端控制的 object key、签发上传/下载 URL，并把媒体元数据写入 PostgreSQL `media_objects`。Message API/RPC/Gateway 只验证媒体元数据的 owner、purpose、status、content type 和 size，不直接访问对象存储。
-
-负责消息链路第一阶段契约和实现，包括发送消息、生成 `server_msg_id`、维护会话内递增 `seq`、同步存储消息、按 seq 拉取消息、维护 `user_id + conversation_id -> has_read_seq` 已读状态，并通过 PostgreSQL transactional outbox 为 Message Transfer、Push 服务提供可靠事件源。这里的 `user_id` 是 V0 account id alias。消息持久化包含 `message_origin=human|ai|system`；Agent/AI 写回消息还记录 `agent_account_id`、`trigger_server_msg_id`、`agent_run_id` 和递归策略。设计见 [`docs/design-docs/message-chain-contract.md`](./docs/design-docs/message-chain-contract.md)、[`docs/design-docs/message-outbox.md`](./docs/design-docs/message-outbox.md) 和 [`docs/design-docs/agent-conversation-hosting.md`](./docs/design-docs/agent-conversation-hosting.md)，产品规格见 [`docs/product-specs/message-chain.md`](./docs/product-specs/message-chain.md)。
+`media-api` + `media-rpc` 负责媒体上传意图、上传完成校验、下载 URL 和头像展示 URL。`media-rpc` 拥有 `media_objects` 写入和对象存储生命周期；`media-api` 提供 `/media/uploads`、`/media/uploads/:media_id/complete`、`/media/:media_id/download-url`、`/media/avatars/:media_id`。Message API/RPC/Gateway 只验证媒体元数据的 owner、purpose、status、content type 和 size，不直接访问对象存储。
 
 ### Message Transfer Worker
 
@@ -135,7 +135,7 @@ LLM observability is separate from system metrics/tracing. AI Hosting emits run/
 
 生产发布采用 Drone CI + GHCR + k3s + Docker Compose 的混合单机模型（GitHub Actions 已废弃，唯一 CI/部署链路是 Drone）：
 
-- Drone CI（`.drone.yml`，服务器 `https://drone.agenticim.xyz`）承担 verify 与 deploy：`verification` pipeline 在 PR 上跑 backend verify + PostgreSQL integration；`deploy-main` pipeline 在 `main` push 时执行 detect → build → deploy → notify。已取消 `develop` 集成分支，所有变更经任务分支 PR + GitHub Merge Queue 合入 `main` 后才触发部署（见 `AGENTS.md`）。
+- Drone CI（`.drone.yml`）承担 verify 与 deploy：`verification` pipeline 在 PR 上跑 backend/frontend verify + PostgreSQL integration；`deploy-main` pipeline 在 `main` push 时执行 detect → build → deploy → notify。已取消 `develop` 集成分支，所有变更经任务分支 PR + GitHub Merge Queue 合入 `main` 后才触发部署（见 `AGENTS.md`）。
 - deploy pipeline 先执行 `detect changes`（`scripts/ci/drone-detect-deploy.sh`）：业务/镜像相关变更输出受影响后端服务列表和 `web_required`；纯 `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh` 等变更进入 config-only deploy；文档/Markdown-only 变更不部署。
 - 后端每个 Go API/RPC/worker 按动态服务矩阵构建独立镜像，web UI 仅在 web-owned 路径变更时构建独立镜像；镜像推送到 GHCR，并只打不可变 commit SHA tag。
 - k3s 运行应用工作负载，包括所有 Go API、RPC、Message Transfer worker、Gateway WebSocket 和 web UI。

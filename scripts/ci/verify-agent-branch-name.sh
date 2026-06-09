@@ -5,10 +5,10 @@ set -euo pipefail
 # Required format:
 #   <type>/<agent-name>/issue-<number>-<task-desc>
 # Example:
-#   fix/eino/issue-20-login-ci
+#   fix/codex/issue-20-login-ci
 
 ALLOWED_TYPES=(feature fix refactor docs test chore ci perf style hotfix)
-TRUSTED_AGENTS=(eino helios hermes achilles furies gaia claude)
+TRUSTED_AGENTS=(claude codex)
 
 branch_name="${AGENT_BRANCH_NAME:-${DRONE_SOURCE_BRANCH:-${DRONE_COMMIT_BRANCH:-}}}"
 
@@ -40,7 +40,7 @@ CI requires source branches to use:
   <type>/<agent-name>/issue-<number>-<task-desc>
 
 Example:
-  fix/eino/issue-20-login-ci
+  fix/codex/issue-20-login-ci
 
 Rules:
   - first segment <type> must be one of: $(join_by ', ' "${ALLOWED_TYPES[@]}")
