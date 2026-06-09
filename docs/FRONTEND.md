@@ -1,5 +1,7 @@
 # FRONTEND.md
 
+适用场景：修改 React/Vite 前端、前端 API adapter、页面交互、样式、Vite proxy 或前端测试。
+
 本文档记录 `agents_im` Web 前端约定。当前阶段已搭建微信风格主框架，并已把登录后的消息、联系人、加好友、发消息主流程切到真实 REST API。生产代码不再保留 mock/default demo 数据源；mock/fetch stub 仅允许存在于测试 fixture 中。
 
 ## 技术栈
@@ -89,7 +91,7 @@ web/
 
 ## 认证与 API Client
 
-- REST client 入口为 `web/src/api/client.ts`，默认同源请求；本地开发由 Vite proxy 将 `/auth`、`/me`、`/users`、`/friends`、`/messages`、`/conversations`、`/groups`、`/ws` 路由到对应后端微服务端口。
+- REST client 入口为 `web/src/api/client.ts`，默认同源请求；本地开发由 Vite proxy 将 `/auth`、`/me`、`/users`、`/friends`、`/messages`、`/conversations`、`/groups`、`/media`、`/admin/*`、`/api/admin/*`、`/api/feedback`、`/ws` 路由到对应后端微服务端口。proxy 事实源是 `web/vite.config.ts`。
 - 后端响应必须使用统一 envelope：`{ "code": "OK", "message": "ok", "data": {} }`。`code !== "OK"` 或 HTTP 非 2xx 时抛出 typed `ApiError`。
 - 受保护接口由 client 注入 `Authorization: Bearer *** token。
 - MVP 认证状态使用 React Context 和 localStorage。保存内容限于 access token 与当前用户展示信息；遇到损坏 session 会清理并回到登录页。

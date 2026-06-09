@@ -50,19 +50,27 @@ TRUSTED_AGENTS = {
         "mention": "@gaia_hermes_bot",
         "email": "gaia@agents.noreply.local",
     },
+    "claude": {
+        "mention": "",
+        "email": "claude@agents.noreply.local",
+    },
+    "codex": {
+        "mention": "",
+        "email": "codex@agents.noreply.local",
+    },
 }
 
 BRANCH_RE = re.compile(
     r"^(feature|fix|refactor|docs|test|chore|ci|perf|style|hotfix)/"
-    r"(?P<agent>eino|helios|hermes|achilles|furies|gaia)/"
+    r"(?P<agent>eino|helios|hermes|achilles|furies|gaia|claude|codex)/"
     r"issue-[0-9]+-[a-z0-9][a-z0-9-]*$"
 )
 TRAILER_RE = re.compile(r"^Agent:\s*([a-z0-9_-]+)\s*$", re.MULTILINE)
-SUBJECT_AGENT_RE = re.compile(r"(?:^|\s)([a-z]+)(?:\([a-z0-9_.-]+\))?\[(eino|helios|hermes|achilles|furies|gaia)\]:")
+SUBJECT_AGENT_RE = re.compile(r"(?:^|\s)([a-z]+)(?:\([a-z0-9_.-]+\))?\[(eino|helios|hermes|achilles|furies|gaia|claude|codex)\]:")
 MERGE_SOURCE_BRANCH_RE = re.compile(
     r"^Merge pull request #[0-9]+ from [^/]+/"
     r"(?P<branch>(?:feature|fix|refactor|docs|test|chore|ci|perf|style|hotfix)/"
-    r"(?:eino|helios|hermes|achilles|furies|gaia)/"
+    r"(?:eino|helios|hermes|achilles|furies|gaia|claude|codex)/"
     r"issue-[0-9]+-[a-z0-9][a-z0-9-]*)$",
     re.MULTILINE,
 )

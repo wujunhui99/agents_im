@@ -1,5 +1,7 @@
 # Frontend Backend Handoff Contract
 
+适用场景：修改前端可见 REST/WebSocket contract、前端 adapter、后端 handler 返回结构或前后端联调边界时读取本文。
+
 This document is the MVP frontend handoff for the Go backend. It describes the frontend-visible REST and WebSocket contracts that are implemented or explicitly identified as local demo gaps in this worktree.
 
 ## Conventions
@@ -424,7 +426,7 @@ The backend rejects normal members, non-members, kicking the owner, and admin at
 
 ## Media REST
 
-Media endpoints are served by `user-api` in phase 1 and require `Authorization: Bearer <access_token>`.
+Media upload/download endpoints are served by `media-api` and require `Authorization: Bearer <access_token>` except public avatar display redirects.
 
 ### Create Upload Intent
 

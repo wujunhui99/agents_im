@@ -1,5 +1,7 @@
 # Development
 
+适用场景：本地启动后端/前端、调试端口、运行本机 smoke 或定位开发环境问题。
+
 This document covers local backend startup for frontend integration and MVP smoke testing.
 
 ## Prerequisites
@@ -50,7 +52,7 @@ make backend-restart   # restart backend services
 make frontend-start    # start Vite dev server at http://127.0.0.1:5173
 make frontend-stop     # stop the Vite dev server started by Makefile
 make frontend-restart  # restart frontend dev server
-make status            # show PID files and ports 8080-8086/5173
+make status            # show PID files and ports 8080-8089/5173
 make test              # run frontend tests/build/lint plus Go tests
 make verify            # run test plus static checks, docker compose config, and git diff check
 ```
@@ -83,6 +85,10 @@ MESSAGE_API_PORT=18083 \
 GATEWAY_WS_PORT=18084 \
 GROUPS_API_PORT=18085 \
 AGENT_API_PORT=18086 \
+MEDIA_API_PORT=18089 \
+MEDIA_RPC_PORT=19096 \
+ADMIN_API_PORT=18088 \
+ADMIN_RPC_PORT=19097 \
 MESSAGE_TRANSFER_OBSERVABILITY_PORT=18087 \
 AGENTS_IM_DEV_STATE_DIR=/tmp/agents-im-dev-e2e \
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH \
@@ -99,6 +105,8 @@ FRIENDS_API_PORT=18082 \
 MESSAGE_API_PORT=18083 \
 GATEWAY_WS_PORT=18084 \
 GROUPS_API_PORT=18085 \
+MEDIA_API_PORT=18089 \
+ADMIN_API_PORT=18088 \
 make frontend-start FRONTEND_HOST=127.0.0.1 FRONTEND_PORT=5173
 ```
 
@@ -142,6 +150,8 @@ Environment note from the debug session: on one local machine, default ports `80
 
 ## Ports
 
+本地服务名和 package path 以 `Makefile` 为准；启动顺序、生成配置和默认端口以 `scripts/dev-up.sh` 为准。下表只作常用端口概览。
+
 | Service | URL |
 | --- | --- |
 | Account API (V0 `user-api`) | `http://127.0.0.1:8080` |
@@ -151,6 +161,9 @@ Environment note from the debug session: on one local machine, default ports `80
 | WebSocket Gateway | `ws://127.0.0.1:8084/ws` |
 | Groups API | `http://127.0.0.1:8085` |
 | Agent API | `http://127.0.0.1:8086` |
+| Message Transfer health | `http://127.0.0.1:8087/healthz` |
+| Admin API | `http://127.0.0.1:8088` |
+| Media API | `http://127.0.0.1:8089` |
 | PostgreSQL | `localhost:5432` |
 | Redis | `localhost:6379` |
 | MinIO API | `http://localhost:9000` |
@@ -159,7 +172,7 @@ Environment note from the debug session: on one local machine, default ports `80
 
 `scripts/dev-up.sh` also starts Tempo (`grafana/tempo`, same image as prod) as the local tracing backend and exports `AGENTS_IM_OTLP_ENDPOINT=127.0.0.1:4317` so local services report traces just like production. Services using `pkg/observability` read that env; goctl-native services (e.g. `groups`) carry a `Telemetry` block in their generated config. Config lives in `deploy/local/tempo.yaml`.
 
-`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and writes `ObjectStorage` config into the generated `user-api` config. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
+`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and wires media object access through `media-api` + `media-rpc`. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
 
 ## Local Object Storage
 
@@ -181,7 +194,7 @@ OBJECT_STORAGE_ACCESS_KEY_ID=agents_im_minio
 OBJECT_STORAGE_SECRET_ACCESS_KEY=agents...word
 ```
 
-The MinIO API is available at `http://localhost:9000`; the console is available at `http://localhost:9001`. The bucket is private and is created by `user-api` at startup. Unit tests use the explicit memory object store and do not require live MinIO.
+The MinIO API is available at `http://localhost:9000`; the console is available at `http://localhost:9001`. The bucket is private and is created by `media-rpc` at startup. Unit tests use the explicit memory object store and do not require live MinIO.
 
 Message API responses include `messageOrigin=human|ai|system` and Agent metadata when present. Local dev does not enable a production LLM by default; Agent conversation hosting must be wired with an explicit runtime/provider config and otherwise fail closed instead of returning fake AI replies.
 

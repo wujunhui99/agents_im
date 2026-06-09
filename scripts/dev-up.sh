@@ -24,9 +24,10 @@ Options:
   --middleware-only  Start Docker middleware and migrations, but skip Go services.
   --with-services   Start Go services after middleware. This is the default.
   --services-only   Restart only host Go services; skip Docker middleware and migrations.
-                   Service ports can be overridden with USER_API_PORT, USER_RPC_PORT,
-                   AUTH_API_PORT, FRIENDS_API_PORT, MESSAGE_API_PORT, GATEWAY_WS_PORT,
-                   GROUPS_API_PORT, AGENT_API_PORT, and MESSAGE_TRANSFER_OBSERVABILITY_PORT.
+	                   Service ports can be overridden with USER_API_PORT, USER_RPC_PORT,
+	                   AUTH_API_PORT, FRIENDS_API_PORT, MESSAGE_API_PORT, GATEWAY_WS_PORT,
+	                   GROUPS_API_PORT, AGENT_API_PORT, MEDIA_API_PORT, MEDIA_RPC_PORT,
+	                   ADMIN_API_PORT, ADMIN_RPC_PORT, and MESSAGE_TRANSFER_OBSERVABILITY_PORT.
   --no-migrate      Skip PostgreSQL migrations.
   --stop            Stop host Go services started by this script.
   -h, --help        Show this help.
@@ -325,6 +326,73 @@ Telemetry:
 YAML
 }
 
+write_media_rpc_config() {
+  cat > "${CONFIG_DIR}/media-rpc.yaml" <<YAML
+Name: media-rpc
+ListenOn: 127.0.0.1:${MEDIA_RPC_PORT:-9096}
+DataSource: ${DATABASE_URL}
+ObjectStorage:
+  Driver: ${OBJECT_STORAGE_DRIVER}
+  Endpoint: ${OBJECT_STORAGE_ENDPOINT}
+  ExternalEndpoint: ${OBJECT_STORAGE_EXTERNAL_ENDPOINT}
+  Bucket: ${OBJECT_STORAGE_BUCKET}
+  Region: ${OBJECT_STORAGE_REGION}
+  UseSSL: ${OBJECT_STORAGE_USE_SSL}
+  ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
+  AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
+  SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+Telemetry:
+  Name: media-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
+YAML
+}
+
+write_media_api_config() {
+  cat > "${CONFIG_DIR}/media-api.yaml" <<YAML
+Name: media-api
+Host: 127.0.0.1
+Port: ${MEDIA_API_PORT:-8089}
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: ${JWT_ACCESS_EXPIRE}
+MediaRPC:
+  Endpoints:
+    - 127.0.0.1:${MEDIA_RPC_PORT:-9096}
+  Timeout: 5000
+Telemetry:
+  Name: media-api
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
+YAML
+}
+
+write_admin_api_config() {
+  cat > "${CONFIG_DIR}/admin-api.yaml" <<YAML
+Name: admin-api
+Host: 127.0.0.1
+Port: ${ADMIN_API_PORT:-8088}
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: ${JWT_ACCESS_EXPIRE}
+AdminRPC:
+  Endpoints:
+    - 127.0.0.1:${ADMIN_RPC_PORT:-9097}
+  Timeout: 5000
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}
+Telemetry:
+  Name: admin-api
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
+  Sampler: 1.0
+  Batcher: otlpgrpc
+YAML
+}
+
 write_message_transfer_config() {
   cat > "${CONFIG_DIR}/message-transfer.yaml" <<YAML
 Name: message-transfer
@@ -422,20 +490,14 @@ Telemetry:
   Sampler: 1.0
   Batcher: otlpgrpc"
   write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
-  write_api_config "admin-api" "${ADMIN_API_PORT:-8088}" "AdminRPC:
-  Endpoints:
-    - 127.0.0.1:${ADMIN_RPC_PORT:-9097}
-  Timeout: 5000
-Telemetry:
-  Name: admin-api
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc"
+  write_media_api_config
+  write_admin_api_config
   write_user_rpc_config
   write_groups_rpc_config
   write_msg_rpc_config
   write_friends_rpc_config
   write_admin_rpc_config
+  write_media_rpc_config
   write_auth_rpc_config
   write_message_transfer_config
 }
@@ -451,6 +513,8 @@ service_pkg() {
     friends-rpc)      echo "./service/friends/rpc" ;;
     admin-api)        echo "./service/admin/api" ;;
     admin-rpc)        echo "./service/admin/rpc" ;;
+    media-api)        echo "./service/media/api" ;;
+    media-rpc)        echo "./service/media/rpc" ;;
     groups-api)       echo "./service/groups/api" ;;
     groups-rpc)       echo "./service/groups/rpc" ;;
     third-rpc)         echo "./service/third/rpc" ;;
@@ -547,6 +611,7 @@ main() {
   start_service "groups-rpc"
   start_service "msg-rpc"
   start_service "friends-rpc"
+  start_service "media-rpc"
   start_service "admin-rpc"
   start_service "auth-rpc"
   start_service "user-api"
@@ -558,6 +623,7 @@ main() {
   start_service "message-transfer"
   start_service "groups-api"
   start_service "agent-api"
+  start_service "media-api"
   start_service "admin-api"
 
   wait_http "user-api" "http://127.0.0.1:${USER_API_PORT:-8080}/healthz"
@@ -571,6 +637,7 @@ main() {
   fi
   wait_http "groups-api" "http://127.0.0.1:${GROUPS_API_PORT:-8085}/healthz"
   wait_http "agent-api" "http://127.0.0.1:${AGENT_API_PORT:-8086}/healthz"
+  wait_http "media-api" "http://127.0.0.1:${MEDIA_API_PORT:-8089}/healthz"
   wait_http "admin-api" "http://127.0.0.1:${ADMIN_API_PORT:-8088}/healthz"
 
   echo "local backend is ready"

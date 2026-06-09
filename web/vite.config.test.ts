@@ -5,17 +5,17 @@ describe('Vite local backend proxy', () => {
   it('proxies every backend contract prefix to its local service port', () => {
     const proxy = viteConfig.server?.proxy ?? {};
 
-    expect(proxy['/admin/dashboard']).toMatchObject({ target: 'http://127.0.0.1:8083' });
-    expect(proxy['/admin/llm-traces']).toMatchObject({ target: 'http://127.0.0.1:8083' });
-    expect(proxy['/admin/conversations']).toMatchObject({ target: 'http://127.0.0.1:8083' });
-    expect(proxy['/admin/users']).toMatchObject({ target: 'http://127.0.0.1:8083' });
-    expect(proxy['/api/admin/feedback']).toMatchObject({ target: 'http://127.0.0.1:8083' });
-    expect(proxy['/api/admin/task-reports']).toMatchObject({ target: 'http://127.0.0.1:8083' });
-    expect(proxy['/api/feedback']).toMatchObject({ target: 'http://127.0.0.1:8083' });
+    expect(proxy['/admin/dashboard']).toMatchObject({ target: 'http://127.0.0.1:8088' });
+    expect(proxy['/admin/llm-traces']).toMatchObject({ target: 'http://127.0.0.1:8088' });
+    expect(proxy['/admin/conversations']).toMatchObject({ target: 'http://127.0.0.1:8088' });
+    expect(proxy['/admin/users']).toMatchObject({ target: 'http://127.0.0.1:8088' });
+    expect(proxy['/api/admin/feedback']).toMatchObject({ target: 'http://127.0.0.1:8088' });
+    expect(proxy['/api/admin/task-reports']).toMatchObject({ target: 'http://127.0.0.1:8088' });
+    expect(proxy['/api/feedback']).toMatchObject({ target: 'http://127.0.0.1:8088' });
     expect(proxy['/auth']).toMatchObject({ target: 'http://127.0.0.1:8081' });
     expect(proxy['/me']).toMatchObject({ target: 'http://127.0.0.1:8080' });
     expect(proxy['/users']).toMatchObject({ target: 'http://127.0.0.1:8080' });
-    expect(proxy['/media']).toMatchObject({ target: 'http://127.0.0.1:8080' });
+    expect(proxy['/media']).toMatchObject({ target: 'http://127.0.0.1:8089' });
     expect(proxy['/friends']).toMatchObject({ target: 'http://127.0.0.1:8082' });
     expect(proxy['/messages']).toMatchObject({ target: 'http://127.0.0.1:8083' });
     expect(proxy['/conversations']).toMatchObject({ target: 'http://127.0.0.1:8083' });

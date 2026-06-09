@@ -1,5 +1,7 @@
 # Design Docs Index
 
+适用场景：需要技术方案、跨模块约束、数据流、服务边界或重要工程决策时从本索引按主题进入。
+
 设计文档用于记录系统级设计、重要技术决策和跨模块约束。每个设计文档都应包含背景、目标、非目标、方案、取舍、风险和验证方式。
 
 ## 核心文档
@@ -13,13 +15,10 @@
 - [jwt-auth-middleware.md](./jwt-auth-middleware.md)：统一 JWT 鉴权中间件与 context user 规则
 - [user-service-go-zero.md](./user-service-go-zero.md)：Account Service go-zero 实现设计
 - [message-chain-contract.md](./message-chain-contract.md)：消息链路接口契约与 OpenIM 借鉴设计
-- [kafka-message-events.md](./kafka-message-events.md)：Kafka-compatible Redpanda 消息事件 topic、schema、producer abstraction 与投递语义
-- [kafka-transfer-consumer.md](./kafka-transfer-consumer.md)：Message Transfer worker 的 Kafka/Redpanda consumer、event mapping 和 offset commit 语义
 - [message-storage.md](./message-storage.md)：消息存储 PostgreSQL/Redis 契约设计
 - [postgres-persistence.md](./postgres-persistence.md)：第一阶段 PostgreSQL 持久化 schema、配置和 repository 设计
 - [database-schema-v2.md](./database-schema-v2.md)：下一版数据库 schema 讨论稿，记录无物理外键、应用层校验、smallint 枚举、账号/Profile/Auth/Friends/Groups 表改进方向
 - [message-outbox.md](./message-outbox.md)：Message Service transactional outbox 事件源与 worker 轮询契约
-- [outbox-kafka-publisher.md](./outbox-kafka-publisher.md)：Outbox `message.created` 到 Kafka `message.accepted` 的发布模块与 at-least-once 语义
 - [gateway-message-contract.md](./gateway-message-contract.md)：Gateway WebSocket command 到 Message Service RPC 的第一阶段映射契约
 - [redis-presence.md](./redis-presence.md)：Redis 在线状态与 Gateway 连接元数据契约
 - [websocket-gateway.md](./websocket-gateway.md)：WebSocket Gateway 第一阶段真实入口、JWT handshake、connection manager 和 command router
