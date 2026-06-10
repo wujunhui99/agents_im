@@ -50,16 +50,16 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: msg-api
                 port:
-                  number: 8083
+                  number: 8090
           - path: /conversations
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: msg-api
                 port:
-                  number: 8083
+                  number: 8090
           - path: /admin/dashboard
             pathType: Prefix
             backend:
@@ -106,9 +106,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: msg-api
                 port:
-                  number: 8083
+                  number: 8090
           - path: /groups
             pathType: Prefix
             backend:
@@ -222,9 +222,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: message-api
+                name: msg-api
                 port:
-                  number: 8083
+                  number: 8090
           - path: /media
             pathType: Prefix
             backend:

@@ -29,6 +29,8 @@ type (
 	ConversationMessagesResponse = admin.ConversationMessagesResponse
 	DashboardRequest             = admin.DashboardRequest
 	DashboardResponse            = admin.DashboardResponse
+	FeedbackCreateRequest        = admin.FeedbackCreateRequest
+	FeedbackCreateResponse       = admin.FeedbackCreateResponse
 	FeedbackDetailRequest        = admin.FeedbackDetailRequest
 	FeedbackDetailResponse       = admin.FeedbackDetailResponse
 	FeedbackListRequest          = admin.FeedbackListRequest
@@ -66,6 +68,7 @@ type (
 		ListFeedback(ctx context.Context, in *FeedbackListRequest, opts ...grpc.CallOption) (*FeedbackListResponse, error)
 		GetFeedback(ctx context.Context, in *FeedbackDetailRequest, opts ...grpc.CallOption) (*FeedbackDetailResponse, error)
 		UpdateFeedback(ctx context.Context, in *FeedbackUpdateRequest, opts ...grpc.CallOption) (*FeedbackUpdateResponse, error)
+		CreateFeedback(ctx context.Context, in *FeedbackCreateRequest, opts ...grpc.CallOption) (*FeedbackCreateResponse, error)
 		ListTaskReports(ctx context.Context, in *TaskReportListRequest, opts ...grpc.CallOption) (*TaskReportListResponse, error)
 		UpsertTaskReport(ctx context.Context, in *TaskReportUpsertRequest, opts ...grpc.CallOption) (*TaskReportDetailResponse, error)
 		ReplayAgentMessage(ctx context.Context, in *ReplayAgentMessageRequest, opts ...grpc.CallOption) (*ReplayAgentMessageResponse, error)
@@ -135,6 +138,11 @@ func (m *defaultAdmin) GetFeedback(ctx context.Context, in *FeedbackDetailReques
 func (m *defaultAdmin) UpdateFeedback(ctx context.Context, in *FeedbackUpdateRequest, opts ...grpc.CallOption) (*FeedbackUpdateResponse, error) {
 	client := admin.NewAdminClient(m.cli.Conn())
 	return client.UpdateFeedback(ctx, in, opts...)
+}
+
+func (m *defaultAdmin) CreateFeedback(ctx context.Context, in *FeedbackCreateRequest, opts ...grpc.CallOption) (*FeedbackCreateResponse, error) {
+	client := admin.NewAdminClient(m.cli.Conn())
+	return client.CreateFeedback(ctx, in, opts...)
 }
 
 func (m *defaultAdmin) ListTaskReports(ctx context.Context, in *TaskReportListRequest, opts ...grpc.CallOption) (*TaskReportListResponse, error) {

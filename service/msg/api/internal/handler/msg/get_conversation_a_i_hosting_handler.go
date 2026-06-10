@@ -1,18 +1,18 @@
 // Code scaffolded by goctl. Safe to edit.
 // goctl 1.10.1
 
-package message
+package msg
 
 import (
 	"net/http"
 
-	"github.com/wujunhui99/agents_im/internal/logic/message"
-	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
-	"github.com/wujunhui99/agents_im/common/share/types"
+	"github.com/wujunhui99/agents_im/service/msg/api/internal/logic/msg"
+	"github.com/wujunhui99/agents_im/service/msg/api/internal/svc"
+	"github.com/wujunhui99/agents_im/service/msg/api/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-func GetConversationAIHostingHandler(svcCtx *messagesvc.ServiceContext) http.HandlerFunc {
+func GetConversationAIHostingHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.ConversationAIHostingReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -20,7 +20,7 @@ func GetConversationAIHostingHandler(svcCtx *messagesvc.ServiceContext) http.Han
 			return
 		}
 
-		l := message.NewGetConversationAIHostingLogic(r.Context(), svcCtx)
+		l := msg.NewGetConversationAIHostingLogic(r.Context(), svcCtx)
 		resp, err := l.GetConversationAIHosting(&req)
 		if err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)

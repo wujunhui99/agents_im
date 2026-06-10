@@ -22,7 +22,6 @@ IMAGE_DEPLOYMENTS=(
   user-api
   auth-api
   friends-api
-  message-api
   msg-api
   gateway-ws
   groups-api
@@ -33,7 +32,6 @@ IMAGE_DEPLOYMENTS=(
   auth-rpc
   friends-rpc
   groups-rpc
-  message-rpc
   msg-rpc
   third-rpc
   media-api

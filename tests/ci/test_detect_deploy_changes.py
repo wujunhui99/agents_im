@@ -82,7 +82,7 @@ class DetectDeployChangesTest(unittest.TestCase):
         out = self.detect(["internal/repository/message_memory.go"])
         self.assertEqual(out["build_required"], "true")
         self.assertIn("user-api", out["backend_services"])
-        self.assertIn("message-api", out["backend_services"])
+        self.assertIn("msg-api", out["backend_services"])
 
 
 if __name__ == "__main__":

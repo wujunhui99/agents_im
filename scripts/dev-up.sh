@@ -25,7 +25,7 @@ Options:
   --with-services   Start Go services after middleware. This is the default.
   --services-only   Restart only host Go services; skip Docker middleware and migrations.
 	                   Service ports can be overridden with USER_API_PORT, USER_RPC_PORT,
-	                   AUTH_API_PORT, FRIENDS_API_PORT, MESSAGE_API_PORT, GATEWAY_WS_PORT,
+	                   AUTH_API_PORT, FRIENDS_API_PORT, MSG_API_PORT, GATEWAY_WS_PORT,
 	                   GROUPS_API_PORT, AGENT_API_PORT, MEDIA_API_PORT, MEDIA_RPC_PORT,
 	                   ADMIN_API_PORT, ADMIN_RPC_PORT, and MESSAGE_TRANSFER_OBSERVABILITY_PORT.
   --no-migrate      Skip PostgreSQL migrations.
@@ -297,6 +297,12 @@ Telemetry:
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
   Sampler: 1.0
   Batcher: otlpgrpc
+DeepSeek:
+  APIKey: ${DEEPSEEK_API_KEY:-}
+  BaseURL: ${DEEPSEEK_BASE_URL:-}
+  Model: ${DEEPSEEK_MODEL:-}
+PythonExecutor:
+  Backend: disabled
 YAML
 }
 
@@ -455,7 +461,6 @@ Telemetry:
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
   Sampler: 1.0
   Batcher: otlpgrpc"
-  write_api_config "message-api" "${MESSAGE_API_PORT:-8083}"
   write_api_config "gateway-ws" "${GATEWAY_WS_PORT:-8084}" "Presence:
   Driver: ${PRESENCE_DRIVER}
   HeartbeatTTLSeconds: ${PRESENCE_TTL_SECONDS:-60}
@@ -483,6 +488,10 @@ Telemetry:
   write_api_config "msg-api" "${MSG_API_PORT:-8090}" "MsgRPC:
   Endpoints:
     - 127.0.0.1:${MSG_RPC_PORT:-9098}
+  Timeout: 5000
+AdminRPC:
+  Endpoints:
+    - 127.0.0.1:${ADMIN_RPC_PORT:-9097}
   Timeout: 5000
 Telemetry:
   Name: msg-api
@@ -520,11 +529,9 @@ service_pkg() {
     third-rpc)         echo "./service/third/rpc" ;;
     user-api)         echo "./service/user/api" ;;
     user-rpc)         echo "./service/user/rpc" ;;
-    message-rpc)      echo "./internal/rpcgen/message" ;;
     msg-rpc)          echo "./service/msg/rpc" ;;
     msg-api)          echo "./service/msg/api" ;;
     gateway-ws)       echo "./service/gateway-ws" ;;
-    message-api)      echo "./service/message-api" ;;
     message-transfer) echo "./service/message-transfer" ;;
     *) echo "unknown service: $1" >&2; return 1 ;;
   esac
@@ -617,7 +624,6 @@ main() {
   start_service "user-api"
   start_service "auth-api"
   start_service "friends-api"
-  start_service "message-api"
   start_service "msg-api"
   start_service "gateway-ws"
   start_service "message-transfer"
@@ -629,7 +635,6 @@ main() {
   wait_http "user-api" "http://127.0.0.1:${USER_API_PORT:-8080}/healthz"
   wait_http "auth-api" "http://127.0.0.1:${AUTH_API_PORT:-8081}/healthz"
   wait_http "friends-api" "http://127.0.0.1:${FRIENDS_API_PORT:-8082}/healthz"
-  wait_http "message-api" "http://127.0.0.1:${MESSAGE_API_PORT:-8083}/healthz"
   wait_http "msg-api" "http://127.0.0.1:${MSG_API_PORT:-8090}/healthz"
   wait_http "gateway-ws" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
   if [[ "${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}" == "true" ]]; then

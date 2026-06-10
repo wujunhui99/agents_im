@@ -25,11 +25,11 @@ fi
 # Production Go code must not directly execute shell/python commands.
 forbid_match "production Go code must not directly execute shell or python commands" \
   -n '"os/exec"|exec\.Command|CommandContext\(|"(/bin/bash|/bin/sh|bash|sh|python|python3)"' \
-  service/gateway-ws service/message-api service/message-transfer internal --glob '*.go' --glob '!*_test.go'
+  service/gateway-ws service/message-transfer internal --glob '*.go' --glob '!*_test.go'
 
 # Header-based current-user auth is forbidden; tests must use Bearer JWT or an explicit reject helper.
 forbid_match "production API/code still contains header-based current user auth" \
-  -n "X-User-Id|CurrentUserID|currentUserID" api internal service/gateway-ws service/message-api service/message-transfer
+  -n "X-User-Id|CurrentUserID|currentUserID" api internal service/gateway-ws service/message-transfer service/msg
 
 legacy_x_user_id_sets="$(rg -n 'Header\.Set\("X-User-Id"' tests internal || true)"
 if [[ -n "$legacy_x_user_id_sets" ]]; then
@@ -49,7 +49,7 @@ forbid_match "observability helpers must not log or inspect secrets, auth header
 forbid_match "forbidden auth secret field found in service source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
   service/user/api/user.api service/user/rpc/user.proto service/user/api/user.go \
-  internal/logic internal/handler service/user/rpc internal/servicecontext
+  internal/logic service/user/rpc internal/servicecontext
 
 forbid_match "forbidden auth secret field found in repository source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
@@ -58,6 +58,6 @@ forbid_match "forbidden auth secret field found in repository source" \
 
 forbid_match "forbidden auth secret field found in message contract source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
-  api/message.api internal/rpcgen/message/message.proto \
+  service/msg/api/msg.api service/msg/rpc/msg.proto \
   internal/logic/messagelogic.go internal/repository/message_memory.go \
-  internal/repository/message_repository.go internal/handler/message
+  internal/repository/message_repository.go

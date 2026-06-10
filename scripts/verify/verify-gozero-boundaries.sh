@@ -39,7 +39,7 @@ if [[ -n "${aggregate_gozero_logic_files}" ]]; then
   exit 1
 fi
 
-root_svc_import_files="$(rg -l '"github.com/wujunhui99/agents_im/internal/svc"' service/gateway-ws service/message-api service/message-transfer internal/handler internal/logic internal/gateway tests --glob '*.go' || true)"
+root_svc_import_files="$(rg -l '"github.com/wujunhui99/agents_im/internal/svc"' service/gateway-ws service/message-transfer internal/logic internal/gateway tests --glob '*.go' || true)"
 if [[ -n "${root_svc_import_files}" ]]; then
   echo "core REST, gateway, and tests must not import legacy root internal/svc:" >&2
   echo "${root_svc_import_files}" >&2
@@ -52,7 +52,6 @@ rpc_generated_dirs=(
   "service/auth/rpc"
   "service/friends/rpc"
   "service/groups/rpc"
-  "internal/rpcgen/message"
   "service/msg/rpc"
   "service/third/rpc"
 )
@@ -64,7 +63,7 @@ for dir in "${rpc_generated_dirs[@]}"; do
 done
 
 # rpc mains must not re-import the old handwritten rpc wrapper.
-for main_file in service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/third/rpc/third.go internal/rpcgen/message/message.go; do
+for main_file in service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/third/rpc/third.go service/msg/rpc/msg.go; do
   if rg -n '"github.com/wujunhui99/agents_im/internal/(auth/)?rpc"' "$main_file"; then
     echo "rpc entrypoint imports old handwritten rpc wrapper: $main_file" >&2
     exit 1
@@ -74,7 +73,7 @@ done
 # rpc mains must not own business wiring (deps stay behind generated rpc service contexts).
 forbid_match "rpc service mains must not own business wiring; keep dependencies behind generated rpc service contexts" \
   -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic|auth/repository)"' \
-  internal/rpcgen/message/message.go service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/third/rpc/third.go
+  service/msg/rpc/msg.go service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/third/rpc/third.go
 
 # api services own no data access — they call rpc/BFF instead.
 for api_spec in \
@@ -100,14 +99,13 @@ for logic_dir in \
 done
 forbid_match "generated rpc logic still contains empty scaffold behavior" \
   -n "todo: add your logic here|return &.*Response\{\}, nil" \
-  internal/rpcgen/*/internal/logic service/user/rpc/internal/logic service/auth/rpc/internal/logic service/third/rpc/internal/logic
+  service/user/rpc/internal/logic service/auth/rpc/internal/logic service/third/rpc/internal/logic
 
 # rpc logic must be wired through svcCtx markers (logic talks to model/provider via svcCtx).
 rpc_logic_markers=(
   "service/user/rpc/internal/logic:UserLogic"
   "service/auth/rpc/internal/logic:AuthLogic"
   "service/friends/rpc/internal/logic:FriendshipModel"
-  "internal/rpcgen/message/internal/logic:MessageLogic"
   "service/msg/rpc/internal/logic:Messages"
   "service/third/rpc/internal/logic:MailProvider"
 )

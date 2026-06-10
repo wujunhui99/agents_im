@@ -16,6 +16,7 @@ type Config struct {
 		AccessExpire int64
 	}
 	// tracing 用 go-zero 自带 Telemetry（在 RestConf.ServiceConf 内，由 yaml 配置），不再用 pkg/observability。
-	Redis  appconfig.RedisConfig `json:",optional"`
-	MsgRPC zrpc.RpcClientConf
+	Redis    appconfig.RedisConfig `json:",optional"`
+	MsgRPC   zrpc.RpcClientConf
+	AdminRPC zrpc.RpcClientConf
 }

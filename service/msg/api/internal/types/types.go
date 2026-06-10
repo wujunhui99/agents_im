@@ -3,6 +3,27 @@
 
 package types
 
+type ConversationAIHostingData struct {
+	ConversationID    string `json:"conversationId"`
+	ChatType          string `json:"chatType"`
+	Enabled           bool   `json:"enabled"`
+	Available         bool   `json:"available"`
+	PeerEnabled       bool   `json:"peerEnabled"`
+	UnavailableReason string `json:"unavailableReason,optional"`
+	MaxRecentMessages int64  `json:"maxRecentMessages"`
+	SummaryEnabled    bool   `json:"summaryEnabled"`
+}
+
+type ConversationAIHostingReq struct {
+	ConversationID string `path:"conversation_id"`
+}
+
+type ConversationAIHostingResp struct {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    ConversationAIHostingData `json:"data"`
+}
+
 type ConversationSeqState struct {
 	ConversationID string   `json:"conversationId"`
 	MaxSeq         int64    `json:"maxSeq"`
@@ -24,6 +45,27 @@ type ConversationSeqsResp struct {
 	Code    string               `json:"code"`
 	Message string               `json:"message"`
 	Data    ConversationSeqsData `json:"data"`
+}
+
+type CreateFeedbackReq struct {
+	Category   string                 `json:"category"`
+	Title      string                 `json:"title"`
+	Content    string                 `json:"content"`
+	Contact    string                 `json:"contact,optional"`
+	PageURL    string                 `json:"pageUrl,optional"`
+	UserAgent  string                 `json:"userAgent,optional"`
+	ClientMeta map[string]interface{} `json:"clientMeta,optional"`
+}
+
+type CreateFeedbackResp struct {
+	Code    string       `json:"code"`
+	Message string       `json:"message"`
+	Data    FeedbackData `json:"data"`
+}
+
+type FeedbackData struct {
+	FeedbackID string `json:"feedbackId"`
+	Status     string `json:"status"`
 }
 
 type MarkConversationAsReadData struct {
@@ -109,4 +151,9 @@ type SendMessageResp struct {
 	Code    string          `json:"code"`
 	Message string          `json:"message"`
 	Data    SendMessageData `json:"data"`
+}
+
+type UpdateConversationAIHostingReq struct {
+	ConversationID string `path:"conversation_id"`
+	Enabled        bool   `json:"enabled"`
 }

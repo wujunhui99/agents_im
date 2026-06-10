@@ -1,23 +1,28 @@
-package message
+// Code scaffolded by goctl. Safe to edit.
+// goctl 1.10.1
+
+package msg
 
 import (
 	"context"
 
+	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
-	business "github.com/wujunhui99/agents_im/internal/logic"
-	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
-	"github.com/wujunhui99/agents_im/common/share/types"
+	"github.com/wujunhui99/agents_im/service/msg/api/internal/svc"
+	"github.com/wujunhui99/agents_im/service/msg/api/internal/types"
+	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type UpdateConversationAIHostingLogic struct {
 	logx.Logger
 	ctx    context.Context
-	svcCtx *messagesvc.ServiceContext
+	svcCtx *svc.ServiceContext
 }
 
-func NewUpdateConversationAIHostingLogic(ctx context.Context, svcCtx *messagesvc.ServiceContext) *UpdateConversationAIHostingLogic {
+func NewUpdateConversationAIHostingLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateConversationAIHostingLogic {
 	return &UpdateConversationAIHostingLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
@@ -30,17 +35,17 @@ func (l *UpdateConversationAIHostingLogic) UpdateConversationAIHosting(req *type
 	if err != nil {
 		return nil, err
 	}
-	result, err := l.svcCtx.AIHostingLogic.UpdateConversationAIHosting(l.ctx, business.UpdateConversationAIHostingRequest{
-		OwnerAccountID: userID,
-		ConversationID: req.ConversationID,
+	result, err := l.svcCtx.MsgRPC.UpdateConversationAIHosting(l.ctx, &msgpb.UpdateConversationAIHostingRequest{
+		OwnerAccountId: userID,
+		ConversationId: req.ConversationID,
 		Enabled:        req.Enabled,
 	})
 	if err != nil {
-		return nil, err
+		return nil, rpcerror.FromStatus(err)
 	}
 	return &types.ConversationAIHostingResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
-		Data:    toConversationAIHostingData(result),
+		Data:    pbToAIHostingData(result),
 	}, nil
 }

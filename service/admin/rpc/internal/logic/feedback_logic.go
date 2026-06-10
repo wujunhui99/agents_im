@@ -128,3 +128,61 @@ func (l *UpdateFeedbackLogic) UpdateFeedback(in *admin.FeedbackUpdateRequest) (*
 	}
 	return &admin.FeedbackUpdateResponse{Feedback: pb}, nil
 }
+
+// ---- CreateFeedback ----
+// 用户提交反馈（msg-api BFF 的 POST /api/feedback 经 gRPC 调入）。
+// 校验规则对齐原 internal/logic.FeedbackLogic.CreateFeedback。
+
+type CreateFeedbackLogic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+	logx.Logger
+}
+
+func NewCreateFeedbackLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CreateFeedbackLogic {
+	return &CreateFeedbackLogic{ctx: ctx, svcCtx: svcCtx, Logger: logx.WithContext(ctx)}
+}
+
+func (l *CreateFeedbackLogic) CreateFeedback(in *admin.FeedbackCreateRequest) (*admin.FeedbackCreateResponse, error) {
+	if l.svcCtx.Feedback == nil {
+		return nil, rpcerror.ToStatus(apperror.Internal("feedback repository is not configured"))
+	}
+	userID := strings.TrimSpace(in.GetUserId())
+	if userID == "" {
+		return nil, rpcerror.ToStatus(apperror.InvalidArgument("user_id is required"))
+	}
+	category, ok := model.NormalizeFeedbackCategory(strings.TrimSpace(in.GetCategory()))
+	if !ok {
+		return nil, rpcerror.ToStatus(apperror.InvalidArgument("feedback category is invalid"))
+	}
+	title := strings.TrimSpace(in.GetTitle())
+	if title == "" {
+		return nil, rpcerror.ToStatus(apperror.InvalidArgument("feedback title is required"))
+	}
+	content := strings.TrimSpace(in.GetContent())
+	if content == "" {
+		return nil, rpcerror.ToStatus(apperror.InvalidArgument("feedback content is required"))
+	}
+	var clientMeta map[string]any
+	if in.GetClientMeta() != nil {
+		clientMeta = in.GetClientMeta().AsMap()
+	}
+	created, err := l.svcCtx.Feedback.CreateFeedback(l.ctx, model.Feedback{
+		UserID:     userID,
+		Category:   category,
+		Status:     model.FeedbackStatusNew,
+		Title:      title,
+		Content:    content,
+		Contact:    strings.TrimSpace(in.GetContact()),
+		PageURL:    strings.TrimSpace(in.GetPageUrl()),
+		UserAgent:  strings.TrimSpace(in.GetUserAgent()),
+		ClientMeta: clientMeta,
+	})
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return &admin.FeedbackCreateResponse{
+		FeedbackId: created.FeedbackID,
+		Status:     string(created.Status),
+	}, nil
+}

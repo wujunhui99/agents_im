@@ -17,9 +17,11 @@ assert_present "-q" service/friends/api/friends.api -- \
 assert_present "-q" service/groups/api/groups.api -- \
   "post /groups" "get /groups/:group_id" "post /groups/:group_id/members" \
   "delete /groups/:group_id/members/me" "get /groups/:group_id/members"
-assert_present "-q" api/message.api -- \
+assert_present "-q" service/msg/api/msg.api -- \
   "post /messages" "get /conversations/:conversation_id/messages" \
-  "get /conversations/seqs" "post /conversations/:conversation_id/read"
+  "get /conversations/seqs" "post /conversations/:conversation_id/read" \
+  "get /conversations/:conversation_id/ai-hosting" "put /conversations/:conversation_id/ai-hosting" \
+  "post /api/feedback"
 
 # --- message ordering contract (schema + code + tests, backend & web) ---
 assert_present "-q" db/migrations/001_init_postgres.sql -- \
@@ -39,17 +41,17 @@ assert_present "-q" service/friends/rpc/friends.proto -- \
   "rpc AddFriend" "rpc DeleteFriend" "rpc ListFriends" "rpc GetFriendship"
 assert_present "-q" service/groups/rpc/groups.proto -- \
   "rpc CreateGroup" "rpc GetGroup" "rpc AddMember" "rpc JoinGroup" "rpc LeaveGroup" "rpc ListMembers"
-assert_present "-q" internal/rpcgen/message/message.proto -- \
-  "service MessageService" "rpc SendMessage" "rpc PullMessages" "rpc GetConversationSeqs" \
+assert_present "-q" service/msg/rpc/msg.proto -- \
+  "service Msg" "rpc SendMessage" "rpc PullMessages" "rpc GetConversationsSeqState" \
   "rpc MarkConversationAsRead" "message Message" "message ConversationSeqState"
 assert_present "-q" service/third/rpc/mail.proto -- \
   "service Mail" "rpc SendTemplateEmail" "repeated string recipients" \
   "map<string, string> template_data" "string provider_request_id" "string provider_message_id"
 
 # --- agent conversation hosting contract ---
-assert_present "-q" internal/rpcgen/message/message.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go pkg/messaging/event.go -- \
+assert_present "-q" service/msg/rpc/msg.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go pkg/messaging/event.go -- \
   "message_origin" "agent_account_id" "trigger_server_msg_id" "agent_run_id" "allow_recursive_trigger"
-assert_present "-q" api/message.api web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx -- \
+assert_present "-q" service/msg/api/msg.api web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx -- \
   "messageOrigin" "agentAccountId" "triggerServerMsgId" "agentRunId" "allowRecursiveTrigger"
 assert_present "-q" internal/logic/messagelogic.go internal/agentim internal/repository db/migrations/003_agent_conversation_hosting.sql -- \
   "MessageCreatedHook" "SetMessageCreatedHook" "message.created:" "NewConversationHostingService" "OnMessageCreated" \
@@ -68,7 +70,6 @@ rpc_generated_servers=(
   "service/friends/rpc/internal/server/friendsserver.go:FriendsServer"
   "service/groups/rpc/internal/server/groupsserver.go:GroupsServer"
   "service/admin/rpc/internal/server/adminserver.go:AdminServer"
-  "internal/rpcgen/message/internal/server/message_service_server.go:MessageServiceServer"
   "service/msg/rpc/internal/server/msgserver.go:MsgServer"
   "service/third/rpc/internal/server/mailserver.go:MailServer"
 )
@@ -86,7 +87,6 @@ rpc_generated_entrypoints=(
   "service/friends/rpc/friends.go:RegisterFriendsServer"
   "service/groups/rpc/groups.go:RegisterGroupsServer"
   "service/admin/rpc/admin.go:RegisterAdminServer"
-  "internal/rpcgen/message/message.go:RegisterMessageServiceServer"
   "service/msg/rpc/msg.go:RegisterMsgServer"
   "service/third/rpc/third.go:RegisterMailServer"
 )
@@ -112,8 +112,6 @@ rpc_generated_proto_files=(
   "service/user/rpc/user/user_grpc.pb.go"
   "service/auth/rpc/auth/auth.pb.go"
   "service/auth/rpc/auth/auth_grpc.pb.go"
-  "internal/rpcgen/message/messagepb/message.pb.go"
-  "internal/rpcgen/message/messagepb/message_grpc.pb.go"
   "service/msg/rpc/msg/msg.pb.go"
   "service/msg/rpc/msg/msg_grpc.pb.go"
   "service/third/rpc/mail/mail.pb.go"
@@ -189,10 +187,10 @@ assert_present "-q" internal/domain/readreceipt/read_receipt.go tests/read_recei
   "NormalizeMarkRead" "CanAdvanceReadSeq" "UnreadCount" "ErrReadSeqExceedsMax"
 
 # --- JWT auth contract ---
-for file in service/user/api/user.api service/friends/api/friends.api service/groups/api/groups.api api/message.api api/media.api service/agent/api/agent.api; do
+for file in service/user/api/user.api service/friends/api/friends.api service/groups/api/groups.api service/msg/api/msg.api api/media.api service/agent/api/agent.api; do
   rg -q "jwt:\s+Auth" "$file"
 done
-for file in etc/auth-api.yaml etc/user-api.yaml etc/friends-api.yaml etc/groups-api.yaml etc/message-api.yaml etc/auth-rpc.yaml; do
+for file in etc/auth-api.yaml etc/user-api.yaml etc/friends-api.yaml etc/groups-api.yaml etc/msg-api.yaml etc/auth-rpc.yaml; do
   rg -q "AccessSecret" "$file"
   rg -q "AccessExpire" "$file"
 done
@@ -200,10 +198,12 @@ rg -q "type JWTAuthConfig" pkg/config/config.go
 rg -q "AccessSecret" pkg/config/config.go service/auth/rpc/internal/config/config.go
 rg -q "AccessExpire" pkg/config/config.go service/auth/rpc/internal/config/config.go
 rg -q "user_id" pkg/ctxuser/user.go
-rg -q "ctxuser\.UserID" internal/logic/message
-rg -q "sender_id must match authenticated user" internal/logic/message/send_message_logic.go
+rg -q "ctxuser\.UserID" service/msg/api/internal/logic/msg
+rg -q "sender_id must match authenticated user" service/msg/api/internal/logic/msg/send_message_logic.go
 assert_present "-q" tests -- \
-  "bearerTokenForUser" "legacy X-User-Id rejection" "invalid token status" "message sender did not use token user"
+  "bearerTokenForUser" "invalid token status"
+assert_present "-q" service/msg/api/internal/logic/msg -- \
+  "message sender did not use token user" "TestSendMessageUsesJWTUser" "TestSendMessageRejectsSenderMismatch"
 rg -q "ExistsByIdentifier" internal/auth
 rg -q "CreateUser" internal/auth
 rg -q "PasswordHash" internal/auth/model/credential.go
@@ -220,9 +220,9 @@ assert_present "-q" tests -- \
 assert_present "-qF" db/migrations/001_init_postgres.sql -- \
   "create table if not exists accounts" "create table if not exists profiles" \
   "account_id text primary key" "account_type smallint not null default 1"
-rg -q "NewGroupsRepositoryForStorage" service/message-api/main.go service/gateway-ws/main.go internal/rpcgen/message/internal/svc/service_context.go
-rg -q "NewMessageLogicWithMediaValidator" internal/rpcgen/message/internal/svc/service_context.go
-rg -q "NewMessageRepositoryForStorage" internal/rpcgen/message/internal/svc/service_context.go
+rg -q "NewGroupsRepositoryForStorage" service/gateway-ws/main.go service/msg/rpc/internal/svc/servicecontext.go
+rg -q "NewMessageLogicWithMediaValidator" internal/servicecontext/message/service_context.go
+rg -q "NewMessageRepositoryForStorage" service/msg/rpc/internal/svc/servicecontext.go
 assert_present "-q" db/migrations/001_init_postgres.sql -- \
   "accounts" "profiles" "auth_credentials" "friendships" "groups" "group_members" \
   "media_objects" "messages" "conversation_threads" "user_conversation_states" "message_outbox"
@@ -230,7 +230,7 @@ rg -q "StorageDriver" pkg/config/config.go etc/*.yaml
 rg -q "ObjectStorageConfig" pkg/config/config.go
 rg -q "NewStore" pkg/objectstorage/factory.go
 rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/minio.go
-rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go service/user/api/user.go service/message-api/main.go service/gateway-ws/main.go
+rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go service/user/api/user.go service/msg/rpc/internal/svc/servicecontext.go service/gateway-ws/main.go
 rg -q "ValidateMessageMedia" internal/logic/messagelogic.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql
 rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go internal/auth/repository/postgres.go
@@ -260,7 +260,7 @@ assert_present "-q" pkg/health pkg/observability -- \
 for api_main in service/agent/api/agent.go; do
   rg -q "TraceMiddlewareFunc" "$api_main"
 done
-assert_present "-q" internal/handler/gozero_routes.go service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/gateway-ws/main.go service/message-transfer/main.go -- \
+assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/gateway-ws/main.go service/message-transfer/main.go -- \
   "/readyz" "/metrics" "ReadinessHandler" "MetricsHandler"
 assert_present "-q" internal/logic/messagelogic.go internal/gateway/ws internal/transfer/worker.go -- \
   "RecordMessageSend" "RecordDeliveryAttempt" "RecordTransferEvent" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"

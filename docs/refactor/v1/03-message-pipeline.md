@@ -581,12 +581,11 @@ OpenIM 的 msggateway 本地维护 `userMap`（`user_map.go`），不依赖 Redi
 
 | 步骤 | 内容 | 备注 |
 |------|------|------|
-| A1（#463） | ai-hosting / feedback 从 message-api 归位（07 §8 Phase 4 提前）：ai-hosting 归 agent 域（agent-rpc 未建可先最小落 `service/agent`）；feedback 建议落 admin-rpc（已有 feedback 读路径）加 CreateFeedback | ingress `/conversations` 前缀被 ai-hosting 共享，不归位无法切流——A2 硬前置 |
-| A2 | ingress 切流 `/messages` + `/conversations` + `/api/feedback` → msg-api；退休 `service/message-api` | 回滚 = ingress 切回 |
+| ~~A1+A2~~（#463，✅ 已合并执行） | msg-api 承接 message-api **全部** HTTP 职责并切流退休：ai-hosting 加 2 个 RPC 落 **msg-rpc**（非 agent 域——勘探发现 web 走 REST 发消息，AI 托管触发钩子必须随 message-api 退役迁入 msg-rpc SendMessage，hosting runtime 反正已在，注明待 B1 迁 msgtransfer / agent 域 rpc）；feedback 落 admin-rpc CreateFeedback；ingress `/messages` + `/conversations` + `/api/feedback` → msg-api:8090；删 `service/message-api` + dormant `internal/rpcgen/message` + `internal/handler` + `internal/logic/message` | 回滚 = ingress 切回（需先 revert 删除）；AI 触发语义对齐原进程内钩子（含 dedup 触发、错误只记日志） |
 | A3 | gateway-ws 4 个 ws command（send_message / pull_messages / mark_conversation_read / get_conversation_seqs）改调 msg-rpc gRPC，删 in-process 接线；随本 PR 改名 `service/msggateway` | ACK 语义不变（msg-rpc 仍同步写 PG 返回 seq），客户端零感知 |
-| A4 | 删 `internal/logic` 消息域、`internal/repository` 消息部分、`internal/rpcgen/message`、`internal/servicecontext/message` | keystone 解锁；删空顶层 `internal/` 的前置 |
+| A4 | 删 `internal/logic` 消息域剩余（messagelogic 等）、`internal/repository` 消息部分、`internal/servicecontext/message` | keystone 解锁；删空顶层 `internal/` 的前置；注意 msg-rpc 的 AI 托管 runtime 也消费 `internal/servicecontext/message`，A4 需与触发点迁移（B1）协同 |
 
-阶段 A 完成后链路：client → msggateway / msg-api → msg-rpc（gRPC）→ PG + outbox → publisher → Kafka → transfer → gateway HTTP。**单轨、无 internal 依赖**，后续改写路径只动 msg-rpc / transfer 两处。
+阶段 A 完成后链路：client → msggateway / msg-api → msg-rpc（gRPC）→ PG + outbox → publisher → Kafka → transfer → gateway HTTP。**单轨**，后续改写路径只动 msg-rpc / transfer 两处（internal 消息域残留 = gateway-ws in-process + AI 托管 runtime）。
 
 ### 阶段 B：写路径 Kafka 化（原 Phase 0+1+2，核心风险区）
 

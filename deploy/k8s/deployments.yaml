@@ -166,62 +166,6 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: message-api
-  namespace: agents-im
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: message-api
-  template:
-    metadata:
-      labels:
-        app: message-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8083"
-    spec:
-      serviceAccountName: python-executor-controller
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: message-api
-          image: ghcr.io/wujunhui99/agents_im/message-api:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/message-api.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: http
-              containerPort: 8083
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
   name: msg-api
   namespace: agents-im
 spec:
@@ -751,55 +695,6 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: message-rpc
-  namespace: agents-im
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: message-rpc
-  template:
-    metadata:
-      labels:
-        app: message-rpc
-    spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: message-rpc
-          image: ghcr.io/wujunhui99/agents_im/message-rpc:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/message-rpc.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: grpc
-              containerPort: 9094
-          livenessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
   name: msg-rpc
   namespace: agents-im
 spec:
@@ -812,6 +707,8 @@ spec:
       labels:
         app: msg-rpc
     spec:
+      # AI 托管 PythonExecutor K8S backend 需要的 RBAC（随 message-api 退役迁入）。
+      serviceAccountName: python-executor-controller
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:

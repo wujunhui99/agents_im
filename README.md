@@ -29,9 +29,9 @@
 
 ```text
 api/                 go-zero REST API 定义
-service/             各微服务入口与实现（user/auth/friends/groups/agent API、RPC、gateway-ws、message-api、message-transfer），main 在 service/<...> 目录
+service/             各微服务入口与实现（user/auth/friends/groups/agent/msg API、RPC、gateway-ws、message-transfer），main 在 service/<...> 目录
 config / etc/        本地和服务配置
-internal/            核心业务逻辑、仓储、网关、Agent runtime、transfer worker、message-rpc（internal/rpcgen/message）等
+internal/            核心业务逻辑、仓储、网关、Agent runtime、transfer worker 等（消息域 REST/RPC 已迁 service/msg）
 db/migrations/       PostgreSQL schema 迁移
 proto/               gRPC proto 和生成代码
 scripts/             本地启动、迁移、demo data、静态验证脚本
@@ -120,7 +120,7 @@ make verify
 | User API | `http://127.0.0.1:8080` |
 | Auth API | `http://127.0.0.1:8081` |
 | Friends API | `http://127.0.0.1:8082` |
-| Message API | `http://127.0.0.1:8083` |
+| Msg API | `http://127.0.0.1:8090` |
 | WebSocket Gateway | `ws://127.0.0.1:8084/ws` |
 | Groups API | `http://127.0.0.1:8085` |
 | Agent API | `http://127.0.0.1:8086` |
@@ -134,7 +134,7 @@ make verify
 USER_API_PORT=18080 \
 AUTH_API_PORT=18081 \
 FRIENDS_API_PORT=18082 \
-MESSAGE_API_PORT=18083 \
+MSG_API_PORT=18090 \
 GATEWAY_WS_PORT=18084 \
 GROUPS_API_PORT=18085 \
 AGENT_API_PORT=18086 \

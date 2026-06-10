@@ -5,7 +5,7 @@ StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 
 Consumer:
-  # Production live push consumes durable message_outbox rows written by message-api.
+  # Production live push consumes durable message_outbox rows written by msg-rpc / gateway-ws.
   Driver: outbox
 
 Dispatcher:

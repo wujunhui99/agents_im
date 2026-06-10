@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 )
 
 type AdminServer struct {
@@ -76,6 +76,11 @@ func (s *AdminServer) GetFeedback(ctx context.Context, in *admin.FeedbackDetailR
 func (s *AdminServer) UpdateFeedback(ctx context.Context, in *admin.FeedbackUpdateRequest) (*admin.FeedbackUpdateResponse, error) {
 	l := logic.NewUpdateFeedbackLogic(ctx, s.svcCtx)
 	return l.UpdateFeedback(in)
+}
+
+func (s *AdminServer) CreateFeedback(ctx context.Context, in *admin.FeedbackCreateRequest) (*admin.FeedbackCreateResponse, error) {
+	l := logic.NewCreateFeedbackLogic(ctx, s.svcCtx)
+	return l.CreateFeedback(in)
 }
 
 func (s *AdminServer) ListTaskReports(ctx context.Context, in *admin.TaskReportListRequest) (*admin.TaskReportListResponse, error) {

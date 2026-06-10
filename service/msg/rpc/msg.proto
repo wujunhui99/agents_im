@@ -31,6 +31,10 @@ service Msg {
 
   // 时间（stub）
   rpc GetServerTime(GetServerTimeRequest) returns (GetServerTimeResponse);
+
+  // AI 托管开关（keystone 例外：随 message-api 退役落到 msg-rpc，待 agent 域 rpc / 03 §9 B1 后迁出）
+  rpc GetConversationAIHosting(GetConversationAIHostingRequest) returns (ConversationAIHostingState);
+  rpc UpdateConversationAIHosting(UpdateConversationAIHostingRequest) returns (ConversationAIHostingState);
 }
 
 message Message {
@@ -204,4 +208,27 @@ message GetServerTimeRequest {}
 
 message GetServerTimeResponse {
   int64 server_time = 1;
+}
+
+// ---- ConversationAIHosting ----
+message GetConversationAIHostingRequest {
+  string owner_account_id = 1;
+  string conversation_id = 2;
+}
+
+message UpdateConversationAIHostingRequest {
+  string owner_account_id = 1;
+  string conversation_id = 2;
+  bool enabled = 3;
+}
+
+message ConversationAIHostingState {
+  string conversation_id = 1;
+  string chat_type = 2;
+  bool enabled = 3;
+  bool available = 4;
+  bool peer_enabled = 5;
+  string unavailable_reason = 6;
+  int64 max_recent_messages = 7;
+  bool summary_enabled = 8;
 }
