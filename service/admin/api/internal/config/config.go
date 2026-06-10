@@ -19,4 +19,8 @@ type Config struct {
 	Redis appconfig.RedisConfig `json:",optional"`
 	// AdminRPC：admin-api 改纯 BFF 后，所有 DB 访问都走 admin-rpc（admin 域唯一碰 DB 的服务）。
 	AdminRPC zrpc.RpcClientConf
+	// UserRPC / AuthRPC：BFF 编排「创建测试账户」——user-rpc 建号（type=test），
+	// auth-rpc 设登录凭据；跨域写不进 admin-rpc。
+	UserRPC zrpc.RpcClientConf
+	AuthRPC zrpc.RpcClientConf
 }

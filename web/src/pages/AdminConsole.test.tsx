@@ -150,6 +150,22 @@ function createAdminApi(overrides?: Partial<AdminApi>): AdminApi {
     })),
     getConversationMessages: vi.fn(async () => conversationMessages),
     searchUsers: vi.fn(async () => userSearch),
+    createTestAccount: vi.fn(async () => ({
+      user: {
+        userId: '3003',
+        identifier: 'test_user1',
+        displayName: '测试账户',
+        name: '测试账户',
+        gender: '',
+        birthDate: '',
+        region: '',
+        accountType: 'test',
+        createdAt: '2026-06-10T00:00:00Z',
+        updatedAt: '2026-06-10T00:00:00Z',
+      },
+      password: 'GeneratedPw99',
+      alreadyExisted: false,
+    })),
     getUserDetail: vi.fn(async () => ({ user: userSearch.users[0] })),
     getUserFriends: vi.fn(async () => ({
       friends: [
@@ -458,6 +474,25 @@ describe('AdminConsole', () => {
     expect(await screen.findByRole('heading', { name: 'Feedback' })).toBeInTheDocument();
     await waitFor(() => expect(adminApi.listFeedback).toHaveBeenCalledWith({ status: 'new' }));
     window.history.pushState({}, '', '/');
+  });
+
+  it('creates a test account from the users view and shows the one-time password', async () => {
+    const user = userEvent.setup();
+    const adminApi = createAdminApi();
+    render(<AdminConsole adminApi={adminApi} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Users' }));
+    await user.type(screen.getByLabelText('Identifier'), 'test_user1');
+    await user.click(screen.getByRole('button', { name: 'Create test account' }));
+
+    expect(await screen.findByText('GeneratedPw99')).toBeInTheDocument();
+    expect(adminApi.createTestAccount).toHaveBeenCalledWith({
+      identifier: 'test_user1',
+      displayName: undefined,
+      password: undefined,
+    });
+    // 创建成功后刷新用户列表
+    expect(adminApi.searchUsers).toHaveBeenCalled();
   });
 
   it('does not render user mutation or impersonated send controls', async () => {

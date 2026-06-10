@@ -24,6 +24,7 @@ const (
 	Auth_Login_FullMethodName                        = "/auth.v1.Auth/Login"
 	Auth_ValidateToken_FullMethodName                = "/auth.v1.Auth/ValidateToken"
 	Auth_ParseToken_FullMethodName                   = "/auth.v1.Auth/ParseToken"
+	Auth_EnsureTestCredential_FullMethodName         = "/auth.v1.Auth/EnsureTestCredential"
 )
 
 // AuthClient is the client API for Auth service.
@@ -35,6 +36,10 @@ type AuthClient interface {
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 	ValidateToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error)
 	ParseToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error)
+	// EnsureTestCredential 为测试账户（account_type=test）创建/重置登录凭据。
+	// 凭据（密码哈希）是 auth 域数据；账户本体由 user-rpc CreateTestAccount 先建。
+	// 已有凭据时直接重置为新密码（管理后台重复创建同名测试账户 = 重置密码）。
+	EnsureTestCredential(ctx context.Context, in *EnsureTestCredentialRequest, opts ...grpc.CallOption) (*EnsureTestCredentialResponse, error)
 }
 
 type authClient struct {
@@ -95,6 +100,16 @@ func (c *authClient) ParseToken(ctx context.Context, in *ValidateTokenRequest, o
 	return out, nil
 }
 
+func (c *authClient) EnsureTestCredential(ctx context.Context, in *EnsureTestCredentialRequest, opts ...grpc.CallOption) (*EnsureTestCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EnsureTestCredentialResponse)
+	err := c.cc.Invoke(ctx, Auth_EnsureTestCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServer is the server API for Auth service.
 // All implementations must embed UnimplementedAuthServer
 // for forward compatibility.
@@ -104,6 +119,10 @@ type AuthServer interface {
 	Login(context.Context, *LoginRequest) (*AuthResponse, error)
 	ValidateToken(context.Context, *ValidateTokenRequest) (*ValidateTokenResponse, error)
 	ParseToken(context.Context, *ValidateTokenRequest) (*ValidateTokenResponse, error)
+	// EnsureTestCredential 为测试账户（account_type=test）创建/重置登录凭据。
+	// 凭据（密码哈希）是 auth 域数据；账户本体由 user-rpc CreateTestAccount 先建。
+	// 已有凭据时直接重置为新密码（管理后台重复创建同名测试账户 = 重置密码）。
+	EnsureTestCredential(context.Context, *EnsureTestCredentialRequest) (*EnsureTestCredentialResponse, error)
 	mustEmbedUnimplementedAuthServer()
 }
 
@@ -128,6 +147,9 @@ func (UnimplementedAuthServer) ValidateToken(context.Context, *ValidateTokenRequ
 }
 func (UnimplementedAuthServer) ParseToken(context.Context, *ValidateTokenRequest) (*ValidateTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ParseToken not implemented")
+}
+func (UnimplementedAuthServer) EnsureTestCredential(context.Context, *EnsureTestCredentialRequest) (*EnsureTestCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EnsureTestCredential not implemented")
 }
 func (UnimplementedAuthServer) mustEmbedUnimplementedAuthServer() {}
 func (UnimplementedAuthServer) testEmbeddedByValue()              {}
@@ -240,6 +262,24 @@ func _Auth_ParseToken_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Auth_EnsureTestCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnsureTestCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).EnsureTestCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_EnsureTestCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).EnsureTestCredential(ctx, req.(*EnsureTestCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Auth_ServiceDesc is the grpc.ServiceDesc for Auth service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +306,10 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ParseToken",
 			Handler:    _Auth_ParseToken_Handler,
+		},
+		{
+			MethodName: "EnsureTestCredential",
+			Handler:    _Auth_EnsureTestCredential_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

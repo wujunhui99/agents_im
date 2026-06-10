@@ -561,6 +561,126 @@ func (x *ValidateTokenResponse) GetExpiresAt() string {
 	return ""
 }
 
+type EnsureTestCredentialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Identifier    string                 `protobuf:"bytes,2,opt,name=identifier,proto3" json:"identifier,omitempty"`
+	Password      string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnsureTestCredentialRequest) Reset() {
+	*x = EnsureTestCredentialRequest{}
+	mi := &file_service_auth_rpc_auth_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnsureTestCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnsureTestCredentialRequest) ProtoMessage() {}
+
+func (x *EnsureTestCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_auth_rpc_auth_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnsureTestCredentialRequest.ProtoReflect.Descriptor instead.
+func (*EnsureTestCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_service_auth_rpc_auth_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *EnsureTestCredentialRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *EnsureTestCredentialRequest) GetIdentifier() string {
+	if x != nil {
+		return x.Identifier
+	}
+	return ""
+}
+
+func (x *EnsureTestCredentialRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+type EnsureTestCredentialResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Identifier    string                 `protobuf:"bytes,2,opt,name=identifier,proto3" json:"identifier,omitempty"`
+	Rotated       bool                   `protobuf:"varint,3,opt,name=rotated,proto3" json:"rotated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnsureTestCredentialResponse) Reset() {
+	*x = EnsureTestCredentialResponse{}
+	mi := &file_service_auth_rpc_auth_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnsureTestCredentialResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnsureTestCredentialResponse) ProtoMessage() {}
+
+func (x *EnsureTestCredentialResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_auth_rpc_auth_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnsureTestCredentialResponse.ProtoReflect.Descriptor instead.
+func (*EnsureTestCredentialResponse) Descriptor() ([]byte, []int) {
+	return file_service_auth_rpc_auth_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *EnsureTestCredentialResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *EnsureTestCredentialResponse) GetIdentifier() string {
+	if x != nil {
+		return x.Identifier
+	}
+	return ""
+}
+
+func (x *EnsureTestCredentialResponse) GetRotated() bool {
+	if x != nil {
+		return x.Rotated
+	}
+	return false
+}
+
 var File_service_auth_rpc_auth_proto protoreflect.FileDescriptor
 
 const file_service_auth_rpc_auth_proto_rawDesc = "" +
@@ -623,14 +743,27 @@ const file_service_auth_rpc_auth_proto_rawDesc = "" +
 	"identifier\x18\x03 \x01(\tR\n" +
 	"identifier\x12\x1d\n" +
 	"\n" +
-	"expires_at\x18\x04 \x01(\tR\texpiresAt2\x86\x03\n" +
+	"expires_at\x18\x04 \x01(\tR\texpiresAt\"r\n" +
+	"\x1bEnsureTestCredentialRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1e\n" +
+	"\n" +
+	"identifier\x18\x02 \x01(\tR\n" +
+	"identifier\x12\x1a\n" +
+	"\bpassword\x18\x03 \x01(\tR\bpassword\"q\n" +
+	"\x1cEnsureTestCredentialResponse\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1e\n" +
+	"\n" +
+	"identifier\x18\x02 \x01(\tR\n" +
+	"identifier\x12\x18\n" +
+	"\arotated\x18\x03 \x01(\bR\arotated2\xeb\x03\n" +
 	"\x04Auth\x12m\n" +
 	"\x1cRequestRegistrationEmailCode\x12%.auth.v1.RegistrationEmailCodeRequest\x1a&.auth.v1.RegistrationEmailCodeResponse\x12;\n" +
 	"\bRegister\x12\x18.auth.v1.RegisterRequest\x1a\x15.auth.v1.AuthResponse\x125\n" +
 	"\x05Login\x12\x15.auth.v1.LoginRequest\x1a\x15.auth.v1.AuthResponse\x12N\n" +
 	"\rValidateToken\x12\x1d.auth.v1.ValidateTokenRequest\x1a\x1e.auth.v1.ValidateTokenResponse\x12K\n" +
 	"\n" +
-	"ParseToken\x12\x1d.auth.v1.ValidateTokenRequest\x1a\x1e.auth.v1.ValidateTokenResponseB7Z5github.com/wujunhui99/agents_im/service/auth/rpc/authb\x06proto3"
+	"ParseToken\x12\x1d.auth.v1.ValidateTokenRequest\x1a\x1e.auth.v1.ValidateTokenResponse\x12c\n" +
+	"\x14EnsureTestCredential\x12$.auth.v1.EnsureTestCredentialRequest\x1a%.auth.v1.EnsureTestCredentialResponseB7Z5github.com/wujunhui99/agents_im/service/auth/rpc/authb\x06proto3"
 
 var (
 	file_service_auth_rpc_auth_proto_rawDescOnce sync.Once
@@ -644,7 +777,7 @@ func file_service_auth_rpc_auth_proto_rawDescGZIP() []byte {
 	return file_service_auth_rpc_auth_proto_rawDescData
 }
 
-var file_service_auth_rpc_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_service_auth_rpc_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_service_auth_rpc_auth_proto_goTypes = []any{
 	(*RegisterRequest)(nil),               // 0: auth.v1.RegisterRequest
 	(*LoginRequest)(nil),                  // 1: auth.v1.LoginRequest
@@ -653,6 +786,8 @@ var file_service_auth_rpc_auth_proto_goTypes = []any{
 	(*ValidateTokenRequest)(nil),          // 4: auth.v1.ValidateTokenRequest
 	(*AuthResponse)(nil),                  // 5: auth.v1.AuthResponse
 	(*ValidateTokenResponse)(nil),         // 6: auth.v1.ValidateTokenResponse
+	(*EnsureTestCredentialRequest)(nil),   // 7: auth.v1.EnsureTestCredentialRequest
+	(*EnsureTestCredentialResponse)(nil),  // 8: auth.v1.EnsureTestCredentialResponse
 }
 var file_service_auth_rpc_auth_proto_depIdxs = []int32{
 	2, // 0: auth.v1.Auth.RequestRegistrationEmailCode:input_type -> auth.v1.RegistrationEmailCodeRequest
@@ -660,13 +795,15 @@ var file_service_auth_rpc_auth_proto_depIdxs = []int32{
 	1, // 2: auth.v1.Auth.Login:input_type -> auth.v1.LoginRequest
 	4, // 3: auth.v1.Auth.ValidateToken:input_type -> auth.v1.ValidateTokenRequest
 	4, // 4: auth.v1.Auth.ParseToken:input_type -> auth.v1.ValidateTokenRequest
-	3, // 5: auth.v1.Auth.RequestRegistrationEmailCode:output_type -> auth.v1.RegistrationEmailCodeResponse
-	5, // 6: auth.v1.Auth.Register:output_type -> auth.v1.AuthResponse
-	5, // 7: auth.v1.Auth.Login:output_type -> auth.v1.AuthResponse
-	6, // 8: auth.v1.Auth.ValidateToken:output_type -> auth.v1.ValidateTokenResponse
-	6, // 9: auth.v1.Auth.ParseToken:output_type -> auth.v1.ValidateTokenResponse
-	5, // [5:10] is the sub-list for method output_type
-	0, // [0:5] is the sub-list for method input_type
+	7, // 5: auth.v1.Auth.EnsureTestCredential:input_type -> auth.v1.EnsureTestCredentialRequest
+	3, // 6: auth.v1.Auth.RequestRegistrationEmailCode:output_type -> auth.v1.RegistrationEmailCodeResponse
+	5, // 7: auth.v1.Auth.Register:output_type -> auth.v1.AuthResponse
+	5, // 8: auth.v1.Auth.Login:output_type -> auth.v1.AuthResponse
+	6, // 9: auth.v1.Auth.ValidateToken:output_type -> auth.v1.ValidateTokenResponse
+	6, // 10: auth.v1.Auth.ParseToken:output_type -> auth.v1.ValidateTokenResponse
+	8, // 11: auth.v1.Auth.EnsureTestCredential:output_type -> auth.v1.EnsureTestCredentialResponse
+	6, // [6:12] is the sub-list for method output_type
+	0, // [0:6] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -683,7 +820,7 @@ func file_service_auth_rpc_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_auth_rpc_auth_proto_rawDesc), len(file_service_auth_rpc_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

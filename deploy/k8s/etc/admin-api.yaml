@@ -9,6 +9,15 @@ Auth:
 AdminRPC:
   Target: dns:///admin-rpc:9097
   Timeout: 5000
+# UserRPC/AuthRPC：BFF 编排「创建测试账户」（user-rpc 建号 + auth-rpc 设凭据）。
+UserRPC:
+  Endpoints:
+    - user-rpc:9090
+  Timeout: 5000
+AuthRPC:
+  Endpoints:
+    - auth-rpc:9091
+  Timeout: 5000
 
 Redis:
   Addr: ${REDIS_ADDR}

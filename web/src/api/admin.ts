@@ -145,6 +145,21 @@ export type AdminUserDetailResponse = {
   user: AdminUser;
 };
 
+export type AdminTestAccountCreateRequest = {
+  identifier: string;
+  displayName?: string;
+  /** 缺省时由服务端生成，并在响应中一次性返回。 */
+  password?: string;
+};
+
+export type AdminTestAccountCreateResponse = {
+  user: AdminUser;
+  /** 生效的登录密码，仅本次响应返回。 */
+  password: string;
+  /** identifier 已是 test 账户，本次操作为重置其密码。 */
+  alreadyExisted: boolean;
+};
+
 export type AdminUserFriendsResponse = {
   friends: AdminFriend[];
 };
@@ -246,6 +261,7 @@ export type AdminApi = {
   getLLMTraceDetail: (traceId: string) => Promise<AdminLLMTraceDetailResponse>;
   getConversationMessages: (conversationId: string) => Promise<AdminConversationMessagesResponse>;
   searchUsers: (query: string) => Promise<AdminUserSearchResponse>;
+  createTestAccount: (request: AdminTestAccountCreateRequest) => Promise<AdminTestAccountCreateResponse>;
   getUserDetail: (accountId: string) => Promise<AdminUserDetailResponse>;
   getUserFriends: (accountId: string) => Promise<AdminUserFriendsResponse>;
   getUserConversations: (accountId: string) => Promise<AdminUserConversationsResponse>;
@@ -278,6 +294,9 @@ export function createAdminApi(api: ApiClient = createApiClient()): AdminApi {
     searchUsers(query) {
       const params = new URLSearchParams({ query, limit: '20' });
       return api.get<AdminUserSearchResponse>(`/admin/users?${params.toString()}`);
+    },
+    createTestAccount(request) {
+      return api.post<AdminTestAccountCreateResponse>('/admin/test-accounts', request);
     },
     getUserDetail(accountId) {
       return api.get<AdminUserDetailResponse>(`/admin/users/${encodeURIComponent(accountId)}`);

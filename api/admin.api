@@ -33,6 +33,12 @@ type AdminUserReq {
 	AccountID string `path:"account_id"`
 }
 
+type AdminTestAccountCreateReq {
+	Identifier  string `json:"identifier"`
+	DisplayName string `json:"displayName,optional"`
+	Password    string `json:"password,optional"`
+}
+
 type AdminLLMTraceListReq {
 	Status string `form:"status,optional"`
 	Limit  int64  `form:"limit,optional"`
@@ -296,6 +302,12 @@ type AdminUserDetailData {
 	User AdminUser `json:"user"`
 }
 
+type AdminTestAccountData {
+	User           AdminUser `json:"user"`
+	Password       string    `json:"password"`
+	AlreadyExisted bool      `json:"alreadyExisted"`
+}
+
 type AdminUserFriendsData {
 	Friends []AdminFriend `json:"friends"`
 }
@@ -359,6 +371,12 @@ type AdminUserDetailResp {
 	Code    string              `json:"code"`
 	Message string              `json:"message"`
 	Data    AdminUserDetailData `json:"data"`
+}
+
+type AdminTestAccountCreateResp {
+	Code    string               `json:"code"`
+	Message string               `json:"message"`
+	Data    AdminTestAccountData `json:"data"`
 }
 
 type AdminUserFriendsResp {
@@ -452,6 +470,9 @@ service admin-api {
 
 	@handler adminGetUserFriends
 	get /admin/users/:account_id/friends (AdminUserReq) returns (AdminUserFriendsResp)
+
+	@handler adminCreateTestAccount
+	post /admin/test-accounts (AdminTestAccountCreateReq) returns (AdminTestAccountCreateResp)
 
 	@handler adminGetUserConversations
 	get /admin/users/:account_id/conversations (AdminUserReq) returns (AdminUserConversationsResp)

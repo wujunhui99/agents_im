@@ -172,7 +172,8 @@ func (p *DefaultAssistantProvisioner) EnsureForUser(ctx context.Context, account
 	if err != nil {
 		return err
 	}
-	if account.AccountType != model.AccountTypeUser {
+	// 测试账户（admin 后台创建）与 user 一致开通默认助手，便于测试 AI 链路。
+	if account.AccountType != model.AccountTypeUser && account.AccountType != model.AccountTypeTest {
 		return nil
 	}
 	assistant, _, _, err := p.ensureDefaultAssistant(ctx)
