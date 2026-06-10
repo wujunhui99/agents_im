@@ -356,6 +356,8 @@ OpenIM `callback.go` 7 个 webhook 钩子：
 
 ## 8. 改造分阶段（与 03 §9 phase 对齐）
 
+> **排期以 [03 §9 重排版（2026-06-10，#462）](./03-message-pipeline.md) 为准**：本节 Phase 4（ai_hosting / feedback 搬走）提前为 03 §9 **阶段 A1**（切流硬前置，#463）；Phase 1（SendMessage 改造）= 03 §9 **B2**；Phase 2（读路径 Redis）/ Phase 3（新增 RPC）后移为 03 §9 **阶段 D**（B3 后解锁）。下文保留原始任务拆解内容。
+
 ### Phase 0：proto 扩展 + 文档化（1 周）
 - 写新 `proto/message.proto`（10 个 RPC，本文 §3.1）；
 - 生成 pb.go、pb_grpc.go；
