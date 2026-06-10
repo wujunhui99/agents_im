@@ -4,19 +4,27 @@
 
 本项目是单节点 k3s 部署：
 
-- k3s 运行所有 Go API/RPC/worker、Web、PostgreSQL、Redis、MinIO、Prometheus/Grafana/Loki/Tempo/Langfuse。
+- k3s 运行所有 Go API/RPC/worker、Web、PostgreSQL、Redis、MinIO、Prometheus/Grafana/Loki/Tempo/Langfuse，
+  以及 **Drone CI 本体**（namespace `drone`，见 `deploy/k8s/drone/README.md`）。
+- 中间件（PostgreSQL/Redis/MinIO）manifests 在 `deploy/k8s/middleware/`，**不在 kustomization 内**，
+  由 bootstrap 应用、人工运维（见 `deploy/k8s/middleware/README.md`）；docker compose 中间件已退役。
 - Drone 负责 PR 验证和 `main` 部署；CI/CD 入口是 `.drone.yml`。
 - 应用 namespace 是 `agents-im`；镜像发布到 `ghcr.io/wujunhui99/agents_im`。
 
 ## Bootstrap
 
-新服务器从仓库根目录执行：
+新服务器（已装 k3s + docker）从仓库根目录执行：
 
 ```bash
-DEEPSEEK_API_KEY='[REDACTED]' ./scripts/bootstrap-server.sh
+# 先把第三方凭据写入 /opt/agents-im/creds.env（0600），键名见脚本头注释
+ADMIN_BOOTSTRAP_PASSWORD='[REDACTED]' ./scripts/bootstrap-server.sh
 ```
 
-脚本会准备 `/opt/agents-im/middleware`、k3s secret、数据库和观测组件所需的本地文件。真实 secret 只能保存在服务器、k3s Secret 或 Drone repository secrets 中，文档、Issue、PR 和聊天里只写 `[REDACTED]`。
+脚本完成：生成 `/opt/agents-im/secrets.env`（全新随机密码）、cert-manager + Let's Encrypt issuer、
+`agents-im-secrets` 等 k8s secret、k8s 中间件（PG/Redis/MinIO）、langfuse 库与 media bucket、
+数据库迁移、Drone server/runner。收尾的人工步骤（OAuth 登录、仓库激活/trusted/secrets、首次全量
+部署）见脚本结尾输出。真实 secret 只能保存在服务器、k3s Secret 或 Drone repository secrets 中，
+文档、Issue、PR 和聊天里只写 `[REDACTED]`。
 
 ## Drone
 
@@ -84,7 +92,10 @@ Observability：
 
 ## Migrations
 
-迁移只在 detect 判定 `migration_required=true` 时执行。Drone 本地部署路径会先运行迁移，再调用 `deploy-k3s.sh` 且传入 `SKIP_MIGRATIONS=true`，避免重复迁移。
+迁移只在 detect 判定 `migration_required=true` 时执行。Drone 本地部署路径会先运行迁移（连 k3s
+postgres ClusterIP + `--network host`），再调用 `deploy-k3s.sh` 且传入 `SKIP_MIGRATIONS=true` 和
+`SKIP_MIDDLEWARE=true`（中间件在 k8s，由 bootstrap/人工管理，部署流水线不再启动 docker compose
+中间件），避免重复迁移。
 
 规则：
 

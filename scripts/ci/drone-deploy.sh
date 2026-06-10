@@ -39,11 +39,6 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
     skip_migrations=false
   fi
 
-  skip_middleware=true
-  if [[ "${skip_migrations}" != "true" ]]; then
-    skip_middleware=false
-  fi
-
   if [[ "${skip_migrations}" != "true" ]]; then
     migration_port="${DRONE_LOCAL_MIGRATION_PORT:-5432}"
     kubeconfig="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
@@ -85,7 +80,7 @@ if [[ -n "${DRONE_DEPLOY_LOCAL:-}" ]]; then
     GHCR_TOKEN="${GHCR_TOKEN}" \
     KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}" \
     SKIP_SET_IMAGE="${skip_set_image}" \
-    SKIP_MIDDLEWARE="${skip_middleware}" \
+    SKIP_MIDDLEWARE="true" \
     SKIP_MIGRATIONS="true" \
     IMAGE_SERVICES="${image_services_space}" \
     ROLLOUT_SERVICES="${rollout_services}" \

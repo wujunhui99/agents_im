@@ -1,0 +1,159 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: drone
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: drone-server-data
+  namespace: drone
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drone-server
+  namespace: drone
+  labels:
+    app: drone-server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: drone-server
+  template:
+    metadata:
+      labels:
+        app: drone-server
+    spec:
+      # k8s service links would inject DRONE_SERVER_PORT=tcp://... which Drone
+      # misreads as its listen-port config and dies with "invalid port configuration".
+      enableServiceLinks: false
+      containers:
+        - name: drone-server
+          image: drone/drone:2
+          envFrom:
+            - secretRef:
+                name: drone-secrets
+          env:
+            - name: DRONE_SERVER_HOST
+              value: drone.agenticim.xyz
+            - name: DRONE_SERVER_PROTO
+              value: https
+            - name: DRONE_REGISTRATION_CLOSED
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: drone-server-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: drone-server
+  namespace: drone
+spec:
+  type: ClusterIP
+  selector:
+    app: drone-server
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: drone-server
+  namespace: drone
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - drone.agenticim.xyz
+      secretName: drone-agenticim-xyz-tls
+  rules:
+    - host: drone.agenticim.xyz
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: drone-server
+                port:
+                  number: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drone-runner-docker
+  namespace: drone
+  labels:
+    app: drone-runner-docker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: drone-runner-docker
+  template:
+    metadata:
+      labels:
+        app: drone-runner-docker
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: drone-runner-docker
+          image: drone/drone-runner-docker:1
+          env:
+            - name: DRONE_RPC_PROTO
+              value: http
+            - name: DRONE_RPC_HOST
+              value: drone-server.drone.svc.cluster.local
+            - name: DRONE_RPC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: drone-secrets
+                  key: DRONE_RPC_SECRET
+            - name: DRONE_RUNNER_CAPACITY
+              value: "1"
+            - name: DRONE_RUNNER_NAME
+              value: k3s-host-docker
+          volumeMounts:
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
