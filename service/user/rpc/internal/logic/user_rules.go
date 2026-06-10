@@ -103,13 +103,15 @@ func validateGender(gender string) (string, error) {
 func accountTypeToDB(accountType string) (int64, error) {
 	normalized, ok := sharemodel.NormalizeAccountType(accountType)
 	if !ok {
-		return 0, apperror.InvalidArgument("account_type must be user, agent, or admin")
+		return 0, apperror.InvalidArgument("account_type must be user, agent, admin, or test")
 	}
 	switch normalized {
 	case sharemodel.AccountTypeAdmin:
 		return model.AccountTypeAdmin, nil
 	case sharemodel.AccountTypeAgent:
 		return model.AccountTypeAgent, nil
+	case sharemodel.AccountTypeTest:
+		return model.AccountTypeTest, nil
 	default:
 		return model.AccountTypeUser, nil
 	}
@@ -121,6 +123,8 @@ func accountTypeFromDB(v int64) string {
 		return string(sharemodel.AccountTypeAdmin)
 	case model.AccountTypeAgent:
 		return string(sharemodel.AccountTypeAgent)
+	case model.AccountTypeTest:
+		return string(sharemodel.AccountTypeTest)
 	default:
 		return string(sharemodel.AccountTypeUser)
 	}

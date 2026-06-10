@@ -34,6 +34,13 @@ type AdminUserReq {
 	AccountID string `path:"account_id"`
 }
 
+type AdminTestAccountCreateReq {
+	Identifier  string `json:"identifier"`
+	DisplayName string `json:"displayName,optional"`
+	// Password 缺省时由 BFF 自动生成，并在响应中一次性返回。
+	Password string `json:"password,optional"`
+}
+
 type AdminLLMTraceListReq {
 	Status string `form:"status,optional"`
 	Limit  int64  `form:"limit,optional"`
@@ -300,6 +307,14 @@ type AdminUserDetailData {
 	User AdminUser `json:"user"`
 }
 
+type AdminTestAccountData {
+	User AdminUser `json:"user"`
+	// Password 是生效的登录密码，仅本次响应返回（不落库明文，请妥善保存）。
+	Password string `json:"password"`
+	// AlreadyExisted=true 表示 identifier 已是 test 账户，本次操作为重置其密码。
+	AlreadyExisted bool `json:"alreadyExisted"`
+}
+
 type AdminUserFriendsData {
 	Friends []AdminFriend `json:"friends"`
 }
@@ -363,6 +378,12 @@ type AdminUserDetailResp {
 	Code    string              `json:"code"`
 	Message string              `json:"message"`
 	Data    AdminUserDetailData `json:"data"`
+}
+
+type AdminTestAccountCreateResp {
+	Code    string               `json:"code"`
+	Message string               `json:"message"`
+	Data    AdminTestAccountData `json:"data"`
 }
 
 type AdminUserFriendsResp {
@@ -442,6 +463,9 @@ service admin-api {
 
 	@handler getUserFriends
 	get /admin/users/:account_id/friends (AdminUserReq) returns (AdminUserFriendsResp)
+
+	@handler createTestAccount
+	post /admin/test-accounts (AdminTestAccountCreateReq) returns (AdminTestAccountCreateResp)
 
 	@handler getUserConversations
 	get /admin/users/:account_id/conversations (AdminUserReq) returns (AdminUserConversationsResp)

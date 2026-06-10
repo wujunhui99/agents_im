@@ -57,3 +57,9 @@ func (s *UserServer) UpdateUserAvatar(ctx context.Context, in *user.UpdateUserAv
 	l := logic.NewUpdateUserAvatarLogic(ctx, s.svcCtx)
 	return l.UpdateUserAvatar(in)
 }
+
+// CreateTestAccount 创建管理后台用的测试账户（account_type=test，不绑定邮箱）。
+func (s *UserServer) CreateTestAccount(ctx context.Context, in *user.CreateTestAccountRequest) (*user.CreateTestAccountResponse, error) {
+	l := logic.NewCreateTestAccountLogic(ctx, s.svcCtx)
+	return l.CreateTestAccount(in)
+}

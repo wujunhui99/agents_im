@@ -341,6 +341,24 @@ type AdminTaskReportPermissionAnalysis struct {
 	Reason                  string   `json:"reason,optional"`
 }
 
+type AdminTestAccountCreateReq struct {
+	Identifier  string `json:"identifier"`
+	DisplayName string `json:"displayName,optional"`
+	Password    string `json:"password,optional"`
+}
+
+type AdminTestAccountCreateResp struct {
+	Code    string               `json:"code"`
+	Message string               `json:"message"`
+	Data    AdminTestAccountData `json:"data"`
+}
+
+type AdminTestAccountData struct {
+	User           AdminUser `json:"user"`
+	Password       string    `json:"password"`
+	AlreadyExisted bool      `json:"alreadyExisted"`
+}
+
 type AdminUser struct {
 	UserID        string `json:"userId"`
 	AccountID     string `json:"accountId,omitempty"`

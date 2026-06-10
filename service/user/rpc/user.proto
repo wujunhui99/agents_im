@@ -18,6 +18,11 @@ service User {
   rpc GetUsersByIDs(GetUsersByIDsRequest) returns (GetUsersByIDsResponse);
   rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UserResponse);
   rpc UpdateUserAvatar(UpdateUserAvatarRequest) returns (UserResponse);
+  // CreateTestAccount 创建管理后台用的测试账户（account_type=test，不绑定邮箱）。
+  // 只建 accounts+profiles；登录凭据由 auth 域负责（BFF 编排调用 auth-rpc）。
+  // 幂等：identifier 已存在且为 test 账户时返回该账户（already_exists=true），
+  // 已存在但非 test 账户时报 AlreadyExists。
+  rpc CreateTestAccount(CreateTestAccountRequest) returns (CreateTestAccountResponse);
 }
 
 // UserEntity is the V0 transport message for an Account/Profile aggregate. user_id is
@@ -93,4 +98,14 @@ message UpdateUserAvatarRequest {
 
 message UserResponse {
   UserEntity user = 1;
+}
+
+message CreateTestAccountRequest {
+  string identifier = 1;
+  string display_name = 2;
+}
+
+message CreateTestAccountResponse {
+  UserEntity user = 1;
+  bool already_exists = 2;
 }

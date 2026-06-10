@@ -11,6 +11,9 @@ const (
 	AccountTypeUser  AccountType = "user"
 	AccountTypeAgent AccountType = "agent"
 	AccountTypeAdmin AccountType = "admin"
+	// AccountTypeTest 是管理后台创建的测试账户：不绑定邮箱，identifier+密码登录，
+	// 其余行为与 user 一致（含默认助手开通）。
+	AccountTypeTest AccountType = "test"
 )
 
 type Account struct {
@@ -163,6 +166,8 @@ func NormalizeAccountType(value string) (AccountType, bool) {
 		return AccountTypeAgent, true
 	case AccountTypeAdmin:
 		return AccountTypeAdmin, true
+	case AccountTypeTest:
+		return AccountTypeTest, true
 	default:
 		return "", false
 	}
@@ -170,7 +175,7 @@ func NormalizeAccountType(value string) (AccountType, bool) {
 
 func (t AccountType) IsValid() bool {
 	switch t {
-	case AccountTypeUser, AccountTypeAgent, AccountTypeAdmin:
+	case AccountTypeUser, AccountTypeAgent, AccountTypeAdmin, AccountTypeTest:
 		return true
 	default:
 		return false

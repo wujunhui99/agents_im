@@ -6,6 +6,7 @@ const (
 	accountTypeDBAdmin int16 = 0
 	accountTypeDBUser  int16 = 1
 	accountTypeDBAgent int16 = 2
+	accountTypeDBTest  int16 = 3
 
 	genderDBUnknown int16 = 0
 	genderDBMale    int16 = 1
@@ -40,6 +41,8 @@ func accountTypeToDB(t model.AccountType) int16 {
 		return accountTypeDBAdmin
 	case model.AccountTypeAgent:
 		return accountTypeDBAgent
+	case model.AccountTypeTest:
+		return accountTypeDBTest
 	default:
 		return accountTypeDBUser
 	}
@@ -51,6 +54,8 @@ func accountTypeFromDB(v int16) model.AccountType {
 		return model.AccountTypeAdmin
 	case accountTypeDBAgent:
 		return model.AccountTypeAgent
+	case accountTypeDBTest:
+		return model.AccountTypeTest
 	default:
 		return model.AccountTypeUser
 	}

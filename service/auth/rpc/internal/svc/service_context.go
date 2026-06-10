@@ -15,6 +15,9 @@ import (
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
 	userrepo "github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
+
+	"github.com/zeromicro/go-zero/core/stores/postgres"
 )
 
 type ServiceContext struct {
@@ -22,6 +25,12 @@ type ServiceContext struct {
 	AuthLogic *business.AuthLogic
 	AuthRepo  authrepo.CredentialRepository
 	UserLogic *userlogic.UserLogic
+
+	// goctl 数据层（auth 域自有，不走 internal/）：EnsureTestCredential 用。
+	// auth 域整体重构（退役 internal/auth）后，上面的 monolith 依赖将全部并入这里。
+	Credentials model.AuthCredentialsModel
+	// AccountsGuard 是跨域鉴权读 keystone 例外（详见 model/accounts_guard.go 注释）。
+	AccountsGuard model.AccountsGuardModel
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -61,6 +70,8 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		log.Printf("admin bootstrap account ensured for identifier %q", c.AdminBootstrap.Identifier)
 	}
 
+	conn := postgres.New(c.DataSource)
+
 	return &ServiceContext{
 		Config: c,
 		AuthLogic: business.NewAuthLogicWithOptions(authRepo, useradapter.NewLogicClient(userLogic), business.NewPasswordHasher(), token.NewHMACTokenManager(c.TokenAuth.AccessSecret, time.Duration(c.TokenAuth.AccessExpire)*time.Second), business.AuthOptions{
@@ -68,7 +79,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			Sessions:         middleware.NewRedisSessionStore(c.SessionRedis),
 			Mailer:           mailer,
 		}),
-		AuthRepo:  authRepo,
-		UserLogic: userLogic,
+		AuthRepo:      authRepo,
+		UserLogic:     userLogic,
+		Credentials:   model.NewAuthCredentialsModel(conn),
+		AccountsGuard: model.NewAccountsGuardModel(conn),
 	}
 }

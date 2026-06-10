@@ -15,6 +15,8 @@ import (
 
 type (
 	AuthResponse                  = auth.AuthResponse
+	EnsureTestCredentialRequest   = auth.EnsureTestCredentialRequest
+	EnsureTestCredentialResponse  = auth.EnsureTestCredentialResponse
 	LoginRequest                  = auth.LoginRequest
 	RegisterRequest               = auth.RegisterRequest
 	RegistrationEmailCodeRequest  = auth.RegistrationEmailCodeRequest
@@ -28,6 +30,8 @@ type (
 		Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 		ValidateToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error)
 		ParseToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error)
+		// EnsureTestCredential 为测试账户（account_type=test）创建/重置登录凭据。
+		EnsureTestCredential(ctx context.Context, in *EnsureTestCredentialRequest, opts ...grpc.CallOption) (*EnsureTestCredentialResponse, error)
 	}
 
 	defaultAuth struct {
@@ -64,4 +68,10 @@ func (m *defaultAuth) ValidateToken(ctx context.Context, in *ValidateTokenReques
 func (m *defaultAuth) ParseToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error) {
 	client := auth.NewAuthClient(m.cli.Conn())
 	return client.ParseToken(ctx, in, opts...)
+}
+
+// EnsureTestCredential 为测试账户（account_type=test）创建/重置登录凭据。
+func (m *defaultAuth) EnsureTestCredential(ctx context.Context, in *EnsureTestCredentialRequest, opts ...grpc.CallOption) (*EnsureTestCredentialResponse, error) {
+	client := auth.NewAuthClient(m.cli.Conn())
+	return client.EnsureTestCredential(ctx, in, opts...)
 }

@@ -14,6 +14,8 @@ import (
 )
 
 type (
+	CreateTestAccountRequest   = user.CreateTestAccountRequest
+	CreateTestAccountResponse  = user.CreateTestAccountResponse
 	CreateUserRequest          = user.CreateUserRequest
 	ExistsByIdentifierRequest  = user.ExistsByIdentifierRequest
 	ExistsByIdentifierResponse = user.ExistsByIdentifierResponse
@@ -34,6 +36,8 @@ type (
 		GetUsersByIDs(ctx context.Context, in *GetUsersByIDsRequest, opts ...grpc.CallOption) (*GetUsersByIDsResponse, error)
 		UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UserResponse, error)
 		UpdateUserAvatar(ctx context.Context, in *UpdateUserAvatarRequest, opts ...grpc.CallOption) (*UserResponse, error)
+		// CreateTestAccount 创建管理后台用的测试账户（account_type=test，不绑定邮箱）。
+		CreateTestAccount(ctx context.Context, in *CreateTestAccountRequest, opts ...grpc.CallOption) (*CreateTestAccountResponse, error)
 	}
 
 	defaultUser struct {
@@ -80,4 +84,10 @@ func (m *defaultUser) UpdateUserProfile(ctx context.Context, in *UpdateUserProfi
 func (m *defaultUser) UpdateUserAvatar(ctx context.Context, in *UpdateUserAvatarRequest, opts ...grpc.CallOption) (*UserResponse, error) {
 	client := user.NewUserClient(m.cli.Conn())
 	return client.UpdateUserAvatar(ctx, in, opts...)
+}
+
+// CreateTestAccount 创建管理后台用的测试账户（account_type=test，不绑定邮箱）。
+func (m *defaultUser) CreateTestAccount(ctx context.Context, in *CreateTestAccountRequest, opts ...grpc.CallOption) (*CreateTestAccountResponse, error) {
+	client := user.NewUserClient(m.cli.Conn())
+	return client.CreateTestAccount(ctx, in, opts...)
 }

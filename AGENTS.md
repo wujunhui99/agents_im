@@ -27,6 +27,7 @@
 5. **敏感信息脱敏**：不要输出 token、JWT、密码、cookie、DSN、访问凭据等敏感值；统一写 `[REDACTED]`。
 6. **文档按需读取**：先读本文件，再按任务类型读 [`docs/AGENT_TASK_GUIDE.md`](./docs/AGENT_TASK_GUIDE.md)；不要一次性读完整 `docs/`。
 7. **数据库变更**：schema/data 变更必须新增 `db/migrations/*.sql`；已发布 migration 不可变。
+8. **禁用顶层 `internal/`**：`agents_im/internal`（monolith god-package）在退役中，新代码一律不得 import 或修改它；数据层用 goctl model 生成到 `service/<domain>/rpc/internal/model`（无 repository 层），做法见 `.claude/skills/refactor-domain-to-service`。存量 keystone 例外按该 skill 的台账处理。
 
 ## 项目目录
 

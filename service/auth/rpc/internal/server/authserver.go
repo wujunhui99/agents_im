@@ -47,3 +47,9 @@ func (s *AuthServer) ParseToken(ctx context.Context, in *auth.ValidateTokenReque
 	l := logic.NewParseTokenLogic(ctx, s.svcCtx)
 	return l.ParseToken(in)
 }
+
+// EnsureTestCredential 为测试账户（account_type=test）创建/重置登录凭据。
+func (s *AuthServer) EnsureTestCredential(ctx context.Context, in *auth.EnsureTestCredentialRequest) (*auth.EnsureTestCredentialResponse, error) {
+	l := logic.NewEnsureTestCredentialLogic(ctx, s.svcCtx)
+	return l.EnsureTestCredential(in)
+}

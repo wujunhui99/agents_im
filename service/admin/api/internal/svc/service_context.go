@@ -15,16 +15,25 @@ import (
 	"github.com/wujunhui99/agents_im/service/admin/api/internal/config"
 	adminpb "github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/adminclient"
+	"github.com/wujunhui99/agents_im/service/auth/rpc/authclient"
+	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
-var ErrAdminRPCConfigRequired = errors.New("admin rpc client config is required")
+var (
+	ErrAdminRPCConfigRequired = errors.New("admin rpc client config is required")
+	ErrUserRPCConfigRequired  = errors.New("user rpc client config is required")
+	ErrAuthRPCConfigRequired  = errors.New("auth rpc client config is required")
+)
 
 type ServiceContext struct {
 	Config   config.Config
 	AdminRPC adminclient.Admin
+	// UserRPC / AuthRPC：BFF 编排「创建测试账户」（user-rpc 建号 + auth-rpc 设凭据）。
+	UserRPC userclient.User
+	AuthRPC authclient.Auth
 	// DeviceAuth：admin 路由组中间件。先走共享活跃会话校验（common/middleware.DeviceAuth），
 	// 再过 admin 账号闸（经 admin-rpc 校验请求者是 admin）。健康检查/metrics 不挂此中间件。
 	DeviceAuth rest.Middleware
@@ -39,10 +48,26 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		return nil, err
 	}
 	adminRPC := adminclient.NewAdmin(cli)
+	if !hasRPCClientConfig(c.UserRPC) {
+		return nil, ErrUserRPCConfigRequired
+	}
+	userCli, err := zrpc.NewClient(c.UserRPC)
+	if err != nil {
+		return nil, err
+	}
+	if !hasRPCClientConfig(c.AuthRPC) {
+		return nil, ErrAuthRPCConfigRequired
+	}
+	authCli, err := zrpc.NewClient(c.AuthRPC)
+	if err != nil {
+		return nil, err
+	}
 	deviceAuth := middleware.NewDeviceAuthMiddleware(middleware.NewRedisSessionStore(c.Redis)).Handle
 	return &ServiceContext{
 		Config:     c,
 		AdminRPC:   adminRPC,
+		UserRPC:    userclient.NewUser(userCli),
+		AuthRPC:    authclient.NewAuth(authCli),
 		DeviceAuth: chainMiddlewares(deviceAuth, adminOnlyMiddleware(adminRPC)),
 	}, nil
 }

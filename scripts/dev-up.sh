@@ -387,6 +387,14 @@ AdminRPC:
   Endpoints:
     - 127.0.0.1:${ADMIN_RPC_PORT:-9097}
   Timeout: 5000
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT:-9090}
+  Timeout: 5000
+AuthRPC:
+  Endpoints:
+    - 127.0.0.1:${AUTH_RPC_PORT:-9091}
+  Timeout: 5000
 Redis:
   Addr: ${REDIS_ADDR}
   Password: ${REDIS_PASSWORD}

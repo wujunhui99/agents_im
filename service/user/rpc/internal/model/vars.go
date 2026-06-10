@@ -10,6 +10,7 @@ const (
 	AccountTypeAdmin int64 = 0
 	AccountTypeUser  int64 = 1
 	AccountTypeAgent int64 = 2
+	AccountTypeTest  int64 = 3
 )
 
 // profiles.gender 的数据库整型取值（smallint），单一来源。与 db/migrations/001 一致。

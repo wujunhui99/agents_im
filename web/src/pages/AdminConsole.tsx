@@ -9,6 +9,7 @@ import {
   type AdminFeedback,
   type AdminLLMTrace,
   type AdminTaskReport,
+  type AdminTestAccountCreateResponse,
   type AdminUser,
   type AdminUserConversationsResponse,
   type AdminUserDetailResponse,
@@ -66,6 +67,12 @@ export function AdminConsole({ adminApi, mediaApi }: AdminConsoleProps) {
   const [userConversations, setUserConversations] = useState<AdminUserConversationsResponse | null>(null);
   const [userLoading, setUserLoading] = useState(false);
   const [userError, setUserError] = useState('');
+  const [testAccountIdentifier, setTestAccountIdentifier] = useState('');
+  const [testAccountDisplayName, setTestAccountDisplayName] = useState('');
+  const [testAccountPassword, setTestAccountPassword] = useState('');
+  const [testAccountResult, setTestAccountResult] = useState<AdminTestAccountCreateResponse | null>(null);
+  const [testAccountError, setTestAccountError] = useState('');
+  const [testAccountLoading, setTestAccountLoading] = useState(false);
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState('new');
   const [feedbackList, setFeedbackList] = useState<AdminFeedback[]>([]);
   const [selectedFeedback, setSelectedFeedback] = useState<AdminFeedback | null>(null);
@@ -232,6 +239,34 @@ export function AdminConsole({ adminApi, mediaApi }: AdminConsoleProps) {
     }
   }
 
+  async function createTestAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const identifier = testAccountIdentifier.trim();
+    if (!identifier) {
+      setTestAccountError('Identifier is required');
+      return;
+    }
+    setTestAccountLoading(true);
+    setTestAccountError('');
+    setTestAccountResult(null);
+    try {
+      const data = await api.createTestAccount({
+        identifier,
+        displayName: testAccountDisplayName.trim() || undefined,
+        password: testAccountPassword || undefined,
+      });
+      setTestAccountResult(data);
+      setTestAccountIdentifier('');
+      setTestAccountDisplayName('');
+      setTestAccountPassword('');
+      await loadUsers(userQuery);
+    } catch {
+      setTestAccountError('Could not create test account');
+    } finally {
+      setTestAccountLoading(false);
+    }
+  }
+
   async function loadFeedback(status = feedbackStatusFilter) {
     setFeedbackLoading(true);
     setFeedbackError('');
@@ -374,6 +409,16 @@ export function AdminConsole({ adminApi, mediaApi }: AdminConsoleProps) {
             onSearch: searchUsers,
             onOpenUser: openUser,
             onOpenConversation: loadConversation,
+            testAccountIdentifier,
+            setTestAccountIdentifier,
+            testAccountDisplayName,
+            setTestAccountDisplayName,
+            testAccountPassword,
+            setTestAccountPassword,
+            testAccountResult,
+            testAccountError,
+            testAccountLoading,
+            onCreateTestAccount: createTestAccount,
           })}
         {activeView === 'feedback' &&
           renderFeedback({
@@ -737,6 +782,16 @@ function renderUsers({
   onSearch,
   onOpenUser,
   onOpenConversation,
+  testAccountIdentifier,
+  setTestAccountIdentifier,
+  testAccountDisplayName,
+  setTestAccountDisplayName,
+  testAccountPassword,
+  setTestAccountPassword,
+  testAccountResult,
+  testAccountError,
+  testAccountLoading,
+  onCreateTestAccount,
 }: {
   userQuery: string;
   setUserQuery: (value: string) => void;
@@ -749,6 +804,16 @@ function renderUsers({
   onSearch: (event: FormEvent<HTMLFormElement>) => void;
   onOpenUser: (user: AdminUser) => void;
   onOpenConversation: (conversationID: string) => void;
+  testAccountIdentifier: string;
+  setTestAccountIdentifier: (value: string) => void;
+  testAccountDisplayName: string;
+  setTestAccountDisplayName: (value: string) => void;
+  testAccountPassword: string;
+  setTestAccountPassword: (value: string) => void;
+  testAccountResult: AdminTestAccountCreateResponse | null;
+  testAccountError: string;
+  testAccountLoading: boolean;
+  onCreateTestAccount: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <div className="admin-page">
@@ -765,6 +830,54 @@ function renderUsers({
           Search users
         </button>
       </form>
+      <section className="admin-detail-panel" role="region" aria-label="Create test account">
+        <h3>Create test account</h3>
+        <p className="admin-hint">
+          测试账户不绑定邮箱，identifier+密码直接登录；同名重复创建会重置该测试账户的密码。
+        </p>
+        <form className="admin-inline-form" onSubmit={onCreateTestAccount}>
+          <label>
+            <span>Identifier</span>
+            <input
+              value={testAccountIdentifier}
+              onChange={(event) => setTestAccountIdentifier(event.target.value)}
+              placeholder="test_user1"
+            />
+          </label>
+          <label>
+            <span>Display name (optional)</span>
+            <input
+              value={testAccountDisplayName}
+              onChange={(event) => setTestAccountDisplayName(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Password (optional, auto-generated)</span>
+            <input
+              value={testAccountPassword}
+              onChange={(event) => setTestAccountPassword(event.target.value)}
+              autoComplete="new-password"
+            />
+          </label>
+          <button type="submit" className="admin-primary-button" disabled={testAccountLoading}>
+            <Users aria-hidden="true" size={16} />
+            {testAccountLoading ? 'Creating…' : 'Create test account'}
+          </button>
+        </form>
+        {testAccountError && <p className="admin-error">{testAccountError}</p>}
+        {testAccountResult && (
+          <dl className="admin-definition-grid" aria-label="Test account credentials">
+            <dt>Identifier</dt>
+            <dd>{testAccountResult.user.identifier}</dd>
+            <dt>Password</dt>
+            <dd>
+              <code>{testAccountResult.password}</code>（仅本次显示，请立即保存）
+            </dd>
+            <dt>Status</dt>
+            <dd>{testAccountResult.alreadyExisted ? '已存在的测试账户，密码已重置' : '新建成功'}</dd>
+          </dl>
+        )}
+      </section>
       {loading && <p className="admin-status">Loading user data</p>}
       {error && <p className="admin-error">{error}</p>}
       {userResults && userResults.users.length === 0 && !userDetail && <p className="admin-empty">No users found</p>}

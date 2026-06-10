@@ -11,9 +11,26 @@ IM 身份主体不只包含人类用户。Agent、admin、未来服务号/公众
 - Account：身份与资料主体，可代表 human user、agent、admin，未来可扩展 service/official account。
 - Account Service：账号资料权威服务，负责 identifier、展示名、性别、生日、地区、`account_type` 等资料，不负责 credential/password/token。
 - Auth Service：认证与凭据边界，负责 password hash、salt、token 签发与校验，不负责账号展示资料。
-- `account_type`：账号类型，当前支持 `user`、`agent`、`admin`。`user` 是 account type，不是服务名。
+- `account_type`：账号类型，当前支持 `user`、`agent`、`admin`、`test`。`user` 是 account type，不是服务名。
 - `account_id`：Account Service 内部 source-of-truth ID，由 Snowflake 算法生成，保存为无前缀数字字符串。
 - `user_id`：V0 public compatibility 字段，是 account id alias。friends/groups/message/gateway/read state 中的 `user_id` 均指向 Account Service 管理的 account id。
+
+## 账户类型（account_type）
+
+`accounts.account_type` 为 smallint，整型取值的单一来源是 `service/user/rpc/internal/model/vars.go`：
+
+| 字符串 | DB 值 | 说明 | 创建途径 | 邮箱 | 登录凭据 |
+|--------|------|------|---------|------|---------|
+| `admin` | 0 | 管理后台管理员，过 admin-api 的 admin 闸 | auth-rpc 启动时由 `ADMIN_BOOTSTRAP_*` secret 引导 | 不绑定 | bootstrap 时写入 |
+| `user` | 1 | 普通用户（默认） | 注册流程（强制邮箱验证码绑定） | 必须绑定且验证 | 注册时写入 |
+| `agent` | 2 | AI Agent 账号（如默认助手） | 系统开通（default assistant provisioner 等） | 不绑定 | 无（不可密码登录） |
+| `test` | 3 | 测试账户，行为与 `user` 一致（含默认助手开通） | admin 管理后台 `POST /admin/test-accounts`（BFF 编排 user-rpc 建号 + auth-rpc 设凭据） | 不绑定 | 创建时写入；同名重复创建 = 重置密码 |
+
+测试账户要点：
+
+- 仅 admin 可创建（admin-api DeviceAuth + admin 闸）；密码可指定，缺省自动生成并在响应中一次性返回。
+- user-rpc `CreateTestAccount` 幂等：identifier 已存在且为 `test` 时返回该账户；为其它类型时报 AlreadyExists。
+- auth-rpc `EnsureTestCredential` 仅对 `test` 账户放行（防止被误用于覆盖普通用户/管理员密码）。
 
 ## V0 Compatibility
 
@@ -32,7 +49,7 @@ Account Service owns:
 - `identifier` uniqueness and public profile lookup;
 - `email_normalized` / `email_verified_at` as account-owned contact/login identity fields;
 - profile fields such as `display_name`、`name`、`gender`、`birth_date`、`region`;
-- `account_type=user|agent|admin`;
+- `account_type=user|agent|admin|test`;
 - `/me` current account profile read/update through JWT identity.
 
 Account Service does not own:

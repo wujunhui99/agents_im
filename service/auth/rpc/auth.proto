@@ -10,6 +10,10 @@ service Auth {
   rpc Login(LoginRequest) returns (AuthResponse);
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
   rpc ParseToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  // EnsureTestCredential 为测试账户（account_type=test）创建/重置登录凭据。
+  // 凭据（密码哈希）是 auth 域数据；账户本体由 user-rpc CreateTestAccount 先建。
+  // 已有凭据时直接重置为新密码（管理后台重复创建同名测试账户 = 重置密码）。
+  rpc EnsureTestCredential(EnsureTestCredentialRequest) returns (EnsureTestCredentialResponse);
 }
 
 message RegisterRequest {
@@ -67,4 +71,16 @@ message ValidateTokenResponse {
   string user_id = 2;
   string identifier = 3;
   string expires_at = 4;
+}
+
+message EnsureTestCredentialRequest {
+  string user_id = 1;
+  string identifier = 2;
+  string password = 3;
+}
+
+message EnsureTestCredentialResponse {
+  string user_id = 1;
+  string identifier = 2;
+  bool rotated = 3;
 }
