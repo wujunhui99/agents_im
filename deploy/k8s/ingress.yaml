@@ -88,6 +88,13 @@ spec:
                 name: admin-api
                 port:
                   number: 8088
+          - path: /admin/test-accounts
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-api
+                port:
+                  number: 8088
           - path: /api/admin/feedback
             pathType: Prefix
             backend:
@@ -198,6 +205,13 @@ spec:
                 port:
                   number: 8088
           - path: /admin/users
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-api
+                port:
+                  number: 8088
+          - path: /admin/test-accounts
             pathType: Prefix
             backend:
               service:
