@@ -17,9 +17,14 @@ description: 把一个业务域从顶层 internal monolith（god-package interna
 
 - **`internal/logic` 是 god-package**：多个域的 `*Logic` 混在同一 `package logic`，共享 DTO（`UserProfile`）、
   helper（`formatTime`）。删一个域文件可能连带影响同包其它域。
-- **message monolith 是 keystone**：`internal/rpcgen/message`、`internal/servicecontext/message` 会 in-process
-  构造几乎所有域的 `*Logic`。被它消费的域，在 message 迁移前**无法从 internal/logic 彻底删生产代码**——
-  保留 internal 旧逻辑给 monolith，新 rpc 走 goctl 自包含，文档里注明“待 message 迁移后删”。
+- **message monolith 是 keystone**：`internal/servicecontext/message` 会 in-process
+  构造几乎所有域的 `*Logic`（消费方现为 gateway-ws 与 msg-rpc 的 AI 托管 runtime，#463 后）。被它消费的域，
+  在 message 迁移前**无法从 internal/logic 彻底删生产代码**——保留 internal 旧逻辑给 monolith，
+  新 rpc 走 goctl 自包含，文档里注明“待 message 迁移后删”。
+- **退役 api 服务前审计进程内旁路职责**：HTTP 路由 1:1 复刻 ≠ 职责 1:1 复刻。旧 api main 里可能挂着
+  hook/后台接线（如 message-api 的 AI 托管触发 `SetMessageCreatedHook`——#463 退役时整套迁入 msg-rpc，
+  否则 web REST 发消息不再触发 Agent 回复）。退役前过一遍 main.go 的非路由接线（hook / Configure* /
+  goroutine），逐个确认新归属。
 - **Go `internal/` 可见性**：`service/X/rpc/internal/...` 只能被 `service/X/rpc/` 导入。需被多方导入的逻辑
   放 `service/<domain>/core`（与 rpc/api 平级）。
 - **import 顺序不是 gofmt-canonical**：本仓库 `pkg/*` 排在 `common/share/*`、`internal/*` 之前。

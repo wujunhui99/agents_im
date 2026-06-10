@@ -12,41 +12,9 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	"github.com/wujunhui99/agents_im/internal/handler"
 	"github.com/wujunhui99/agents_im/internal/logic"
-	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	"github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/pkg/response"
-	"github.com/zeromicro/go-zero/core/service"
-	"github.com/zeromicro/go-zero/rest"
-	"github.com/zeromicro/go-zero/rest/httpx"
 )
-
-func newMessageGoZeroRouter(t *testing.T, serviceContext *messagesvc.ServiceContext) http.Handler {
-	t.Helper()
-	return newGoZeroRouter(t, func(server *rest.Server) {
-		handler.RegisterMessageGoZeroHandlers(server, serviceContext)
-	})
-}
-
-func newGoZeroRouter(t *testing.T, register func(*rest.Server)) http.Handler {
-	t.Helper()
-
-	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
-	server := rest.MustNewServer(rest.RestConf{
-		ServiceConf: service.ServiceConf{Name: "test-api"},
-		Host:        "127.0.0.1",
-		Port:        8888,
-	}, rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
-	t.Cleanup(server.Stop)
-	register(server)
-
-	serverless, err := rest.NewServerless(server)
-	if err != nil {
-		t.Fatalf("build go-zero test router: %v", err)
-	}
-	return http.HandlerFunc(serverless.Serve)
-}
 
 func newJSONRequest(method string, target string, body string) *http.Request {
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
@@ -78,12 +46,6 @@ func bearerTokenForUser(t *testing.T, userID string) string {
 		t.Fatalf("issue test jwt: %v", err)
 	}
 	return "Bearer " + rawToken
-}
-
-func setRejectedLegacyXUserIDHeader(t *testing.T, req *http.Request, userID string) {
-	t.Helper()
-
-	req.Header.Set("X-User-Id", userID) // legacy X-User-Id rejection helper
 }
 
 func mustCreateUser(t *testing.T, userLogic *logic.UserLogic, identifier string) logic.UserProfile {

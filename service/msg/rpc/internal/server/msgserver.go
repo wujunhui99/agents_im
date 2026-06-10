@@ -88,3 +88,14 @@ func (s *MsgServer) GetServerTime(ctx context.Context, in *msg.GetServerTimeRequ
 	l := logic.NewGetServerTimeLogic(ctx, s.svcCtx)
 	return l.GetServerTime(in)
 }
+
+// AI 托管开关（keystone 例外：随 message-api 退役落到 msg-rpc，待 agent 域 rpc / 03 §9 B1 后迁出）
+func (s *MsgServer) GetConversationAIHosting(ctx context.Context, in *msg.GetConversationAIHostingRequest) (*msg.ConversationAIHostingState, error) {
+	l := logic.NewGetConversationAIHostingLogic(ctx, s.svcCtx)
+	return l.GetConversationAIHosting(in)
+}
+
+func (s *MsgServer) UpdateConversationAIHosting(ctx context.Context, in *msg.UpdateConversationAIHostingRequest) (*msg.ConversationAIHostingState, error) {
+	l := logic.NewUpdateConversationAIHostingLogic(ctx, s.svcCtx)
+	return l.UpdateConversationAIHosting(in)
+}

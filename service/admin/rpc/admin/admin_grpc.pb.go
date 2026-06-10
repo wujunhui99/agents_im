@@ -30,6 +30,7 @@ const (
 	Admin_ListFeedback_FullMethodName            = "/admin.v1.Admin/ListFeedback"
 	Admin_GetFeedback_FullMethodName             = "/admin.v1.Admin/GetFeedback"
 	Admin_UpdateFeedback_FullMethodName          = "/admin.v1.Admin/UpdateFeedback"
+	Admin_CreateFeedback_FullMethodName          = "/admin.v1.Admin/CreateFeedback"
 	Admin_ListTaskReports_FullMethodName         = "/admin.v1.Admin/ListTaskReports"
 	Admin_UpsertTaskReport_FullMethodName        = "/admin.v1.Admin/UpsertTaskReport"
 	Admin_ReplayAgentMessage_FullMethodName      = "/admin.v1.Admin/ReplayAgentMessage"
@@ -54,6 +55,7 @@ type AdminClient interface {
 	ListFeedback(ctx context.Context, in *FeedbackListRequest, opts ...grpc.CallOption) (*FeedbackListResponse, error)
 	GetFeedback(ctx context.Context, in *FeedbackDetailRequest, opts ...grpc.CallOption) (*FeedbackDetailResponse, error)
 	UpdateFeedback(ctx context.Context, in *FeedbackUpdateRequest, opts ...grpc.CallOption) (*FeedbackUpdateResponse, error)
+	CreateFeedback(ctx context.Context, in *FeedbackCreateRequest, opts ...grpc.CallOption) (*FeedbackCreateResponse, error)
 	ListTaskReports(ctx context.Context, in *TaskReportListRequest, opts ...grpc.CallOption) (*TaskReportListResponse, error)
 	UpsertTaskReport(ctx context.Context, in *TaskReportUpsertRequest, opts ...grpc.CallOption) (*TaskReportDetailResponse, error)
 	ReplayAgentMessage(ctx context.Context, in *ReplayAgentMessageRequest, opts ...grpc.CallOption) (*ReplayAgentMessageResponse, error)
@@ -177,6 +179,16 @@ func (c *adminClient) UpdateFeedback(ctx context.Context, in *FeedbackUpdateRequ
 	return out, nil
 }
 
+func (c *adminClient) CreateFeedback(ctx context.Context, in *FeedbackCreateRequest, opts ...grpc.CallOption) (*FeedbackCreateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FeedbackCreateResponse)
+	err := c.cc.Invoke(ctx, Admin_CreateFeedback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *adminClient) ListTaskReports(ctx context.Context, in *TaskReportListRequest, opts ...grpc.CallOption) (*TaskReportListResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TaskReportListResponse)
@@ -226,6 +238,7 @@ type AdminServer interface {
 	ListFeedback(context.Context, *FeedbackListRequest) (*FeedbackListResponse, error)
 	GetFeedback(context.Context, *FeedbackDetailRequest) (*FeedbackDetailResponse, error)
 	UpdateFeedback(context.Context, *FeedbackUpdateRequest) (*FeedbackUpdateResponse, error)
+	CreateFeedback(context.Context, *FeedbackCreateRequest) (*FeedbackCreateResponse, error)
 	ListTaskReports(context.Context, *TaskReportListRequest) (*TaskReportListResponse, error)
 	UpsertTaskReport(context.Context, *TaskReportUpsertRequest) (*TaskReportDetailResponse, error)
 	ReplayAgentMessage(context.Context, *ReplayAgentMessageRequest) (*ReplayAgentMessageResponse, error)
@@ -271,6 +284,9 @@ func (UnimplementedAdminServer) GetFeedback(context.Context, *FeedbackDetailRequ
 }
 func (UnimplementedAdminServer) UpdateFeedback(context.Context, *FeedbackUpdateRequest) (*FeedbackUpdateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateFeedback not implemented")
+}
+func (UnimplementedAdminServer) CreateFeedback(context.Context, *FeedbackCreateRequest) (*FeedbackCreateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateFeedback not implemented")
 }
 func (UnimplementedAdminServer) ListTaskReports(context.Context, *TaskReportListRequest) (*TaskReportListResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTaskReports not implemented")
@@ -500,6 +516,24 @@ func _Admin_UpdateFeedback_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Admin_CreateFeedback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FeedbackCreateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServer).CreateFeedback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Admin_CreateFeedback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServer).CreateFeedback(ctx, req.(*FeedbackCreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Admin_ListTaskReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(TaskReportListRequest)
 	if err := dec(in); err != nil {
@@ -604,6 +638,10 @@ var Admin_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateFeedback",
 			Handler:    _Admin_UpdateFeedback_Handler,
+		},
+		{
+			MethodName: "CreateFeedback",
+			Handler:    _Admin_CreateFeedback_Handler,
 		},
 		{
 			MethodName: "ListTaskReports",

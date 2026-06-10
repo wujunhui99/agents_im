@@ -2610,6 +2610,159 @@ func (x *FeedbackUpdateResponse) GetFeedback() *AdminFeedback {
 	return nil
 }
 
+// 用户提交反馈(来自 msg-api BFF 的 POST /api/feedback)。
+type FeedbackCreateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Category      string                 `protobuf:"bytes,2,opt,name=category,proto3" json:"category,omitempty"`
+	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Content       string                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	Contact       string                 `protobuf:"bytes,5,opt,name=contact,proto3" json:"contact,omitempty"`
+	PageUrl       string                 `protobuf:"bytes,6,opt,name=page_url,json=pageUrl,proto3" json:"page_url,omitempty"`
+	UserAgent     string                 `protobuf:"bytes,7,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`
+	ClientMeta    *structpb.Struct       `protobuf:"bytes,8,opt,name=client_meta,json=clientMeta,proto3" json:"client_meta,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FeedbackCreateRequest) Reset() {
+	*x = FeedbackCreateRequest{}
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FeedbackCreateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FeedbackCreateRequest) ProtoMessage() {}
+
+func (x *FeedbackCreateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FeedbackCreateRequest.ProtoReflect.Descriptor instead.
+func (*FeedbackCreateRequest) Descriptor() ([]byte, []int) {
+	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *FeedbackCreateRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *FeedbackCreateRequest) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+func (x *FeedbackCreateRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *FeedbackCreateRequest) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *FeedbackCreateRequest) GetContact() string {
+	if x != nil {
+		return x.Contact
+	}
+	return ""
+}
+
+func (x *FeedbackCreateRequest) GetPageUrl() string {
+	if x != nil {
+		return x.PageUrl
+	}
+	return ""
+}
+
+func (x *FeedbackCreateRequest) GetUserAgent() string {
+	if x != nil {
+		return x.UserAgent
+	}
+	return ""
+}
+
+func (x *FeedbackCreateRequest) GetClientMeta() *structpb.Struct {
+	if x != nil {
+		return x.ClientMeta
+	}
+	return nil
+}
+
+type FeedbackCreateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FeedbackId    string                 `protobuf:"bytes,1,opt,name=feedback_id,json=feedbackId,proto3" json:"feedback_id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FeedbackCreateResponse) Reset() {
+	*x = FeedbackCreateResponse{}
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FeedbackCreateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FeedbackCreateResponse) ProtoMessage() {}
+
+func (x *FeedbackCreateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FeedbackCreateResponse.ProtoReflect.Descriptor instead.
+func (*FeedbackCreateResponse) Descriptor() ([]byte, []int) {
+	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *FeedbackCreateResponse) GetFeedbackId() string {
+	if x != nil {
+		return x.FeedbackId
+	}
+	return ""
+}
+
+func (x *FeedbackCreateResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
 type TaskReportListRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Outcome       string                 `protobuf:"bytes,1,opt,name=outcome,proto3" json:"outcome,omitempty"`
@@ -2621,7 +2774,7 @@ type TaskReportListRequest struct {
 
 func (x *TaskReportListRequest) Reset() {
 	*x = TaskReportListRequest{}
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[33]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2633,7 +2786,7 @@ func (x *TaskReportListRequest) String() string {
 func (*TaskReportListRequest) ProtoMessage() {}
 
 func (x *TaskReportListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[33]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2646,7 +2799,7 @@ func (x *TaskReportListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskReportListRequest.ProtoReflect.Descriptor instead.
 func (*TaskReportListRequest) Descriptor() ([]byte, []int) {
-	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{33}
+	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *TaskReportListRequest) GetOutcome() string {
@@ -2679,7 +2832,7 @@ type TaskReportListResponse struct {
 
 func (x *TaskReportListResponse) Reset() {
 	*x = TaskReportListResponse{}
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[34]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2691,7 +2844,7 @@ func (x *TaskReportListResponse) String() string {
 func (*TaskReportListResponse) ProtoMessage() {}
 
 func (x *TaskReportListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[34]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2704,7 +2857,7 @@ func (x *TaskReportListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskReportListResponse.ProtoReflect.Descriptor instead.
 func (*TaskReportListResponse) Descriptor() ([]byte, []int) {
-	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{34}
+	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *TaskReportListResponse) GetItems() []*AdminTaskReport {
@@ -2723,7 +2876,7 @@ type TaskReportUpsertRequest struct {
 
 func (x *TaskReportUpsertRequest) Reset() {
 	*x = TaskReportUpsertRequest{}
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[35]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2735,7 +2888,7 @@ func (x *TaskReportUpsertRequest) String() string {
 func (*TaskReportUpsertRequest) ProtoMessage() {}
 
 func (x *TaskReportUpsertRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[35]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2748,7 +2901,7 @@ func (x *TaskReportUpsertRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskReportUpsertRequest.ProtoReflect.Descriptor instead.
 func (*TaskReportUpsertRequest) Descriptor() ([]byte, []int) {
-	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{35}
+	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *TaskReportUpsertRequest) GetReport() *AdminTaskReport {
@@ -2767,7 +2920,7 @@ type TaskReportDetailResponse struct {
 
 func (x *TaskReportDetailResponse) Reset() {
 	*x = TaskReportDetailResponse{}
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[36]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2779,7 +2932,7 @@ func (x *TaskReportDetailResponse) String() string {
 func (*TaskReportDetailResponse) ProtoMessage() {}
 
 func (x *TaskReportDetailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[36]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2792,7 +2945,7 @@ func (x *TaskReportDetailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskReportDetailResponse.ProtoReflect.Descriptor instead.
 func (*TaskReportDetailResponse) Descriptor() ([]byte, []int) {
-	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{36}
+	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *TaskReportDetailResponse) GetReport() *AdminTaskReport {
@@ -2812,7 +2965,7 @@ type ReplayAgentMessageRequest struct {
 
 func (x *ReplayAgentMessageRequest) Reset() {
 	*x = ReplayAgentMessageRequest{}
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[37]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2824,7 +2977,7 @@ func (x *ReplayAgentMessageRequest) String() string {
 func (*ReplayAgentMessageRequest) ProtoMessage() {}
 
 func (x *ReplayAgentMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[37]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2837,7 +2990,7 @@ func (x *ReplayAgentMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplayAgentMessageRequest.ProtoReflect.Descriptor instead.
 func (*ReplayAgentMessageRequest) Descriptor() ([]byte, []int) {
-	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{37}
+	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ReplayAgentMessageRequest) GetConversationId() string {
@@ -2868,7 +3021,7 @@ type ReplayAgentMessageResponse struct {
 
 func (x *ReplayAgentMessageResponse) Reset() {
 	*x = ReplayAgentMessageResponse{}
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[38]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2880,7 +3033,7 @@ func (x *ReplayAgentMessageResponse) String() string {
 func (*ReplayAgentMessageResponse) ProtoMessage() {}
 
 func (x *ReplayAgentMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_admin_rpc_admin_proto_msgTypes[38]
+	mi := &file_service_admin_rpc_admin_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2893,7 +3046,7 @@ func (x *ReplayAgentMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplayAgentMessageResponse.ProtoReflect.Descriptor instead.
 func (*ReplayAgentMessageResponse) Descriptor() ([]byte, []int) {
-	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{38}
+	return file_service_admin_rpc_admin_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ReplayAgentMessageResponse) GetConversationId() string {
@@ -3210,7 +3363,22 @@ const file_service_admin_rpc_admin_proto_rawDesc = "" +
 	"\n" +
 	"admin_note\x18\x03 \x01(\tR\tadminNote\"M\n" +
 	"\x16FeedbackUpdateResponse\x123\n" +
-	"\bfeedback\x18\x01 \x01(\v2\x17.admin.v1.AdminFeedbackR\bfeedback\"_\n" +
+	"\bfeedback\x18\x01 \x01(\v2\x17.admin.v1.AdminFeedbackR\bfeedback\"\x8a\x02\n" +
+	"\x15FeedbackCreateRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
+	"\bcategory\x18\x02 \x01(\tR\bcategory\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\tR\acontent\x12\x18\n" +
+	"\acontact\x18\x05 \x01(\tR\acontact\x12\x19\n" +
+	"\bpage_url\x18\x06 \x01(\tR\apageUrl\x12\x1d\n" +
+	"\n" +
+	"user_agent\x18\a \x01(\tR\tuserAgent\x128\n" +
+	"\vclient_meta\x18\b \x01(\v2\x17.google.protobuf.StructR\n" +
+	"clientMeta\"Q\n" +
+	"\x16FeedbackCreateResponse\x12\x1f\n" +
+	"\vfeedback_id\x18\x01 \x01(\tR\n" +
+	"feedbackId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\"_\n" +
 	"\x15TaskReportListRequest\x12\x18\n" +
 	"\aoutcome\x18\x01 \x01(\tR\aoutcome\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x16\n" +
@@ -3230,7 +3398,8 @@ const file_service_admin_rpc_admin_proto_rawDesc = "" +
 	"\ttriggered\x18\x03 \x01(\bR\ttriggered\x12\x18\n" +
 	"\askipped\x18\x04 \x01(\bR\askipped\x12\x16\n" +
 	"\x06reason\x18\x05 \x01(\tR\x06reason\x120\n" +
-	"\amessage\x18\x06 \x01(\v2\x16.admin.v1.AdminMessageR\amessage2\xb0\t\n" +
+	"\amessage\x18\x06 \x01(\v2\x16.admin.v1.AdminMessageR\amessage2\x85\n" +
+	"\n" +
 	"\x05Admin\x12G\n" +
 	"\fGetDashboard\x12\x1a.admin.v1.DashboardRequest\x1a\x1b.admin.v1.DashboardResponse\x12h\n" +
 	"\x17GetConversationMessages\x12%.admin.v1.ConversationMessagesRequest\x1a&.admin.v1.ConversationMessagesResponse\x12H\n" +
@@ -3242,7 +3411,8 @@ const file_service_admin_rpc_admin_proto_rawDesc = "" +
 	"\x11GetLLMTraceDetail\x12\x1f.admin.v1.LLMTraceDetailRequest\x1a .admin.v1.LLMTraceDetailResponse\x12M\n" +
 	"\fListFeedback\x12\x1d.admin.v1.FeedbackListRequest\x1a\x1e.admin.v1.FeedbackListResponse\x12P\n" +
 	"\vGetFeedback\x12\x1f.admin.v1.FeedbackDetailRequest\x1a .admin.v1.FeedbackDetailResponse\x12S\n" +
-	"\x0eUpdateFeedback\x12\x1f.admin.v1.FeedbackUpdateRequest\x1a .admin.v1.FeedbackUpdateResponse\x12T\n" +
+	"\x0eUpdateFeedback\x12\x1f.admin.v1.FeedbackUpdateRequest\x1a .admin.v1.FeedbackUpdateResponse\x12S\n" +
+	"\x0eCreateFeedback\x12\x1f.admin.v1.FeedbackCreateRequest\x1a .admin.v1.FeedbackCreateResponse\x12T\n" +
 	"\x0fListTaskReports\x12\x1f.admin.v1.TaskReportListRequest\x1a .admin.v1.TaskReportListResponse\x12Y\n" +
 	"\x10UpsertTaskReport\x12!.admin.v1.TaskReportUpsertRequest\x1a\".admin.v1.TaskReportDetailResponse\x12_\n" +
 	"\x12ReplayAgentMessage\x12#.admin.v1.ReplayAgentMessageRequest\x1a$.admin.v1.ReplayAgentMessageResponseB9Z7github.com/wujunhui99/agents_im/service/admin/rpc/adminb\x06proto3"
@@ -3259,7 +3429,7 @@ func file_service_admin_rpc_admin_proto_rawDescGZIP() []byte {
 	return file_service_admin_rpc_admin_proto_rawDescData
 }
 
-var file_service_admin_rpc_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_service_admin_rpc_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_service_admin_rpc_admin_proto_goTypes = []any{
 	(*AdminUser)(nil),                    // 0: admin.v1.AdminUser
 	(*AdminMessage)(nil),                 // 1: admin.v1.AdminMessage
@@ -3294,18 +3464,20 @@ var file_service_admin_rpc_admin_proto_goTypes = []any{
 	(*FeedbackDetailResponse)(nil),       // 30: admin.v1.FeedbackDetailResponse
 	(*FeedbackUpdateRequest)(nil),        // 31: admin.v1.FeedbackUpdateRequest
 	(*FeedbackUpdateResponse)(nil),       // 32: admin.v1.FeedbackUpdateResponse
-	(*TaskReportListRequest)(nil),        // 33: admin.v1.TaskReportListRequest
-	(*TaskReportListResponse)(nil),       // 34: admin.v1.TaskReportListResponse
-	(*TaskReportUpsertRequest)(nil),      // 35: admin.v1.TaskReportUpsertRequest
-	(*TaskReportDetailResponse)(nil),     // 36: admin.v1.TaskReportDetailResponse
-	(*ReplayAgentMessageRequest)(nil),    // 37: admin.v1.ReplayAgentMessageRequest
-	(*ReplayAgentMessageResponse)(nil),   // 38: admin.v1.ReplayAgentMessageResponse
-	(*structpb.Struct)(nil),              // 39: google.protobuf.Struct
+	(*FeedbackCreateRequest)(nil),        // 33: admin.v1.FeedbackCreateRequest
+	(*FeedbackCreateResponse)(nil),       // 34: admin.v1.FeedbackCreateResponse
+	(*TaskReportListRequest)(nil),        // 35: admin.v1.TaskReportListRequest
+	(*TaskReportListResponse)(nil),       // 36: admin.v1.TaskReportListResponse
+	(*TaskReportUpsertRequest)(nil),      // 37: admin.v1.TaskReportUpsertRequest
+	(*TaskReportDetailResponse)(nil),     // 38: admin.v1.TaskReportDetailResponse
+	(*ReplayAgentMessageRequest)(nil),    // 39: admin.v1.ReplayAgentMessageRequest
+	(*ReplayAgentMessageResponse)(nil),   // 40: admin.v1.ReplayAgentMessageResponse
+	(*structpb.Struct)(nil),              // 41: google.protobuf.Struct
 }
 var file_service_admin_rpc_admin_proto_depIdxs = []int32{
 	1,  // 0: admin.v1.AdminConversation.last_message:type_name -> admin.v1.AdminMessage
 	0,  // 1: admin.v1.AdminFriend.friend:type_name -> admin.v1.AdminUser
-	39, // 2: admin.v1.AdminFeedback.client_meta:type_name -> google.protobuf.Struct
+	41, // 2: admin.v1.AdminFeedback.client_meta:type_name -> google.protobuf.Struct
 	10, // 3: admin.v1.DashboardResponse.totals:type_name -> admin.v1.AdminDashboardTotals
 	6,  // 4: admin.v1.DashboardResponse.recent_traces:type_name -> admin.v1.AdminLLMTrace
 	2,  // 5: admin.v1.DashboardResponse.recent_conversations:type_name -> admin.v1.AdminConversation
@@ -3322,43 +3494,46 @@ var file_service_admin_rpc_admin_proto_depIdxs = []int32{
 	4,  // 16: admin.v1.FeedbackListResponse.items:type_name -> admin.v1.AdminFeedback
 	4,  // 17: admin.v1.FeedbackDetailResponse.feedback:type_name -> admin.v1.AdminFeedback
 	4,  // 18: admin.v1.FeedbackUpdateResponse.feedback:type_name -> admin.v1.AdminFeedback
-	5,  // 19: admin.v1.TaskReportListResponse.items:type_name -> admin.v1.AdminTaskReport
-	5,  // 20: admin.v1.TaskReportUpsertRequest.report:type_name -> admin.v1.AdminTaskReport
-	5,  // 21: admin.v1.TaskReportDetailResponse.report:type_name -> admin.v1.AdminTaskReport
-	1,  // 22: admin.v1.ReplayAgentMessageResponse.message:type_name -> admin.v1.AdminMessage
-	11, // 23: admin.v1.Admin.GetDashboard:input_type -> admin.v1.DashboardRequest
-	13, // 24: admin.v1.Admin.GetConversationMessages:input_type -> admin.v1.ConversationMessagesRequest
-	15, // 25: admin.v1.Admin.SearchUsers:input_type -> admin.v1.UserSearchRequest
-	17, // 26: admin.v1.Admin.GetUserDetail:input_type -> admin.v1.UserDetailRequest
-	19, // 27: admin.v1.Admin.GetUserFriends:input_type -> admin.v1.UserFriendsRequest
-	21, // 28: admin.v1.Admin.GetUserConversations:input_type -> admin.v1.UserConversationsRequest
-	23, // 29: admin.v1.Admin.ListLLMTraces:input_type -> admin.v1.LLMTraceListRequest
-	25, // 30: admin.v1.Admin.GetLLMTraceDetail:input_type -> admin.v1.LLMTraceDetailRequest
-	27, // 31: admin.v1.Admin.ListFeedback:input_type -> admin.v1.FeedbackListRequest
-	29, // 32: admin.v1.Admin.GetFeedback:input_type -> admin.v1.FeedbackDetailRequest
-	31, // 33: admin.v1.Admin.UpdateFeedback:input_type -> admin.v1.FeedbackUpdateRequest
-	33, // 34: admin.v1.Admin.ListTaskReports:input_type -> admin.v1.TaskReportListRequest
-	35, // 35: admin.v1.Admin.UpsertTaskReport:input_type -> admin.v1.TaskReportUpsertRequest
-	37, // 36: admin.v1.Admin.ReplayAgentMessage:input_type -> admin.v1.ReplayAgentMessageRequest
-	12, // 37: admin.v1.Admin.GetDashboard:output_type -> admin.v1.DashboardResponse
-	14, // 38: admin.v1.Admin.GetConversationMessages:output_type -> admin.v1.ConversationMessagesResponse
-	16, // 39: admin.v1.Admin.SearchUsers:output_type -> admin.v1.UserSearchResponse
-	18, // 40: admin.v1.Admin.GetUserDetail:output_type -> admin.v1.UserDetailResponse
-	20, // 41: admin.v1.Admin.GetUserFriends:output_type -> admin.v1.UserFriendsResponse
-	22, // 42: admin.v1.Admin.GetUserConversations:output_type -> admin.v1.UserConversationsResponse
-	24, // 43: admin.v1.Admin.ListLLMTraces:output_type -> admin.v1.LLMTraceListResponse
-	26, // 44: admin.v1.Admin.GetLLMTraceDetail:output_type -> admin.v1.LLMTraceDetailResponse
-	28, // 45: admin.v1.Admin.ListFeedback:output_type -> admin.v1.FeedbackListResponse
-	30, // 46: admin.v1.Admin.GetFeedback:output_type -> admin.v1.FeedbackDetailResponse
-	32, // 47: admin.v1.Admin.UpdateFeedback:output_type -> admin.v1.FeedbackUpdateResponse
-	34, // 48: admin.v1.Admin.ListTaskReports:output_type -> admin.v1.TaskReportListResponse
-	36, // 49: admin.v1.Admin.UpsertTaskReport:output_type -> admin.v1.TaskReportDetailResponse
-	38, // 50: admin.v1.Admin.ReplayAgentMessage:output_type -> admin.v1.ReplayAgentMessageResponse
-	37, // [37:51] is the sub-list for method output_type
-	23, // [23:37] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	41, // 19: admin.v1.FeedbackCreateRequest.client_meta:type_name -> google.protobuf.Struct
+	5,  // 20: admin.v1.TaskReportListResponse.items:type_name -> admin.v1.AdminTaskReport
+	5,  // 21: admin.v1.TaskReportUpsertRequest.report:type_name -> admin.v1.AdminTaskReport
+	5,  // 22: admin.v1.TaskReportDetailResponse.report:type_name -> admin.v1.AdminTaskReport
+	1,  // 23: admin.v1.ReplayAgentMessageResponse.message:type_name -> admin.v1.AdminMessage
+	11, // 24: admin.v1.Admin.GetDashboard:input_type -> admin.v1.DashboardRequest
+	13, // 25: admin.v1.Admin.GetConversationMessages:input_type -> admin.v1.ConversationMessagesRequest
+	15, // 26: admin.v1.Admin.SearchUsers:input_type -> admin.v1.UserSearchRequest
+	17, // 27: admin.v1.Admin.GetUserDetail:input_type -> admin.v1.UserDetailRequest
+	19, // 28: admin.v1.Admin.GetUserFriends:input_type -> admin.v1.UserFriendsRequest
+	21, // 29: admin.v1.Admin.GetUserConversations:input_type -> admin.v1.UserConversationsRequest
+	23, // 30: admin.v1.Admin.ListLLMTraces:input_type -> admin.v1.LLMTraceListRequest
+	25, // 31: admin.v1.Admin.GetLLMTraceDetail:input_type -> admin.v1.LLMTraceDetailRequest
+	27, // 32: admin.v1.Admin.ListFeedback:input_type -> admin.v1.FeedbackListRequest
+	29, // 33: admin.v1.Admin.GetFeedback:input_type -> admin.v1.FeedbackDetailRequest
+	31, // 34: admin.v1.Admin.UpdateFeedback:input_type -> admin.v1.FeedbackUpdateRequest
+	33, // 35: admin.v1.Admin.CreateFeedback:input_type -> admin.v1.FeedbackCreateRequest
+	35, // 36: admin.v1.Admin.ListTaskReports:input_type -> admin.v1.TaskReportListRequest
+	37, // 37: admin.v1.Admin.UpsertTaskReport:input_type -> admin.v1.TaskReportUpsertRequest
+	39, // 38: admin.v1.Admin.ReplayAgentMessage:input_type -> admin.v1.ReplayAgentMessageRequest
+	12, // 39: admin.v1.Admin.GetDashboard:output_type -> admin.v1.DashboardResponse
+	14, // 40: admin.v1.Admin.GetConversationMessages:output_type -> admin.v1.ConversationMessagesResponse
+	16, // 41: admin.v1.Admin.SearchUsers:output_type -> admin.v1.UserSearchResponse
+	18, // 42: admin.v1.Admin.GetUserDetail:output_type -> admin.v1.UserDetailResponse
+	20, // 43: admin.v1.Admin.GetUserFriends:output_type -> admin.v1.UserFriendsResponse
+	22, // 44: admin.v1.Admin.GetUserConversations:output_type -> admin.v1.UserConversationsResponse
+	24, // 45: admin.v1.Admin.ListLLMTraces:output_type -> admin.v1.LLMTraceListResponse
+	26, // 46: admin.v1.Admin.GetLLMTraceDetail:output_type -> admin.v1.LLMTraceDetailResponse
+	28, // 47: admin.v1.Admin.ListFeedback:output_type -> admin.v1.FeedbackListResponse
+	30, // 48: admin.v1.Admin.GetFeedback:output_type -> admin.v1.FeedbackDetailResponse
+	32, // 49: admin.v1.Admin.UpdateFeedback:output_type -> admin.v1.FeedbackUpdateResponse
+	34, // 50: admin.v1.Admin.CreateFeedback:output_type -> admin.v1.FeedbackCreateResponse
+	36, // 51: admin.v1.Admin.ListTaskReports:output_type -> admin.v1.TaskReportListResponse
+	38, // 52: admin.v1.Admin.UpsertTaskReport:output_type -> admin.v1.TaskReportDetailResponse
+	40, // 53: admin.v1.Admin.ReplayAgentMessage:output_type -> admin.v1.ReplayAgentMessageResponse
+	39, // [39:54] is the sub-list for method output_type
+	24, // [24:39] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_service_admin_rpc_admin_proto_init() }
@@ -3372,7 +3547,7 @@ func file_service_admin_rpc_admin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_admin_rpc_admin_proto_rawDesc), len(file_service_admin_rpc_admin_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   39,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

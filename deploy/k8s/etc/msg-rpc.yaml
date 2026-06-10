@@ -8,3 +8,30 @@ Telemetry:
   Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}
   Sampler: 1.0
   Batcher: otlpgrpc
+
+# AI 托管运行时（keystone 例外：随 message-api 退役迁入，待 03 §9 B1 迁 msgtransfer）。
+DeepSeek:
+  APIKey: ${DEEPSEEK_API_KEY}
+  BaseURL: ${DEEPSEEK_BASE_URL}
+  Model: ${DEEPSEEK_MODEL}
+LLMObservability:
+  Enabled: false
+  Backend: ${LLM_OBSERVABILITY_BACKEND}
+  CaptureOutput: false
+  MaxOutputBytes: 2048
+  Langfuse:
+    Host: ${LANGFUSE_HOST}
+    PublicKey: ${LANGFUSE_PUBLIC_KEY}
+    SecretKey: ${LANGFUSE_SECRET_KEY}
+PythonExecutor:
+  Backend: ${PYTHON_EXECUTOR_BACKEND}
+  DefaultTimeoutSeconds: ${PYTHON_EXECUTOR_DEFAULT_TIMEOUT_SECONDS}
+  MaxTimeoutSeconds: ${PYTHON_EXECUTOR_MAX_TIMEOUT_SECONDS}
+  DefaultMemoryMiB: ${PYTHON_EXECUTOR_DEFAULT_MEMORY_MIB}
+  MaxMemoryMiB: ${PYTHON_EXECUTOR_MAX_MEMORY_MIB}
+  MaxOutputBytes: ${PYTHON_EXECUTOR_MAX_OUTPUT_BYTES}
+  K8S:
+    Namespace: ${PYTHON_EXECUTOR_K8S_NAMESPACE}
+    Image: ${PYTHON_EXECUTOR_K8S_IMAGE}
+    ServiceAccountName: ${PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME}
+    RuntimeClassName: ${PYTHON_EXECUTOR_K8S_RUNTIME_CLASS_NAME}

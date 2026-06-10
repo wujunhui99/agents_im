@@ -19,18 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Msg_SendMessage_FullMethodName               = "/msg.v1.Msg/SendMessage"
-	Msg_AppendStreamMessage_FullMethodName       = "/msg.v1.Msg/AppendStreamMessage"
-	Msg_PullMessages_FullMethodName              = "/msg.v1.Msg/PullMessages"
-	Msg_GetLastMessageByConvs_FullMethodName     = "/msg.v1.Msg/GetLastMessageByConvs"
-	Msg_GetConversationsSeqState_FullMethodName  = "/msg.v1.Msg/GetConversationsSeqState"
-	Msg_GetMaxSeqs_FullMethodName                = "/msg.v1.Msg/GetMaxSeqs"
-	Msg_GetHasReadSeqs_FullMethodName            = "/msg.v1.Msg/GetHasReadSeqs"
-	Msg_MarkConversationAsRead_FullMethodName    = "/msg.v1.Msg/MarkConversationAsRead"
-	Msg_RevokeMessage_FullMethodName             = "/msg.v1.Msg/RevokeMessage"
-	Msg_DeleteMessages_FullMethodName            = "/msg.v1.Msg/DeleteMessages"
-	Msg_ClearConversationMessages_FullMethodName = "/msg.v1.Msg/ClearConversationMessages"
-	Msg_GetServerTime_FullMethodName             = "/msg.v1.Msg/GetServerTime"
+	Msg_SendMessage_FullMethodName                 = "/msg.v1.Msg/SendMessage"
+	Msg_AppendStreamMessage_FullMethodName         = "/msg.v1.Msg/AppendStreamMessage"
+	Msg_PullMessages_FullMethodName                = "/msg.v1.Msg/PullMessages"
+	Msg_GetLastMessageByConvs_FullMethodName       = "/msg.v1.Msg/GetLastMessageByConvs"
+	Msg_GetConversationsSeqState_FullMethodName    = "/msg.v1.Msg/GetConversationsSeqState"
+	Msg_GetMaxSeqs_FullMethodName                  = "/msg.v1.Msg/GetMaxSeqs"
+	Msg_GetHasReadSeqs_FullMethodName              = "/msg.v1.Msg/GetHasReadSeqs"
+	Msg_MarkConversationAsRead_FullMethodName      = "/msg.v1.Msg/MarkConversationAsRead"
+	Msg_RevokeMessage_FullMethodName               = "/msg.v1.Msg/RevokeMessage"
+	Msg_DeleteMessages_FullMethodName              = "/msg.v1.Msg/DeleteMessages"
+	Msg_ClearConversationMessages_FullMethodName   = "/msg.v1.Msg/ClearConversationMessages"
+	Msg_GetServerTime_FullMethodName               = "/msg.v1.Msg/GetServerTime"
+	Msg_GetConversationAIHosting_FullMethodName    = "/msg.v1.Msg/GetConversationAIHosting"
+	Msg_UpdateConversationAIHosting_FullMethodName = "/msg.v1.Msg/UpdateConversationAIHosting"
 )
 
 // MsgClient is the client API for Msg service.
@@ -59,6 +61,9 @@ type MsgClient interface {
 	ClearConversationMessages(ctx context.Context, in *ClearConversationMessagesRequest, opts ...grpc.CallOption) (*ClearConversationMessagesResponse, error)
 	// 时间（stub）
 	GetServerTime(ctx context.Context, in *GetServerTimeRequest, opts ...grpc.CallOption) (*GetServerTimeResponse, error)
+	// AI 托管开关（keystone 例外：随 message-api 退役落到 msg-rpc，待 agent 域 rpc / 03 §9 B1 后迁出）
+	GetConversationAIHosting(ctx context.Context, in *GetConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error)
+	UpdateConversationAIHosting(ctx context.Context, in *UpdateConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error)
 }
 
 type msgClient struct {
@@ -189,6 +194,26 @@ func (c *msgClient) GetServerTime(ctx context.Context, in *GetServerTimeRequest,
 	return out, nil
 }
 
+func (c *msgClient) GetConversationAIHosting(ctx context.Context, in *GetConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConversationAIHostingState)
+	err := c.cc.Invoke(ctx, Msg_GetConversationAIHosting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) UpdateConversationAIHosting(ctx context.Context, in *UpdateConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConversationAIHostingState)
+	err := c.cc.Invoke(ctx, Msg_UpdateConversationAIHosting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 // All implementations must embed UnimplementedMsgServer
 // for forward compatibility.
@@ -215,6 +240,9 @@ type MsgServer interface {
 	ClearConversationMessages(context.Context, *ClearConversationMessagesRequest) (*ClearConversationMessagesResponse, error)
 	// 时间（stub）
 	GetServerTime(context.Context, *GetServerTimeRequest) (*GetServerTimeResponse, error)
+	// AI 托管开关（keystone 例外：随 message-api 退役落到 msg-rpc，待 agent 域 rpc / 03 §9 B1 后迁出）
+	GetConversationAIHosting(context.Context, *GetConversationAIHostingRequest) (*ConversationAIHostingState, error)
+	UpdateConversationAIHosting(context.Context, *UpdateConversationAIHostingRequest) (*ConversationAIHostingState, error)
 	mustEmbedUnimplementedMsgServer()
 }
 
@@ -260,6 +288,12 @@ func (UnimplementedMsgServer) ClearConversationMessages(context.Context, *ClearC
 }
 func (UnimplementedMsgServer) GetServerTime(context.Context, *GetServerTimeRequest) (*GetServerTimeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetServerTime not implemented")
+}
+func (UnimplementedMsgServer) GetConversationAIHosting(context.Context, *GetConversationAIHostingRequest) (*ConversationAIHostingState, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetConversationAIHosting not implemented")
+}
+func (UnimplementedMsgServer) UpdateConversationAIHosting(context.Context, *UpdateConversationAIHostingRequest) (*ConversationAIHostingState, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateConversationAIHosting not implemented")
 }
 func (UnimplementedMsgServer) mustEmbedUnimplementedMsgServer() {}
 func (UnimplementedMsgServer) testEmbeddedByValue()             {}
@@ -498,6 +532,42 @@ func _Msg_GetServerTime_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_GetConversationAIHosting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConversationAIHostingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).GetConversationAIHosting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_GetConversationAIHosting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).GetConversationAIHosting(ctx, req.(*GetConversationAIHostingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_UpdateConversationAIHosting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateConversationAIHostingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).UpdateConversationAIHosting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_UpdateConversationAIHosting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).UpdateConversationAIHosting(ctx, req.(*UpdateConversationAIHostingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Msg_ServiceDesc is the grpc.ServiceDesc for Msg service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -552,6 +622,14 @@ var Msg_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetServerTime",
 			Handler:    _Msg_GetServerTime_Handler,
+		},
+		{
+			MethodName: "GetConversationAIHosting",
+			Handler:    _Msg_GetConversationAIHosting_Handler,
+		},
+		{
+			MethodName: "UpdateConversationAIHosting",
+			Handler:    _Msg_UpdateConversationAIHosting_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

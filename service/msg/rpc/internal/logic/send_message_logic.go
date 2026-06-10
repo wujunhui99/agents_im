@@ -9,6 +9,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
@@ -52,6 +53,7 @@ func (l *SendMessageLogic) SendMessage(in *msg.SendMessageRequest) (*msg.SendMes
 			if existing.PayloadHash != payloadHash {
 				return nil, rpcerror.ToStatus(apperror.AlreadyExists("idempotency conflict"))
 			}
+			l.fireMessageCreatedHook(ns, existing, true)
 			return &msg.SendMessageResponse{Message: messageToPB(existing), Deduplicated: true}, nil
 		}
 		if model.IsPostgresCheckViolation(err) {
@@ -60,7 +62,39 @@ func (l *SendMessageLogic) SendMessage(in *msg.SendMessageRequest) (*msg.SendMes
 		return nil, rpcerror.ToStatus(err)
 	}
 
+	l.fireMessageCreatedHook(ns, stored, deduplicated)
 	return &msg.SendMessageResponse{Message: messageToPB(stored), Deduplicated: deduplicated}, nil
+}
+
+// fireMessageCreatedHook 在消息落库后触发 AI 托管钩子（keystone 例外：语义对齐原
+// internal/logic.MessageLogic 的 messageCreatedHook 调用点——成功路径含 dedup 均触发、
+// 钩子错误只记日志不影响 ACK；待 03-message-pipeline §9 B1 把触发点迁到 msgtransfer 后删除）。
+func (l *SendMessageLogic) fireMessageCreatedHook(ns normalizedSend, stored *model.Messages, deduplicated bool) {
+	if l.svcCtx.AgentHook == nil || stored == nil {
+		return
+	}
+	message := messageToBusiness(stored)
+	eventID := ""
+	if strings.TrimSpace(message.ServerMsgID) != "" {
+		eventID = "message.created:" + message.ServerMsgID
+	}
+	recipients := repository.DeliveryRecipientUserIDs(repository.CreateMessageInput{
+		SenderID:           ns.SenderID,
+		ReceiverID:         ns.ReceiverID,
+		GroupID:            ns.GroupID,
+		ChatType:           ns.ChatType,
+		MessageOrigin:      ns.MessageOrigin,
+		ParticipantUserIDs: ns.ParticipantUserIDs,
+	})
+	if err := l.svcCtx.AgentHook.OnMessageCreated(l.ctx, business.MessageCreatedHookInput{
+		EventID:          eventID,
+		Message:          message.Clone(),
+		Deduplicated:     deduplicated,
+		RecipientUserIDs: recipients,
+	}); err != nil {
+		l.Errorf("message created hook failed after message accepted server_msg_id=%q conversation_id=%q seq=%d: %v",
+			message.ServerMsgID, message.ConversationID, message.Seq, err)
+	}
 }
 
 // persist 在单事务内完成幂等写入（移植自 internal/repository.CreateMessageIdempotent）。

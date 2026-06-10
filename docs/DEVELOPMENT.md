@@ -81,7 +81,7 @@ Each service port can be overridden for single-machine debugging, especially whe
 USER_API_PORT=18080 \
 AUTH_API_PORT=18081 \
 FRIENDS_API_PORT=18082 \
-MESSAGE_API_PORT=18083 \
+MSG_API_PORT=18090 \
 GATEWAY_WS_PORT=18084 \
 GROUPS_API_PORT=18085 \
 AGENT_API_PORT=18086 \
@@ -102,7 +102,7 @@ Start the frontend with the same port overrides so Vite proxies to that alternat
 USER_API_PORT=18080 \
 AUTH_API_PORT=18081 \
 FRIENDS_API_PORT=18082 \
-MESSAGE_API_PORT=18083 \
+MSG_API_PORT=18090 \
 GATEWAY_WS_PORT=18084 \
 GROUPS_API_PORT=18085 \
 MEDIA_API_PORT=18089 \
@@ -157,7 +157,7 @@ Environment note from the debug session: on one local machine, default ports `80
 | Account API (V0 `user-api`) | `http://127.0.0.1:8080` |
 | Auth API | `http://127.0.0.1:8081` |
 | Friends API | `http://127.0.0.1:8082` |
-| Message API | `http://127.0.0.1:8083` |
+| Msg API | `http://127.0.0.1:8090` |
 | WebSocket Gateway | `ws://127.0.0.1:8084/ws` |
 | Groups API | `http://127.0.0.1:8085` |
 | Agent API | `http://127.0.0.1:8086` |

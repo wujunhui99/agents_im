@@ -61,3 +61,19 @@ func pbToSeqState(s *msgpb.ConversationSeqState) types.ConversationSeqState {
 	}
 	return state
 }
+
+func pbToAIHostingData(s *msgpb.ConversationAIHostingState) types.ConversationAIHostingData {
+	if s == nil {
+		return types.ConversationAIHostingData{}
+	}
+	return types.ConversationAIHostingData{
+		ConversationID:    s.GetConversationId(),
+		ChatType:          s.GetChatType(),
+		Enabled:           s.GetEnabled(),
+		Available:         s.GetAvailable(),
+		PeerEnabled:       s.GetPeerEnabled(),
+		UnavailableReason: s.GetUnavailableReason(),
+		MaxRecentMessages: s.GetMaxRecentMessages(),
+		SummaryEnabled:    s.GetSummaryEnabled(),
+	}
+}

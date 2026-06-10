@@ -11,7 +11,6 @@ BACKEND_SERVICES = [
     "user-api",
     "auth-api",
     "friends-api",
-    "message-api",
     "msg-api",
     "gateway-ws",
     "groups-api",
@@ -22,7 +21,6 @@ BACKEND_SERVICES = [
     "auth-rpc",
     "friends-rpc",
     "groups-rpc",
-    "message-rpc",
     "msg-rpc",
     "third-rpc",
     "media-api",
@@ -56,7 +54,6 @@ API_SERVICES = {
     "auth": "auth-api",
     "friends": "friends-api",
     "groups": "groups-api",
-    "message": "message-api",
     "msg": "msg-api",
     "agent": "agent-api",
     "admin": "admin-api",
@@ -76,7 +73,6 @@ API_BACKEND_SERVICES = [
     "user-api",
     "auth-api",
     "friends-api",
-    "message-api",
     "msg-api",
     "groups-api",
     "agent-api",
@@ -85,29 +81,20 @@ API_BACKEND_SERVICES = [
 # Non-go-zero services whose main lives directly under service/<name>/ (cmd/ removed).
 FLAT_SERVICE_DIRS = {
     "service/gateway-ws/": "gateway-ws",
-    "service/message-api/": "message-api",
     "service/message-transfer/": "message-transfer",
 }
 
-# Only the message domain still rides the monolith internal/* tree (message-api /
-# message-transfer). user/auth/friends/groups moved to service/<domain>/api and their
-# legacy internal/{handler,logic,servicecontext}/<domain> scaffolding was deleted (#389).
+# message-api 已退役（#463）：REST 入口归 service/msg/api，AI 托管运行时随
+# internal/servicecontext/message 由 gateway-ws 与 msg-rpc 消费（待 03 §9 B1 迁 msgtransfer）。
 INTERNAL_DOMAIN_SERVICE_PREFIXES = {
-    "internal/handler/message/": ["message-api"],
     "internal/handler/admin/": ["admin-api"],
     # service/admin/{api,rpc}/** 由 service/<domain>/<kind> 通用规则精确路由；
     # 这里兜底任何 service/admin/ 顶层散文件，两者都重建。
     "service/admin/": ["admin-api", "admin-rpc"],
-    "internal/logic/message/": ["message-api", "message-transfer"],
-    "internal/servicecontext/message/": ["message-api", "message-transfer"],
+    "internal/servicecontext/message/": ["gateway-ws", "msg-rpc"],
 }
 
-INTERNAL_EXACT_SERVICE_PATHS = {
-    # gozero_routes.go now only registers message handlers (RegisterMessageGoZeroHandlers).
-    "internal/handler/gozero_routes.go": ["message-api"],
-    "internal/handler/gozero_routes_test.go": ["message-api"],
-    "internal/handler/admin_routes_test.go": ["message-api"],
-}
+INTERNAL_EXACT_SERVICE_PATHS = {}
 
 
 class DeploySelection:

@@ -32,13 +32,12 @@ case "${1:-}" in
     if [[ "${2:-}" == "deployment" || "${2:-}" == "deploy" ]]; then
       service="${3:-}"
       case "${service}" in
-        message-api) echo 'ghcr.io/wujunhui99/agents_im/message-api:new-message-sha' ;;
+        msg-api) echo 'ghcr.io/wujunhui99/agents_im/msg-api:new-message-sha' ;;
         web) echo 'ghcr.io/wujunhui99/agents_im/web:new-web-sha' ;;
         user-rpc) echo 'ghcr.io/wujunhui99/agents_im/user-rpc:stable-backend' ;;
         auth-rpc) echo 'ghcr.io/wujunhui99/agents_im/auth-rpc:stable-backend' ;;
         friends-rpc) echo 'ghcr.io/wujunhui99/agents_im/friends-rpc:stable-backend' ;;
         groups-rpc) echo 'ghcr.io/wujunhui99/agents_im/groups-rpc:stable-backend' ;;
-        message-rpc) echo 'ghcr.io/wujunhui99/agents_im/message-rpc:stable-backend' ;;
         msg-rpc) echo 'ghcr.io/wujunhui99/agents_im/msg-rpc:stable-backend' ;;
         third-rpc) echo 'ghcr.io/wujunhui99/agents_im/third-rpc:stable-backend' ;;
         web) echo 'ghcr.io/wujunhui99/agents_im/web:old-web' ;;
@@ -59,7 +58,7 @@ case "${1:-}" in
       image="ghcr.io/wujunhui99/agents_im/${service}:stable-backend"
       case "${service}" in
         web) image='ghcr.io/wujunhui99/agents_im/web:new-web-sha' ;;
-        message-api) image='ghcr.io/wujunhui99/agents_im/message-api:new-message-sha' ;;
+        msg-api) image='ghcr.io/wujunhui99/agents_im/msg-api:new-message-sha' ;;
       esac
       cat <<JSON
 {"items":[{"metadata":{"name":"${service}-pod"},"status":{"phase":"Running","containerStatuses":[{"name":"${service}","ready":true,"imageID":"ghcr.io/wujunhui99/agents_im/${service}@sha256:testdigest"}]},"spec":{"containers":[{"name":"${service}","image":"${image}"}]}}]}
@@ -104,14 +103,14 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: message-api
+  name: msg-api
   namespace: agents-im
 spec:
   template:
     spec:
       containers:
-        - image: ghcr.io/wujunhui99/agents_im/message-api:__IMAGE_TAG_REQUIRED__
-          name: message-api
+        - image: ghcr.io/wujunhui99/agents_im/msg-api:__IMAGE_TAG_REQUIRED__
+          name: msg-api
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -200,14 +199,12 @@ fi
 DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --event-name push \
   --ref refs/heads/main \
-  api/message.api \
-  internal/handler/gozero_routes.go \
-  internal/handler/gozero_routes_test.go \
+  service/msg/api/internal/logic/msg/send_message_logic.go \
   web/src/api/feedback.ts)"
-if ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"message-api\",\"groups-api\",\"agent-api\"]'" <<<"${DETECT_OUTPUT}" || \
+if ! grep -Fq "backend_services='[\"msg-api\"]'" <<<"${DETECT_OUTPUT}" || \
   grep -Fq 'gateway-ws' <<<"${DETECT_OUTPUT}" || \
   grep -Fq 'user-rpc' <<<"${DETECT_OUTPUT}" || \
-  ! grep -Fq "image_services_space='user-api auth-api friends-api message-api groups-api agent-api web'" <<<"${DETECT_OUTPUT}"; then
+  ! grep -Fq "image_services_space='msg-api web'" <<<"${DETECT_OUTPUT}"; then
   echo "expected API route/web changes to rebuild API backends plus web, not every backend/RPC/worker" >&2
   printf '%s\n' "${DETECT_OUTPUT}" >&2
   exit 1
@@ -216,11 +213,11 @@ fi
 DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --event-name push \
   --ref refs/heads/main \
-  internal/logic/message/create_feedback_logic.go)"
-if ! grep -Fq "backend_services='[\"message-api\",\"message-transfer\"]'" <<<"${DETECT_OUTPUT}" || \
+  internal/servicecontext/message/service_context.go)"
+if ! grep -Fq "backend_services='[\"gateway-ws\",\"msg-rpc\"]'" <<<"${DETECT_OUTPUT}" || \
   grep -Fq 'user-api' <<<"${DETECT_OUTPUT}" || \
   ! grep -Fq "migration_required=false" <<<"${DETECT_OUTPUT}"; then
-  echo "expected message-domain logic changes to rebuild message-api and message-transfer only without migrations" >&2
+  echo "expected AI hosting runtime changes to rebuild gateway-ws and msg-rpc only without migrations" >&2
   printf '%s\n' "${DETECT_OUTPUT}" >&2
   exit 1
 fi
@@ -230,7 +227,7 @@ DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --ref refs/heads/main \
   db/migrations/202605260001_example.sql)"
 if ! grep -Fq "migration_required=true" <<<"${DETECT_OUTPUT}" || \
-  ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"message-api\",\"msg-api\",\"gateway-ws\",\"groups-api\",\"agent-api\",\"admin-api\",\"message-transfer\",\"user-rpc\",\"auth-rpc\",\"friends-rpc\",\"groups-rpc\",\"message-rpc\",\"msg-rpc\",\"third-rpc\",\"media-api\",\"media-rpc\",\"admin-rpc\"]'" <<<"${DETECT_OUTPUT}"; then
+  ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"msg-api\",\"gateway-ws\",\"groups-api\",\"agent-api\",\"admin-api\",\"message-transfer\",\"user-rpc\",\"auth-rpc\",\"friends-rpc\",\"groups-rpc\",\"msg-rpc\",\"third-rpc\",\"media-api\",\"media-rpc\",\"admin-rpc\"]'" <<<"${DETECT_OUTPUT}"; then
   echo "expected executable migration changes to require migrations and rebuild all backends" >&2
   printf '%s\n' "${DETECT_OUTPUT}" >&2
   exit 1
@@ -426,8 +423,8 @@ SKIP_MIDDLEWARE=true \
 DATABASE_URL=postgres://override-dsn \
 IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
 IMAGE_TAG=new-message-sha \
-IMAGE_SERVICES=message-api \
-ROLLOUT_SERVICES=message-api \
+IMAGE_SERVICES=msg-api \
+ROLLOUT_SERVICES=msg-api \
 "${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-explicit-dsn.out
 
 if grep -Fq "jsonpath={.data.DATABASE_URL}" "${CALL_LOG}"; then
@@ -436,8 +433,8 @@ if grep -Fq "jsonpath={.data.DATABASE_URL}" "${CALL_LOG}"; then
   exit 1
 fi
 
-if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/message-api:new-message-sha" "${CALL_LOG}"; then
-  echo "expected message-api image to be rendered to the new release tag when explicit DATABASE_URL is provided" >&2
+if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/msg-api:new-message-sha" "${CALL_LOG}"; then
+  echo "expected msg-api image to be rendered to the new release tag when explicit DATABASE_URL is provided" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
@@ -448,8 +445,8 @@ if grep -Fq "set image deployment/" "${CALL_LOG}"; then
   exit 1
 fi
 
-if ! grep -Fq "get pods -l app=message-api -o json" "${CALL_LOG}"; then
-  echo "expected message-api deploy to verify running pod image" >&2
+if ! grep -Fq "get pods -l app=msg-api -o json" "${CALL_LOG}"; then
+  echo "expected msg-api deploy to verify running pod image" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi

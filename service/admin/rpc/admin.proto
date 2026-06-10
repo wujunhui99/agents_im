@@ -21,6 +21,7 @@ service Admin {
   rpc ListFeedback(FeedbackListRequest) returns (FeedbackListResponse);
   rpc GetFeedback(FeedbackDetailRequest) returns (FeedbackDetailResponse);
   rpc UpdateFeedback(FeedbackUpdateRequest) returns (FeedbackUpdateResponse);
+  rpc CreateFeedback(FeedbackCreateRequest) returns (FeedbackCreateResponse);
   rpc ListTaskReports(TaskReportListRequest) returns (TaskReportListResponse);
   rpc UpsertTaskReport(TaskReportUpsertRequest) returns (TaskReportDetailResponse);
   rpc ReplayAgentMessage(ReplayAgentMessageRequest) returns (ReplayAgentMessageResponse);
@@ -298,6 +299,23 @@ message FeedbackUpdateRequest {
 
 message FeedbackUpdateResponse {
   AdminFeedback feedback = 1;
+}
+
+// 用户提交反馈(来自 msg-api BFF 的 POST /api/feedback)。
+message FeedbackCreateRequest {
+  string user_id = 1;
+  string category = 2;
+  string title = 3;
+  string content = 4;
+  string contact = 5;
+  string page_url = 6;
+  string user_agent = 7;
+  google.protobuf.Struct client_meta = 8;
+}
+
+message FeedbackCreateResponse {
+  string feedback_id = 1;
+  string status = 2;
 }
 
 message TaskReportListRequest {

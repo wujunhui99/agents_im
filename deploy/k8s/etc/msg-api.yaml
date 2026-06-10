@@ -8,6 +8,9 @@ Auth:
 MsgRPC:
   Target: dns:///msg-rpc:9098
   Timeout: 5000
+AdminRPC:
+  Target: dns:///admin-rpc:9097
+  Timeout: 5000
 # go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。
 Telemetry:
   Name: msg-api

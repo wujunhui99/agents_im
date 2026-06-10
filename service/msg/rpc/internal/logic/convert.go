@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/wujunhui99/agents_im/pkg/observability"
+	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 )
@@ -33,6 +34,46 @@ func messageToPB(m *model.Messages) *msg.Message {
 		AllowRecursiveTrigger: m.AllowRecursiveTrigger,
 		SendTime:              model.MessageSendTime(m),
 		CreatedAt:             m.ServerReceivedAt.UTC().UnixMilli(),
+	}
+}
+
+// messageToBusiness 把存库行映射成 internal 层 Message（AI 托管钩子输入；keystone 例外，
+// 待 03-message-pipeline §9 B1 把触发点迁到 msgtransfer 后随钩子一起删除）。字段语义与 messageToPB 一致。
+func messageToBusiness(m *model.Messages) business.Message {
+	if m == nil {
+		return business.Message{}
+	}
+	return business.Message{
+		ServerMsgID:           m.MessageId,
+		ClientMsgID:           m.ClientMsgId,
+		ConversationID:        m.ConversationId,
+		Seq:                   m.Seq,
+		SenderID:              m.SenderAccountId,
+		ReceiverID:            m.ReceiverAccountId,
+		GroupID:               m.GroupId,
+		ChatType:              model.ConversationTypeString(m.ConversationType),
+		ContentType:           model.ContentTypeString(m.ContentType),
+		Content:               model.DecodeMessageContent(m.Content),
+		MessageOrigin:         model.MessageOriginString(m.MessageOrigin),
+		AgentAccountID:        m.AgentAccountId,
+		TriggerServerMsgID:    m.TriggerMessageId,
+		AgentRunID:            m.AgentRunId,
+		AllowRecursiveTrigger: m.AllowRecursiveTrigger,
+		SendTime:              model.MessageSendTime(m),
+		CreatedAt:             m.ServerReceivedAt.UTC().UnixMilli(),
+	}
+}
+
+func aiHostingStateToPB(s business.ConversationAIHostingResponse) *msg.ConversationAIHostingState {
+	return &msg.ConversationAIHostingState{
+		ConversationId:    s.ConversationID,
+		ChatType:          s.ChatType,
+		Enabled:           s.Enabled,
+		Available:         s.Available,
+		PeerEnabled:       s.PeerEnabled,
+		UnavailableReason: s.UnavailableReason,
+		MaxRecentMessages: int64(s.MaxRecentMessages),
+		SummaryEnabled:    s.SummaryEnabled,
 	}
 }
 

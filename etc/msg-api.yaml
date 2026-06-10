@@ -9,6 +9,10 @@ MsgRPC:
   Endpoints:
     - 127.0.0.1:9098
   Timeout: 5000
+AdminRPC:
+  Endpoints:
+    - 127.0.0.1:9097
+  Timeout: 5000
 # go-zero 自带 tracing：本地上报到 docker-compose 的 tempo（OTLP gRPC）。
 Telemetry:
   Name: msg-api

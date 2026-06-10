@@ -18,6 +18,21 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			[]rest.Middleware{serverCtx.DeviceAuth},
 			[]rest.Route{
 				{
+					Method:  http.MethodPost,
+					Path:    "/api/feedback",
+					Handler: msg.CreateFeedbackHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/conversations/:conversation_id/ai-hosting",
+					Handler: msg.GetConversationAIHostingHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPut,
+					Path:    "/conversations/:conversation_id/ai-hosting",
+					Handler: msg.UpdateConversationAIHostingHandler(serverCtx),
+				},
+				{
 					Method:  http.MethodGet,
 					Path:    "/conversations/:conversation_id/messages",
 					Handler: msg.PullMessagesHandler(serverCtx),

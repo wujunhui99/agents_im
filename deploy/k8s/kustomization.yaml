@@ -20,7 +20,6 @@ configMapGenerator:
       - etc/user-api.yaml
       - etc/auth-api.yaml
       - etc/friends-api.yaml
-      - etc/message-api.yaml
       - etc/msg-api.yaml
       - etc/gateway-ws.yaml
       - etc/groups-api.yaml
@@ -31,7 +30,6 @@ configMapGenerator:
       - etc/auth-rpc.yaml
       - etc/friends-rpc.yaml
       - etc/groups-rpc.yaml
-      - etc/message-rpc.yaml
       - etc/msg-rpc.yaml
       - etc/third-rpc.yaml
       - etc/media-rpc.yaml

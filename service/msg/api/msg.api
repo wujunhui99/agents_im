@@ -2,9 +2,9 @@ syntax = "v1"
 
 info (
 	title:   "Msg API"
-	desc:    "消息域 HTTP BFF——4 条消息路由经 gRPC 调 msg-rpc（07-message-rpc-redesign）"
+	desc:    "消息域 HTTP BFF——承接原 message-api 全部路由：4 条消息路由 + AI 托管开关经 gRPC 调 msg-rpc，feedback 经 gRPC 调 admin-rpc（07-message-rpc-redesign / issue #463）"
 	author:  "claude"
-	version: "v0.1.0"
+	version: "v0.2.0"
 )
 
 type Message {
@@ -119,6 +119,55 @@ type MarkConversationAsReadResp {
 	Data    MarkConversationAsReadData `json:"data"`
 }
 
+// ---- ConversationAIHosting（BFF over msg-rpc）----
+type ConversationAIHostingReq {
+	ConversationID string `path:"conversation_id"`
+}
+
+type UpdateConversationAIHostingReq {
+	ConversationID string `path:"conversation_id"`
+	Enabled        bool   `json:"enabled"`
+}
+
+type ConversationAIHostingData {
+	ConversationID    string `json:"conversationId"`
+	ChatType          string `json:"chatType"`
+	Enabled           bool   `json:"enabled"`
+	Available         bool   `json:"available"`
+	PeerEnabled       bool   `json:"peerEnabled"`
+	UnavailableReason string `json:"unavailableReason,optional"`
+	MaxRecentMessages int64  `json:"maxRecentMessages"`
+	SummaryEnabled    bool   `json:"summaryEnabled"`
+}
+
+type ConversationAIHostingResp {
+	Code    string                    `json:"code"`
+	Message string                    `json:"message"`
+	Data    ConversationAIHostingData `json:"data"`
+}
+
+// ---- CreateFeedback（BFF over admin-rpc）----
+type CreateFeedbackReq {
+	Category   string                 `json:"category"`
+	Title      string                 `json:"title"`
+	Content    string                 `json:"content"`
+	Contact    string                 `json:"contact,optional"`
+	PageURL    string                 `json:"pageUrl,optional"`
+	UserAgent  string                 `json:"userAgent,optional"`
+	ClientMeta map[string]interface{} `json:"clientMeta,optional"`
+}
+
+type FeedbackData {
+	FeedbackID string `json:"feedbackId"`
+	Status     string `json:"status"`
+}
+
+type CreateFeedbackResp {
+	Code    string       `json:"code"`
+	Message string       `json:"message"`
+	Data    FeedbackData `json:"data"`
+}
+
 @server (
 	jwt:        Auth
 	middleware: DeviceAuth
@@ -136,5 +185,14 @@ service msg-api {
 
 	@handler markConversationAsRead
 	post /conversations/:conversation_id/read (MarkConversationAsReadReq) returns (MarkConversationAsReadResp)
+
+	@handler getConversationAIHosting
+	get /conversations/:conversation_id/ai-hosting (ConversationAIHostingReq) returns (ConversationAIHostingResp)
+
+	@handler updateConversationAIHosting
+	put /conversations/:conversation_id/ai-hosting (UpdateConversationAIHostingReq) returns (ConversationAIHostingResp)
+
+	@handler createFeedback
+	post /api/feedback (CreateFeedbackReq) returns (CreateFeedbackResp)
 }
 
