@@ -1098,7 +1098,9 @@ function renderMessageMetadata(message: ChatMessage, hasReadSeq: number | undefi
 
 function renderOutgoingMessageStatus(message: ChatMessage, hasReadSeq: number | undefined) {
   if (message.status === 'sent') {
-    const read = message.seq !== undefined && message.seq <= (hasReadSeq ?? 0);
+    // seq=0 是 Kafka 写路径的占位 ACK（异步分配，03 §9 B2），不得参与已读比较。
+    const seq = authoritativeSeq(message);
+    const read = seq !== undefined && seq <= (hasReadSeq ?? 0);
     return (
       <span
         className={`message-status message-status-sent message-status-check${read ? ' message-status-read' : ''}`}

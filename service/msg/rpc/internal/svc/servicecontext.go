@@ -2,6 +2,9 @@ package svc
 
 import (
 	"log"
+	"os"
+	"strconv"
+	"strings"
 
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	business "github.com/wujunhui99/agents_im/internal/logic"
@@ -9,6 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
@@ -35,6 +39,16 @@ type ServiceContext struct {
 	// MessageLogic.SetMessageCreatedHook）；AIHosting 服务 Get/UpdateConversationAIHosting RPC。
 	AgentHook business.MessageCreatedHook
 	AIHosting *business.ConversationAIHostingLogic
+
+	// Kafka 写路径（03 §9 B2，flag MSG_DIRECT_KAFKA）：on 时 SendMessage 只 publish
+	// msg.toTransfer.v1，AI 写回也经本进程 SendMessage（防 PG/Redis 双 seq 分裂），
+	// AI 触发由 agent.trigger.v1 consumer（msg.go 启动）回流到 AgentHook。
+	KafkaEnabled bool
+	KafkaBrokers []string
+	Producer     EventPublisher
+
+	// agentSender 是 Kafka 模式下 AI 写回的晚绑定承载体（见 agent_sender.go）。
+	agentSender *kafkaModeSender
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -50,25 +64,76 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
 
-	hosting := newConversationAIHostingRuntime(c, mediaRepo, groupsLogic)
-
-	return &ServiceContext{
-		Config:    c,
-		Messages:  model.NewMessagesModel(conn),
-		Threads:   model.NewConversationThreadsModel(conn),
-		States:    model.NewUserConversationStatesModel(conn),
-		Outbox:    model.NewMessageOutboxModel(conn),
-		Groups:    groupsLogic,
-		Media:     mediavalidate.NewMessageValidator(mediaRepo),
-		AgentHook: hosting.AgentMessageHook,
-		AIHosting: hosting.AIHostingLogic,
+	kafkaEnabled, kafkaBrokers := resolveKafkaFlag(c)
+	var producer *messaging.KafkaProducer
+	var senderOverride *kafkaModeSender
+	if kafkaEnabled {
+		producer, err = messaging.NewKafkaProducer(kafkaBrokers)
+		if err != nil {
+			log.Fatalf("build kafka producer (MSG_DIRECT_KAFKA on): %v", err)
+		}
+		// AI 写回经本进程 SendMessage（晚绑定 svcCtx），防 PG/Redis 双 seq 分裂。
+		senderOverride = &kafkaModeSender{}
 	}
+
+	// 避免 typed-nil interface：仅启用时才把 override 传给 hosting 接线。
+	var senderIface agentim.MessageSender
+	if senderOverride != nil {
+		senderIface = senderOverride
+	}
+	hosting := newConversationAIHostingRuntime(c, mediaRepo, groupsLogic, senderIface)
+
+	svcCtx := &ServiceContext{
+		Config:       c,
+		Messages:     model.NewMessagesModel(conn),
+		Threads:      model.NewConversationThreadsModel(conn),
+		States:       model.NewUserConversationStatesModel(conn),
+		Outbox:       model.NewMessageOutboxModel(conn),
+		Groups:       groupsLogic,
+		Media:        mediavalidate.NewMessageValidator(mediaRepo),
+		AgentHook:    hosting.AgentMessageHook,
+		AIHosting:    hosting.AIHostingLogic,
+		KafkaEnabled: kafkaEnabled,
+		KafkaBrokers: kafkaBrokers,
+		agentSender:  senderOverride,
+	}
+	// 避免 typed-nil interface（disabled 时 Producer 必须是真 nil）。
+	if producer != nil {
+		svcCtx.Producer = producer
+	}
+	return svcCtx
+}
+
+// resolveKafkaFlag 解析 MSG_DIRECT_KAFKA 开关：环境变量优先于 yaml（秒级回滚开关）。
+func resolveKafkaFlag(c config.Config) (bool, []string) {
+	enabled := c.Kafka.Enabled
+	if value := strings.TrimSpace(os.Getenv("MSG_DIRECT_KAFKA")); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			log.Fatalf("invalid MSG_DIRECT_KAFKA value %q: %v", value, err)
+		}
+		enabled = parsed
+	}
+	brokers := appconfig.KafkaBrokerList(firstNonEmpty(strings.TrimSpace(os.ExpandEnv(c.Kafka.Brokers)), os.Getenv("KAFKA_BROKERS")))
+	if enabled && len(brokers) == 0 {
+		log.Fatalf("MSG_DIRECT_KAFKA is on but no kafka brokers configured")
+	}
+	return enabled, brokers
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // newConversationAIHostingRuntime 移植自 service/message-api/main.go 的 AI 托管接线：
 // 构造 internal messagesvc.ServiceContext（MessageLogic 仅作 Agent 回复写回通道，写同一批表 +
 // outbox，与 msg-rpc goctl 数据层共存）并 ConfigureConversationAIHosting。
-func newConversationAIHostingRuntime(c config.Config, mediaRepo repository.MediaRepository, groupsLogic *business.GroupsLogic) *messagesvc.ServiceContext {
+func newConversationAIHostingRuntime(c config.Config, mediaRepo repository.MediaRepository, groupsLogic *business.GroupsLogic, senderOverride agentim.MessageSender) *messagesvc.ServiceContext {
 	messageRepo, err := repository.NewMessageRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
 	if err != nil {
 		log.Fatalf("build message repository: %v", err)
@@ -120,6 +185,8 @@ func newConversationAIHostingRuntime(c config.Config, mediaRepo repository.Media
 	messageContext.AgentAuditLogic = business.NewAgentAuditLogic(agentAuditRepo)
 	messageContext.AgentRegistryRepo = agentRegistryRepo
 	messageContext.PythonExecutor = pythonExecutor
+	// Kafka 模式：AI 写回不直写 PG（MessageLogic），改经 msg-rpc SendMessage（03 §9 B2）。
+	messageContext.AgentResponseSender = senderOverride
 	if err := messagesvc.ConfigureConversationAIHosting(messageContext, c.DeepSeek, c.LLMObservability); err != nil {
 		log.Fatalf("configure AI conversation hosting: %v", err)
 	}

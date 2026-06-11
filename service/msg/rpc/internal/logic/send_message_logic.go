@@ -43,6 +43,11 @@ func (l *SendMessageLogic) SendMessage(in *msg.SendMessageRequest) (*msg.SendMes
 	}
 	payloadHash := messagePayloadHash(ns)
 
+	// MSG_DIRECT_KAFKA（03 §9 B2）：唯一写原语 = publish Kafka，见 sendDirectKafka。
+	if l.svcCtx.KafkaEnabled && l.svcCtx.Producer != nil {
+		return l.sendDirectKafka(ns, payloadHash)
+	}
+
 	stored, deduplicated, err := l.persist(ns, payloadHash)
 	if err != nil {
 		if model.IsPostgresUniqueViolation(err) {

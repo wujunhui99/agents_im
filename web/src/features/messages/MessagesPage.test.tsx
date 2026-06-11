@@ -1209,6 +1209,78 @@ describe('MessagesPage real API mode', () => {
     expect(within(outgoingMessage).queryByText('已发送')).not.toBeInTheDocument();
   });
 
+  // 03 §9 B2（MSG_DIRECT_KAFKA）：REST ACK 不带 seq（seq=0 占位），随后自己的
+  // message_received 推送（新链路 fanout 含 sender）按 clientMsgId 合并回填 seq，
+  // 不得出现重复气泡。
+  it('accepts a seq-less send ACK and reconciles seq from the own websocket echo without duplicating', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({
+      deduplicated: false,
+      message: serverMessage({
+        serverMsgId: 'srv_kafka_ack',
+        clientMsgId: request.clientMsgId,
+        seq: 0,
+        senderId: currentUserId,
+        receiverId: request.chatType === 'single' ? request.receiverId : undefined,
+        chatType: request.chatType,
+        content: request.content,
+        sendTime: 1777464300000,
+        createdAt: 1777464300000,
+      }),
+    }));
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: '真实后端会话消息' })], sendMessage);
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    expect(await screen.findByText('真实后端会话消息')).toBeInTheDocument();
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].open();
+    });
+
+    await user.click(screen.getByRole('button', { name: /未知联系人/ }));
+    await user.type(screen.getByRole('textbox', { name: '输入消息' }), 'kafka 占位消息');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalled());
+
+    const sentRequest = sendMessage.mock.calls[0][0] as SendMessageRequest;
+    const log = screen.getByRole('log', { name: '聊天消息' });
+    const outgoingMessage = within(log).getByRole('article', { name: '我发送的消息：kafka 占位消息' });
+    expect(within(outgoingMessage).getByLabelText('发送成功').textContent).toBe('✔');
+
+    // 自己的 push 回填 seq（同 clientMsgId）→ 仍只有一条气泡。
+    act(() => {
+      sockets[0].receive(
+        messageReceivedEvent({
+          serverMsgId: 'srv_kafka_ack',
+          clientMsgId: sentRequest.clientMsgId,
+          seq: 2,
+          senderId: currentUserId,
+          receiverId: peerUserId,
+          content: 'kafka 占位消息',
+          sendTime: 1777464300000,
+          createdAt: 1777464300000,
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      const bubbles = within(screen.getByRole('log', { name: '聊天消息' })).getAllByRole('article', {
+        name: '我发送的消息：kafka 占位消息',
+      });
+      expect(bubbles).toHaveLength(1);
+    });
+  });
+
   it('blocks oversized images locally before upload or send', async () => {
     const user = userEvent.setup();
     const sendMessage = vi.fn<MessageApi['sendMessage']>();

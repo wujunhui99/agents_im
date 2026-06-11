@@ -35,3 +35,8 @@ PythonExecutor:
     Image:
     ServiceAccountName:
     RuntimeClassName:
+
+# Kafka 写路径（03 §9 B2，flag MSG_DIRECT_KAFKA 可经环境变量覆盖）。
+Kafka:
+  Enabled: false
+  Brokers: ${KAFKA_BROKERS}
