@@ -14,6 +14,9 @@ const (
 const (
 	EventTypeMessageAccepted = "message.accepted"
 	EventTypeMessageRead     = "message.read"
+	// EventTypeMessageSubmitted is the msg.toTransfer.v1 payload: msg-rpc accepted
+	// the send but seq is not yet allocated — msgtransfer assigns it (03 §4.2).
+	EventTypeMessageSubmitted = "message.submitted"
 )
 
 const (
@@ -48,10 +51,20 @@ type MessageEventPayload struct {
 	UserID                string          `json:"user_id,omitempty"`
 	HasReadSeq            int64           `json:"has_read_seq,omitempty"`
 	ReadAt                int64           `json:"read_at,omitempty"`
-	TraceID               string          `json:"trace_id,omitempty"`
-	RequestID             string          `json:"request_id,omitempty"`
-	TraceParent           string          `json:"traceparent,omitempty"`
-	TraceState            string          `json:"tracestate,omitempty"`
+	// VisibleUserIDs are the participants whose user_conversation_states rows must
+	// exist (visibility), resolved by msg-rpc at send time. Required for
+	// message.submitted; carried through to msg.toPostgres.v1.
+	VisibleUserIDs []string `json:"visible_user_ids,omitempty"`
+	// PayloadHash is msg-rpc's idempotency-conflict fingerprint, persisted to
+	// messages.payload_hash so PG-path dedup semantics survive the Kafka path.
+	PayloadHash string `json:"payload_hash,omitempty"`
+	// SendTime is the authoritative message timestamp (unix ms) assigned by
+	// msg-rpc; the persist consumer writes it to messages.client_send_time.
+	SendTime    int64  `json:"send_time,omitempty"`
+	TraceID     string `json:"trace_id,omitempty"`
+	RequestID   string `json:"request_id,omitempty"`
+	TraceParent string `json:"traceparent,omitempty"`
+	TraceState  string `json:"tracestate,omitempty"`
 }
 
 func (e MessageEvent) Validate() error {
@@ -59,7 +72,7 @@ func (e MessageEvent) Validate() error {
 		return errors.New("event_id is required")
 	}
 	switch e.EventType {
-	case EventTypeMessageAccepted, EventTypeMessageRead:
+	case EventTypeMessageAccepted, EventTypeMessageRead, EventTypeMessageSubmitted:
 	default:
 		return fmt.Errorf("unsupported event_type %q", e.EventType)
 	}
@@ -96,6 +109,22 @@ func (e MessageEvent) Validate() error {
 		if e.Payload.UserID == "" {
 			return errors.New("payload.user_id is required for message.read")
 		}
+	case EventTypeMessageSubmitted:
+		if e.ServerMsgID == "" {
+			return errors.New("server_msg_id is required for message.submitted")
+		}
+		if e.Seq != 0 {
+			return errors.New("seq must be 0 for message.submitted (msgtransfer allocates it)")
+		}
+		if e.SenderID == "" {
+			return errors.New("sender_id is required for message.submitted")
+		}
+		if e.Payload.ClientMsgID == "" {
+			return errors.New("payload.client_msg_id is required for message.submitted")
+		}
+		if len(e.Payload.VisibleUserIDs) == 0 {
+			return errors.New("payload.visible_user_ids is required for message.submitted")
+		}
 	}
 	return nil
 }
@@ -112,6 +141,9 @@ func (e MessageEvent) Clone() MessageEvent {
 func (p MessageEventPayload) Clone() MessageEventPayload {
 	if p.ReceiverIDs != nil {
 		p.ReceiverIDs = append([]string(nil), p.ReceiverIDs...)
+	}
+	if p.VisibleUserIDs != nil {
+		p.VisibleUserIDs = append([]string(nil), p.VisibleUserIDs...)
 	}
 	if p.Content != nil {
 		p.Content = append(json.RawMessage(nil), p.Content...)

@@ -1,0 +1,212 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"log"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/internal/transfer"
+	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/health"
+	"github.com/wujunhui99/agents_im/pkg/messaging"
+	"github.com/wujunhui99/agents_im/pkg/observability"
+	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/chain"
+)
+
+func readinessMessage(err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
+func main() {
+	configFile := flag.String("f", "etc/msgtransfer.yaml", "config file")
+	flag.Parse()
+
+	cfg, err := config.LoadMessageTransferConfig(*configFile)
+	if err != nil {
+		log.Fatalf("load message transfer config: %v", err)
+	}
+	shutdownTracing, err := observability.InitServiceTracing(context.Background(), cfg.Tracing, cfg.Name)
+	if err != nil {
+		log.Fatalf("init tracing: %v", err)
+	}
+	defer func() {
+		if err := observability.ShutdownTracing(shutdownTracing); err != nil {
+			log.Printf("shutdown tracing: %v", err)
+		}
+	}()
+
+	consumer, err := buildConsumer(cfg)
+	if err != nil {
+		log.Fatalf("build message transfer consumer: %v", err)
+	}
+	if closer, ok := consumer.(interface{ Close() error }); ok {
+		defer func() {
+			if err := closer.Close(); err != nil {
+				log.Printf("close message transfer consumer: %v", err)
+			}
+		}()
+	}
+	dispatcher := buildDispatcher(cfg)
+	recorder, err := buildDeliveryAttemptRecorder(cfg)
+	if err != nil {
+		log.Fatalf("build delivery attempt recorder: %v", err)
+	}
+	workerOptions := []transfer.WorkerOption{
+		transfer.WithWorkerID(cfg.WorkerID),
+		transfer.WithIdempotencyStore(transfer.NewMemoryIdempotencyStore()),
+		transfer.WithPollInterval(time.Duration(cfg.Worker.PollIntervalMillis) * time.Millisecond),
+		transfer.WithRetryBackoff(time.Duration(cfg.Worker.RetryBackoffMillis) * time.Millisecond),
+		transfer.WithMaxAttempts(cfg.Worker.MaxAttempts),
+	}
+	if recorder != nil {
+		workerOptions = append(workerOptions, transfer.WithDeliveryAttemptRecorder(recorder))
+	}
+	worker := transfer.NewWorker(consumer, dispatcher, workerOptions...)
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Kafka 写链路（03 §9 B1，additive）：与 legacy outbox worker 并行，B3 退役后者。
+	var kafkaChain *chain.Chain
+	if cfg.Kafka.Enabled {
+		kafkaChain, err = chain.New(chain.Options{
+			Kafka:      cfg.Kafka,
+			DataSource: cfg.DataSource,
+			Dispatcher: dispatcher,
+			Recorder:   recorder,
+			WorkerID:   cfg.WorkerID,
+		})
+		if err != nil {
+			log.Fatalf("build kafka chain: %v", err)
+		}
+		if err := kafkaChain.Start(ctx); err != nil {
+			log.Fatalf("start kafka chain: %v", err)
+		}
+		defer func() {
+			if err := kafkaChain.Close(); err != nil {
+				log.Printf("close kafka chain: %v", err)
+			}
+		}()
+		log.Printf("%s kafka chain started brokers=%s topics=%s,%s,%s,%s", cfg.Name, cfg.Kafka.Brokers,
+			messaging.TopicToTransfer, messaging.TopicToPostgres, messaging.TopicToPush, messaging.TopicAgentTrigger)
+	}
+
+	observabilityServer := startObservabilityHTTP(ctx, cfg, consumer, dispatcher, kafkaChain)
+	defer shutdownObservabilityHTTP(observabilityServer)
+
+	log.Printf(
+		"%s starting worker_id=%s topic=%s group=%s consumer=%s dispatcher=%s storage=%s dry_run=%t",
+		cfg.Name,
+		cfg.WorkerID,
+		cfg.Consumer.Topic,
+		cfg.Consumer.Group,
+		cfg.Consumer.Driver,
+		cfg.Dispatcher.Driver,
+		cfg.StorageDriver,
+		cfg.DryRun,
+	)
+	if err := worker.Run(ctx); err != nil {
+		log.Fatalf("message transfer worker stopped with error: %v", err)
+	}
+	log.Printf("%s stopped", cfg.Name)
+}
+
+func buildConsumer(cfg config.MessageTransferConfig) (transfer.EventConsumer, error) {
+	switch cfg.Consumer.Driver {
+	case config.TransferConsumerOutbox:
+		repo, err := repository.NewOutboxRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
+		if err != nil {
+			return nil, err
+		}
+		return transfer.NewOutboxEventConsumer(transfer.OutboxEventConsumerConfig{
+			Repository:   repo,
+			WorkerID:     cfg.WorkerID,
+			BatchLimit:   100,
+			LockDuration: 30 * time.Second,
+		})
+	default:
+		return transfer.NewInMemoryConsumer(), nil
+	}
+}
+
+func buildDispatcher(cfg config.MessageTransferConfig) transfer.DeliveryDispatcher {
+	switch cfg.Dispatcher.Driver {
+	case config.TransferDispatcherGateway:
+		return transfer.NewGatewayHTTPDispatcher(transfer.GatewayHTTPDispatcherConfig{
+			Endpoint: cfg.Dispatcher.GatewayEndpoint,
+		})
+	default:
+		return transfer.NoopDispatcher{}
+	}
+}
+
+func buildDeliveryAttemptRecorder(cfg config.MessageTransferConfig) (transfer.DeliveryAttemptRecorder, error) {
+	switch cfg.StorageDriver {
+	case config.StorageDriverPostgres:
+		repo, err := repository.NewPostgresMessageRepository(cfg.DataSource)
+		if err != nil {
+			return nil, err
+		}
+		return transfer.NewRepositoryDeliveryAttemptRecorder(repo), nil
+	default:
+		return transfer.NewRepositoryDeliveryAttemptRecorder(repository.NewMemoryMessageRepository()), nil
+	}
+}
+
+func startObservabilityHTTP(ctx context.Context, cfg config.MessageTransferConfig, consumer transfer.EventConsumer, dispatcher transfer.DeliveryDispatcher, kafkaChain *chain.Chain) *http.Server {
+	if !cfg.Observability.Enabled {
+		return nil
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", health.LivenessHandler(cfg.Name))
+	mux.HandleFunc("/readyz", health.ReadinessHandler(cfg.Name, func(r *http.Request) []health.Check {
+		checks := []health.Check{
+			health.ComponentCheck("event_consumer", consumer != nil, "configured"),
+			health.ComponentCheck("delivery_dispatcher", dispatcher != nil, "configured"),
+		}
+		if kafkaChain != nil {
+			err := kafkaChain.Ready(r.Context())
+			checks = append(checks, health.ComponentCheck("kafka_chain", err == nil, readinessMessage(err)))
+		}
+		return checks
+	}))
+	mux.HandleFunc("/metrics", observability.MetricsHandler())
+
+	server := &http.Server{
+		Addr:              fmt.Sprintf("%s:%d", cfg.Observability.Host, cfg.Observability.Port),
+		Handler:           observability.TraceMiddleware(mux),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	go func() {
+		log.Printf("%s observability listening on %s", cfg.Name, server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("message transfer observability server stopped with error: %v", err)
+		}
+	}()
+	go func() {
+		<-ctx.Done()
+		shutdownObservabilityHTTP(server)
+	}()
+	return server
+}
+
+func shutdownObservabilityHTTP(server *http.Server) {
+	if server == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
+		log.Printf("shutdown message transfer observability server: %v", err)
+	}
+}
