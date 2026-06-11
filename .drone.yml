@@ -6,7 +6,9 @@ type: docker
 trigger:
   event:
     - pull_request
-  target:
+  # PR 的 base 分支过滤必须用 branch；trigger.target 匹配的是 promote/rollback 的
+  # deployment target，pull_request 事件下恒空 → pipeline 被静默跳过（#472）。
+  branch:
     - main
 
 services:
