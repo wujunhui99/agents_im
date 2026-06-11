@@ -138,9 +138,11 @@ kubectl -n "${NAMESPACE}" create secret docker-registry ghcr-pull-secret \
 kubectl apply -f deploy/k8s/middleware/postgres.yaml
 kubectl apply -f deploy/k8s/middleware/redis.yaml
 kubectl apply -f deploy/k8s/middleware/minio.yaml
+kubectl apply -f deploy/k8s/middleware/redpanda.yaml
 kubectl -n "${NAMESPACE}" rollout status statefulset/postgres --timeout=300s
 kubectl -n "${NAMESPACE}" rollout status statefulset/redis --timeout=300s
 kubectl -n "${NAMESPACE}" rollout status statefulset/minio --timeout=300s
+kubectl -n "${NAMESPACE}" rollout status statefulset/redpanda --timeout=300s
 
 # ---------- 5. langfuse 库 + media bucket ----------
 kubectl -n "${NAMESPACE}" exec statefulset/postgres -- \
