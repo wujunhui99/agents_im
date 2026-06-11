@@ -103,7 +103,7 @@ forbid_match "generated rpc logic still contains empty scaffold behavior" \
 
 # rpc logic must be wired through svcCtx markers (logic talks to model/provider via svcCtx).
 rpc_logic_markers=(
-  "service/user/rpc/internal/logic:UserLogic"
+  "service/user/rpc/internal/logic:Accounts"
   "service/auth/rpc/internal/logic:AuthLogic"
   "service/friends/rpc/internal/logic:FriendshipModel"
   "service/msg/rpc/internal/logic:Messages"
