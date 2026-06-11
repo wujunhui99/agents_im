@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
 const conversationAIHostingPeerEnabledReason = "对方已开启 AI 托管，本会话暂时只能由一方开启"

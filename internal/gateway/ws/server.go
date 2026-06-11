@@ -15,16 +15,16 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/pkg/presence"
-	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
 )
 
 const CommandHeartbeat = gateway.CommandHeartbeat
@@ -37,20 +37,20 @@ const (
 )
 
 type Server struct {
-	auth           config.JWTAuthConfig
-	tokenManager   token.Manager
-	sessions       middleware.SessionStore
-	messageLogic   *logic.MessageLogic
-	connections    *ConnectionManager
-	dispatcher     delivery.Dispatcher
-	presence       presence.PresenceStore
-	presenceTTL    time.Duration
-	instanceID     string
-	wsConfig       config.GatewayWSConfig
-	configErr      error
-	origins        map[string]struct{}
-	upgrader       websocket.Upgrader
-	now            func() time.Time
+	auth         config.JWTAuthConfig
+	tokenManager token.Manager
+	sessions     middleware.SessionStore
+	messageLogic *logic.MessageLogic
+	connections  *ConnectionManager
+	dispatcher   delivery.Dispatcher
+	presence     presence.PresenceStore
+	presenceTTL  time.Duration
+	instanceID   string
+	wsConfig     config.GatewayWSConfig
+	configErr    error
+	origins      map[string]struct{}
+	upgrader     websocket.Upgrader
+	now          func() time.Time
 }
 
 type ServerOption func(*Server)

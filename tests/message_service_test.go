@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
 func TestMessageSingleChatSeqStartsAtOne(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 
 func TestOutboxEventConsumerReceivesMessageAcceptedEnvelope(t *testing.T) {

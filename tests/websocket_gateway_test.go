@@ -12,14 +12,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/internal/gateway"
 	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
-	"github.com/wujunhui99/agents_im/pkg/presence"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
+	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/presence"
 )
 
 type wsResponse struct {

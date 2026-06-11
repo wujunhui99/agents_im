@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
+	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
-	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 )
 
 type AdminServer struct {

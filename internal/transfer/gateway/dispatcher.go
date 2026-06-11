@@ -8,8 +8,8 @@ import (
 	"time"
 
 	gatewaydelivery "github.com/wujunhui99/agents_im/internal/gateway/delivery"
-	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/internal/transfer"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 
 var (

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/common/share/model"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 )
 
 func TestPythonExecuteAdapterInvokesExecutorWithSafePolicyAndReturnsJSON(t *testing.T) {

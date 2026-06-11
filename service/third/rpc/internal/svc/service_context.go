@@ -3,8 +3,8 @@ package svc
 import (
 	"log"
 
-	mailprovider "github.com/wujunhui99/agents_im/service/third/rpc/internal/provider"
 	"github.com/wujunhui99/agents_im/service/third/rpc/internal/config"
+	mailprovider "github.com/wujunhui99/agents_im/service/third/rpc/internal/provider"
 )
 
 type ServiceContext struct {

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
 func TestResponseWriterUsesMessageSenderSeam(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
 func TestGroupSendUsesActiveParticipantsForRecipientsAndVisibility(t *testing.T) {

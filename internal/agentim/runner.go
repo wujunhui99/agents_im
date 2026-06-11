@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wujunhui99/agents_im/common/share/agentaudit"
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	"github.com/wujunhui99/agents_im/common/share/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/zeromicro/go-zero/core/logx"

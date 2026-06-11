@@ -239,7 +239,7 @@ type AdminFeedback {
 	Contact    string         `json:"contact,optional"`
 	PageURL    string         `json:"pageUrl,optional"`
 	UserAgent  string         `json:"userAgent,optional"`
-	ClientMeta map[string]any `json:"clientMeta,optional"`
+	ClientMeta map[string]interface{} `json:"clientMeta,optional"`
 	AdminNote  string         `json:"adminNote,optional"`
 	CreatedAt  string         `json:"createdAt"`
 	UpdatedAt  string         `json:"updatedAt"`
