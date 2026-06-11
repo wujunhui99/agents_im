@@ -216,6 +216,18 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         # full rebuild below.
         return
 
+    if path.startswith("scripts/ci/") or path.startswith("scripts/verify"):
+        # Remaining scripts/ci/ (verification steps, telegram notify — the deploy
+        # orchestration trio is matched by the canary set above) and the verify
+        # script family run only inside CI; they never reach the deployed app.
+        return
+
+    if path.startswith("tests/"):
+        # Top-level tests/ is CI-only: Go *_test.go files are not compiled into
+        # service binaries and tests/ci python suites run only in verification.
+        # They must not trigger the fail-safe full rebuild.
+        return
+
     service = service_from_yaml(path, "deploy/k8s/etc/")
     if service is not None:
         add_config_rollout(selection, service)

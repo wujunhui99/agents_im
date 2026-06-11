@@ -96,6 +96,37 @@ class DetectDeployChangesTest(unittest.TestCase):
             self.assertEqual(out["build_required"], "false", path)
             self.assertEqual(out["deploy_required"], "false", path)
 
+    def test_ci_verification_scripts_do_not_deploy(self):
+        # Verification-only CI scripts run inside the pipeline; the deploy
+        # orchestration trio (drone-build-images/drone-deploy/drone-detect-deploy)
+        # keeps its groups-rpc canary instead (#488).
+        for path in [
+            "scripts/ci/drone-backend-verify.sh",
+            "scripts/ci/drone-postgres-integration.sh",
+            "scripts/ci/drone-markdown-link-check.sh",
+            "scripts/ci/drone-telegram-notify.py",
+            "scripts/ci/verify-agent-branch-name.sh",
+            "scripts/verify-static.sh",
+            "scripts/verify/verify-gozero-boundaries.sh",
+        ]:
+            out = self.detect([path])
+            self.assertEqual(out["build_required"], "false", path)
+            self.assertEqual(out["deploy_required"], "false", path)
+        out = self.detect(["scripts/ci/drone-deploy.sh"])
+        self.assertEqual(out["deploy_required"], "true")
+        self.assertEqual(out["build_required"], "false")
+        out = self.detect(["scripts/migrate-postgres.sh"])
+        self.assertEqual(out["migration_required"], "true")
+
+    def test_top_level_tests_do_not_deploy(self):
+        # tests/ is CI-only (go test files are not compiled into binaries;
+        # tests/ci python suites run in verification only).
+        out = self.detect(
+            ["tests/ci/test_detect_deploy_changes.py", "tests/message_service_test.go"]
+        )
+        self.assertEqual(out["build_required"], "false")
+        self.assertEqual(out["deploy_required"], "false")
+
 
 if __name__ == "__main__":
     unittest.main()
