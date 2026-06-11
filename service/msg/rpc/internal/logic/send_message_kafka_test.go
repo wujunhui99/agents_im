@@ -33,7 +33,7 @@ func (f *fakePublisher) PublishEvent(_ context.Context, topic string, event mess
 }
 
 // Kafka 模式：SendMessage 只 publish message.submitted，ACK seq=0，不碰数据层
-//（svcCtx 不配任何 model——若误走 PG 路径会 nil panic，本身就是断言）。
+// （svcCtx 不配任何 model——若误走 PG 路径会 nil panic，本身就是断言）。
 func TestSendMessageDirectKafkaPublishesSubmittedAndAcksWithoutSeq(t *testing.T) {
 	publisher := &fakePublisher{}
 	svcCtx := &svc.ServiceContext{KafkaEnabled: true, Producer: publisher}
