@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+  namespace: agents-im
+  labels:
+    app: redpanda
+spec:
+  type: ClusterIP
+  selector:
+    app: redpanda
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+    - name: admin
+      port: 9644
+      targetPort: 9644
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redpanda
+  namespace: agents-im
+  labels:
+    app: redpanda
+spec:
+  serviceName: redpanda
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redpanda
+  template:
+    metadata:
+      labels:
+        app: redpanda
+    spec:
+      # Kafka listener is unauthenticated by design: ClusterIP only, single-tenant
+      # cluster, same trust boundary as the in-cluster service mesh. Revisit if the
+      # cluster ever hosts third-party workloads.
+      containers:
+        - name: redpanda
+          image: redpandadata/redpanda:v25.3.15
+          args:
+            # Single broker on a shared 4C/8G node: pin seastar to 1 core / 400M and
+            # mark overprovisioned so it yields CPU. 03-message-pipeline §9 B0 records
+            # the deviation from the doc's 3-broker target (one physical node has no
+            # real fault isolation to offer; acks=all still gives fsync durability).
+            # NOTE: no --mode dev-container here — developer mode disables fsync and
+            # would void acks=all durability semantics.
+            - redpanda
+            - start
+            - --smp=1
+            - --memory=400M
+            - --reserve-memory=0M
+            - --overprovisioned
+            - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+            - --advertise-kafka-addr=PLAINTEXT://redpanda.agents-im.svc.cluster.local:9092
+          ports:
+            - name: kafka
+              containerPort: 9092
+            - name: admin
+              containerPort: 9644
+          readinessProbe:
+            httpGet:
+              path: /v1/status/ready
+              port: 9644
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/redpanda/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 5Gi
