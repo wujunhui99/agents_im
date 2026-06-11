@@ -18,10 +18,28 @@ services:
       POSTGRES_DB: agents_im
       POSTGRES_USER: agents_im
       POSTGRES_PASSWORD: agents_im_dev_password
+  - name: redis
+    image: redis:7-alpine
+  # msgtransfer Kafka 链路集成测试（dev-container 模式仅限 CI——关 fsync，禁用于生产）。
+  - name: redpanda
+    image: redpandadata/redpanda:v25.3.15
+    command:
+      - redpanda
+      - start
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --memory
+      - 400M
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092
 
 steps:
   - name: backend-verification
-    image: golang:1.24-bookworm
+    image: golang:1.25-bookworm
     commands:
       - bash scripts/ci/verify-agent-branch-name.sh
       - bash scripts/ci/verify-pr-issue-link.sh
@@ -46,9 +64,11 @@ steps:
           - .drone.yml
 
   - name: postgres-integration
-    image: golang:1.24-bookworm
+    image: golang:1.25-bookworm
     environment:
       DATABASE_URL: postgres://agents_im:agents_im_dev_password@postgres:5432/agents_im?sslmode=disable
+      REDIS_ADDR: redis:6379
+      KAFKA_BROKERS: redpanda:9092
     commands:
       - bash scripts/ci/drone-postgres-integration.sh
 

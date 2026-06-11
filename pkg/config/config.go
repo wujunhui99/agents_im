@@ -139,6 +139,20 @@ type MessageTransferConfig struct {
 	Dispatcher    TransferDispatcherConfig
 	Worker        TransferWorkerConfig
 	Observability ObservabilityHTTPConfig
+	Kafka         TransferKafkaConfig
+}
+
+// TransferKafkaConfig enables the Kafka write pipeline (03-message-pipeline §9 B1):
+// consume msg.toTransfer.v1, allocate seq in Redis, persist to PG via
+// msg.toPostgres.v1 and fan out via msg.toPush.v1. Coexists with the legacy
+// outbox consumer until 03 §9 B3 retires it.
+type TransferKafkaConfig struct {
+	Enabled bool
+	// Brokers is a comma-separated bootstrap list, e.g. "redpanda.agents-im.svc.cluster.local:9092".
+	Brokers string
+	Redis   RedisConfig
+	// Workers bounds parallel per-conversation batch processing (default 8).
+	Workers int
 }
 
 type TransferConsumerConfig struct {
@@ -194,7 +208,7 @@ const (
 	defaultObjectStorageBucket         = "agents-im-media"
 	defaultObjectStorageRegion         = "us-east-1"
 	defaultTransferTopic               = "message.events.v1"
-	defaultTransferGroup               = "message-transfer-worker"
+	defaultTransferGroup               = "msgtransfer-worker"
 	defaultTransferPollIntervalMillis  = 100
 	defaultTransferRetryBackoffMillis  = 1000
 	defaultTransferMaxAttempts         = 5
@@ -324,7 +338,7 @@ func DefaultPythonExecutorConfig() PythonExecutorConfig {
 
 func DefaultMessageTransferConfig() MessageTransferConfig {
 	return MessageTransferConfig{
-		Name:          "message-transfer",
+		Name:          "msgtransfer",
 		WorkerID:      defaultWorkerID(),
 		DryRun:        true,
 		StorageDriver: StorageDriverMemory,
@@ -641,7 +655,7 @@ func ResolveTransferDispatcherDriver(value string) string {
 }
 
 func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConfig {
-	cfg.Name = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "message-transfer")
+	cfg.Name = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "msgtransfer")
 	cfg.WorkerID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.WorkerID)), os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), defaultWorkerID())
 	cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
 	cfg.DataSource = ResolveDataSource(cfg.DataSource)
@@ -666,7 +680,36 @@ func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConf
 	if err == nil {
 		cfg.Observability = resolvedObservability
 	}
+	cfg.Kafka = resolveTransferKafkaConfig(cfg.Kafka)
 	return cfg
+}
+
+func resolveTransferKafkaConfig(cfg TransferKafkaConfig) TransferKafkaConfig {
+	if value := strings.TrimSpace(os.Getenv("MESSAGE_TRANSFER_KAFKA_ENABLED")); value != "" {
+		if enabled, err := strconv.ParseBool(value); err == nil {
+			cfg.Enabled = enabled
+		}
+	}
+	cfg.Brokers = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Brokers)), os.Getenv("KAFKA_BROKERS"))
+	if resolved, err := ResolveRedisConfig(cfg.Redis); err == nil {
+		cfg.Redis = resolved
+	}
+	if cfg.Workers <= 0 {
+		cfg.Workers = 8
+	}
+	return cfg
+}
+
+// KafkaBrokerList splits the comma-separated broker string.
+func KafkaBrokerList(brokers string) []string {
+	parts := strings.Split(brokers, ",")
+	list := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			list = append(list, trimmed)
+		}
+	}
+	return list
 }
 
 func ResolveObservabilityHTTPConfig(cfg ObservabilityHTTPConfig) (ObservabilityHTTPConfig, error) {
@@ -1615,5 +1658,5 @@ func defaultWorkerID() string {
 	if hostname := strings.TrimSpace(os.Getenv("HOSTNAME")); hostname != "" {
 		return hostname
 	}
-	return "message-transfer-local"
+	return "msgtransfer-local"
 }

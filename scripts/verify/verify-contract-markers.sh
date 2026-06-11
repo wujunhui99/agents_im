@@ -145,10 +145,10 @@ assert_present "-q" internal/transfer/worker_test.go -- \
   "TestWorkerRetryableFailureDoesNotMarkSuccessful" "TestWorkerContextCancellationStopsLoop"
 
 rg -q "LoadMessageTransferConfig" pkg/config/config.go
-rg -q "message-transfer" service/message-transfer/main.go etc/message-transfer.yaml
-rg -q "ConsumerGroup|Consumer\.Group" etc/message-transfer.yaml pkg/config/config.go
-rg -q "Topic|Consumer\.Topic" etc/message-transfer.yaml pkg/config/config.go
-rg -q "WorkerID|Worker\.ID" etc/message-transfer.yaml pkg/config/config.go
+rg -q "msgtransfer" service/msgtransfer/msgtransfer.go etc/msgtransfer.yaml
+rg -q "ConsumerGroup|Consumer\.Group" etc/msgtransfer.yaml pkg/config/config.go
+rg -q "Topic|Consumer\.Topic" etc/msgtransfer.yaml pkg/config/config.go
+rg -q "WorkerID|Worker\.ID" etc/msgtransfer.yaml pkg/config/config.go
 
 assert_present "-q" internal/gateway/delivery internal/gateway/ws tests/websocket_gateway_test.go -- \
   "type Dispatcher interface" "DeliverToUser" "DeliverToConversation" "EventMessageReceived" "EventMessageDelivered" \
@@ -260,11 +260,11 @@ assert_present "-q" pkg/health pkg/observability -- \
 for api_main in service/agent/api/agent.go; do
   rg -q "TraceMiddlewareFunc" "$api_main"
 done
-assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/gateway-ws/main.go service/message-transfer/main.go -- \
+assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/gateway-ws/main.go service/msgtransfer/msgtransfer.go -- \
   "/readyz" "/metrics" "ReadinessHandler" "MetricsHandler"
 assert_present "-q" internal/logic/messagelogic.go internal/gateway/ws internal/transfer/worker.go -- \
   "RecordMessageSend" "RecordDeliveryAttempt" "RecordTransferEvent" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"
-rg -q "Observability:" etc/message-transfer.yaml
+rg -q "Observability:" etc/msgtransfer.yaml
 rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
 rg -q "agents_im_message_sends_total" pkg/observability/metrics.go
 rg -q "trace_id" internal/gateway/ws/server.go

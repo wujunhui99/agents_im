@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       gateway-ws)       pkg=./service/gateway-ws ;; \
       admin-api)        pkg=./service/admin/api ;; \
       admin-rpc)        pkg=./service/admin/rpc ;; \
-      message-transfer) pkg=./service/message-transfer ;; \
+      msgtransfer) pkg=./service/msgtransfer ;; \
       *) echo "unknown SERVICE: $SERVICE" >&2; exit 1 ;; \
     esac; \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o /out/service "$pkg"

@@ -19,7 +19,7 @@ type (
 		Transact(ctx context.Context, fn func(ctx context.Context, session sqlx.Session) error) error
 
 		// InsertCreatedEvent 写入一条 message.created outbox 事件（payload 由 Logic 层构造好）。
-		// payload JSON 必须与 message-transfer 消费方 (internal/outboxpublisher) 约定一致。
+		// payload JSON 必须与 msgtransfer 消费方 (internal/outboxpublisher) 约定一致。
 		InsertCreatedEvent(ctx context.Context, params OutboxCreatedEventParams) error
 	}
 

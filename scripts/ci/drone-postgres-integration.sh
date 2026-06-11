@@ -26,3 +26,5 @@ done
 
 bash scripts/migrate-postgres.sh --host-psql
 go test -tags=integration ./tests
+# msgtransfer Kafka 链路（03 §9 B1）：需要 redpanda + redis service（.drone.yml）。
+go test -tags=integration -timeout 180s ./service/msgtransfer/...

@@ -39,7 +39,7 @@ if [[ -n "${aggregate_gozero_logic_files}" ]]; then
   exit 1
 fi
 
-root_svc_import_files="$(rg -l '"github.com/wujunhui99/agents_im/internal/svc"' service/gateway-ws service/message-transfer internal/logic internal/gateway tests --glob '*.go' || true)"
+root_svc_import_files="$(rg -l '"github.com/wujunhui99/agents_im/internal/svc"' service/gateway-ws service/msgtransfer internal/logic internal/gateway tests --glob '*.go' || true)"
 if [[ -n "${root_svc_import_files}" ]]; then
   echo "core REST, gateway, and tests must not import legacy root internal/svc:" >&2
   echo "${root_svc_import_files}" >&2

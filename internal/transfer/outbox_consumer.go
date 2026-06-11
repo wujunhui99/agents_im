@@ -39,7 +39,7 @@ func NewOutboxEventConsumer(cfg OutboxEventConsumerConfig) (*OutboxEventConsumer
 	}
 	workerID := strings.TrimSpace(cfg.WorkerID)
 	if workerID == "" {
-		workerID = "message-transfer-outbox"
+		workerID = "msgtransfer-outbox"
 	}
 	batchLimit := cfg.BatchLimit
 	if batchLimit <= 0 {

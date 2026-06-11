@@ -14,11 +14,20 @@ import (
 	"github.com/wujunhui99/agents_im/internal/transfer"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/health"
+	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/observability"
+	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/chain"
 )
 
+func readinessMessage(err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
 func main() {
-	configFile := flag.String("f", "etc/message-transfer.yaml", "config file")
+	configFile := flag.String("f", "etc/msgtransfer.yaml", "config file")
 	flag.Parse()
 
 	cfg, err := config.LoadMessageTransferConfig(*configFile)
@@ -65,7 +74,33 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	observabilityServer := startObservabilityHTTP(ctx, cfg, consumer, dispatcher)
+
+	// Kafka 写链路（03 §9 B1，additive）：与 legacy outbox worker 并行，B3 退役后者。
+	var kafkaChain *chain.Chain
+	if cfg.Kafka.Enabled {
+		kafkaChain, err = chain.New(chain.Options{
+			Kafka:      cfg.Kafka,
+			DataSource: cfg.DataSource,
+			Dispatcher: dispatcher,
+			Recorder:   recorder,
+			WorkerID:   cfg.WorkerID,
+		})
+		if err != nil {
+			log.Fatalf("build kafka chain: %v", err)
+		}
+		if err := kafkaChain.Start(ctx); err != nil {
+			log.Fatalf("start kafka chain: %v", err)
+		}
+		defer func() {
+			if err := kafkaChain.Close(); err != nil {
+				log.Printf("close kafka chain: %v", err)
+			}
+		}()
+		log.Printf("%s kafka chain started brokers=%s topics=%s,%s,%s,%s", cfg.Name, cfg.Kafka.Brokers,
+			messaging.TopicToTransfer, messaging.TopicToPostgres, messaging.TopicToPush, messaging.TopicAgentTrigger)
+	}
+
+	observabilityServer := startObservabilityHTTP(ctx, cfg, consumer, dispatcher, kafkaChain)
 	defer shutdownObservabilityHTTP(observabilityServer)
 
 	log.Printf(
@@ -127,18 +162,23 @@ func buildDeliveryAttemptRecorder(cfg config.MessageTransferConfig) (transfer.De
 	}
 }
 
-func startObservabilityHTTP(ctx context.Context, cfg config.MessageTransferConfig, consumer transfer.EventConsumer, dispatcher transfer.DeliveryDispatcher) *http.Server {
+func startObservabilityHTTP(ctx context.Context, cfg config.MessageTransferConfig, consumer transfer.EventConsumer, dispatcher transfer.DeliveryDispatcher, kafkaChain *chain.Chain) *http.Server {
 	if !cfg.Observability.Enabled {
 		return nil
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", health.LivenessHandler(cfg.Name))
-	mux.HandleFunc("/readyz", health.ReadinessHandler(cfg.Name, func(*http.Request) []health.Check {
-		return []health.Check{
+	mux.HandleFunc("/readyz", health.ReadinessHandler(cfg.Name, func(r *http.Request) []health.Check {
+		checks := []health.Check{
 			health.ComponentCheck("event_consumer", consumer != nil, "configured"),
 			health.ComponentCheck("delivery_dispatcher", dispatcher != nil, "configured"),
 		}
+		if kafkaChain != nil {
+			err := kafkaChain.Ready(r.Context())
+			checks = append(checks, health.ComponentCheck("kafka_chain", err == nil, readinessMessage(err)))
+		}
+		return checks
 	}))
 	mux.HandleFunc("/metrics", observability.MetricsHandler())
 

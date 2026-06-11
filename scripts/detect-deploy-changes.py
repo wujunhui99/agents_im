@@ -16,7 +16,7 @@ BACKEND_SERVICES = [
     "groups-api",
     "agent-api",
     "admin-api",
-    "message-transfer",
+    "msgtransfer",
     "user-rpc",
     "auth-rpc",
     "friends-rpc",
@@ -81,7 +81,7 @@ API_BACKEND_SERVICES = [
 # Non-go-zero services whose main lives directly under service/<name>/ (cmd/ removed).
 FLAT_SERVICE_DIRS = {
     "service/gateway-ws/": "gateway-ws",
-    "service/message-transfer/": "message-transfer",
+    "service/msgtransfer/": "msgtransfer",
 }
 
 # message-api 已退役（#463）：REST 入口归 service/msg/api，AI 托管运行时随

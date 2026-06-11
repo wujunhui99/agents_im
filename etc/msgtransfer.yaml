@@ -1,4 +1,4 @@
-Name: message-transfer
+Name: msgtransfer
 
 WorkerID: ${HOSTNAME}
 DryRun: true
@@ -21,3 +21,8 @@ Observability:
   Enabled: true
   Host: 127.0.0.1
   Port: 8087
+
+# Kafka 写链路（03 §9 B1）。本地默认关闭；dev-up 起 redpanda 后可置 true。
+Kafka:
+  Enabled: false
+  Brokers: ${KAFKA_BROKERS}
