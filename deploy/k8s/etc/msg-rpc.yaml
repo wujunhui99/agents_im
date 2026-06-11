@@ -36,8 +36,8 @@ PythonExecutor:
     ServiceAccountName: ${PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME}
     RuntimeClassName: ${PYTHON_EXECUTOR_K8S_RUNTIME_CLASS_NAME}
 
-# Kafka 写路径（03 §9 B2）：默认 off（行为与旧实现一致）。B3 切流时改 true 或
-# 给 deployment 加 MSG_DIRECT_KAFKA=true（env 优先，秒级回滚）。
+# Kafka 写路径（03 §9 B3 已切流）：SendMessage 只 publish msg.toTransfer.v1，
+# ACK seq=0 占位。回滚：给 deployment 加 MSG_DIRECT_KAFKA=false（env 优先，秒级）。
 Kafka:
-  Enabled: false
+  Enabled: true
   Brokers: redpanda.agents-im.svc.cluster.local:9092
