@@ -17,7 +17,7 @@
 #   - ADMIN_BOOTSTRAP_PASSWORD 经环境变量传入（管理后台 admin 账号密码）
 #
 # 应用部署不在本脚本内：bootstrap 完成后由 Drone deploy-main（merge 到 main）部署，
-# 或手工 `IMAGE_TAG=<sha> SKIP_MIDDLEWARE=true SKIP_MIGRATIONS=true ./scripts/deploy-k3s.sh`。
+# 或手工 `IMAGE_TAG=<sha> SKIP_MIGRATIONS=true ./scripts/deploy-k3s.sh`。
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/agents-im}"
@@ -182,5 +182,5 @@ bootstrap complete. 接下来人工完成：
        PATCH /api/repos/wujunhui99/agents_im {"trusted": true}   # .drone.yml host volume 必需
        POST /api/repos/wujunhui99/agents_im/secrets    # ghcr_username/ghcr_token/telegram_bot_token/telegram_chat_id
   3. 首次全量部署：push devops 分支触发全量镜像构建，然后
-       IMAGE_TAG=<sha> SKIP_MIDDLEWARE=true SKIP_MIGRATIONS=true ./scripts/deploy-k3s.sh
+       IMAGE_TAG=<sha> SKIP_MIGRATIONS=true ./scripts/deploy-k3s.sh
 NEXT

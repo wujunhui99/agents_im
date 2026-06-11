@@ -250,7 +250,6 @@ export PATH="${TMP_DIR}:${PATH}"
 FAKE_KUBECTL_LOG="${CALL_LOG}" \
 NAMESPACE=agents-im \
 KUBECTL="${FAKE_KUBECTL}" \
-SKIP_MIDDLEWARE=true \
 SKIP_MIGRATIONS=true \
 IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
 IMAGE_TAG=new-web-sha \
@@ -323,7 +322,6 @@ fi
 FAKE_KUBECTL_LOG="${CALL_LOG}" \
 NAMESPACE=agents-im \
 KUBECTL="${FAKE_KUBECTL}" \
-SKIP_MIDDLEWARE=true \
 SKIP_MIGRATIONS=true \
 SKIP_SET_IMAGE=true \
 ROLLOUT_SERVICES=groups-rpc \
@@ -386,7 +384,6 @@ fi
 FAKE_KUBECTL_LOG="${CALL_LOG}" \
 NAMESPACE=agents-im \
 KUBECTL="${FAKE_KUBECTL}" \
-SKIP_MIDDLEWARE=true \
 SKIP_MIGRATIONS=true \
 SKIP_SET_IMAGE=true \
 ROLLOUT_SERVICES=grafana \
@@ -419,7 +416,6 @@ fi
 FAKE_KUBECTL_LOG="${CALL_LOG}" \
 NAMESPACE=agents-im \
 KUBECTL="${FAKE_KUBECTL}" \
-SKIP_MIDDLEWARE=true \
 DATABASE_URL=postgres://override-dsn \
 IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
 IMAGE_TAG=new-message-sha \
@@ -462,7 +458,6 @@ fi
 if FAKE_KUBECTL_LOG="${CALL_LOG}" \
   NAMESPACE=agents-im \
   KUBECTL="${FAKE_KUBECTL}" \
-  SKIP_MIDDLEWARE=true \
   SKIP_MIGRATIONS=true \
   IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
   IMAGE_SERVICES=web \
@@ -484,7 +479,6 @@ fi
 if FAKE_KUBECTL_LOG="${CALL_LOG}" \
   NAMESPACE=agents-im \
   KUBECTL="${FAKE_KUBECTL}" \
-  SKIP_MIDDLEWARE=true \
   SKIP_MIGRATIONS=true \
   IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
   IMAGE_TAG=latest \
@@ -514,7 +508,6 @@ if FAKE_KUBECTL_LOG="${CALL_LOG}" \
   FAKE_KUSTOMIZE_UNRENDERED_PLACEHOLDER=true \
   NAMESPACE=agents-im \
   KUBECTL="${FAKE_KUBECTL}" \
-  SKIP_MIDDLEWARE=true \
   SKIP_MIGRATIONS=true \
   SKIP_SET_IMAGE=true \
   ROLLOUT_SERVICES=groups-rpc \

@@ -4,13 +4,11 @@ set -euo pipefail
 NAMESPACE="${NAMESPACE:-agents-im}"
 IMAGE_REGISTRY="${IMAGE_REGISTRY:-ghcr.io/wujunhui99/agents_im}"
 IMAGE_TAG="${IMAGE_TAG:-}"
-MIDDLEWARE_DIR="${MIDDLEWARE_DIR:-/opt/agents-im/middleware}"
 MANIFEST_DIR="${MANIFEST_DIR:-deploy/k8s}"
 KUBECTL="${KUBECTL:-kubectl}"
 GHCR_USERNAME="${GHCR_USERNAME:-}"
 GHCR_TOKEN="${GHCR_TOKEN:-}"
 SKIP_SET_IMAGE="${SKIP_SET_IMAGE:-false}"
-SKIP_MIDDLEWARE="${SKIP_MIDDLEWARE:-false}"
 SKIP_MIGRATIONS="${SKIP_MIGRATIONS:-false}"
 IMAGE_SERVICES="${IMAGE_SERVICES:-}"
 ROLLOUT_SERVICES="${ROLLOUT_SERVICES:-}"
@@ -237,18 +235,6 @@ ensure_secret() {
   fi
 }
 
-start_middleware() {
-  if bool_true "${SKIP_MIDDLEWARE}"; then
-    echo "Skipping middleware startup."
-    return
-  fi
-  if [[ ! -f "${MIDDLEWARE_DIR}/docker-compose.yml" ]]; then
-    echo "middleware compose file not found: ${MIDDLEWARE_DIR}/docker-compose.yml" >&2
-    exit 1
-  fi
-  docker compose --env-file "${MIDDLEWARE_DIR}/.env" -f "${MIDDLEWARE_DIR}/docker-compose.yml" up -d
-}
-
 ensure_image_pull_secret() {
   if [[ -n "${GHCR_USERNAME}" && -n "${GHCR_TOKEN}" ]]; then
     ${KUBECTL} -n "${NAMESPACE}" create secret docker-registry ghcr-pull-secret \
@@ -395,19 +381,14 @@ apply_manifests() {
 main() {
   if [[ "${1:-}" == "--render-only" ]]; then
     RENDER_ONLY="true"
-    SKIP_MIDDLEWARE="true"
     SKIP_MIGRATIONS="true"
     shift
   fi
   require "${KUBECTL}"
   require python3
-  if ! bool_true "${SKIP_MIDDLEWARE}"; then
-    require docker
-  fi
   if ! bool_true "${SKIP_MIGRATIONS}"; then
     require psql
   fi
-  start_middleware
   run_migrations
   apply_manifests
 }

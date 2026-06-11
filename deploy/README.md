@@ -93,9 +93,9 @@ Observability：
 ## Migrations
 
 迁移只在 detect 判定 `migration_required=true` 时执行。Drone 本地部署路径会先运行迁移（连 k3s
-postgres ClusterIP + `--network host`），再调用 `deploy-k3s.sh` 且传入 `SKIP_MIGRATIONS=true` 和
-`SKIP_MIDDLEWARE=true`（中间件在 k8s，由 bootstrap/人工管理，部署流水线不再启动 docker compose
-中间件），避免重复迁移。
+postgres ClusterIP + `--network host`），再调用 `deploy-k3s.sh` 且传入 `SKIP_MIGRATIONS=true`，
+避免重复迁移。中间件在 k8s（`deploy/k8s/middleware/`），由 bootstrap/人工管理，部署流水线
+不涉及（docker compose 中间件及其 `SKIP_MIDDLEWARE` 开关已退役，#486）。
 
 规则：
 
