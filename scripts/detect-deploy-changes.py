@@ -222,6 +222,12 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         # script family run only inside CI; they never reach the deployed app.
         return
 
+    if path.startswith("tests/"):
+        # Top-level tests/ is CI-only: Go *_test.go files are not compiled into
+        # service binaries and tests/ci python suites run only in verification.
+        # They must not trigger the fail-safe full rebuild.
+        return
+
     service = service_from_yaml(path, "deploy/k8s/etc/")
     if service is not None:
         add_config_rollout(selection, service)

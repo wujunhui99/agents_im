@@ -118,6 +118,15 @@ class DetectDeployChangesTest(unittest.TestCase):
         out = self.detect(["scripts/migrate-postgres.sh"])
         self.assertEqual(out["migration_required"], "true")
 
+    def test_top_level_tests_do_not_deploy(self):
+        # tests/ is CI-only (go test files are not compiled into binaries;
+        # tests/ci python suites run in verification only).
+        out = self.detect(
+            ["tests/ci/test_detect_deploy_changes.py", "tests/message_service_test.go"]
+        )
+        self.assertEqual(out["build_required"], "false")
+        self.assertEqual(out["deploy_required"], "false")
+
 
 if __name__ == "__main__":
     unittest.main()
