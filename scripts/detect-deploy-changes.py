@@ -206,6 +206,16 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         selection.add_rollout("groups-rpc")
         return
 
+    if path in {
+        "scripts/drone-watch.sh",
+        "scripts/bootstrap-server.sh",
+        "scripts/test-deploy-k3s.sh",
+    }:
+        # Agent-local tooling, one-time server provisioning, and the deploy-script
+        # test harness never affect the deployed app — must not hit the fail-safe
+        # full rebuild below.
+        return
+
     service = service_from_yaml(path, "deploy/k8s/etc/")
     if service is not None:
         add_config_rollout(selection, service)

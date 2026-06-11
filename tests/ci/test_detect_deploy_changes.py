@@ -84,6 +84,18 @@ class DetectDeployChangesTest(unittest.TestCase):
         self.assertIn("user-api", out["backend_services"])
         self.assertIn("msg-api", out["backend_services"])
 
+    def test_local_tooling_scripts_do_not_deploy(self):
+        # Agent watcher / provisioning / deploy-script test harness never affect
+        # the deployed app (#486) — must not hit the fail-safe full rebuild.
+        for path in [
+            "scripts/drone-watch.sh",
+            "scripts/bootstrap-server.sh",
+            "scripts/test-deploy-k3s.sh",
+        ]:
+            out = self.detect([path])
+            self.assertEqual(out["build_required"], "false", path)
+            self.assertEqual(out["deploy_required"], "false", path)
+
 
 if __name__ == "__main__":
     unittest.main()
