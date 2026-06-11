@@ -58,6 +58,18 @@
 
 关键语义：浏览器原生 WebSocket 不能设置 `Authorization`，生产同源使用 `/ws?token=[REDACTED]`，需允许 query token；WS open 不等于 live push 成功，必须验证 A 发 B、B 不刷新收到。生产复现优先用既有互为好友测试账号；reproduction-only 不改代码、不启动本地服务。
 
+### 生产冒烟固定账户与流程
+
+prod 冒烟**固定使用**两个 test 账户（不要新建账户）：`smokeb3a1`（accountId `323499294365372416`）、`smokeb3a2`（accountId `323499427278671872`）。密码不落任何文档/日志：每次冒烟先用 admin 账号（k8s secret `agents-im-secrets` 的 `ADMIN_BOOTSTRAP_*`）登录，再 `POST /admin/test-accounts {"identifier":"smokeb3a1"}` 重置并取回一次性密码（对已存在 test 账户该接口语义=重置密码，响应 `alreadyExisted=true`）。
+
+标准流程（每次按此顺序，结束时清理好友关系）：
+
+1. smokeb3a1 → `POST /friends` 加 smokeb3a2，smokeb3a2 → `POST /friends/requests/:user_id/accept` 接受；
+2. smokeb3a1 → `POST /messages`（single chat）发消息，按任务验证 ACK/seq/落库/push；
+3. smokeb3a1 → `DELETE /friends/:user_id` 删除好友收尾。
+
+入口域名：`/auth/*`、`/admin/test-accounts` 走 `ms.agenticim.xyz`；`/messages`、`/conversations/*`、`/friends/*` 走 `agenticim.xyz`（ms 域名的 `/` 落到 web 静态服务，POST 会被 nginx 405）。集群访问方式见 `deploy/README.md`。
+
 ## AI / Agent / AI Reply
 
 适用：修改 Agent 账号、AI runtime、AI 托管/建议回复、LLM provider/model 配置或 Agent 消息语义。
