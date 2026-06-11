@@ -407,8 +407,9 @@ func TestPostgresAgentAuditRepositoryAppendOnlyAndRedaction(t *testing.T) {
 	}
 
 	run, err := audit.CreateAgentRun(ctx, agentaudit.CreateRunInput{
-		RunID:          "run_pg_audit_1",
-		AgentID:        "agent_pg_1",
+		// 迁移 013 后 run_id/agent_id/tool_call_id 均为 bigint，必须传数字串。
+		RunID:          "910001",
+		AgentID:        "910002",
 		ConversationID: "single:usr_pg_1:agent_pg_1",
 		Status:         agentaudit.StatusSucceeded,
 		InputSummary: agentaudit.Summary{
@@ -426,7 +427,7 @@ func TestPostgresAgentAuditRepositoryAppendOnlyAndRedaction(t *testing.T) {
 	}
 
 	if _, err := audit.CreateAgentToolCall(ctx, agentaudit.CreateToolCallInput{
-		ToolCallID: "tool_pg_1",
+		ToolCallID: "910003",
 		RunID:      run.RunID,
 		AgentID:    run.AgentID,
 		ToolName:   "im.get_conversation_context",
@@ -438,7 +439,7 @@ func TestPostgresAgentAuditRepositoryAppendOnlyAndRedaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(toolCalls) != 1 || toolCalls[0].ToolCallID != "tool_pg_1" {
+	if len(toolCalls) != 1 || toolCalls[0].ToolCallID != "910003" {
 		t.Fatalf("postgres tool calls mismatch: %+v", toolCalls)
 	}
 
