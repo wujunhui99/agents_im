@@ -903,6 +903,14 @@ Observability:
   Enabled: true
   Host: 127.0.0.1
   Port: 18085
+Kafka:
+  Enabled: true
+  Brokers: redpanda.test:9092,redpanda2.test:9092
+  Workers: 4
+  Redis:
+    Addr: redis.test:6379
+    Password: kafka-redis-pass
+    DB: 2
 `), 0o600)
 	if err != nil {
 		t.Fatal(err)
@@ -926,6 +934,15 @@ Observability:
 	}
 	if cfg.Worker.PollIntervalMillis != 25 || cfg.Worker.RetryBackoffMillis != 250 || cfg.Worker.MaxAttempts != 3 {
 		t.Fatalf("worker config mismatch: %+v", cfg.Worker)
+	}
+	if !cfg.Kafka.Enabled || cfg.Kafka.Brokers != "redpanda.test:9092,redpanda2.test:9092" || cfg.Kafka.Workers != 4 {
+		t.Fatalf("kafka config mismatch: %+v", cfg.Kafka)
+	}
+	if cfg.Kafka.Redis.Addr != "redis.test:6379" || cfg.Kafka.Redis.Password != "kafka-redis-pass" || cfg.Kafka.Redis.DB != 2 {
+		t.Fatalf("kafka redis config mismatch: %+v", cfg.Kafka.Redis)
+	}
+	if got := KafkaBrokerList(cfg.Kafka.Brokers); len(got) != 2 || got[0] != "redpanda.test:9092" {
+		t.Fatalf("kafka broker list mismatch: %v", got)
 	}
 	if !cfg.Observability.Enabled || cfg.Observability.Host != "127.0.0.1" || cfg.Observability.Port != 18085 {
 		t.Fatalf("observability config mismatch: %+v", cfg.Observability)

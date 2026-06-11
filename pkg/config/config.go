@@ -566,6 +566,32 @@ func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+	// Kafka 写链路（03 §9 B1/B2）。注意本加载器是 flat-YAML 白名单制：新增配置段
+	// 必须在这里显式读取，否则 yaml 配置会被静默丢弃（#480 教训）。
+	if value := values["Kafka.Enabled"]; value != "" {
+		enabled, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Kafka.Enabled = enabled
+	}
+	cfg.Kafka.Brokers = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(values["Kafka.Brokers"])), cfg.Kafka.Brokers)
+	if value := values["Kafka.Workers"]; value != "" {
+		workers, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Kafka.Workers = workers
+	}
+	cfg.Kafka.Redis.Addr = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(values["Kafka.Redis.Addr"])), cfg.Kafka.Redis.Addr)
+	cfg.Kafka.Redis.Password = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(values["Kafka.Redis.Password"])), cfg.Kafka.Redis.Password)
+	if value := values["Kafka.Redis.DB"]; value != "" {
+		db, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Kafka.Redis.DB = db
+	}
 	cfg = ResolveMessageTransferConfig(cfg)
 	return cfg, nil
 }
