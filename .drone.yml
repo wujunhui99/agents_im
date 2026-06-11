@@ -39,7 +39,7 @@ services:
 
 steps:
   - name: backend-verification
-    image: golang:1.24-bookworm
+    image: golang:1.25-bookworm
     commands:
       - bash scripts/ci/verify-agent-branch-name.sh
       - bash scripts/ci/verify-pr-issue-link.sh
@@ -64,7 +64,7 @@ steps:
           - .drone.yml
 
   - name: postgres-integration
-    image: golang:1.24-bookworm
+    image: golang:1.25-bookworm
     environment:
       DATABASE_URL: postgres://agents_im:agents_im_dev_password@postgres:5432/agents_im?sslmode=disable
       REDIS_ADDR: redis:6379
