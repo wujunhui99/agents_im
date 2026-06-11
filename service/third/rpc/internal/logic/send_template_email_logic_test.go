@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	mailprovider "github.com/wujunhui99/agents_im/service/third/rpc/internal/provider"
 	"github.com/wujunhui99/agents_im/service/third/rpc/internal/config"
+	mailprovider "github.com/wujunhui99/agents_im/service/third/rpc/internal/provider"
 	"github.com/wujunhui99/agents_im/service/third/rpc/internal/svc"
 	mailpb "github.com/wujunhui99/agents_im/service/third/rpc/mail"
 	"google.golang.org/grpc/codes"

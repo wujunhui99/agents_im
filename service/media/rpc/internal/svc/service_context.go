@@ -5,9 +5,9 @@ import (
 	"log"
 
 	sharedmodel "github.com/wujunhui99/agents_im/common/share/model"
+	"github.com/wujunhui99/agents_im/internal/repository"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/objectstorage"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
 	"github.com/zeromicro/go-zero/core/stores/postgres"

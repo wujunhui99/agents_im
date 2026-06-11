@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/internal/outboxpublisher"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/messaging"
 )
 
 const (

@@ -7,8 +7,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/common/share/model"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
 type AgentCreateHandler interface {

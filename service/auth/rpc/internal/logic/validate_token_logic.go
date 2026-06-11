@@ -3,8 +3,8 @@ package logic
 import (
 	"context"
 
-	business "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
+	business "github.com/wujunhui99/agents_im/internal/auth/logic"
 	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
 

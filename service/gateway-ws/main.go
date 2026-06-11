@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/agentim"
 	"github.com/wujunhui99/agents_im/common/middleware"
+	"github.com/wujunhui99/agents_im/internal/agentim"
 	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"

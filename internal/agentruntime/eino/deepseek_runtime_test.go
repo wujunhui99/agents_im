@@ -8,13 +8,13 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
-	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	immodel "github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
+	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/config"
-	immodel "github.com/wujunhui99/agents_im/common/share/model"
-	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 )
 
 func TestDeepSeekRuntimeFailsClosedWhenProviderConfigMissing(t *testing.T) {
