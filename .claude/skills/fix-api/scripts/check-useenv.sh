@@ -3,7 +3,7 @@
 #
 # 入口已内联到各 service main（user/auth/friends/groups/msg 的 api+rpc、third-rpc 在
 # service/<svc>/<api|rpc>/<svc>.go）。
-# agent-api、gateway-ws、message-transfer 用自定义 pkg/config 加载器
+# agent-api、gateway-ws、msgtransfer 用自定义 pkg/config 加载器
 # （逐字段 os.ExpandEnv），不走 conf.MustLoad，故不在此检查范围。
 found=0
 for f in $(grep -rln "conf.MustLoad" --include="*.go" service/ internal/ 2>/dev/null | grep -v "_test.go" | sort); do

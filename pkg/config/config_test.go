@@ -882,9 +882,9 @@ func TestResolveRedisAndPresenceConfigFromEnv(t *testing.T) {
 }
 
 func TestLoadMessageTransferConfig(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "message-transfer.yaml")
+	configPath := filepath.Join(t.TempDir(), "msgtransfer.yaml")
 	err := os.WriteFile(configPath, []byte(`
-Name: message-transfer-test
+Name: msgtransfer-test
 WorkerID: worker-a
 DryRun: true
 StorageDriver: postgres
@@ -912,7 +912,7 @@ Observability:
 	if err != nil {
 		t.Fatalf("load message transfer config: %v", err)
 	}
-	if cfg.Name != "message-transfer-test" || cfg.WorkerID != "worker-a" || !cfg.DryRun {
+	if cfg.Name != "msgtransfer-test" || cfg.WorkerID != "worker-a" || !cfg.DryRun {
 		t.Fatalf("basic transfer config mismatch: %+v", cfg)
 	}
 	if cfg.StorageDriver != StorageDriverPostgres || cfg.DataSource != "postgres://example.invalid/agents_im" {

@@ -72,7 +72,7 @@ func TestSingleTextRoundtrip(t *testing.T) {
 	}
 	serverMsgID := resp.Message.ServerMsgId
 
-	// outbox 事件已写入（喂 message-transfer）
+	// outbox 事件已写入（喂 msgtransfer）
 	var outboxCount int
 	if err := conn.QueryRowCtx(ctx, &outboxCount,
 		"select count(*) from message_outbox where message_id = $1 and event_type = 1", serverMsgID); err != nil {

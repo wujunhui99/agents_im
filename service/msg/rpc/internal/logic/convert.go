@@ -92,7 +92,7 @@ func seqStateToPB(s model.ConversationSeqState) *msg.ConversationSeqState {
 }
 
 // ---- message.created outbox 事件 payload ----
-// 必须与 message-transfer 消费方 (internal/outboxpublisher.MessageEventFromOutbox →
+// 必须与 msgtransfer 消费方 (internal/outboxpublisher.MessageEventFromOutbox →
 // repository.MessageCreatedOutboxPayload) 的 JSON 形状逐字节一致。
 
 type outboxMessage struct {

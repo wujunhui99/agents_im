@@ -12,7 +12,7 @@ import (
 )
 
 // MessageEventFromOutbox converts a durable message_outbox row into the
-// messaging.MessageEvent consumed by the message-transfer outbox worker. This is
+// messaging.MessageEvent consumed by the msgtransfer outbox worker. This is
 // the live V1 fanout path; the former Kafka publisher that also used it has been
 // removed (Redpanda/Kafka were unused).
 func MessageEventFromOutbox(event repository.OutboxEvent) (messaging.MessageEvent, error) {

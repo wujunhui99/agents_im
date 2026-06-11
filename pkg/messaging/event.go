@@ -8,7 +8,7 @@ import (
 
 const (
 	DefaultMessageEventsTopic = "message.events.v1"
-	DefaultConsumerGroup      = "message-transfer-worker"
+	DefaultConsumerGroup      = "msgtransfer-worker"
 )
 
 const (

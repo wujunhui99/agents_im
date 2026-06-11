@@ -194,7 +194,7 @@ const (
 	defaultObjectStorageBucket         = "agents-im-media"
 	defaultObjectStorageRegion         = "us-east-1"
 	defaultTransferTopic               = "message.events.v1"
-	defaultTransferGroup               = "message-transfer-worker"
+	defaultTransferGroup               = "msgtransfer-worker"
 	defaultTransferPollIntervalMillis  = 100
 	defaultTransferRetryBackoffMillis  = 1000
 	defaultTransferMaxAttempts         = 5
@@ -324,7 +324,7 @@ func DefaultPythonExecutorConfig() PythonExecutorConfig {
 
 func DefaultMessageTransferConfig() MessageTransferConfig {
 	return MessageTransferConfig{
-		Name:          "message-transfer",
+		Name:          "msgtransfer",
 		WorkerID:      defaultWorkerID(),
 		DryRun:        true,
 		StorageDriver: StorageDriverMemory,
@@ -641,7 +641,7 @@ func ResolveTransferDispatcherDriver(value string) string {
 }
 
 func ResolveMessageTransferConfig(cfg MessageTransferConfig) MessageTransferConfig {
-	cfg.Name = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "message-transfer")
+	cfg.Name = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "msgtransfer")
 	cfg.WorkerID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.WorkerID)), os.Getenv("MESSAGE_TRANSFER_WORKER_ID"), defaultWorkerID())
 	cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
 	cfg.DataSource = ResolveDataSource(cfg.DataSource)
@@ -1615,5 +1615,5 @@ func defaultWorkerID() string {
 	if hostname := strings.TrimSpace(os.Getenv("HOSTNAME")); hostname != "" {
 		return hostname
 	}
-	return "message-transfer-local"
+	return "msgtransfer-local"
 }

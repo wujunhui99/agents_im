@@ -1,4 +1,4 @@
-Name: message-transfer
+Name: msgtransfer
 WorkerID: ${HOSTNAME}
 DryRun: false
 StorageDriver: postgres

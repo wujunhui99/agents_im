@@ -134,7 +134,7 @@ load_env() {
   export MESSAGE_TRANSFER_OBSERVABILITY_ENABLED="${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED:-true}"
   export MESSAGE_TRANSFER_OBSERVABILITY_HOST="${MESSAGE_TRANSFER_OBSERVABILITY_HOST:-127.0.0.1}"
   export MESSAGE_TRANSFER_OBSERVABILITY_PORT="${MESSAGE_TRANSFER_OBSERVABILITY_PORT:-8087}"
-  export MESSAGE_TRANSFER_WORKER_ID="${MESSAGE_TRANSFER_WORKER_ID:-message-transfer-local}"
+  export MESSAGE_TRANSFER_WORKER_ID="${MESSAGE_TRANSFER_WORKER_ID:-msgtransfer-local}"
   export MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS="${MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS:-100}"
   export MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS="${MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS:-1000}"
   export MESSAGE_TRANSFER_MAX_ATTEMPTS="${MESSAGE_TRANSFER_MAX_ATTEMPTS:-5}"
@@ -408,8 +408,8 @@ YAML
 }
 
 write_message_transfer_config() {
-  cat > "${CONFIG_DIR}/message-transfer.yaml" <<YAML
-Name: message-transfer
+  cat > "${CONFIG_DIR}/msgtransfer.yaml" <<YAML
+Name: msgtransfer
 WorkerID: ${MESSAGE_TRANSFER_WORKER_ID}
 DryRun: false
 StorageDriver: postgres
@@ -540,7 +540,7 @@ service_pkg() {
     msg-rpc)          echo "./service/msg/rpc" ;;
     msg-api)          echo "./service/msg/api" ;;
     gateway-ws)       echo "./service/gateway-ws" ;;
-    message-transfer) echo "./service/message-transfer" ;;
+    msgtransfer) echo "./service/msgtransfer" ;;
     *) echo "unknown service: $1" >&2; return 1 ;;
   esac
 }
@@ -634,7 +634,7 @@ main() {
   start_service "friends-api"
   start_service "msg-api"
   start_service "gateway-ws"
-  start_service "message-transfer"
+  start_service "msgtransfer"
   start_service "groups-api"
   start_service "agent-api"
   start_service "media-api"
@@ -646,7 +646,7 @@ main() {
   wait_http "msg-api" "http://127.0.0.1:${MSG_API_PORT:-8090}/healthz"
   wait_http "gateway-ws" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
   if [[ "${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}" == "true" ]]; then
-    wait_http "message-transfer" "http://127.0.0.1:${MESSAGE_TRANSFER_OBSERVABILITY_PORT}/healthz"
+    wait_http "msgtransfer" "http://127.0.0.1:${MESSAGE_TRANSFER_OBSERVABILITY_PORT}/healthz"
   fi
   wait_http "groups-api" "http://127.0.0.1:${GROUPS_API_PORT:-8085}/healthz"
   wait_http "agent-api" "http://127.0.0.1:${AGENT_API_PORT:-8086}/healthz"

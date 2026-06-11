@@ -73,10 +73,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: message-transfer
+  name: msgtransfer
   namespace: agents-im
 spec:
-  selector: { app: message-transfer }
+  selector: { app: msgtransfer }
   ports: [{ name: http, port: 8087, targetPort: 8087 }]
 ---
 apiVersion: v1

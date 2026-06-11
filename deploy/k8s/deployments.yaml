@@ -440,17 +440,17 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: message-transfer
+  name: msgtransfer
   namespace: agents-im
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: message-transfer
+      app: msgtransfer
   template:
     metadata:
       labels:
-        app: message-transfer
+        app: msgtransfer
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: "/metrics"
@@ -459,10 +459,10 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
-        - name: message-transfer
-          image: ghcr.io/wujunhui99/agents_im/message-transfer:__IMAGE_TAG_REQUIRED__
+        - name: msgtransfer
+          image: ghcr.io/wujunhui99/agents_im/msgtransfer:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/message-transfer.yaml"]
+          args: ["-f", "/config/msgtransfer.yaml"]
           envFrom:
             - configMapRef:
                 name: agents-im-config

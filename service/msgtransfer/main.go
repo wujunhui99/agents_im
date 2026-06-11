@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	configFile := flag.String("f", "etc/message-transfer.yaml", "config file")
+	configFile := flag.String("f", "etc/msgtransfer.yaml", "config file")
 	flag.Parse()
 
 	cfg, err := config.LoadMessageTransferConfig(*configFile)
