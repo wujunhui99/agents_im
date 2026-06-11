@@ -1,40 +1,27 @@
 #!/usr/bin/env bash
+# 后端验证（#488 提速版）：goctl api validate + gofmt + go test + CI 单测 + 静态门禁。
+# 工具链精简：docker compose config → compose-config 步骤；markdown-link-check →
+# 独立 node 步骤（drone-markdown-link-check.sh）；protoc/protoc-gen-* 已删（验证流程
+# 无消费方，proto 再生成是 dev 时操作）。GOMODCACHE/GOCACHE/GOBIN 由 .drone.yml 指到
+# host 缓存卷，goctl 命中版本即跳过安装。
 set -euo pipefail
 
-export PATH=/tmp/go/bin:"${HOME}/go/bin:${PATH}"
+GOBIN="${GOBIN:-$(go env GOPATH)/bin}"
+export PATH="${GOBIN}:${PATH}"
 
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl protobuf-compiler ripgrep python3-yaml
+  DEBIAN_FRONTEND=noninteractive apt-get install -y ripgrep python3-yaml
 else
   echo "apt-get is required by the Drone backend verification image" >&2
   exit 1
 fi
 
-install -d -m 0755 /etc/apt/keyrings
-. /etc/os-release
-
-if ! command -v docker >/dev/null 2>&1; then
-  curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-  chmod a+r /etc/apt/keyrings/docker.asc
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list
+GOCTL_VERSION=1.10.1
+if ! command -v goctl >/dev/null 2>&1 || ! goctl --version | grep -qF "${GOCTL_VERSION}"; then
+  go install "github.com/zeromicro/go-zero/tools/goctl@v${GOCTL_VERSION}"
 fi
-
-if ! command -v node >/dev/null 2>&1 || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)' >/dev/null 2>&1; then
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-fi
-
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce-cli docker-compose-plugin nodejs
-
-go install github.com/zeromicro/go-zero/tools/goctl@v1.10.1
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
-
 goctl --version
-protoc --version
-protoc-gen-go --version
-protoc-gen-go-grpc --version
 
 for f in api/*.api; do
   goctl api validate -api "$f"
@@ -55,14 +42,3 @@ fi
 go test ./...
 python3 -m unittest discover -s tests/ci -t tests/ci -p 'test_*.py'
 bash scripts/verify-static.sh
-docker compose config
-
-mapfile -t md_files < <(
-  find . -name "*.md" \
-    -not -path "./.git/*" \
-    -not -path "./docs/references/*" \
-    -print
-)
-if ((${#md_files[@]} > 0)); then
-  npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json "${md_files[@]}"
-fi

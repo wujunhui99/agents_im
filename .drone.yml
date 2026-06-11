@@ -37,24 +37,44 @@ services:
       - --advertise-kafka-addr
       - PLAINTEXT://redpanda:9092
 
+# 提速（#488）：步骤 DAG 并行 + host 缓存卷 /opt/agents-im/ci-cache（repo trusted=true）。
+# Go module/build cache 与 goctl 二进制跨构建复用；npm cache 同理。
+# postgres-integration 串在 backend 后复用热 GOCACHE——runner 与 prod 同宿主（4C/8G），
+# 并行双份全量 Go 编译会挤资源。
 steps:
   - name: backend-verification
     image: golang:1.25-bookworm
+    depends_on:
+      - clone
+    environment:
+      GOMODCACHE: /ci-cache/go/mod
+      GOCACHE: /ci-cache/go/build
+      GOBIN: /ci-cache/go/bin
     commands:
       - bash scripts/ci/verify-agent-branch-name.sh
       - bash scripts/ci/verify-pr-issue-link.sh
       - bash scripts/ci/drone-backend-verify.sh
+    volumes:
+      - name: ci_cache
+        path: /ci-cache
 
   # Runs only when web-owned files change (Drone changeset filter). The deploy
   # detector (detect-deploy-changes.py) is unsuitable here: it is scoped to
   # main/devops refs and returns web_required=false for PR source branches.
   - name: frontend-verification
     image: node:20-bookworm-slim
+    depends_on:
+      - clone
+    environment:
+      npm_config_cache: /ci-cache/npm
     commands:
-      - npm --prefix web ci
+      - npm --prefix web ci --prefer-offline
       - npm --prefix web run lint
       - npm --prefix web run test:run
       - npm --prefix web run build
+    volumes:
+      - name: ci_cache
+        path: /ci-cache
     when:
       paths:
         include:
@@ -63,17 +83,53 @@ steps:
           - package-lock.json
           - .drone.yml
 
+  # 从 backend-verification 拆出（原先为跑 npx 在 golang 镜像里装 NodeSource node）。
+  - name: markdown-link-check
+    image: node:20-bookworm-slim
+    depends_on:
+      - clone
+    environment:
+      npm_config_cache: /ci-cache/npm
+    commands:
+      - bash scripts/ci/drone-markdown-link-check.sh
+    volumes:
+      - name: ci_cache
+        path: /ci-cache
+
+  # 从 backend-verification 拆出（原先为跑 docker compose config 装 docker apt 源 + cli）。
+  # docker:*-cli 自带 compose 插件；compose config 纯客户端渲染，不需要 daemon。
+  - name: compose-config
+    image: docker.io/library/docker:29-cli
+    depends_on:
+      - clone
+    commands:
+      - docker compose config -q
+
   - name: postgres-integration
     image: golang:1.25-bookworm
+    depends_on:
+      - backend-verification
     environment:
       DATABASE_URL: postgres://agents_im:agents_im_dev_password@postgres:5432/agents_im?sslmode=disable
       REDIS_ADDR: redis:6379
       KAFKA_BROKERS: redpanda:9092
+      GOMODCACHE: /ci-cache/go/mod
+      GOCACHE: /ci-cache/go/build
+      GOBIN: /ci-cache/go/bin
     commands:
       - bash scripts/ci/drone-postgres-integration.sh
+    volumes:
+      - name: ci_cache
+        path: /ci-cache
 
   - name: notify telegram
     image: python:3.12-alpine
+    depends_on:
+      - backend-verification
+      - frontend-verification
+      - markdown-link-check
+      - compose-config
+      - postgres-integration
     environment:
       TELEGRAM_BOT_TOKEN:
         from_secret: telegram_bot_token
@@ -86,7 +142,10 @@ steps:
         - success
         - failure
 
-volumes: []
+volumes:
+  - name: ci_cache
+    host:
+      path: /opt/agents-im/ci-cache
 
 ---
 kind: pipeline
