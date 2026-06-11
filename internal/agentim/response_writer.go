@@ -155,7 +155,9 @@ func validateMessageServiceResponse(resp logic.SendMessageResponse, req logic.Se
 	if expectedConversationID != "" && message.ConversationID != expectedConversationID {
 		return apperror.Internal("message service returned mismatched conversation_id")
 	}
-	if message.Seq <= 0 {
+	// Kafka 写路径（03 §9 B2）的 ACK 不带 seq（异步分配），seq=0 合法；
+	// 负数仍是契约违例。agent 已读推进依赖 TriggerSeq（入站消息 seq），不受影响。
+	if message.Seq < 0 {
 		return apperror.Internal("message service returned invalid seq")
 	}
 	if message.SenderID != req.SenderID {

@@ -36,6 +36,9 @@ type ServiceContext struct {
 	AgentRepo         repository.AgentRepository
 	AgentRegistryRepo repository.AgentRegistryRepository
 	PythonExecutor    pythonexec.Executor
+	// AgentResponseSender 覆盖 AI 写回通道（默认 MessageLogic 直写 PG）。
+	// Kafka 模式（03 §9 B2）由 msg-rpc 注入「经自身 SendMessage 走 Kafka」的实现。
+	AgentResponseSender agentim.MessageSender
 }
 
 type ConversationAIHostingRuntimeOptions struct {
@@ -117,7 +120,11 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	if ctx.AgentAuditLogic == nil {
 		ctx.AgentAuditLogic = logic.NewAgentAuditLogic(ctx.AgentAuditRepo)
 	}
-	writer, err := agentim.NewMessageServiceResponseWriter(ctx.MessageLogic)
+	var responseSender agentim.MessageSender = ctx.MessageLogic
+	if ctx.AgentResponseSender != nil {
+		responseSender = ctx.AgentResponseSender
+	}
+	writer, err := agentim.NewMessageServiceResponseWriter(responseSender)
 	if err != nil {
 		return err
 	}
