@@ -21,3 +21,9 @@ Observability:
   Enabled: true
   Host: 0.0.0.0
   Port: ${MESSAGE_TRANSFER_OBSERVABILITY_PORT}
+
+# Kafka 写链路（03 §9 B1，additive）：B2 前无人向 msg.toTransfer.v1 生产（dormant），
+# Redis 经 REDIS_ADDR/REDIS_PASSWORD env 解析。
+Kafka:
+  Enabled: true
+  Brokers: redpanda.agents-im.svc.cluster.local:9092

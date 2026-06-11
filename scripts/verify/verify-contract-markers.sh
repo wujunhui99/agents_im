@@ -145,7 +145,7 @@ assert_present "-q" internal/transfer/worker_test.go -- \
   "TestWorkerRetryableFailureDoesNotMarkSuccessful" "TestWorkerContextCancellationStopsLoop"
 
 rg -q "LoadMessageTransferConfig" pkg/config/config.go
-rg -q "msgtransfer" service/msgtransfer/main.go etc/msgtransfer.yaml
+rg -q "msgtransfer" service/msgtransfer/msgtransfer.go etc/msgtransfer.yaml
 rg -q "ConsumerGroup|Consumer\.Group" etc/msgtransfer.yaml pkg/config/config.go
 rg -q "Topic|Consumer\.Topic" etc/msgtransfer.yaml pkg/config/config.go
 rg -q "WorkerID|Worker\.ID" etc/msgtransfer.yaml pkg/config/config.go
@@ -260,7 +260,7 @@ assert_present "-q" pkg/health pkg/observability -- \
 for api_main in service/agent/api/agent.go; do
   rg -q "TraceMiddlewareFunc" "$api_main"
 done
-assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/gateway-ws/main.go service/msgtransfer/main.go -- \
+assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/gateway-ws/main.go service/msgtransfer/msgtransfer.go -- \
   "/readyz" "/metrics" "ReadinessHandler" "MetricsHandler"
 assert_present "-q" internal/logic/messagelogic.go internal/gateway/ws internal/transfer/worker.go -- \
   "RecordMessageSend" "RecordDeliveryAttempt" "RecordTransferEvent" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"

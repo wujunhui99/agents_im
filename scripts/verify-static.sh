@@ -137,7 +137,7 @@ required_files=(
   "service/third/rpc/third.go"
   "service/third/rpc/internal/server/mailserver.go"
   "service/gateway-ws/main.go"
-  "service/msgtransfer/main.go"
+  "service/msgtransfer/msgtransfer.go"
   "etc/gateway-ws.yaml"
   "etc/msgtransfer.yaml"
   "etc/msg-rpc.yaml"
