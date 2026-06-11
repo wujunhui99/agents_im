@@ -96,6 +96,15 @@ class DetectDeployChangesTest(unittest.TestCase):
             self.assertEqual(out["build_required"], "false", path)
             self.assertEqual(out["deploy_required"], "false", path)
 
+    def test_top_level_tests_do_not_deploy(self):
+        # tests/ is CI-only (go test files are not compiled into binaries;
+        # tests/ci python suites run in verification only).
+        out = self.detect(
+            ["tests/ci/test_detect_deploy_changes.py", "tests/message_service_test.go"]
+        )
+        self.assertEqual(out["build_required"], "false")
+        self.assertEqual(out["deploy_required"], "false")
+
 
 if __name__ == "__main__":
     unittest.main()
