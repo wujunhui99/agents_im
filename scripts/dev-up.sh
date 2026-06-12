@@ -128,7 +128,9 @@ load_env() {
   export GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS="${GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS:-75}"
   export GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND="${GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND:-20}"
   export GATEWAY_WS_COMMAND_RATE_LIMIT_BURST="${GATEWAY_WS_COMMAND_RATE_LIMIT_BURST:-40}"
-  export MESSAGE_TRANSFER_CONSUMER_DRIVER="${MESSAGE_TRANSFER_CONSUMER_DRIVER:-outbox}"
+  # Kafka 是唯一写链路（03 §9 B3b）：msg-rpc / msgtransfer 启动必需。
+  export REDPANDA_KAFKA_PORT="${REDPANDA_KAFKA_PORT:-19092}"
+  export KAFKA_BROKERS="${KAFKA_BROKERS:-localhost:${REDPANDA_KAFKA_PORT}}"
   export MESSAGE_TRANSFER_DISPATCHER_DRIVER="${MESSAGE_TRANSFER_DISPATCHER_DRIVER:-gateway}"
   export MESSAGE_TRANSFER_GATEWAY_ENDPOINT="${MESSAGE_TRANSFER_GATEWAY_ENDPOINT:-http://127.0.0.1:${GATEWAY_WS_PORT:-8084}}"
   export MESSAGE_TRANSFER_OBSERVABILITY_ENABLED="${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED:-true}"
@@ -303,6 +305,9 @@ DeepSeek:
   Model: ${DEEPSEEK_MODEL:-}
 PythonExecutor:
   Backend: disabled
+Kafka:
+  Enabled: true
+  Brokers: ${KAFKA_BROKERS}
 YAML
 }
 
@@ -415,9 +420,6 @@ DryRun: false
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 
-Consumer:
-  Driver: ${MESSAGE_TRANSFER_CONSUMER_DRIVER}
-
 Dispatcher:
   Driver: ${MESSAGE_TRANSFER_DISPATCHER_DRIVER}
   GatewayEndpoint: ${MESSAGE_TRANSFER_GATEWAY_ENDPOINT}
@@ -431,6 +433,10 @@ Observability:
   Enabled: ${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}
   Host: ${MESSAGE_TRANSFER_OBSERVABILITY_HOST}
   Port: ${MESSAGE_TRANSFER_OBSERVABILITY_PORT}
+
+Kafka:
+  Enabled: true
+  Brokers: ${KAFKA_BROKERS}
 YAML
 }
 
@@ -606,7 +612,7 @@ main() {
 
   if [[ "${WITH_MIDDLEWARE}" -eq 1 ]]; then
     require_command docker
-    docker compose up -d postgres redis minio tempo
+    docker compose up -d postgres redis minio redpanda tempo
     wait_for_postgres
     require_command curl
     wait_for_minio

@@ -45,6 +45,29 @@ services:
     volumes:
       - agents_im_minio_data:/data
 
+  # 本地消息写链路 Kafka（03 §9 B3b：Kafka 是唯一写路径，msg-rpc/msgtransfer 启动必需）。
+  # dev-container 模式不保 fsync，仅限本地；生产是 deploy/k8s/middleware/redpanda.yaml 单 broker。
+  redpanda:
+    image: redpandadata/redpanda:v25.3.15
+    container_name: agents-im-redpanda
+    command:
+      - redpanda
+      - start
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --memory
+      - 400M
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092,EXTERNAL://localhost:${REDPANDA_KAFKA_PORT:-19092}
+    ports:
+      - "127.0.0.1:${REDPANDA_KAFKA_PORT:-19092}:19092"
+    volumes:
+      - agents_im_redpanda_data:/var/lib/redpanda/data
+
   # 本地分布式追踪后端，与生产一致（grafana/tempo:2.6.1）。
   # 主机上的服务经 OTLP gRPC 4317 上报；生产是 otel-collector→tempo，本地直连 tempo 的 OTLP 接收器。
   tempo:
@@ -62,3 +85,4 @@ volumes:
   agents_im_pg_data:
   agents_im_redis_data:
   agents_im_minio_data:
+  agents_im_redpanda_data:

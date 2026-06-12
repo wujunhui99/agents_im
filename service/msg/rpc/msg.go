@@ -34,28 +34,26 @@ func run(configFile string) {
 	conf.MustLoad(configFile, &c, conf.UseEnv())
 	ctx := svc.NewServiceContext(c)
 
-	// Kafka 写路径（03 §9 B2，MSG_DIRECT_KAFKA）：绑定 AI 写回 + 启动 agent.trigger
-	// 消费（触发点已前移 msgtransfer，经 Kafka 回流到本进程 AgentHook）。
-	if ctx.KafkaEnabled {
-		ctx.BindAgentResponseSender(logic.NewAgentResponseSender(ctx))
+	// Kafka 唯一写链路（03 §9 B2/B3b）：绑定 AI 写回 + 启动 agent.trigger
+	// 消费（触发点在 msgtransfer，经 Kafka 回流到本进程 AgentHook）。
+	ctx.BindAgentResponseSender(logic.NewAgentResponseSender(ctx))
 
-		ensureCtx, cancelEnsure := context.WithTimeout(context.Background(), 30*time.Second)
-		if err := messaging.EnsureTopics(ensureCtx, ctx.KafkaBrokers,
-			messaging.TopicToTransfer, messaging.TopicAgentTrigger); err != nil {
-			cancelEnsure()
-			log.Fatalf("ensure kafka topics (MSG_DIRECT_KAFKA on): %v", err)
-		}
+	ensureCtx, cancelEnsure := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := messaging.EnsureTopics(ensureCtx, ctx.KafkaBrokers,
+		messaging.TopicToTransfer, messaging.TopicAgentTrigger); err != nil {
 		cancelEnsure()
-
-		consumerCtx, cancelConsumer := context.WithCancel(context.Background())
-		defer cancelConsumer()
-		go func() {
-			if err := logic.RunAgentTriggerConsumer(consumerCtx, ctx); err != nil && consumerCtx.Err() == nil {
-				logx.Errorf("agent trigger consumer stopped: %v", err)
-			}
-		}()
-		fmt.Printf("MSG_DIRECT_KAFKA on: producing %s, consuming %s\n", messaging.TopicToTransfer, messaging.TopicAgentTrigger)
+		log.Fatalf("ensure kafka topics: %v", err)
 	}
+	cancelEnsure()
+
+	consumerCtx, cancelConsumer := context.WithCancel(context.Background())
+	defer cancelConsumer()
+	go func() {
+		if err := logic.RunAgentTriggerConsumer(consumerCtx, ctx); err != nil && consumerCtx.Err() == nil {
+			logx.Errorf("agent trigger consumer stopped: %v", err)
+		}
+	}()
+	fmt.Printf("kafka write path: producing %s, consuming %s\n", messaging.TopicToTransfer, messaging.TopicAgentTrigger)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		msgpb.RegisterMsgServer(grpcServer, server.NewMsgServer(ctx))

@@ -26,7 +26,6 @@ type ServiceContext struct {
 	Messages model.MessagesModel
 	Threads  model.ConversationThreadsModel
 	States   model.UserConversationStatesModel
-	Outbox   model.MessageOutboxModel
 
 	// 跨域 keystone 例外：SendMessage 写路径需要 inline 鉴权（群成员解析 + 媒体校验），
 	// 无法干净 BFF 化，暂依赖 internal（待 groups/media 完全 BFF/rpc 化后删）。
@@ -40,10 +39,10 @@ type ServiceContext struct {
 	AgentHook business.MessageCreatedHook
 	AIHosting *business.ConversationAIHostingLogic
 
-	// Kafka 写路径（03 §9 B2，flag MSG_DIRECT_KAFKA）：on 时 SendMessage 只 publish
-	// msg.toTransfer.v1，AI 写回也经本进程 SendMessage（防 PG/Redis 双 seq 分裂），
-	// AI 触发由 agent.trigger.v1 consumer（msg.go 启动）回流到 AgentHook。
-	KafkaEnabled bool
+	// Kafka 写路径（03 §9 B2/B3b）：SendMessage 只 publish msg.toTransfer.v1，
+	// AI 写回也经本进程 SendMessage（防 PG/Redis 双 seq 分裂），AI 触发由
+	// agent.trigger.v1 consumer（msg.go 启动）回流到 AgentHook。
+	// B3b 起旧 PG 同步写路径已退役，Kafka 是唯一写链路（缺配置启动失败）。
 	KafkaBrokers []string
 	Producer     EventPublisher
 
@@ -64,61 +63,48 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
 
-	kafkaEnabled, kafkaBrokers := resolveKafkaFlag(c)
-	var producer *messaging.KafkaProducer
-	var senderOverride *kafkaModeSender
-	if kafkaEnabled {
-		producer, err = messaging.NewKafkaProducer(kafkaBrokers)
-		if err != nil {
-			log.Fatalf("build kafka producer (MSG_DIRECT_KAFKA on): %v", err)
-		}
-		// AI 写回经本进程 SendMessage（晚绑定 svcCtx），防 PG/Redis 双 seq 分裂。
-		senderOverride = &kafkaModeSender{}
+	kafkaBrokers := resolveKafkaBrokers(c)
+	producer, err := messaging.NewKafkaProducer(kafkaBrokers)
+	if err != nil {
+		log.Fatalf("build kafka producer: %v", err)
 	}
-
-	// 避免 typed-nil interface：仅启用时才把 override 传给 hosting 接线。
-	var senderIface agentim.MessageSender
-	if senderOverride != nil {
-		senderIface = senderOverride
-	}
-	hosting := newConversationAIHostingRuntime(c, mediaRepo, groupsLogic, senderIface)
+	// AI 写回经本进程 SendMessage（晚绑定 svcCtx），防 PG/Redis 双 seq 分裂。
+	senderOverride := &kafkaModeSender{}
+	hosting := newConversationAIHostingRuntime(c, mediaRepo, groupsLogic, senderOverride)
 
 	svcCtx := &ServiceContext{
 		Config:       c,
 		Messages:     model.NewMessagesModel(conn),
 		Threads:      model.NewConversationThreadsModel(conn),
 		States:       model.NewUserConversationStatesModel(conn),
-		Outbox:       model.NewMessageOutboxModel(conn),
 		Groups:       groupsLogic,
 		Media:        mediavalidate.NewMessageValidator(mediaRepo),
 		AgentHook:    hosting.AgentMessageHook,
 		AIHosting:    hosting.AIHostingLogic,
-		KafkaEnabled: kafkaEnabled,
 		KafkaBrokers: kafkaBrokers,
+		Producer:     producer,
 		agentSender:  senderOverride,
-	}
-	// 避免 typed-nil interface（disabled 时 Producer 必须是真 nil）。
-	if producer != nil {
-		svcCtx.Producer = producer
 	}
 	return svcCtx
 }
 
-// resolveKafkaFlag 解析 MSG_DIRECT_KAFKA 开关：环境变量优先于 yaml（秒级回滚开关）。
-func resolveKafkaFlag(c config.Config) (bool, []string) {
-	enabled := c.Kafka.Enabled
+// resolveKafkaBrokers 解析 Kafka brokers。B3b 起 Kafka 是唯一写链路：
+// 旧 MSG_DIRECT_KAFKA 回滚开关随 PG 同步写路径一并退役，显式关闭=启动失败（失败优先）。
+func resolveKafkaBrokers(c config.Config) []string {
 	if value := strings.TrimSpace(os.Getenv("MSG_DIRECT_KAFKA")); value != "" {
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
 			log.Fatalf("invalid MSG_DIRECT_KAFKA value %q: %v", value, err)
 		}
-		enabled = parsed
+		if !parsed {
+			log.Fatalf("MSG_DIRECT_KAFKA=false is no longer supported: non-Kafka write path retired (03 §9 B3b)")
+		}
 	}
 	brokers := appconfig.KafkaBrokerList(firstNonEmpty(strings.TrimSpace(os.ExpandEnv(c.Kafka.Brokers)), os.Getenv("KAFKA_BROKERS")))
-	if enabled && len(brokers) == 0 {
-		log.Fatalf("MSG_DIRECT_KAFKA is on but no kafka brokers configured")
+	if len(brokers) == 0 {
+		log.Fatalf("kafka brokers are required: non-Kafka write path retired (03 §9 B3b)")
 	}
-	return enabled, brokers
+	return brokers
 }
 
 func firstNonEmpty(values ...string) string {

@@ -27,7 +27,7 @@
 - 服务器中间件（PostgreSQL / Redis / MinIO）由 k3s（GitOps）托管，应用发布脚本必须先确认中间件可用，再执行迁移和 k3s rollout
 - 当前 k3s manifests 使用 `hostNetwork: true`，服务会直接占用宿主机端口；新增或调整端口前必须检查宿主机端口冲突，并保持 `ListenOn`、`containerPort`、Service `port/targetPort` 一致
 - 生产 tracing 启用时，OTLP endpoint/protocol/sampler 配置错误必须导致服务启动失败；不能静默降级成无 tracing。OTel Collector/Tempo 不可用时应用请求不应伪造成功 trace export，但 shutdown 必须尽量 flush spans。
-- 排查跨服务消息链路时优先使用响应头、WebSocket ACK 或日志里的 OpenTelemetry `trace_id`，再在 Grafana Tempo 中查看 REST/WebSocket/message outbox/transfer/gateway delivery/Agent runtime spans。
+- 排查跨服务消息链路时优先使用响应头、WebSocket ACK 或日志里的 OpenTelemetry `trace_id`，再在 Grafana Tempo 中查看 REST/WebSocket/message transfer/gateway delivery/Agent runtime spans。
 
 ## 生产服务初始化
 
@@ -52,7 +52,6 @@ if err != nil {
 - `repository.MustRepositoryForStorage`
 - `repository.MustGroupsRepositoryForStorage`
 - `repository.MustMessageRepositoryForStorage`
-- `repository.MustOutboxRepositoryForStorage`
 - `repository.MustAgentRepositoryForStorage`
 - `repository.MustAgentAuditRepositoryForStorage`
 - `repository.MustAgentRegistryRepositoryForStorage`

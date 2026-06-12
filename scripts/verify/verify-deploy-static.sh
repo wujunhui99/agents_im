@@ -62,8 +62,12 @@ if grep -q '^DryRun: true' deploy/k8s/etc/msgtransfer.yaml; then
   echo "production msgtransfer must not run in dry-run mode" >&2
   exit 1
 fi
-if ! grep -A4 '^Consumer:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'Driver: outbox'; then
-  echo "production msgtransfer must consume message_outbox for V1 live push" >&2
+if grep -q '^Consumer:' deploy/k8s/etc/msgtransfer.yaml; then
+  echo "legacy msgtransfer outbox consumer config resurrected (03 §9 B3b retired)" >&2
+  exit 1
+fi
+if ! grep -A3 '^Kafka:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'Enabled: true'; then
+  echo "production msgtransfer must run the kafka chain (sole consume path after 03 §9 B3b)" >&2
   exit 1
 fi
 if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'Driver: gateway'; then

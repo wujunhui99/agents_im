@@ -4,10 +4,6 @@ DryRun: false
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 
-Consumer:
-  # Legacy live push consumes durable message_outbox rows written by msg-rpc non-Kafka mode（03 §9 B3b 退役）.
-  Driver: outbox
-
 Dispatcher:
   Driver: gateway
   GatewayEndpoint: http://127.0.0.1:8084
@@ -22,7 +18,7 @@ Observability:
   Host: 0.0.0.0
   Port: ${MESSAGE_TRANSFER_OBSERVABILITY_PORT}
 
-# Kafka 写链路（03 §9 B1，additive）：B2 前无人向 msg.toTransfer.v1 生产（dormant），
+# Kafka 链路是唯一消费路径（03 §9 B3b：legacy outbox consumer 已退役）；
 # Redis 经 REDIS_ADDR/REDIS_PASSWORD env 解析。
 Kafka:
   Enabled: true

@@ -240,18 +240,10 @@ rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
 rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
 rg -q "docker compose" scripts/migrate-postgres.sh
 
-# --- outbox schema/code/publisher ---
-assert_present "-q" db/migrations/001_init_postgres.sql -- \
-  "event_id" "event_type" "aggregate_type" "aggregate_id" "conversation_id" "message_id" \
-  "payload jsonb" "attempt_count" "next_attempt_at" "locked_by" "locked_until" "published_at"
-assert_present "-q" internal/repository/message_outbox_repository.go internal/repository/postgres_outbox.go internal/repository/postgres_message.go internal/repository/message_memory.go tests/message_service_test.go tests/postgres_persistence_integration_test.go -- \
-  "type OutboxRepository interface" "OutboxEventTypeMessageCreated" "PollPending" "MarkPublished" "MarkFailed" \
-  "messageCreatedOutboxPayload" "insertMessageOutboxEvent" "SKIP LOCKED"
-assert_present "-q" internal/outboxpublisher -- \
-  "package outboxpublisher" "MessageEventFromOutbox" "messaging.MessageEvent" "EventTypeMessageAccepted"
-rg -q "TestMessageEventFromOutboxBuildsAcceptedEvent" internal/outboxpublisher/message_event_test.go
-rg -q "TestMessageEventFromOutboxIncludesAISenderInSingleChatReceiverIDs" internal/outboxpublisher/message_event_test.go
-rg -q "TestMessageEventFromOutboxRejectsMalformedPayload" internal/outboxpublisher/message_event_test.go
+# --- outbox 退役（03 §9 B3b）：写链路唯一原语 = Kafka，message_outbox 表保留 90 天观察 ---
+assert_present "-q" db/migrations/001_init_postgres.sql -- "message_outbox"
+forbid_match "retired outbox write path resurrected (03 §9 B3b)" \
+  -q "insertMessageOutboxEvent|OutboxRepository|outboxpublisher" internal service --glob '*.go'
 
 # --- observability code surface ---
 assert_present "-q" pkg/health pkg/observability -- \

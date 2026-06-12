@@ -44,98 +44,51 @@ func main() {
 		}
 	}()
 
-	consumer, err := buildConsumer(cfg)
-	if err != nil {
-		log.Fatalf("build message transfer consumer: %v", err)
-	}
-	if closer, ok := consumer.(interface{ Close() error }); ok {
-		defer func() {
-			if err := closer.Close(); err != nil {
-				log.Printf("close message transfer consumer: %v", err)
-			}
-		}()
-	}
 	dispatcher := buildDispatcher(cfg)
 	recorder, err := buildDeliveryAttemptRecorder(cfg)
 	if err != nil {
 		log.Fatalf("build delivery attempt recorder: %v", err)
 	}
-	workerOptions := []transfer.WorkerOption{
-		transfer.WithWorkerID(cfg.WorkerID),
-		transfer.WithIdempotencyStore(transfer.NewMemoryIdempotencyStore()),
-		transfer.WithPollInterval(time.Duration(cfg.Worker.PollIntervalMillis) * time.Millisecond),
-		transfer.WithRetryBackoff(time.Duration(cfg.Worker.RetryBackoffMillis) * time.Millisecond),
-		transfer.WithMaxAttempts(cfg.Worker.MaxAttempts),
-	}
-	if recorder != nil {
-		workerOptions = append(workerOptions, transfer.WithDeliveryAttemptRecorder(recorder))
-	}
-	worker := transfer.NewWorker(consumer, dispatcher, workerOptions...)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Kafka 写链路（03 §9 B1，additive）：与 legacy outbox worker 并行，B3 退役后者。
-	var kafkaChain *chain.Chain
-	if cfg.Kafka.Enabled {
-		kafkaChain, err = chain.New(chain.Options{
-			Kafka:      cfg.Kafka,
-			DataSource: cfg.DataSource,
-			Dispatcher: dispatcher,
-			Recorder:   recorder,
-			WorkerID:   cfg.WorkerID,
-		})
-		if err != nil {
-			log.Fatalf("build kafka chain: %v", err)
-		}
-		if err := kafkaChain.Start(ctx); err != nil {
-			log.Fatalf("start kafka chain: %v", err)
-		}
-		defer func() {
-			if err := kafkaChain.Close(); err != nil {
-				log.Printf("close kafka chain: %v", err)
-			}
-		}()
-		log.Printf("%s kafka chain started brokers=%s topics=%s,%s,%s,%s", cfg.Name, cfg.Kafka.Brokers,
-			messaging.TopicToTransfer, messaging.TopicToPostgres, messaging.TopicToPush, messaging.TopicAgentTrigger)
+	// Kafka 链路是唯一消费路径（03 §9 B3b）：legacy outbox worker 已退役，
+	// 缺 Kafka 配置直接启动失败（失败优先），不再静默空转。
+	kafkaChain, err := chain.New(chain.Options{
+		Kafka:      cfg.Kafka,
+		DataSource: cfg.DataSource,
+		Dispatcher: dispatcher,
+		Recorder:   recorder,
+		WorkerID:   cfg.WorkerID,
+	})
+	if err != nil {
+		log.Fatalf("build kafka chain: %v", err)
 	}
+	if err := kafkaChain.Start(ctx); err != nil {
+		log.Fatalf("start kafka chain: %v", err)
+	}
+	defer func() {
+		if err := kafkaChain.Close(); err != nil {
+			log.Printf("close kafka chain: %v", err)
+		}
+	}()
+	log.Printf("%s kafka chain started brokers=%s topics=%s,%s,%s,%s", cfg.Name, cfg.Kafka.Brokers,
+		messaging.TopicToTransfer, messaging.TopicToPostgres, messaging.TopicToPush, messaging.TopicAgentTrigger)
 
-	observabilityServer := startObservabilityHTTP(ctx, cfg, consumer, dispatcher, kafkaChain)
+	observabilityServer := startObservabilityHTTP(ctx, cfg, dispatcher, kafkaChain)
 	defer shutdownObservabilityHTTP(observabilityServer)
 
 	log.Printf(
-		"%s starting worker_id=%s topic=%s group=%s consumer=%s dispatcher=%s storage=%s dry_run=%t",
+		"%s starting worker_id=%s dispatcher=%s storage=%s dry_run=%t",
 		cfg.Name,
 		cfg.WorkerID,
-		cfg.Consumer.Topic,
-		cfg.Consumer.Group,
-		cfg.Consumer.Driver,
 		cfg.Dispatcher.Driver,
 		cfg.StorageDriver,
 		cfg.DryRun,
 	)
-	if err := worker.Run(ctx); err != nil {
-		log.Fatalf("message transfer worker stopped with error: %v", err)
-	}
+	<-ctx.Done()
 	log.Printf("%s stopped", cfg.Name)
-}
-
-func buildConsumer(cfg config.MessageTransferConfig) (transfer.EventConsumer, error) {
-	switch cfg.Consumer.Driver {
-	case config.TransferConsumerOutbox:
-		repo, err := repository.NewOutboxRepositoryForStorage(cfg.StorageDriver, cfg.DataSource)
-		if err != nil {
-			return nil, err
-		}
-		return transfer.NewOutboxEventConsumer(transfer.OutboxEventConsumerConfig{
-			Repository:   repo,
-			WorkerID:     cfg.WorkerID,
-			BatchLimit:   100,
-			LockDuration: 30 * time.Second,
-		})
-	default:
-		return transfer.NewInMemoryConsumer(), nil
-	}
 }
 
 func buildDispatcher(cfg config.MessageTransferConfig) transfer.DeliveryDispatcher {
@@ -162,7 +115,7 @@ func buildDeliveryAttemptRecorder(cfg config.MessageTransferConfig) (transfer.De
 	}
 }
 
-func startObservabilityHTTP(ctx context.Context, cfg config.MessageTransferConfig, consumer transfer.EventConsumer, dispatcher transfer.DeliveryDispatcher, kafkaChain *chain.Chain) *http.Server {
+func startObservabilityHTTP(ctx context.Context, cfg config.MessageTransferConfig, dispatcher transfer.DeliveryDispatcher, kafkaChain *chain.Chain) *http.Server {
 	if !cfg.Observability.Enabled {
 		return nil
 	}
@@ -170,15 +123,11 @@ func startObservabilityHTTP(ctx context.Context, cfg config.MessageTransferConfi
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", health.LivenessHandler(cfg.Name))
 	mux.HandleFunc("/readyz", health.ReadinessHandler(cfg.Name, func(r *http.Request) []health.Check {
-		checks := []health.Check{
-			health.ComponentCheck("event_consumer", consumer != nil, "configured"),
+		err := kafkaChain.Ready(r.Context())
+		return []health.Check{
 			health.ComponentCheck("delivery_dispatcher", dispatcher != nil, "configured"),
+			health.ComponentCheck("kafka_chain", err == nil, readinessMessage(err)),
 		}
-		if kafkaChain != nil {
-			err := kafkaChain.Ready(r.Context())
-			checks = append(checks, health.ComponentCheck("kafka_chain", err == nil, readinessMessage(err)))
-		}
-		return checks
 	}))
 	mux.HandleFunc("/metrics", observability.MetricsHandler())
 
