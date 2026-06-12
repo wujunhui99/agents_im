@@ -271,34 +271,48 @@ msg-rpc.SendMessage()
 
 ### 4.2 目标（重构后）
 
-按 00-decisions D1（无 outbox）+ D2（seq 在 transfer 分配）+ D5（topic 命名）：
+按 00-decisions D1（无 outbox）+ D2（seq 在 transfer 分配）+ D5（topic 命名）+ **D15（判定分层，2026-06-12 定稿）**：
 
 ```
 msg-rpc.SendMessage()
-  └ producer.Publish(topic=msg.toTransfer.v1, key=conversation_id, value=proto.Marshal(MsgData))
+  └ producer.Publish(topic=msg.toTransfer.v1, key=conversation_id, value=...)
+      事件携带 receiver_account_type / 群聊 agent 成员（发消息时已知，零成本）
                                        │ ACK 立刻返回（不带 seq）
                                        ▼
-                  msgtransfer batcher ──> categorize 阶段
-                                       │   - 判断 message_origin
-                                       │   - 判断 conversation 是否 hosted by agent
-                                       │   - 判断是否 @ Agent
-                                       │   若需要触发 agent ↓
+                  msgtransfer batcher ──> categorize（dedup + seq 之后）
+                                       │  【零依赖轻判，只用事件自带字段，不查库不调 RPC】
+                                       │   - origin=ai 且未标 allow_recursive → 不发（防递归第一道闸）
+                                       │   - receiver_account_type=agent → trigger_kind=agent_recipient
+                                       │   - 其余人类消息 → trigger_kind=candidate_hosting
                                        │
                                        ├─ produce msg.toPostgres.v1（归档）
                                        ├─ produce msg.toPush.v1（推送）
-                                       └─ produce agent.trigger.v1（触发 agent）
+                                       └─ produce agent.trigger.v1（单 topic，key=conversation_id）
                                                   │
                                                   ▼
-                                          agent-rpc worker 消费
-                                                  │
-                                                  ├ runtime.Run（LLM + tools）
-                                                  └ imadapter → msg-rpc.SendMessage（AI msg 再走完整链）
+                            agent-rpc 消费（group agent-trigger，Kafka 上零生产面）
+                                       │  【终判，查的全是自己域内的表（D13 goctl model）】
+                                       │   - agent_recipient → 直接跑 orchestrator
+                                       │   - candidate_hosting → 查 conversation_ai_hosting，
+                                       │     无托管即丢弃（一次本地索引查询）
+                                       │   - 幂等：trigger event_id 记 agent run audit
+                                       │
+                                       ├ runtime.Run（LLM + tools）
+                                       └ imadapter → msg-rpc.SendMessage（AI msg 再走完整链，
+                                          origin=ai 在 transfer 轻判处被拦 → 递归终止）
 ```
 
-好处：完全异步 + 可独立扩容 agent worker + agent 故障不影响消息写入。
-代价：trigger 链增加 1 hop kafka 延迟（百毫秒级，可接受）。
+好处：完全异步 + 可独立扩容 agent worker + agent 故障不影响消息写入；判定分层后
+**消息主链对 agent/user 域零同步依赖**（禁止 transfer 反查 user-rpc/msg-rpc/agent-rpc——
+事件携带优于下游反查），托管配置的裁决权留在其 owner（agent 域）。
+代价：trigger 链增加 1 hop kafka 延迟（百毫秒级，可接受）；candidate_hosting ≈ 全量人类
+消息进 topic——当前量级成本可忽略，量级需要时在 transfer 加托管会话/agent 账号缓存预过滤
+（只改发多发少，不动 topic/schema/消费逻辑）。
 
-> 渐进路径：先在 msg-rpc 内同步走（现状）→ 引入 `service/agent/rpc/internal/orchestrator/` 后台 worker channel → 上 Kafka topic `agent.trigger.v1`（在 03 文档 Phase 2/3 完成后落地；00-decisions D10）。
+> 渐进路径（与 B2 过渡态兼容，每步独立可验证）：现状 = trigger 无条件 produce、
+> msg-rpc 内回流 consumer 判定（03 §9 B2 落地偏差）→ ①事件加 receiver_account_type /
+> trigger_kind 字段（向后兼容）→ ②transfer 加轻判 → ③agent-rpc 以新 consumer group
+> 消费 → ④删 msg-rpc 回流 consumer + newConversationAIHostingRuntime 接线（解锁 03 §9 A4）。
 
 ---
 
@@ -309,7 +323,7 @@ msg-rpc.SendMessage()
 1. **AG-4 rename** `internal/agent/pythonexec` → `pkg/pythonexec`（00-decisions D10），纯 move。
 2. **AG-5 forbidden 黑名单加注释 + config-driven**。
 3. **AG-1 建 service/agent/rpc**：定义 proto、生成代码、初始化 svc/server。
-4. **AG-2/AG-3 拆 internal/agentim**：搬到 `service/agent/rpc/internal/{trigger,orchestrator,hosting,imadapter,audit}/`。
+4. **AG-2/AG-3 拆 internal/agentim**：搬到 `service/agent/rpc/internal/{trigger,orchestrator,hosting,imadapter,audit}/`；agent-rpc 以新 consumer group 消费 `agent.trigger.v1`（D15 终判），验证后删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线——这是 03 §9 A4（删 `internal/servicecontext/message`）的解锁条件。
 5. **AG-6 数据层改 model**（D13）：agent_* 表全部改 goctl model 落 `service/agent/rpc/internal/model/`，废 repository 层。
 6. **AG-9 LLM provider 抽象**：`service/agent/rpc/internal/runtime/llm/{factory.go, deepseek, openai, anthropic}`（00-decisions D10）。
 7. **AG-10 agent-api 改 BFF only**：删 PythonExecutor、AgentLogic 在 api svc 的依赖，全部走 agent-rpc。
@@ -332,9 +346,10 @@ msg-rpc.SendMessage()
 
 ## 7. 与文档 03 的交集
 
-文档 03（消息链路）按 OpenIM 模型在 msgtransfer batch handler 里直接产生 `agent.trigger.v1`；本文 §4.2 是同一件事的 Agent 侧描述。约定（00-decisions D5）：
+文档 03（消息链路）按 OpenIM 模型在 msgtransfer batch handler 里直接产生 `agent.trigger.v1`；本文 §4.2 是同一件事的 Agent 侧描述。约定（00-decisions D5 + D15）：
 
-- Kafka topic `agent.trigger.v1` 由 msgtransfer 在 categorize 阶段（即分配 seq、写 Redis cache 之后、produce toPostgres/toPush 同一批次）产生；
-- agent-rpc 消费这个 topic，跑 RunOrchestrator；
+- Kafka topic `agent.trigger.v1` 由 msgtransfer 在 categorize 阶段（即分配 seq、写 Redis cache 之后、produce toPostgres/toPush 同一批次）产生，**produce 前只做零依赖轻判**（origin / receiver_account_type，事件自带字段）；
+- agent-rpc 消费这个 topic（group `agent-trigger`）做**终判**（candidate_hosting 查自己域内托管表）后跑 RunOrchestrator——transfer **不查** hosting 配置、不调旁路 RPC（D15）；
 - 写回 IM 通过 msg-rpc gRPC（imadapter）→ msg-rpc 再 `producer.Publish(msg.toTransfer.v1)`，**AI 消息走与人类消息完全相同的 Kafka 链路**（00-decisions D1：没有 outbox 这种特殊路径）；
-- 防递归靠 trigger event 的 `source_agent_run_id` + `hostingService` 的幂等表，不依赖 outbox 字段。
+- 防递归第一道闸在 transfer 轻判（origin=ai 不 produce），trigger event 的 `source_agent_run_id` + `hostingService` 幂等表兜底，不依赖 outbox 字段；
+- #463 临时塞进 msg.proto 的 `Get/UpdateConversationAIHosting` 随 agent-rpc 上线迁出（hosting 配置 owner = agent 域），msg-api 的 ai-hosting 路由改 BFF 调 agent-rpc。
