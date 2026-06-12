@@ -159,18 +159,23 @@
 - **来源**：本轮 Claude × 用户讨论（2026-06-04）。
 - **影响文档**：01（`pkg/jwtauth` 入 pkg 清单）、02（auth 段：`AuthRuntime` / `ActiveSessionRepository` 退役，鉴权改 `pkg/jwtauth`）。
 
-### D15 — Agent 触发：单 topic + 判定分层（transfer 零依赖轻判，agent-rpc 终判）
+### D15 — Agent 触发：单 topic + 判定分层（transfer 仅 origin 闸门，agent-rpc 终判）
 
-- **单 topic**：两类触发场景——①receiver 是 agent 账号（agent 收信）②会话开启 AI 托管（ai_host）——都走 `agent.trigger.v1`，**不拆双 topic**。理由：消费者同一个（agent-rpc）、处理代价同源（LLM）、顺序需求相同；同会话可能同时命中两类，拆开丢失 partition key（conversation_id）的会话内有序，幂等/防递归还要做两遍。事件以 **`trigger_kind`** 字段区分：`agent_recipient` | `candidate_hosting`。
+> 2026-06-12 同日修正（#499）：初版"msg-rpc 事件携带 `receiver_account_type`、transfer 打
+> `trigger_kind` 标"不成立——msg-rpc SendMessage **并不知道** receiver 账号类型（`accounts`
+> 归 user 域），携带它需要 msg-rpc 每次发送反查 user 域，等于把"主链反查旁路域"换了个位置。
+> 两个字段退出事件契约，判定全部收敛到 agent-rpc 本地表。
+
+- **单 topic**：两类触发场景——①receiver 是 agent 账号（agent 收信）②会话开启 AI 托管（ai_host）——都走 `agent.trigger.v1`，**不拆双 topic**。理由：消费者同一个（agent-rpc）、处理代价同源（LLM）、顺序需求相同；同会话可能同时命中两类，拆开丢失 partition key（conversation_id）的会话内有序，幂等/防递归还要做两遍。触发类型是**消费端内部推导的概念**（用于分支/指标/限流），不进事件 schema。
 - **判定分层，分界线 = 是否需要查库**：
-  - **transfer 只做零依赖轻判**（全部用事件自带字段，不查库、不调 RPC）：`message_origin=ai` 且未标 `allow_recursive_trigger` → 不 produce（防递归第一道闸，从消费端前移到生产端）；`receiver_account_type=agent`（或群聊含 agent 成员）→ `trigger_kind=agent_recipient`；其余人类消息 → `trigger_kind=candidate_hosting`。
-  - **agent-rpc 消费端做终判**：`candidate_hosting` 查**自己域内**的 `conversation_ai_hosting` 表（goctl model，本地查询非跨服务），无托管即丢弃。
-- **事件携带优于下游反查**：msg-rpc 产生 `msg.toTransfer.v1` 事件时携带 `receiver_account_type` / 群聊 agent 成员（发消息时已知的事实，零成本），transfer 透传——**禁止 transfer 同步调 user-rpc / msg-rpc / agent-rpc 做触发判定**：消息主链不为旁路域加同步依赖（agent/user 域抖动不得影响全站消息）。
+  - **transfer 轻判只有一条**：`message_origin=ai` 且未标 `allow_recursive_trigger` → 不 produce（防递归第一道闸，从消费端前移到生产端）。origin 是 msg-rpc 写回时自己设置的字段，真正零查询。其余消息**全部 produce、不打标**。
+  - **agent-rpc 消费端做全部终判**，查的都是自己域内的表（D13 goctl model，本地索引查询非跨服务）：①receiver / 群成员 ∈ **agents 注册表** → agent 收信触发；②conversation ∈ **conversation_ai_hosting** → 托管触发；都不命中即丢弃。两类判定数据的权威同在 agent 域，同构地落在同一个消费者。
+- **主链零旁路依赖（硬约束）**：**禁止 transfer 与 msg-rpc 为触发判定同步调 user-rpc / agent-rpc 或查旁路域表**——agent/user 域抖动不得影响全站消息。需要查库的判定一律随数据 owner 走。
 - **托管配置 owner = agent 域**：`conversation_ai_hosting` 表终态归 `service/agent/rpc/internal/model`（D13）；#463 临时塞进 msg.proto 的 2 个 ai-hosting RPC 随 agent-rpc 上线迁出，msg-api 的 ai-hosting 路由改 BFF 调 agent-rpc。
-- **流量预过滤是未来旋钮，不是现在的设计**：candidate_hosting 在当前量级 = 全量人类消息，agent-rpc 一次本地索引查询丢弃，成本可忽略；量级需要时在 transfer 加"托管会话/agent 账号"Redis 缓存预过滤（只改发多发少，不改 topic/schema/消费逻辑）。
+- **流量预过滤是未来旋钮，不是现在的设计**：当前量级下 agent-rpc 对每条人类消息做两次本地索引查询后丢弃，成本可忽略；量级需要时在 transfer 加"托管会话 / agent 账号集合"Redis 缓存预过滤（只改发多发少，不改 topic/schema/消费逻辑）。
 - **agent-rpc 在 Kafka 上零生产面**：写回 IM 只经 imadapter 调 msg-rpc SendMessage（gRPC），AI 消息走与人类消息完全相同的链路。
-- **迁移路径**（与 B2 过渡态兼容，每步独立）：①toTransfer/trigger 事件加 `receiver_account_type`、`trigger_kind` 字段（向后兼容）→ ②transfer 加轻判 → ③agent-rpc 以新 consumer group `agent-trigger` 消费 → ④删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（同时解锁 A4 删 `internal/servicecontext/message`）。
-- **来源**：本轮 Claude × 用户讨论（2026-06-12）。
+- **迁移路径**（与 B2 过渡态兼容，每步独立）：①transfer 加 origin 闸门 → ②agent-rpc 以新 consumer group `agent-trigger` 消费（含两个本地终判）→ ③删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（同时解锁 A4 删 `internal/servicecontext/message`）。事件 schema 无需变更。
+- **来源**：本轮 Claude × 用户讨论（2026-06-12，#497 初稿 / #499 修正）。
 - **影响文档**：03（§10 反向影响重写）、04（§4.2 目标链路 + §7 交集约定）、07（ai-hosting RPC 临时性注记）。
 
 ---
