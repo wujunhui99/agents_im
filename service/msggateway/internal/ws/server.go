@@ -593,8 +593,6 @@ func (s *Server) dispatch(ctx context.Context, conn *Connection, commandType str
 	}
 }
 
-
-
 func (c *Connection) Info() ConnectionInfo {
 	return ConnectionInfo{
 		ConnectionID: c.ID,
@@ -893,10 +891,6 @@ func logWebSocketCommand(conn *Connection, traceContext observability.TraceConte
 		code,
 	)
 }
-
-
-
-
 
 func bearerToken(headerValue string) string {
 	headerValue = strings.TrimSpace(headerValue)
