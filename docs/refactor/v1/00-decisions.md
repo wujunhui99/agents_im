@@ -159,24 +159,39 @@
 - **来源**：本轮 Claude × 用户讨论（2026-06-04）。
 - **影响文档**：01（`pkg/jwtauth` 入 pkg 清单）、02（auth 段：`AuthRuntime` / `ActiveSessionRepository` 退役，鉴权改 `pkg/jwtauth`）。
 
-### D15 — Agent 触发：单 topic + 判定分层（transfer 仅 origin 闸门，agent-rpc 终判）
+### D15 — Agent 触发：单 topic 全量 produce + 终判收敛 agent-rpc
 
-> 2026-06-12 同日修正（#499）：初版"msg-rpc 事件携带 `receiver_account_type`、transfer 打
-> `trigger_kind` 标"不成立——msg-rpc SendMessage **并不知道** receiver 账号类型（`accounts`
-> 归 user 域），携带它需要 msg-rpc 每次发送反查 user 域，等于把"主链反查旁路域"换了个位置。
-> 两个字段退出事件契约，判定全部收敛到 agent-rpc 本地表。
+> 修订史（均 2026-06-12）：#497 初稿 → #499 修正（触发判定字段退出事件契约——msg-rpc 不知道
+> receiver 账号类型，携带 = 主链反查换位置）→ #501 二次修正（**D16** 账号类型编进 account_id
+> 后，"receiver 是否 agent"在任何位置都零查询可知：transfer 据此过滤 toPush；toAgent 全量
+> produce 不再设 origin 闸门，防递归检查移到 agent-rpc 终判第一步）。
 
 - **单 topic**：两类触发场景——①receiver 是 agent 账号（agent 收信）②会话开启 AI 托管（ai_host）——都走 `agent.trigger.v1`，**不拆双 topic**。理由：消费者同一个（agent-rpc）、处理代价同源（LLM）、顺序需求相同；同会话可能同时命中两类，拆开丢失 partition key（conversation_id）的会话内有序，幂等/防递归还要做两遍。触发类型是**消费端内部推导的概念**（用于分支/指标/限流），不进事件 schema。
-- **判定分层，分界线 = 是否需要查库**：
-  - **transfer 轻判只有一条**：`message_origin=ai` 且未标 `allow_recursive_trigger` → 不 produce（防递归第一道闸，从消费端前移到生产端）。origin 是 msg-rpc 写回时自己设置的字段，真正零查询。其余消息**全部 produce、不打标**。
-  - **agent-rpc 消费端做全部终判**，查的都是自己域内的表（D13 goctl model，本地索引查询非跨服务）：①receiver / 群成员 ∈ **agents 注册表** → agent 收信触发；②conversation ∈ **conversation_ai_hosting** → 托管触发；都不命中即丢弃。两类判定数据的权威同在 agent 域，同构地落在同一个消费者。
-- **主链零旁路依赖（硬约束）**：**禁止 transfer 与 msg-rpc 为触发判定同步调 user-rpc / agent-rpc 或查旁路域表**——agent/user 域抖动不得影响全站消息。需要查库的判定一律随数据 owner 走。
+- **toAgent 全量 produce，transfer 零分支**：`agent.trigger.v1` 对每条存储消息无条件 produce（与 B1 现状一致）。每条人类消息本质上都要被问一次"是否托管"——判定次数是不变量，设计自由度只在**在哪问**（热路径 vs 异步消费）与**谁来问**（数据 owner vs 旁人）；全量 produce 把这次判定放到了异步消费端 + 域 owner，msg-rpc 热路径与 transfer 主链零负担。
+- **agent-rpc 消费端做全部终判**（consumer group `agent-trigger`，按序三步）：
+  1. `message_origin=ai` 且未标 `allow_recursive_trigger` → 丢弃（**防递归闸门**，事件字段检查零查询）；
+  2. receiver / 群成员 **ID 类型位 = agent**（D16，零查询）→ agent 收信触发；
+  3. conversation ∈ **conversation_ai_hosting**（自己域内 goctl model，本地索引查询）→ 托管触发；都不命中即丢弃。
+- **toPush 按 recv_id 类型位过滤**（D16 后零查询）：agent 收件人不进 push fanout（单聊 recv_id / 群聊逐成员过滤）——把"agent 账号无连接面、不接收推送"从隐含假设（presence 落空 no-op）升格为显式语义，同时解决 03 §9 C3 离线推送的 agent 过滤。
+- **主链零旁路依赖（硬约束）**：**禁止 transfer 与 msg-rpc 为触发判定同步调 user-rpc / agent-rpc 或查旁路域表**——ID 类型位（D16）与事件自带字段（origin）是仅有的零依赖判定来源；需要查库的判定一律随数据 owner 走。
 - **托管配置 owner = agent 域**：`conversation_ai_hosting` 表终态归 `service/agent/rpc/internal/model`（D13）；#463 临时塞进 msg.proto 的 2 个 ai-hosting RPC 随 agent-rpc 上线迁出，msg-api 的 ai-hosting 路由改 BFF 调 agent-rpc。
-- **流量预过滤是未来旋钮，不是现在的设计**：当前量级下 agent-rpc 对每条人类消息做两次本地索引查询后丢弃，成本可忽略；量级需要时在 transfer 加"托管会话 / agent 账号集合"Redis 缓存预过滤（只改发多发少，不改 topic/schema/消费逻辑）。
+- **流量预过滤是未来旋钮，不是现在的设计**：判定移走后新增的只有运输成本（每条消息一份 Kafka 事件写读，单 broker 顺序写）；量级需要时在 transfer 加"托管会话集合"Redis 缓存预过滤（只改发多发少，不改 topic/schema/消费逻辑）。
 - **agent-rpc 在 Kafka 上零生产面**：写回 IM 只经 imadapter 调 msg-rpc SendMessage（gRPC），AI 消息走与人类消息完全相同的链路。
-- **迁移路径**（与 B2 过渡态兼容，每步独立）：①transfer 加 origin 闸门 → ②agent-rpc 以新 consumer group `agent-trigger` 消费（含两个本地终判）→ ③删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（同时解锁 A4 删 `internal/servicecontext/message`）。事件 schema 无需变更。
-- **来源**：本轮 Claude × 用户讨论（2026-06-12，#497 初稿 / #499 修正）。
+- **迁移路径**（与 B2 过渡态兼容，每步独立）：①D16 账号 ID 切换 + 数据清零 → ②transfer 加 toPush 的 recv_id 类型过滤（toAgent 已是全量，零改动）→ ③agent-rpc 以新 consumer group 消费（三步终判）→ ④删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（同时解锁 A4 删 `internal/servicecontext/message`）。事件 schema 无需变更。
+- **来源**：本轮 Claude × 用户讨论（2026-06-12，#497 初稿 / #499 / #501 修正）。
 - **影响文档**：03（§10 反向影响重写）、04（§4.2 目标链路 + §7 交集约定）、07（ai-hosting RPC 临时性注记）。
+
+### D16 — account_id 类型化：Sonyflake 变体 int64，账号类型编进 ID
+
+- **布局（64 bit）**：1 位符号（恒 0）+ **39 位时间戳**（10ms 粒度，≈174 年）+ **5 位账号类型**（32 种：0 保留，1=user，2=agent，3=admin，扩展走 allowlist）+ **9 位机器号**（512 实例）+ **10 位序列号**（1024/10ms/实例 ≈ 10w ID/s/实例）。时间戳在高位，ID 保持近似时间有序（PK 局部性）。
+- **列类型**：account_id 及全部引用列 text → **bigint**；对外（JSON/JWT claim/前端）仍以十进制字符串传输（JS Number 精度不够 int64）。
+- **存量数据处理 = 清零重置（方案 1）**：服务未上线、数据全为测试数据——清库重跑 migration + flush Redis + 重建 default assistant seed；**不做 ID 重写迁移**（方案 2 需联动重写 messages 收发列、`single:<a>:<b>` 会话 ID、friendships、Redis key，对测试数据毫无意义）。schema 变更走新增 migration（已发布 migration 不可变）。
+- **解析纪律（硬约束）**：账号类型只准经 **`pkg/idgen`** 的 helper（如 `idgen.AccountType(id)`）读取，**禁止各服务散落 bit 运算**；类型自描述方便到容易滥用——只有真正需要账号类型的位置（transfer toPush 过滤、agent-rpc 终判、admin/调试）允许分支。
+- **双事实源不变量**：`accounts.account_type` 列与 ID 类型位**创建时强一致**（创建路径断言），且**账号类型终身不可变**（user↔agent 不允许转换）——类型进 ID 的前提条件。
+- **不变的东西**：`conversation_id` 派生逻辑不动（把 account_id 当不透明字符串排序拼接，数值字符串兼容）；消息/媒体等其它实体 ID 不编码类型（只有账号有"类型"这个一等概念）。
+- **买到什么**："receiver 是否 agent"在全链路零查询可知——D15 的 toPush 过滤与 agent 收信终判零依赖化，03 §9 C3 离线推送的 agent 过滤顺带解决；日志/SQL/排障可读性（配 idgen 解码工具）。
+- **来源**：本轮 Claude × 用户讨论（2026-06-12）。前缀字符串方案（`usr_`/`agt_`）被否：用户选 int64 位段（列更紧凑、保持数值序）。
+- **影响文档**：03（§10）、04（§4.2）；实现期影响 pkg/idgen、db/migrations、账号创建路径。
 
 ---
 
@@ -303,6 +318,7 @@
 | D13 纯 goctl model，废 repository 层 | ✅ 修复（TD-7/§4/§5/§3） | ✅ 引用（聚合描述） | n/a | ✅ 修复（AG-3/AG-6） | n/a | ✅ 修复（XC-1） | n/a |
 | D14 无状态 JWT + Redis 单活 jti | ✅ 引用（pkg/jwtauth） | ✅ 修复（auth 鉴权段） | n/a | n/a | n/a | n/a | n/a |
 | D15 agent.trigger 单 topic + 判定分层 | n/a | n/a | ✅ 修复（§10） | ✅ 修复（§4.2/§7） | n/a | n/a | ✅ 引用（ai-hosting 归属） |
+| D16 account_id 类型化（Sonyflake 变体） | n/a | n/a | ✅ 引用（§10） | ✅ 引用（§4.2） | n/a | n/a | n/a |
 
 `✅ 原始决策`：该决策的来源文档。
 `✅ 修复`：本次同步通过修改对齐。
