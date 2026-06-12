@@ -30,7 +30,7 @@ func TestReadinessHandlerReportsReady(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 
-	ReadinessHandler("gateway-ws", func(*http.Request) []Check {
+	ReadinessHandler("msggateway", func(*http.Request) []Check {
 		return []Check{
 			ComponentCheck("message_logic", true, "configured"),
 			ComponentCheck("presence_store", true, "configured"),
@@ -54,7 +54,7 @@ func TestReadinessHandlerReportsUnavailable(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 
-	ReadinessHandler("gateway-ws", func(*http.Request) []Check {
+	ReadinessHandler("msggateway", func(*http.Request) []Check {
 		return []Check{
 			ComponentCheck("message_logic", false, "not configured"),
 		}

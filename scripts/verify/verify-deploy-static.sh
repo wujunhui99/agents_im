@@ -18,7 +18,7 @@ bash scripts/ci/verify-migration-immutability.sh
 # --- dev / demo tooling content ---
 assert_present "-qF" scripts/dev-up.sh -- \
   "docker compose up -d postgres redis minio" "bash scripts/migrate-postgres.sh" \
-  "StorageDriver: postgres" "ObjectStorage:" "gateway-ws"
+  "StorageDriver: postgres" "ObjectStorage:" "msggateway"
 assert_present "-qF" scripts/dev-demo-data.sh -- \
   "/auth/register" "/friends" "/groups" "/messages" "/read"
 
@@ -36,20 +36,20 @@ assert_present "-q" .env.example deploy/middleware/.env.example deploy/k8s/secre
   "OBJECT_STORAGE_REGION" "OBJECT_STORAGE_USE_SSL" "OBJECT_STORAGE_EXTERNAL_USE_SSL" \
   "OBJECT_STORAGE_ACCESS_KEY_ID" "OBJECT_STORAGE_SECRET_ACCESS_KEY"
 
-# --- production gateway-ws origin / query-token config ---
-rg -q "gateway-ws" service/gateway-ws/main.go etc/gateway-ws.yaml
-rg -q "AllowQueryToken: true" deploy/k8s/etc/gateway-ws.yaml
+# --- production msggateway origin / query-token config ---
+rg -q "msggateway" service/msggateway/msggateway.go etc/msggateway.yaml
+rg -q "AllowQueryToken: true" deploy/k8s/etc/msggateway.yaml
 rg -q 'GATEWAY_WS_ALLOW_QUERY_TOKEN: "true"' deploy/k8s/configmap.yaml
 rg -q 'GATEWAY_WS_ALLOWED_ORIGINS: "https://agenticim\.xyz"' deploy/k8s/configmap.yaml
 if rg -q 'GATEWAY_WS_ALLOWED_ORIGINS:\s*""' deploy/k8s/configmap.yaml; then
   echo "production k8s websocket origins must not be empty" >&2
   exit 1
 fi
-rg -F -q 'AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}' deploy/k8s/etc/gateway-ws.yaml
-rg -q 'AllowedOrigins: http://localhost:5173,http://127\.0\.0\.1:5173' etc/gateway-ws.yaml
-rg -q "AllowQueryToken: true" etc/gateway-ws.yaml
-if ! grep -q 'AllowQueryToken: true' deploy/k8s/etc/gateway-ws.yaml; then
-  echo "production gateway-ws must allow query token for browser WebSocket" >&2
+rg -F -q 'AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}' deploy/k8s/etc/msggateway.yaml
+rg -q 'AllowedOrigins: http://localhost:5173,http://127\.0\.0\.1:5173' etc/msggateway.yaml
+rg -q "AllowQueryToken: true" etc/msggateway.yaml
+if ! grep -q 'AllowQueryToken: true' deploy/k8s/etc/msggateway.yaml; then
+  echo "production msggateway must allow query token for browser WebSocket" >&2
   exit 1
 fi
 
@@ -67,11 +67,11 @@ if ! grep -A4 '^Consumer:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'Driver: ou
   exit 1
 fi
 if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'Driver: gateway'; then
-  echo "production msgtransfer must dispatch to gateway-ws" >&2
+  echo "production msgtransfer must dispatch to msggateway" >&2
   exit 1
 fi
 if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'GatewayEndpoint: http://127\.0\.0\.1:8084'; then
-  echo "production msgtransfer must target colocated gateway-ws internal endpoint" >&2
+  echo "production msgtransfer must target colocated msggateway internal endpoint" >&2
   exit 1
 fi
 

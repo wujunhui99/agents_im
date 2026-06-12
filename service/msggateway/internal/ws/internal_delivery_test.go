@@ -1,4 +1,4 @@
-package tests
+package ws
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
+	"github.com/wujunhui99/agents_im/common/share/gateway/delivery"
 )
 
 func TestWebSocketGatewayInternalConversationDeliveryEndpointPushesToOnlineReceiver(t *testing.T) {

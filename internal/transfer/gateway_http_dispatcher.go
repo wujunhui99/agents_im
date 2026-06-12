@@ -13,7 +13,7 @@ import (
 
 	"go.opentelemetry.io/otel/propagation"
 
-	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
+	"github.com/wujunhui99/agents_im/common/share/gateway/delivery"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 )
 

@@ -22,7 +22,7 @@
 | third (含 mail) | `service/third/rpc/internal/provider/`（provider + tencent_ses，已脱 internal） | `service/third/rpc/...`           | `service/third/rpc`      | ✅ 已迁（mail 折入新服务 third，#429）|
 | agent    | `internal/agent/`（pythonexec）、`internal/agentim/`、`internal/agentruntime/`、`internal/logic/agentlogic*` | `service/agent/api/...`          | `service/agent/api`     | 🟡 只迁了 API，业务逻辑还在 internal |
 | message  | `internal/logic/message/`、`internal/handler/message/`、`internal/servicecontext/message/`、`internal/rpcgen/message` | **不存在** `service/msg/`    | 过渡态扁平 `service/message-api`；message-rpc 寄生 `internal/rpcgen/message` | ❌ 未迁 |
-| gateway  | `internal/gateway/{ws,delivery}`、`internal/servicecontext/gateway/` | **不存在** `service/msggateway/`    | 过渡态扁平 `service/gateway-ws`    | ❌ 未迁 |
+| gateway  | （已清空——ws 迁 `service/msggateway/internal/ws`，contract/delivery 迁 `common/share/gateway`） | `service/msggateway/`            | `service/msggateway`               | ✅ 已迁（#492，ws command 走 msg-rpc gRPC）|
 | transfer | `internal/transfer/...`                              | **不存在** `service/msgtransfer/`   | 过渡态扁平 `service/message-transfer` | ❌ 未迁 |
 | admin    | `internal/handler/admin/`、`internal/logic/admin*`、`internal/servicecontext/admin/`、`internal/adminbootstrap/` | **不存在** `service/admin/`      | 寄生在 `service/message-api`（其 main 同时引用 `adminsvc`） | 🚨 寄生 |
 
@@ -84,7 +84,7 @@ auth、user、friends、groups、message、gateway、admin 在 `internal/service
 ### TD-9 🟡 入口装配风格分裂
 入口统一在 `service/<domain>/<api|rpc>/<domain>.go`（goctl 生成的 `package main`，无 `cmd/`、无 `entry/`），但装配风格两套：
 - auth-api / user-api / friends-api / groups-api / third-rpc / agent-api → goctl 标准 main，只 `conf.MustLoad` + 注册 handler，干净；
-- message-api / gateway-ws / message-transfer（过渡态扁平目录）→ 仍在 main 里手动装配 60+ 行依赖（repo、logic、agentim、authrepo、observability、httpx errors…）。
+- 过渡态扁平目录已清退：message-api 退役（#463）、msgtransfer 改名迁移（#474）、msggateway 改名并砍掉 monolith 装配（#492，main 只剩 ws server + presence + session + msg-rpc client）。
 
 应当全部收敛到 goctl 标准 main，并把过渡态扁平目录迁入 `service/<domain>/<api|rpc>/`（msg-api/msg-rpc/msggateway/msgtransfer）。
 

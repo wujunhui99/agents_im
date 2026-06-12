@@ -469,7 +469,11 @@ Telemetry:
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
   Sampler: 1.0
   Batcher: otlpgrpc"
-  write_api_config "gateway-ws" "${GATEWAY_WS_PORT:-8084}" "Presence:
+  write_api_config "msggateway" "${GATEWAY_WS_PORT:-8084}" "MsgRPC:
+  Endpoints:
+    - 127.0.0.1:${MSG_RPC_PORT:-9098}
+  Timeout: 5000
+Presence:
   Driver: ${PRESENCE_DRIVER}
   HeartbeatTTLSeconds: ${PRESENCE_TTL_SECONDS:-60}
   KeyPrefix: ${PRESENCE_KEY_PREFIX:-agents_im:presence}
@@ -539,7 +543,7 @@ service_pkg() {
     user-rpc)         echo "./service/user/rpc" ;;
     msg-rpc)          echo "./service/msg/rpc" ;;
     msg-api)          echo "./service/msg/api" ;;
-    gateway-ws)       echo "./service/gateway-ws" ;;
+    msggateway)       echo "./service/msggateway" ;;
     msgtransfer) echo "./service/msgtransfer" ;;
     *) echo "unknown service: $1" >&2; return 1 ;;
   esac
@@ -633,7 +637,7 @@ main() {
   start_service "auth-api"
   start_service "friends-api"
   start_service "msg-api"
-  start_service "gateway-ws"
+  start_service "msggateway"
   start_service "msgtransfer"
   start_service "groups-api"
   start_service "agent-api"
@@ -644,7 +648,7 @@ main() {
   wait_http "auth-api" "http://127.0.0.1:${AUTH_API_PORT:-8081}/healthz"
   wait_http "friends-api" "http://127.0.0.1:${FRIENDS_API_PORT:-8082}/healthz"
   wait_http "msg-api" "http://127.0.0.1:${MSG_API_PORT:-8090}/healthz"
-  wait_http "gateway-ws" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
+  wait_http "msggateway" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
   if [[ "${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}" == "true" ]]; then
     wait_http "msgtransfer" "http://127.0.0.1:${MESSAGE_TRANSFER_OBSERVABILITY_PORT}/healthz"
   fi

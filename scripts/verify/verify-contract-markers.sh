@@ -124,17 +124,17 @@ for file in "${rpc_generated_proto_files[@]}"; do
 done
 
 # --- gateway / websocket / transfer code surface ---
-assert_present "-q" internal/gateway/contract.go tests/gateway_contract_test.go -- \
+assert_present "-q" common/share/gateway/contract.go tests/gateway_contract_test.go -- \
   "send_message" "pull_messages" "get_conversation_seqs" "mark_conversation_read" "heartbeat" \
   "SendMessage" "PullMessages" "GetConversationSeqs" "MarkConversationAsRead"
-assert_present "-q" internal/gateway/ws internal/gateway/contract.go tests/websocket_gateway_test.go -- \
+assert_present "-q" service/msggateway/internal/ws common/share/gateway/contract.go -- \
   "HandleWebSocket" "Validate\(rawToken\)" "Register" "CommandHeartbeat" "CommandSendMessage" \
   "CommandPullMessages" "CommandGetConversationSeqs" "CommandMarkConversationRead"
-assert_present "-q" internal/gateway/ws/server.go tests/websocket_gateway_test.go -- \
+assert_present "-q" service/msggateway/internal/ws/server.go service/msggateway/internal/ws/gateway_ws_test.go -- \
   "RequestIDCamel" "Payload" "frontendErrorCode" "VALIDATION_ERROR" \
   "TestWebSocketGatewayReconnectSyncFlow" "TestWebSocketGatewayPullMessagesIsDuplicateSafe" \
   "TestWebSocketGatewayPullMessagesFromMissingSeq" "TestWebSocketGatewayInvalidCommandReturnsFrontendErrorEnvelope"
-rg -q "TestWebSocketOriginPolicyUsesConfiguredExactOrigins" internal/gateway/ws/server_test.go
+rg -q "TestWebSocketOriginPolicyUsesConfiguredExactOrigins" service/msggateway/internal/ws/server_test.go
 
 assert_present "-q" internal/transfer -- \
   "type MessageEvent struct" "type Envelope struct" "type EventConsumer interface" "type DeliveryDispatcher interface" \
@@ -150,7 +150,7 @@ rg -q "ConsumerGroup|Consumer\.Group" etc/msgtransfer.yaml pkg/config/config.go
 rg -q "Topic|Consumer\.Topic" etc/msgtransfer.yaml pkg/config/config.go
 rg -q "WorkerID|Worker\.ID" etc/msgtransfer.yaml pkg/config/config.go
 
-assert_present "-q" internal/gateway/delivery internal/gateway/ws tests/websocket_gateway_test.go -- \
+assert_present "-q" common/share/gateway/delivery service/msggateway/internal/ws -- \
   "type Dispatcher interface" "DeliverToUser" "DeliverToConversation" "EventMessageReceived" "EventMessageDelivered" \
   "StatusOffline" "NewInMemoryDeliveryDispatcher" "PushToUser" "PushToConversation" "UserConnections"
 assert_present "-q" internal/transfer/gateway -- \
@@ -166,10 +166,10 @@ assert_present "-q" internal/repository internal/transfer db/migrations/001_init
 forbid_match "removed message V2 table still referenced: message_idempotency_keys" \
   -q "message_idempotency_keys" db/migrations/001_init_postgres.sql internal/repository --glob '*.go'
 
-assert_present "-q" internal/gateway/ws internal/gateway/delivery pkg/presence tests/websocket_gateway_test.go -- \
+assert_present "-q" service/msggateway/internal/ws common/share/gateway/delivery pkg/presence -- \
   "WithPresenceStore" "WithPresenceTTL" "WithInstanceID" "RegisterConnection" "Heartbeat" "UnregisterConnection" \
   "ListUserConnections" "InstanceID" "StatusRouted" "type Route struct"
-rg -q "Presence:" etc/gateway-ws.yaml
+rg -q "Presence:" etc/msggateway.yaml
 
 # --- presence / config code surface ---
 assert_present "-q" pkg/config/config.go -- \
@@ -201,7 +201,9 @@ rg -q "user_id" pkg/ctxuser/user.go
 rg -q "ctxuser\.UserID" service/msg/api/internal/logic/msg
 rg -q "sender_id must match authenticated user" service/msg/api/internal/logic/msg/send_message_logic.go
 assert_present "-q" tests -- \
-  "bearerTokenForUser" "invalid token status"
+  "bearerTokenForUser"
+assert_present "-q" service/msggateway/internal/ws -- \
+  "invalid token status"
 assert_present "-q" service/msg/api/internal/logic/msg -- \
   "message sender did not use token user" "TestSendMessageUsesJWTUser" "TestSendMessageRejectsSenderMismatch"
 rg -q "ExistsByIdentifier" internal/auth
@@ -220,7 +222,7 @@ assert_present "-q" tests -- \
 assert_present "-qF" db/migrations/001_init_postgres.sql -- \
   "create table if not exists accounts" "create table if not exists profiles" \
   "account_id text primary key" "account_type smallint not null default 1"
-rg -q "NewGroupsRepositoryForStorage" service/gateway-ws/main.go service/msg/rpc/internal/svc/servicecontext.go
+rg -q "NewGroupsRepositoryForStorage" service/msg/rpc/internal/svc/servicecontext.go
 rg -q "NewMessageLogicWithMediaValidator" internal/servicecontext/message/service_context.go
 rg -q "NewMessageRepositoryForStorage" service/msg/rpc/internal/svc/servicecontext.go
 assert_present "-q" db/migrations/001_init_postgres.sql -- \
@@ -230,7 +232,7 @@ rg -q "StorageDriver" pkg/config/config.go etc/*.yaml
 rg -q "ObjectStorageConfig" pkg/config/config.go
 rg -q "NewStore" pkg/objectstorage/factory.go
 rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/minio.go
-rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go service/user/api/user.go service/msg/rpc/internal/svc/servicecontext.go service/gateway-ws/main.go
+rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go service/user/api/user.go service/msg/rpc/internal/svc/servicecontext.go
 rg -q "ValidateMessageMedia" internal/logic/messagelogic.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql
 rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go internal/auth/repository/postgres.go
@@ -260,14 +262,14 @@ assert_present "-q" pkg/health pkg/observability -- \
 for api_main in service/agent/api/agent.go; do
   rg -q "TraceMiddlewareFunc" "$api_main"
 done
-assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/gateway-ws/main.go service/msgtransfer/msgtransfer.go -- \
+assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/msggateway/msggateway.go service/msgtransfer/msgtransfer.go -- \
   "/readyz" "/metrics" "ReadinessHandler" "MetricsHandler"
-assert_present "-q" internal/logic/messagelogic.go internal/gateway/ws internal/transfer/worker.go -- \
+assert_present "-q" internal/logic/messagelogic.go service/msggateway/internal/ws internal/transfer/worker.go -- \
   "RecordMessageSend" "RecordDeliveryAttempt" "RecordTransferEvent" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"
 rg -q "Observability:" etc/msgtransfer.yaml
 rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
 rg -q "agents_im_message_sends_total" pkg/observability/metrics.go
-rg -q "trace_id" internal/gateway/ws/server.go
+rg -q "trace_id" service/msggateway/internal/ws/server.go
 assert_present "-q" pkg/llmobs internal/agenteval internal/agentim internal/agentruntime/eino pkg/config .env.example -- \
   "RuntimeModeAIHostingAutoReply" "NewEinoCallbackHandler" "ErrLangfuseConfigMissing" "langfuseIngestionPath" \
   "LLMObservability" "LANGFUSE_PUBLIC_KEY" "PythonGoPerformanceCaseID" "ai_hosting.python_go_performance.v1"

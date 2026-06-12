@@ -37,10 +37,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: gateway-ws
+  name: msggateway
   namespace: agents-im
 spec:
-  selector: { app: gateway-ws }
+  selector: { app: msggateway }
   ports: [{ name: http, port: 8084, targetPort: 8084 }]
 ---
 apiVersion: v1

@@ -1,12 +1,13 @@
-Name: gateway-ws
+Name: msggateway
 Host: 0.0.0.0
 Port: 8084
 
 Auth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
-StorageDriver: postgres
-DataSource: ${DATABASE_URL}
+MsgRPC:
+  Target: dns:///msg-rpc:9098
+  Timeout: 5000
 Presence:
   Driver: redis
   HeartbeatTTLSeconds: 60

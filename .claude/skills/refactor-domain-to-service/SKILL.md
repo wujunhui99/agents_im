@@ -18,7 +18,7 @@ description: 把一个业务域从顶层 internal monolith（god-package interna
 - **`internal/logic` 是 god-package**：多个域的 `*Logic` 混在同一 `package logic`，共享 DTO（`UserProfile`）、
   helper（`formatTime`）。删一个域文件可能连带影响同包其它域。
 - **message monolith 是 keystone**：`internal/servicecontext/message` 会 in-process
-  构造几乎所有域的 `*Logic`（消费方现为 gateway-ws 与 msg-rpc 的 AI 托管 runtime，#463 后）。被它消费的域，
+  构造几乎所有域的 `*Logic`（消费方现仅剩 msg-rpc 的 AI 托管 runtime——#463 后；msggateway 已切 gRPC 脱钩，#492）。被它消费的域，
   在 message 迁移前**无法从 internal/logic 彻底删生产代码**——保留 internal 旧逻辑给 monolith，
   新 rpc 走 goctl 自包含，文档里注明“待 message 迁移后删”。
 - **退役 api 服务前审计进程内旁路职责**：HTTP 路由 1:1 复刻 ≠ 职责 1:1 复刻。旧 api main 里可能挂着

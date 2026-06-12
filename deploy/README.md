@@ -55,7 +55,7 @@ ADMIN_BOOTSTRAP_PASSWORD='[REDACTED]' ./scripts/bootstrap-server.sh
 
 - `web/**` 只构建部署 `web`。
 - `service/<domain>/api/**` -> `<domain>-api`；`service/<domain>/rpc/**` -> `<domain>-rpc`。
-- `service/gateway-ws/**`、`service/message-transfer/**` 直接映射同名服务。
+- `service/msggateway/**`、`service/msgtransfer/**` 直接映射同名服务。
 - `api/<domain>.api` 映射对应 API；`proto/**`、`go.mod`、`go.sum`、`Dockerfile`、`internal/**`、`common/**` 等共享输入 fail safe 到所有后端。
 - `deploy/k8s/**`、`.drone.yml`、`scripts/ci/**`、`scripts/deploy-k3s.sh` 是 config-only 部署入口；Markdown-only 不部署。
 - `db/migrations/*.sql` 或 `scripts/migrate-postgres.sh` 触发迁移。
@@ -79,7 +79,7 @@ Ingress 路由要点：
 - `/friends` -> `friends-api`
 - `/groups` -> `groups-api`
 - `/messages`、`/conversations`、`/api/feedback` -> `msg-api`
-- `/ws` -> `gateway-ws`
+- `/ws` -> `msggateway`
 - `/media` -> `media-api`
 - `/admin/*`、`/api/admin/*`、`/api/feedback` -> `admin-api`
 - `/` -> `web`

@@ -15,7 +15,7 @@ Gateway is the long-connection entry point for IM clients. The previous Gateway 
 
 ## Goals
 
-- Expose `GET /ws` as a WebSocket upgrade endpoint through `cmd/gateway-ws`.
+- Expose `GET /ws` as a WebSocket upgrade endpoint through `service/msggateway`.
 - Authenticate the WebSocket handshake with the existing HS256 JWT token format.
 - Accept token from `Authorization: Bearer <token>`; `?token=<token>` is available only when explicitly enabled in Gateway config.
 - Enforce an explicit browser `Origin` policy instead of relying on `gorilla/websocket` defaults.
@@ -37,7 +37,7 @@ Gateway is the long-connection entry point for IM clients. The previous Gateway 
 Entry point:
 
 ```text
-cmd/gateway-ws/main.go -f etc/gateway-ws.yaml
+service/msggateway/msggateway.go -f etc/msggateway.yaml
 ```
 
 Routes:
@@ -50,7 +50,7 @@ GET /ws
 Configuration reuses the existing flat API config loader:
 
 ```yaml
-Name: gateway-ws
+Name: msggateway
 Host: 0.0.0.0
 Port: 8084
 Auth:
@@ -84,7 +84,7 @@ Equivalent environment overrides use `GATEWAY_WS_*` names: `GATEWAY_WS_ALLOWED_O
 
 The k3s production deployment enables `GATEWAY_WS_ALLOW_QUERY_TOKEN=true` and `GatewayWS.AllowQueryToken=true` so the frontend can connect with browser-native WebSocket via `/ws?token=[REDACTED]`. It also sets `GATEWAY_WS_ALLOWED_ORIGINS=https://agenticim.xyz` in the production ConfigMap. This only changes handshake authentication; browser access is still governed by exact `AllowedOrigins`.
 
-Production should configure explicit browser origins. Empty `AllowedOrigins` is a same-origin fallback for direct deployments where the Gateway sees the same host and protocol as the browser `Origin`; it should not be relied on behind ingress, hostNetwork, TLS termination, or other proxy layers that can rewrite `Host` or `X-Forwarded-Proto`. `deploy/k8s/etc/gateway-ws.yaml` remains environment-driven through `GATEWAY_WS_ALLOWED_ORIGINS`, so gray/staging environments should set their own comma-separated public origin(s) without code changes.
+Production should configure explicit browser origins. Empty `AllowedOrigins` is a same-origin fallback for direct deployments where the Gateway sees the same host and protocol as the browser `Origin`; it should not be relied on behind ingress, hostNetwork, TLS termination, or other proxy layers that can rewrite `Host` or `X-Forwarded-Proto`. `deploy/k8s/etc/msggateway.yaml` remains environment-driven through `GATEWAY_WS_ALLOWED_ORIGINS`, so gray/staging environments should set their own comma-separated public origin(s) without code changes.
 
 ## Handshake
 

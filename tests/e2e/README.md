@@ -16,7 +16,7 @@ Run scripts from the repo root. Local mode assumes the relevant local backend se
 
 For local Vite mode, `http://127.0.0.1:5173` should be the Vite server for the current checkout. As a proxy sanity check, `POST /messages` through Vite without a token should return a `401` JSON envelope from `message-api`; a plain `404 page not found` response means the harness will fail before reaching the message regression.
 
-When default backend ports are occupied by another worktree, start the local backend on alternate ports with `scripts/dev-up.sh --services-only` and start Vite with the same `USER_API_PORT`, `AUTH_API_PORT`, `FRIENDS_API_PORT`, `MESSAGE_API_PORT`, `GATEWAY_WS_PORT`, and `GROUPS_API_PORT` environment variables. The local transfer worker reads the Postgres outbox directly and dispatches to `gateway-ws`, so the WebSocket regressions do not require a separate Kafka publisher process.
+When default backend ports are occupied by another worktree, start the local backend on alternate ports with `scripts/dev-up.sh --services-only` and start Vite with the same `USER_API_PORT`, `AUTH_API_PORT`, `FRIENDS_API_PORT`, `MESSAGE_API_PORT`, `GATEWAY_WS_PORT`, and `GROUPS_API_PORT` environment variables. The local transfer worker reads the Postgres outbox directly and dispatches to `msggateway`, so the WebSocket regressions do not require a separate Kafka publisher process.
 
 ## WebSocket live-push regression
 

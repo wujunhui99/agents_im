@@ -33,6 +33,8 @@ type APIConfig struct {
 	ObjectStorage    ObjectStorageConfig
 	PythonExecutor   PythonExecutorConfig
 	MailRPC          zrpc.RpcClientConf
+	// MsgRPC 是 msggateway → msg-rpc 的 gRPC 客户端配置（03 §9 A3）。
+	MsgRPC zrpc.RpcClientConf
 }
 
 type AdminBootstrapConfig struct {
@@ -431,6 +433,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		return cfg, err
 	}
 	cfg.MailRPC, err = mailRPCConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.MsgRPC, err = msgRPCConfigFromValues(values)
 	if err != nil {
 		return cfg, err
 	}
@@ -1276,6 +1282,35 @@ func mailRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, erro
 		cfg.Timeout = timeout
 	}
 	return ResolveMailRPCConfig(cfg), nil
+}
+
+func msgRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error) {
+	cfg := zrpc.RpcClientConf{
+		Target:    firstNonEmpty(values["MsgRPC.Target"], values["MsgRPCTarget"]),
+		Endpoints: brokerListFromValue(firstNonEmpty(values["MsgRPC.Endpoints"], values["MsgRPCEndpoints"])),
+	}
+	if value := firstNonEmpty(values["MsgRPC.Timeout"], values["MsgRPCTimeout"]); strings.TrimSpace(value) != "" {
+		timeout, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Timeout = timeout
+	}
+	return ResolveMsgRPCConfig(cfg), nil
+}
+
+// ResolveMsgRPCConfig 解析 msggateway → msg-rpc 客户端配置；env 兜底
+// MSG_RPC_TARGET / AGENTS_IM_MSG_RPC_TARGET（同 MailRPC 模式）。
+func ResolveMsgRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
+	cfg.Target = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Target)), os.Getenv("AGENTS_IM_MSG_RPC_TARGET"), os.Getenv("MSG_RPC_TARGET"))
+	if len(cfg.Endpoints) == 0 {
+		cfg.Endpoints = brokerListFromValue(firstNonEmpty(os.Getenv("AGENTS_IM_MSG_RPC_ENDPOINTS"), os.Getenv("MSG_RPC_ENDPOINTS")))
+	}
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = 5000
+	}
+	cfg.NonBlock = true
+	return cfg
 }
 
 func ResolveMailRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
