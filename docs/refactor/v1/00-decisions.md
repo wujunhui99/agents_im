@@ -62,7 +62,8 @@
 | `agent.trigger.v1`     | msgtransfer   | agent-rpc     | conversation_id | `agent-trigger`    |
 
 - 任何文档新增 topic 必须更新本表。
-- 现有 `message.events.v1`（当前 outbox 用）在 D1 完成后即可弃用。
+- `agent.trigger.v1` 的事件 schema 与判定分层见 D15。
+- 旧 `message.events.v1`（outbox 用）已随 03 §9 B3b（#495）连同 outbox 链路删除。
 
 ### D6 — Kafka wire format：`proto.Marshal(messagepb.MsgData)`
 - 与 OpenIM 一致，Kafka topic value 是 protobuf 二进制（`messagepb.MsgData`），不是 JSON。
@@ -157,6 +158,20 @@
 - **待定（实现期）**：refresh token 是否引入及 refresh 时 jti 沿用 / 轮换；`device_type` 取值集合与归一化。
 - **来源**：本轮 Claude × 用户讨论（2026-06-04）。
 - **影响文档**：01（`pkg/jwtauth` 入 pkg 清单）、02（auth 段：`AuthRuntime` / `ActiveSessionRepository` 退役，鉴权改 `pkg/jwtauth`）。
+
+### D15 — Agent 触发：单 topic + 判定分层（transfer 零依赖轻判，agent-rpc 终判）
+
+- **单 topic**：两类触发场景——①receiver 是 agent 账号（agent 收信）②会话开启 AI 托管（ai_host）——都走 `agent.trigger.v1`，**不拆双 topic**。理由：消费者同一个（agent-rpc）、处理代价同源（LLM）、顺序需求相同；同会话可能同时命中两类，拆开丢失 partition key（conversation_id）的会话内有序，幂等/防递归还要做两遍。事件以 **`trigger_kind`** 字段区分：`agent_recipient` | `candidate_hosting`。
+- **判定分层，分界线 = 是否需要查库**：
+  - **transfer 只做零依赖轻判**（全部用事件自带字段，不查库、不调 RPC）：`message_origin=ai` 且未标 `allow_recursive_trigger` → 不 produce（防递归第一道闸，从消费端前移到生产端）；`receiver_account_type=agent`（或群聊含 agent 成员）→ `trigger_kind=agent_recipient`；其余人类消息 → `trigger_kind=candidate_hosting`。
+  - **agent-rpc 消费端做终判**：`candidate_hosting` 查**自己域内**的 `conversation_ai_hosting` 表（goctl model，本地查询非跨服务），无托管即丢弃。
+- **事件携带优于下游反查**：msg-rpc 产生 `msg.toTransfer.v1` 事件时携带 `receiver_account_type` / 群聊 agent 成员（发消息时已知的事实，零成本），transfer 透传——**禁止 transfer 同步调 user-rpc / msg-rpc / agent-rpc 做触发判定**：消息主链不为旁路域加同步依赖（agent/user 域抖动不得影响全站消息）。
+- **托管配置 owner = agent 域**：`conversation_ai_hosting` 表终态归 `service/agent/rpc/internal/model`（D13）；#463 临时塞进 msg.proto 的 2 个 ai-hosting RPC 随 agent-rpc 上线迁出，msg-api 的 ai-hosting 路由改 BFF 调 agent-rpc。
+- **流量预过滤是未来旋钮，不是现在的设计**：candidate_hosting 在当前量级 = 全量人类消息，agent-rpc 一次本地索引查询丢弃，成本可忽略；量级需要时在 transfer 加"托管会话/agent 账号"Redis 缓存预过滤（只改发多发少，不改 topic/schema/消费逻辑）。
+- **agent-rpc 在 Kafka 上零生产面**：写回 IM 只经 imadapter 调 msg-rpc SendMessage（gRPC），AI 消息走与人类消息完全相同的链路。
+- **迁移路径**（与 B2 过渡态兼容，每步独立）：①toTransfer/trigger 事件加 `receiver_account_type`、`trigger_kind` 字段（向后兼容）→ ②transfer 加轻判 → ③agent-rpc 以新 consumer group `agent-trigger` 消费 → ④删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（同时解锁 A4 删 `internal/servicecontext/message`）。
+- **来源**：本轮 Claude × 用户讨论（2026-06-12）。
+- **影响文档**：03（§10 反向影响重写）、04（§4.2 目标链路 + §7 交集约定）、07（ai-hosting RPC 临时性注记）。
 
 ---
 
@@ -282,6 +297,7 @@
 | D12 RPC 间一律不互调（含不经 adapter） | ✅ 引用（§3 约束/§6 验收 E） | ✅ 原始（收紧 CP-3） | n/a | n/a | n/a | n/a | n/a |
 | D13 纯 goctl model，废 repository 层 | ✅ 修复（TD-7/§4/§5/§3） | ✅ 引用（聚合描述） | n/a | ✅ 修复（AG-3/AG-6） | n/a | ✅ 修复（XC-1） | n/a |
 | D14 无状态 JWT + Redis 单活 jti | ✅ 引用（pkg/jwtauth） | ✅ 修复（auth 鉴权段） | n/a | n/a | n/a | n/a | n/a |
+| D15 agent.trigger 单 topic + 判定分层 | n/a | n/a | ✅ 修复（§10） | ✅ 修复（§4.2/§7） | n/a | n/a | ✅ 引用（ai-hosting 归属） |
 
 `✅ 原始决策`：该决策的来源文档。
 `✅ 修复`：本次同步通过修改对齐。
