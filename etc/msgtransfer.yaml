@@ -5,9 +5,6 @@ DryRun: true
 StorageDriver: memory
 DataSource: ${DATABASE_URL}
 
-Consumer:
-  Driver: outbox
-
 Dispatcher:
   Driver: gateway
   GatewayEndpoint: http://127.0.0.1:8084
@@ -22,7 +19,8 @@ Observability:
   Host: 127.0.0.1
   Port: 8087
 
-# Kafka 写链路（03 §9 B1）。本地默认关闭；dev-up 起 redpanda 后可置 true。
+# Kafka 链路是唯一消费路径（03 §9 B3b）：本地由 dev-up/docker-compose 起 redpanda，
+# KAFKA_BROKERS 默认 localhost:19092；缺 brokers 启动失败。
 Kafka:
-  Enabled: false
+  Enabled: true
   Brokers: ${KAFKA_BROKERS}

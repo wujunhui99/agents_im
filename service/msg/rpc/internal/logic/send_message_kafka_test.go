@@ -36,7 +36,7 @@ func (f *fakePublisher) PublishEvent(_ context.Context, topic string, event mess
 // （svcCtx 不配任何 model——若误走 PG 路径会 nil panic，本身就是断言）。
 func TestSendMessageDirectKafkaPublishesSubmittedAndAcksWithoutSeq(t *testing.T) {
 	publisher := &fakePublisher{}
-	svcCtx := &svc.ServiceContext{KafkaEnabled: true, Producer: publisher}
+	svcCtx := &svc.ServiceContext{Producer: publisher}
 
 	resp, err := NewSendMessageLogic(context.Background(), svcCtx).SendMessage(&msg.SendMessageRequest{
 		SenderId:    "usr_alice",
@@ -94,7 +94,7 @@ func TestSendMessageDirectKafkaPublishesSubmittedAndAcksWithoutSeq(t *testing.T)
 
 func TestSendMessageDirectKafkaFailsClosedWhenPublishFails(t *testing.T) {
 	publisher := &fakePublisher{err: context.DeadlineExceeded}
-	svcCtx := &svc.ServiceContext{KafkaEnabled: true, Producer: publisher}
+	svcCtx := &svc.ServiceContext{Producer: publisher}
 
 	_, err := NewSendMessageLogic(context.Background(), svcCtx).SendMessage(&msg.SendMessageRequest{
 		SenderId:    "usr_alice",

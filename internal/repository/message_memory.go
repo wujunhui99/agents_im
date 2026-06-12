@@ -15,12 +15,10 @@ import (
 type MemoryMessageRepository struct {
 	mu               sync.RWMutex
 	nextMessageID    uint64
-	nextOutboxID     uint64
 	conversations    map[string]*memoryConversation
 	idempotency      map[string]messageIdempotencyRecord
 	readStates       map[string]int64
 	visibleStartSeqs map[string]int64
-	outbox           []OutboxEvent
 	now              func() time.Time
 }
 
@@ -68,7 +66,6 @@ func NewMemoryMessageRepository() *MemoryMessageRepository {
 }
 
 func (r *MemoryMessageRepository) CreateMessageIdempotent(ctx context.Context, input CreateMessageInput) (Message, bool, error) {
-	applyTraceContextToCreateMessageInput(ctx, &input)
 	if _, err := normalizeMessageOriginInput(&input); err != nil {
 		return Message{}, false, err
 	}
@@ -151,104 +148,7 @@ func (r *MemoryMessageRepository) CreateMessageIdempotent(ctx context.Context, i
 		r.ensureVisibleStartSeqLocked(userID, conversationID, visibleStartSeq)
 	}
 	r.setReadSeqLocked(input.SenderID, conversationID, message.Seq)
-	if err := r.appendMessageCreatedOutboxLocked(message, input, nowMillis); err != nil {
-		return Message{}, false, err
-	}
 	return message.Clone(), false, nil
-}
-
-func (r *MemoryMessageRepository) PollPending(_ context.Context, workerID string, limit int, lockDuration time.Duration) ([]OutboxEvent, error) {
-	workerID = strings.TrimSpace(workerID)
-	if workerID == "" {
-		return nil, apperror.InvalidArgument("worker_id is required")
-	}
-	if limit <= 0 {
-		limit = 100
-	}
-	if limit > 500 {
-		limit = 500
-	}
-	if lockDuration <= 0 {
-		lockDuration = 30 * time.Second
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	now := r.now().UTC()
-	lockedUntil := now.Add(lockDuration)
-	events := make([]OutboxEvent, 0, limit)
-	for i := range r.outbox {
-		if len(events) >= limit {
-			break
-		}
-		event := &r.outbox[i]
-		if event.Status != OutboxStatusPending {
-			continue
-		}
-		if event.NextAttemptAt.After(now) {
-			continue
-		}
-		if !event.LockedUntil.IsZero() && event.LockedUntil.After(now) {
-			continue
-		}
-		event.LockedBy = workerID
-		event.LockedUntil = lockedUntil
-		event.UpdatedAt = now
-		events = append(events, event.Clone())
-	}
-	return events, nil
-}
-
-func (r *MemoryMessageRepository) MarkPublished(_ context.Context, eventID string, workerID string) error {
-	workerID = strings.TrimSpace(workerID)
-	if workerID == "" {
-		return apperror.InvalidArgument("worker_id is required")
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	now := r.now().UTC()
-	event, err := r.lockedOutboxEventLocked(eventID, workerID, now)
-	if err != nil {
-		return err
-	}
-	event.Status = OutboxStatusPublished
-	event.LockedBy = ""
-	event.LockedUntil = time.Time{}
-	event.PublishedAt = now
-	event.UpdatedAt = now
-	return nil
-}
-
-func (r *MemoryMessageRepository) MarkFailed(_ context.Context, eventID string, workerID string, failure OutboxFailure) error {
-	workerID = strings.TrimSpace(workerID)
-	if workerID == "" {
-		return apperror.InvalidArgument("worker_id is required")
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	now := r.now().UTC()
-	event, err := r.lockedOutboxEventLocked(eventID, workerID, now)
-	if err != nil {
-		return err
-	}
-	event.AttemptCount++
-	event.LastError = strings.TrimSpace(failure.LastError)
-	event.LockedBy = ""
-	event.LockedUntil = time.Time{}
-	event.UpdatedAt = now
-	if failure.NextAttemptAt.IsZero() {
-		event.Status = OutboxStatusFailed
-		event.NextAttemptAt = now
-		return nil
-	}
-	event.Status = OutboxStatusPending
-	event.NextAttemptAt = failure.NextAttemptAt.UTC()
-	return nil
 }
 
 func (r *MemoryMessageRepository) GetMessages(_ context.Context, conversationID string, fromSeq, toSeq int64, limit int, order string) ([]Message, bool, int64, error) {
@@ -627,48 +527,6 @@ func (r *MemoryMessageRepository) messagesInRangeLocked(conversation *memoryConv
 		}
 	}
 	return messages, isEnd, nextSeq, nil
-}
-
-func (r *MemoryMessageRepository) appendMessageCreatedOutboxLocked(message Message, input CreateMessageInput, nowMillis int64) error {
-	payload, err := messageCreatedOutboxPayload(message, input)
-	if err != nil {
-		return err
-	}
-	now := time.UnixMilli(nowMillis).UTC()
-	r.nextOutboxID++
-	r.outbox = append(r.outbox, OutboxEvent{
-		EventID:        fmt.Sprintf("outbox_%06d", r.nextOutboxID),
-		EventType:      OutboxEventTypeMessageCreated,
-		AggregateType:  OutboxAggregateTypeMessage,
-		AggregateID:    message.ServerMsgID,
-		ConversationID: message.ConversationID,
-		ServerMsgID:    message.ServerMsgID,
-		Seq:            message.Seq,
-		Payload:        payload,
-		Status:         OutboxStatusPending,
-		NextAttemptAt:  now,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	})
-	return nil
-}
-
-func (r *MemoryMessageRepository) lockedOutboxEventLocked(eventID string, workerID string, now time.Time) (*OutboxEvent, error) {
-	eventID = strings.TrimSpace(eventID)
-	if eventID == "" {
-		return nil, apperror.InvalidArgument("event_id is required")
-	}
-	for i := range r.outbox {
-		event := &r.outbox[i]
-		if event.EventID != eventID {
-			continue
-		}
-		if event.Status != OutboxStatusPending || event.LockedBy != workerID || event.LockedUntil.IsZero() || !event.LockedUntil.After(now) {
-			return nil, apperror.NotFound("outbox event lock not found")
-		}
-		return event, nil
-	}
-	return nil, apperror.NotFound("outbox event not found")
 }
 
 func inputConversationID(input CreateMessageInput) (string, error) {

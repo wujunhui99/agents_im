@@ -92,17 +92,6 @@ func NewMediaRepositoryForStorage(driver string, dataSource string) (MediaReposi
 	return NewPostgresMediaRepository(appconfig.ResolveDataSource(dataSource))
 }
 
-func NewOutboxRepositoryForStorage(driver string, dataSource string) (OutboxRepository, error) {
-	storageDriver, err := repositoryStorageDriver(driver)
-	if err != nil {
-		return nil, err
-	}
-	if storageDriver == appconfig.StorageDriverMemory {
-		return NewMemoryMessageRepository(), nil
-	}
-	return NewPostgresMessageRepository(appconfig.ResolveDataSource(dataSource))
-}
-
 func NewAgentRepositoryForStorage(driver string, dataSource string) (AgentRepository, error) {
 	storageDriver, err := repositoryStorageDriver(driver)
 	if err != nil {

@@ -69,7 +69,6 @@ func NewPostgresMessageRepositoryFromConn(conn sqlx.SqlConn) *PostgresMessageRep
 }
 
 func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context, input CreateMessageInput) (Message, bool, error) {
-	applyTraceContextToCreateMessageInput(ctx, &input)
 	if _, err := normalizeMessageOriginInput(&input); err != nil {
 		return Message{}, false, err
 	}
@@ -113,9 +112,6 @@ func (r *PostgresMessageRepository) CreateMessageIdempotent(ctx context.Context,
 			return err
 		}
 		if err := updateConversationThreadAfterMessage(ctx, session, conversationID, messageRow.ServerMsgID, nextSeq, sendTime); err != nil {
-			return err
-		}
-		if err := insertMessageOutboxEvent(ctx, session, messageRow, input); err != nil {
 			return err
 		}
 

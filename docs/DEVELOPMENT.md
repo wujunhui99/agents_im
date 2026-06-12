@@ -110,7 +110,7 @@ ADMIN_API_PORT=18088 \
 make frontend-start FRONTEND_HOST=127.0.0.1 FRONTEND_PORT=5173
 ```
 
-Local `message-transfer` uses the Postgres outbox consumer by default and dispatches to `msggateway`, so HTTP `POST /messages` can produce live WebSocket pushes without requiring a separate Kafka publisher process.
+The local message chain mirrors production (03 §9 B3b single rail): `docker compose up -d redpanda` provides Kafka, msg-rpc publishes `msg.toTransfer.v1`, and `msgtransfer` allocates seqs, persists to Postgres, and dispatches `message_received` to `msggateway`. msg-rpc and msgtransfer fail fast at startup when `KAFKA_BROKERS` (default `localhost:19092`) is unreachable or unset.
 
 ## Single-machine E2E Smoke Command
 

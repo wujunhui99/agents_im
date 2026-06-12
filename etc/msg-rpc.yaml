@@ -36,7 +36,8 @@ PythonExecutor:
     ServiceAccountName:
     RuntimeClassName:
 
-# Kafka 写路径（03 §9 B2，flag MSG_DIRECT_KAFKA 可经环境变量覆盖）。
+# Kafka 是唯一写链路（03 §9 B3b 退役旧 PG 同步写）：缺 brokers 启动失败；
+# 本地 redpanda 由 dev-up/docker-compose 提供（KAFKA_BROKERS 默认 localhost:19092）。
 Kafka:
-  Enabled: false
+  Enabled: true
   Brokers: ${KAFKA_BROKERS}

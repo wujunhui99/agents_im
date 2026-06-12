@@ -28,7 +28,6 @@ type ServiceContext struct {
 	AgentHostingRepo  repository.AgentConversationHostingRepository
 	AIHostingRepo     repository.ConversationAIHostingRepository
 	GroupMembers      logic.GroupMemberLister
-	OutboxRepo        repository.OutboxRepository
 	AgentAuditLogic   *logic.AgentAuditLogic
 	AgentAuditRepo    repository.AgentAuditRepository
 	AgentResolver     logic.AgentAccountExistenceChecker
@@ -79,7 +78,6 @@ func NewServiceContextWithFeedback(repo repository.MessageRepository, mediaRepo 
 		AgentHostingRepo: agentHostingRepo,
 		AIHostingRepo:    aiHostingRepo,
 		GroupMembers:     groups,
-		OutboxRepo:       outboxRepositoryFromMessageRepo(repo),
 		AgentAuditLogic:  logic.NewAgentAuditLogic(agentAuditRepo),
 		AgentAuditRepo:   agentAuditRepo,
 	}
@@ -215,11 +213,6 @@ func llmObservabilityConfig(obs config.LLMObservabilityConfig) llmobs.Config {
 			SecretKey: obs.Langfuse.SecretKey,
 		},
 	}
-}
-
-func outboxRepositoryFromMessageRepo(repo repository.MessageRepository) repository.OutboxRepository {
-	outboxRepo, _ := repo.(repository.OutboxRepository)
-	return outboxRepo
 }
 
 func newConversationAIHostingToolProvider(registryRepo repository.AgentRegistryRepository, executor pythonexec.Executor) (runtimetools.Provider, error) {

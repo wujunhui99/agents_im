@@ -36,7 +36,7 @@ func (s *kafkaModeSender) SendMessage(ctx context.Context, req business.SendMess
 	return fn(ctx, req)
 }
 
-// BindAgentResponseSender 注入 Kafka 模式的 AI 写回实现（仅 KafkaEnabled 时有承载体）。
+// BindAgentResponseSender 注入 AI 写回实现（Kafka 唯一写链路，03 §9 B3b）。
 func (s *ServiceContext) BindAgentResponseSender(fn AgentSendFunc) {
 	if s.agentSender != nil {
 		s.agentSender.bind(fn)

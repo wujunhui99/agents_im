@@ -57,14 +57,6 @@ func TestGroupExplicitTargetAgentCreatesOneRunAndMessageServiceReply(t *testing.
 	if aiMessage.AllowRecursiveTrigger {
 		t.Fatalf("group agent response should suppress recursion by default: %+v", aiMessage)
 	}
-
-	outbox, err := h.messageRepo.PollPending(ctx, "group-agent-test-worker", 10, time.Second)
-	if err != nil {
-		t.Fatalf("poll outbox: %v", err)
-	}
-	if len(outbox) != 2 {
-		t.Fatalf("outbox events = %d, want human + ai message.created events", len(outbox))
-	}
 }
 
 func TestGroupMessageWithoutExplicitTargetDoesNotTriggerAgentNoise(t *testing.T) {
