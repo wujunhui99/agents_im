@@ -439,7 +439,7 @@ func (h *Handler) do(ctx context.Context, channelID int, val *batcher.Msg[Consum
 | `BatchInsertChat2Cache` 后行为   | 写 Redis、produce toMongo、produce toPush | 写 Redis、produce toPostgres、produce toPush  |
 | seq cache 实现                   | `seqConversationCacheRedis`           | 同上，复用 `pkg/idgen`（00-decisions D10）或新建 |
 | message cache                    | `msgCache.SetMessageBySeqs`，bucket 100 | 同上                                          |
-| Agent 触发                       | 无（OpenIM 不带 Agent）               | 在 categorize 后增加分支：零依赖轻判（origin/receiver_account_type）后 produce `agent.trigger.v1`，需查库的终判在 agent-rpc 消费端（§10 / D15） |
+| Agent 触发                       | 无（OpenIM 不带 Agent）               | 在 categorize 后增加分支：origin 闸门（防递归）后 produce `agent.trigger.v1`，全部判定在 agent-rpc 消费端查自己域内表（§10 / D15） |
 
 ---
 
@@ -628,41 +628,41 @@ OpenIM 的 msggateway 本地维护 `userMap`（`user_map.go`），不依赖 Redi
 
 ## 10. 对 04-agent.md 的反向影响
 
-> 2026-06-12 定稿（00-decisions **D15**）：触发判定**分层**——transfer 只做零依赖轻判，
-> 需要查库的终判留在配置 owner（agent-rpc）。早期版本"categorize 查 hosting 配置 / 解析 @"
-> 的描述作废：那会给消息主链引入 agent 域同步依赖（agent 侧抖动拖累全站消息），且
-> hosting 配置表终态归 agent 域（D13），transfer 无权也不该反查。
+> 2026-06-12 定稿（00-decisions **D15**，同日 #499 修正）：触发判定**分层**——transfer 只保留
+> 零查询的 origin 闸门，需要查库的终判全部留在数据 owner（agent-rpc）。两个早期表述作废：
+> ①"categorize 查 hosting 配置 / 解析 @"——给消息主链引入 agent 域同步依赖；②"msg-rpc 事件
+> 携带 receiver_account_type、transfer 打 trigger_kind 标"——msg-rpc 并不知道 receiver 账号
+> 类型（accounts 归 user 域），携带它 = 主链反查换位置。
 
 Agent 触发链路（文档 04 §4.2）：
 
 ```
-msg-rpc SendMessage：toTransfer 事件携带 receiver_account_type / 群聊 agent 成员
-  （发消息时已知的事实，事件携带优于下游反查，禁止 transfer 反查 user/msg/agent RPC）
+msg-rpc SendMessage → msg.toTransfer.v1（事件 schema 不为触发判定加任何字段）
         ↓
-msgtransfer categorize（dedup + seq 之后，与 toPostgres/toPush 同批）零依赖轻判：
-  - message_origin=ai 且未标 allow_recursive_trigger → 不 produce（防递归第一道闸）
-  - receiver_account_type=agent（或群聊含 agent 成员）→ trigger_kind=agent_recipient
-  - 其余人类消息 → trigger_kind=candidate_hosting
-  → produce agent.trigger.v1（单 topic，key=conversation_id，事件带 seq + trigger_kind）
+msgtransfer categorize（dedup + seq 之后，与 toPostgres/toPush 同批）：
+  唯一闸门：message_origin=ai 且未标 allow_recursive_trigger → 不 produce
+  （防递归第一道闸；origin 是 msg-rpc 写回时自带字段，零查询）
+  其余消息全部 produce agent.trigger.v1（单 topic，key=conversation_id，事件带 seq），不打标
         ↓
-agent-rpc（consumer group agent-trigger，Kafka 上零生产面）终判：
-  - agent_recipient → 直接跑 RunOrchestrator
-  - candidate_hosting → 查自己域内 conversation_ai_hosting（本地 model）→ 无托管即丢弃
+agent-rpc（consumer group agent-trigger，Kafka 上零生产面）终判，查的全是自己域内的表：
+  - receiver / 群成员 ∈ agents 注册表（本地 model）→ agent 收信触发
+  - conversation ∈ conversation_ai_hosting（本地 model）→ 托管触发
+  - 都不命中 → 丢弃；触发类型为消费端内部推导概念，不进事件契约
   - 幂等：trigger event_id 记 agent run audit，重复消费不重跑
   → runtime.Run（LLM + tools）→ imadapter 调 msg-rpc SendMessage 写回
         ↓
 AI 写回消息走与人类消息完全相同的 Kafka 链路（无特殊路径），
-transfer 轻判因 origin=ai 拦下 → 递归终止；trigger event 带 source_agent_run_id 兜底幂等。
+transfer origin 闸门拦下 → 递归终止；trigger event 带 source_agent_run_id 兜底幂等。
 ```
 
-不拆双 topic（agent 收信 / 会话托管两类场景共用 `agent.trigger.v1`，`trigger_kind` 字段区分）：
-消费者同一个、处理代价同源、顺序需求相同；同会话可能同时命中两类，拆开丢失
-conversation_id 分区键的会话内有序。candidate_hosting 当前 ≈ 全量人类消息——这是有意的：
-量级需要时在 transfer 加托管会话/agent 账号的 Redis 缓存预过滤（只改发多发少，不动结构）。
+不拆双 topic（agent 收信 / 会话托管两类场景共用 `agent.trigger.v1`）：消费者同一个、处理
+代价同源、顺序需求相同；同会话可能同时命中两类，拆开丢失 conversation_id 分区键的会话内
+有序。topic 上 ≈ 全量人类消息——这是有意的：agent-rpc 两次本地索引查询后丢弃，成本可忽略；
+量级需要时在 transfer 加托管会话/agent 账号集合的 Redis 缓存预过滤（只改发多发少，不动结构）。
 
 现状（B1/B2 过渡态）：trigger 对每条存储消息无条件 produce、判定全在消费端（msg-rpc 回流
-AgentHook）。迁移按 D15 四步：事件加字段 → transfer 轻判 → agent-rpc 新 group 消费 →
-删 msg-rpc 回流 consumer 与 hosting runtime 接线（解锁 A4）。
+AgentHook）。迁移按 D15 三步：transfer 加 origin 闸门 → agent-rpc 新 group 消费（两个本地
+终判）→ 删 msg-rpc 回流 consumer 与 hosting runtime 接线（解锁 A4）。事件 schema 零变更。
 
 ---
 
