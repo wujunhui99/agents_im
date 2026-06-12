@@ -1,28 +1,23 @@
+// single-machine：进程内冒烟 monolith 账号/消息 logic 的核心链路
+// （注册 → 加好友 → REST 语义发消息 → 拉取）。
+// 03 §9 A3 起 WebSocket gateway 不再 in-process 装配 monolith（4 个 ws command
+// 走 msg-rpc gRPC），ws 行为由 service/msggateway/internal/ws 测试覆盖，
+// 本冒烟不再包含 ws leg。
 package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
 	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
-	"github.com/wujunhui99/agents_im/internal/gateway"
-	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
-	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
-	"github.com/wujunhui99/agents_im/pkg/config"
 )
 
 func main() {
@@ -73,55 +68,11 @@ func main() {
 		fail("pull did not return sent REST message")
 	}
 
-	wsServer := gatewayws.NewServer(
-		gatewaysvc.NewServiceContext(messageLogic, testAuth(authSecret)),
-		gatewayws.WithSessionStore(sessionStore),
-	)
-	httpServer := httptest.NewServer(wsServer)
-	defer httpServer.Close()
-
-	aliceConn := dial(httpServer.URL, alice.Token)
-	defer aliceConn.Close()
-	bobConn := dial(httpServer.URL, bob.Token)
-	defer bobConn.Close()
-
-	ackCh := readMatching(aliceConn, func(frame map[string]any) bool {
-		return frame["command"] == gateway.CommandSendMessage || frame["type"] == gateway.CommandSendMessage
-	})
-	pushCh := readMatching(bobConn, func(frame map[string]any) bool { return frame["type"] == delivery.EventMessageReceived })
-	must("write websocket send", aliceConn.WriteJSON(map[string]any{
-		"requestId": "single-process-ws-send",
-		"command":   gateway.CommandSendMessage,
-		"payload": map[string]any{
-			"chatType":    logic.MessageChatTypeSingle,
-			"receiverId":  bob.UserID,
-			"clientMsgId": unique("ws"),
-			"contentType": logic.MessageContentTypeText,
-			"content":     "hello from single process websocket e2e",
-		},
-	}))
-
-	ack := <-ackCh
-	push := <-pushCh
-	if ack["status"] != gateway.AckStatusOK {
-		fail(fmt.Sprintf("unexpected websocket ack: %+v", ack))
-	}
-	ackPayload := ack["payload"].(map[string]any)
-	ackMessage := ackPayload["message"].(map[string]any)
-	pushData := push["data"].(map[string]any)
-	if pushData["server_msg_id"] != ackMessage["serverMsgId"] {
-		fail(fmt.Sprintf("push server_msg_id mismatch: ack=%+v push=%+v", ackMessage, pushData))
-	}
-
 	fmt.Println("single-process e2e passed")
 	fmt.Printf("alice_user_id=%s\n", alice.UserID)
 	fmt.Printf("bob_user_id=%s\n", bob.UserID)
 	fmt.Printf("rest_conversation_id=%s\n", restSent.Message.ConversationID)
-	fmt.Printf("ws_server_msg_id=%s\n", ackMessage["serverMsgId"])
-}
-
-func testAuth(secret string) config.JWTAuthConfig {
-	return config.JWTAuthConfig{AccessSecret: secret, AccessExpire: 86400}
+	fmt.Printf("rest_server_msg_id=%s\n", restSent.Message.ServerMsgID)
 }
 
 type e2eRegistrationMailer struct{}
@@ -132,46 +83,6 @@ func (e2eRegistrationMailer) SendTemplateEmail(context.Context, mailadapter.Send
 
 func unique(prefix string) string {
 	return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
-}
-
-func dial(serverURL string, token string) *websocket.Conn {
-	u, err := url.Parse(serverURL)
-	must("parse server url", err)
-	u.Scheme = "ws"
-	u.Path = "/ws"
-	header := http.Header{}
-	header.Set("Authorization", "Bearer "+token)
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), header)
-	must("dial websocket", err)
-	return conn
-}
-
-func readMatching(conn *websocket.Conn, predicate func(map[string]any) bool) <-chan map[string]any {
-	ch := make(chan map[string]any, 1)
-	go func() {
-		deadline := time.Now().Add(5 * time.Second)
-		for time.Now().Before(deadline) {
-			_ = conn.SetReadDeadline(deadline)
-			var frame map[string]any
-			if err := conn.ReadJSON(&frame); err != nil {
-				fail(fmt.Sprintf("read websocket frame: %v", err))
-			}
-			if predicate(frame) {
-				ch <- normalizeJSON(frame)
-				return
-			}
-		}
-		fail("timed out waiting for websocket frame")
-	}()
-	return ch
-}
-
-func normalizeJSON(frame map[string]any) map[string]any {
-	raw, err := json.Marshal(frame)
-	must("marshal frame", err)
-	var normalized map[string]any
-	must("unmarshal frame", json.Unmarshal(raw, &normalized))
-	return normalized
 }
 
 func must(label string, err error) {

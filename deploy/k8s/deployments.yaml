@@ -274,17 +274,17 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gateway-ws
+  name: msggateway
   namespace: agents-im
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: gateway-ws
+      app: msggateway
   template:
     metadata:
       labels:
-        app: gateway-ws
+        app: msggateway
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: "/metrics"
@@ -293,10 +293,10 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
-        - name: gateway-ws
-          image: ghcr.io/wujunhui99/agents_im/gateway-ws:__IMAGE_TAG_REQUIRED__
+        - name: msggateway
+          image: ghcr.io/wujunhui99/agents_im/msggateway:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/gateway-ws.yaml"]
+          args: ["-f", "/config/msggateway.yaml"]
           envFrom:
             - configMapRef:
                 name: agents-im-config

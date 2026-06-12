@@ -29,7 +29,7 @@
 
 ```text
 api/                 go-zero REST API 定义
-service/             各微服务入口与实现（user/auth/friends/groups/agent/msg API、RPC、gateway-ws、message-transfer），main 在 service/<...> 目录
+service/             各微服务入口与实现（user/auth/friends/groups/agent/msg API、RPC、msggateway、msgtransfer），main 在 service/<...> 目录
 config / etc/        本地和服务配置
 internal/            核心业务逻辑、仓储、网关、Agent runtime、transfer worker 等（消息域 REST/RPC 已迁 service/msg）
 db/migrations/       PostgreSQL schema 迁移

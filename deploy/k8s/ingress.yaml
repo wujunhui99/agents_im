@@ -149,7 +149,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: gateway-ws
+                name: msggateway
                 port:
                   number: 8084
           - path: /

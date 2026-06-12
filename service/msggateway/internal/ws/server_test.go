@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -16,12 +14,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	"github.com/wujunhui99/agents_im/internal/gateway"
-	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
-	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
-	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
-	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
+	"github.com/wujunhui99/agents_im/common/share/gateway"
+	"github.com/wujunhui99/agents_im/common/share/gateway/delivery"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/presence"
 )
@@ -346,72 +340,54 @@ func TestGatewayInternalUserPresenceEndpointReportsOnlineState(t *testing.T) {
 	}
 }
 
-func TestSendMessagePushesSingleReceiverOnly(t *testing.T) {
-	server, recorder := newCommandTestServer(nil)
+func TestSendMessageCommandReturnsACKWithoutLocalFanout(t *testing.T) {
+	// 03 §9 A3：send 后 gateway 不做本地 fanout——message_received 由
+	// msgtransfer 经 /internal/delivery/conversation 下发，包括 sender 自己。
+	server, recorder := newCommandTestServer()
 	resp := dispatchSendCommand(t, server, "usr_sender", "req-single-push", map[string]interface{}{
-		"chatType":    logic.MessageChatTypeSingle,
+		"chatType":    "single",
 		"receiverId":  "usr_receiver",
 		"clientMsgId": "client-single-push",
-		"contentType": logic.MessageContentTypeText,
+		"contentType": "text",
 		"content":     "hello receiver",
 	})
 
-	assertSendOK(t, resp, false)
-	calls := recorder.Calls()
-	if len(calls) != 1 {
-		t.Fatalf("delivery calls = %d, want 1", len(calls))
+	sent := assertSendOK(t, resp, false)
+	if sent.Message.SenderID != "usr_sender" || sent.Message.ReceiverID != "usr_receiver" {
+		t.Fatalf("send ack message mismatch: %+v", sent.Message)
 	}
-	if !reflect.DeepEqual(calls[0].recipientUserIDs, []string{"usr_receiver"}) {
-		t.Fatalf("single push recipients = %+v, want [usr_receiver]", calls[0].recipientUserIDs)
-	}
-	if calls[0].event.Data.SenderID != "usr_sender" || calls[0].event.Data.ReceiverID != "usr_receiver" {
-		t.Fatalf("single push message mismatch: %+v", calls[0].event.Data)
+	if calls := recorder.Calls(); len(calls) != 0 {
+		t.Fatalf("delivery calls = %d, want 0 (no gateway-local fanout after A3)", len(calls))
 	}
 }
 
-func TestSendMessagePushesGroupActiveMembersExceptSender(t *testing.T) {
-	groups := &commandTestGroupLister{
-		members: []logic.GroupMemberInfo{
-			{UserID: "usr_sender", State: "active"},
-			{UserID: "usr_member_b", State: "active"},
-			{UserID: "usr_member_c", State: "active"},
-			{UserID: "usr_sender", State: "active"},
-			{UserID: "usr_left", State: "left"},
-		},
-	}
-	server, recorder := newCommandTestServer(groups)
-	resp := dispatchSendCommand(t, server, "usr_sender", "req-group-push", map[string]interface{}{
-		"chatType":    logic.MessageChatTypeGroup,
-		"groupId":     "grp_ws_push",
-		"clientMsgId": "client-group-push",
-		"contentType": logic.MessageContentTypeText,
-		"content":     "hello group",
+func TestSendMessageCommandForwardsAuthenticatedSenderToBackend(t *testing.T) {
+	server, _ := newCommandTestServer()
+	backend := server.backend.(*fakeBackend)
+	dispatchSendCommand(t, server, "usr_sender", "req-sender-bind", map[string]interface{}{
+		"chatType":    "single",
+		"receiverId":  "usr_receiver",
+		"clientMsgId": "client-sender-bind",
+		"contentType": "text",
+		"content":     "hello",
 	})
 
-	sent := assertSendOK(t, resp, false)
-	calls := recorder.Calls()
-	if len(calls) != 1 {
-		t.Fatalf("delivery calls = %d, want 1", len(calls))
+	sends := backend.SendCalls()
+	if len(sends) != 1 {
+		t.Fatalf("backend send calls = %d, want 1", len(sends))
 	}
-	if calls[0].conversationID != sent.Message.ConversationID {
-		t.Fatalf("conversation id = %q, want %q", calls[0].conversationID, sent.Message.ConversationID)
-	}
-	sort.Strings(calls[0].recipientUserIDs)
-	if !reflect.DeepEqual(calls[0].recipientUserIDs, []string{"usr_member_b", "usr_member_c"}) {
-		t.Fatalf("group push recipients = %+v, want active members except sender", calls[0].recipientUserIDs)
-	}
-	if calls[0].event.Data.GroupID != "grp_ws_push" || calls[0].event.Data.ReceiverID != "" {
-		t.Fatalf("group push message mismatch: %+v", calls[0].event.Data)
+	if sends[0].SenderID != "usr_sender" {
+		t.Fatalf("backend sender = %q, want authenticated user", sends[0].SenderID)
 	}
 }
 
-func TestSendMessageDeduplicatedRetryDoesNotPushAgain(t *testing.T) {
-	server, recorder := newCommandTestServer(nil)
+func TestSendMessageDeduplicatedRetryKeepsACKShape(t *testing.T) {
+	server, recorder := newCommandTestServer()
 	payload := map[string]interface{}{
-		"chatType":    logic.MessageChatTypeSingle,
+		"chatType":    "single",
 		"receiverId":  "usr_receiver",
 		"clientMsgId": "client-dedup-push",
-		"contentType": logic.MessageContentTypeText,
+		"contentType": "text",
 		"content":     "hello once",
 	}
 
@@ -420,9 +396,8 @@ func TestSendMessageDeduplicatedRetryDoesNotPushAgain(t *testing.T) {
 	second := dispatchSendCommand(t, server, "usr_sender", "req-dedup-second", payload)
 	assertSendOK(t, second, true)
 
-	calls := recorder.Calls()
-	if len(calls) != 1 {
-		t.Fatalf("delivery calls after deduplicated retry = %d, want 1", len(calls))
+	if calls := recorder.Calls(); len(calls) != 0 {
+		t.Fatalf("delivery calls after sends = %d, want 0", len(calls))
 	}
 }
 
@@ -435,23 +410,14 @@ func newWSTestServer(t *testing.T, opts ...ServerOption) (*Server, *httptest.Ser
 	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND", "")
 	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST", "")
 
-	messageContext := messagesvc.NewServiceContextWithAuth(
-		repository.NewMemoryMessageRepository(),
-		nil,
-		nil,
-		testAuthConfig(),
-	)
-	serviceContext := gatewaysvc.NewServiceContext(messageContext.MessageLogic, testAuthConfig())
-	app := NewServer(serviceContext, opts...)
+	app := NewServer(testAuthConfig(), newFakeBackend(), opts...)
 	server := httptest.NewServer(app)
 	return app, server, server.Close
 }
 
-func newCommandTestServer(groups logic.GroupMemberLister) (*Server, *recordingDeliveryDispatcher) {
+func newCommandTestServer() (*Server, *recordingDeliveryDispatcher) {
 	recorder := &recordingDeliveryDispatcher{}
-	messageContext := messagesvc.NewServiceContext(repository.NewMemoryMessageRepository(), nil, groups)
-	serviceContext := gatewaysvc.NewServiceContext(messageContext.MessageLogic, config.DefaultJWTAuthConfig())
-	return NewServer(serviceContext, WithDeliveryDispatcher(recorder)), recorder
+	return NewServer(config.DefaultJWTAuthConfig(), newFakeBackend(), WithDeliveryDispatcher(recorder)), recorder
 }
 
 func dispatchSendCommand(t *testing.T, server *Server, userID string, requestID string, payload map[string]interface{}) responseFrame {
@@ -618,17 +584,6 @@ func responseStatus(resp *http.Response) int {
 		return 0
 	}
 	return resp.StatusCode
-}
-
-type commandTestGroupLister struct {
-	members []logic.GroupMemberInfo
-}
-
-func (l *commandTestGroupLister) ListMembers(_ context.Context, req logic.ListMembersRequest) (logic.ListMembersResponse, error) {
-	return logic.ListMembersResponse{
-		GroupID: req.GroupID,
-		Members: append([]logic.GroupMemberInfo(nil), l.members...),
-	}, nil
 }
 
 type recordingDeliveryDispatcher struct {

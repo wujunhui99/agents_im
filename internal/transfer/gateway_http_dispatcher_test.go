@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
+	"github.com/wujunhui99/agents_im/common/share/gateway/delivery"
 )
 
 func TestGatewayHTTPDispatcherPostsConversationDelivery(t *testing.T) {

@@ -12,7 +12,7 @@ BACKEND_SERVICES = [
     "auth-api",
     "friends-api",
     "msg-api",
-    "gateway-ws",
+    "msggateway",
     "groups-api",
     "agent-api",
     "admin-api",
@@ -80,18 +80,18 @@ API_BACKEND_SERVICES = [
 
 # Non-go-zero services whose main lives directly under service/<name>/ (cmd/ removed).
 FLAT_SERVICE_DIRS = {
-    "service/gateway-ws/": "gateway-ws",
+    "service/msggateway/": "msggateway",
     "service/msgtransfer/": "msgtransfer",
 }
 
 # message-api 已退役（#463）：REST 入口归 service/msg/api，AI 托管运行时随
-# internal/servicecontext/message 由 gateway-ws 与 msg-rpc 消费（待 03 §9 B1 迁 msgtransfer）。
+# internal/servicecontext/message 仅由 msg-rpc 消费（03 §9 A3 后 msggateway 走 gRPC，待 B1 迁 msgtransfer）。
 INTERNAL_DOMAIN_SERVICE_PREFIXES = {
     "internal/handler/admin/": ["admin-api"],
     # service/admin/{api,rpc}/** 由 service/<domain>/<kind> 通用规则精确路由；
     # 这里兜底任何 service/admin/ 顶层散文件，两者都重建。
     "service/admin/": ["admin-api", "admin-rpc"],
-    "internal/servicecontext/message/": ["gateway-ws", "msg-rpc"],
+    "internal/servicecontext/message/": ["msg-rpc"],
 }
 
 INTERNAL_EXACT_SERVICE_PATHS = {}

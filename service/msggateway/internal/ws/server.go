@@ -17,10 +17,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	"github.com/wujunhui99/agents_im/internal/gateway"
-	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
-	"github.com/wujunhui99/agents_im/internal/logic"
-	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
+	"github.com/wujunhui99/agents_im/common/share/gateway"
+	"github.com/wujunhui99/agents_im/common/share/gateway/delivery"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/observability"
@@ -40,7 +38,7 @@ type Server struct {
 	auth         config.JWTAuthConfig
 	tokenManager token.Manager
 	sessions     middleware.SessionStore
-	messageLogic *logic.MessageLogic
+	backend      MessageBackend
 	connections  *ConnectionManager
 	dispatcher   delivery.Dispatcher
 	presence     presence.PresenceStore
@@ -111,20 +109,14 @@ type heartbeatData struct {
 	ServerTime   int64  `json:"server_time"`
 }
 
-func NewServer(serviceContext *gatewaysvc.ServiceContext, opts ...ServerOption) *Server {
-	auth := config.DefaultJWTAuthConfig()
-	var messageLogic *logic.MessageLogic
-	if serviceContext != nil {
-		auth = serviceContext.Auth
-		messageLogic = serviceContext.MessageLogic
-	}
+func NewServer(auth config.JWTAuthConfig, backend MessageBackend, opts ...ServerOption) *Server {
 	auth = normalizeAuth(auth)
 	wsConfig, wsConfigErr := config.ResolveGatewayWSConfig(config.GatewayWSConfig{})
 
 	server := &Server{
 		auth:         auth,
 		tokenManager: token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second),
-		messageLogic: messageLogic,
+		backend:      backend,
 		connections:  NewConnectionManager(),
 		presence:     presence.NewMemoryStore(),
 		presenceTTL:  presence.HeartbeatTTL(config.DefaultPresenceConfig()),
@@ -246,7 +238,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
-	if s.messageLogic == nil {
+	if s.backend == nil {
 		log.Printf("websocket_handshake_failed trace_id=%s request_id=%s user_id=%s status=not_ready", traceContext.TraceID, traceContext.RequestID, claims.UserID)
 		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 		return
@@ -559,141 +551,46 @@ func (s *Server) dispatch(ctx context.Context, conn *Connection, commandType str
 		if err := unmarshalPayload(payload, &req); err != nil {
 			return nil, err
 		}
-		mapped := gateway.MapSendMessageRequest(conn.UserID, req)
-		result, err := s.messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-			SenderID:    mapped.SenderID,
-			ReceiverID:  mapped.ReceiverID,
-			GroupID:     mapped.GroupID,
-			ChatType:    mapped.ChatType,
-			ClientMsgID: mapped.ClientMsgID,
-			ContentType: mapped.ContentType,
-			Content:     mapped.Content,
-		})
+		// send 后不做本地 fanout：message_received（含 sender 的 seq 回填）由
+		// msgtransfer 经 /internal/delivery/conversation 推到所有 gateway（03 §9 A3）。
+		result, err := s.backend.SendMessage(ctx, gateway.MapSendMessageRequest(conn.UserID, req))
 		if err != nil {
 			return nil, err
 		}
-		if !result.Deduplicated {
-			s.pushNewMessage(ctx, conn.UserID, result.Message, result.RecipientUserIDs)
-		}
-		return gateway.MapSendMessageResponse(gateway.SendMessageRPCResponse{
-			Message:      toGatewayMessage(result.Message),
-			Deduplicated: result.Deduplicated,
-		}), nil
+		return gateway.MapSendMessageResponse(result), nil
 	case gateway.CommandPullMessages:
 		var req gateway.PullMessagesCommandRequest
 		if err := unmarshalPayload(payload, &req); err != nil {
 			return nil, err
 		}
-		mapped := gateway.MapPullMessagesRequest(conn.UserID, req)
-		result, err := s.messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
-			UserID:         mapped.UserID,
-			ConversationID: mapped.ConversationID,
-			FromSeq:        mapped.FromSeq,
-			ToSeq:          mapped.ToSeq,
-			Limit:          int(mapped.Limit),
-			Order:          mapped.Order,
-		})
+		result, err := s.backend.PullMessages(ctx, gateway.MapPullMessagesRequest(conn.UserID, req))
 		if err != nil {
 			return nil, err
 		}
-		messages := make([]gateway.MessageSnapshot, 0, len(result.Messages))
-		for _, message := range result.Messages {
-			messages = append(messages, toGatewayMessage(message))
-		}
-		return gateway.MapPullMessagesResponse(gateway.PullMessagesRPCResponse{
-			Messages: messages,
-			IsEnd:    result.IsEnd,
-			NextSeq:  result.NextSeq,
-		}), nil
+		return gateway.MapPullMessagesResponse(result), nil
 	case gateway.CommandGetConversationSeqs:
 		var req gateway.GetConversationSeqsCommandRequest
 		if err := unmarshalPayload(payload, &req); err != nil {
 			return nil, err
 		}
-		mapped := gateway.MapGetConversationSeqsRequest(conn.UserID, req)
-		result, err := s.messageLogic.GetConversationSeqs(ctx, logic.GetConversationSeqsRequest{
-			UserID:          mapped.UserID,
-			ConversationIDs: mapped.ConversationIDs,
-		})
+		result, err := s.backend.GetConversationSeqs(ctx, gateway.MapGetConversationSeqsRequest(conn.UserID, req))
 		if err != nil {
 			return nil, err
 		}
-		states := make([]gateway.ConversationSeqState, 0, len(result.States))
-		for _, state := range result.States {
-			states = append(states, toGatewayConversationState(state))
-		}
-		return gateway.MapGetConversationSeqsResponse(gateway.GetConversationSeqsRPCResponse{States: states}), nil
+		return gateway.MapGetConversationSeqsResponse(result), nil
 	case gateway.CommandMarkConversationRead:
 		var req gateway.MarkConversationReadCommandRequest
 		if err := unmarshalPayload(payload, &req); err != nil {
 			return nil, err
 		}
-		mapped := gateway.MapMarkConversationReadRequest(conn.UserID, req)
-		result, err := s.messageLogic.MarkConversationAsRead(ctx, logic.MarkConversationAsReadRequest{
-			UserID:         mapped.UserID,
-			ConversationID: mapped.ConversationID,
-			HasReadSeq:     mapped.HasReadSeq,
-		})
+		result, err := s.backend.MarkConversationAsRead(ctx, gateway.MapMarkConversationReadRequest(conn.UserID, req))
 		if err != nil {
 			return nil, err
 		}
-		return gateway.MapMarkConversationReadResponse(gateway.MarkConversationAsReadRPCResponse{
-			ConversationID: result.ConversationID,
-			HasReadSeq:     result.HasReadSeq,
-			MaxSeq:         result.MaxSeq,
-			UnreadCount:    result.UnreadCount,
-			Updated:        result.Updated,
-		}), nil
+		return gateway.MapMarkConversationReadResponse(result), nil
 	default:
 		return nil, apperror.InvalidArgument("unsupported command type")
 	}
-}
-
-func (s *Server) pushNewMessage(ctx context.Context, senderID string, message logic.Message, recipientUserIDs []string) {
-	ctx, span := observability.StartSpan(ctx, "websocket.push_new_message")
-	defer span.End()
-	recipients := pushRecipients(senderID, message, recipientUserIDs)
-	if len(recipients) == 0 {
-		return
-	}
-	deliveryMessage := toDeliveryMessage(message)
-	applyTraceContextToDeliveryMessage(ctx, &deliveryMessage)
-	_, err := s.PushToConversation(ctx, message.ConversationID, recipients, delivery.NewMessageEvent(delivery.EventMessageReceived, deliveryMessage))
-	if err != nil {
-		observability.RecordSpanError(span, err)
-		traceContext := observability.TraceContextFromContext(ctx)
-		log.Printf("websocket_push_failed trace_id=%s conversation_id=%s server_msg_id=%s error=%v", traceContext.TraceID, message.ConversationID, message.ServerMsgID, err)
-	}
-}
-
-func pushRecipients(senderID string, message logic.Message, recipientUserIDs []string) []string {
-	senderID = strings.TrimSpace(senderID)
-	seen := map[string]struct{}{}
-	recipients := make([]string, 0, len(recipientUserIDs))
-	add := func(userID string) {
-		userID = strings.TrimSpace(userID)
-		if userID == "" || userID == senderID {
-			return
-		}
-		if _, ok := seen[userID]; ok {
-			return
-		}
-		seen[userID] = struct{}{}
-		recipients = append(recipients, userID)
-	}
-
-	for _, userID := range recipientUserIDs {
-		add(userID)
-	}
-	if len(recipientUserIDs) > 0 {
-		return recipients
-	}
-
-	switch strings.ToLower(strings.TrimSpace(message.ChatType)) {
-	case logic.MessageChatTypeSingle:
-		add(message.ReceiverID)
-	}
-	return recipients
 }
 
 func (c *Connection) Info() ConnectionInfo {
@@ -995,80 +892,6 @@ func logWebSocketCommand(conn *Connection, traceContext observability.TraceConte
 	)
 }
 
-func toDeliveryMessage(message logic.Message) delivery.Message {
-	return delivery.Message{
-		ServerMsgID:           message.ServerMsgID,
-		ClientMsgID:           message.ClientMsgID,
-		ConversationID:        message.ConversationID,
-		Seq:                   message.Seq,
-		SenderID:              message.SenderID,
-		ReceiverID:            message.ReceiverID,
-		GroupID:               message.GroupID,
-		ChatType:              message.ChatType,
-		ContentType:           message.ContentType,
-		Content:               message.Content,
-		MessageOrigin:         message.MessageOrigin,
-		AgentAccountID:        message.AgentAccountID,
-		TriggerServerMsgID:    message.TriggerServerMsgID,
-		AgentRunID:            message.AgentRunID,
-		AllowRecursiveTrigger: message.AllowRecursiveTrigger,
-		SendTime:              message.SendTime,
-		CreatedAt:             message.CreatedAt,
-	}
-}
-
-func applyTraceContextToDeliveryMessage(ctx context.Context, message *delivery.Message) {
-	if message == nil {
-		return
-	}
-	traceContext := observability.TraceContextFromContext(ctx)
-	if traceContext.TraceID == "" {
-		return
-	}
-	message.TraceID = traceContext.TraceID
-	message.RequestID = traceContext.RequestID
-	message.TraceParent = traceContext.TraceParent
-	message.TraceState = traceContext.TraceState
-}
-
-func toGatewayMessage(message logic.Message) gateway.MessageSnapshot {
-	return gateway.MessageSnapshot{
-		ServerMsgID:           message.ServerMsgID,
-		ClientMsgID:           message.ClientMsgID,
-		ConversationID:        message.ConversationID,
-		Seq:                   message.Seq,
-		SenderID:              message.SenderID,
-		ReceiverID:            message.ReceiverID,
-		GroupID:               message.GroupID,
-		ChatType:              message.ChatType,
-		ContentType:           message.ContentType,
-		Content:               message.Content,
-		MessageOrigin:         message.MessageOrigin,
-		AgentAccountID:        message.AgentAccountID,
-		TriggerServerMsgID:    message.TriggerServerMsgID,
-		AgentRunID:            message.AgentRunID,
-		AllowRecursiveTrigger: message.AllowRecursiveTrigger,
-		SendTime:              message.SendTime,
-		CreatedAt:             message.CreatedAt,
-	}
-}
-
-func toGatewayConversationState(state logic.ConversationSeqState) gateway.ConversationSeqState {
-	var lastMessage *gateway.MessageSnapshot
-	if state.LastMessage != nil {
-		message := toGatewayMessage(*state.LastMessage)
-		lastMessage = &message
-	}
-	return gateway.ConversationSeqState{
-		ConversationID: state.ConversationID,
-		MaxSeq:         state.MaxSeq,
-		HasReadSeq:     state.HasReadSeq,
-		UnreadCount:    state.UnreadCount,
-		MaxSeqTime:     state.MaxSeqTime,
-		LastMessage:    lastMessage,
-	}
-}
-
 func bearerToken(headerValue string) string {
 	headerValue = strings.TrimSpace(headerValue)
 	if headerValue == "" {
@@ -1127,14 +950,14 @@ func normalizeAuth(auth config.JWTAuthConfig) config.JWTAuthConfig {
 	return auth
 }
 
-var errNilMessageLogic = errors.New("message logic is not configured")
+var errNilBackend = errors.New("message backend is not configured")
 
 func (s *Server) Ready() error {
 	if s.configErr != nil {
 		return s.configErr
 	}
-	if s.messageLogic == nil {
-		return errNilMessageLogic
+	if s.backend == nil {
+		return errNilBackend
 	}
 	return nil
 }

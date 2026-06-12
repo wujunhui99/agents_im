@@ -110,7 +110,7 @@ ADMIN_API_PORT=18088 \
 make frontend-start FRONTEND_HOST=127.0.0.1 FRONTEND_PORT=5173
 ```
 
-Local `message-transfer` uses the Postgres outbox consumer by default and dispatches to `gateway-ws`, so HTTP `POST /messages` can produce live WebSocket pushes without requiring a separate Kafka publisher process.
+Local `message-transfer` uses the Postgres outbox consumer by default and dispatches to `msggateway`, so HTTP `POST /messages` can produce live WebSocket pushes without requiring a separate Kafka publisher process.
 
 ## Single-machine E2E Smoke Command
 
@@ -120,16 +120,15 @@ A fast in-process smoke command exists for the core single-machine flow when the
 PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./test/e2e/single-machine
 ```
 
-It uses real business logic and a real WebSocket gateway test server in one process to validate:
+It uses real business logic in one process to validate:
 
 1. register Alice;
 2. register Bob;
 3. add Bob as Alice's friend;
 4. send a single-chat message through message logic;
-5. pull the message as Bob;
-6. connect Alice and Bob to WebSocket;
-7. send `send_message` over WebSocket;
-8. assert Alice receives ACK and Bob receives live `message_received` push.
+5. pull the message as Bob.
+
+Since 03 §9 A3, `msggateway` no longer assembles monolith message logic in-process (its 4 ws commands go through msg-rpc gRPC), so this smoke no longer includes a WebSocket leg; ws behavior is covered by `service/msggateway/internal/ws` tests (fake msg-rpc backend + `/internal/delivery/conversation` push).
 
 This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, and MinIO when the environment is clean.
 

@@ -20,7 +20,7 @@ REST/Gateway 运行时上下文位于：
 | groups-api | `internal/servicecontext/groups` | `GroupsLogic`、Groups repo、Account existence checker |
 | message-api | `internal/servicecontext/message` | `MessageLogic`、Media validator、AI hosting/audit/outbox |
 | agent-api | `service/agent/api/internal/svc` | `AgentLogic`、Agent repo、Account type checker |
-| gateway-ws | `internal/servicecontext/gateway` | JWT auth runtime、`MessageLogic` |
+| msggateway | 无（03 §9 A3 起不再用 servicecontext） | msg-rpc gRPC backend（`service/msggateway/internal/backend`）、JWT auth |
 | shared auth runtime | `internal/servicecontext/common` | JWT config、optional active-session repository |
 
 `internal/handler/**` 和 `internal/logic/<service>/*_logic.go` 只能 import 自己边界的 focused context，不能 import `github.com/wujunhui99/agents_im/internal/svc`。
@@ -35,17 +35,17 @@ Message Service 只持有 message-send media validation 所需的 media reposito
 
 ## 生产初始化规则
 
-- REST/Gateway entrypoint 继续在 `cmd/*-api/main.go` 和 `cmd/gateway-ws/main.go` 显式构造 repository/object storage/presence，并用 `log.Fatalf(...)` fail fast。
+- REST/Gateway entrypoint 继续在各自 main（如 `service/msggateway/msggateway.go`）显式构造 repository/object storage/presence，并用 `log.Fatalf(...)` fail fast。
 - 不允许为了简化 context wiring 在生产路径静默 fallback 到 memory repository、memory object store 或 nil validator。
 - friends-api 不再构造 object storage，因为它不服务 media routes；user-api 仍必须构造 object storage 并 `EnsureBucket`。
-- gateway-ws 构造 message logic 后注入 focused gateway context，Gateway 不持有 Message API 的 AI hosting/outbox context。
+- msggateway 不构造任何 message logic/repository：消息域 ws command 经 msg-rpc gRPC backend 转发（03 §9 A3），进程只持有 ws server、presence、session store 与 msg-rpc client。
 
 ## 静态校验
 
 `scripts/verify-static.sh` 现在强制：
 
 - 根级 `internal/svc` package 不存在；
-- `cmd`、`internal/handler`、`internal/logic`、`internal/gateway`、`tests` 不得 import `github.com/wujunhui99/agents_im/internal/svc`。
+- `cmd`、`internal/handler`、`internal/logic`、`tests` 不得 import `github.com/wujunhui99/agents_im/internal/svc`。
 - REST adapter logic 不得新增聚合 `gozero_logic.go`；
 - auth-api 不得回退到 `internal/auth/svc`，必须使用 `internal/servicecontext/auth`。
 

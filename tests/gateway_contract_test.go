@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/gateway"
+	"github.com/wujunhui99/agents_im/common/share/gateway"
 )
 
 func TestGatewayCommandNames(t *testing.T) {

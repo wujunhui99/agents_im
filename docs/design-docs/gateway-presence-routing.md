@@ -33,7 +33,7 @@ This phase connects those seams without changing the client command protocol or 
 
 ## Runtime Behavior
 
-`cmd/gateway-ws` creates a presence store from the existing API config:
+`service/msggateway` creates a presence store from the existing API config:
 
 ```text
 Presence.Driver: memory | redis

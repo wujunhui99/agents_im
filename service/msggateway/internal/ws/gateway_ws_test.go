@@ -1,4 +1,4 @@
-package tests
+package ws
 
 import (
 	"context"
@@ -6,18 +6,12 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/wujunhui99/agents_im/internal/gateway"
-	"github.com/wujunhui99/agents_im/internal/gateway/delivery"
-	gatewayws "github.com/wujunhui99/agents_im/internal/gateway/ws"
-	"github.com/wujunhui99/agents_im/internal/repository"
-	gatewaysvc "github.com/wujunhui99/agents_im/internal/servicecontext/gateway"
-	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
+	"github.com/wujunhui99/agents_im/common/share/gateway"
+	"github.com/wujunhui99/agents_im/common/share/gateway/delivery"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/presence"
 )
@@ -67,7 +61,7 @@ func TestWebSocketGatewayRejectsMissingAndInvalidToken(t *testing.T) {
 	server, cleanup := newGatewayWSTestServer(t)
 	defer cleanup()
 
-	_, missingResp, missingErr := websocket.DefaultDialer.Dial(wsURL(server.URL, ""), nil)
+	_, missingResp, missingErr := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), nil)
 	if missingErr == nil {
 		t.Fatal("missing token dial succeeded")
 	}
@@ -77,7 +71,7 @@ func TestWebSocketGatewayRejectsMissingAndInvalidToken(t *testing.T) {
 
 	header := http.Header{}
 	header.Set("Authorization", "Bearer invalid-token")
-	_, invalidResp, invalidErr := websocket.DefaultDialer.Dial(wsURL(server.URL, ""), header)
+	_, invalidResp, invalidErr := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), header)
 	if invalidErr == nil {
 		t.Fatal("invalid token dial succeeded")
 	}
@@ -90,23 +84,20 @@ func TestWebSocketGatewayAcceptsValidTokenFromHeaderAndConfiguredQuery(t *testin
 	server, cleanup := newGatewayWSTestServer(t)
 	defer cleanup()
 
-	header := http.Header{}
-	header.Set("Authorization", bearerTokenForUser(t, "usr_ws_header"))
-	headerConn, _, err := websocket.DefaultDialer.Dial(wsURL(server.URL, ""), header)
+	headerConn, _, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), authHeader(t, "usr_ws_header"))
 	if err != nil {
 		t.Fatalf("dial with authorization header: %v", err)
 	}
 	_ = headerConn.Close()
 
-	queryServer, queryCleanup := newGatewayWSTestServer(t, gatewayws.WithGatewayWSConfig(config.GatewayWSConfig{
+	queryServer, queryCleanup := newGatewayWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
 		AllowQueryToken:           true,
 		CommandRateLimitPerSecond: 100,
 		CommandRateLimitBurst:     100,
 	}))
 	defer queryCleanup()
 
-	rawToken := strings.TrimPrefix(bearerTokenForUser(t, "usr_ws_query"), "Bearer ")
-	queryConn, _, err := websocket.DefaultDialer.Dial(wsURL(queryServer.URL, rawToken), nil)
+	queryConn, _, err := websocket.DefaultDialer.Dial(testWSURL(queryServer.URL, rawTokenForUser(t, "usr_ws_query")), nil)
 	if err != nil {
 		t.Fatalf("dial with token query param: %v", err)
 	}
@@ -122,12 +113,12 @@ func TestWebSocketGatewayHeartbeatReturnsOK(t *testing.T) {
 
 	writeCommand(t, conn, map[string]interface{}{
 		"request_id": "req-heartbeat",
-		"type":       gatewayws.CommandHeartbeat,
+		"type":       CommandHeartbeat,
 		"payload":    map[string]interface{}{},
 	})
 
 	resp := readWSResponse(t, conn)
-	if resp.RequestID != "req-heartbeat" || resp.Type != gatewayws.CommandHeartbeat || resp.Status != gateway.AckStatusOK {
+	if resp.RequestID != "req-heartbeat" || resp.Type != CommandHeartbeat || resp.Status != gateway.AckStatusOK {
 		t.Fatalf("unexpected heartbeat response envelope: %+v", resp)
 	}
 	if resp.TraceID == "" {
@@ -184,7 +175,7 @@ func TestWebSocketGatewayHeartbeatRefreshesPresenceTTL(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	writeCommand(t, conn, map[string]interface{}{
 		"request_id": "req-presence-heartbeat",
-		"type":       gatewayws.CommandHeartbeat,
+		"type":       CommandHeartbeat,
 		"payload":    map[string]interface{}{},
 	})
 	resp := readWSResponse(t, conn)
@@ -240,8 +231,8 @@ func TestWebSocketGatewayPresenceKeepsOnlyLatestConnection(t *testing.T) {
 		t.Fatalf("set replaced connection deadline: %v", err)
 	}
 	_, _, err := connA.ReadMessage()
-	if !websocket.IsCloseError(err, gatewayws.CloseCodeSessionReplaced) {
-		t.Fatalf("replaced connection read error = %v, want close code %d", err, gatewayws.CloseCodeSessionReplaced)
+	if !websocket.IsCloseError(err, CloseCodeSessionReplaced) {
+		t.Fatalf("replaced connection read error = %v, want close code %d", err, CloseCodeSessionReplaced)
 	}
 
 	result, err := app.PushToUser(context.Background(), "usr_ws_presence_multi", delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
@@ -319,30 +310,8 @@ func TestWebSocketGatewaySendAndPullMessages(t *testing.T) {
 	}
 }
 
-func TestWebSocketGatewaySendMessagePushesToOnlineReceiver(t *testing.T) {
-	app, server, cleanup := newGatewayWSAppTestServer(t)
-	defer cleanup()
-
-	senderConn := dialGatewayWS(t, server.URL, "usr_ws_live_sender")
-	defer senderConn.Close()
-	receiverConn := dialGatewayWS(t, server.URL, "usr_ws_live_receiver")
-	defer receiverConn.Close()
-	waitFor(t, func() bool {
-		return app.Connections().UserCount("usr_ws_live_receiver") == 1
-	}, "receiver websocket registered before live-push send")
-
-	sent := sendWSMessage(t, senderConn, "req-live-send", "usr_ws_live_receiver", "client-live-1", "live hello")
-	push := readWSPushEvent(t, receiverConn)
-	if push.Type != delivery.EventMessageReceived {
-		t.Fatalf("push type = %q, want %q", push.Type, delivery.EventMessageReceived)
-	}
-	if push.Data.ServerMsgID != sent.Message.ServerMsgID || push.Data.ConversationID != sent.Message.ConversationID || push.Data.Seq != sent.Message.Seq {
-		t.Fatalf("push message identity mismatch: push=%+v sent=%+v", push.Data, sent.Message)
-	}
-	if push.Data.SenderID != "usr_ws_live_sender" || push.Data.ReceiverID != "usr_ws_live_receiver" || push.Data.Content != "live hello" {
-		t.Fatalf("push message payload mismatch: %+v", push.Data)
-	}
-}
+// A3 起 send 后 gateway 不做本地 fanout（TestSendMessageCommandReturnsACKWithoutLocalFanout），
+// message_received 推送链路由 internal_delivery_test.go 经 /internal/delivery/conversation 覆盖。
 
 func TestWebSocketGatewayReconnectSyncFlow(t *testing.T) {
 	server, cleanup := newGatewayWSTestServer(t)
@@ -537,8 +506,8 @@ func TestWebSocketGatewayPushDeliversToLatestUserConnectionOnly(t *testing.T) {
 		t.Fatalf("set replaced connection deadline: %v", err)
 	}
 	_, _, err := connA.ReadMessage()
-	if !websocket.IsCloseError(err, gatewayws.CloseCodeSessionReplaced) {
-		t.Fatalf("replaced connection read error = %v, want close code %d", err, gatewayws.CloseCodeSessionReplaced)
+	if !websocket.IsCloseError(err, CloseCodeSessionReplaced) {
+		t.Fatalf("replaced connection read error = %v, want close code %d", err, CloseCodeSessionReplaced)
 	}
 
 	event := delivery.NewMessageEvent(delivery.EventMessageReceived, delivery.Message{
@@ -685,11 +654,11 @@ func TestWebSocketGatewayPushDoesNotBreakCommandResponses(t *testing.T) {
 
 	writeCommand(t, conn, map[string]interface{}{
 		"request_id": "req-heartbeat-after-push",
-		"type":       gatewayws.CommandHeartbeat,
+		"type":       CommandHeartbeat,
 		"payload":    map[string]interface{}{},
 	})
 	resp := readWSResponse(t, conn)
-	if resp.RequestID != "req-heartbeat-after-push" || resp.Type != gatewayws.CommandHeartbeat || resp.Status != gateway.AckStatusOK {
+	if resp.RequestID != "req-heartbeat-after-push" || resp.Type != CommandHeartbeat || resp.Status != gateway.AckStatusOK {
 		t.Fatalf("unexpected heartbeat response after push: %+v", resp)
 	}
 }
@@ -709,14 +678,14 @@ func TestWebSocketGatewayConnectionCloseCleansManager(t *testing.T) {
 	}, "websocket connection unregistered after close")
 }
 
-func newGatewayWSTestServer(t *testing.T, opts ...gatewayws.ServerOption) (*httptest.Server, func()) {
+func newGatewayWSTestServer(t *testing.T, opts ...ServerOption) (*httptest.Server, func()) {
 	t.Helper()
 
 	_, server, cleanup := newGatewayWSAppTestServer(t, opts...)
 	return server, cleanup
 }
 
-func newGatewayWSAppTestServer(t *testing.T, opts ...gatewayws.ServerOption) (*gatewayws.Server, *httptest.Server, func()) {
+func newGatewayWSAppTestServer(t *testing.T, opts ...ServerOption) (*Server, *httptest.Server, func()) {
 	t.Helper()
 
 	app := newGatewayWSApp(t, opts...)
@@ -724,7 +693,7 @@ func newGatewayWSAppTestServer(t *testing.T, opts ...gatewayws.ServerOption) (*g
 	return app, server, server.Close
 }
 
-func newGatewayWSAppTestServerWithPresence(t *testing.T, store presence.PresenceStore) (*gatewayws.Server, *httptest.Server, func()) {
+func newGatewayWSAppTestServerWithPresence(t *testing.T, store presence.PresenceStore) (*Server, *httptest.Server, func()) {
 	t.Helper()
 
 	app := newGatewayWSAppWithPresence(t, store)
@@ -732,56 +701,38 @@ func newGatewayWSAppTestServerWithPresence(t *testing.T, store presence.Presence
 	return app, server, server.Close
 }
 
-func newGatewayWSApp(t *testing.T, opts ...gatewayws.ServerOption) *gatewayws.Server {
+func newGatewayWSApp(t *testing.T, opts ...ServerOption) *Server {
 	t.Helper()
 
 	return newGatewayWSAppWithPresence(t, presence.NewMemoryStore(), opts...)
 }
 
-func newGatewayWSAppWithPresence(t *testing.T, store presence.PresenceStore, opts ...gatewayws.ServerOption) *gatewayws.Server {
+func newGatewayWSAppWithPresence(t *testing.T, store presence.PresenceStore, opts ...ServerOption) *Server {
 	t.Helper()
+	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "")
+	t.Setenv("GATEWAY_WS_ALLOW_QUERY_TOKEN", "")
+	t.Setenv("GATEWAY_WS_PING_INTERVAL_SECONDS", "")
+	t.Setenv("GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS", "")
+	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND", "")
+	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST", "")
 
-	messageContext := messagesvc.NewServiceContextWithAuth(
-		repository.NewMemoryMessageRepository(),
-		nil,
-		nil,
-		testJWTAuthConfig(),
-	)
-	serviceContext := gatewaysvc.NewServiceContext(messageContext.MessageLogic, testJWTAuthConfig())
-	serverOpts := []gatewayws.ServerOption{
-		gatewayws.WithPresenceStore(store),
-		gatewayws.WithPresenceTTL(time.Minute),
-		gatewayws.WithInstanceID("gateway-test"),
+	serverOpts := []ServerOption{
+		WithPresenceStore(store),
+		WithPresenceTTL(time.Minute),
+		WithInstanceID("gateway-test"),
 	}
 	serverOpts = append(serverOpts, opts...)
-	return gatewayws.NewServer(serviceContext, serverOpts...)
+	return NewServer(testAuthConfig(), newFakeBackend(), serverOpts...)
 }
 
 func dialGatewayWS(t *testing.T, serverURL string, userID string) *websocket.Conn {
 	t.Helper()
 
-	header := http.Header{}
-	header.Set("Authorization", bearerTokenForUser(t, userID))
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL(serverURL, ""), header)
+	conn, _, err := websocket.DefaultDialer.Dial(testWSURL(serverURL, ""), authHeader(t, userID))
 	if err != nil {
 		t.Fatalf("dial websocket gateway: %v", err)
 	}
 	return conn
-}
-
-func wsURL(serverURL string, rawToken string) string {
-	u, err := url.Parse(serverURL)
-	if err != nil {
-		panic(err)
-	}
-	u.Scheme = "ws"
-	u.Path = "/ws"
-	if rawToken != "" {
-		query := u.Query()
-		query.Set("token", rawToken)
-		u.RawQuery = query.Encode()
-	}
-	return u.String()
 }
 
 func writeCommand(t *testing.T, conn *websocket.Conn, command map[string]interface{}) {
@@ -829,11 +780,11 @@ func syncGatewayWSConnection(t *testing.T, conn *websocket.Conn, requestID strin
 
 	writeCommand(t, conn, map[string]interface{}{
 		"request_id": requestID,
-		"type":       gatewayws.CommandHeartbeat,
+		"type":       CommandHeartbeat,
 		"payload":    map[string]interface{}{},
 	})
 	resp := readWSResponse(t, conn)
-	if resp.frontendRequestID() != requestID || resp.commandName() != gatewayws.CommandHeartbeat || resp.Status != gateway.AckStatusOK {
+	if resp.frontendRequestID() != requestID || resp.commandName() != CommandHeartbeat || resp.Status != gateway.AckStatusOK {
 		t.Fatalf("unexpected websocket sync heartbeat response: %+v", resp)
 	}
 }
@@ -916,13 +867,6 @@ func pullWSMessages(t *testing.T, conn *websocket.Conn, requestID string, conver
 	var pulled gateway.PullMessagesCommandResponse
 	decodeRaw(t, resp.responsePayload(), &pulled)
 	return pulled
-}
-
-func responseStatus(resp *http.Response) int {
-	if resp == nil {
-		return 0
-	}
-	return resp.StatusCode
 }
 
 type failingPresenceStore struct {
