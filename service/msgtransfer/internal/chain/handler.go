@@ -10,6 +10,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 )
 
@@ -41,16 +42,20 @@ type TransferHandler struct {
 	store    ChainStore
 	producer EventProducer
 	workers  int
+	// typedAccountIDs enables the D16 toPush filter (agent-typed receivers are
+	// dropped from push fanout). Gated by config until the D16 account-id
+	// switch + data reset; agent.trigger.v1 stays unconditional either way.
+	typedAccountIDs bool
 }
 
-func NewTransferHandler(seq SeqMalloc, store ChainStore, producer EventProducer, workers int) (*TransferHandler, error) {
+func NewTransferHandler(seq SeqMalloc, store ChainStore, producer EventProducer, workers int, typedAccountIDs bool) (*TransferHandler, error) {
 	if seq == nil || store == nil || producer == nil {
 		return nil, fmt.Errorf("transfer handler requires seq allocator, store and producer")
 	}
 	if workers <= 0 {
 		workers = 8
 	}
-	return &TransferHandler{seq: seq, store: store, producer: producer, workers: workers}, nil
+	return &TransferHandler{seq: seq, store: store, producer: producer, workers: workers, typedAccountIDs: typedAccountIDs}, nil
 }
 
 // HandleBatch processes one polled batch. A malformed record is logged and
@@ -138,10 +143,20 @@ func (h *TransferHandler) handleConversation(ctx context.Context, conversationID
 		}
 	}
 	for _, event := range accepted {
-		for _, topic := range []string{messaging.TopicToPostgres, messaging.TopicToPush, messaging.TopicAgentTrigger} {
+		// toPostgres + agent.trigger carry the full event: archive is complete and
+		// the trigger topic is unconditional/branch-free by design (D15 — all
+		// judgment lives in the consumer).
+		for _, topic := range []string{messaging.TopicToPostgres, messaging.TopicAgentTrigger} {
 			if err := h.producer.PublishEvent(ctx, topic, event); err != nil {
 				return fmt.Errorf("produce %s: %w", topic, err)
 			}
+		}
+		pushEvent, hasRecipients := h.pushFanoutEvent(event)
+		if !hasRecipients {
+			continue
+		}
+		if err := h.producer.PublishEvent(ctx, messaging.TopicToPush, pushEvent); err != nil {
+			return fmt.Errorf("produce %s: %w", messaging.TopicToPush, err)
 		}
 	}
 	// Dedup record last: everything before it is idempotent, so a crash in
@@ -157,6 +172,28 @@ func (h *TransferHandler) handleConversation(ctx context.Context, conversationID
 		}
 	}
 	return nil
+}
+
+// pushFanoutEvent builds the toPush copy of an accepted event. With the D16
+// filter on, receivers whose account id carries the agent type bits are
+// dropped from fanout (agent accounts have no connection surface and never
+// receive pushes — D15); a fanout that filters down to empty skips the topic
+// entirely. The returned event owns its payload (Clone) so the mutation never
+// leaks into the toPostgres / agent.trigger copies.
+func (h *TransferHandler) pushFanoutEvent(event messaging.MessageEvent) (messaging.MessageEvent, bool) {
+	if !h.typedAccountIDs {
+		return event, len(event.Payload.ReceiverIDs) > 0
+	}
+	pushEvent := event.Clone()
+	humans := pushEvent.Payload.ReceiverIDs[:0]
+	for _, id := range pushEvent.Payload.ReceiverIDs {
+		if idgen.IsAgentAccountID(id) {
+			continue
+		}
+		humans = append(humans, id)
+	}
+	pushEvent.Payload.ReceiverIDs = humans
+	return pushEvent, len(humans) > 0
 }
 
 // deriveReceiverIDs computes push fanout recipients. Unlike the legacy outbox

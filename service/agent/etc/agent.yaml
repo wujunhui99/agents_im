@@ -1,0 +1,13 @@
+# service/agent — agent.trigger.v1 consumer (issue #503 scaffold).
+# All drivers are mock: no LLM call, no IM write-back, no hosting table read.
+Name: agent
+Kafka:
+  # Local dev redpanda (scripts/dev-up.sh); env KAFKA_BROKERS overrides.
+  Brokers: localhost:19092
+  Group: agent-trigger
+Runtime:
+  Driver: mock
+Sender:
+  Driver: mock
+Hosting:
+  Driver: mock

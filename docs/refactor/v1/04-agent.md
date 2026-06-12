@@ -318,6 +318,11 @@ msg-rpc.SendMessage()
 > + 测试数据清零 → ②transfer 加 toPush 类型过滤（toAgent 零改动）→ ③agent-rpc 以新
 > consumer group 消费（三步终判）→ ④删 msg-rpc 回流 consumer +
 > newConversationAIHostingRuntime 接线（解锁 03 §9 A4）。
+>
+> **接口先行（#503）**：②③的代码骨架已落地——`service/agent`（扁平 main，未部署，
+> 不加 api/rpc 子目录）internal/{trigger,runtime,imadapter,consumer} 即本节终判 +
+> runtime + 写回的接口面，当前全部 mock driver（零副作用）；toPush 过滤挂
+> `Kafka.TypedAccountIds` 开关默认关（①未做前类型位是噪声）。详见 03 §10。
 
 ---
 

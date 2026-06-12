@@ -21,8 +21,13 @@ const (
 )
 
 const (
-	GroupTransfer     = "msgtransfer"
-	GroupPersist      = "msgtransfer-postgres"
-	GroupPush         = "msgtransfer-push"
+	GroupTransfer = "msgtransfer"
+	GroupPersist  = "msgtransfer-postgres"
+	GroupPush     = "msgtransfer-push"
+	// GroupAgentTrigger is the transitional consumer group inside msg-rpc (B2
+	// 回流): retires at D15 migration step ④ once GroupAgentService owns the topic.
 	GroupAgentTrigger = "msg-rpc-agent-trigger"
+	// GroupAgentService is service/agent's consumer group on agent.trigger.v1
+	// (D15 final judgment lives there; 04-agent §4.2 step ③).
+	GroupAgentService = "agent-trigger"
 )

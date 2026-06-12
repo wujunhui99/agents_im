@@ -155,6 +155,12 @@ type TransferKafkaConfig struct {
 	Redis   RedisConfig
 	// Workers bounds parallel per-conversation batch processing (default 8).
 	Workers int
+	// TypedAccountIDs turns on the D16 toPush filter: receivers whose account id
+	// carries the agent type bits are dropped from push fanout (D15 migration
+	// step ②). MUST stay false until the D16 account-id switch + data reset
+	// (step ①) has happened — legacy snowflake ids decode the type bits as noise
+	// and would randomly lose pushes. Env override: MESSAGE_TRANSFER_TYPED_ACCOUNT_IDS.
+	TypedAccountIDs bool
 }
 
 type TransferConsumerConfig struct {
@@ -598,6 +604,13 @@ func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
 		}
 		cfg.Kafka.Redis.DB = db
 	}
+	if value := values["Kafka.TypedAccountIds"]; value != "" {
+		typed, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Kafka.TypedAccountIDs = typed
+	}
 	cfg = ResolveMessageTransferConfig(cfg)
 	return cfg, nil
 }
@@ -723,6 +736,11 @@ func resolveTransferKafkaConfig(cfg TransferKafkaConfig) TransferKafkaConfig {
 		}
 	}
 	cfg.Brokers = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Brokers)), os.Getenv("KAFKA_BROKERS"))
+	if value := strings.TrimSpace(os.Getenv("MESSAGE_TRANSFER_TYPED_ACCOUNT_IDS")); value != "" {
+		if typed, err := strconv.ParseBool(value); err == nil {
+			cfg.TypedAccountIDs = typed
+		}
+	}
 	if resolved, err := ResolveRedisConfig(cfg.Redis); err == nil {
 		cfg.Redis = resolved
 	}
