@@ -316,13 +316,21 @@ steps:
   # spawn step containers. Must depend on the last step (notify telegram) so it
   # never runs concurrently with another step's container startup — a parallel
   # `docker image prune` races containerd lease GC and breaks step creation
-  # ("lease does not exist"). until=4h keeps recently-pulled step images.
+  # ("lease does not exist").
+  #
+  # Dangling-only (`-f`, NOT `-af --filter until=4h`): `until` filters on image
+  # *Created* date (the upstream build date — months old for base images), not
+  # pull recency, so the old form evicted golang/node/postgres/redis/redpanda
+  # every deploy (~1.7GB) and the next PR re-pulled them (~45s on the
+  # verification critical path, #519). Project images build via buildx --push
+  # and never land in this daemon, so there is no project-image disk to reclaim
+  # here — only dead layers, which `-f` removes while keeping base images warm.
   - name: prune images
     image: docker.io/library/docker:29-cli
     depends_on:
       - notify telegram
     commands:
-      - docker image prune -af --filter "until=4h"
+      - docker image prune -f
     volumes:
       - name: docker_sock
         path: /var/run/docker.sock
