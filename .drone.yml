@@ -62,20 +62,53 @@ steps:
   # Runs only when web-owned files change (Drone changeset filter). The deploy
   # detector (detect-deploy-changes.py) is unsuitable here: it is scoped to
   # main/devops refs and returns web_required=false for PR source branches.
-  - name: frontend-verification
+  #
+  # Split into install + (lint-build ‖ test) so the independent lint/build and
+  # test work runs in parallel (#523). `npm ci` runs ONCE in frontend-install:
+  # all steps share the cloned workspace, so two parallel `npm ci` would race on
+  # web/node_modules (rm -rf + reinstall, not atomic). The two consumer steps
+  # only read node_modules. when:paths is repeated on each so they skip together
+  # on non-web PRs.
+  - name: frontend-install
     image: node:20-bookworm-slim
     depends_on:
       - clone
     environment:
       npm_config_cache: /ci-cache/npm
     commands:
-      - npm --prefix web ci --prefer-offline
-      - npm --prefix web run lint
-      - npm --prefix web run test:run
-      - npm --prefix web run build
+      - npm --prefix web ci --prefer-offline --no-audit
     volumes:
       - name: ci_cache
         path: /ci-cache
+    when:
+      paths:
+        include:
+          - web/**
+          - package.json
+          - package-lock.json
+          - .drone.yml
+
+  - name: frontend-lint-build
+    image: node:20-bookworm-slim
+    depends_on:
+      - frontend-install
+    commands:
+      - npm --prefix web run lint
+      - npm --prefix web run build
+    when:
+      paths:
+        include:
+          - web/**
+          - package.json
+          - package-lock.json
+          - .drone.yml
+
+  - name: frontend-test
+    image: node:20-bookworm-slim
+    depends_on:
+      - frontend-install
+    commands:
+      - npm --prefix web run test:run
     when:
       paths:
         include:
@@ -127,7 +160,8 @@ steps:
     image: python:3.12-alpine
     depends_on:
       - backend-verification
-      - frontend-verification
+      - frontend-lint-build
+      - frontend-test
       - markdown-link-check
       - compose-config
       - postgres-integration
