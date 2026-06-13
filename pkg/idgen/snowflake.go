@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	snowflakeEpochMs = int64(1704067200000) // 2024-01-01T00:00:00Z
+	snowflakeEpochMs = int64(1767225600000) // 2026-01-01T00:00:00Z
 	nodeBits         = uint(10)
 	sequenceBits     = uint(12)
 	maxNodeID        = int64(-1) ^ (int64(-1) << nodeBits)

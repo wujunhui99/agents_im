@@ -15,15 +15,15 @@ func mintIDs(t *testing.T) (userID, agentID, secondAgentID string) {
 	if err != nil {
 		t.Fatalf("new account id generator: %v", err)
 	}
-	userID, err = gen.NextString(idgen.AccountTypeUser)
+	userID, err = gen.NextString(idgen.FacetHuman)
 	if err != nil {
 		t.Fatalf("mint user id: %v", err)
 	}
-	agentID, err = gen.NextString(idgen.AccountTypeAgent)
+	agentID, err = gen.NextString(idgen.FacetAgent)
 	if err != nil {
 		t.Fatalf("mint agent id: %v", err)
 	}
-	secondAgentID, err = gen.NextString(idgen.AccountTypeAgent)
+	secondAgentID, err = gen.NextString(idgen.FacetAgent)
 	if err != nil {
 		t.Fatalf("mint second agent id: %v", err)
 	}

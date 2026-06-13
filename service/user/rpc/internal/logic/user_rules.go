@@ -7,8 +7,21 @@ import (
 
 	sharemodel "github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
 )
+
+// facetForAccountType maps the granular DB account_type to the D16 account-facet
+// encoded in the account id. Only agent accounts get FacetAgent (toPush=0);
+// every other type (user/admin/test) is human-side (toPush=1). This keeps the id
+// facet bit in lockstep with accounts.account_type — the D16 double-source
+// invariant asserted at the creation boundary.
+func facetForAccountType(accountTypeDB int64) idgen.Facet {
+	if accountTypeDB == model.AccountTypeAgent {
+		return idgen.FacetAgent
+	}
+	return idgen.FacetHuman
+}
 
 // gender 字符串取值（transport 层）。
 const (

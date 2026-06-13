@@ -268,11 +268,11 @@ func TestHandleBatchFiltersAgentReceiversFromPush(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new account id generator: %v", err)
 	}
-	userID, err := gen.NextString(idgen.AccountTypeUser)
+	userID, err := gen.NextString(idgen.FacetHuman)
 	if err != nil {
 		t.Fatalf("mint user id: %v", err)
 	}
-	agentID, err := gen.NextString(idgen.AccountTypeAgent)
+	agentID, err := gen.NextString(idgen.FacetAgent)
 	if err != nil {
 		t.Fatalf("mint agent id: %v", err)
 	}
@@ -318,11 +318,11 @@ func TestHandleBatchSkipsPushWhenAllReceiversAreAgents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new account id generator: %v", err)
 	}
-	agentSender, err := gen.NextString(idgen.AccountTypeAgent)
+	agentSender, err := gen.NextString(idgen.FacetAgent)
 	if err != nil {
 		t.Fatalf("mint agent sender: %v", err)
 	}
-	agentReceiver, err := gen.NextString(idgen.AccountTypeAgent)
+	agentReceiver, err := gen.NextString(idgen.FacetAgent)
 	if err != nil {
 		t.Fatalf("mint agent receiver: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestHandleBatchFilterOffKeepsLegacyFanout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new account id generator: %v", err)
 	}
-	agentReceiver, err := gen.NextString(idgen.AccountTypeAgent)
+	agentReceiver, err := gen.NextString(idgen.FacetAgent)
 	if err != nil {
 		t.Fatalf("mint agent receiver: %v", err)
 	}

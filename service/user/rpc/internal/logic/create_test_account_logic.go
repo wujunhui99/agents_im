@@ -53,7 +53,7 @@ func (l *CreateTestAccountLogic) CreateTestAccount(in *userpb.CreateTestAccountR
 		return nil, rpcerror.ToStatus(err)
 	}
 
-	accountID, err := idgen.NewString()
+	accountID, err := idgen.NewAccountString(facetForAccountType(model.AccountTypeTest))
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
