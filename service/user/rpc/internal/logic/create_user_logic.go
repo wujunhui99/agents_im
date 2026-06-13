@@ -50,7 +50,7 @@ func (l *CreateUserLogic) CreateUser(in *userpb.CreateUserRequest) (*userpb.User
 		return nil, rpcerror.ToStatus(err)
 	}
 
-	accountID, err := idgen.NewString()
+	accountID, err := idgen.NewAccountString(facetForAccountType(accountTypeDB))
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}

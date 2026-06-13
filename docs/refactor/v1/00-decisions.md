@@ -181,16 +181,19 @@
 - **来源**：本轮 Claude × 用户讨论（2026-06-12，#497 初稿 / #499 / #501 修正）。
 - **影响文档**：03（§10 反向影响重写）、04（§4.2 目标链路 + §7 交集约定）、07（ai-hosting RPC 临时性注记）。
 
-### D16 — account_id 类型化：Sonyflake 变体 int64，账号类型编进 ID
+### D16 — account_id 类型化：Sonyflake 变体 int64，账户面（人类/agent）编进 ID
 
-- **布局（64 bit）**：1 位符号（恒 0）+ **39 位时间戳**（10ms 粒度，≈174 年）+ **5 位账号类型**（32 种：0 保留，1=user，2=agent，3=admin，扩展走 allowlist）+ **9 位机器号**（512 实例）+ **10 位序列号**（1024/10ms/实例 ≈ 10w ID/s/实例）。时间戳在高位，ID 保持近似时间有序（PK 局部性）。
+- **布局（63 bit，符号位恒 0 保正数）**：1 位符号（恒 0，正数——保 `conversation_id` 字符串序与可读性）+ **41 位时间戳**（1ms 粒度，≈69.7 年，自定义 epoch）+ **3 位账户面位（account-facet）** + **9 位机器号**（512 实例）+ **10 位序列号**（1024 ID/ms/实例 ≈ 100w ID/s/实例）。时间戳在高位，ID 近似时间有序（PK 局部性）。
+  - **账户面位（account-facet，3 bit）语义**：bit0 = `toPush`（推送面）——`1` = 人类侧账户（有连接面、进 push fanout：user / admin / test / …所有非 agent 类型），`0` = agent 账户（无连接面、不进 push、是触发源）；bit1-2 **预留**（默认 0，未来扩展走 allowlist，禁止隐式启用）。
+  - **不是完整账号类型枚举**：account-facet 只编码"人类侧 vs agent"这一进 push / 触发判定需要的最粗分类（toPush 单 bit 即够）；细粒度类型（admin / test / user / …）仍只存 `accounts.account_type` 列，**不进 ID**。
 - **列类型**：account_id 及全部引用列 text → **bigint**；对外（JSON/JWT claim/前端）仍以十进制字符串传输（JS Number 精度不够 int64）。
 - **存量数据处理 = 清零重置（方案 1）**：服务未上线、数据全为测试数据——清库重跑 migration + flush Redis + 重建 default assistant seed；**不做 ID 重写迁移**（方案 2 需联动重写 messages 收发列、`single:<a>:<b>` 会话 ID、friendships、Redis key，对测试数据毫无意义）。schema 变更走新增 migration（已发布 migration 不可变）。
-- **解析纪律（硬约束）**：账号类型只准经 **`pkg/idgen`** 的 helper（如 `idgen.AccountType(id)`）读取，**禁止各服务散落 bit 运算**；类型自描述方便到容易滥用——只有真正需要账号类型的位置（transfer toPush 过滤、agent-rpc 终判、admin/调试）允许分支。
-- **双事实源不变量**：`accounts.account_type` 列与 ID 类型位**创建时强一致**（创建路径断言），且**账号类型终身不可变**（user↔agent 不允许转换）——类型进 ID 的前提条件。
-- **不变的东西**：`conversation_id` 派生逻辑不动（把 account_id 当不透明字符串排序拼接，数值字符串兼容）；消息/媒体等其它实体 ID 不编码类型（只有账号有"类型"这个一等概念）。
+- **解析纪律（硬约束）**：账户面位只准经 **`pkg/idgen`** 的 helper（`idgen.IsAgent(id)` / `idgen.ToPush(id)`，底层 `idgen.AccountFacet(id)`）读取，**禁止各服务散落 bit 运算**；自描述方便到容易滥用——只有真正需要的位置（transfer toPush 过滤、agent-rpc 终判、admin/调试）允许分支。
+- **双事实源不变量**：`accounts.account_type` 列的"是否 agent"与 ID 的 `toPush` 位（bit0）**创建时强一致**（agent ⇒ toPush=0，其余一律 ⇒ toPush=1；创建路径断言），且**账号类型终身不可变**（user↔agent 不允许转换）——面位进 ID 的前提条件。
+- **不变的东西**：`conversation_id` 派生逻辑不动（把 account_id 当不透明字符串排序拼接，数值字符串兼容）；消息/媒体等其它实体 ID 不编码面位（只有账号有"人类 vs agent"这个一等概念）。
 - **买到什么**："receiver 是否 agent"在全链路零查询可知——D15 的 toPush 过滤与 agent 收信终判零依赖化，03 §9 C3 离线推送的 agent 过滤顺带解决；日志/SQL/排障可读性（配 idgen 解码工具）。
-- **来源**：本轮 Claude × 用户讨论（2026-06-12）。前缀字符串方案（`usr_`/`agt_`）被否：用户选 int64 位段（列更紧凑、保持数值序）。
+- **落地范围（2026-06-13 首批）**：`pkg/idgen` 重构为本布局 + 2026 epoch；facet 接入**已迁移到 service 的活跃账号创建路径**（user-rpc `CreateUser`/`CreateTestAccount`，facet 据 `account_type` 推导：agent→FacetAgent、其余→FacetHuman）；默认助手 seed 经新增 `db/migrations/020` 改写为 facet-agent 常量 `322961408`（009 的 `900000000000000077` 在新布局下解码为 facet=3 人类，会让 judge 漏触发、transfer 误推）。**Agent 运行时创建仍在退役中的顶层 `internal/logic`（rule 8 冻结），暂不接 facet**——其 account_id 走旧 snowflake，待 agent 创建迁入 `service/agent` 时补 facet；线上当前仅 seed 助手一个 agent 账号，功能不受影响。前提是配套**数据清零重置**：旧测试账号是非 facet ID，不清会被 `IsAgentAccountID` 误判。
+- **来源**：本轮 Claude × 用户讨论（2026-06-12；2026-06-13 修订位段：39→41 位时间戳并改 1ms 粒度、5 位账号类型枚举→3 位 account-facet（toPush + 2 预留）、10→9 位机器号）。前缀字符串方案（`usr_`/`agt_`）被否：用户选 int64 位段（列更紧凑、保持数值序）。列 text→bigint 拆为独立后续（facet 能力用 ID 值即可，与列类型无关）。
 - **影响文档**：03（§10）、04（§4.2）；实现期影响 pkg/idgen、db/migrations、账号创建路径。
 
 ---
