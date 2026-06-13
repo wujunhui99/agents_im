@@ -2,11 +2,11 @@
 
 适用场景：需要创建分支、worktree、commit、PR 或排查 Git/CI 门禁时读取本文。
 
-端到端开发流程以 [`docs/AGENTIC_DEVELOPMENT_WORKFLOW.md`](./AGENTIC_DEVELOPMENT_WORKFLOW.md) 为准；本文只维护 Git 操作和门禁细节。本项目不使用 `develop` 集成分支。
+本文维护 Git 操作和门禁细节；端到端流程见 [`AGENTS.md`](../AGENTS.md)。本项目不使用 `develop` 集成分支。
 
 ## Branch Model
 
-- `main`: 唯一长期主分支和发布分支；禁止直接 push 或绕过 Merge Queue merge。
+- `main`: 唯一长期主分支和发布分支，改动通过 PR 合入。
 - Task branch: `<type>/<agent-id>/issue-<number>-<task-desc>`，例如 `fix/codex/issue-123-login-error`。
 - Current agent ids: `claude`, `codex`.
 - Branch `type`: `feature`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `perf`, `style`, `hotfix`.
@@ -29,7 +29,7 @@ The `.claude/worktrees/` directory is ignored; do not add worktrees as gitlinks.
 
 ## Commit And PR Rules
 
-See [`docs/AGENT_GIT_STANDARD.md`](./AGENT_GIT_STANDARD.md). Summary:
+Commit 与 PR 规则：
 
 - Commit subject: `<type>(<scope>)[<agent-id>]: <short title>`.
 - Required trailers: `Issue`, `Agent`, `Human-Owner`.
