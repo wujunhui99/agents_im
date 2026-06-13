@@ -14,10 +14,10 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 
-	"github.com/wujunhui99/agents_im/internal/transfer"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/chain"
+	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/transfer"
 )
 
 // 全链 roundtrip：publish message.submitted → toTransfer 消费（dedup + Redis seq

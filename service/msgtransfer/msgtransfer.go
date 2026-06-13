@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/internal/transfer"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/health"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/chain"
+	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/transfer"
 )
 
 func readinessMessage(err error) string {

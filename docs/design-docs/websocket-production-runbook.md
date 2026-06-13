@@ -223,8 +223,8 @@ Dispatcher:
 
 新增 HTTP dispatcher：
 
-- `internal/transfer/gateway_http_dispatcher.go`
-- `internal/transfer/gateway_http_dispatcher_test.go`
+- `service/msgtransfer/internal/transfer/gateway_http_dispatcher.go`
+- `service/msgtransfer/internal/transfer/gateway_http_dispatcher_test.go`
 
 核心行为：
 
@@ -477,8 +477,8 @@ kubectl -n agents-im get deploy msggateway message-transfer -o wide
 - `internal/gateway/ws/delivery.go`
 - `internal/gateway/delivery/delivery.go`
 - `cmd/message-transfer/main.go`
-- `internal/transfer/gateway_http_dispatcher.go`
-- `internal/transfer/gateway_http_dispatcher_test.go`
+- `service/msgtransfer/internal/transfer/gateway_http_dispatcher.go`
+- `service/msgtransfer/internal/transfer/gateway_http_dispatcher_test.go`
 - `tests/websocket_gateway_internal_delivery_test.go`
 - `deploy/k8s/etc/msggateway.yaml`
 - `deploy/k8s/etc/message-transfer.yaml`
