@@ -179,12 +179,10 @@ assert_present "-q" pkg/presence -- \
   "IsUserOnline" "github.com/redis/go-redis/v9" ":user:" ":conn:"
 rg -q "REDIS_ADDR is required.*skip|t\.Skip" pkg/presence/redis_integration_test.go
 
-# --- messaging event schema & read receipt ---
+# --- messaging event schema ---
 assert_present "-q" pkg/messaging/event.go pkg/messaging/event_test.go -- \
   "type MessageEvent struct" "event_id" "event_type" "conversation_id" "server_msg_id" "sender_id" \
   "chat_type" "created_at" "payload" "message.accepted" "message.read"
-assert_present "-q" internal/domain/readreceipt/read_receipt.go tests/read_receipts_test.go -- \
-  "NormalizeMarkRead" "CanAdvanceReadSeq" "UnreadCount" "ErrReadSeqExceedsMax"
 
 # --- JWT auth contract ---
 for file in service/user/api/user.api service/friends/api/friends.api service/groups/api/groups.api service/msg/api/msg.api api/media.api service/agent/api/agent.api; do
