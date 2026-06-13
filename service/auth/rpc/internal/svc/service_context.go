@@ -7,13 +7,13 @@ import (
 
 	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	"github.com/wujunhui99/agents_im/internal/adminbootstrap"
-	business "github.com/wujunhui99/agents_im/internal/auth/logic"
-	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
 	userrepo "github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/service/auth/core/adminbootstrap"
+	business "github.com/wujunhui99/agents_im/service/auth/core/logic"
+	"github.com/wujunhui99/agents_im/service/auth/core/mailadapter"
+	authrepo "github.com/wujunhui99/agents_im/service/auth/core/repository"
+	"github.com/wujunhui99/agents_im/service/auth/core/useradapter"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
 
@@ -27,7 +27,9 @@ type ServiceContext struct {
 	UserLogic *userlogic.UserLogic
 
 	// goctl 数据层（auth 域自有，不走 internal/）：EnsureTestCredential 用。
-	// auth 域整体重构（退役 internal/auth）后，上面的 monolith 依赖将全部并入这里。
+	// auth 域真相已搬到 service/auth/core（脱 internal/auth）；上面仍依赖的
+	// internal/logic（UserLogic）+ internal/repository 属 user 域 monolith，
+	// 待 user 域迁移后并入这里、auth 域再 goctl 化。
 	Credentials model.AuthCredentialsModel
 	// AccountsGuard 是跨域鉴权读 keystone 例外（详见 model/accounts_guard.go 注释）。
 	AccountsGuard model.AccountsGuardModel

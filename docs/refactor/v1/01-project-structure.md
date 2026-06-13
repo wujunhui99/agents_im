@@ -15,7 +15,7 @@
 
 | 域       | 老位置（internal）                                   | 新位置（service）                | 入口（service main 包）         | 状态 |
 |----------|------------------------------------------------------|----------------------------------|---------------------|------|
-| auth     | `internal/auth/{logic,repository,token,...}`、`internal/servicecontext/auth/` | `service/auth/{api,rpc}/...`     | `service/auth/{api,rpc}`（goctl main） | ✅ 已迁 |
+| auth     | （已清空——`internal/auth/*`+`internal/adminbootstrap` 平移到 `service/auth/core/*`，顶层 internal 不再有 auth 代码）| `service/auth/{api,rpc}/...` + `service/auth/core/*`（域逻辑/repository，被 rpc 与 e2e single-machine 共享）| `service/auth/{api,rpc}`（goctl main） | ✅ 已迁（核心移 core，数据层未 goctl，见 progress 表）|
 | user     | `internal/logic/user/`、`internal/handler/user/`、`internal/servicecontext/user/` | `service/user/{api,rpc}/...`     | `service/user/{api,rpc}` | ✅ 已迁 |
 | friends  | `internal/logic/friends/`、`internal/handler/friends/`、`internal/servicecontext/friends/`、`internal/rpcgen/friends` | `service/friends/{api,rpc}/...`  | `service/friends/{api,rpc}` | ⚠️ 双轨在跑 |
 | groups   | `internal/logic/groups/`、`internal/handler/groups/`、`internal/servicecontext/groups/`、`internal/rpcgen/groups` | `service/groups/{api,rpc}/...`   | `service/groups/{api,rpc}`   | ⚠️ 双轨在跑 |
@@ -231,7 +231,7 @@ agents_im/
 12. **建 service/msg**（最大块，单独 epic）：搬 `internal/logic/message`、`internal/handler/message`、`internal/servicecontext/message`、`internal/rpcgen/message`；按 07 文档扩展为 10 个 RPC。
 13. **建 service/msggateway**：搬 `internal/gateway/`；按 03 §7 砍业务依赖（00-decisions D8）。
 14. **建 service/msgtransfer 与 service/push**：搬 `internal/transfer/`；按 03 §3.1 拆出 push（00-decisions D3）。
-15. **拆 internal/agent 残部**（04 §3）：`internal/agentim/`、`internal/agentruntime/`、`internal/agenteval/`、`internal/auth/`、`internal/logic/agent*` → 全部进入 `service/agent/rpc/internal/{trigger,orchestrator,hosting,imadapter,audit,runtime,eval}/`。
+15. **拆 internal/agent 残部**（04 §3）：`internal/agentim/`、`internal/agentruntime/`、`internal/agenteval/`、`internal/logic/agent*` → 全部进入 `service/agent/rpc/internal/{trigger,orchestrator,hosting,imadapter,audit,runtime,eval}/`。（`internal/auth/` 已单独平移到 `service/auth/core`，不并入 agent。）
 16. **internal/repository 按域拆为 goctl model**（D13）：每搬一个 service，就用 `goctl model pg` 从 `db/migrations` 生成该域 model 落 `service/<domain>/rpc/internal/model/`（自定义查询写 custom 区），**不保留 repository 抽象**；最终 `internal/repository/` 整目录删除。
 
 ### Stage 5 — 收尾验证

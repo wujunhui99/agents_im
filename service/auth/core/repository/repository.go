@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/auth/model"
+	"github.com/wujunhui99/agents_im/service/auth/core/model"
 )
 
 type CredentialRepository interface {

@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/service/auth/core/mailadapter"
+	authrepo "github.com/wujunhui99/agents_im/service/auth/core/repository"
 	mailpb "github.com/wujunhui99/agents_im/service/third/rpc/mail"
 	"google.golang.org/grpc"
 )

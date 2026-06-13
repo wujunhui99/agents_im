@@ -96,7 +96,7 @@ func TestEnsureTestCredentialCreatesBcryptCredential(t *testing.T) {
 	if row.algo != passwordAlgoDBBcrypt {
 		t.Fatalf("password_algo = %d, want %d (bcrypt)", row.algo, passwordAlgoDBBcrypt)
 	}
-	// 登录校验端（internal/auth bcrypt-v1）用 bcrypt.CompareHashAndPassword 验证同一列。
+	// 登录校验端（service/auth/core bcrypt-v1）用 bcrypt.CompareHashAndPassword 验证同一列。
 	if bcrypt.CompareHashAndPassword([]byte(row.hash), []byte("super-secret-pw")) != nil {
 		t.Fatal("stored hash does not verify the requested password")
 	}

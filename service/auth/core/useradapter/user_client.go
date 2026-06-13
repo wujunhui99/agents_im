@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	// 过渡依赖：auth 注册需创建 user，暂调 user 域 monolith logic。
+	// 待 user 域迁移（退役 internal/logic）后改走 user-rpc。
 	userlogic "github.com/wujunhui99/agents_im/internal/logic"
 )
 

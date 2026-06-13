@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/wujunhui99/agents_im/common/share/model"
-	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/config"
+	authlogic "github.com/wujunhui99/agents_im/service/auth/core/logic"
+	authrepo "github.com/wujunhui99/agents_im/service/auth/core/repository"
 )
 
 func TestEnsureAdminAccountCreatesLoginableAdmin(t *testing.T) {

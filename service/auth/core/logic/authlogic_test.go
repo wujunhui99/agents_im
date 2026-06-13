@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/service/auth/core/mailadapter"
+	authrepo "github.com/wujunhui99/agents_im/service/auth/core/repository"
+	"github.com/wujunhui99/agents_im/service/auth/core/useradapter"
 )
 
 func TestRegistrationEmailCodeRequestSendsMailAndRegisterConsumesCode(t *testing.T) {

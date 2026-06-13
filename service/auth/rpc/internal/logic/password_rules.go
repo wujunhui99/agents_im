@@ -9,13 +9,13 @@ import (
 )
 
 // passwordAlgoDBBcrypt 是 auth_credentials.password_algo 的 bcrypt 取值，与
-// internal/auth 的 `bcrypt-v1` 契约一致：登录校验端（internal/auth/logic 的
+// service/auth/core 的 `bcrypt-v1` 契约一致：登录校验端（service/auth/core/logic 的
 // BcryptPasswordHasher）按 algo=1 用 bcrypt.CompareHashAndPassword 验证。
-// bcrypt 哈希自带盐与 cost，无需 salt 列。auth 域整体重构（退役 internal/auth）
+// bcrypt 哈希自带盐与 cost，无需 salt 列。auth 域整体重构（退役 service/auth/core）
 // 时哈希实现统一迁入此处。
 const passwordAlgoDBBcrypt int64 = 1
 
-// validatePassword 与 internal/auth/logic 的注册密码规则一致：非空、8~128 字符。
+// validatePassword 与 service/auth/core/logic 的注册密码规则一致：非空、8~128 字符。
 func validatePassword(password string) error {
 	if strings.TrimSpace(password) == "" {
 		return apperror.InvalidArgument("password is required")

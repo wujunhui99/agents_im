@@ -12,12 +12,12 @@ import (
 
 	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
-	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
-	"github.com/wujunhui99/agents_im/internal/auth/useradapter"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	authlogic "github.com/wujunhui99/agents_im/service/auth/core/logic"
+	"github.com/wujunhui99/agents_im/service/auth/core/mailadapter"
+	authrepo "github.com/wujunhui99/agents_im/service/auth/core/repository"
+	"github.com/wujunhui99/agents_im/service/auth/core/useradapter"
 )
 
 func main() {

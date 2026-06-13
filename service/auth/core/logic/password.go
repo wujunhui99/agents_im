@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 
-	"github.com/wujunhui99/agents_im/internal/auth/model"
+	"github.com/wujunhui99/agents_im/service/auth/core/model"
 	"golang.org/x/crypto/bcrypt"
 )
 

@@ -1,7 +1,7 @@
 package logic
 
 import (
-	business "github.com/wujunhui99/agents_im/internal/auth/logic"
+	business "github.com/wujunhui99/agents_im/service/auth/core/logic"
 	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 )
 

@@ -16,10 +16,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/wujunhui99/agents_im/common/share/agentaudit"
 	"github.com/wujunhui99/agents_im/common/share/model"
-	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	authmodel "github.com/wujunhui99/agents_im/service/auth/core/model"
+	authrepo "github.com/wujunhui99/agents_im/service/auth/core/repository"
 )
 
 func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {

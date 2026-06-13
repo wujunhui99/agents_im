@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/wujunhui99/agents_im/internal/auth/model"
+	"github.com/wujunhui99/agents_im/service/auth/core/model"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 

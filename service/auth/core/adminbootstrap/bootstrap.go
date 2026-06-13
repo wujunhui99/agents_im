@@ -5,9 +5,10 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/common/share/model"
-	authlogic "github.com/wujunhui99/agents_im/internal/auth/logic"
-	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
+	authlogic "github.com/wujunhui99/agents_im/service/auth/core/logic"
+	authmodel "github.com/wujunhui99/agents_im/service/auth/core/model"
+	authrepo "github.com/wujunhui99/agents_im/service/auth/core/repository"
+	// 过渡依赖：bootstrap 建 admin user 暂调 user 域 monolith logic；待 user 域迁移后改走 user-rpc。
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/config"
