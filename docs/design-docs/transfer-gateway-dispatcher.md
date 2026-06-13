@@ -14,7 +14,7 @@ Message Transfer owns accepted-message event processing, idempotency, and retry 
 
 ## Goals
 
-- Implement a `transfer.DeliveryDispatcher` adapter under `internal/transfer/gateway`.
+- Implement a `transfer.DeliveryDispatcher` adapter under `service/msgtransfer/internal/transfer/gateway`.
 - Convert `message.accepted` transfer events into Gateway `message_received` delivery events.
 - Deliver only to direct recipient user IDs already present on the transfer event.
 - Make offline and malformed-recipient outcomes deterministic.
@@ -30,7 +30,7 @@ Message Transfer owns accepted-message event processing, idempotency, and retry 
 
 ## Adapter Contract
 
-Package: `internal/transfer/gateway`
+Package: `service/msgtransfer/internal/transfer/gateway`
 
 `Dispatcher` wraps an existing `internal/gateway/delivery.Dispatcher` and implements:
 
@@ -84,4 +84,4 @@ Required validation for this branch:
 - `bash scripts/verify-static.sh`
 - `docker compose config`
 
-Targeted tests live in `internal/transfer/gateway/dispatcher_test.go` and cover successful delivery conversion, offline handling, no-recipient handling, worker idempotency for duplicate events, and retry classification with `RetryDecision`.
+Targeted tests live in `service/msgtransfer/internal/transfer/gateway/dispatcher_test.go` and cover successful delivery conversion, offline handling, no-recipient handling, worker idempotency for duplicate events, and retry classification with `RetryDecision`.

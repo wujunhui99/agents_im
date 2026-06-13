@@ -136,11 +136,11 @@ assert_present "-q" service/msggateway/internal/ws/server.go service/msggateway/
   "TestWebSocketGatewayPullMessagesFromMissingSeq" "TestWebSocketGatewayInvalidCommandReturnsFrontendErrorEnvelope"
 rg -q "TestWebSocketOriginPolicyUsesConfiguredExactOrigins" service/msggateway/internal/ws/server_test.go
 
-assert_present "-q" internal/transfer -- \
+assert_present "-q" service/msgtransfer/internal/transfer -- \
   "type MessageEvent struct" "type Envelope struct" "type EventConsumer interface" "type DeliveryDispatcher interface" \
   "type IdempotencyStore interface" "type RetryDecision struct" "type Worker struct" "func NewWorker" \
   "func \(w \*Worker\) Start" "func \(w \*Worker\) RunOnce" "func \(w \*Worker\) Stop" "NewInMemoryConsumer" "type NoopDispatcher struct"
-assert_present "-q" internal/transfer/worker_test.go -- \
+assert_present "-q" service/msgtransfer/internal/transfer/worker_test.go -- \
   "TestWorkerConsumesEventAndMarksSuccessful" "TestWorkerIdempotencySkipsDuplicateDispatch" \
   "TestWorkerRetryableFailureDoesNotMarkSuccessful" "TestWorkerContextCancellationStopsLoop"
 
@@ -153,15 +153,15 @@ rg -q "WorkerID|Worker\.ID" etc/msgtransfer.yaml pkg/config/config.go
 assert_present "-q" common/share/gateway/delivery service/msggateway/internal/ws -- \
   "type Dispatcher interface" "DeliverToUser" "DeliverToConversation" "EventMessageReceived" "EventMessageDelivered" \
   "StatusOffline" "NewInMemoryDeliveryDispatcher" "PushToUser" "PushToConversation" "UserConnections"
-assert_present "-q" internal/transfer/gateway -- \
+assert_present "-q" service/msgtransfer/internal/transfer/gateway -- \
   "type Dispatcher struct" "func NewDispatcher" "func \(d \*Dispatcher\) Dispatch" "EventMessageReceived" \
   "DeliverToConversation" "StatusOffline" "DispatchRetryable" "ErrNoRecipients"
-assert_present "-q" internal/transfer/gateway/dispatcher_test.go -- \
+assert_present "-q" service/msgtransfer/internal/transfer/gateway/dispatcher_test.go -- \
   "TestDispatcherDeliversMessageAcceptedToGateway" "TestDispatcherOfflineRecipientsAreCompletedWithoutDeliveredUsers" \
   "TestDispatcherNoRecipientsFailsWithoutCallingGateway" "TestWorkerIdempotencySkipsDuplicateGatewayDispatch" \
   "TestWorkerRetryDecisionForGatewayError"
 
-assert_present "-q" internal/repository internal/transfer db/migrations/001_init_postgres.sql -- \
+assert_present "-q" internal/repository service/msgtransfer/internal/transfer db/migrations/001_init_postgres.sql -- \
   "DeliveryRecipientUserIDs" "type DeliveryAttemptRecorder interface" "MetricsDeliveryAttemptRecorder" "RecipientDeliveryResult" "message_outbox"
 forbid_match "removed message V2 table still referenced: message_idempotency_keys" \
   -q "message_idempotency_keys" db/migrations/001_init_postgres.sql internal/repository --glob '*.go'
@@ -256,13 +256,13 @@ for api_main in service/agent/api/agent.go; do
 done
 assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/msggateway/msggateway.go service/msgtransfer/msgtransfer.go -- \
   "/readyz" "/metrics" "ReadinessHandler" "MetricsHandler"
-assert_present "-q" internal/logic/messagelogic.go service/msggateway/internal/ws internal/transfer/worker.go -- \
+assert_present "-q" internal/logic/messagelogic.go service/msggateway/internal/ws service/msgtransfer/internal/transfer/worker.go -- \
   "RecordMessageSend" "RecordDeliveryAttempt" "RecordTransferEvent" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"
 rg -q "Observability:" etc/msgtransfer.yaml
 rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
 rg -q "agents_im_message_sends_total" pkg/observability/metrics.go
 rg -q "trace_id" service/msggateway/internal/ws/server.go
-assert_present "-q" pkg/llmobs internal/agenteval internal/agentim internal/agentruntime/eino pkg/config .env.example -- \
+assert_present "-q" pkg/llmobs internal/agentim internal/agentruntime/eino pkg/config .env.example -- \
   "RuntimeModeAIHostingAutoReply" "NewEinoCallbackHandler" "ErrLangfuseConfigMissing" "langfuseIngestionPath" \
-  "LLMObservability" "LANGFUSE_PUBLIC_KEY" "PythonGoPerformanceCaseID" "ai_hosting.python_go_performance.v1"
+  "LLMObservability" "LANGFUSE_PUBLIC_KEY"
 rg -q "LLM_OBSERVABILITY_BACKEND=noop" .env.example

@@ -19,7 +19,7 @@ This phase adds the worker shape and testable contracts only. It does not requir
 ## Goals
 
 - Add `cmd/message-transfer` as the worker entry point.
-- Define worker-facing event, consumer, dispatcher, retry, and idempotency interfaces under `internal/transfer`.
+- Define worker-facing event, consumer, dispatcher, retry, and idempotency interfaces under `service/msgtransfer/internal/transfer`.
 - Keep the default runtime as in-memory consumer plus noop dispatcher.
 - Document how future OutboxRepository, EventBus, and DeliveryDispatcher implementations plug into the worker.
 - Cover consume, dispatch, retryable failure, idempotency, and cancellation behavior with in-memory tests.
@@ -61,7 +61,7 @@ The default `memory` consumer starts with an empty queue. The default `noop` dis
 
 ## Event Contract
 
-`internal/transfer.MessageEvent` mirrors the future `message.accepted` event from [`message-chain-contract.md`](./message-chain-contract.md):
+`service/msgtransfer/internal/transfer.MessageEvent` mirrors the future `message.accepted` event from [`message-chain-contract.md`](./message-chain-contract.md):
 
 ```text
 event_id
@@ -156,7 +156,7 @@ docker compose config
 npx --yes markdown-link-check@3.13.7 --config .github/markdown-link-check.json $(find . -name "*.md" -not -path "./.git/*" -not -path "./docs/references/*" -print)
 ```
 
-Current tests live in [`../../internal/transfer/worker_test.go`](../../internal/transfer/worker_test.go) and cover successful consume/dispatch, duplicate idempotency behavior, retryable failure, and context cancellation.
+Current tests live in [`../../service/msgtransfer/internal/transfer/worker_test.go`](../../service/msgtransfer/internal/transfer/worker_test.go) and cover successful consume/dispatch, duplicate idempotency behavior, retryable failure, and context cancellation.
 
 ## Risks and Follow-ups
 

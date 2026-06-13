@@ -10,9 +10,9 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/wujunhui99/agents_im/internal/transfer"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/observability"
+	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/transfer"
 )
 
 // KafkaPushConsumer adapts msg.toPush.v1 to the existing transfer.Worker
@@ -24,8 +24,8 @@ import (
 // redelivers from Kafka (unless a later offset on the same partition was already
 // committed, which implicitly commits the earlier one; push is best-effort beyond
 // that — the message is durably in PG and clients converge by pulling, 03 §8.3).
-// It is a keystone exception that this package imports internal/transfer; both
-// go away together (B3/C2).
+// This package consumes the service-local transfer package
+// (service/msgtransfer/internal/transfer); both go away together (B3/C2).
 type KafkaPushConsumer struct {
 	client  *kgo.Client
 	pending chan pushEnvelope

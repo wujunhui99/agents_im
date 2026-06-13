@@ -10,10 +10,10 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/wujunhui99/agents_im/internal/transfer"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/model"
+	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/transfer"
 )
 
 // Chain wires the Kafka write pipeline (03 §9 B1): toTransfer hot path,
