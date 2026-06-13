@@ -1,0 +1,218 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-replica
+  namespace: agents-im
+  labels:
+    app: postgres-replica
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres-replica
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-replica-public
+  namespace: agents-im
+  labels:
+    app: postgres-replica
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app: postgres-replica
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-replica-config
+  namespace: agents-im
+  labels:
+    app: postgres-replica
+data:
+  pg_hba.conf: |
+    local   all             all                                     trust
+    hostssl all             agenticim_readonly  0.0.0.0/0           scram-sha-256 clientcert=verify-full
+    hostssl all             agenticim_readonly  ::/0                scram-sha-256 clientcert=verify-full
+    host    all             all                0.0.0.0/0            reject
+    host    all             all                ::/0                 reject
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-replica
+  namespace: agents-im
+  labels:
+    app: postgres-replica
+spec:
+  serviceName: postgres-replica
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-replica
+  template:
+    metadata:
+      labels:
+        app: postgres-replica
+    spec:
+      initContainers:
+        - name: init-replica
+          image: postgres:16-alpine
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: PRIMARY_HOST
+              value: postgres.agents-im.svc.cluster.local
+            - name: PRIMARY_PORT
+              value: "5432"
+            - name: REPLICATION_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-replica-auth
+                  key: REPLICATION_USER
+            - name: REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-replica-auth
+                  key: REPLICATION_PASSWORD
+          command:
+            - sh
+            - -ec
+            - |
+              apply_replica_overrides() {
+                touch "${PGDATA}/postgresql.auto.conf"
+                sed -i \
+                  -e "/^hot_standby = /d" \
+                  -e "/^default_transaction_read_only = /d" \
+                  -e "/^ssl = /d" \
+                  -e "/^ssl_ca_file = /d" \
+                  -e "/^ssl_cert_file = /d" \
+                  -e "/^ssl_key_file = /d" \
+                  -e "/^ssl_min_protocol_version = /d" \
+                  -e "/^hba_file = /d" \
+                  -e "/^max_connections = /d" \
+                  -e "/^shared_buffers = /d" \
+                  -e "/^work_mem = /d" \
+                  -e "/^maintenance_work_mem = /d" \
+                  "${PGDATA}/postgresql.auto.conf"
+                cat >> "${PGDATA}/postgresql.auto.conf" <<'EOF'
+              hot_standby = 'on'
+              default_transaction_read_only = 'on'
+              ssl = 'on'
+              ssl_ca_file = '/etc/postgres-replica/tls/ca.crt'
+              ssl_cert_file = '/etc/postgres-replica/tls/tls.crt'
+              ssl_key_file = '/etc/postgres-replica/tls/tls.key'
+              ssl_min_protocol_version = 'TLSv1.2'
+              hba_file = '/etc/postgres-replica/config/pg_hba.conf'
+              max_connections = '100'
+              shared_buffers = '64MB'
+              work_mem = '4MB'
+              maintenance_work_mem = '64MB'
+              EOF
+              }
+
+              mkdir -p /etc/postgres-replica/tls
+              cp /etc/postgres-replica/tls-secret/ca.crt /etc/postgres-replica/tls/ca.crt
+              cp /etc/postgres-replica/tls-secret/tls.crt /etc/postgres-replica/tls/tls.crt
+              cp /etc/postgres-replica/tls-secret/tls.key /etc/postgres-replica/tls/tls.key
+              chown -R 70:70 /etc/postgres-replica/tls
+              chmod 600 /etc/postgres-replica/tls/tls.key
+              chmod 644 /etc/postgres-replica/tls/ca.crt /etc/postgres-replica/tls/tls.crt
+
+              if [ -s "${PGDATA}/PG_VERSION" ]; then
+                apply_replica_overrides
+                chown -R 70:70 "${PGDATA}" /etc/postgres-replica/tls
+                exit 0
+              fi
+
+              rm -rf "${PGDATA}"
+              mkdir -p "${PGDATA}"
+              chmod 700 "${PGDATA}"
+
+              export PGPASSWORD="${REPLICATION_PASSWORD}"
+              until pg_isready -h "${PRIMARY_HOST}" -p "${PRIMARY_PORT}" -U "${REPLICATION_USER}" -d postgres >/dev/null 2>&1; do
+                sleep 2
+              done
+              pg_basebackup \
+                -h "${PRIMARY_HOST}" \
+                -p "${PRIMARY_PORT}" \
+                -U "${REPLICATION_USER}" \
+                -D "${PGDATA}" \
+                -Fp \
+                -Xs \
+                -R \
+                -S agents_im_replica_slot
+
+              apply_replica_overrides
+              chown -R 70:70 "${PGDATA}" /etc/postgres-replica/tls
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: server-tls-secret
+              mountPath: /etc/postgres-replica/tls-secret
+              readOnly: true
+            - name: server-tls
+              mountPath: /etc/postgres-replica/tls
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U agenticim_readonly -d agents_im"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 384Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-replica-config
+              mountPath: /etc/postgres-replica/config
+              readOnly: true
+            - name: server-tls
+              mountPath: /etc/postgres-replica/tls
+              readOnly: true
+      volumes:
+        - name: postgres-replica-config
+          configMap:
+            name: postgres-replica-config
+        - name: server-tls-secret
+          secret:
+            secretName: postgres-replica-server-tls
+            defaultMode: 0400
+        - name: server-tls
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 5Gi
