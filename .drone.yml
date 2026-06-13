@@ -37,10 +37,11 @@ services:
       - --advertise-kafka-addr
       - PLAINTEXT://redpanda:9092
 
-# 提速（#488）：步骤 DAG 并行 + host 缓存卷 /opt/agents-im/ci-cache（repo trusted=true）。
-# Go module/build cache 与 goctl 二进制跨构建复用；npm cache 同理。
-# postgres-integration 串在 backend 后复用热 GOCACHE——runner 与 prod 同宿主（4C/8G），
-# 并行双份全量 Go 编译会挤资源。
+# 提速（#488/#521）：步骤 DAG 并行 + host 缓存卷 /opt/agents-im/ci-cache（repo trusted=true）。
+# Go module/build cache 与 goctl 二进制跨构建复用；npm cache 同理。缓存卷在宿主常驻、
+# 跨 build 持久（docker image prune 只动镜像层、不碰 host 卷），所以 postgres-integration
+# 无需串在 backend 后等它焐热 GOCACHE——上一次 build 的热缓存已在，并行即享热缓存、走增量
+# 编译（非整份全量），故全部 verify 步骤并行。
 steps:
   - name: backend-verification
     image: golang:1.25-bookworm
@@ -108,7 +109,7 @@ steps:
   - name: postgres-integration
     image: golang:1.25-bookworm
     depends_on:
-      - backend-verification
+      - clone
     environment:
       DATABASE_URL: postgres://agents_im:agents_im_dev_password@postgres:5432/agents_im?sslmode=disable
       REDIS_ADDR: redis:6379
