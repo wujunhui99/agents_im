@@ -112,41 +112,6 @@ make frontend-start FRONTEND_HOST=127.0.0.1 FRONTEND_PORT=5173
 
 The local message chain mirrors production (03 §9 B3b single rail): `docker compose up -d redpanda` provides Kafka, msg-rpc publishes `msg.toTransfer.v1`, and `msgtransfer` allocates seqs, persists to Postgres, and dispatches `message_received` to `msggateway`. msg-rpc and msgtransfer fail fast at startup when `KAFKA_BROKERS` (default `localhost:19092`) is unreachable or unset.
 
-## Single-machine E2E Smoke Command
-
-A fast in-process smoke command exists for the core single-machine flow when the external dev environment is unavailable or polluted by stale processes:
-
-```bash
-PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./test/e2e/single-machine
-```
-
-It uses real business logic in one process to validate:
-
-1. register Alice;
-2. register Bob;
-3. add Bob as Alice's friend;
-4. send a single-chat message through message logic;
-5. pull the message as Bob.
-
-Since 03 §9 A3, `msggateway` no longer assembles monolith message logic in-process (its 4 ws commands go through msg-rpc gRPC), so this smoke no longer includes a WebSocket leg; ws behavior is covered by `service/msggateway/internal/ws` tests (fake msg-rpc backend + `/internal/delivery/conversation` push).
-
-This is a smoke check, not a replacement for full local runtime E2E with Docker middleware and bound HTTP ports. Full E2E should still use `make start`, real REST APIs, WebSocket gateway, PostgreSQL, Redis, and MinIO when the environment is clean.
-
-### Local E2E Debug Notes
-
-Recent single-machine E2E hardening work was consolidated into long-lived docs instead of keeping temporary fix notes under `docs/local-e2e*` or `docs/ws-live-delivery*`. The old temporary notes were removed after their durable content was merged here and into `docs/design-docs/websocket-gateway.md`.
-
-The related git commits are:
-
-```text
-bbba8fe Document local e2e commit
-a1a0b93 Add single-machine e2e fallback
-ae6922d Wire websocket send to live delivery
-e92e484 Fix dev demo cleanup trap
-```
-
-Environment note from the debug session: on one local machine, default ports `8080-8085` were occupied by root-owned `.dev/bin/*` processes. Without elevated permissions, the current user could not stop or replace those processes. Use alternate ports with `AGENTS_IM_DEV_STATE_DIR` as shown above, or clean the root-owned processes externally before using default ports.
-
 ## Ports
 
 本地服务名和 package path 以 `Makefile` 为准；启动顺序、生成配置和默认端口以 `scripts/dev-up.sh` 为准。下表只作常用端口概览。

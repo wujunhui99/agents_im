@@ -36,7 +36,6 @@ db/migrations/       PostgreSQL schema 迁移
 proto/               gRPC proto 和生成代码
 scripts/             本地启动、迁移、demo data、静态验证脚本
 tests/               跨服务契约和 MVP smoke 测试
-test/e2e/            单机 e2e 烟测入口（single-machine）
 web/                 React/Vite 前端
 docs/                架构、产品规格、设计文档、执行计划和开发文档
 deploy/              k3s 应用部署清单、生产中间件 Compose、部署说明
@@ -153,27 +152,6 @@ scripts/dev-demo-data.sh
 
 脚本会打印 demo ID 和 conversation ID，不打印 token 或密码。
 
-## 单机 Smoke E2E
-
-当 Docker、本地端口或外部服务环境不可用时，可以运行快速单进程 smoke：
-
-```bash
-PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./test/e2e/single-machine
-```
-
-该命令会在一个进程内验证：
-
-1. 注册 Alice；
-2. 注册 Bob；
-3. Alice 添加 Bob 为好友；
-4. 通过业务逻辑发送单聊消息；
-5. Bob 拉取消息；
-6. Alice/Bob 连接 WebSocket；
-7. Alice 通过 WebSocket 发送消息；
-8. Alice 收到 ACK，Bob 收到在线 `message_received` 推送。
-
-它是快速 smoke，不替代完整 Docker + REST + WebSocket 的本地 E2E。
-
 ## 验证命令
 
 提交前建议至少运行：
@@ -191,12 +169,6 @@ git diff --check
 npm run frontend:test
 npm run frontend:build
 npm run frontend:lint
-```
-
-本地端到端 smoke：
-
-```bash
-PATH=/tmp/go/bin:$HOME/go/bin:$PATH go run ./test/e2e/single-machine
 ```
 
 ## CI/CD 与部署
