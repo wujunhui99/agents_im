@@ -4,12 +4,12 @@
 
 ## 工作流
 
-- 端到端流程以 [`docs/AGENTIC_DEVELOPMENT_WORKFLOW.md`](./docs/AGENTIC_DEVELOPMENT_WORKFLOW.md) 为准：Issue -> `main` 任务分支/必要时独立 worktree -> 实现与验证 -> commit -> PR -> GitHub Merge Queue -> CI/部署/回归验证。
-- 纯文档改动可按任务授权免 Issue、免独立 worktree、免产品回归；仍走任务分支、PR、CI/Merge Queue。
-- 禁止直接 commit/push/merge 到 `main`；push、开 PR、merge 必须有任务明确授权。
-- 分支、commit、PR 规则见 [`docs/AGENT_GIT_STANDARD.md`](./docs/AGENT_GIT_STANDARD.md)：分支第二段必须是可信 Agent 名；每个开发 PR 只解决一个 Issue，PR body 包含 `Closes #<issue>`；commit 使用 Agent identity、规范 subject 和 trailers。
+- 端到端流程：Issue -> worktree + 任务分支 -> 实现与验证 -> commit -> PR(body 含 `Closes #<issue>`) -> CI/部署/回归验证。每个开发 PR 只解决一个 Issue。
+- 分支命名：`<type>/<agent-id>/issue-<number>-<task-desc>`；`<agent-id>` 用可信 Agent 名（`claude`/`codex`），CI 用 `scripts/ci/verify-agent-branch-name.sh` 校验。commit 用 Agent identity、规范 subject 与 trailers。
+- 纯文档改动免独立 worktree：在任务分支（`<type>` 用 `docs`）直接改文档、push、PR、merge；仍走 Issue 与 CI。
 - 解决 GitHub Issue 后必须评论一次，简要说明实现方式。
 - Claude Code 后台执行 `scripts/drone-watch.sh`；Codex 前台执行或自行轮询后台日志，必须报告 Drone 结果。
+- Git/PR 操作细节与本地验证命令见 [`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md)。
 
 ## 自我进化
 
@@ -25,14 +25,14 @@
 3. **根因优先**：修复前先复现、读完整错误、追踪数据流；不要未理解原因就堆补丁。
 4. **验证优先**：声称完成必须给出可重复命令；没有真实启动/请求时，只能说 contract/unit/static verification。
 5. **敏感信息脱敏**：不要输出 token、JWT、密码、cookie、DSN、访问凭据等敏感值；统一写 `[REDACTED]`。
-6. **文档按需读取**：先读本文件，再按任务类型读 [`docs/AGENT_TASK_GUIDE.md`](./docs/AGENT_TASK_GUIDE.md)；不要一次性读完整 `docs/`。
+6. **文档按需读取**：先读本文件，再按任务类型从 [`docs/design-docs/index.md`](./docs/design-docs/index.md) 与 [`docs/product-specs/index.md`](./docs/product-specs/index.md) 进入专题文档；不要一次性读完整 `docs/`。
 7. **数据库变更**：schema/data 变更必须新增 `db/migrations/*.sql`；已发布 migration 不可变。
 8. **禁用顶层 `internal/`**：`agents_im/internal`（monolith god-package）在退役中，新代码一律不得 import 或修改它；数据层用 goctl model 生成到 `service/<domain>/rpc/internal/model`（无 repository 层），做法见 `.claude/skills/refactor-domain-to-service`。存量 keystone 例外按该 skill 的台账处理。
 
 ## 项目目录
 
 - 项目概览：`agents_im` 是 Go/go-zero + React/Vite 的实时 IM 系统，覆盖账号、社交、消息、WebSocket、媒体和 Agent/AI runtime。
-- 任务专题与验证：[`docs/AGENT_TASK_GUIDE.md`](./docs/AGENT_TASK_GUIDE.md)
+- 任务定位：本地服务/端口/部署事实源以 `Makefile`（`make services`）、`scripts/dev-up.sh`、`scripts/detect-deploy-changes.py` 为准；生产冒烟见 [`docs/qa/prod-smoke.md`](./docs/qa/prod-smoke.md)。
 - 架构/开发：[`ARCHITECTURE.md`](./ARCHITECTURE.md)、[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)、[`docs/design-docs/index.md`](./docs/design-docs/index.md)、[`docs/product-specs/index.md`](./docs/product-specs/index.md)
-- 流程/协作：[`docs/AGENTIC_DEVELOPMENT_WORKFLOW.md`](./docs/AGENTIC_DEVELOPMENT_WORKFLOW.md)、[`docs/AGENT_GIT_STANDARD.md`](./docs/AGENT_GIT_STANDARD.md)、[`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md)
+- 流程/协作：[`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md)
 - 质量/产品/部署：[`docs/FRONTEND.md`](./docs/FRONTEND.md)、[`docs/PRODUCT_SENSE.md`](./docs/PRODUCT_SENSE.md)、[`docs/SECURITY.md`](./docs/SECURITY.md)、[`docs/RELIABILITY.md`](./docs/RELIABILITY.md)、[`deploy/README.md`](./deploy/README.md)

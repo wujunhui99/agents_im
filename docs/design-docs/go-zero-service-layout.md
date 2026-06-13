@@ -59,7 +59,7 @@ git config user.name 'Hermes (AI Agent)'
 git config user.email 'hermes@agents.noreply.local'
 ```
 
-分支名必须满足 `docs/AGENT_GIT_STANDARD.md`：
+分支名必须满足 `docs/GIT_WORKFLOW.md`：
 
 ```text
 <type>/<agent-name>/issue-<number>-<task-desc>
@@ -72,7 +72,7 @@ refactor/hermes/issue-281-user-rpc-service-layout
 refactor/eino/issue-282-friends-rpc-service-layout
 ```
 
-如果还没有 Issue，必须先创建 Issue，再创建分支和提交；开发 PR 必须只关闭一个 Issue。Codex worker 也必须 issue-first：接到迁移任务后先用 `gh issue create` 创建或复用一个明确匹配的 Issue，得到 Issue number 后再按 `docs/AGENT_GIT_STANDARD.md` 创建仓库认可的 agent 分支；如果当前仓库未允许 `codex` 作为第二路径段，就使用 Controller 指定的可信 agent 分支或明确失败报告 blocker。缺少 GitHub 权限时必须失败并报告 blocker，不能用 `issue-0`、不能假装已有 Issue。
+如果还没有 Issue，必须先创建 Issue，再创建分支和提交；开发 PR 必须只关闭一个 Issue。Codex worker 也必须 issue-first：接到迁移任务后先用 `gh issue create` 创建或复用一个明确匹配的 Issue，得到 Issue number 后再按 `docs/GIT_WORKFLOW.md` 创建仓库认可的 agent 分支；如果当前仓库未允许 `codex` 作为第二路径段，就使用 Controller 指定的可信 agent 分支或明确失败报告 blocker。缺少 GitHub 权限时必须失败并报告 blocker，不能用 `issue-0`、不能假装已有 Issue。
 
 ## Commit 规则
 
