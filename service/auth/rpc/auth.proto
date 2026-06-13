@@ -14,6 +14,9 @@ service Auth {
   // 凭据（密码哈希）是 auth 域数据；账户本体由 user-rpc CreateTestAccount 先建。
   // 已有凭据时直接重置为新密码（管理后台重复创建同名测试账户 = 重置密码）。
   rpc EnsureTestCredential(EnsureTestCredentialRequest) returns (EnsureTestCredentialResponse);
+  // EnsureAdminCredential 为管理员账号补齐首次登录凭据。
+  // 仅允许 account_type=admin；已有凭据时不覆盖密码，保持 bootstrap 幂等。
+  rpc EnsureAdminCredential(EnsureAdminCredentialRequest) returns (EnsureAdminCredentialResponse);
 }
 
 message RegisterRequest {
@@ -83,4 +86,16 @@ message EnsureTestCredentialResponse {
   string user_id = 1;
   string identifier = 2;
   bool rotated = 3;
+}
+
+message EnsureAdminCredentialRequest {
+  string user_id = 1;
+  string identifier = 2;
+  string password = 3;
+}
+
+message EnsureAdminCredentialResponse {
+  string user_id = 1;
+  string identifier = 2;
+  bool created = 3;
 }

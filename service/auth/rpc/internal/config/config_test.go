@@ -17,10 +17,6 @@ ListenOn: 127.0.0.1:19091
 TokenAuth:
   AccessSecret: "[REDACTED]"
   AccessExpire: 3600
-AdminBootstrap:
-  Identifier: amin
-  Password: "[REDACTED]"
-  DisplayName: 管理后台管理员
 StorageDriver: postgres
 DataSource: "[REDACTED]"
 MailRPC:
@@ -38,9 +34,6 @@ MailRPC:
 	}
 	if cfg.TokenAuth != (commonconfig.JWTAuthConfig{AccessSecret: "[REDACTED]", AccessExpire: 3600}) {
 		t.Fatalf("token auth config mismatch: accessSecretMatches=%v accessExpire=%d", cfg.TokenAuth.AccessSecret == "[REDACTED]", cfg.TokenAuth.AccessExpire)
-	}
-	if cfg.AdminBootstrap.Identifier != "amin" || cfg.AdminBootstrap.Password != "[REDACTED]" {
-		t.Fatalf("admin bootstrap config mismatch: identifier=%q passwordMatches=%v", cfg.AdminBootstrap.Identifier, cfg.AdminBootstrap.Password == "[REDACTED]")
 	}
 	if cfg.StorageDriver != commonconfig.StorageDriverPostgres || cfg.DataSource == "" {
 		t.Fatalf("storage config mismatch: driver=%q dataSourceEmpty=%v", cfg.StorageDriver, cfg.DataSource == "")

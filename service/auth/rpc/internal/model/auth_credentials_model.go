@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"errors"
 
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
@@ -16,6 +17,8 @@ type (
 		// UpsertPassword 创建或重置 account_id 对应凭据的密码（测试账户设置/重置密码用）。
 		// 已有凭据时只更新 password_hash/password_algo；返回 created=true 表示新建、false 表示重置。
 		UpsertPassword(ctx context.Context, accountID string, passwordHash string, passwordAlgo int64) (created bool, err error)
+		// InsertPasswordIfAbsent 仅在 account_id 没有凭据时创建密码；已有凭据不覆盖。
+		InsertPasswordIfAbsent(ctx context.Context, accountID string, passwordHash string, passwordAlgo int64) (created bool, err error)
 		// WithSession 返回绑定到给定事务 session 的 model，供 Logic 层在事务内复用。
 		WithSession(session sqlx.Session) AuthCredentialsModel
 		// Transact 暴露事务入口，事务边界由 Logic 层控制（Model 不自行编排业务事务）。
@@ -53,6 +56,21 @@ set password_hash = excluded.password_hash,
     updated_at = now()
 returning (xmax = 0) as created`
 	if err := m.conn.QueryRowCtx(ctx, &created, query, accountID, passwordHash, passwordAlgo); err != nil {
+		return false, err
+	}
+	return created, nil
+}
+
+func (m *customAuthCredentialsModel) InsertPasswordIfAbsent(ctx context.Context, accountID string, passwordHash string, passwordAlgo int64) (bool, error) {
+	var created bool
+	query := `insert into ` + m.table + ` (account_id, password_hash, password_algo)
+values ($1, $2, $3)
+on conflict (account_id) do nothing
+returning true as created`
+	if err := m.conn.QueryRowCtx(ctx, &created, query, accountID, passwordHash, passwordAlgo); err != nil {
+		if errors.Is(err, sqlx.ErrNotFound) {
+			return false, nil
+		}
 		return false, err
 	}
 	return created, nil

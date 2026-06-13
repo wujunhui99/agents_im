@@ -60,6 +60,8 @@ func registerObservabilityHandlers(server *rest.Server, serviceContext *svc.Serv
 				return []health.Check{
 					componentCheck("auth_config", serviceContext != nil && serviceContext.Config.Auth.AccessSecret != "", "configured"),
 					componentCheck("admin_rpc", serviceContext != nil && serviceContext.AdminRPC != nil, "configured"),
+					componentCheck("user_rpc", serviceContext != nil && serviceContext.UserRPC != nil, "configured"),
+					componentCheck("auth_rpc", serviceContext != nil && serviceContext.AuthRPC != nil, "configured"),
 				}
 			}),
 		},

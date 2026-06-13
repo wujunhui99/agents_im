@@ -7,10 +7,9 @@ import (
 
 type Config struct {
 	zrpc.RpcServerConf
-	TokenAuth      commonconfig.JWTAuthConfig
-	AdminBootstrap commonconfig.AdminBootstrapConfig `json:",optional"`
-	StorageDriver  string                            `json:",default=memory,options=memory|postgres|postgresql"`
-	DataSource     string                            `json:",optional"`
+	TokenAuth     commonconfig.JWTAuthConfig
+	StorageDriver string `json:",default=memory,options=memory|postgres|postgresql"`
+	DataSource    string `json:",optional"`
 	// SessionRedis (not "Redis") avoids colliding with zrpc.RpcServerConf.Redis
 	// (redis.RedisKeyConf), which go-zero would otherwise populate from this block
 	// and reject for a missing required Host. Holds the active-session store conn.

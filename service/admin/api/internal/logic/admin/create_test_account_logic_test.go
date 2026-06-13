@@ -67,6 +67,10 @@ func (f *fakeAuthRPC) EnsureTestCredential(_ context.Context, in *authpb.EnsureT
 	return &authpb.EnsureTestCredentialResponse{UserId: in.GetUserId(), Identifier: in.GetIdentifier()}, nil
 }
 
+func (f *fakeAuthRPC) EnsureAdminCredential(context.Context, *authpb.EnsureAdminCredentialRequest, ...grpc.CallOption) (*authpb.EnsureAdminCredentialResponse, error) {
+	panic("fakeAuthRPC.EnsureAdminCredential: unused")
+}
+
 func (f *fakeAuthRPC) RequestRegistrationEmailCode(context.Context, *authpb.RegistrationEmailCodeRequest, ...grpc.CallOption) (*authpb.RegistrationEmailCodeResponse, error) {
 	panic("fakeAuthRPC.RequestRegistrationEmailCode: unused")
 }

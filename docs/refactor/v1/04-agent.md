@@ -167,7 +167,7 @@ Eino 本身支持 ChatModel 抽象 — 但适配层把它和 `config.DeepSeekCon
 ### AG-13 🟡 Default Assistant 工具种子在迁移历史里
 `db/migrations/009_default_agent_creator_assistant.sql`、`010_default_assistant_python_execute_tool.sql`、`011_default_assistant_agent_create_tool.sql`、`012_agent_create_tool_schema_relaxation.sql` 四个 migration 都在配 default assistant 的 tool 绑定。说明工具绑定是"种子"性数据，但通过 migration 维护非常脆——schema 改动要小心保留这些种子。
 
-> 修复：把 seed 数据移出 migration，改成幂等的一次性 seed 命令（放 `test/e2e/` 同级的工具目录或 admin 服务的子命令）或者 admin-bootstrap 启动时 ensure。`internal/adminbootstrap/` 已经有类似逻辑，可以扩展。
+> 修复：把 seed 数据移出 migration，改成幂等的一次性 seed 命令（放 `test/e2e/` 同级的工具目录或 admin 服务的子命令）或者 admin-bootstrap 启动时 ensure。`service/admin/api/internal/bootstrap/` 已经有类似逻辑，可以扩展。
 
 ---
 

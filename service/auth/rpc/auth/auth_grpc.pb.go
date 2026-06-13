@@ -25,6 +25,7 @@ const (
 	Auth_ValidateToken_FullMethodName                = "/auth.v1.Auth/ValidateToken"
 	Auth_ParseToken_FullMethodName                   = "/auth.v1.Auth/ParseToken"
 	Auth_EnsureTestCredential_FullMethodName         = "/auth.v1.Auth/EnsureTestCredential"
+	Auth_EnsureAdminCredential_FullMethodName        = "/auth.v1.Auth/EnsureAdminCredential"
 )
 
 // AuthClient is the client API for Auth service.
@@ -40,6 +41,9 @@ type AuthClient interface {
 	// 凭据（密码哈希）是 auth 域数据；账户本体由 user-rpc CreateTestAccount 先建。
 	// 已有凭据时直接重置为新密码（管理后台重复创建同名测试账户 = 重置密码）。
 	EnsureTestCredential(ctx context.Context, in *EnsureTestCredentialRequest, opts ...grpc.CallOption) (*EnsureTestCredentialResponse, error)
+	// EnsureAdminCredential 为管理员账号补齐首次登录凭据。
+	// 仅允许 account_type=admin；已有凭据时不覆盖密码，保持 bootstrap 幂等。
+	EnsureAdminCredential(ctx context.Context, in *EnsureAdminCredentialRequest, opts ...grpc.CallOption) (*EnsureAdminCredentialResponse, error)
 }
 
 type authClient struct {
@@ -110,6 +114,16 @@ func (c *authClient) EnsureTestCredential(ctx context.Context, in *EnsureTestCre
 	return out, nil
 }
 
+func (c *authClient) EnsureAdminCredential(ctx context.Context, in *EnsureAdminCredentialRequest, opts ...grpc.CallOption) (*EnsureAdminCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EnsureAdminCredentialResponse)
+	err := c.cc.Invoke(ctx, Auth_EnsureAdminCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServer is the server API for Auth service.
 // All implementations must embed UnimplementedAuthServer
 // for forward compatibility.
@@ -123,6 +137,9 @@ type AuthServer interface {
 	// 凭据（密码哈希）是 auth 域数据；账户本体由 user-rpc CreateTestAccount 先建。
 	// 已有凭据时直接重置为新密码（管理后台重复创建同名测试账户 = 重置密码）。
 	EnsureTestCredential(context.Context, *EnsureTestCredentialRequest) (*EnsureTestCredentialResponse, error)
+	// EnsureAdminCredential 为管理员账号补齐首次登录凭据。
+	// 仅允许 account_type=admin；已有凭据时不覆盖密码，保持 bootstrap 幂等。
+	EnsureAdminCredential(context.Context, *EnsureAdminCredentialRequest) (*EnsureAdminCredentialResponse, error)
 	mustEmbedUnimplementedAuthServer()
 }
 
@@ -150,6 +167,9 @@ func (UnimplementedAuthServer) ParseToken(context.Context, *ValidateTokenRequest
 }
 func (UnimplementedAuthServer) EnsureTestCredential(context.Context, *EnsureTestCredentialRequest) (*EnsureTestCredentialResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EnsureTestCredential not implemented")
+}
+func (UnimplementedAuthServer) EnsureAdminCredential(context.Context, *EnsureAdminCredentialRequest) (*EnsureAdminCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EnsureAdminCredential not implemented")
 }
 func (UnimplementedAuthServer) mustEmbedUnimplementedAuthServer() {}
 func (UnimplementedAuthServer) testEmbeddedByValue()              {}
@@ -280,6 +300,24 @@ func _Auth_EnsureTestCredential_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Auth_EnsureAdminCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnsureAdminCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).EnsureAdminCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_EnsureAdminCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).EnsureAdminCredential(ctx, req.(*EnsureAdminCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Auth_ServiceDesc is the grpc.ServiceDesc for Auth service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -310,6 +348,10 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EnsureTestCredential",
 			Handler:    _Auth_EnsureTestCredential_Handler,
+		},
+		{
+			MethodName: "EnsureAdminCredential",
+			Handler:    _Auth_EnsureAdminCredential_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
