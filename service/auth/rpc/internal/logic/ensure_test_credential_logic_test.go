@@ -34,6 +34,14 @@ func (m *fakeCredentialsModel) UpsertPassword(_ context.Context, accountID strin
 	return !existed, nil
 }
 
+func (m *fakeCredentialsModel) InsertPasswordIfAbsent(_ context.Context, accountID string, passwordHash string, passwordAlgo int64) (bool, error) {
+	if _, existed := m.rows[accountID]; existed {
+		return false, nil
+	}
+	m.rows[accountID] = &fakeCredentialRow{hash: passwordHash, algo: passwordAlgo}
+	return true, nil
+}
+
 func (m *fakeCredentialsModel) WithSession(_ sqlx.Session) model.AuthCredentialsModel { return m }
 
 func (m *fakeCredentialsModel) Transact(ctx context.Context, fn func(ctx context.Context, session sqlx.Session) error) error {
@@ -150,5 +158,72 @@ func TestEnsureTestCredentialRejectsMissingAccountAndBadInput(t *testing.T) {
 	}
 	if _, err := logic.EnsureTestCredential(&auth.EnsureTestCredentialRequest{UserId: "ghost", Password: "short"}); err == nil {
 		t.Fatal("ensure with short password should fail")
+	}
+}
+
+func TestEnsureAdminCredentialCreatesBcryptCredential(t *testing.T) {
+	creds := newFakeCredentialsModel()
+	guard := &fakeAccountsGuard{types: map[string]int64{"admin-1": model.AccountTypeDBAdmin}}
+	logic := NewEnsureAdminCredentialLogic(context.Background(), newEnsureTestSvc(creds, guard))
+
+	resp, err := logic.EnsureAdminCredential(&auth.EnsureAdminCredentialRequest{
+		UserId:     "admin-1",
+		Identifier: "amin",
+		Password:   "admin-secret-pw",
+	})
+	if err != nil {
+		t.Fatalf("EnsureAdminCredential: %v", err)
+	}
+	if !resp.GetCreated() {
+		t.Fatal("first ensure should report credential created")
+	}
+	row := creds.rows["admin-1"]
+	if row == nil {
+		t.Fatal("credential row not written")
+	}
+	if row.algo != passwordAlgoDBBcrypt {
+		t.Fatalf("password_algo = %d, want %d (bcrypt)", row.algo, passwordAlgoDBBcrypt)
+	}
+	if bcrypt.CompareHashAndPassword([]byte(row.hash), []byte("admin-secret-pw")) != nil {
+		t.Fatal("stored hash does not verify the requested password")
+	}
+}
+
+func TestEnsureAdminCredentialDoesNotRotateExistingPassword(t *testing.T) {
+	creds := newFakeCredentialsModel()
+	guard := &fakeAccountsGuard{types: map[string]int64{"admin-1": model.AccountTypeDBAdmin}}
+	logic := NewEnsureAdminCredentialLogic(context.Background(), newEnsureTestSvc(creds, guard))
+
+	if _, err := logic.EnsureAdminCredential(&auth.EnsureAdminCredentialRequest{UserId: "admin-1", Password: "first-password"}); err != nil {
+		t.Fatalf("first ensure: %v", err)
+	}
+	firstHash := creds.rows["admin-1"].hash
+	resp, err := logic.EnsureAdminCredential(&auth.EnsureAdminCredentialRequest{UserId: "admin-1", Password: "second-password"})
+	if err != nil {
+		t.Fatalf("second ensure: %v", err)
+	}
+	if resp.GetCreated() {
+		t.Fatal("second ensure should not report credential created")
+	}
+	if creds.rows["admin-1"].hash != firstHash {
+		t.Fatal("admin ensure must not rotate an existing password")
+	}
+	if bcrypt.CompareHashAndPassword([]byte(creds.rows["admin-1"].hash), []byte("first-password")) != nil {
+		t.Fatal("existing hash no longer verifies the original password")
+	}
+}
+
+func TestEnsureAdminCredentialRejectsNonAdminAccount(t *testing.T) {
+	creds := newFakeCredentialsModel()
+	guard := &fakeAccountsGuard{types: map[string]int64{"test-1": model.AccountTypeDBTest, "user-1": 1}}
+	logic := NewEnsureAdminCredentialLogic(context.Background(), newEnsureTestSvc(creds, guard))
+
+	for _, id := range []string{"test-1", "user-1"} {
+		if _, err := logic.EnsureAdminCredential(&auth.EnsureAdminCredentialRequest{UserId: id, Password: "whatever-pw"}); err == nil {
+			t.Fatalf("ensure for non-admin account %q should fail", id)
+		}
+	}
+	if len(creds.rows) != 0 {
+		t.Fatal("no credential should be written for non-admin accounts")
 	}
 }

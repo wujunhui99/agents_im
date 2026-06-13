@@ -9,7 +9,8 @@ import (
 // accounts.account_type 的 DB 整型取值（smallint）。单一来源在 user 域
 // `service/user/rpc/internal/model/vars.go`；这里是跨域鉴权读所需的本地副本。
 const (
-	AccountTypeDBTest int64 = 3
+	AccountTypeDBAdmin int64 = 0
+	AccountTypeDBTest  int64 = 3
 )
 
 // AccountsGuardModel 是跨域鉴权读（keystone 例外）：accounts 是 user 域的表，

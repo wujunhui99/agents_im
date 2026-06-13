@@ -153,7 +153,7 @@
 - **登出**（auth-rpc）：`HDEL <device_type>`（当前设备）或 `DEL`（全设备）。
 - **每请求校验收口到 `pkg/jwtauth`**（不调 auth-rpc，零 RPC 跳）：① 本地验签 + 验 `exp`；② 从**已验签的** JWT 取 `jti`+`device_type`（`device_type` 必须来自签名 claim，**不能信请求头 / body**）→ `HGET user_active_sessions:{uid} <device_type>` → 比对 jti，不一致 / 缺失 → 401。
 - **TTL**：key 级 TTL，登录时刷新为最长 token 有效期；安全由本地 `exp` 校验 + jti 比对保证（Redis 滞留 field 不会放行已过期 token，仅占内存）。
-- **消费方迁移**：原 7 处 in-process 依赖 `internal/auth/repository.ActiveSessionRepository` 的鉴权点（agent-api / message-api / gateway-ws / admin-api + internal 的 adminbootstrap / gateway/ws / servicecontext/common）改 import `pkg/jwtauth` + 共享 Redis；`internal/auth` 删除后不再依赖 auth 代码。
+- **消费方迁移**：原 in-process 依赖 `internal/auth/repository.ActiveSessionRepository` 的鉴权点（agent-api / message-api / gateway-ws / admin-api + internal 的 gateway/ws / servicecontext/common）改 import `pkg/jwtauth` + 共享 Redis；`internal/auth` 删除后不再依赖 auth 代码。
 - **边界**：`user_active_sessions:{uid}` 由 auth **写**、各服务经 `pkg/jwtauth` **读**（共享身份缓存，key 结构与读写逻辑由 `pkg/jwtauth` 收口）。比"每请求调 auth-rpc"更快，且 auth-rpc 不在每请求关键路径上。
 - **待定（实现期）**：refresh token 是否引入及 refresh 时 jti 沿用 / 轮换；`device_type` 取值集合与归一化。
 - **来源**：本轮 Claude × 用户讨论（2026-06-04）。

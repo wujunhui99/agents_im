@@ -7,7 +7,6 @@ import (
 
 	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/common/share/auth/token"
-	"github.com/wujunhui99/agents_im/internal/adminbootstrap"
 	business "github.com/wujunhui99/agents_im/internal/auth/logic"
 	"github.com/wujunhui99/agents_im/internal/auth/mailadapter"
 	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
@@ -59,15 +58,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	userLogic.WithDefaultAssistantProvisioner(defaultAssistant)
 	if _, err := defaultAssistant.Backfill(context.Background()); err != nil {
 		log.Fatalf("backfill default assistant: %v", err)
-	}
-	if created, err := adminbootstrap.EnsureAdminAccount(context.Background(), adminbootstrap.Config{
-		Identifier:  c.AdminBootstrap.Identifier,
-		Password:    c.AdminBootstrap.Password,
-		DisplayName: c.AdminBootstrap.DisplayName,
-	}, userLogic, authRepo); err != nil {
-		log.Fatalf("bootstrap admin account: %v", err)
-	} else if created {
-		log.Printf("admin bootstrap account ensured for identifier %q", c.AdminBootstrap.Identifier)
 	}
 
 	conn := postgres.New(c.DataSource)

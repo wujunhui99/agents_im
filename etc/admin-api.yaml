@@ -10,6 +10,19 @@ AdminRPC:
   Endpoints:
     - 127.0.0.1:9097
   Timeout: 5000
+# UserRPC/AuthRPC：BFF 编排「创建测试账户」和「AdminBootstrap」。
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:9090
+  Timeout: 5000
+AuthRPC:
+  Endpoints:
+    - 127.0.0.1:9091
+  Timeout: 5000
+AdminBootstrap:
+  Identifier: amin
+  Password: ${ADMIN_BOOTSTRAP_PASSWORD}
+  DisplayName: 管理后台管理员
 
 Redis:
   Addr: localhost:6379

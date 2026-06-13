@@ -221,10 +221,6 @@ ListenOn: 127.0.0.1:${AUTH_RPC_PORT:-9091}
 TokenAuth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: ${JWT_ACCESS_EXPIRE}
-AdminBootstrap:
-  Identifier: ${ADMIN_BOOTSTRAP_IDENTIFIER:-amin}
-  Password: ${ADMIN_BOOTSTRAP_PASSWORD:-}
-  DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME:-管理后台管理员}
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 SessionRedis:
@@ -400,6 +396,10 @@ AuthRPC:
   Endpoints:
     - 127.0.0.1:${AUTH_RPC_PORT:-9091}
   Timeout: 5000
+AdminBootstrap:
+  Identifier: ${ADMIN_BOOTSTRAP_IDENTIFIER:-amin}
+  Password: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+  DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME:-管理后台管理员}
 Redis:
   Addr: ${REDIS_ADDR}
   Password: ${REDIS_PASSWORD}

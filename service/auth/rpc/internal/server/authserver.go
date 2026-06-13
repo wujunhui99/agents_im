@@ -53,3 +53,9 @@ func (s *AuthServer) EnsureTestCredential(ctx context.Context, in *auth.EnsureTe
 	l := logic.NewEnsureTestCredentialLogic(ctx, s.svcCtx)
 	return l.EnsureTestCredential(in)
 }
+
+// EnsureAdminCredential 为管理员账号补齐首次登录凭据。
+func (s *AuthServer) EnsureAdminCredential(ctx context.Context, in *auth.EnsureAdminCredentialRequest) (*auth.EnsureAdminCredentialResponse, error) {
+	l := logic.NewEnsureAdminCredentialLogic(ctx, s.svcCtx)
+	return l.EnsureAdminCredential(in)
+}

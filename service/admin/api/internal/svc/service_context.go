@@ -4,7 +4,10 @@
 package svc
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/wujunhui99/agents_im/common/middleware"
@@ -12,6 +15,7 @@ import (
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
+	"github.com/wujunhui99/agents_im/service/admin/api/internal/bootstrap"
 	"github.com/wujunhui99/agents_im/service/admin/api/internal/config"
 	adminpb "github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/adminclient"
@@ -55,6 +59,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	if err != nil {
 		return nil, err
 	}
+	userRPC := userclient.NewUser(userCli)
 	if !hasRPCClientConfig(c.AuthRPC) {
 		return nil, ErrAuthRPCConfigRequired
 	}
@@ -62,12 +67,18 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	if err != nil {
 		return nil, err
 	}
+	authRPC := authclient.NewAuth(authCli)
+	if created, err := bootstrap.EnsureAdminAccount(context.Background(), c.AdminBootstrap, userRPC, authRPC); err != nil {
+		return nil, fmt.Errorf("bootstrap admin account: %w", err)
+	} else if created {
+		log.Printf("admin bootstrap account ensured for identifier %q", c.AdminBootstrap.Identifier)
+	}
 	deviceAuth := middleware.NewDeviceAuthMiddleware(middleware.NewRedisSessionStore(c.Redis)).Handle
 	return &ServiceContext{
 		Config:     c,
 		AdminRPC:   adminRPC,
-		UserRPC:    userclient.NewUser(userCli),
-		AuthRPC:    authclient.NewAuth(authCli),
+		UserRPC:    userRPC,
+		AuthRPC:    authRPC,
 		DeviceAuth: chainMiddlewares(deviceAuth, adminOnlyMiddleware(adminRPC)),
 	}, nil
 }

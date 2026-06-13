@@ -24,7 +24,7 @@
 | message  | `internal/logic/message/`、`internal/handler/message/`、`internal/servicecontext/message/`、`internal/rpcgen/message` | **不存在** `service/msg/`    | 过渡态扁平 `service/message-api`；message-rpc 寄生 `internal/rpcgen/message` | ❌ 未迁 |
 | gateway  | （已清空——ws 迁 `service/msggateway/internal/ws`，contract/delivery 迁 `common/share/gateway`） | `service/msggateway/`            | `service/msggateway`               | ✅ 已迁（#492，ws command 走 msg-rpc gRPC）|
 | transfer | `internal/transfer/...`                              | **不存在** `service/msgtransfer/`   | 过渡态扁平 `service/message-transfer` | ❌ 未迁 |
-| admin    | `internal/handler/admin/`、`internal/logic/admin*`、`internal/servicecontext/admin/`、`internal/adminbootstrap/` | **不存在** `service/admin/`      | 寄生在 `service/message-api`（其 main 同时引用 `adminsvc`） | 🚨 寄生 |
+| admin    | `internal/handler/admin/`、`internal/logic/admin*`、`internal/servicecontext/admin/`；`internal/adminbootstrap/` 已迁 `service/admin/api/internal/bootstrap` | `service/admin/{api,rpc}/...`      | `service/admin/{api,rpc}` | 🟡 已拆服务，仍有跨域只读/internal 债 |
 
 > 一句话：**单体根的 `internal/handler/` + `internal/logic/` + `internal/servicecontext/` 仍然是 message/gateway/admin 三个服务的事实代码主干**，已迁的 auth/user/friends/groups 还有部分残骸没清。
 
@@ -226,7 +226,7 @@ agents_im/
 10. ✅ **`internal/mail/` → `service/third/rpc/internal/provider/`**：mail 折入新服务 **third**（第三方接入层），provider 实现已搬过去脱离 internal（#429；原计划 02 CP-8 落点 service/mail，实际合并为 third 以减少微服务数量）。
 11. **拆 admin-api**（TD-1，收益最大）：
     - 建 `service/admin/api`（goctl main 即入口），Makefile 注册 admin-api（`BACKEND_SERVICES` + `PKG_admin-api`）；
-    - 搬：`internal/handler/admin`、`internal/logic/admin*`、`internal/adminbootstrap`、`internal/servicecontext/admin`；
+    - 搬：`internal/handler/admin`、`internal/logic/admin*`、`internal/servicecontext/admin`；`internal/adminbootstrap` 已迁至 `service/admin/api/internal/bootstrap`；
     - msg-api 卸下 admin 依赖。
 12. **建 service/msg**（最大块，单独 epic）：搬 `internal/logic/message`、`internal/handler/message`、`internal/servicecontext/message`、`internal/rpcgen/message`；按 07 文档扩展为 10 个 RPC。
 13. **建 service/msggateway**：搬 `internal/gateway/`；按 03 §7 砍业务依赖（00-decisions D8）。

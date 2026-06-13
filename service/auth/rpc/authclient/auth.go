@@ -15,6 +15,8 @@ import (
 
 type (
 	AuthResponse                  = auth.AuthResponse
+	EnsureAdminCredentialRequest  = auth.EnsureAdminCredentialRequest
+	EnsureAdminCredentialResponse = auth.EnsureAdminCredentialResponse
 	EnsureTestCredentialRequest   = auth.EnsureTestCredentialRequest
 	EnsureTestCredentialResponse  = auth.EnsureTestCredentialResponse
 	LoginRequest                  = auth.LoginRequest
@@ -32,6 +34,8 @@ type (
 		ParseToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error)
 		// EnsureTestCredential 为测试账户（account_type=test）创建/重置登录凭据。
 		EnsureTestCredential(ctx context.Context, in *EnsureTestCredentialRequest, opts ...grpc.CallOption) (*EnsureTestCredentialResponse, error)
+		// EnsureAdminCredential 为管理员账号补齐首次登录凭据。
+		EnsureAdminCredential(ctx context.Context, in *EnsureAdminCredentialRequest, opts ...grpc.CallOption) (*EnsureAdminCredentialResponse, error)
 	}
 
 	defaultAuth struct {
@@ -74,4 +78,10 @@ func (m *defaultAuth) ParseToken(ctx context.Context, in *ValidateTokenRequest, 
 func (m *defaultAuth) EnsureTestCredential(ctx context.Context, in *EnsureTestCredentialRequest, opts ...grpc.CallOption) (*EnsureTestCredentialResponse, error) {
 	client := auth.NewAuthClient(m.cli.Conn())
 	return client.EnsureTestCredential(ctx, in, opts...)
+}
+
+// EnsureAdminCredential 为管理员账号补齐首次登录凭据。
+func (m *defaultAuth) EnsureAdminCredential(ctx context.Context, in *EnsureAdminCredentialRequest, opts ...grpc.CallOption) (*EnsureAdminCredentialResponse, error) {
+	client := auth.NewAuthClient(m.cli.Conn())
+	return client.EnsureAdminCredential(ctx, in, opts...)
 }
