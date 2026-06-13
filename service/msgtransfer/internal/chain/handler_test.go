@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
+	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 )
 
@@ -123,7 +125,7 @@ func TestHandleBatchAssignsSequentialSeqsAndFansOut(t *testing.T) {
 	seq := &fakeSeq{}
 	store := newFakeStore()
 	producer := newFakeProducer()
-	handler, err := NewTransferHandler(seq, store, producer, 4)
+	handler, err := NewTransferHandler(seq, store, producer, 4, false)
 	if err != nil {
 		t.Fatalf("new handler: %v", err)
 	}
@@ -172,7 +174,7 @@ func TestHandleBatchDedupSkipsReplaysAndInBatchDuplicates(t *testing.T) {
 	seq := &fakeSeq{}
 	store := newFakeStore()
 	producer := newFakeProducer()
-	handler, _ := NewTransferHandler(seq, store, producer, 4)
+	handler, _ := NewTransferHandler(seq, store, producer, 4, false)
 
 	conv := "single:user-a:user-b"
 	first := []*kgo.Record{
@@ -206,7 +208,7 @@ func TestHandleBatchKeepsConversationsIndependent(t *testing.T) {
 	seq := &fakeSeq{}
 	store := newFakeStore()
 	producer := newFakeProducer()
-	handler, _ := NewTransferHandler(seq, store, producer, 4)
+	handler, _ := NewTransferHandler(seq, store, producer, 4, false)
 
 	records := make([]*kgo.Record, 0, 10)
 	for conversation := 0; conversation < 5; conversation++ {
@@ -230,6 +232,151 @@ func TestHandleBatchKeepsConversationsIndependent(t *testing.T) {
 		if !reflect.DeepEqual(seqs, []int64{1, 2}) {
 			t.Fatalf("conversation %s expected seqs [1 2], got %v", conv, seqs)
 		}
+	}
+}
+
+// typedRecord is submittedRecord with D16 typed account ids for sender/receiver.
+func typedRecord(t *testing.T, conversationID, sender, receiver, clientMsgID string) *kgo.Record {
+	t.Helper()
+	event := messaging.MessageEvent{
+		EventID:        "evt-" + clientMsgID,
+		EventType:      messaging.EventTypeMessageSubmitted,
+		ConversationID: conversationID,
+		ServerMsgID:    "srv-" + clientMsgID,
+		SenderID:       sender,
+		ChatType:       messaging.ChatTypeSingle,
+		CreatedAt:      1700000000000,
+		Payload: messaging.MessageEventPayload{
+			ClientMsgID:    clientMsgID,
+			ReceiverID:     receiver,
+			ContentType:    "text",
+			Content:        json.RawMessage(`{"text":"hi"}`),
+			VisibleUserIDs: []string{sender, receiver},
+			PayloadHash:    "hash-" + clientMsgID,
+			SendTime:       1700000000000,
+		},
+	}
+	raw, err := messaging.MarshalMessageEvent(event)
+	if err != nil {
+		t.Fatalf("marshal submitted event: %v", err)
+	}
+	return &kgo.Record{Topic: messaging.TopicToTransfer, Key: []byte(conversationID), Value: raw}
+}
+
+func TestHandleBatchFiltersAgentReceiversFromPush(t *testing.T) {
+	gen, err := idgen.NewAccountIDGenerator(1)
+	if err != nil {
+		t.Fatalf("new account id generator: %v", err)
+	}
+	userID, err := gen.NextString(idgen.AccountTypeUser)
+	if err != nil {
+		t.Fatalf("mint user id: %v", err)
+	}
+	agentID, err := gen.NextString(idgen.AccountTypeAgent)
+	if err != nil {
+		t.Fatalf("mint agent id: %v", err)
+	}
+
+	seq := &fakeSeq{}
+	store := newFakeStore()
+	producer := newFakeProducer()
+	handler, err := NewTransferHandler(seq, store, producer, 4, true)
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	conv := "single:" + userID + ":" + agentID
+	records := []*kgo.Record{typedRecord(t, conv, userID, agentID, "c1")}
+	if err := handler.HandleBatch(context.Background(), records); err != nil {
+		t.Fatalf("handle batch: %v", err)
+	}
+
+	// Archive and trigger stay full-fanout/branch-free (D15).
+	for _, topic := range []string{messaging.TopicToPostgres, messaging.TopicAgentTrigger} {
+		events := producer.events[topic]
+		if len(events) != 1 {
+			t.Fatalf("expected 1 event on %s, got %d", topic, len(events))
+		}
+		want := []string{agentID, userID}
+		sort.Strings(want)
+		if !reflect.DeepEqual(events[0].Payload.ReceiverIDs, want) {
+			t.Fatalf("%s receiver_ids = %v, want %v", topic, events[0].Payload.ReceiverIDs, want)
+		}
+	}
+	// toPush drops the agent receiver; the (human) sender keeps its seq-reconcile push.
+	pushed := producer.events[messaging.TopicToPush]
+	if len(pushed) != 1 {
+		t.Fatalf("expected 1 toPush event, got %d", len(pushed))
+	}
+	if !reflect.DeepEqual(pushed[0].Payload.ReceiverIDs, []string{userID}) {
+		t.Fatalf("toPush receiver_ids = %v, want [%s]", pushed[0].Payload.ReceiverIDs, userID)
+	}
+}
+
+func TestHandleBatchSkipsPushWhenAllReceiversAreAgents(t *testing.T) {
+	gen, err := idgen.NewAccountIDGenerator(1)
+	if err != nil {
+		t.Fatalf("new account id generator: %v", err)
+	}
+	agentSender, err := gen.NextString(idgen.AccountTypeAgent)
+	if err != nil {
+		t.Fatalf("mint agent sender: %v", err)
+	}
+	agentReceiver, err := gen.NextString(idgen.AccountTypeAgent)
+	if err != nil {
+		t.Fatalf("mint agent receiver: %v", err)
+	}
+
+	seq := &fakeSeq{}
+	store := newFakeStore()
+	producer := newFakeProducer()
+	handler, _ := NewTransferHandler(seq, store, producer, 4, true)
+
+	conv := "single:" + agentSender + ":" + agentReceiver
+	records := []*kgo.Record{typedRecord(t, conv, agentSender, agentReceiver, "c1")}
+	if err := handler.HandleBatch(context.Background(), records); err != nil {
+		t.Fatalf("handle batch: %v", err)
+	}
+
+	if got := len(producer.events[messaging.TopicToPush]); got != 0 {
+		t.Fatalf("expected no toPush events, got %d", got)
+	}
+	for _, topic := range []string{messaging.TopicToPostgres, messaging.TopicAgentTrigger} {
+		if got := len(producer.events[topic]); got != 1 {
+			t.Fatalf("expected 1 event on %s, got %d", topic, got)
+		}
+	}
+}
+
+func TestHandleBatchFilterOffKeepsLegacyFanout(t *testing.T) {
+	gen, err := idgen.NewAccountIDGenerator(1)
+	if err != nil {
+		t.Fatalf("new account id generator: %v", err)
+	}
+	agentReceiver, err := gen.NextString(idgen.AccountTypeAgent)
+	if err != nil {
+		t.Fatalf("mint agent receiver: %v", err)
+	}
+
+	seq := &fakeSeq{}
+	store := newFakeStore()
+	producer := newFakeProducer()
+	handler, _ := NewTransferHandler(seq, store, producer, 4, false)
+
+	conv := "single:user-a:" + agentReceiver
+	records := []*kgo.Record{typedRecord(t, conv, "user-a", agentReceiver, "c1")}
+	if err := handler.HandleBatch(context.Background(), records); err != nil {
+		t.Fatalf("handle batch: %v", err)
+	}
+
+	pushed := producer.events[messaging.TopicToPush]
+	if len(pushed) != 1 {
+		t.Fatalf("expected 1 toPush event, got %d", len(pushed))
+	}
+	want := []string{agentReceiver, "user-a"}
+	sort.Strings(want)
+	if !reflect.DeepEqual(pushed[0].Payload.ReceiverIDs, want) {
+		t.Fatalf("toPush receiver_ids = %v, want %v (filter off)", pushed[0].Payload.ReceiverIDs, want)
 	}
 }
 

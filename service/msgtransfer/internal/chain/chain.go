@@ -72,7 +72,7 @@ func New(opts Options) (*Chain, error) {
 	if err != nil {
 		return nil, err
 	}
-	transferHandler, err := NewTransferHandler(seq, store, producer, opts.Kafka.Workers)
+	transferHandler, err := NewTransferHandler(seq, store, producer, opts.Kafka.Workers, opts.Kafka.TypedAccountIDs)
 	if err != nil {
 		return nil, err
 	}

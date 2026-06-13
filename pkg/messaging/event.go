@@ -24,6 +24,15 @@ const (
 	ChatTypeGroup  = "group"
 )
 
+// Message origin values carried in payload.message_origin (mirrors the
+// messages.message_origin enum). Consumers branch on MessageOriginAI for the
+// recursion gate (D15 step ① of the agent-rpc final judgment).
+const (
+	MessageOriginHuman  = "human"
+	MessageOriginAI     = "ai"
+	MessageOriginSystem = "system"
+)
+
 type MessageEvent struct {
 	EventID        string              `json:"event_id"`
 	EventType      string              `json:"event_type"`

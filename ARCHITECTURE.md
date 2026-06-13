@@ -86,6 +86,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 - 在账号系统中配合 `user` / `agent` / `admin` 账号类型，让 Agent 账号作为 IM 会话成员参与单聊和群聊。
 - 当前 `service/agent/api`（入口 `agent.go`，直接装配 `internal/*`）启动，`service/agent/api/agent.api` 提供 Agent profile 管理基础，配置单独持久化到 `agents` 表；创建 Agent 必须通过 Account Service 资料能力验证绑定账号为 `account_type=agent`，验证不可用时必须失败。当前没有真实 Agent RPC/proto contract，不能创建空 RPC scaffold 冒充服务边界。
+- `service/agent`（扁平 main，issue #503 骨架，未部署）以独立 consumer group `agent-trigger` 消费 `agent.trigger.v1`，承载 D15 三步终判（origin 防递归 → D16 账号 ID 类型位判 agent 收信 → conversation hosting）；runtime / IM 写回 / hosting 查询均为显式 mock driver（零副作用），真实实现随 [`docs/refactor/v1/04-agent.md`](./docs/refactor/v1/04-agent.md) §5 落地。过渡期真实 AI 回复仍由 msg-rpc 内 `agent.trigger.v1` 回流 consumer 产生。
 - 管理系统提示词、工具、Agent skills 和 Agent 配置，并将元数据持久化在 PostgreSQL。
 - 使用系统提示词、工具和 skills 组装 Agent runtime。
 - 通过 MinIO/S3-compatible object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。
