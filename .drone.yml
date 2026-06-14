@@ -80,9 +80,6 @@ steps:
       paths:
         include:
           - web/**
-          - package.json
-          - package-lock.json
-          - .drone.yml
 
   # 从 backend-verification 拆出（原先为跑 npx 在 golang 镜像里装 NodeSource node）。
   - name: markdown-link-check
