@@ -18,6 +18,7 @@
 - [message-storage.md](./message-storage.md)：消息存储 PostgreSQL/Redis 契约设计
 - [postgres-persistence.md](./postgres-persistence.md)：第一阶段 PostgreSQL 持久化 schema、配置和 repository 设计
 - [database-schema-v2.md](./database-schema-v2.md)：下一版数据库 schema 讨论稿，记录无物理外键、应用层校验、smallint 枚举、账号/Profile/Auth/Friends/Groups 表改进方向
+- [snowflake-id-generation.md](./snowflake-id-generation.md)：media_id / msg_id 共用雪花 ID 生成器（RoutedFlake）位布局、机器号来源选型与 API（#527 §0/§1，#528）
 - [message-outbox.md](./message-outbox.md)：Message Service transactional outbox 事件源与 worker 轮询契约
 - [gateway-message-contract.md](./gateway-message-contract.md)：Gateway WebSocket command 到 Message Service RPC 的第一阶段映射契约
 - [redis-presence.md](./redis-presence.md)：Redis 在线状态与 Gateway 连接元数据契约
