@@ -293,6 +293,19 @@ func TestResolveMachineID(t *testing.T) {
 			t.Fatal("expected error when no ordinal suffix is present")
 		}
 	})
+
+	t.Run("deployment suffix ending in digits fails (no silent non-unique id)", func(t *testing.T) {
+		// A Deployment/ReplicaSet pod name whose random suffix happens to end in
+		// digits must NOT be mistaken for a StatefulSet ordinal: its trailing
+		// digits are not unique/stable across replicas. The final `-` segment is
+		// non-numeric (`q2v85`), so it must fail loudly rather than return 85.
+		t.Setenv(machineIDEnvVar, "")
+		t.Setenv("POD_NAME", "media-rpc-6d4b8f9c7-q2v85")
+		t.Setenv("HOSTNAME", "media-rpc-6d4b8f9c7-q2v85")
+		if _, err := ResolveMachineID(); err == nil {
+			t.Fatal("expected error for Deployment-style pod name with digit-ending random suffix")
+		}
+	})
 }
 
 func TestRoutedFlakeNextStringNumeric(t *testing.T) {

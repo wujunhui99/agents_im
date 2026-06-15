@@ -716,6 +716,13 @@ spec:
           image: ghcr.io/wujunhui99/agents_im/msg-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
           args: ["-f", "/config/msg-rpc.yaml"]
+          env:
+            # RoutedFlake (msg_id) 机器号。单副本下常量 "0" 即唯一。
+            # ⚠️ 扩副本(replicas≥2)前必须改为 StatefulSet + 注入 POD_NAME 让
+            #    ResolveMachineID 按 pod ordinal 发号,并删掉本常量,否则多副本
+            #    同毫秒静默撞 ID。见 docs/design-docs/snowflake-id-generation.md。
+            - name: AGENTS_IM_SNOWFLAKE_MACHINE_ID
+              value: "0"
           envFrom:
             - configMapRef:
                 name: agents-im-config
@@ -889,6 +896,14 @@ spec:
           image: ghcr.io/wujunhui99/agents_im/media-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
           args: ["-f", "/config/media-rpc.yaml"]
+          env:
+            # RoutedFlake (media_id) 机器号。单副本下常量 "0" 即唯一;media 与
+            # msg 是独立 ID 空间,两者都给 "0" 互不碰撞。
+            # ⚠️ 扩副本(replicas≥2)前必须改为 StatefulSet + 注入 POD_NAME 让
+            #    ResolveMachineID 按 pod ordinal 发号,并删掉本常量,否则多副本
+            #    同毫秒静默撞 ID。见 docs/design-docs/snowflake-id-generation.md。
+            - name: AGENTS_IM_SNOWFLAKE_MACHINE_ID
+              value: "0"
           envFrom:
             - configMapRef:
                 name: agents-im-config
