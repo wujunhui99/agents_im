@@ -3,7 +3,6 @@ package idgen
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -187,17 +186,15 @@ func (g *RoutedFlake) waitNextMillis(currentMs int64) int64 {
 	}
 }
 
-var ordinalSuffix = regexp.MustCompile(`(\d+)$`)
-
 // ResolveMachineID resolves this instance's stable, unique machine number from,
 // in priority order:
 //
 //  1. AGENTS_IM_SNOWFLAKE_MACHINE_ID — explicit override (any deployment may
 //     inject the number directly).
-//  2. POD_NAME trailing ordinal      — a StatefulSet pod is named
+//  2. POD_NAME ordinal               — a StatefulSet pod is named
 //     `<name>-<ordinal>` (e.g. media-rpc-3 → 3); the ordinal is unique and
 //     stable across reschedules, which is exactly what a machine number needs.
-//  3. HOSTNAME trailing ordinal      — the OS hostname equals the pod name in a
+//  3. HOSTNAME ordinal               — the OS hostname equals the pod name in a
 //     StatefulSet, so it is the same ordinal as a fallback.
 //
 // It returns an error when none of these yields a non-negative integer ordinal.
@@ -230,12 +227,24 @@ func ResolveMachineID() (int64, error) {
 	return 0, fmt.Errorf("routedflake: no stable machine id; set %s or run as a StatefulSet pod with an ordinal suffix (hash fallback is banned)", machineIDEnvVar)
 }
 
+// ordinalFromName extracts a StatefulSet pod ordinal from a name of the shape
+// `<name>-<ordinal>` (e.g. media-rpc-3 → 3). The final `-`-delimited segment must
+// be ENTIRELY numeric. A Deployment/ReplicaSet pod name
+// (`<name>-<rs-hash>-<rand-suffix>`) has a non-numeric last segment and is
+// rejected even when that suffix happens to end in digits (e.g.
+// media-rpc-6d4b8f9c7-q2v85) — otherwise we would silently mint a non-unique
+// machine id, which is exactly the failure mode this generator forbids
+// (#527 §1 / #528 / #539).
 func ordinalFromName(name string) (int64, bool) {
-	match := ordinalSuffix.FindString(name)
-	if match == "" {
+	idx := strings.LastIndex(name, "-")
+	if idx < 0 {
 		return 0, false
 	}
-	value, err := strconv.ParseInt(match, 10, 64)
+	last := name[idx+1:]
+	if last == "" {
+		return 0, false
+	}
+	value, err := strconv.ParseInt(last, 10, 64)
 	if err != nil || value < 0 {
 		return 0, false
 	}

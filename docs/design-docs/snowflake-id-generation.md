@@ -59,12 +59,15 @@ s,  err := gen.NextString(hint)    // 十进制字符串传输形（见 #529）
 机器号**必须唯一且稳定**——两个副本拿到同一机器号会静默生成重复 ID。`ResolveMachineID()` 按优先级解析：
 
 1. **`AGENTS_IM_SNOWFLAKE_MACHINE_ID`**：显式注入（任何部署可直接给号）。专用环境变量，与旧 `Snowflake` 的 `AGENTS_IM_SNOWFLAKE_NODE_ID` 区分（后者带 hash fallback，本生成器禁止）。
-2. **`POD_NAME` 末尾序号**：StatefulSet pod 名为 `<name>-<ordinal>`（如 `media-rpc-3` → 3），ordinal 唯一且跨重调度稳定，正是机器号所需。
-3. **`HOSTNAME` 末尾序号**：StatefulSet pod 内 `HOSTNAME` == pod 名，作兜底。
+2. **`POD_NAME` ordinal**：StatefulSet pod 名为 `<name>-<ordinal>`（如 `media-rpc-3` → 3），ordinal 唯一且跨重调度稳定，正是机器号所需。**只认最后一个 `-` 分隔段为纯数字的形状**——Deployment/ReplicaSet pod 名（`<name>-<rs-hash>-<随机后缀>`）末段非纯数字，即便后缀恰好以数字结尾（如 `media-rpc-6d4b8f9c7-q2v85`）也**拒绝**，绝不把不唯一的尾数当 ordinal。
+3. **`HOSTNAME` ordinal**：StatefulSet pod 内 `HOSTNAME` == pod 名，作兜底，同样按"末段纯数字"判定。
 
 **全部取不到序号即返回错误**（fail-first），不猜。**显式禁用 `hash(pod name)`**：hash 会碰撞，碰撞即重复 ID（#527 §1 / #528 硬约束）。
 
-> 部署落地（在接入 media/msg 的子 issue #530/#531 内做，非本库职责）：media-rpc / msg-rpc 以 **StatefulSet** 部署（保证稳定 ordinal），或在 Deployment 下通过 `AGENTS_IM_SNOWFLAKE_MACHINE_ID` 注入唯一号；副本数上限受 `MachineBits` 约束（如 5 位 → 32 副本）。
+> 部署落地：
+> - **单副本（现状，media-rpc / msg-rpc 均 `kind: Deployment` `replicas: 1`）**：直接在各 Deployment 容器 `env:` 写死 `AGENTS_IM_SNOWFLAKE_MACHINE_ID="0"`（media 与 msg 是独立 ID 空间，都给 `0` 互不碰撞）。**扩副本前必须改下一条**——manifest 已就近注释该约束。
+> - **多副本**：改 **StatefulSet** 部署并用 downward API 注入 `POD_NAME`（`fieldRef: metadata.name`），靠稳定 ordinal 自动发号，**删掉**上面的常量；副本数上限受 `MachineBits` 约束（如 5 位 → 32 副本）。
+> - 真正构造 `RoutedFlake` 实例（读 env / 调 `ResolveMachineID`）在接入 media/msg 的子 issue #530/#531 内做，非本库职责。
 
 ## 与既有生成器的关系
 
