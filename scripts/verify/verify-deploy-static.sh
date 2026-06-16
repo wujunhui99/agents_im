@@ -240,8 +240,15 @@ def backend_for(rule, path):
             return service.get("name"), service.get("port", {}).get("number")
     return None, None
 
+def middleware_by_name(name):
+    for doc in docs:
+        if doc.get("kind") == "Middleware" and doc.get("metadata", {}).get("name") == name:
+            return doc
+    return None
+
 expected = {
     "langfuse.agenticim.xyz": ("langfuse", 3000, "langfuse-agenticim-xyz-tls"),
+    "minio.agenticim.xyz": ("minio", 9001, "minio-agenticim-xyz-tls"),
 }
 for host, (svc, port, tls_secret) in expected.items():
     ingress, rule = ingress_by_host(host)
@@ -260,6 +267,19 @@ for host, (svc, port, tls_secret) in expected.items():
     if (got_svc, got_port) != (svc, port):
         print(f"deploy/k8s/ingress.yaml: {host}/ routes to {(got_svc, got_port)}, want {(svc, port)}", file=sys.stderr)
         sys.exit(1)
+    if host == "minio.agenticim.xyz":
+        middlewares = ingress.get("metadata", {}).get("annotations", {}).get("traefik.ingress.kubernetes.io/router.middlewares", "")
+        if "agents-im-minio-console-basic-auth@kubernetescrd" not in middlewares:
+            print("deploy/k8s/ingress.yaml: minio.agenticim.xyz must keep basic auth", file=sys.stderr)
+            sys.exit(1)
+        middleware = middleware_by_name("minio-console-basic-auth")
+        if not middleware:
+            print("deploy/k8s/ingress.yaml: missing minio-console-basic-auth middleware", file=sys.stderr)
+            sys.exit(1)
+        basic_auth = middleware.get("spec", {}).get("basicAuth", {})
+        if basic_auth.get("secret") != "observability-basic-auth" or basic_auth.get("removeHeader") is not True:
+            print("deploy/k8s/ingress.yaml: minio-console-basic-auth must use observability-basic-auth and remove Authorization header", file=sys.stderr)
+            sys.exit(1)
 
 jaeger_ingress, _ = ingress_by_host("jaeger.agenticim.xyz")
 if jaeger_ingress:
