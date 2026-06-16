@@ -10,6 +10,11 @@ MailRPC:
   Endpoints:
     - third-rpc:9095
   Timeout: 5000
+# UserRPC：注册/登录读用户资料经属主 user-rpc（#551，脱 internal/logic.UserLogic）。
+UserRPC:
+  Endpoints:
+    - user-rpc:9090
+  Timeout: 5000
 
 SessionRedis:
   Addr: ${REDIS_ADDR}

@@ -2,10 +2,14 @@ package useradapter
 
 import (
 	"context"
+	"strings"
 	"time"
 
-	userlogic "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
+
+// useradapter 定义 auth 对「用户域」的依赖契约（接口 + DTO）。实现由 auth-rpc 注入：
+// #551 起走 service/auth/rpc/internal/userrpc（user-rpc 客户端），不再绑 internal/logic.UserLogic。
 
 type ExistsResult struct {
 	Identifier string
@@ -46,87 +50,24 @@ type UserClient interface {
 	GetUserByID(ctx context.Context, userID string) (UserProfile, error)
 }
 
-type LogicClient struct {
-	logic *userlogic.UserLogic
-}
-
-func NewLogicClient(logic *userlogic.UserLogic) *LogicClient {
-	return &LogicClient{logic: logic}
-}
-
+// NormalizeIdentifier 校验并规范化登录标识符。原先转调 internal/logic.NormalizeIdentifier，
+// #551 内联以彻底脱离 internal/logic（规则同步：小写、trim、3-32 长度、首字符字母/数字、
+// 仅字母数字下划线）。
 func NormalizeIdentifier(identifier string) (string, error) {
-	return userlogic.NormalizeIdentifier(identifier)
-}
-
-func (c *LogicClient) ExistsByIdentifier(ctx context.Context, identifier string) (ExistsResult, error) {
-	result, err := c.logic.ExistsByIdentifier(ctx, userlogic.ExistsByIdentifierRequest{
-		Identifier: identifier,
-	})
-	if err != nil {
-		return ExistsResult{}, err
+	normalized := strings.ToLower(strings.TrimSpace(identifier))
+	if len(normalized) < 3 || len(normalized) > 32 {
+		return "", apperror.InvalidArgument("identifier must be 3 to 32 characters")
 	}
-
-	return ExistsResult{
-		Identifier: result.Identifier,
-		Exists:     result.Exists,
-	}, nil
-}
-
-func (c *LogicClient) CreateUser(ctx context.Context, req CreateUserRequest) (UserProfile, error) {
-	profile, err := c.logic.CreateUser(ctx, userlogic.CreateUserRequest{
-		Identifier:      req.Identifier,
-		Email:           req.Email,
-		EmailVerifiedAt: req.EmailVerifiedAt,
-		DisplayName:     req.DisplayName,
-		Name:            req.Name,
-		Gender:          req.Gender,
-		BirthDate:       req.BirthDate,
-		Region:          req.Region,
-	})
-	if err != nil {
-		return UserProfile{}, err
+	for idx, r := range normalized {
+		isLetter := r >= 'a' && r <= 'z'
+		isDigit := r >= '0' && r <= '9'
+		isUnderscore := r == '_'
+		if idx == 0 && !isLetter && !isDigit {
+			return "", apperror.InvalidArgument("identifier must start with a letter or digit")
+		}
+		if !isLetter && !isDigit && !isUnderscore {
+			return "", apperror.InvalidArgument("identifier can only contain letters, digits, and underscore")
+		}
 	}
-
-	return UserProfile{
-		UserID:          profile.UserID,
-		Identifier:      profile.Identifier,
-		Email:           profile.Email,
-		EmailVerifiedAt: profile.EmailVerifiedAt,
-		DisplayName:     profile.DisplayName,
-		Name:            profile.Name,
-		Gender:          profile.Gender,
-		BirthDate:       profile.BirthDate,
-		Region:          profile.Region,
-		AccountType:     profile.AccountType,
-		AvatarMediaID:   profile.AvatarMediaID,
-		AvatarURL:       profile.AvatarURL,
-		CreatedAt:       profile.CreatedAt,
-		UpdatedAt:       profile.UpdatedAt,
-	}, nil
-}
-
-func (c *LogicClient) GetUserByID(ctx context.Context, userID string) (UserProfile, error) {
-	profile, err := c.logic.GetUserByID(ctx, userlogic.GetUserByIDRequest{
-		UserID: userID,
-	})
-	if err != nil {
-		return UserProfile{}, err
-	}
-
-	return UserProfile{
-		UserID:          profile.UserID,
-		Identifier:      profile.Identifier,
-		Email:           profile.Email,
-		EmailVerifiedAt: profile.EmailVerifiedAt,
-		DisplayName:     profile.DisplayName,
-		Name:            profile.Name,
-		Gender:          profile.Gender,
-		BirthDate:       profile.BirthDate,
-		Region:          profile.Region,
-		AccountType:     profile.AccountType,
-		AvatarMediaID:   profile.AvatarMediaID,
-		AvatarURL:       profile.AvatarURL,
-		CreatedAt:       profile.CreatedAt,
-		UpdatedAt:       profile.UpdatedAt,
-	}, nil
+	return normalized, nil
 }
