@@ -35,6 +35,9 @@ type APIConfig struct {
 	MailRPC          zrpc.RpcClientConf
 	// MsgRPC 是 msggateway → msg-rpc 的 gRPC 客户端配置（03 §9 A3）。
 	MsgRPC zrpc.RpcClientConf
+	// UserRPC 是读用户资料的属主 user-rpc 客户端配置（gate #550：消费者脱 internal 读 profiles，
+	// 经属主 rpc 而非 internal/repository；#551 auth、#553 起 agent-api 等）。
+	UserRPC zrpc.RpcClientConf
 }
 
 type AdminBootstrapConfig struct {
@@ -443,6 +446,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		return cfg, err
 	}
 	cfg.MsgRPC, err = msgRPCConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.UserRPC, err = userRPCConfigFromValues(values)
 	if err != nil {
 		return cfg, err
 	}
@@ -1315,6 +1322,35 @@ func msgRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error
 		cfg.Timeout = timeout
 	}
 	return ResolveMsgRPCConfig(cfg), nil
+}
+
+func userRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error) {
+	cfg := zrpc.RpcClientConf{
+		Target:    firstNonEmpty(values["UserRPC.Target"], values["UserRPCTarget"]),
+		Endpoints: brokerListFromValue(firstNonEmpty(values["UserRPC.Endpoints"], values["UserRPCEndpoints"])),
+	}
+	if value := firstNonEmpty(values["UserRPC.Timeout"], values["UserRPCTimeout"]); strings.TrimSpace(value) != "" {
+		timeout, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Timeout = timeout
+	}
+	return ResolveUserRPCConfig(cfg), nil
+}
+
+// ResolveUserRPCConfig 解析读用户资料的 user-rpc 客户端配置；env 兜底
+// USER_RPC_TARGET / AGENTS_IM_USER_RPC_TARGET（同 MsgRPC 模式）。
+func ResolveUserRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
+	cfg.Target = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Target)), os.Getenv("AGENTS_IM_USER_RPC_TARGET"), os.Getenv("USER_RPC_TARGET"))
+	if len(cfg.Endpoints) == 0 {
+		cfg.Endpoints = brokerListFromValue(firstNonEmpty(os.Getenv("AGENTS_IM_USER_RPC_ENDPOINTS"), os.Getenv("USER_RPC_ENDPOINTS")))
+	}
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = 5000
+	}
+	cfg.NonBlock = true
+	return cfg
 }
 
 // ResolveMsgRPCConfig 解析 msggateway → msg-rpc 客户端配置；env 兜底

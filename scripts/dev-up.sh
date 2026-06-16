@@ -520,7 +520,10 @@ Telemetry:
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
   Sampler: 1.0
   Batcher: otlpgrpc"
-  write_api_config "agent-api" "${AGENT_API_PORT:-8086}"
+  write_api_config "agent-api" "${AGENT_API_PORT:-8086}" "UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT:-9090}
+  Timeout: 5000"
   write_media_api_config
   write_admin_api_config
   write_user_rpc_config
