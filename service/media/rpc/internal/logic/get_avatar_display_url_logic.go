@@ -27,7 +27,7 @@ func NewGetAvatarDisplayURLLogic(ctx context.Context, svcCtx *svc.ServiceContext
 }
 
 func (l *GetAvatarDisplayURLLogic) GetAvatarDisplayURL(in *media.GetAvatarDisplayURLRequest) (*media.GetDownloadURLResponse, error) {
-	mediaID, err := validateMediaIDComponent(in.GetMediaId(), "media_id")
+	mediaID, err := parseMediaID(in.GetMediaId())
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
@@ -47,7 +47,7 @@ func (l *GetAvatarDisplayURLLogic) GetAvatarDisplayURL(in *media.GetAvatarDispla
 		return nil, rpcerror.ToStatus(err)
 	}
 	return &media.GetDownloadURLResponse{
-		MediaId:     obj.MediaId,
+		MediaId:     formatMediaID(obj.MediaId),
 		DownloadUrl: downloadURL,
 		ExpiresAt:   expiresAt.UnixMilli(),
 	}, nil

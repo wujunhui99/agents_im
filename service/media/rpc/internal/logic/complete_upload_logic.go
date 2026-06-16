@@ -29,7 +29,11 @@ func NewCompleteUploadLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Co
 }
 
 func (l *CompleteUploadLogic) CompleteUpload(in *media.CompleteUploadRequest) (*media.CompleteUploadResponse, error) {
-	obj, err := mediaForOwner(l.ctx, l.svcCtx, in.GetOwnerUserId(), in.GetMediaId())
+	mediaID, err := parseMediaID(in.GetMediaId())
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	obj, err := mediaForOwner(l.ctx, l.svcCtx, in.GetOwnerUserId(), mediaID)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}

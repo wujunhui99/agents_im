@@ -19,4 +19,10 @@ const (
 
 	// StorageProviderMinIO 是建库默认 storage_provider（见 001_init storage_provider default 1）。
 	StorageProviderMinIO int64 = 1
+
+	// digest_algo：object_key 承载的哈希算法（EPIC #527 §2，见 021 migration）。
+	// 0=未指定（object_key 尚未迁到 agents_im/{sha256}，#546 OSS 迁移前的存量行）；
+	// 1=SHA256（object_key=agents_im/{整文件 sha256}）。建库默认 0，不谎称 SHA256。
+	MediaDigestAlgoUnspecified int64 = 0
+	MediaDigestAlgoSHA256      int64 = 1
 )

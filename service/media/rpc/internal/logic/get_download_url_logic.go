@@ -36,7 +36,7 @@ func (l *GetDownloadURLLogic) GetDownloadURL(in *media.GetDownloadURLRequest) (*
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	mediaID, err := validateMediaIDComponent(in.GetMediaId(), "media_id")
+	mediaID, err := parseMediaID(in.GetMediaId())
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
@@ -63,7 +63,7 @@ func (l *GetDownloadURLLogic) GetDownloadURL(in *media.GetDownloadURLRequest) (*
 		return nil, rpcerror.ToStatus(err)
 	}
 	return &media.GetDownloadURLResponse{
-		MediaId:     obj.MediaId,
+		MediaId:     formatMediaID(obj.MediaId),
 		DownloadUrl: downloadURL,
 		ExpiresAt:   expiresAt.UnixMilli(),
 	}, nil
