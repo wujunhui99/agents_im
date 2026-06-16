@@ -2,12 +2,14 @@ package logic
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	sharedmodel "github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
@@ -18,21 +20,23 @@ import (
 )
 
 // --- fakes（脱 internal/repository：media 数据走 fake model，跨域鉴权走 fake reader/checker）---
+// media_id 为雪花 bigint（EPIC #527 §1），wire 上以十进制字符串承载（ADR #529）；故 fake model
+// 按 int64 主键存，请求/断言用 strconv 在 int64 与十进制串之间转。
 
 type fakeMediaModel struct {
 	model.MediaObjectsModel
-	rows map[string]*model.MediaObjects
+	rows map[int64]*model.MediaObjects
 }
 
 func newFakeMediaModel(rows ...*model.MediaObjects) *fakeMediaModel {
-	m := &fakeMediaModel{rows: map[string]*model.MediaObjects{}}
+	m := &fakeMediaModel{rows: map[int64]*model.MediaObjects{}}
 	for _, r := range rows {
 		m.rows[r.MediaId] = r
 	}
 	return m
 }
 
-func (m *fakeMediaModel) FindOne(_ context.Context, mediaID string) (*model.MediaObjects, error) {
+func (m *fakeMediaModel) FindOne(_ context.Context, mediaID int64) (*model.MediaObjects, error) {
 	if r, ok := m.rows[mediaID]; ok {
 		copy := *r
 		return &copy, nil
@@ -49,7 +53,7 @@ func (m *fakeMediaModel) CreateMediaObject(_ context.Context, data *model.MediaO
 	return &copy, nil
 }
 
-func (m *fakeMediaModel) UpdateStatus(_ context.Context, mediaID string, status int64) (*model.MediaObjects, error) {
+func (m *fakeMediaModel) UpdateStatus(_ context.Context, mediaID int64, status int64) (*model.MediaObjects, error) {
 	r, ok := m.rows[mediaID]
 	if !ok {
 		return nil, model.ErrNotFound
@@ -71,11 +75,21 @@ func (f fakeAccounts) GetByID(_ context.Context, accountID string) (sharedmodel.
 }
 
 type fakeAttachmentAccess struct {
-	allow map[string]bool // userID|mediaID -> allowed
+	allow map[string]bool // userID|mediaID(十进制串) -> allowed
 }
 
 func (f fakeAttachmentAccess) UserCanAccessMedia(_ context.Context, userID, mediaID string) (bool, error) {
 	return f.allow[userID+"|"+mediaID], nil
+}
+
+// newMediaIDGen 构造测试用 media_id 生成器（HintBits=0、单机 machine 0），与 svc 默认布局一致。
+func newMediaIDGen(t *testing.T) *idgen.RoutedFlake {
+	t.Helper()
+	gen, err := idgen.NewRoutedFlake(idgen.RoutedFlakeConfig{HintBits: 0, MachineBits: 10, MachineID: 0})
+	if err != nil {
+		t.Fatalf("build media id generator: %v", err)
+	}
+	return gen
 }
 
 func newMemStore(infos ...objectstorage.ObjectInfo) *objectstorage.MemoryStore {
@@ -96,12 +110,12 @@ func wantCode(t *testing.T, err error, code codes.Code) {
 	}
 }
 
-func readyMedia(mediaID, owner string, purpose int64, contentType string, size int64) *model.MediaObjects {
+func readyMedia(mediaID int64, owner string, purpose int64, contentType string, size int64) *model.MediaObjects {
 	return &model.MediaObjects{
 		MediaId:          mediaID,
-		OwnerAccountId:   owner,
+		UploaderId:       owner,
 		Bucket:           "agents-im-media",
-		ObjectKey:        "users/" + owner + "/media/" + mediaID + "/file",
+		ObjectKey:        "media/" + owner + "/" + strconv.FormatInt(mediaID, 10) + "/file",
 		OriginalFilename: "file",
 		ContentType:      contentType,
 		SizeBytes:        size,
@@ -114,10 +128,10 @@ func readyMedia(mediaID, owner string, purpose int64, contentType string, size i
 
 func TestCreateUploadIntentSanitizesObjectKeyAndPersists(t *testing.T) {
 	fm := newFakeMediaModel()
-	svcCtx := &svc.ServiceContext{MediaModel: fm, Store: newMemStore(), Bucket: "agents-im-media"}
+	svcCtx := &svc.ServiceContext{MediaModel: fm, MediaIDGen: newMediaIDGen(t), Store: newMemStore(), Bucket: "agents-im-media"}
 
 	resp, err := NewCreateUploadIntentLogic(context.Background(), svcCtx).CreateUploadIntent(&media.CreateUploadIntentRequest{
-		OwnerUserId: "usr_owner",
+		OwnerUserId: "323130844539310080",
 		Purpose:     purposeMessageImage,
 		Filename:    "../../client/chosen/cat photo.jpg",
 		ContentType: "image/jpeg",
@@ -129,13 +143,15 @@ func TestCreateUploadIntentSanitizesObjectKeyAndPersists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUploadIntent: %v", err)
 	}
-	if !strings.HasPrefix(resp.GetMediaId(), "med_") {
-		t.Fatalf("media id = %q, want med_ prefix", resp.GetMediaId())
+	mediaID, err := strconv.ParseInt(resp.GetMediaId(), 10, 64)
+	if err != nil || mediaID <= 0 {
+		t.Fatalf("media id = %q, want positive decimal snowflake", resp.GetMediaId())
 	}
-	if strings.Contains(resp.GetObjectKey(), "..") || strings.Contains(resp.GetObjectKey(), "client/chosen") {
-		t.Fatalf("object key leaks client path: %q", resp.GetObjectKey())
+	// object_key 不信客户端文件名：既不含 ".."，也不含原始 path / 文件名。
+	if strings.Contains(resp.GetObjectKey(), "..") || strings.Contains(resp.GetObjectKey(), "client/chosen") || strings.Contains(resp.GetObjectKey(), "cat") {
+		t.Fatalf("object key leaks client path/filename: %q", resp.GetObjectKey())
 	}
-	stored, ok := fm.rows[resp.GetMediaId()]
+	stored, ok := fm.rows[mediaID]
 	if !ok || stored.Status != model.MediaStatusPending || stored.Purpose != model.MediaPurposeMessageImage {
 		t.Fatalf("stored object not pending message_image: %+v", stored)
 	}
@@ -145,9 +161,9 @@ func TestCreateUploadIntentSanitizesObjectKeyAndPersists(t *testing.T) {
 }
 
 func TestCreateUploadIntentRejectsInvalidPurpose(t *testing.T) {
-	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(), Store: newMemStore(), Bucket: "agents-im-media"}
+	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(), MediaIDGen: newMediaIDGen(t), Store: newMemStore(), Bucket: "agents-im-media"}
 	_, err := NewCreateUploadIntentLogic(context.Background(), svcCtx).CreateUploadIntent(&media.CreateUploadIntentRequest{
-		OwnerUserId: "usr_owner",
+		OwnerUserId: "323130844539310080",
 		Purpose:     "agent_skill",
 		Filename:    "a.bin",
 		ContentType: "application/octet-stream",
@@ -159,22 +175,23 @@ func TestCreateUploadIntentRejectsInvalidPurpose(t *testing.T) {
 // --- CompleteUpload ---
 
 func TestCompleteUploadMarksReadyWhenObjectMatches(t *testing.T) {
+	const pendingID int64 = 7003
 	pending := &model.MediaObjects{
-		MediaId:        "med_pending",
-		OwnerAccountId: "usr_owner",
-		Bucket:         "agents-im-media",
-		ObjectKey:      "users/usr_owner/media/med_pending/cat.jpg",
-		ContentType:    "image/jpeg",
-		SizeBytes:      1024,
-		Purpose:        model.MediaPurposeMessageImage,
-		Status:         model.MediaStatusPending,
+		MediaId:     pendingID,
+		UploaderId:  "323130844539310080",
+		Bucket:      "agents-im-media",
+		ObjectKey:   "media/323130844539310080/7003/cat.jpg",
+		ContentType: "image/jpeg",
+		SizeBytes:   1024,
+		Purpose:     model.MediaPurposeMessageImage,
+		Status:      model.MediaStatusPending,
 	}
 	store := newMemStore(objectstorage.ObjectInfo{ObjectKey: pending.ObjectKey, ContentType: "image/jpeg", SizeBytes: 1024})
 	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(pending), Store: store, Bucket: "agents-im-media"}
 
 	resp, err := NewCompleteUploadLogic(context.Background(), svcCtx).CompleteUpload(&media.CompleteUploadRequest{
-		OwnerUserId: "usr_owner",
-		MediaId:     "med_pending",
+		OwnerUserId: "323130844539310080",
+		MediaId:     strconv.FormatInt(pendingID, 10),
 	})
 	if err != nil {
 		t.Fatalf("CompleteUpload: %v", err)
@@ -185,23 +202,25 @@ func TestCompleteUploadMarksReadyWhenObjectMatches(t *testing.T) {
 }
 
 func TestCompleteUploadRejectsSizeMismatch(t *testing.T) {
+	const pendingID int64 = 7003
 	pending := &model.MediaObjects{
-		MediaId: "med_pending", OwnerAccountId: "usr_owner", Bucket: "agents-im-media",
-		ObjectKey: "users/usr_owner/media/med_pending/cat.jpg", ContentType: "image/jpeg",
+		MediaId: pendingID, UploaderId: "323130844539310080", Bucket: "agents-im-media",
+		ObjectKey: "media/323130844539310080/7003/cat.jpg", ContentType: "image/jpeg",
 		SizeBytes: 1024, Purpose: model.MediaPurposeMessageImage, Status: model.MediaStatusPending,
 	}
 	store := newMemStore(objectstorage.ObjectInfo{ObjectKey: pending.ObjectKey, ContentType: "image/jpeg", SizeBytes: 9999})
 	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(pending), Store: store, Bucket: "agents-im-media"}
-	_, err := NewCompleteUploadLogic(context.Background(), svcCtx).CompleteUpload(&media.CompleteUploadRequest{OwnerUserId: "usr_owner", MediaId: "med_pending"})
+	_, err := NewCompleteUploadLogic(context.Background(), svcCtx).CompleteUpload(&media.CompleteUploadRequest{OwnerUserId: "323130844539310080", MediaId: strconv.FormatInt(pendingID, 10)})
 	wantCode(t, err, codes.InvalidArgument)
 }
 
 // --- GetDownloadURL 鉴权 ---
 
 func TestGetDownloadURLOwnerAllowed(t *testing.T) {
-	m := readyMedia("med_dl", "usr_owner", model.MediaPurposeMessageFile, "application/pdf", 2048)
+	const dlID int64 = 7001
+	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageFile, "application/pdf", 2048)
 	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore()}
-	resp, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "usr_owner", MediaId: "med_dl"})
+	resp, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", MediaId: strconv.FormatInt(dlID, 10)})
 	if err != nil {
 		t.Fatalf("GetDownloadURL: %v", err)
 	}
@@ -211,33 +230,37 @@ func TestGetDownloadURLOwnerAllowed(t *testing.T) {
 }
 
 func TestGetDownloadURLNonOwnerForbidden(t *testing.T) {
-	m := readyMedia("med_dl", "usr_owner", model.MediaPurposeMessageFile, "application/pdf", 2048)
+	const dlID int64 = 7001
+	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageFile, "application/pdf", 2048)
 	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore(),
 		Accounts:         fakeAccounts{users: map[string]sharedmodel.User{}},
 		AttachmentAccess: fakeAttachmentAccess{allow: map[string]bool{}},
 	}
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "usr_owner", RequesterUserId: "usr_other", MediaId: "med_dl"})
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", RequesterUserId: "999000111222333444", MediaId: strconv.FormatInt(dlID, 10)})
 	wantCode(t, err, codes.PermissionDenied)
 }
 
 func TestGetDownloadURLAdminAllowed(t *testing.T) {
-	m := readyMedia("med_dl", "usr_owner", model.MediaPurposeMessageFile, "application/pdf", 2048)
+	const dlID int64 = 7001
+	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageFile, "application/pdf", 2048)
 	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore(),
-		Accounts: fakeAccounts{users: map[string]sharedmodel.User{"usr_admin": {AccountType: sharedmodel.AccountTypeAdmin}}},
+		Accounts: fakeAccounts{users: map[string]sharedmodel.User{"999000111222333444": {AccountType: sharedmodel.AccountTypeAdmin}}},
 	}
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "usr_owner", RequesterUserId: "usr_admin", MediaId: "med_dl"})
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", RequesterUserId: "999000111222333444", MediaId: strconv.FormatInt(dlID, 10)})
 	if err != nil {
 		t.Fatalf("admin download: %v", err)
 	}
 }
 
 func TestGetDownloadURLMessageParticipantAllowed(t *testing.T) {
-	m := readyMedia("med_dl", "usr_sender", model.MediaPurposeMessageImage, "image/jpeg", 2048)
+	const dlID int64 = 7001
+	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageImage, "image/jpeg", 2048)
+	receiver := "999000111222333444"
 	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore(),
 		Accounts:         fakeAccounts{users: map[string]sharedmodel.User{}},
-		AttachmentAccess: fakeAttachmentAccess{allow: map[string]bool{"usr_receiver|med_dl": true}},
+		AttachmentAccess: fakeAttachmentAccess{allow: map[string]bool{receiver + "|" + strconv.FormatInt(dlID, 10): true}},
 	}
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "usr_sender", RequesterUserId: "usr_receiver", MediaId: "med_dl"})
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", RequesterUserId: receiver, MediaId: strconv.FormatInt(dlID, 10)})
 	if err != nil {
 		t.Fatalf("participant download: %v", err)
 	}
@@ -246,23 +269,24 @@ func TestGetDownloadURLMessageParticipantAllowed(t *testing.T) {
 // --- GetAvatarDisplayURL ---
 
 func TestGetAvatarDisplayURLReturnsPresignedURL(t *testing.T) {
-	m := readyMedia("med_avatar", "usr_owner", model.MediaPurposeAvatar, "image/png", 128)
+	const avatarID int64 = 7002
+	m := readyMedia(avatarID, "323130844539310080", model.MediaPurposeAvatar, "image/png", 128)
 	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore()}
-	resp, err := NewGetAvatarDisplayURLLogic(context.Background(), svcCtx).GetAvatarDisplayURL(&media.GetAvatarDisplayURLRequest{MediaId: "med_avatar"})
+	resp, err := NewGetAvatarDisplayURLLogic(context.Background(), svcCtx).GetAvatarDisplayURL(&media.GetAvatarDisplayURLRequest{MediaId: strconv.FormatInt(avatarID, 10)})
 	if err != nil {
 		t.Fatalf("GetAvatarDisplayURL: %v", err)
 	}
-	if resp.GetMediaId() != "med_avatar" || resp.GetDownloadUrl() == "" {
+	if resp.GetMediaId() != strconv.FormatInt(avatarID, 10) || resp.GetDownloadUrl() == "" {
 		t.Fatalf("unexpected response: %+v", resp)
 	}
 }
 
 // TestGetAvatarDisplayURLMissingMediaReturnsNotFoundStatus guards that media-rpc
 // emits a typed gRPC NotFound (not opaque Unknown) so media-api maps it to HTTP
-// 404 instead of 500 (#390).
+// 404 instead of 500 (#390). 用一个合法但不存在的雪花 id（解析通过、查不到）。
 func TestGetAvatarDisplayURLMissingMediaReturnsNotFoundStatus(t *testing.T) {
 	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(), Store: newMemStore()}
-	_, err := NewGetAvatarDisplayURLLogic(context.Background(), svcCtx).GetAvatarDisplayURL(&media.GetAvatarDisplayURLRequest{MediaId: "med_missing"})
+	_, err := NewGetAvatarDisplayURLLogic(context.Background(), svcCtx).GetAvatarDisplayURL(&media.GetAvatarDisplayURLRequest{MediaId: "999999999999999"})
 	wantCode(t, err, codes.NotFound)
 }
 
@@ -277,5 +301,21 @@ func TestValidateMediaIDComponent(t *testing.T) {
 	}
 	if _, err := validateMediaIDComponent("bad/slash", "media_id"); err == nil {
 		t.Fatal("slash should fail")
+	}
+}
+
+func TestParseMediaID(t *testing.T) {
+	if _, err := parseMediaID(""); err == nil {
+		t.Fatal("empty media_id should fail")
+	}
+	if _, err := parseMediaID("med_64cdcaf1c7841f7c"); err == nil {
+		t.Fatal("legacy med_ id should fail (not decimal)")
+	}
+	if _, err := parseMediaID("0"); err == nil {
+		t.Fatal("zero media_id should fail")
+	}
+	id, err := parseMediaID("58537781550383104")
+	if err != nil || id != 58537781550383104 {
+		t.Fatalf("parseMediaID snowflake: got %d, %v", id, err)
 	}
 }

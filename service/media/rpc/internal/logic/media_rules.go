@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,8 +21,9 @@ import (
 
 // 媒体业务规则：purpose/status 整型(model/vars.go) <-> 字符串契约映射、输入校验（只 validate 不
 // normalize，清洗由客户端负责）、对象存储 key 生成、内容类型白名单、下载鉴权。数据层走 svcCtx.MediaModel
-// (goctl)；跨域下载鉴权（管理员/消息附件可见性）经 svcCtx.Accounts/AttachmentAccess 读 internal/repository，
-// 是 keystone 阻塞的过渡，待 message-rpc 落地后 BFF 化（见 issue #433）。
+// (goctl)；media_id 为雪花 bigint（EPIC #527 §1，wire 十进制字符串）。跨域下载鉴权（管理员/消息附件
+// 可见性）经 svcCtx.Accounts/AttachmentAccess 读 internal/repository，是 keystone 阻塞的过渡，待
+// message-rpc 落地后 BFF 化（见 issue #433；§4 下载授权编排见 #532）。
 
 const (
 	purposeAvatar       = "avatar"
@@ -91,6 +94,8 @@ func statusToString(status int64) string {
 
 // --- 输入校验（不做规范化）---
 
+// validateMediaIDComponent 校验账号 id 形态的入参（owner_user_id / requester_user_id）。account 引用
+// 仍以十进制字符串承载（D16），故按字符串校验，不解析成 int。
 func validateMediaIDComponent(value string, field string) (string, error) {
 	if value == "" {
 		return "", apperror.InvalidArgument(field + " is required")
@@ -102,6 +107,18 @@ func validateMediaIDComponent(value string, field string) (string, error) {
 		return "", apperror.InvalidArgument(field + " contains invalid characters")
 	}
 	return value, nil
+}
+
+// parseMediaID 把 wire 上的十进制字符串 media_id 解析成雪花 bigint（EPIC #527 §1 / ADR #529）。
+func parseMediaID(value string) (int64, error) {
+	if value == "" {
+		return 0, apperror.InvalidArgument("media_id is required")
+	}
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, apperror.InvalidArgument("media_id must be a positive integer")
+	}
+	return id, nil
 }
 
 func validateOriginalFilename(filename string) (string, error) {
@@ -215,7 +232,7 @@ func validateAvatarMediaObject(media *model.MediaObjects) error {
 
 // --- 数据访问 + 跨域下载鉴权 ---
 
-func mediaByID(ctx context.Context, svcCtx *svc.ServiceContext, mediaID string) (*model.MediaObjects, error) {
+func mediaByID(ctx context.Context, svcCtx *svc.ServiceContext, mediaID int64) (*model.MediaObjects, error) {
 	media, err := svcCtx.MediaModel.FindOne(ctx, mediaID)
 	if err != nil {
 		if err == model.ErrNotFound {
@@ -229,12 +246,8 @@ func mediaByID(ctx context.Context, svcCtx *svc.ServiceContext, mediaID string) 
 	return media, nil
 }
 
-func mediaForOwner(ctx context.Context, svcCtx *svc.ServiceContext, ownerUserID string, mediaID string) (*model.MediaObjects, error) {
+func mediaForOwner(ctx context.Context, svcCtx *svc.ServiceContext, ownerUserID string, mediaID int64) (*model.MediaObjects, error) {
 	ownerUserID, err := validateMediaIDComponent(ownerUserID, "owner_user_id")
-	if err != nil {
-		return nil, err
-	}
-	mediaID, err = validateMediaIDComponent(mediaID, "media_id")
 	if err != nil {
 		return nil, err
 	}
@@ -242,14 +255,14 @@ func mediaForOwner(ctx context.Context, svcCtx *svc.ServiceContext, ownerUserID 
 	if err != nil {
 		return nil, err
 	}
-	if media.OwnerAccountId != ownerUserID {
+	if media.UploaderId != ownerUserID {
 		return nil, apperror.Forbidden("media object is not owned by requester")
 	}
 	return media, nil
 }
 
 func requesterCanAccessMedia(ctx context.Context, svcCtx *svc.ServiceContext, requesterUserID string, media *model.MediaObjects) (bool, error) {
-	if media.OwnerAccountId == requesterUserID {
+	if media.UploaderId == requesterUserID {
 		return true, nil
 	}
 	allowed, err := requesterIsAdmin(ctx, svcCtx, requesterUserID)
@@ -280,42 +293,75 @@ func requesterCanAccessAttachment(ctx context.Context, svcCtx *svc.ServiceContex
 	if svcCtx.AttachmentAccess == nil {
 		return false, nil
 	}
-	return svcCtx.AttachmentAccess.UserCanAccessMedia(ctx, requesterUserID, media.MediaId)
+	// content.mediaId 以十进制字符串承载（ADR #529），与本地 media_id 统一成同一字符串形比较。
+	return svcCtx.AttachmentAccess.UserCanAccessMedia(ctx, requesterUserID, formatMediaID(media.MediaId))
 }
 
 // --- 对象 key 生成、内容类型白名单、id/metadata 构造、PB 映射 ---
 
-func mediaObjectKey(ownerUserID string, mediaID string, filename string) string {
-	return "users/" + ownerUserID + "/media/" + mediaID + "/" + sanitizeObjectFilename(filename)
+// mediaObjectKey 生成 object_key = media/{uploader_id_last4}/{yyyymmdd}/{RAND16}.{ext}
+// （EPIC #527 §1）。RAND16 为 8 字节随机数的 16 位十六进制串；ext 从已校验的 content-type 反推、
+// 不信客户端后缀；原始文件名另存列、不进 path。唯一约束冲突由调用方重生 token 重试。
+func mediaObjectKey(uploaderID string, contentType string) (string, error) {
+	token, err := rand16Token()
+	if err != nil {
+		return "", err
+	}
+	day := time.Now().UTC().Format("20060102")
+	return fmt.Sprintf("media/%s/%s/%s.%s", uploaderLast4(uploaderID), day, token, extForContentType(contentType)), nil
 }
 
-func sanitizeObjectFilename(filename string) string {
-	filename = path.Base(strings.ReplaceAll(strings.TrimSpace(filename), "\\", "/"))
-	var builder strings.Builder
-	lastUnderscore := false
-	for _, r := range filename {
-		allowed := (r >= 'a' && r <= 'z') ||
-			(r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') ||
-			r == '.' || r == '-' || r == '_'
-		if allowed {
-			builder.WriteRune(r)
-			lastUnderscore = false
-			continue
-		}
-		if !lastUnderscore {
-			builder.WriteByte('_')
-			lastUnderscore = true
-		}
+// uploaderLast4 取 uploader_id 末 4 位作分桶前缀（十进制串）；不足 4 位则用全量。
+func uploaderLast4(uploaderID string) string {
+	r := []rune(uploaderID)
+	if len(r) <= 4 {
+		return uploaderID
 	}
-	sanitized := strings.Trim(builder.String(), "._-")
-	if sanitized == "" {
-		return "upload"
+	return string(r[len(r)-4:])
+}
+
+// rand16Token 生成 64-bit 随机 token 的 16 位十六进制串（非标准 UUID，求短）。
+func rand16Token() (string, error) {
+	var raw [8]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", err
 	}
-	if len(sanitized) > 128 {
-		sanitized = sanitized[:128]
+	return hex.EncodeToString(raw[:]), nil
+}
+
+// extForContentType 从已校验的 content-type 反推扩展名（不信客户端文件后缀）。白名单与
+// validatePurposeContent 一致；未知类型落 bin。
+func extForContentType(contentType string) string {
+	switch normalizeContentType(contentType) {
+	case "image/jpeg":
+		return "jpg"
+	case "image/png":
+		return "png"
+	case "image/webp":
+		return "webp"
+	case "image/gif":
+		return "gif"
+	case "application/pdf":
+		return "pdf"
+	case "text/plain":
+		return "txt"
+	case "application/zip", "application/x-zip-compressed":
+		return "zip"
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+		return "docx"
+	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		return "xlsx"
+	case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+		return "pptx"
+	case "application/msword":
+		return "doc"
+	case "application/vnd.ms-excel":
+		return "xls"
+	case "application/vnd.ms-powerpoint":
+		return "ppt"
+	default:
+		return "bin"
 	}
-	return sanitized
 }
 
 func normalizeContentType(value string) string {
@@ -359,12 +405,9 @@ func isAllowedFileContentType(contentType string) bool {
 	}
 }
 
-func newMediaID() (string, error) {
-	var raw [8]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		return "", err
-	}
-	return "med_" + hex.EncodeToString(raw[:]), nil
+// formatMediaID 把雪花 bigint media_id 转成 wire 十进制字符串（ADR #529）。
+func formatMediaID(mediaID int64) string {
+	return strconv.FormatInt(mediaID, 10)
 }
 
 // uploadMetadataJSON 把 sha256/width/height 落进 media_objects.metadata（与旧 repository 行为一致；
@@ -381,8 +424,8 @@ func uploadMetadataJSON(sha256 string, width, height int32) (string, error) {
 func toPBMediaObject(media *model.MediaObjects) *mediapb.MediaObject {
 	// sha256/width/height 存在 metadata 里、当前不回读（与旧实现一致），故留空。
 	return &mediapb.MediaObject{
-		MediaId:          media.MediaId,
-		OwnerUserId:      media.OwnerAccountId,
+		MediaId:          formatMediaID(media.MediaId),
+		OwnerUserId:      media.UploaderId,
 		Bucket:           media.Bucket,
 		ObjectKey:        media.ObjectKey,
 		ContentType:      media.ContentType,
