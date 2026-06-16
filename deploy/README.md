@@ -68,6 +68,7 @@ ADMIN_BOOTSTRAP_PASSWORD='[REDACTED]' ./scripts/bootstrap-server.sh
 - Management System：`https://ms.agenticim.xyz/`
 - Grafana：`https://grafana.agenticim.xyz/`
 - Langfuse：`https://langfuse.agenticim.xyz/`
+- MinIO Console：`https://minio.agenticim.xyz/`（受 basic-auth + MinIO 登录保护）
 - Prometheus UI：`https://ms.agenticim.xyz/observability/metrics`（受保护路径）
 
 Ingress 路由要点：
@@ -81,6 +82,8 @@ Ingress 路由要点：
 - `/messages`、`/conversations`、`/api/feedback` -> `msg-api`
 - `/ws` -> `msggateway`
 - `/media` -> `media-api`
+- `/agents-im-media` -> `agents-im-minio`（S3-compatible object API）
+- `minio.agenticim.xyz/` -> `minio:9001`（MinIO Console）
 - `/admin/*`、`/api/admin/*`、`/api/feedback` -> `admin-api`
 - `/` -> `web`
 
