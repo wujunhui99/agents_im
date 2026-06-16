@@ -16,7 +16,10 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
+	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/userrpc"
+	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
 type ServiceContext struct {
@@ -63,6 +66,16 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
 
+	// 账号读写经属主 user-rpc（gate #550，脱 internal/repository accountRepo 的 avatar string scan/空串写）。
+	if !hasRPCClientConfig(c.UserRPC) {
+		log.Fatalf("msg-rpc requires user rpc client config (UserRPC)")
+	}
+	userRPCClient, err := zrpc.NewClient(c.UserRPC)
+	if err != nil {
+		log.Fatalf("build user rpc client: %v", err)
+	}
+	userCli := userclient.NewUser(userRPCClient)
+
 	kafkaBrokers := resolveKafkaBrokers(c)
 	producer, err := messaging.NewKafkaProducer(kafkaBrokers)
 	if err != nil {
@@ -70,7 +83,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 	// AI 写回经本进程 SendMessage（晚绑定 svcCtx），防 PG/Redis 双 seq 分裂。
 	senderOverride := &kafkaModeSender{}
-	hosting := newConversationAIHostingRuntime(c, mediaRepo, groupsLogic, senderOverride)
+	hosting := newConversationAIHostingRuntime(c, mediaRepo, groupsLogic, senderOverride, userCli)
 
 	svcCtx := &ServiceContext{
 		Config:       c,
@@ -116,18 +129,26 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+// hasRPCClientConfig 判断 zrpc 客户端是否已配置(target / endpoints / etcd 任一)。
+func hasRPCClientConfig(conf zrpc.RpcClientConf) bool {
+	return conf.Target != "" || len(conf.Endpoints) > 0 || (len(conf.Etcd.Hosts) > 0 && conf.Etcd.Key != "")
+}
+
 // newConversationAIHostingRuntime 移植自 service/message-api/main.go 的 AI 托管接线：
 // 构造 internal messagesvc.ServiceContext（MessageLogic 仅作 Agent 回复写回通道，写同一批表 +
 // outbox，与 msg-rpc goctl 数据层共存）并 ConfigureConversationAIHosting。
-func newConversationAIHostingRuntime(c config.Config, mediaRepo repository.MediaRepository, groupsLogic *business.GroupsLogic, senderOverride agentim.MessageSender) *messagesvc.ServiceContext {
+func newConversationAIHostingRuntime(c config.Config, mediaRepo repository.MediaRepository, groupsLogic *business.GroupsLogic, senderOverride agentim.MessageSender, userCli userclient.User) *messagesvc.ServiceContext {
 	messageRepo, err := repository.NewMessageRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
 	if err != nil {
 		log.Fatalf("build message repository: %v", err)
 	}
-	accountRepo, err := repository.NewRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
+	// friendshipRepo 提供 agent-create 工具路径的好友写（friendships 表无 avatar，非 #550 blocker）。
+	friendshipRepo, err := repository.NewRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
 	if err != nil {
 		log.Fatalf("build account repository: %v", err)
 	}
+	// AccountRepo = Composite：账号读写经 user-rpc（脱 internal avatar 读写），好友写委托 postgres repo。
+	accountRepo := userrpc.NewComposite(userCli, friendshipRepo)
 	agentHostingRepo, err := repository.NewAgentConversationHostingRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
 	if err != nil {
 		log.Fatalf("build agent hosting repository: %v", err)

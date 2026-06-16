@@ -11,6 +11,10 @@ type Config struct {
 	// tracing 用 go-zero 自带 Telemetry（在 RpcServerConf.ServiceConf 内，由 yaml 配置）。
 	DataSource string `json:",optional"`
 
+	// UserRPC：AI 托管运行时 agent-create 工具路径的账号读写经属主 user-rpc
+	// （gate #550，脱 internal/repository accountRepo 的 avatar string scan/空串写）。
+	UserRPC zrpc.RpcClientConf `json:",optional"`
+
 	// AI 托管运行时（keystone 例外：随 message-api 退役迁入，SendMessage 后触发 Agent 回复；
 	// 待 03-message-pipeline §9 B1 把触发点迁到 msgtransfer 后删除）。
 	DeepSeek         appconfig.DeepSeekConfig         `json:",optional"`
