@@ -231,6 +231,10 @@ MailRPC:
   Endpoints:
     - 127.0.0.1:${MAIL_RPC_PORT:-9095}
   Timeout: 5000
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT:-9090}
+  Timeout: 5000
 Telemetry:
   Name: auth-rpc
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}

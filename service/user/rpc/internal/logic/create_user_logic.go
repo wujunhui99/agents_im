@@ -55,6 +55,12 @@ func (l *CreateUserLogic) CreateUser(in *userpb.CreateUserRequest) (*userpb.User
 		return nil, rpcerror.ToStatus(err)
 	}
 
+	// email_verified_at：auth 注册校验邮箱后带入（RFC3339，空=未验证）。落 accounts。
+	emailVerifiedAt, err := parseEmailVerifiedAt(in.GetEmailVerifiedAt())
+	if err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+
 	// 事务边界在 Logic 层：accounts + profiles 两行要么全成、要么全败。
 	var created *model.AccountProfile
 	err = l.svcCtx.Accounts.Transact(l.ctx, func(ctx context.Context, session sqlx.Session) error {
@@ -66,6 +72,7 @@ func (l *CreateUserLogic) CreateUser(in *userpb.CreateUserRequest) (*userpb.User
 			Identifier:      identifier,
 			AccountType:     accountTypeDB,
 			EmailNormalized: strings.TrimSpace(in.GetEmail()),
+			EmailVerifiedAt: emailVerifiedAt,
 		}); err != nil {
 			return err
 		}

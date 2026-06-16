@@ -52,6 +52,9 @@ message CreateUserRequest {
   string region = 6;
   string account_type = 7;
   string email = 8;
+  // email_verified_at: RFC3339 时间戳(空串=未验证)。auth 注册校验邮箱后经此带入,
+  // 落 accounts.email_verified_at;不传则为 NULL(未验证)。
+  string email_verified_at = 9;
 }
 
 message GetUserByIdentifierRequest {

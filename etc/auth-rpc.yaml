@@ -10,6 +10,11 @@ MailRPC:
   Endpoints:
     - 127.0.0.1:9095
   Timeout: 5000
+# UserRPC：注册/登录读用户资料经属主 user-rpc（#551，脱 internal/logic.UserLogic）。
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:9090
+  Timeout: 5000
 
 SessionRedis:
   Addr: localhost:6379

@@ -1,15 +1,31 @@
 package logic
 
 import (
+	"database/sql"
 	"errors"
 	"net/url"
 	"strings"
+	"time"
 
 	sharemodel "github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
 )
+
+// parseEmailVerifiedAt 解析 wire 上的 RFC3339 email_verified_at（空串=未验证→NULL）。
+// auth 注册校验邮箱后经此带入，落 accounts.email_verified_at；契约保持 string（ADR #529 同规）。
+func parseEmailVerifiedAt(value string) (sql.NullTime, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return sql.NullTime{}, nil
+	}
+	t, err := time.Parse(time.RFC3339, trimmed)
+	if err != nil {
+		return sql.NullTime{}, apperror.InvalidArgument("email_verified_at must be RFC3339 or empty")
+	}
+	return sql.NullTime{Time: t.UTC(), Valid: true}, nil
+}
 
 // facetForAccountType maps the granular DB account_type to the D16 account-facet
 // encoded in the account id. Only agent accounts get FacetAgent (toPush=0);

@@ -164,17 +164,20 @@ func (x *UserEntity) GetAvatarUrl() string {
 }
 
 type CreateUserRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Identifier    string                 `protobuf:"bytes,1,opt,name=identifier,proto3" json:"identifier,omitempty"`
-	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Gender        string                 `protobuf:"bytes,4,opt,name=gender,proto3" json:"gender,omitempty"`
-	BirthDate     string                 `protobuf:"bytes,5,opt,name=birth_date,json=birthDate,proto3" json:"birth_date,omitempty"`
-	Region        string                 `protobuf:"bytes,6,opt,name=region,proto3" json:"region,omitempty"`
-	AccountType   string                 `protobuf:"bytes,7,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
-	Email         string                 `protobuf:"bytes,8,opt,name=email,proto3" json:"email,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Identifier  string                 `protobuf:"bytes,1,opt,name=identifier,proto3" json:"identifier,omitempty"`
+	DisplayName string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Name        string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Gender      string                 `protobuf:"bytes,4,opt,name=gender,proto3" json:"gender,omitempty"`
+	BirthDate   string                 `protobuf:"bytes,5,opt,name=birth_date,json=birthDate,proto3" json:"birth_date,omitempty"`
+	Region      string                 `protobuf:"bytes,6,opt,name=region,proto3" json:"region,omitempty"`
+	AccountType string                 `protobuf:"bytes,7,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
+	Email       string                 `protobuf:"bytes,8,opt,name=email,proto3" json:"email,omitempty"`
+	// email_verified_at: RFC3339 时间戳(空串=未验证)。auth 注册校验邮箱后经此带入,
+	// 落 accounts.email_verified_at;不传则为 NULL(未验证)。
+	EmailVerifiedAt string `protobuf:"bytes,9,opt,name=email_verified_at,json=emailVerifiedAt,proto3" json:"email_verified_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CreateUserRequest) Reset() {
@@ -259,6 +262,13 @@ func (x *CreateUserRequest) GetAccountType() string {
 func (x *CreateUserRequest) GetEmail() string {
 	if x != nil {
 		return x.Email
+	}
+	return ""
+}
+
+func (x *CreateUserRequest) GetEmailVerifiedAt() string {
+	if x != nil {
+		return x.EmailVerifiedAt
 	}
 	return ""
 }
@@ -848,7 +858,7 @@ const file_service_user_rpc_user_proto_rawDesc = "" +
 	"\x0favatar_media_id\x18\v \x01(\tR\ravatarMediaId\x12\x14\n" +
 	"\x05email\x18\f \x01(\tR\x05email\x12\x1d\n" +
 	"\n" +
-	"avatar_url\x18\r \x01(\tR\tavatarUrl\"\xf2\x01\n" +
+	"avatar_url\x18\r \x01(\tR\tavatarUrl\"\x9e\x02\n" +
 	"\x11CreateUserRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +
@@ -860,7 +870,8 @@ const file_service_user_rpc_user_proto_rawDesc = "" +
 	"birth_date\x18\x05 \x01(\tR\tbirthDate\x12\x16\n" +
 	"\x06region\x18\x06 \x01(\tR\x06region\x12!\n" +
 	"\faccount_type\x18\a \x01(\tR\vaccountType\x12\x14\n" +
-	"\x05email\x18\b \x01(\tR\x05email\"<\n" +
+	"\x05email\x18\b \x01(\tR\x05email\x12*\n" +
+	"\x11email_verified_at\x18\t \x01(\tR\x0femailVerifiedAt\"<\n" +
 	"\x1aGetUserByIdentifierRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +
