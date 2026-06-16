@@ -333,6 +333,10 @@ write_admin_rpc_config() {
 Name: admin-rpc
 ListenOn: 127.0.0.1:${ADMIN_RPC_PORT:-9097}
 DataSource: ${DATABASE_URL}
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT:-9090}
+  Timeout: 5000
 Telemetry:
   Name: admin-rpc
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}

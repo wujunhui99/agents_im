@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v5.29.3
-// source: service/user/rpc/user.proto
+// source: user.proto
 
 package user
 
@@ -24,6 +24,8 @@ const (
 	User_ExistsByIdentifier_FullMethodName  = "/user.v1.User/ExistsByIdentifier"
 	User_GetUserByID_FullMethodName         = "/user.v1.User/GetUserByID"
 	User_GetUsersByIDs_FullMethodName       = "/user.v1.User/GetUsersByIDs"
+	User_SearchAccounts_FullMethodName      = "/user.v1.User/SearchAccounts"
+	User_CountAccounts_FullMethodName       = "/user.v1.User/CountAccounts"
 	User_UpdateUserProfile_FullMethodName   = "/user.v1.User/UpdateUserProfile"
 	User_UpdateUserAvatar_FullMethodName    = "/user.v1.User/UpdateUserAvatar"
 	User_CreateTestAccount_FullMethodName   = "/user.v1.User/CreateTestAccount"
@@ -45,6 +47,11 @@ type UserClient interface {
 	// GetUsersByIDs 批量获取用户资料：一条 WHERE id IN (...) 取代 N 次 GetUserByID。
 	// 不存在的 id 静默跳过（返回找到的子集，不报错），调用方按需比对缺失。
 	GetUsersByIDs(ctx context.Context, in *GetUsersByIDsRequest, opts ...grpc.CallOption) (*GetUsersByIDsResponse, error)
+	// SearchAccounts 按 query 模糊搜账号（account_id/identifier/display_name/name LIKE）；
+	// 管理后台跨域只读，经属主 user-rpc（gate #550：脱 internal/repository accountRepo）。
+	SearchAccounts(ctx context.Context, in *SearchAccountsRequest, opts ...grpc.CallOption) (*SearchAccountsResponse, error)
+	// CountAccounts 统计账号总数（管理后台 dashboard 用）。
+	CountAccounts(ctx context.Context, in *CountAccountsRequest, opts ...grpc.CallOption) (*CountAccountsResponse, error)
 	UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UserResponse, error)
 	UpdateUserAvatar(ctx context.Context, in *UpdateUserAvatarRequest, opts ...grpc.CallOption) (*UserResponse, error)
 	// CreateTestAccount 创建管理后台用的测试账户（account_type=test，不绑定邮箱）。
@@ -112,6 +119,26 @@ func (c *userClient) GetUsersByIDs(ctx context.Context, in *GetUsersByIDsRequest
 	return out, nil
 }
 
+func (c *userClient) SearchAccounts(ctx context.Context, in *SearchAccountsRequest, opts ...grpc.CallOption) (*SearchAccountsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchAccountsResponse)
+	err := c.cc.Invoke(ctx, User_SearchAccounts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userClient) CountAccounts(ctx context.Context, in *CountAccountsRequest, opts ...grpc.CallOption) (*CountAccountsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CountAccountsResponse)
+	err := c.cc.Invoke(ctx, User_CountAccounts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userClient) UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UserResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UserResponse)
@@ -158,6 +185,11 @@ type UserServer interface {
 	// GetUsersByIDs 批量获取用户资料：一条 WHERE id IN (...) 取代 N 次 GetUserByID。
 	// 不存在的 id 静默跳过（返回找到的子集，不报错），调用方按需比对缺失。
 	GetUsersByIDs(context.Context, *GetUsersByIDsRequest) (*GetUsersByIDsResponse, error)
+	// SearchAccounts 按 query 模糊搜账号（account_id/identifier/display_name/name LIKE）；
+	// 管理后台跨域只读，经属主 user-rpc（gate #550：脱 internal/repository accountRepo）。
+	SearchAccounts(context.Context, *SearchAccountsRequest) (*SearchAccountsResponse, error)
+	// CountAccounts 统计账号总数（管理后台 dashboard 用）。
+	CountAccounts(context.Context, *CountAccountsRequest) (*CountAccountsResponse, error)
 	UpdateUserProfile(context.Context, *UpdateUserProfileRequest) (*UserResponse, error)
 	UpdateUserAvatar(context.Context, *UpdateUserAvatarRequest) (*UserResponse, error)
 	// CreateTestAccount 创建管理后台用的测试账户（account_type=test，不绑定邮箱）。
@@ -189,6 +221,12 @@ func (UnimplementedUserServer) GetUserByID(context.Context, *GetUserByIDRequest)
 }
 func (UnimplementedUserServer) GetUsersByIDs(context.Context, *GetUsersByIDsRequest) (*GetUsersByIDsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUsersByIDs not implemented")
+}
+func (UnimplementedUserServer) SearchAccounts(context.Context, *SearchAccountsRequest) (*SearchAccountsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchAccounts not implemented")
+}
+func (UnimplementedUserServer) CountAccounts(context.Context, *CountAccountsRequest) (*CountAccountsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CountAccounts not implemented")
 }
 func (UnimplementedUserServer) UpdateUserProfile(context.Context, *UpdateUserProfileRequest) (*UserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateUserProfile not implemented")
@@ -310,6 +348,42 @@ func _User_GetUsersByIDs_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _User_SearchAccounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchAccountsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServer).SearchAccounts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: User_SearchAccounts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServer).SearchAccounts(ctx, req.(*SearchAccountsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _User_CountAccounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountAccountsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServer).CountAccounts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: User_CountAccounts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServer).CountAccounts(ctx, req.(*CountAccountsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _User_UpdateUserProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateUserProfileRequest)
 	if err := dec(in); err != nil {
@@ -392,6 +466,14 @@ var User_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _User_GetUsersByIDs_Handler,
 		},
 		{
+			MethodName: "SearchAccounts",
+			Handler:    _User_SearchAccounts_Handler,
+		},
+		{
+			MethodName: "CountAccounts",
+			Handler:    _User_CountAccounts_Handler,
+		},
+		{
 			MethodName: "UpdateUserProfile",
 			Handler:    _User_UpdateUserProfile_Handler,
 		},
@@ -405,5 +487,5 @@ var User_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "service/user/rpc/user.proto",
+	Metadata: "user.proto",
 }

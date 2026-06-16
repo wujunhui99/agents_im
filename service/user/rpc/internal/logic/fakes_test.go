@@ -3,6 +3,8 @@ package logic
 import (
 	"context"
 	"database/sql"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
@@ -94,6 +96,37 @@ func (m *fakeAccountsModel) ExistsByIdentifier(_ context.Context, identifier str
 		}
 	}
 	return false, nil
+}
+
+// SearchAccountProfiles 复刻 SQL 语义：query 空返回全部（按 created_at desc, account_id asc），
+// 否则 account_id/identifier/display_name/name 大小写不敏感 LIKE；最后截到 limit。
+func (m *fakeAccountsModel) SearchAccountProfiles(_ context.Context, query string, limit int) ([]*model.AccountProfile, error) {
+	query = strings.ToLower(strings.TrimSpace(query))
+	out := make([]*model.AccountProfile, 0, len(m.store.byID))
+	for _, rec := range m.store.byID {
+		if query == "" ||
+			strings.Contains(strings.ToLower(rec.AccountID), query) ||
+			strings.Contains(strings.ToLower(rec.Identifier), query) ||
+			strings.Contains(strings.ToLower(rec.DisplayName), query) ||
+			strings.Contains(strings.ToLower(rec.Name), query) {
+			clone := *rec
+			out = append(out, &clone)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if !out[i].AccountCreatedAt.Equal(out[j].AccountCreatedAt) {
+			return out[i].AccountCreatedAt.After(out[j].AccountCreatedAt)
+		}
+		return out[i].AccountID < out[j].AccountID
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
+func (m *fakeAccountsModel) CountAccounts(_ context.Context) (int64, error) {
+	return int64(len(m.store.byID)), nil
 }
 
 // gen accountsModel methods unused by Logic unit tests.

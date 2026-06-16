@@ -48,6 +48,16 @@ func (s *UserServer) GetUsersByIDs(ctx context.Context, in *user.GetUsersByIDsRe
 	return l.GetUsersByIDs(in)
 }
 
+func (s *UserServer) SearchAccounts(ctx context.Context, in *user.SearchAccountsRequest) (*user.SearchAccountsResponse, error) {
+	l := logic.NewSearchAccountsLogic(ctx, s.svcCtx)
+	return l.SearchAccounts(in)
+}
+
+func (s *UserServer) CountAccounts(ctx context.Context, in *user.CountAccountsRequest) (*user.CountAccountsResponse, error) {
+	l := logic.NewCountAccountsLogic(ctx, s.svcCtx)
+	return l.CountAccounts(in)
+}
+
 func (s *UserServer) UpdateUserProfile(ctx context.Context, in *user.UpdateUserProfileRequest) (*user.UserResponse, error) {
 	l := logic.NewUpdateUserProfileLogic(ctx, s.svcCtx)
 	return l.UpdateUserProfile(in)

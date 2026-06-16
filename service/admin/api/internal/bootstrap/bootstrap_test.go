@@ -54,6 +54,14 @@ func (f *fakeBootstrapUserRPC) GetUsersByIDs(context.Context, *userpb.GetUsersBy
 	panic("fakeBootstrapUserRPC.GetUsersByIDs: unused")
 }
 
+func (f *fakeBootstrapUserRPC) SearchAccounts(context.Context, *userpb.SearchAccountsRequest, ...grpc.CallOption) (*userpb.SearchAccountsResponse, error) {
+	panic("fakeBootstrapUserRPC.SearchAccounts: unused")
+}
+
+func (f *fakeBootstrapUserRPC) CountAccounts(context.Context, *userpb.CountAccountsRequest, ...grpc.CallOption) (*userpb.CountAccountsResponse, error) {
+	panic("fakeBootstrapUserRPC.CountAccounts: unused")
+}
+
 func (f *fakeBootstrapUserRPC) UpdateUserProfile(context.Context, *userpb.UpdateUserProfileRequest, ...grpc.CallOption) (*userpb.UserResponse, error) {
 	panic("fakeBootstrapUserRPC.UpdateUserProfile: unused")
 }

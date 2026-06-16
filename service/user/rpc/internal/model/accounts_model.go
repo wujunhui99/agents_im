@@ -52,6 +52,11 @@ type (
 		ListAccountProfilesByIDs(ctx context.Context, accountIDs []string) ([]*AccountProfile, error)
 		// ExistsByIdentifier 报告 identifier 是否已存在。
 		ExistsByIdentifier(ctx context.Context, identifier string) (bool, error)
+		// SearchAccountProfiles 按 query 模糊搜 account⋈profile（account_id/identifier/
+		// display_name/name LIKE，大小写不敏感）；query 空则返回最近创建的 limit 条。管理后台用。
+		SearchAccountProfiles(ctx context.Context, query string, limit int) ([]*AccountProfile, error)
+		// CountAccounts 统计账号总数。
+		CountAccounts(ctx context.Context) (int64, error)
 	}
 
 	customAccountsModel struct {
@@ -141,4 +146,28 @@ func (m *customAccountsModel) ExistsByIdentifier(ctx context.Context, identifier
 	var exists bool
 	err := m.conn.QueryRowCtx(ctx, &exists, "select exists(select 1 from accounts where identifier = $1)", identifier)
 	return exists, err
+}
+
+// SearchAccountProfiles 复刻 internal/repository.SearchAccounts 的语义（行为对齐管理后台旧路径）。
+func (m *customAccountsModel) SearchAccountProfiles(ctx context.Context, query string, limit int) ([]*AccountProfile, error) {
+	query = strings.ToLower(strings.TrimSpace(query))
+	like := "%" + query + "%"
+	sql := accountProfileSelectPrefix + `where $1 = ''
+   or lower(a.account_id) like $2
+   or lower(a.identifier) like $2
+   or lower(p.display_name) like $2
+   or lower(p.name) like $2
+order by a.created_at desc, a.account_id asc
+limit $3`
+	var resp []*AccountProfile
+	if err := m.conn.QueryRowsCtx(ctx, &resp, sql, query, like, limit); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (m *customAccountsModel) CountAccounts(ctx context.Context) (int64, error) {
+	var count int64
+	err := m.conn.QueryRowCtx(ctx, &count, "select count(*) from accounts")
+	return count, err
 }
