@@ -305,6 +305,10 @@ DeepSeek:
   Model: ${DEEPSEEK_MODEL:-}
 PythonExecutor:
   Backend: disabled
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT:-9090}
+  Timeout: 5000
 Kafka:
   Enabled: true
   Brokers: ${KAFKA_BROKERS}

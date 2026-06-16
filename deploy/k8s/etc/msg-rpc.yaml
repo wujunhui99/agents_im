@@ -2,6 +2,13 @@ Name: msg-rpc
 ListenOn: 0.0.0.0:9098
 
 DataSource: ${DATABASE_URL}
+
+# UserRPC：AI 托管 agent-create 工具路径账号读写经属主 user-rpc（gate #550，脱 internal accountRepo）。
+UserRPC:
+  Endpoints:
+    - user-rpc:9090
+  Timeout: 5000
+
 # go-zero 自带 tracing：endpoint 由 OTLP collector 注入（空则关闭）。
 Telemetry:
   Name: msg-rpc
