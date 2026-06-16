@@ -16,6 +16,8 @@ import (
 type (
 	CreateTestAccountRequest   = user.CreateTestAccountRequest
 	CreateTestAccountResponse  = user.CreateTestAccountResponse
+	CountAccountsRequest       = user.CountAccountsRequest
+	CountAccountsResponse      = user.CountAccountsResponse
 	CreateUserRequest          = user.CreateUserRequest
 	ExistsByIdentifierRequest  = user.ExistsByIdentifierRequest
 	ExistsByIdentifierResponse = user.ExistsByIdentifierResponse
@@ -23,6 +25,8 @@ type (
 	GetUserByIdentifierRequest = user.GetUserByIdentifierRequest
 	GetUsersByIDsRequest       = user.GetUsersByIDsRequest
 	GetUsersByIDsResponse      = user.GetUsersByIDsResponse
+	SearchAccountsRequest      = user.SearchAccountsRequest
+	SearchAccountsResponse     = user.SearchAccountsResponse
 	UpdateUserAvatarRequest    = user.UpdateUserAvatarRequest
 	UpdateUserProfileRequest   = user.UpdateUserProfileRequest
 	UserEntity                 = user.UserEntity
@@ -34,6 +38,10 @@ type (
 		ExistsByIdentifier(ctx context.Context, in *ExistsByIdentifierRequest, opts ...grpc.CallOption) (*ExistsByIdentifierResponse, error)
 		GetUserByID(ctx context.Context, in *GetUserByIDRequest, opts ...grpc.CallOption) (*UserResponse, error)
 		GetUsersByIDs(ctx context.Context, in *GetUsersByIDsRequest, opts ...grpc.CallOption) (*GetUsersByIDsResponse, error)
+		// SearchAccounts 按 query 模糊搜账号（管理后台跨域只读，经属主 user-rpc）。
+		SearchAccounts(ctx context.Context, in *SearchAccountsRequest, opts ...grpc.CallOption) (*SearchAccountsResponse, error)
+		// CountAccounts 统计账号总数（管理后台 dashboard 用）。
+		CountAccounts(ctx context.Context, in *CountAccountsRequest, opts ...grpc.CallOption) (*CountAccountsResponse, error)
 		UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UserResponse, error)
 		UpdateUserAvatar(ctx context.Context, in *UpdateUserAvatarRequest, opts ...grpc.CallOption) (*UserResponse, error)
 		// CreateTestAccount 创建管理后台用的测试账户（account_type=test，不绑定邮箱）。
@@ -74,6 +82,16 @@ func (m *defaultUser) GetUserByID(ctx context.Context, in *GetUserByIDRequest, o
 func (m *defaultUser) GetUsersByIDs(ctx context.Context, in *GetUsersByIDsRequest, opts ...grpc.CallOption) (*GetUsersByIDsResponse, error) {
 	client := user.NewUserClient(m.cli.Conn())
 	return client.GetUsersByIDs(ctx, in, opts...)
+}
+
+func (m *defaultUser) SearchAccounts(ctx context.Context, in *SearchAccountsRequest, opts ...grpc.CallOption) (*SearchAccountsResponse, error) {
+	client := user.NewUserClient(m.cli.Conn())
+	return client.SearchAccounts(ctx, in, opts...)
+}
+
+func (m *defaultUser) CountAccounts(ctx context.Context, in *CountAccountsRequest, opts ...grpc.CallOption) (*CountAccountsResponse, error) {
+	client := user.NewUserClient(m.cli.Conn())
+	return client.CountAccounts(ctx, in, opts...)
 }
 
 func (m *defaultUser) UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UserResponse, error) {

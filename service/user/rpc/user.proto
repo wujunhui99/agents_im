@@ -16,6 +16,11 @@ service User {
   // GetUsersByIDs 批量获取用户资料：一条 WHERE id IN (...) 取代 N 次 GetUserByID。
   // 不存在的 id 静默跳过（返回找到的子集，不报错），调用方按需比对缺失。
   rpc GetUsersByIDs(GetUsersByIDsRequest) returns (GetUsersByIDsResponse);
+  // SearchAccounts 按 query 模糊搜账号（account_id/identifier/display_name/name LIKE）；
+  // 管理后台跨域只读，经属主 user-rpc（gate #550：脱 internal/repository accountRepo）。
+  rpc SearchAccounts(SearchAccountsRequest) returns (SearchAccountsResponse);
+  // CountAccounts 统计账号总数（管理后台 dashboard 用）。
+  rpc CountAccounts(CountAccountsRequest) returns (CountAccountsResponse);
   rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UserResponse);
   rpc UpdateUserAvatar(UpdateUserAvatarRequest) returns (UserResponse);
   // CreateTestAccount 创建管理后台用的测试账户（account_type=test，不绑定邮箱）。
@@ -80,6 +85,21 @@ message GetUsersByIDsRequest {
 
 message GetUsersByIDsResponse {
   repeated UserEntity users = 1;
+}
+
+message SearchAccountsRequest {
+  string query = 1;
+  int32 limit = 2;
+}
+
+message SearchAccountsResponse {
+  repeated UserEntity users = 1;
+}
+
+message CountAccountsRequest {}
+
+message CountAccountsResponse {
+  int64 count = 1;
 }
 
 message UpdateUserProfileRequest {
