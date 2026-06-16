@@ -33,6 +33,12 @@ PythonExecutor:
     ServiceAccountName: ${PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME}
     RuntimeClassName: ${PYTHON_EXECUTOR_K8S_RUNTIME_CLASS_NAME}
 
+# UserRPC：账号资料读经属主 user-rpc(gate #550，脱 internal/repository accountRepo)。
+UserRPC:
+  Endpoints:
+    - user-rpc:9090
+  Timeout: 5000
+
 Redis:
   Addr: ${REDIS_ADDR}
   Password: ${REDIS_PASSWORD}
