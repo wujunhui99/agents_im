@@ -32,7 +32,7 @@ if [[ -d internal/auth/svc ]]; then
   exit 1
 fi
 
-aggregate_gozero_logic_files="$(find internal/logic internal/auth/logic -path '*/gozero_logic.go' -type f -print || true)"
+aggregate_gozero_logic_files="$(find internal/logic -path '*/gozero_logic.go' -type f -print || true)"
 if [[ -n "${aggregate_gozero_logic_files}" ]]; then
   echo "go-zero REST adapter logic must use goctl-style per-operation *_logic.go files, not aggregate gozero_logic.go files:" >&2
   echo "${aggregate_gozero_logic_files}" >&2
@@ -104,7 +104,7 @@ forbid_match "generated rpc logic still contains empty scaffold behavior" \
 # rpc logic must be wired through svcCtx markers (logic talks to model/provider via svcCtx).
 rpc_logic_markers=(
   "service/user/rpc/internal/logic:Accounts"
-  "service/auth/rpc/internal/logic:AuthLogic"
+  "service/auth/rpc/internal/logic:Credentials"
   "service/friends/rpc/internal/logic:FriendshipModel"
   "service/msg/rpc/internal/logic:Messages"
   "service/third/rpc/internal/logic:MailProvider"
