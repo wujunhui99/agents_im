@@ -102,6 +102,7 @@ class DetectDeployChangesTest(unittest.TestCase):
         # keeps its groups-rpc canary instead (#488).
         for path in [
             "scripts/ci/drone-backend-verify.sh",
+            "scripts/ci/drone-detect-changes.sh",
             "scripts/ci/drone-postgres-integration.sh",
             "scripts/ci/drone-markdown-link-check.sh",
             "scripts/ci/drone-telegram-notify.py",

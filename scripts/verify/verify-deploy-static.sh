@@ -8,10 +8,35 @@ cd "$(git rev-parse --show-toplevel)"
 
 # --- Drone pipeline + migration immutability ---
 assert_present "-qF" .drone.yml -- \
-  "kind: pipeline" "backend-verification" "postgres-integration" "deploy-main" \
-  "bash scripts/ci/drone-backend-verify.sh" "bash scripts/ci/drone-postgres-integration.sh" \
+  "kind: pipeline" "detect changes" "backend-verification" "postgres-integration" "deploy-main" \
+  "bash scripts/ci/drone-run-if-required.sh" "bash scripts/ci/drone-backend-verify.sh" \
+  "bash scripts/ci/drone-frontend-verify.sh" "bash scripts/ci/drone-postgres-integration.sh" \
+  "bash scripts/ci/drone-detect-changes.sh" \
   "bash scripts/ci/drone-detect-deploy.sh" "bash scripts/ci/drone-build-images.sh" "bash scripts/ci/drone-deploy.sh" \
   "from_secret: ghcr_token" "postgres:16-alpine" "ghcr.io/wujunhui99/agents_im"
+assert_present "-qF" scripts/ci/drone-backend-verify.sh -- "docker compose config -q"
+assert_present "-qF" scripts/ci/drone-frontend-verify.sh -- \
+  "npm --prefix web ci --prefer-offline" "npm --prefix web run lint" \
+  "npm --prefix web run test:run" "npm --prefix web run build"
+
+python3 - <<'PY'
+import sys
+import yaml
+
+with open(".drone.yml", encoding="utf-8") as f:
+    docs = [doc for doc in yaml.safe_load_all(f) if doc]
+
+for doc_index, doc in enumerate(docs, start=1):
+    for step in doc.get("steps") or []:
+        for command_index, command in enumerate(step.get("commands") or []):
+            if not isinstance(command, str):
+                step_name = step.get("name", "<unnamed>")
+                print(
+                    f".drone.yml doc {doc_index} step {step_name!r} commands[{command_index}] must be a string",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+PY
 
 bash scripts/ci/verify-migration-immutability.sh
 
