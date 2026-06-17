@@ -41,8 +41,8 @@ services:
       RUSTFS_ADDRESS: 0.0.0.0:9000
       RUSTFS_CONSOLE_ENABLE: "true"
       RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
-      RUSTFS_ACCESS_KEY: ${OSS_ROOT_USER:-agents_im_oss}
-      RUSTFS_SECRET_KEY: ${OSS_ROOT_PASSWORD:-agents_im_oss_dev_password}
+      RUSTFS_ACCESS_KEY: ${OSS_ROOT_USER:-agents_im}
+      RUSTFS_SECRET_KEY: ${OSS_ROOT_PASSWORD:-agents_im_dev_password}
     ports:
       - "${OSS_API_PORT:-9000}:9000"
       - "127.0.0.1:${OSS_CONSOLE_PORT:-9001}:9001"
