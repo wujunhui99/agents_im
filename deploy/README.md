@@ -68,7 +68,7 @@ ADMIN_BOOTSTRAP_PASSWORD='[REDACTED]' ./scripts/bootstrap-server.sh
 - Management System：`https://ms.agenticim.xyz/`
 - Grafana：`https://grafana.agenticim.xyz/`
 - Langfuse：`https://langfuse.agenticim.xyz/`
-- RustFS Console：`https://rustfs.agenticim.xyz/rustfs/console/`（受 basic-auth 保护）
+- RustFS Console：`https://rustfs.agenticim.xyz/rustfs/console/`（用 RustFS AK/SK 登录；不挂 basic-auth，见 #575）
 - Prometheus UI：`https://ms.agenticim.xyz/observability/metrics`（受保护路径）
 
 Ingress 路由要点：

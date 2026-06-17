@@ -268,17 +268,11 @@ for host, (svc, port, tls_secret) in expected.items():
         print(f"deploy/k8s/ingress.yaml: {host}/ routes to {(got_svc, got_port)}, want {(svc, port)}", file=sys.stderr)
         sys.exit(1)
     if host == "rustfs.agenticim.xyz":
+        # RustFS 控制台不能挂 Traefik basicAuth：控制台登录用自身 Authorization 头调 API，与 basicAuth
+        # 冲突致登录死循环（#575）。鉴权由 RustFS 自带 AK/SK 登录承担，故此处必须无 basicAuth 中间件。
         middlewares = ingress.get("metadata", {}).get("annotations", {}).get("traefik.ingress.kubernetes.io/router.middlewares", "")
-        if "agents-im-oss-console-basic-auth@kubernetescrd" not in middlewares:
-            print("deploy/k8s/ingress.yaml: rustfs.agenticim.xyz must keep basic auth", file=sys.stderr)
-            sys.exit(1)
-        middleware = middleware_by_name("oss-console-basic-auth")
-        if not middleware:
-            print("deploy/k8s/ingress.yaml: missing oss-console-basic-auth middleware", file=sys.stderr)
-            sys.exit(1)
-        basic_auth = middleware.get("spec", {}).get("basicAuth", {})
-        if basic_auth.get("secret") != "observability-basic-auth" or basic_auth.get("removeHeader") is not True:
-            print("deploy/k8s/ingress.yaml: oss-console-basic-auth must use observability-basic-auth and remove Authorization header", file=sys.stderr)
+        if "basic-auth" in middlewares:
+            print("deploy/k8s/ingress.yaml: rustfs.agenticim.xyz must NOT use basic auth (conflicts with console login, #575)", file=sys.stderr)
             sys.exit(1)
 
 jaeger_ingress, _ = ingress_by_host("jaeger.agenticim.xyz")
