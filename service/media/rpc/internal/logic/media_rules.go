@@ -2,7 +2,7 @@ package logic
 
 import (
 	"context"
-	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -159,8 +159,9 @@ func validateUploadIntent(in *mediapb.CreateUploadIntentRequest) (uploadIntentIn
 	if in.GetSizeBytes() <= 0 {
 		return uploadIntentInput{}, apperror.InvalidArgument("sizeBytes must be positive")
 	}
+	// sha256 是内容寻址的主键，必传（object_key=agents_im/{sha256}，EPIC #527 §3）。
 	sha := in.GetSha256()
-	if sha != "" && !sha256HexPattern.MatchString(sha) {
+	if !sha256HexPattern.MatchString(sha) {
 		return uploadIntentInput{}, apperror.InvalidArgument("sha256 must be lowercase hex with 64 characters")
 	}
 	if err := validatePurposeContent(purpose, contentType, in.GetSizeBytes()); err != nil {
@@ -297,71 +298,50 @@ func requesterCanAccessAttachment(ctx context.Context, svcCtx *svc.ServiceContex
 	return svcCtx.AttachmentAccess.UserCanAccessMedia(ctx, requesterUserID, formatMediaID(media.MediaId))
 }
 
-// --- 对象 key 生成、内容类型白名单、id/metadata 构造、PB 映射 ---
+// --- 对象 key 生成（内容寻址）、checksum 比对、内容类型白名单、id/metadata 构造、PB 映射 ---
 
-// mediaObjectKey 生成 object_key = media/{uploader_id_last4}/{yyyymmdd}/{RAND16}.{ext}
-// （EPIC #527 §1）。RAND16 为 8 字节随机数的 16 位十六进制串；ext 从已校验的 content-type 反推、
-// 不信客户端后缀；原始文件名另存列、不进 path。唯一约束冲突由调用方重生 token 重试。
-func mediaObjectKey(uploaderID string, contentType string) (string, error) {
-	token, err := rand16Token()
-	if err != nil {
-		return "", err
-	}
-	day := time.Now().UTC().Format("20060102")
-	return fmt.Sprintf("media/%s/%s/%s.%s", uploaderLast4(uploaderID), day, token, extForContentType(contentType)), nil
+const (
+	// finalKeyPrefix：确认后落地的内容寻址 key 前缀，object_key=agents_im/{整文件 sha256}。
+	finalKeyPrefix = "agents_im/"
+	// tmpKeyPrefix：直传 OSS 的暂存前缀，tmp/{upload_id}/{sha256}；确认后 copy 到 finalKey 并删除。
+	tmpKeyPrefix = "tmp/"
+)
+
+// finalObjectKey 返回内容寻址的最终 key agents_im/{sha256}（同文件 → 同 key → 文件级去重/秒传）。
+func finalObjectKey(sha256 string) string {
+	return finalKeyPrefix + sha256
 }
 
-// uploaderLast4 取 uploader_id 末 4 位作分桶前缀（十进制串）；不足 4 位则用全量。
-func uploaderLast4(uploaderID string) string {
-	r := []rune(uploaderID)
-	if len(r) <= 4 {
-		return uploaderID
-	}
-	return string(r[len(r)-4:])
+// tmpObjectKey 返回直传暂存 key tmp/{upload_id}/{sha256}；upload_id 用 media_id（雪花唯一）。
+func tmpObjectKey(uploadID int64, sha256 string) string {
+	return fmt.Sprintf("%s%d/%s", tmpKeyPrefix, uploadID, sha256)
 }
 
-// rand16Token 生成 64-bit 随机 token 的 16 位十六进制串（非标准 UUID，求短）。
-func rand16Token() (string, error) {
-	var raw [8]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		return "", err
+// sha256FromTmpKey 从 tmp/{upload_id}/{sha256} 反解整文件 sha256（confirm 时据此算 finalKey、比对
+// OSS checksum）。形态不符返回 false。
+func sha256FromTmpKey(objectKey string) (string, bool) {
+	if !strings.HasPrefix(objectKey, tmpKeyPrefix) {
+		return "", false
 	}
-	return hex.EncodeToString(raw[:]), nil
+	parts := strings.Split(objectKey, "/")
+	if len(parts) != 3 {
+		return "", false
+	}
+	sha := parts[2]
+	if !sha256HexPattern.MatchString(sha) {
+		return "", false
+	}
+	return sha, true
 }
 
-// extForContentType 从已校验的 content-type 反推扩展名（不信客户端文件后缀）。白名单与
-// validatePurposeContent 一致；未知类型落 bin。
-func extForContentType(contentType string) string {
-	switch normalizeContentType(contentType) {
-	case "image/jpeg":
-		return "jpg"
-	case "image/png":
-		return "png"
-	case "image/webp":
-		return "webp"
-	case "image/gif":
-		return "gif"
-	case "application/pdf":
-		return "pdf"
-	case "text/plain":
-		return "txt"
-	case "application/zip", "application/x-zip-compressed":
-		return "zip"
-	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-		return "docx"
-	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-		return "xlsx"
-	case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-		return "pptx"
-	case "application/msword":
-		return "doc"
-	case "application/vnd.ms-excel":
-		return "xls"
-	case "application/vnd.ms-powerpoint":
-		return "ppt"
-	default:
-		return "bin"
+// sha256ChecksumMatches 判定 OSS 返回的 base64 SHA-256 checksum 是否等于期望的 sha256(hex)。
+// checksum 为空（OSS 未校验/未返回）一律视为不匹配——media 不回算兜底（EPIC #527 §3 职责划分）。
+func sha256ChecksumMatches(checksumBase64, sha256Hex string) bool {
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(checksumBase64))
+	if err != nil || len(raw) != 32 {
+		return false
 	}
+	return hex.EncodeToString(raw) == sha256Hex
 }
 
 func normalizeContentType(value string) string {

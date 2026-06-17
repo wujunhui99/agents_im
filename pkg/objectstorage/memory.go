@@ -26,6 +26,11 @@ func (s *MemoryStore) PresignPut(_ context.Context, objectKey, contentType strin
 	return memoryURL("put", objectKey, contentType, sizeBytes, s.now().Add(expires)), nil
 }
 
+func (s *MemoryStore) PresignPutWithChecksum(_ context.Context, objectKey, contentType string, sizeBytes int64, sha256Hex string, expires time.Duration) (string, error) {
+	u := memoryURL("put", objectKey, contentType, sizeBytes, s.now().Add(expires))
+	return u + "&checksumSha256=" + url.QueryEscape(sha256Hex), nil
+}
+
 func (s *MemoryStore) PresignGet(_ context.Context, objectKey string, expires time.Duration) (string, error) {
 	return memoryURL("get", objectKey, "", 0, s.now().Add(expires)), nil
 }
@@ -39,6 +44,41 @@ func (s *MemoryStore) StatObject(_ context.Context, objectKey string) (ObjectInf
 		return ObjectInfo{}, ErrObjectNotFound
 	}
 	return info, nil
+}
+
+func (s *MemoryStore) CopyObject(_ context.Context, srcKey, dstKey string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	src, ok := s.objects[strings.TrimSpace(srcKey)]
+	if !ok {
+		return ErrObjectNotFound
+	}
+	dst := src
+	dst.ObjectKey = strings.TrimSpace(dstKey)
+	s.objects[dst.ObjectKey] = dst
+	return nil
+}
+
+func (s *MemoryStore) RemoveObject(_ context.Context, objectKey string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.objects, strings.TrimSpace(objectKey))
+	return nil
+}
+
+func (s *MemoryStore) ListByPrefix(_ context.Context, prefix string) ([]ObjectInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var out []ObjectInfo
+	for key, info := range s.objects {
+		if strings.HasPrefix(key, prefix) {
+			out = append(out, info)
+		}
+	}
+	return out, nil
 }
 
 func (s *MemoryStore) EnsureBucket(context.Context) error {

@@ -455,10 +455,11 @@ type CreateMediaUploadReq struct {
 }
 
 type CreateMediaUploadData struct {
-	MediaID   string `json:"mediaId"`
-	ObjectKey string `json:"objectKey"`
-	UploadURL string `json:"uploadUrl"`
-	ExpiresAt int64  `json:"expiresAt"`
+	MediaID         string `json:"mediaId"`
+	ObjectKey       string `json:"objectKey"`
+	UploadURL       string `json:"uploadUrl"`
+	ExpiresAt       int64  `json:"expiresAt"`
+	AlreadyComplete bool   `json:"alreadyComplete"`
 }
 
 type CreateMediaUploadResp struct {

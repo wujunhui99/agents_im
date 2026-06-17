@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/media/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
 	mediapb "github.com/wujunhui99/agents_im/service/media/rpc/media"
@@ -26,6 +28,11 @@ func run(configFile string) {
 	var c config.Config
 	conf.MustLoad(configFile, &c, conf.UseEnv())
 	ctx := svc.NewServiceContext(c)
+
+	// 后台清理 tmp/ 残留（中断/失败上传的孤儿对象，EPIC #527 §3）；随进程生命周期运行。
+	if ctx.Store != nil {
+		go logic.NewTempUploadCleaner(ctx.Store).Run(context.Background())
+	}
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		mediapb.RegisterMediaServer(grpcServer, server.NewMediaServer(ctx))
