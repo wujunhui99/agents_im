@@ -6,10 +6,10 @@ import (
 
 	"github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -29,16 +29,17 @@ func NewSearchUsersLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Searc
 }
 
 func (l *SearchUsersLogic) SearchUsers(in *admin.UserSearchRequest) (*admin.UserSearchResponse, error) {
-	if l.svcCtx.Accounts == nil {
+	if l.svcCtx.UserRPC == nil {
 		return nil, rpcerror.ToStatus(apperror.Internal("admin account repository is not configured"))
 	}
-	users, err := l.svcCtx.Accounts.SearchAccounts(l.ctx, repository.AccountSearchFilter{
+	resp, err := l.svcCtx.UserRPC.SearchAccounts(l.ctx, &userpb.SearchAccountsRequest{
 		Query: strings.TrimSpace(in.GetQuery()),
-		Limit: normalizeAdminLimit(int(in.GetLimit()), 20, 100),
+		Limit: int32(normalizeAdminLimit(int(in.GetLimit()), 20, 100)),
 	})
 	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
+	users := resp.GetUsers()
 	out := make([]*admin.AdminUser, 0, len(users))
 	for _, user := range users {
 		out = append(out, adminUserPB(user))
@@ -59,18 +60,18 @@ func NewGetUserDetailLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Get
 }
 
 func (l *GetUserDetailLogic) GetUserDetail(in *admin.UserDetailRequest) (*admin.UserDetailResponse, error) {
-	if l.svcCtx.Accounts == nil {
+	if l.svcCtx.UserRPC == nil {
 		return nil, rpcerror.ToStatus(apperror.Internal("admin account repository is not configured"))
 	}
 	accountID, err := validateRequiredAdminID(in.GetAccountId(), "account_id", adminAccountIDMaxLen)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	user, err := l.svcCtx.Accounts.GetByID(l.ctx, accountID)
+	user, err := l.svcCtx.UserRPC.GetUserByID(l.ctx, &userpb.GetUserByIDRequest{UserId: accountID})
 	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
-	return &admin.UserDetailResponse{User: adminUserPB(user)}, nil
+	return &admin.UserDetailResponse{User: adminUserPB(user.GetUser())}, nil
 }
 
 // ---- GetUserFriends ----
@@ -86,15 +87,15 @@ func NewGetUserFriendsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Ge
 }
 
 func (l *GetUserFriendsLogic) GetUserFriends(in *admin.UserFriendsRequest) (*admin.UserFriendsResponse, error) {
-	if l.svcCtx.Accounts == nil || l.svcCtx.Friends == nil {
+	if l.svcCtx.UserRPC == nil || l.svcCtx.Friends == nil {
 		return nil, rpcerror.ToStatus(apperror.Internal("admin friend repositories are not configured"))
 	}
 	accountID, err := validateRequiredAdminID(in.GetAccountId(), "account_id", adminAccountIDMaxLen)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	if _, err := l.svcCtx.Accounts.GetByID(l.ctx, accountID); err != nil {
-		return nil, rpcerror.ToStatus(err)
+	if _, err := l.svcCtx.UserRPC.GetUserByID(l.ctx, &userpb.GetUserByIDRequest{UserId: accountID}); err != nil {
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
 	friendships, err := l.svcCtx.Friends.ListFriends(l.ctx, accountID)
 	if err != nil {
@@ -110,11 +111,11 @@ func (l *GetUserFriendsLogic) GetUserFriends(in *admin.UserFriendsRequest) (*adm
 			CreatedAt: formatAdminTime(friendship.CreatedAt),
 			UpdatedAt: formatAdminTime(friendship.UpdatedAt),
 		}
-		friend, err := l.svcCtx.Accounts.GetByID(l.ctx, friendship.FriendID)
+		friend, err := l.svcCtx.UserRPC.GetUserByID(l.ctx, &userpb.GetUserByIDRequest{UserId: friendship.FriendID})
 		if err != nil {
-			return nil, rpcerror.ToStatus(err)
+			return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 		}
-		view.Friend = adminUserPB(friend)
+		view.Friend = adminUserPB(friend.GetUser())
 		out = append(out, view)
 	}
 	return &admin.UserFriendsResponse{Friends: out}, nil
@@ -133,15 +134,15 @@ func NewGetUserConversationsLogic(ctx context.Context, svcCtx *svc.ServiceContex
 }
 
 func (l *GetUserConversationsLogic) GetUserConversations(in *admin.UserConversationsRequest) (*admin.UserConversationsResponse, error) {
-	if l.svcCtx.Accounts == nil || l.svcCtx.Messages == nil {
+	if l.svcCtx.UserRPC == nil || l.svcCtx.Messages == nil {
 		return nil, rpcerror.ToStatus(apperror.Internal("admin conversation repositories are not configured"))
 	}
 	accountID, err := validateRequiredAdminID(in.GetAccountId(), "account_id", adminAccountIDMaxLen)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	if _, err := l.svcCtx.Accounts.GetByID(l.ctx, accountID); err != nil {
-		return nil, rpcerror.ToStatus(err)
+	if _, err := l.svcCtx.UserRPC.GetUserByID(l.ctx, &userpb.GetUserByIDRequest{UserId: accountID}); err != nil {
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
 	states, err := l.svcCtx.Messages.GetConversationSeqStates(l.ctx, accountID, nil)
 	if err != nil {

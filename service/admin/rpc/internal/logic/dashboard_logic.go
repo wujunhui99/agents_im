@@ -9,6 +9,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -25,13 +26,14 @@ func NewGetDashboardLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetD
 
 // GetDashboard 汇总跨域总量 + 最近 LLM trace + 最近会话状态。
 func (l *GetDashboardLogic) GetDashboard(in *admin.DashboardRequest) (*admin.DashboardResponse, error) {
-	if l.svcCtx.Accounts == nil || l.svcCtx.Messages == nil || l.svcCtx.AgentAudits == nil {
+	if l.svcCtx.UserRPC == nil || l.svcCtx.Messages == nil || l.svcCtx.AgentAudits == nil {
 		return nil, rpcerror.ToStatus(apperror.Internal("admin repositories are not configured"))
 	}
-	users, err := l.svcCtx.Accounts.CountAccounts(l.ctx)
+	usersResp, err := l.svcCtx.UserRPC.CountAccounts(l.ctx, &userpb.CountAccountsRequest{})
 	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
+	users := usersResp.GetCount()
 	conversations, err := l.svcCtx.Messages.CountConversations(l.ctx)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
