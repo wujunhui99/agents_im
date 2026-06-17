@@ -68,7 +68,7 @@ ADMIN_BOOTSTRAP_PASSWORD='[REDACTED]' ./scripts/bootstrap-server.sh
 - Management System：`https://ms.agenticim.xyz/`
 - Grafana：`https://grafana.agenticim.xyz/`
 - Langfuse：`https://langfuse.agenticim.xyz/`
-- RustFS Console：`https://minio.agenticim.xyz/`（受 basic-auth 保护；host 暂留 minio.agenticim.xyz）
+- RustFS Console：`https://rustfs.agenticim.xyz/rustfs/console/`（受 basic-auth 保护）
 - Prometheus UI：`https://ms.agenticim.xyz/observability/metrics`（受保护路径）
 
 Ingress 路由要点：
@@ -83,7 +83,7 @@ Ingress 路由要点：
 - `/ws` -> `msggateway`
 - `/media` -> `media-api`
 - `/agents-im-media` -> `agents-im-oss`（S3-compatible object API，RustFS）
-- `minio.agenticim.xyz/` -> `oss:9001`（RustFS Console）
+- `rustfs.agenticim.xyz/` -> `oss:9001`（RustFS Console）
 - `/admin/*`、`/api/admin/*`、`/api/feedback` -> `admin-api`
 - `/` -> `web`
 

@@ -248,7 +248,7 @@ def middleware_by_name(name):
 
 expected = {
     "langfuse.agenticim.xyz": ("langfuse", 3000, "langfuse-agenticim-xyz-tls"),
-    "minio.agenticim.xyz": ("oss", 9001, "minio-agenticim-xyz-tls"),
+    "rustfs.agenticim.xyz": ("oss", 9001, "rustfs-agenticim-xyz-tls"),
 }
 for host, (svc, port, tls_secret) in expected.items():
     ingress, rule = ingress_by_host(host)
@@ -267,10 +267,10 @@ for host, (svc, port, tls_secret) in expected.items():
     if (got_svc, got_port) != (svc, port):
         print(f"deploy/k8s/ingress.yaml: {host}/ routes to {(got_svc, got_port)}, want {(svc, port)}", file=sys.stderr)
         sys.exit(1)
-    if host == "minio.agenticim.xyz":
+    if host == "rustfs.agenticim.xyz":
         middlewares = ingress.get("metadata", {}).get("annotations", {}).get("traefik.ingress.kubernetes.io/router.middlewares", "")
         if "agents-im-oss-console-basic-auth@kubernetescrd" not in middlewares:
-            print("deploy/k8s/ingress.yaml: minio.agenticim.xyz must keep basic auth", file=sys.stderr)
+            print("deploy/k8s/ingress.yaml: rustfs.agenticim.xyz must keep basic auth", file=sys.stderr)
             sys.exit(1)
         middleware = middleware_by_name("oss-console-basic-auth")
         if not middleware:

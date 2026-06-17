@@ -320,12 +320,12 @@ metadata:
 spec:
   ingressClassName: traefik
   tls:
-    # 控制台 host 暂留 minio.agenticim.xyz（DNS A 记录 + cert 已签发，改名需另做 DNS/证书）。
+    # RustFS 控制台 host（*.agenticim.xyz 泛解析到服务器，cert-manager HTTP-01 自动签发）。
     - hosts:
-        - minio.agenticim.xyz
-      secretName: minio-agenticim-xyz-tls
+        - rustfs.agenticim.xyz
+      secretName: rustfs-agenticim-xyz-tls
   rules:
-    - host: minio.agenticim.xyz
+    - host: rustfs.agenticim.xyz
       http:
         paths:
           - path: /
