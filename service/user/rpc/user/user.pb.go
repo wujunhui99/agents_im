@@ -32,8 +32,8 @@ type UserEntity struct {
 	Gender        string                 `protobuf:"bytes,5,opt,name=gender,proto3" json:"gender,omitempty"`
 	BirthDate     string                 `protobuf:"bytes,6,opt,name=birth_date,json=birthDate,proto3" json:"birth_date,omitempty"`
 	Region        string                 `protobuf:"bytes,7,opt,name=region,proto3" json:"region,omitempty"`
-	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	CreatedAt     int64                  `protobuf:"varint,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     int64                  `protobuf:"varint,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	AccountType   string                 `protobuf:"bytes,10,opt,name=account_type,json=accountType,proto3" json:"account_type,omitempty"`
 	AvatarMediaId string                 `protobuf:"bytes,11,opt,name=avatar_media_id,json=avatarMediaId,proto3" json:"avatar_media_id,omitempty"`
 	Email         string                 `protobuf:"bytes,12,opt,name=email,proto3" json:"email,omitempty"`
@@ -121,18 +121,18 @@ func (x *UserEntity) GetRegion() string {
 	return ""
 }
 
-func (x *UserEntity) GetCreatedAt() string {
+func (x *UserEntity) GetCreatedAt() int64 {
 	if x != nil {
 		return x.CreatedAt
 	}
-	return ""
+	return 0
 }
 
-func (x *UserEntity) GetUpdatedAt() string {
+func (x *UserEntity) GetUpdatedAt() int64 {
 	if x != nil {
 		return x.UpdatedAt
 	}
-	return ""
+	return 0
 }
 
 func (x *UserEntity) GetAccountType() string {
@@ -1027,9 +1027,9 @@ const file_user_proto_rawDesc = "" +
 	"birth_date\x18\x06 \x01(\tR\tbirthDate\x12\x16\n" +
 	"\x06region\x18\a \x01(\tR\x06region\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\b \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"created_at\x18\b \x01(\x03R\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\tR\tupdatedAt\x12!\n" +
+	"updated_at\x18\t \x01(\x03R\tupdatedAt\x12!\n" +
 	"\faccount_type\x18\n" +
 	" \x01(\tR\vaccountType\x12&\n" +
 	"\x0favatar_media_id\x18\v \x01(\tR\ravatarMediaId\x12\x14\n" +

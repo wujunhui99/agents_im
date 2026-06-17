@@ -97,7 +97,7 @@ func unsupported(method string) error {
 }
 
 // toUser 把 user-rpc UserEntity 映射成 common/share/model.User。avatar 维持十进制串(wire 不变)；
-// 时间戳按 user-rpc convert.formatTime 的 RFC3339(UTC)还原。
+// 时间戳按 user-rpc convert.unixMilli 的 UnixMilli(UTC)还原。
 func toUser(u *userclient.UserEntity) model.User {
 	if u == nil {
 		return model.User{}
@@ -108,8 +108,8 @@ func toUser(u *userclient.UserEntity) model.User {
 			Identifier:  u.GetIdentifier(),
 			Email:       u.GetEmail(),
 			AccountType: model.AccountType(u.GetAccountType()),
-			CreatedAt:   parseTime(u.GetCreatedAt()),
-			UpdatedAt:   parseTime(u.GetUpdatedAt()),
+			CreatedAt:   fromUnixMilli(u.GetCreatedAt()),
+			UpdatedAt:   fromUnixMilli(u.GetUpdatedAt()),
 		},
 		model.Profile{
 			AccountID:     u.GetUserId(),
@@ -120,19 +120,17 @@ func toUser(u *userclient.UserEntity) model.User {
 			Region:        u.GetRegion(),
 			AvatarMediaID: u.GetAvatarMediaId(),
 			AvatarURL:     u.GetAvatarUrl(),
-			CreatedAt:     parseTime(u.GetCreatedAt()),
-			UpdatedAt:     parseTime(u.GetUpdatedAt()),
+			CreatedAt:     fromUnixMilli(u.GetCreatedAt()),
+			UpdatedAt:     fromUnixMilli(u.GetUpdatedAt()),
 		},
 	)
 }
 
-func parseTime(value string) time.Time {
-	if value == "" {
+// fromUnixMilli 把 UnixMilli(UTC) 还原成 time.Time；0 → 零值。int64 解码不会失败，
+// 不再有旧 parseTime(RFC3339 string) 的静默吞错路径。
+func fromUnixMilli(ms int64) time.Time {
+	if ms == 0 {
 		return time.Time{}
 	}
-	t, err := time.Parse(time.RFC3339, value)
-	if err != nil {
-		return time.Time{}
-	}
-	return t
+	return time.UnixMilli(ms).UTC()
 }

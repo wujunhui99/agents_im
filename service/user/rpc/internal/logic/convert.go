@@ -25,14 +25,15 @@ func toUserEntity(ap *model.AccountProfile) *userpb.UserEntity {
 		Email:         ap.EmailNormalized,
 		AvatarUrl:     ap.AvatarURL,
 		// transport 的 created_at/updated_at 取 profile 时间戳（与 monolith 行为一致）。
-		CreatedAt: formatTime(ap.ProfileCreatedAt),
-		UpdatedAt: formatTime(ap.ProfileUpdatedAt),
+		CreatedAt: unixMilli(ap.ProfileCreatedAt),
+		UpdatedAt: unixMilli(ap.ProfileUpdatedAt),
 	}
 }
 
-func formatTime(t time.Time) string {
+// unixMilli 把时间戳编码成 UnixMilli（UTC）；零值 time → 0（与仓库其它 int64 时间字段一致）。
+func unixMilli(t time.Time) int64 {
 	if t.IsZero() {
-		return ""
+		return 0
 	}
-	return t.UTC().Format(time.RFC3339)
+	return t.UTC().UnixMilli()
 }

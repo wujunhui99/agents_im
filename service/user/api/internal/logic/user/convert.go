@@ -2,6 +2,7 @@ package user
 
 import (
 	"strings"
+	"time"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/types"
@@ -15,6 +16,15 @@ func optionalString(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+// rfc3339FromUnixMilli 把 user-rpc 的 UnixMilli 时间戳渲染成对外 REST 契约的 RFC3339(UTC) 串；
+// 0 → 空串（与旧 user-rpc formatTime 的零值行为一致，前端契约不变）。
+func rfc3339FromUnixMilli(ms int64) string {
+	if ms == 0 {
+		return ""
+	}
+	return time.UnixMilli(ms).UTC().Format(time.RFC3339)
 }
 
 func userRespFromRPC(resp *userpb.UserResponse) (*types.UserResp, error) {
@@ -37,8 +47,8 @@ func userRespFromRPC(resp *userpb.UserResponse) (*types.UserResp, error) {
 			AccountType:   user.GetAccountType(),
 			AvatarMediaID: user.GetAvatarMediaId(),
 			AvatarURL:     user.GetAvatarUrl(),
-			CreatedAt:     user.GetCreatedAt(),
-			UpdatedAt:     user.GetUpdatedAt(),
+			CreatedAt:     rfc3339FromUnixMilli(user.GetCreatedAt()),
+			UpdatedAt:     rfc3339FromUnixMilli(user.GetUpdatedAt()),
 		},
 	}, nil
 }

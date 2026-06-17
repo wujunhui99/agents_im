@@ -2,11 +2,21 @@ package friends
 
 import (
 	"context"
+	"time"
 
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/types"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 )
+
+// rfc3339FromUnixMilli 把 user-rpc 的 UnixMilli 时间戳渲染成对外 RFC3339(UTC) 串；0 → 空串
+// （与旧 user-rpc formatTime 的零值行为一致，FriendProfile.CreatedAt/UpdatedAt 仍是 string）。
+func rfc3339FromUnixMilli(ms int64) string {
+	if ms == 0 {
+		return ""
+	}
+	return time.UnixMilli(ms).UTC().Format(time.RFC3339)
+}
 
 // peerOf 返回某条 Friendship 在当前视角下需要展示资料的对端账号 id。
 type peerOf func(types.Friendship) string
@@ -95,7 +105,7 @@ func friendProfile(u *userpb.UserEntity) types.FriendProfile {
 		AccountType:   u.GetAccountType(),
 		AvatarMediaID: u.GetAvatarMediaId(),
 		AvatarURL:     u.GetAvatarUrl(),
-		CreatedAt:     u.GetCreatedAt(),
-		UpdatedAt:     u.GetUpdatedAt(),
+		CreatedAt:     rfc3339FromUnixMilli(u.GetCreatedAt()),
+		UpdatedAt:     rfc3339FromUnixMilli(u.GetUpdatedAt()),
 	}
 }
