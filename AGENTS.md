@@ -5,7 +5,7 @@
 ## 工作流
 
 - 端到端流程：Issue -> worktree + 任务分支 -> 实现与验证 -> commit -> PR(body 含 `Closes #<issue>`) -> CI/部署/回归验证。每个开发 PR 只解决一个 Issue。
-- 分支命名：`<type>/<agent-id>/issue-<number>-<task-desc>`；`<agent-id>` 用可信 Agent 名（`claude`/`codex`），CI 用 `scripts/ci/verify-agent-branch-name.sh` 校验。commit 用 Agent identity、规范 subject 与 trailers。
+- 分支命名：`<type>/<agent-id>/issue-<number>-<task-desc>`；`<type>` 用全称（`feature` 非 `feat`，取值见 GIT_WORKFLOW.md）、`<agent-id>` 用可信 Agent 名（`claude`/`codex`），CI 用 `scripts/ci/verify-agent-branch-name.sh` 校验。commit 用 Agent identity、规范 subject 与 trailers。
 - 纯文档改动免独立 worktree：在任务分支（`<type>` 用 `docs`）直接改文档、push、PR、merge；仍走 Issue 与 CI。
 - 解决 GitHub Issue 后必须评论一次，简要说明实现方式。
 - Claude Code 后台执行 `scripts/drone-watch.sh`；Codex 前台执行或自行轮询后台日志，必须报告 Drone 结果。
