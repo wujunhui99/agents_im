@@ -480,7 +480,7 @@ POST /media/uploads/med_000001/complete
 Authorization: Bearer <access_token>
 ```
 
-The backend verifies owner, pending status, object existence, size, and content type before changing status to `ready`. If MinIO/object storage is unreachable, the request fails visibly.
+The backend verifies owner, pending status, object existence, size, and content type before changing status to `ready`. If RustFS/object storage is unreachable, the request fails visibly.
 
 ### Download URL
 

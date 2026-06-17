@@ -24,7 +24,7 @@ Rationale:
 
 - Registration codes need reliable outbound delivery, not IMAP/webmail/user mailboxes.
 - Transactional providers/relays handle DKIM signing, IP reputation and bounce/abuse controls better than a small self-hosted sender.
-- The current production node already runs PostgreSQL, Redis, Redpanda, MinIO and the app services; adding a full mail suite would add disproportionate operational risk.
+- The current production node already runs PostgreSQL, Redis, Redpanda, RustFS and the app services; adding a full mail suite would add disproportionate operational risk.
 - SMTP credentials/API keys can be injected through existing secret management without committing secrets.
 
 ## Options Compared
@@ -75,7 +75,7 @@ A best-effort server check through the existing SSH alias succeeded, with all ho
 - CPU: 4 cores.
 - Memory: about 7.8 GiB total; current app stack already running.
 - Disk: about 88 GiB root volume, about 27% used at check time.
-- Existing middleware observed: PostgreSQL, Redis, Redpanda, MinIO.
+- Existing middleware observed: PostgreSQL, Redis, Redpanda, RustFS.
 - Existing `agents-im` pods were running at check time.
 
 This is enough capacity for a small SMTP relay sidecar/container if needed, but the recommended provider/relay path does not require a new heavy service.

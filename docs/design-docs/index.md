@@ -38,7 +38,7 @@
 - [im-agent-decoupling.md](./im-agent-decoupling.md)：IM 与 Agent 解耦设计
 - [websocket-reliability.md](./websocket-reliability.md)：WebSocket 可靠性设计
 - [agent-tooling.md](./agent-tooling.md)：Agent 工具调用体系设计
-- [agent-system-architecture.md](./agent-system-architecture.md)：Agent 账号类型、prompt/tool/skill registry、MinIO skill 文件、MCP 和 Python Executor 第一版架构
+- [agent-system-architecture.md](./agent-system-architecture.md)：Agent 账号类型、prompt/tool/skill registry、RustFS skill 文件、MCP 和 Python Executor 第一版架构
 - [agent-runtime-eino.md](./agent-runtime-eino.md)：Agent Runtime 本地接口、Eino 适配边界和 fail-first 请求/结果校验
 - [python-executor-sandbox.md](./python-executor-sandbox.md)：`python.execute` local tool、disabled default executor 和未来独立沙箱执行服务边界
 - [agent-conversation-hosting.md](./agent-conversation-hosting.md)：Agent 会话托管、message_origin、AI 写回 Message Service 和防循环幂等设计

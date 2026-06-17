@@ -1,3 +1,5 @@
+> 注：MinIO 已于 #569 退役为 RustFS（S3 兼容）；下文 MinIO 指当时的对象存储组件，按时点记录保留、不改写。
+
 # 05 — 可观测性 / CI / 部署 重构完成情况
 
 > 追踪 [`../05-observability-cicd.md`](../05-observability-cicd.md) 的 OB-1..OB-17 落地进度。

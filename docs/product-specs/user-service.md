@@ -40,7 +40,7 @@ Account Service 是账号资料的权威服务，先于 `auth`、`friends`、`gr
 - `birth_date`：生日，允许未设置；不落库存储会随时间变化的年龄。
 - `region`：地区，允许未设置。
 - `account_type`：账号类型，支持 `user`、`agent`、`admin`；公开 HTTP 注册/创建路径默认并固定为 `user`，内部 User RPC/logic 可显式创建 `agent` 或 `admin`。
-- `avatar_media_id`：当前头像绑定的 media id，允许为空。头像文件本身由 Media API 上传到 MinIO/S3-compatible object storage，用户资料只保存 ready media 的引用。
+- `avatar_media_id`：当前头像绑定的 media id，允许为空。头像文件本身由 Media API 上传到 RustFS (S3-compatible) object storage，用户资料只保存 ready media 的引用。
 - `created_at` / `updated_at`：资料创建和更新时间。
 
 旧 `account_type=normal` 不再作为有效输入兼容；迁移前必须转换为 `user`，否则按非法 `account_type` 失败。

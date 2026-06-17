@@ -577,7 +577,7 @@ Emitted after `has_read_seq` advances.
 
 ## Media dependency
 
-Media metadata is stored in PostgreSQL `media_objects`; object bytes live in MinIO/S3-compatible storage. Message send does not trust client-provided object keys or URLs. For image/file messages it validates only a `mediaId` reference and requires the media record to be ready and owned by the sender before persisting the message.
+Media metadata is stored in PostgreSQL `media_objects`; object bytes live in RustFS (S3-compatible) storage. Message send does not trust client-provided object keys or URLs. For image/file messages it validates only a `mediaId` reference and requires the media record to be ready and owned by the sender before persisting the message.
 
 Download URL authorization for `/media/:media_id/download-url` is owner-only for non-message media. Image/file message attachments also allow conversation participants who can see the message containing the referenced `mediaId`.
 
