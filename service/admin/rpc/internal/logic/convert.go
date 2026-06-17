@@ -16,27 +16,32 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	dbmodel "github.com/wujunhui99/agents_im/service/admin/rpc/internal/model"
+	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // ---- 跨域只读 → pb 转换（内容做敏感词脱敏，时间统一 RFC3339Nano） ----
 
-func adminUserPB(user model.User) *admin.AdminUser {
-	user = user.Clone()
+// adminUserPB 把 user-rpc UserEntity 直接转成 admin.AdminUser（不再经 model.User 过渡态）。
+// UserEntity 只有 user_id，admin 的 user_id/account_id 同源；时间是 UnixMilli。
+func adminUserPB(u *userpb.UserEntity) *admin.AdminUser {
+	if u == nil {
+		return &admin.AdminUser{}
+	}
 	return &admin.AdminUser{
-		UserId:        user.UserID,
-		AccountId:     user.AccountID,
-		Identifier:    user.Identifier,
-		DisplayName:   user.DisplayName,
-		Name:          user.Name,
-		Gender:        user.Gender,
-		BirthDate:     user.BirthDate,
-		Region:        user.Region,
-		AccountType:   string(user.AccountType),
-		AvatarMediaId: user.AvatarMediaID,
-		AvatarUrl:     user.AvatarURL,
-		CreatedAt:     formatAdminTime(user.CreatedAt),
-		UpdatedAt:     formatAdminTime(user.UpdatedAt),
+		UserId:        u.GetUserId(),
+		AccountId:     u.GetUserId(),
+		Identifier:    u.GetIdentifier(),
+		DisplayName:   u.GetDisplayName(),
+		Name:          u.GetName(),
+		Gender:        u.GetGender(),
+		BirthDate:     u.GetBirthDate(),
+		Region:        u.GetRegion(),
+		AccountType:   u.GetAccountType(),
+		AvatarMediaId: u.GetAvatarMediaId(),
+		AvatarUrl:     u.GetAvatarUrl(),
+		CreatedAt:     formatAdminTimeMillis(u.GetCreatedAt()),
+		UpdatedAt:     formatAdminTimeMillis(u.GetUpdatedAt()),
 	}
 }
 
@@ -344,6 +349,15 @@ func formatAdminTime(value time.Time) string {
 		return ""
 	}
 	return value.UTC().Format(time.RFC3339Nano)
+}
+
+// formatAdminTimeMillis 把 user-rpc 的 UnixMilli 时间戳渲染成 admin pb 的 RFC3339Nano(UTC) 串；
+// 0 → 空串（与 formatAdminTime 零值行为一致）。
+func formatAdminTimeMillis(ms int64) string {
+	if ms == 0 {
+		return ""
+	}
+	return time.UnixMilli(ms).UTC().Format(time.RFC3339Nano)
 }
 
 func formatAdminNullTime(value sql.NullTime) string {
