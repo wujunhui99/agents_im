@@ -136,12 +136,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: agents-im-minio
+  name: agents-im-oss
   namespace: agents-im
 spec:
-  # Repointed to the in-cluster MinIO StatefulSet (middleware migrated to k8s).
-  # The legacy socat proxy (agents-im-minio-proxy -> stopped docker minio) is retired.
-  selector: { app: minio }
+  # External presigned URL routing (ingress agenticim.xyz -> here). Object storage
+  # migrated MinIO -> RustFS (issue #569); targets the in-cluster RustFS StatefulSet.
+  selector: { app: rustfs }
   ports:
     - name: http
       port: 9000

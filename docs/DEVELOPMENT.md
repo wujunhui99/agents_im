@@ -130,35 +130,35 @@ The local message chain mirrors production (03 §9 B3b single rail): `docker com
 | Media API | `http://127.0.0.1:8089` |
 | PostgreSQL | `localhost:5432` |
 | Redis | `localhost:6379` |
-| MinIO API | `http://localhost:9000` |
-| MinIO Console | `http://localhost:9001` |
+| RustFS (object storage) API | `http://localhost:9000` |
+| RustFS Console | `http://localhost:9001` |
 | Tempo (OTLP gRPC / HTTP UI) | `localhost:4317` / `http://localhost:3200` |
 
 `scripts/dev-up.sh` also starts Tempo (`grafana/tempo`, same image as prod) as the local tracing backend and exports `AGENTS_IM_OTLP_ENDPOINT=127.0.0.1:4317` so local services report traces just like production. Services using `pkg/observability` read that env; goctl-native services (e.g. `groups`) carry a `Telemetry` block in their generated config. Config lives in `deploy/local/tempo.yaml`.
 
-`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts MinIO for local object storage and wires media object access through `media-api` + `media-rpc`. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
+`scripts/dev-up.sh` uses PostgreSQL storage so the separate local API processes share account profiles (V0 `users` table), credentials, friendships, groups, Agent profiles, media metadata, and message history. It also starts RustFS for local object storage and wires media object access through `media-api` + `media-rpc`. Agent creation verifies `account_type=agent` through the Account Service profile repository; unavailable verification fails closed.
 
 ## Local Object Storage
 
-Local media uploads use MinIO/S3-compatible object storage. Development defaults are in `.env.example` using local-only placeholder credentials; do not reuse them outside development.
+Local media uploads use RustFS (S3-compatible) object storage. Development defaults are in `.env.example` using local-only placeholder credentials; do not reuse them outside development.
 
 ```bash
-MINIO_ROOT_USER=agents_im_minio
-MINIO_ROOT_PASSWORD=agents...word
-MINIO_API_PORT=9000
-MINIO_CONSOLE_PORT=9001
-OBJECT_STORAGE_DRIVER=minio
+OSS_ROOT_USER=agents_im_oss
+OSS_ROOT_PASSWORD=agents...word
+OSS_API_PORT=9000
+OSS_CONSOLE_PORT=9001
+OBJECT_STORAGE_DRIVER=rustfs
 OBJECT_STORAGE_ENDPOINT=localhost:9000
 OBJECT_STORAGE_EXTERNAL_ENDPOINT=localhost:9000
 OBJECT_STORAGE_BUCKET=agents-im-media
 OBJECT_STORAGE_REGION=us-east-1
 OBJECT_STORAGE_USE_SSL=false
 OBJECT_STORAGE_EXTERNAL_USE_SSL=false
-OBJECT_STORAGE_ACCESS_KEY_ID=agents_im_minio
+OBJECT_STORAGE_ACCESS_KEY_ID=agents_im_oss
 OBJECT_STORAGE_SECRET_ACCESS_KEY=agents...word
 ```
 
-The MinIO API is available at `http://localhost:9000`; the console is available at `http://localhost:9001`. The bucket is private and is created by `media-rpc` at startup. Unit tests use the explicit memory object store and do not require live MinIO.
+The S3 API is available at `http://localhost:9000`; the RustFS console is available at `http://localhost:9001`. `OBJECT_STORAGE_DRIVER=rustfs` selects the S3 client (legacy values `minio`/`s3` are accepted and normalized to `rustfs`). The private `agents-im-media` bucket is created out-of-band (prod: `scripts/bootstrap-server.sh`; local: create it once via the RustFS console or `mc mb`). Unit tests use the explicit memory object store and do not require live object storage.
 
 Message API responses include `messageOrigin=human|ai|system` and Agent metadata when present. Local dev does not enable a production LLM by default; Agent conversation hosting must be wired with an explicit runtime/provider config and otherwise fail closed instead of returning fake AI replies.
 
@@ -177,7 +177,7 @@ The script prints demo IDs and a conversation ID. It does not print tokens or pa
 When you only need database middleware:
 
 ```bash
-docker compose up -d postgres redis minio
+docker compose up -d postgres redis rustfs
 bash scripts/migrate-postgres.sh
 ```
 

@@ -50,8 +50,8 @@ POSTGRES_USER=agents_im
 POSTGRES_DB=agents_im
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 REDIS_PASSWORD=$(openssl rand -hex 24)
-MINIO_ROOT_USER=agents_im_minio
-MINIO_ROOT_PASSWORD=$(openssl rand -hex 24)
+OSS_ROOT_USER=agents_im_oss
+OSS_ROOT_PASSWORD=$(openssl rand -hex 24)
 JWT_ACCESS_SECRET=$(openssl rand -hex 32)
 LANGFUSE_NEXTAUTH_SECRET=$(openssl rand -base64 32 | tr -d '\n')
 LANGFUSE_SALT=$(openssl rand -hex 32)
@@ -96,15 +96,15 @@ kubectl -n "${NAMESPACE}" create secret generic agents-im-secrets \
   --from-literal=POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
   --from-literal=POSTGRES_DB="${POSTGRES_DB}" \
   --from-literal=REDIS_PASSWORD="${REDIS_PASSWORD}" \
-  --from-literal=OBJECT_STORAGE_DRIVER="minio" \
-  --from-literal=OBJECT_STORAGE_ENDPOINT="minio.${NAMESPACE}.svc.cluster.local:9000" \
+  --from-literal=OBJECT_STORAGE_DRIVER="rustfs" \
+  --from-literal=OBJECT_STORAGE_ENDPOINT="oss.${NAMESPACE}.svc.cluster.local:9000" \
   --from-literal=OBJECT_STORAGE_EXTERNAL_ENDPOINT="${OBJECT_STORAGE_EXTERNAL_ENDPOINT:-agenticim.xyz}" \
   --from-literal=OBJECT_STORAGE_BUCKET="agents-im-media" \
   --from-literal=OBJECT_STORAGE_REGION="us-east-1" \
   --from-literal=OBJECT_STORAGE_USE_SSL="false" \
   --from-literal=OBJECT_STORAGE_EXTERNAL_USE_SSL="true" \
-  --from-literal=OBJECT_STORAGE_ACCESS_KEY_ID="${MINIO_ROOT_USER}" \
-  --from-literal=OBJECT_STORAGE_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" \
+  --from-literal=OBJECT_STORAGE_ACCESS_KEY_ID="${OSS_ROOT_USER}" \
+  --from-literal=OBJECT_STORAGE_SECRET_ACCESS_KEY="${OSS_ROOT_PASSWORD}" \
   --from-literal=DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:?missing in creds.env}" \
   --from-literal=LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY:-}" \
   --from-literal=LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-}" \
@@ -137,18 +137,20 @@ kubectl -n "${NAMESPACE}" create secret docker-registry ghcr-pull-secret \
 # ---------- 4. 中间件（k8s StatefulSet）----------
 kubectl apply -f deploy/k8s/middleware/postgres.yaml
 kubectl apply -f deploy/k8s/middleware/redis.yaml
-kubectl apply -f deploy/k8s/middleware/minio.yaml
+kubectl apply -f deploy/k8s/middleware/rustfs.yaml
 kubectl apply -f deploy/k8s/middleware/redpanda.yaml
 kubectl -n "${NAMESPACE}" rollout status statefulset/postgres --timeout=300s
 kubectl -n "${NAMESPACE}" rollout status statefulset/redis --timeout=300s
-kubectl -n "${NAMESPACE}" rollout status statefulset/minio --timeout=300s
+kubectl -n "${NAMESPACE}" rollout status statefulset/rustfs --timeout=300s
 kubectl -n "${NAMESPACE}" rollout status statefulset/redpanda --timeout=300s
 
 # ---------- 5. langfuse 库 + media bucket ----------
 kubectl -n "${NAMESPACE}" exec statefulset/postgres -- \
   sh -c "psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -tc \"SELECT 1 FROM pg_database WHERE datname='langfuse'\" | grep -q 1 || createdb -U ${POSTGRES_USER} langfuse"
-kubectl -n "${NAMESPACE}" exec statefulset/minio -- \
-  sh -c "mc alias set local http://127.0.0.1:9000 \"\$MINIO_ROOT_USER\" \"\$MINIO_ROOT_PASSWORD\" >/dev/null && mc mb --ignore-existing local/agents-im-media"
+# RustFS 镜像不含 mc，用一次性 minio/mc Pod（凭据走 secret）对 oss Service 建 bucket。
+kubectl -n "${NAMESPACE}" run oss-mkbucket --rm --attach --restart=Never \
+  --image=minio/mc:latest \
+  --overrides='{"spec":{"containers":[{"name":"mc","image":"minio/mc:latest","envFrom":[{"secretRef":{"name":"agents-im-secrets"}}],"command":["sh","-c","mc alias set oss http://oss:9000 \"$OBJECT_STORAGE_ACCESS_KEY_ID\" \"$OBJECT_STORAGE_SECRET_ACCESS_KEY\" && mc mb --ignore-existing oss/agents-im-media"]}]}}'
 
 # ---------- 6. 数据库迁移（经 ClusterIP，宿主 psql 或 docker）----------
 PG_IP="$(kubectl -n "${NAMESPACE}" get svc postgres -o jsonpath='{.spec.clusterIP}')"

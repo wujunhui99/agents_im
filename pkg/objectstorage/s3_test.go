@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-func TestMinIOStorePresignPutCanUseExternalHTTPSWithInternalHTTP(t *testing.T) {
+func TestS3StorePresignPutCanUseExternalHTTPSWithInternalHTTP(t *testing.T) {
 	externalUseSSL := true
-	store, err := NewMinIOStore(Config{
+	store, err := NewS3Store(Config{
 		Endpoint:         "127.0.0.1:9000",
 		ExternalEndpoint: "storage.example.com",
 		Bucket:           "agents-im-media",
@@ -23,7 +23,7 @@ func TestMinIOStorePresignPutCanUseExternalHTTPSWithInternalHTTP(t *testing.T) {
 		SecretAccessKey:  "unit-test-secret-key",
 	})
 	if err != nil {
-		t.Fatalf("new minio store: %v", err)
+		t.Fatalf("new s3 store: %v", err)
 	}
 
 	uploadURL, err := store.PresignPut(context.Background(), "users/usr_media/media/med_1/cat.jpg", "image/jpeg", 42, 5*time.Minute)
@@ -45,10 +45,10 @@ func TestMinIOStorePresignPutCanUseExternalHTTPSWithInternalHTTP(t *testing.T) {
 	}
 }
 
-// TestMinIOStorePresignPutWithChecksumSignsChecksumHeader 验证内容寻址直传 URL 把
+// TestS3StorePresignPutWithChecksumSignsChecksumHeader 验证内容寻址直传 URL 把
 // x-amz-checksum-sha256 烤进签名（SignedHeaders 含该头），客户端必须原样回放、OSS 据此校验。
-func TestMinIOStorePresignPutWithChecksumSignsChecksumHeader(t *testing.T) {
-	store, err := NewMinIOStore(Config{
+func TestS3StorePresignPutWithChecksumSignsChecksumHeader(t *testing.T) {
+	store, err := NewS3Store(Config{
 		Endpoint:        "127.0.0.1:9000",
 		Bucket:          "agents-im-media",
 		Region:          "us-east-1",
@@ -56,7 +56,7 @@ func TestMinIOStorePresignPutWithChecksumSignsChecksumHeader(t *testing.T) {
 		SecretAccessKey: "unit-test-secret-key",
 	})
 	if err != nil {
-		t.Fatalf("new minio store: %v", err)
+		t.Fatalf("new s3 store: %v", err)
 	}
 	sha := strings.Repeat("a", 64)
 	uploadURL, err := store.PresignPutWithChecksum(context.Background(), "tmp/123/"+sha, "image/jpeg", 42, sha, 5*time.Minute)

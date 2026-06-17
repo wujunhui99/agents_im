@@ -1,14 +1,17 @@
+# 对象存储：RustFS（S3 兼容，替代停止社区维护的 MinIO，见 issue #569）。
+# 应用层 OBJECT_STORAGE_DRIVER=rustfs（= S3 客户端；minio/s3 为 legacy 别名），走同一 S3 协议。
+# 集群内 endpoint Service 名 "oss"：OBJECT_STORAGE_ENDPOINT=oss.agents-im.svc.cluster.local:9000。
 apiVersion: v1
 kind: Service
 metadata:
-  name: minio
+  name: oss
   namespace: agents-im
   labels:
-    app: minio
+    app: rustfs
 spec:
   type: ClusterIP
   selector:
-    app: minio
+    app: rustfs
   ports:
     - name: api
       port: 9000
@@ -17,36 +20,61 @@ spec:
       port: 9001
       targetPort: 9001
 ---
+# StatefulSet 的稳定网络标识（headless）。
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs
+  namespace: agents-im
+  labels:
+    app: rustfs
+spec:
+  clusterIP: None
+  selector:
+    app: rustfs
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: minio
+  name: rustfs
   namespace: agents-im
   labels:
-    app: minio
+    app: rustfs
 spec:
-  serviceName: minio
+  serviceName: rustfs
   replicas: 1
   selector:
     matchLabels:
-      app: minio
+      app: rustfs
   template:
     metadata:
       labels:
-        app: minio
+        app: rustfs
     spec:
       containers:
-        - name: minio
-          # 钉到 prod 实际运行版本（2026-06-10 重装时拉取）；升级须人工 apply 并验证。
-          image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-          args: ["server", "/data", "--console-address", ":9001"]
+        - name: rustfs
+          # 钉版本（= latest 对应的 1.0.0-beta.8，本地实测 sha256 checksum 行为）；升级须人工验证。
+          image: rustfs/rustfs:1.0.0-beta.8
           env:
-            - name: MINIO_ROOT_USER
+            - name: RUSTFS_VOLUMES
+              value: /data
+            - name: RUSTFS_ADDRESS
+              value: 0.0.0.0:9000
+            - name: RUSTFS_CONSOLE_ENABLE
+              value: "true"
+            - name: RUSTFS_CONSOLE_ADDRESS
+              value: 0.0.0.0:9001
+            # 凭据复用 agents-im-secrets（与 MinIO root 同一对 AK/SK）。
+            - name: RUSTFS_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: agents-im-secrets
                   key: OBJECT_STORAGE_ACCESS_KEY_ID
-            - name: MINIO_ROOT_PASSWORD
+            - name: RUSTFS_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: agents-im-secrets
@@ -57,8 +85,7 @@ spec:
             - name: console
               containerPort: 9001
           readinessProbe:
-            httpGet:
-              path: /minio/health/ready
+            tcpSocket:
               port: 9000
             initialDelaySeconds: 5
             periodSeconds: 10
@@ -67,7 +94,7 @@ spec:
               cpu: 50m
               memory: 128Mi
             limits:
-              memory: 512Mi
+              memory: 1Gi
           volumeMounts:
             - name: data
               mountPath: /data

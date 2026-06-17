@@ -4,9 +4,9 @@
 
 本项目是单节点 k3s 部署：
 
-- k3s 运行所有 Go API/RPC/worker、Web、PostgreSQL、Redis、MinIO、Prometheus/Grafana/Loki/Tempo/Langfuse，
+- k3s 运行所有 Go API/RPC/worker、Web、PostgreSQL、Redis、RustFS、Prometheus/Grafana/Loki/Tempo/Langfuse，
   以及 **Drone CI 本体**（namespace `drone`，见 `deploy/k8s/drone/README.md`）。
-- 中间件（PostgreSQL/Redis/MinIO）manifests 在 `deploy/k8s/middleware/`，**不在 kustomization 内**，
+- 中间件（PostgreSQL/Redis/RustFS）manifests 在 `deploy/k8s/middleware/`，**不在 kustomization 内**，
   由 bootstrap 应用、人工运维（见 `deploy/k8s/middleware/README.md`）；docker compose 中间件已退役。
 - Drone 负责 PR 验证和 `main` 部署；CI/CD 入口是 `.drone.yml`。
 - 应用 namespace 是 `agents-im`；镜像发布到 `ghcr.io/wujunhui99/agents_im`。
@@ -21,7 +21,7 @@ ADMIN_BOOTSTRAP_PASSWORD='[REDACTED]' ./scripts/bootstrap-server.sh
 ```
 
 脚本完成：生成 `/opt/agents-im/secrets.env`（全新随机密码）、cert-manager + Let's Encrypt issuer、
-`agents-im-secrets` 等 k8s secret、k8s 中间件（PG/Redis/MinIO）、langfuse 库与 media bucket、
+`agents-im-secrets` 等 k8s secret、k8s 中间件（PG/Redis/RustFS）、langfuse 库与 media bucket、
 数据库迁移、Drone server/runner。收尾的人工步骤（OAuth 登录、仓库激活/trusted/secrets、首次全量
 部署）见脚本结尾输出。真实 secret 只能保存在服务器、k3s Secret 或 Drone repository secrets 中，
 文档、Issue、PR 和聊天里只写 `[REDACTED]`。
@@ -68,7 +68,7 @@ ADMIN_BOOTSTRAP_PASSWORD='[REDACTED]' ./scripts/bootstrap-server.sh
 - Management System：`https://ms.agenticim.xyz/`
 - Grafana：`https://grafana.agenticim.xyz/`
 - Langfuse：`https://langfuse.agenticim.xyz/`
-- MinIO Console：`https://minio.agenticim.xyz/`（受 basic-auth + MinIO 登录保护）
+- RustFS Console：`https://minio.agenticim.xyz/`（受 basic-auth 保护；host 暂留 minio.agenticim.xyz）
 - Prometheus UI：`https://ms.agenticim.xyz/observability/metrics`（受保护路径）
 
 Ingress 路由要点：
@@ -82,8 +82,8 @@ Ingress 路由要点：
 - `/messages`、`/conversations`、`/api/feedback` -> `msg-api`
 - `/ws` -> `msggateway`
 - `/media` -> `media-api`
-- `/agents-im-media` -> `agents-im-minio`（S3-compatible object API）
-- `minio.agenticim.xyz/` -> `minio:9001`（MinIO Console）
+- `/agents-im-media` -> `agents-im-oss`（S3-compatible object API，RustFS）
+- `minio.agenticim.xyz/` -> `oss:9001`（RustFS Console）
 - `/admin/*`、`/api/admin/*`、`/api/feedback` -> `admin-api`
 - `/` -> `web`
 

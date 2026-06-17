@@ -17,8 +17,9 @@ const (
 	MediaStatusRejected int64 = 3
 	MediaStatusDeleted  int64 = 4
 
-	// StorageProviderMinIO 是建库默认 storage_provider（见 001_init storage_provider default 1）。
-	StorageProviderMinIO int64 = 1
+	// StorageProviderRustFS 是建库默认 storage_provider（见 001_init storage_provider default 1）。
+	// 值 1 历史上代表 MinIO，现承载 RustFS（同 S3 协议，#569）；DB 枚举值不变。
+	StorageProviderRustFS int64 = 1
 
 	// digest_algo：object_key 承载的哈希算法（EPIC #527 §2，见 021 migration）。
 	// 0=未指定（object_key 尚未迁到 agents_im/{sha256}，#546 OSS 迁移前的存量行）；

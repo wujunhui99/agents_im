@@ -10,8 +10,8 @@ func NewStore(cfg appconfig.ObjectStorageConfig) (ObjectStore, error) {
 	switch cfg.Driver {
 	case appconfig.ObjectStorageDriverMemory:
 		return NewMemoryStore(), nil
-	case appconfig.ObjectStorageDriverMinIO:
-		return NewMinIOStore(Config{
+	case appconfig.ObjectStorageDriverRustFS:
+		return NewS3Store(Config{
 			Driver:           cfg.Driver,
 			Endpoint:         cfg.Endpoint,
 			ExternalEndpoint: cfg.ExternalEndpoint,
