@@ -7,7 +7,6 @@ Etcd:
 TokenAuth:
   AccessSecret: dev-jwt-secret-change-me
   AccessExpire: 86400
-StorageDriver: memory
 MailRPC:
   Endpoints:
     - 127.0.0.1:9095

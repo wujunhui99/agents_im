@@ -204,10 +204,10 @@ assert_present "-q" service/msggateway/internal/ws -- \
   "invalid token status"
 assert_present "-q" service/msg/api/internal/logic/msg -- \
   "message sender did not use token user" "TestSendMessageUsesJWTUser" "TestSendMessageRejectsSenderMismatch"
-rg -q "ExistsByIdentifier" internal/auth
-rg -q "CreateUser" internal/auth
-rg -q "PasswordHash" internal/auth/model/credential.go
-rg -q "Salt" internal/auth/model/credential.go
+# auth-rpc 注册/登录直调下游 user-rpc（去 adapter，#563）；凭据数据层落 goctl model。
+rg -q "ExistsByIdentifier" service/auth/rpc/internal/logic
+rg -q "CreateUser" service/auth/rpc/internal/logic
+rg -q "PasswordHash" service/auth/rpc/internal/model/auth_credentials_model.go
 
 # --- social MVP authorization contract ---
 assert_present "-q" internal -- \
@@ -233,7 +233,7 @@ rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/minio.go
 rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go service/user/api/user.go service/msg/rpc/internal/svc/servicecontext.go
 rg -q "ValidateMessageMedia" internal/logic/messagelogic.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql
-rg -q "NewPostgresRepository" internal/repository/postgres_user_friends.go internal/auth/repository/postgres.go
+rg -q "NewPostgresRepository" internal/repository/postgres_common.go
 rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
 rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
 rg -q "docker compose" scripts/migrate-postgres.sh
