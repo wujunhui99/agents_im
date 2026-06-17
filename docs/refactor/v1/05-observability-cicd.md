@@ -193,10 +193,10 @@ const langfuseExportTimeout = 10 * time.Second
 
 > 修复：sink 改为 channel + 后台 goroutine 批量发送；前台只入队（drop on backpressure + 计数 metric）。
 
-### OB-13 ⚠️ Drone PR pipeline 不跑前端
-`verification` pipeline 只跑 `backend-verification` + `postgres-integration`，没跑前端 lint/test/build。`AGENTS.md` 写"web 改动加前端测试/build"，但 PR CI 没有做。
+### OB-13 ⚠️ Drone PR pipeline 路径门控不完整
+`verification` pipeline 需要按 PR diff 跑对应门禁：`web/` 改动跑前端 lint/test/build，`.md` 改动跑 Markdown link check，其他代码/配置改动跑后端与 PostgreSQL 集成验证。
 
-> 修复：加 `frontend-verification` step，按 `detect-deploy-changes.py` 判断 web 受影响才跑。
+> 修复：加 `detect changes` step 统一计算 PR diff，输出 `frontend_required`、`markdown_required`、`backend_required`；各验证 step 读取结果后决定执行或跳过。
 
 ### OB-14 ⚠️ 部署不分环境 → 移至 v2
 环境分离（staging/prod）需求已**推迟到 v2 重构**实现，详见 [`docs/refactor/v2/05-observability-cicd.md`](../v2/05-observability-cicd.md)。Argo CD GitOps 已在 v1 落地接管 prod；环境分离在其之上做。
@@ -340,9 +340,11 @@ const langfuseExportTimeout = 10 * time.Second
 ### 6.2 Drone pipeline 拆分
 ```
 verification (PR)
-  ├ backend-verify (gofmt, go vet, go test ./...)
-  ├ frontend-verify (npm run lint, build) ← 新增
-  ├ postgres-integration
+  ├ detect-changes (PR policy + diff classification)
+  ├ backend-verify (non-web/non-md changes)
+  ├ frontend-verify (web/ changes)
+  ├ markdown-link-check (.md changes)
+  ├ postgres-integration (non-web/non-md changes)
   └ telegram-notify
 
 deploy-main (main push)
@@ -413,7 +415,7 @@ deploy-main (main push)
 | OB-10 | telegram 通知单轨（Drone）。|
 | OB-11 | Langfuse 独立 PG（k8s statefulset）。|
 | OB-12 | LLM observability sink 异步化（channel + 后台 batch）。|
-| OB-13 | PR CI 加 `frontend-verification`。|
+| OB-13 | PR CI 加路径检测与按需验证（前端 / Markdown / 后端+PG）。|
 | OB-14 | 不加 `develop` 分支；Argo CD GitOps：拆独立 gitops 仓库供 Argo CD 监控，Drone 按 PR+label 改 gitops 仓库，Argo CD 经 webhook 自动部署。|
 | OB-15 | 迁移到 Argo CD（与 OB-14 同一 epic）。|
 | OB-16 | 写 ready check audit 表（每服务列探测了哪些依赖）。|

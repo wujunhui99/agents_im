@@ -27,7 +27,7 @@
 | OB-6 | 统一 `/metrics` 路径（业务已统一；prometheus 自身路径由 route-prefix 决定） | P1 | ✅ | PR #360 / issue #359 | 2026-05-30 |
 | OB-12 | LLM observability sink 异步化（channel + 后台 worker + drop 计数） | P1 | ✅ | PR #362 / issue #361 | 2026-05-30 |
 | OB-4 | Prometheus 改 k8s service discovery（注解+relabel+RBAC，顺带补 admin-api） | P1 | ✅ | PR #364 / issue #363 | 2026-05-30 |
-| OB-13 | PR CI 加 `frontend-verification`（when.paths 门控 web 改动） | P1 | ✅ | PR #366 / issue #365 | 2026-05-30 |
+| OB-13 | PR CI 加路径检测（`web/` 改动跑前端，`.md` 改动跑 Markdown，其他改动跑后端/PG） | P1 | ✅ | PR #366 / issue #365 | 2026-05-30 |
 | OB-16 | ready check audit 表（[readyz-audit.md](../../observability/readyz-audit.md)；发现 readyz 仅装配检查不探测依赖） | P1 | ✅ | PR #367 | 2026-05-30 |
 | OB-8 | `detect-deploy-changes` 单元测试 + 接入 CI（CLI 本已具备） | P1 | ✅ | PR #369 / issue #368 | 2026-05-30 |
 | OB-15 | Argo CD 已装并接管 `agents-im`（Application `agents-im` Synced/Healthy） | P2 | ✅ | gitops 引导 | 2026-05-30 |

@@ -66,9 +66,11 @@ If Docker or PostgreSQL is unavailable, report the blocker and run the closest s
 
 Key steps:
 
-- `backend-verification`: branch name check, PR issue link check, go-zero API validation, Go formatting check, `go test ./...`, static verification, compose/Markdown checks.
-- `frontend-verification`: runs only for web-owned changes; executes `npm --prefix web ci`, lint, tests, and build.
-- `postgres-integration`: runs migrations against an isolated PostgreSQL service and then `go test -tags=integration ./tests`.
+- `detect changes`: always runs PR policy gates, computes the PR diff, and writes whether frontend, Markdown, and backend verification are required.
+- `backend-verification`: exits successfully without backend work when the diff is only `web/` and `.md` files; otherwise runs go-zero API validation, Go formatting check, `go test ./...`, `docker compose config -q`, and static verification.
+- `frontend-verification`: exits successfully without npm work unless a `web/` path changed; otherwise runs `npm --prefix web ci`, lint, tests, and build.
+- `markdown-link-check`: exits successfully without link checking unless a `.md` path changed.
+- `postgres-integration`: exits successfully without PostgreSQL work when the diff is only `web/` and `.md` files; otherwise runs migrations against an isolated PostgreSQL service and then `go test -tags=integration ./tests`.
 
 `deploy-main` runs only after `main` receives a merge. It detects changed files, builds selected images, applies k3s manifests, and waits for rollout when deployment is required.
 

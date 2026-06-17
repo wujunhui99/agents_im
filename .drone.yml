@@ -43,70 +43,61 @@ services:
 # 无需串在 backend 后等它焐热 GOCACHE——上一次 build 的热缓存已在，并行即享热缓存、走增量
 # 编译（非整份全量），故全部 verify 步骤并行。
 steps:
+  # Always run PR policy gates, then compute the PR changeset for the expensive
+  # verification steps below. Drone step conditions do not support path filters
+  # on this runner, so each step sources .drone-changes.env and exits 0 unless
+  # its owned paths changed.
+  - name: detect changes
+    image: alpine/git:2.45.2
+    depends_on:
+      - clone
+    commands:
+      - apk add --no-cache bash python3
+      - bash scripts/ci/verify-agent-branch-name.sh
+      - bash scripts/ci/verify-pr-issue-link.sh
+      - bash scripts/ci/drone-detect-changes.sh .drone-changes.env
+
   - name: backend-verification
     image: golang:1.25-bookworm
     depends_on:
-      - clone
+      - detect changes
     environment:
       GOMODCACHE: /ci-cache/go/mod
       GOCACHE: /ci-cache/go/build
       GOBIN: /ci-cache/go/bin
     commands:
-      - bash scripts/ci/verify-agent-branch-name.sh
-      - bash scripts/ci/verify-pr-issue-link.sh
-      - bash scripts/ci/drone-backend-verify.sh
+      - bash scripts/ci/drone-run-if-required.sh backend_required "backend verification" bash scripts/ci/drone-backend-verify.sh
     volumes:
       - name: ci_cache
         path: /ci-cache
 
-  # Runs only when web-owned files change (Drone changeset filter). The deploy
-  # detector (detect-deploy-changes.py) is unsuitable here: it is scoped to
-  # main/devops refs and returns web_required=false for PR source branches.
   - name: frontend-verification
     image: node:20-bookworm-slim
     depends_on:
-      - clone
+      - detect changes
     environment:
       npm_config_cache: /ci-cache/npm
     commands:
-      - npm --prefix web ci --prefer-offline
-      - npm --prefix web run lint
-      - npm --prefix web run test:run
-      - npm --prefix web run build
+      - bash scripts/ci/drone-run-if-required.sh frontend_required "frontend verification" bash scripts/ci/drone-frontend-verify.sh
     volumes:
       - name: ci_cache
         path: /ci-cache
-    when:
-      paths:
-        include:
-          - web/**
 
   # 从 backend-verification 拆出（原先为跑 npx 在 golang 镜像里装 NodeSource node）。
   - name: markdown-link-check
     image: node:20-bookworm-slim
     depends_on:
-      - clone
-    environment:
-      npm_config_cache: /ci-cache/npm
+      - detect changes
     commands:
-      - bash scripts/ci/drone-markdown-link-check.sh
+      - bash scripts/ci/drone-run-if-required.sh markdown_required "markdown link check" bash scripts/ci/drone-markdown-link-check.sh
     volumes:
       - name: ci_cache
         path: /ci-cache
 
-  # 从 backend-verification 拆出（原先为跑 docker compose config 装 docker apt 源 + cli）。
-  # docker:*-cli 自带 compose 插件；compose config 纯客户端渲染，不需要 daemon。
-  - name: compose-config
-    image: docker.io/library/docker:29-cli
-    depends_on:
-      - clone
-    commands:
-      - docker compose config -q
-
   - name: postgres-integration
     image: golang:1.25-bookworm
     depends_on:
-      - clone
+      - detect changes
     environment:
       DATABASE_URL: postgres://agents_im:agents_im_dev_password@postgres:5432/agents_im?sslmode=disable
       REDIS_ADDR: redis:6379
@@ -115,7 +106,7 @@ steps:
       GOCACHE: /ci-cache/go/build
       GOBIN: /ci-cache/go/bin
     commands:
-      - bash scripts/ci/drone-postgres-integration.sh
+      - bash scripts/ci/drone-run-if-required.sh backend_required "postgres integration" bash scripts/ci/drone-postgres-integration.sh
     volumes:
       - name: ci_cache
         path: /ci-cache
@@ -123,10 +114,10 @@ steps:
   - name: notify telegram
     image: python:3.12-alpine
     depends_on:
+      - detect changes
       - backend-verification
       - frontend-verification
       - markdown-link-check
-      - compose-config
       - postgres-integration
     environment:
       TELEGRAM_BOT_TOKEN:
