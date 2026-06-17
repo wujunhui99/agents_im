@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
-	business "github.com/wujunhui99/agents_im/internal/auth/logic"
 	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
 
@@ -25,10 +24,14 @@ func NewParseTokenLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ParseT
 	}
 }
 
+// ParseToken 与 ValidateToken 同义（校验签名 + 活跃会话）：保持既有 RPC 行为不变。
 func (l *ParseTokenLogic) ParseToken(in *auth.ValidateTokenRequest) (*auth.ValidateTokenResponse, error) {
-	result, err := l.svcCtx.AuthLogic.ValidateToken(l.ctx, business.ValidateTokenRequest{Token: in.GetToken()})
+	claims, err := l.svcCtx.Tokens.Validate(in.GetToken())
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	return toValidateTokenResponse(result), nil
+	if err := l.svcCtx.Sessions.Validate(l.ctx, claims.UserID, claims.Device, claims.JTI); err != nil {
+		return nil, rpcerror.ToStatus(err)
+	}
+	return toValidateTokenResponse(claims), nil
 }

@@ -17,7 +17,6 @@ ListenOn: 127.0.0.1:19091
 TokenAuth:
   AccessSecret: "[REDACTED]"
   AccessExpire: 3600
-StorageDriver: postgres
 DataSource: "[REDACTED]"
 MailRPC:
   Endpoints:
@@ -35,8 +34,8 @@ MailRPC:
 	if cfg.TokenAuth != (commonconfig.JWTAuthConfig{AccessSecret: "[REDACTED]", AccessExpire: 3600}) {
 		t.Fatalf("token auth config mismatch: accessSecretMatches=%v accessExpire=%d", cfg.TokenAuth.AccessSecret == "[REDACTED]", cfg.TokenAuth.AccessExpire)
 	}
-	if cfg.StorageDriver != commonconfig.StorageDriverPostgres || cfg.DataSource == "" {
-		t.Fatalf("storage config mismatch: driver=%q dataSourceEmpty=%v", cfg.StorageDriver, cfg.DataSource == "")
+	if cfg.DataSource == "" {
+		t.Fatalf("storage config mismatch: dataSourceEmpty=%v", cfg.DataSource == "")
 	}
 	if len(cfg.MailRPC.Endpoints) != 1 || cfg.MailRPC.Endpoints[0] != "127.0.0.1:9095" || cfg.MailRPC.Timeout != 5000 {
 		t.Fatalf("mail rpc config mismatch: %+v", cfg.MailRPC)

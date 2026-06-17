@@ -221,7 +221,6 @@ ListenOn: 127.0.0.1:${AUTH_RPC_PORT:-9091}
 TokenAuth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: ${JWT_ACCESS_EXPIRE}
-StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 SessionRedis:
   Addr: ${REDIS_ADDR}

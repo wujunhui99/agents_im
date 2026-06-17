@@ -42,6 +42,18 @@ func (m *fakeCredentialsModel) InsertPasswordIfAbsent(_ context.Context, account
 	return true, nil
 }
 
+func (m *fakeCredentialsModel) InsertCredential(context.Context, string, string, int64) error {
+	panic("fakeCredentialsModel.InsertCredential: unused")
+}
+
+func (m *fakeCredentialsModel) FindAuthByIdentifier(context.Context, string) (*model.CredentialAuth, error) {
+	panic("fakeCredentialsModel.FindAuthByIdentifier: unused")
+}
+
+func (m *fakeCredentialsModel) EmailExists(context.Context, string) (bool, error) {
+	panic("fakeCredentialsModel.EmailExists: unused")
+}
+
 func (m *fakeCredentialsModel) WithSession(_ sqlx.Session) model.AuthCredentialsModel { return m }
 
 func (m *fakeCredentialsModel) Transact(ctx context.Context, fn func(ctx context.Context, session sqlx.Session) error) error {

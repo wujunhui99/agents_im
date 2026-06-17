@@ -4,7 +4,6 @@ ListenOn: 0.0.0.0:9091
 TokenAuth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
-StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 MailRPC:
   Endpoints:

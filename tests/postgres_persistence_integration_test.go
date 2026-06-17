@@ -16,22 +16,18 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/wujunhui99/agents_im/common/share/agentaudit"
 	"github.com/wujunhui99/agents_im/common/share/model"
-	authmodel "github.com/wujunhui99/agents_im/internal/auth/model"
-	authrepo "github.com/wujunhui99/agents_im/internal/auth/repository"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
-func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
+// 凭据持久化已迁出 internal/auth 到 service/auth/rpc/internal/model（goctl），
+// 不再在本 monolith 仓库测试覆盖；此处只验剩余 monolith 仓库（users/friends/groups）。
+func TestPostgresUserFriendsGroupsRepositories(t *testing.T) {
 	ctx := context.Background()
 	dsn := integrationPostgresDSN(t)
 	migrateAndCleanPostgres(t, ctx, dsn)
 
 	users, err := repository.NewPostgresRepository(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	authCredentials, err := authrepo.NewPostgresRepository(dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,23 +95,6 @@ func TestPostgresUserAuthFriendsGroupsRepositories(t *testing.T) {
 
 	if exists, err := users.ExistsByIdentifier(ctx, "pg_alice"); err != nil || !exists {
 		t.Fatalf("alice should exist, exists=%v err=%v", exists, err)
-	}
-
-	credential, err := authCredentials.Create(ctx, authmodel.Credential{
-		Identifier:   alice.Identifier,
-		UserID:       alice.UserID,
-		PasswordHash: "hash-for-integration",
-		HashVersion:  authmodel.PasswordHashVersionBcrypt,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	loadedCredential, err := authCredentials.GetByIdentifier(ctx, alice.Identifier)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if loadedCredential.UserID != credential.UserID {
-		t.Fatalf("loaded credential user id mismatch: got %q want %q", loadedCredential.UserID, credential.UserID)
 	}
 
 	friendship, created, err := users.AddFriend(ctx, alice.UserID, bob.UserID)
