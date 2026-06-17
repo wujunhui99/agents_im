@@ -40,8 +40,8 @@ message UserEntity {
   string gender = 5;
   string birth_date = 6;
   string region = 7;
-  string created_at = 8;
-  string updated_at = 9;
+  int64 created_at = 8;
+  int64 updated_at = 9;
   string account_type = 10;
   string avatar_media_id = 11;
   string email = 12;

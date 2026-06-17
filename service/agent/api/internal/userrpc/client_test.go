@@ -58,7 +58,7 @@ func TestGetByIDMapsEntityToUser(t *testing.T) {
 		AccountType:   string(model.AccountTypeAgent),
 		AvatarMediaId: "59109426052726784",
 		AvatarUrl:     "/media/avatars/59109426052726784",
-		CreatedAt:     "2026-06-13T02:39:45Z",
+		CreatedAt:     1781318385000, // 2026-06-13T02:39:45Z 的 UnixMilli
 	}}}
 	user, err := NewAccountClient(fake).GetByID(context.Background(), "323130844539310080")
 	if err != nil {
@@ -74,7 +74,7 @@ func TestGetByIDMapsEntityToUser(t *testing.T) {
 		t.Fatalf("avatar_media_id = %q, want decimal string preserved", user.AvatarMediaID)
 	}
 	if user.CreatedAt.IsZero() {
-		t.Fatal("created_at should parse from RFC3339")
+		t.Fatal("created_at should decode from UnixMilli")
 	}
 }
 

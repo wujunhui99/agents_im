@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
@@ -23,6 +24,15 @@ import (
 const generatedPasswordLength = 12
 
 const generatedPasswordCharset = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+// rfc3339FromUnixMilli 把 user-rpc 的 UnixMilli 时间戳渲染成对外 RFC3339(UTC) 串；0 → 空串
+// （与旧 user-rpc formatTime 的零值行为一致，AdminUser.CreatedAt/UpdatedAt 仍是 string）。
+func rfc3339FromUnixMilli(ms int64) string {
+	if ms == 0 {
+		return ""
+	}
+	return time.UnixMilli(ms).UTC().Format(time.RFC3339)
+}
 
 type CreateTestAccountLogic struct {
 	logx.Logger
@@ -90,8 +100,8 @@ func (l *CreateTestAccountLogic) CreateTestAccount(req *types.AdminTestAccountCr
 				AccountType:   user.GetAccountType(),
 				AvatarMediaID: user.GetAvatarMediaId(),
 				AvatarURL:     user.GetAvatarUrl(),
-				CreatedAt:     user.GetCreatedAt(),
-				UpdatedAt:     user.GetUpdatedAt(),
+				CreatedAt:     rfc3339FromUnixMilli(user.GetCreatedAt()),
+				UpdatedAt:     rfc3339FromUnixMilli(user.GetUpdatedAt()),
 			},
 			Password:       password,
 			AlreadyExisted: created.GetAlreadyExists(),

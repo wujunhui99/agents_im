@@ -151,8 +151,8 @@ func userResponse(userID string, identifier string, email string, displayName st
 			AccountType:   "user",
 			AvatarMediaId: "med_avatar_1",
 			AvatarUrl:     "/media/avatars/med_avatar_1",
-			CreatedAt:     "2026-05-27T00:00:00Z",
-			UpdatedAt:     "2026-05-27T00:00:00Z",
+			CreatedAt:     1779840000000, // 2026-05-27T00:00:00Z 的 UnixMilli
+			UpdatedAt:     1779840000000,
 		},
 	}
 }
