@@ -43,10 +43,11 @@ func CreateUploadIntentHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			Code:    string(apperror.CodeOK),
 			Message: "ok",
 			Data: types.CreateMediaUploadData{
-				MediaID:   resp.GetMediaId(),
-				ObjectKey: resp.GetObjectKey(),
-				UploadURL: resp.GetUploadUrl(),
-				ExpiresAt: resp.GetExpiresAt(),
+				MediaID:         resp.GetMediaId(),
+				ObjectKey:       resp.GetObjectKey(),
+				UploadURL:       resp.GetUploadUrl(),
+				ExpiresAt:       resp.GetExpiresAt(),
+				AlreadyComplete: resp.GetAlreadyComplete(),
 			},
 		})
 	}

@@ -48,6 +48,11 @@ message CreateUploadIntentResponse {
   string object_key = 2;
   string upload_url = 3;
   int64 expires_at = 4;
+  // already_complete is true on a file-level instant upload (秒传): object_key
+  // agents_im/{sha256} already existed, so a ready media row was created without
+  // any bytes transfer. The client then skips the PUT + CompleteUpload entirely
+  // (upload_url is empty, expires_at is 0). EPIC #527 §3.
+  bool already_complete = 5;
 }
 
 message CompleteUploadRequest {
