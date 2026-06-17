@@ -740,7 +740,7 @@ func TestResolveObjectStorageConfigAllowsExternalHTTPSWithInternalHTTP(t *testin
 
 	externalUseSSL := true
 	cfg, err := ResolveObjectStorageConfig(ObjectStorageConfig{
-		Driver:           ObjectStorageDriverMinIO,
+		Driver:           ObjectStorageDriverRustFS,
 		Endpoint:         "127.0.0.1:9000",
 		ExternalEndpoint: "storage.example.com",
 		Bucket:           "agents-im-media",
@@ -761,6 +761,24 @@ func TestResolveObjectStorageConfigAllowsExternalHTTPSWithInternalHTTP(t *testin
 	}
 }
 
+// TestResolveObjectStorageConfigCanonicalizesLegacyDrivers 旧值 minio/s3 归一化到 rustfs（#569 切换期兼容）。
+func TestResolveObjectStorageConfigCanonicalizesLegacyDrivers(t *testing.T) {
+	for _, legacy := range []string{"minio", "s3", "RustFS"} {
+		cfg, err := ResolveObjectStorageConfig(ObjectStorageConfig{
+			Driver:          legacy,
+			Endpoint:        "127.0.0.1:9000",
+			AccessKeyID:     "k",
+			SecretAccessKey: "s",
+		}, StorageDriverPostgres)
+		if err != nil {
+			t.Fatalf("driver %q: %v", legacy, err)
+		}
+		if cfg.Driver != ObjectStorageDriverRustFS {
+			t.Fatalf("driver %q canonicalized to %q, want %q", legacy, cfg.Driver, ObjectStorageDriverRustFS)
+		}
+	}
+}
+
 func TestResolveObjectStorageConfigDefaultsExternalEndpointToHTTPSWhenSplitFromInternal(t *testing.T) {
 	t.Setenv("OBJECT_STORAGE_USE_SSL", "")
 	t.Setenv("AGENTS_IM_OBJECT_STORAGE_USE_SSL", "")
@@ -768,7 +786,7 @@ func TestResolveObjectStorageConfigDefaultsExternalEndpointToHTTPSWhenSplitFromI
 	t.Setenv("AGENTS_IM_OBJECT_STORAGE_EXTERNAL_USE_SSL", "")
 
 	cfg, err := ResolveObjectStorageConfig(ObjectStorageConfig{
-		Driver:           ObjectStorageDriverMinIO,
+		Driver:           ObjectStorageDriverRustFS,
 		Endpoint:         "127.0.0.1:9000",
 		ExternalEndpoint: "storage.example.com",
 		Bucket:           "agents-im-media",

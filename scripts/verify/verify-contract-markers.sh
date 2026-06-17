@@ -229,7 +229,7 @@ assert_present "-q" db/migrations/001_init_postgres.sql -- \
 rg -q "StorageDriver" pkg/config/config.go etc/*.yaml
 rg -q "ObjectStorageConfig" pkg/config/config.go
 rg -q "NewStore" pkg/objectstorage/factory.go
-rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/minio.go
+rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/s3.go
 rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go service/user/api/user.go service/msg/rpc/internal/svc/servicecontext.go
 rg -q "ValidateMessageMedia" internal/logic/messagelogic.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql

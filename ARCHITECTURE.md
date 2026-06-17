@@ -89,9 +89,9 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - `service/agent`（扁平 main，issue #503 骨架，未部署）以独立 consumer group `agent-trigger` 消费 `agent.trigger.v1`，承载 D15 三步终判（origin 防递归 → D16 账号 ID 类型位判 agent 收信 → conversation hosting）；runtime / IM 写回 / hosting 查询均为显式 mock driver（零副作用），真实实现随 [`docs/refactor/v1/04-agent.md`](./docs/refactor/v1/04-agent.md) §5 落地。过渡期真实 AI 回复仍由 msg-rpc 内 `agent.trigger.v1` 回流 consumer 产生。
 - 管理系统提示词、工具、Agent skills 和 Agent 配置，并将元数据持久化在 PostgreSQL。
 - 使用系统提示词、工具和 skills 组装 Agent runtime。
-- 通过 MinIO/S3-compatible object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。
+- 通过 RustFS (S3-compatible) object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。
 - 管理 MCP 工具和本地工具。MCP server 和工具元数据入库；本地工具只允许服务端白名单 `handler_key`，不得从数据库执行任意脚本。
-- 当前 Agent registry 基线已提供 prompt/tool/skill 元数据与 Agent 白名单绑定的 Go logic/repository 和 PostgreSQL schema；该基线不执行工具、不调用 LLM、不上传或读取 MinIO 二进制内容。
+- 当前 Agent registry 基线已提供 prompt/tool/skill 元数据与 Agent 白名单绑定的 Go logic/repository 和 PostgreSQL schema；该基线不执行工具、不调用 LLM、不上传或读取对象存储二进制内容。
 - 当前 Agent runtime provider 基线已提供 CloudWeGo Eino + DeepSeek ChatModel adapter/config，读取 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`；缺少 API key 时构造模型必须失败，不提供 mock/fake response。
 - 当前 AI Hosting LLM observability 通过 `internal/llmobs` 和 Eino callback seam 发出 run/generation 事件；默认 noop/test sink 不联网，Langfuse 是目标后端但 live export 未实现时必须显式失败，设计见 [`docs/design-docs/llm-observability.md`](./docs/design-docs/llm-observability.md)。
 - 当前 Agent runtime 工具解析契约位于 `internal/agentruntime/tools`：运行时必须从 `AgentRegistryRepository` 读取 Agent 工具绑定并重新校验工具状态、管理员配置、MCP server 状态和安全 transport；该契约只产出 Eino 可适配的安全 metadata/adapter seam，不执行 MCP 网络调用，也不提供 shell、命令、本地进程、stdio MCP、Python 或文件系统写入工具。
@@ -116,7 +116,7 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 
 - PostgreSQL：持久化账号资料（`accounts` + `profiles`）、会话、消息、Agent 配置、工具调用记录等核心数据。
 - Redis：缓存会话状态、在线状态、幂等键、热点数据和短期运行状态。Presence 场景中 Redis 只保存连接 hash、用户连接集合和短期 online marker；丢失后由 Gateway 连接重建，不作为持久业务数据权威。
-- MinIO/S3-compatible object storage：保存用户头像、图片消息和文件消息的二进制对象。PostgreSQL 的 `media_objects` 保存 owner、purpose、status、content type、size、sha256 和 object key；对象 key 由后端生成，客户端只能使用短时预签名 URL 上传/下载。
+- RustFS (S3-compatible) object storage：保存用户头像、图片消息和文件消息的二进制对象。PostgreSQL 的 `media_objects` 保存 owner、purpose、status、content type、size、sha256 和 object key；对象 key 由后端生成，客户端只能使用短时预签名 URL 上传/下载。
 
 ### Observability Stack
 
@@ -140,7 +140,7 @@ LLM observability is separate from system metrics/tracing. AI Hosting emits run/
 - deploy pipeline 先执行 `detect changes`（`scripts/ci/drone-detect-deploy.sh`）：业务/镜像相关变更输出受影响后端服务列表和 `web_required`；纯 `deploy/k8s/**`、`etc/<service>.yaml`、`scripts/deploy-k3s.sh` 等变更进入 config-only deploy；文档/Markdown-only 变更不部署。
 - 后端每个 Go API/RPC/worker 按动态服务矩阵构建独立镜像，web UI 仅在 web-owned 路径变更时构建独立镜像；镜像推送到 GHCR，并只打不可变 commit SHA tag。
 - k3s 运行应用工作负载，包括所有 Go API、RPC、Message Transfer worker、Gateway WebSocket 和 web UI。
-- 服务器中间件 PostgreSQL、Redis、MinIO、Redpanda 已迁入 k3s（manifests 在 `deploy/k8s/middleware/`）；本地开发用 Docker Compose 起 PostgreSQL、Redis、MinIO、Redpanda。消息写链路依赖 Kafka（03 §9 B2/B3b），msg-rpc / msgtransfer 缺 brokers 启动失败。
+- 服务器中间件 PostgreSQL、Redis、RustFS、Redpanda 已迁入 k3s（manifests 在 `deploy/k8s/middleware/`）；本地开发用 Docker Compose 起 PostgreSQL、Redis、RustFS、Redpanda。消息写链路依赖 Kafka（03 §9 B2/B3b），msg-rpc / msgtransfer 缺 brokers 启动失败。
 - `scripts/bootstrap-server.sh` 负责首次服务器初始化：写中间件 `.env`、启动 middleware、创建 k3s `agents-im-secrets`，并可创建 `ghcr-pull-secret`。
 - `scripts/deploy-k3s.sh` 负责常规发布：启动/确认中间件、从 k3s secret 读取 `DATABASE_URL` 执行 PostgreSQL migration、刷新 GHCR pull secret、应用已渲染且保留不可变镜像 tag 的 `deploy/k8s` manifests 并等待相关 rollout。选择性镜像发布通过 `IMAGE_SERVICES` 只更新已构建服务的镜像 tag；config-only deploy 会跳过镜像更新、middleware 和 migration，只对受影响 deployment 执行 `rollout restart` / `rollout status`。
 
@@ -181,6 +181,6 @@ LLM observability is separate from system metrics/tracing. AI Hosting emits run/
 - 服务拆分粒度与代码仓库结构。
 - 消息事件 schema 见 `pkg/messaging/event.go`（`messaging.MessageEvent`）；早期 Kafka topic 设计为历史参考，broker 已移除。
 - PostgreSQL 表结构和迁移方案。
-- Agent 工具权限模型第一版见 `docs/design-docs/agent-system-architecture.md`，后续需随 MCP、MinIO skill 和 Python Executor 实现继续细化。
+- Agent 工具权限模型第一版见 `docs/design-docs/agent-system-architecture.md`，后续需随 MCP、RustFS skill 和 Python Executor 实现继续细化。
 
 - `docs/deployment-k3s-pitfalls.md` — k3s/Drone deployment pitfalls and runbook.

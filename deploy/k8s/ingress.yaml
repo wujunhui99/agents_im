@@ -142,7 +142,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: agents-im-minio
+                name: agents-im-oss
                 port:
                   number: 9000
           - path: /ws
@@ -251,7 +251,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: agents-im-minio
+                name: agents-im-oss
                 port:
                   number: 9000
           - path: /
@@ -302,7 +302,7 @@ spec:
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
-  name: minio-console-basic-auth
+  name: oss-console-basic-auth
   namespace: agents-im
 spec:
   basicAuth:
@@ -312,14 +312,15 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: agents-im-minio-console
+  name: agents-im-oss-console
   namespace: agents-im
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    traefik.ingress.kubernetes.io/router.middlewares: agents-im-minio-console-basic-auth@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: agents-im-oss-console-basic-auth@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
+    # 控制台 host 暂留 minio.agenticim.xyz（DNS A 记录 + cert 已签发，改名需另做 DNS/证书）。
     - hosts:
         - minio.agenticim.xyz
       secretName: minio-agenticim-xyz-tls
@@ -331,7 +332,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: minio
+                name: oss
                 port:
                   number: 9001
 ---

@@ -27,13 +27,13 @@ type Config struct {
 	SecretAccessKey  string
 }
 
-type MinIOStore struct {
+type S3Store struct {
 	client        *minio.Client
 	presignClient *minio.Client
 	bucket        string
 }
 
-func NewMinIOStore(cfg Config) (*MinIOStore, error) {
+func NewS3Store(cfg Config) (*S3Store, error) {
 	endpoint := strings.TrimSpace(cfg.Endpoint)
 	bucket := strings.TrimSpace(cfg.Bucket)
 	accessKey := strings.TrimSpace(cfg.AccessKeyID)
@@ -76,10 +76,10 @@ func NewMinIOStore(cfg Config) (*MinIOStore, error) {
 		}
 	}
 
-	return &MinIOStore{client: client, presignClient: presignClient, bucket: bucket}, nil
+	return &S3Store{client: client, presignClient: presignClient, bucket: bucket}, nil
 }
 
-func (s *MinIOStore) PresignPut(ctx context.Context, objectKey, contentType string, sizeBytes int64, expires time.Duration) (string, error) {
+func (s *S3Store) PresignPut(ctx context.Context, objectKey, contentType string, sizeBytes int64, expires time.Duration) (string, error) {
 	if sizeBytes <= 0 {
 		return "", errors.New("object size must be positive")
 	}
@@ -97,7 +97,7 @@ func (s *MinIOStore) PresignPut(ctx context.Context, objectKey, contentType stri
 // into the SigV4 signature (via PresignHeader). The client must replay both headers
 // verbatim; OSS then computes the body SHA-256 and rejects a mismatch (BadDigest),
 // so byte integrity is enforced by OSS, not media (EPIC #527 §3).
-func (s *MinIOStore) PresignPutWithChecksum(ctx context.Context, objectKey, contentType string, sizeBytes int64, sha256Hex string, expires time.Duration) (string, error) {
+func (s *S3Store) PresignPutWithChecksum(ctx context.Context, objectKey, contentType string, sizeBytes int64, sha256Hex string, expires time.Duration) (string, error) {
 	if sizeBytes <= 0 {
 		return "", errors.New("object size must be positive")
 	}
@@ -118,7 +118,7 @@ func (s *MinIOStore) PresignPutWithChecksum(ctx context.Context, objectKey, cont
 	return u.String(), nil
 }
 
-func (s *MinIOStore) PresignGet(ctx context.Context, objectKey string, expires time.Duration) (string, error) {
+func (s *S3Store) PresignGet(ctx context.Context, objectKey string, expires time.Duration) (string, error) {
 	u, err := s.presignClient.PresignedGetObject(ctx, s.bucket, objectKey, expires, url.Values{})
 	if err != nil {
 		return "", err
@@ -126,7 +126,7 @@ func (s *MinIOStore) PresignGet(ctx context.Context, objectKey string, expires t
 	return u.String(), nil
 }
 
-func (s *MinIOStore) StatObject(ctx context.Context, objectKey string) (ObjectInfo, error) {
+func (s *S3Store) StatObject(ctx context.Context, objectKey string) (ObjectInfo, error) {
 	// Checksum: true sets x-amz-checksum-mode=ENABLED so HeadObject returns the
 	// server-side SHA-256 (EPIC #527 §3 gating ③：取回 OSS 已校验的 ChecksumSHA256)。
 	info, err := s.client.StatObject(ctx, s.bucket, objectKey, minio.StatObjectOptions{Checksum: true})
@@ -148,7 +148,7 @@ func (s *MinIOStore) StatObject(ctx context.Context, objectKey string) (ObjectIn
 
 // CopyObject performs a server-side copy (no external traffic) — used to rename
 // tmp/{upload_id}/{sha256} → agents_im/{sha256} after OSS verifies the checksum.
-func (s *MinIOStore) CopyObject(ctx context.Context, srcKey, dstKey string) error {
+func (s *S3Store) CopyObject(ctx context.Context, srcKey, dstKey string) error {
 	_, err := s.client.CopyObject(ctx,
 		minio.CopyDestOptions{Bucket: s.bucket, Object: dstKey},
 		minio.CopySrcOptions{Bucket: s.bucket, Object: srcKey},
@@ -164,12 +164,12 @@ func (s *MinIOStore) CopyObject(ctx context.Context, srcKey, dstKey string) erro
 
 // RemoveObject deletes objectKey; S3/MinIO delete is idempotent, so removing a
 // missing object returns nil and tmp-cleanup retries stay safe.
-func (s *MinIOStore) RemoveObject(ctx context.Context, objectKey string) error {
+func (s *S3Store) RemoveObject(ctx context.Context, objectKey string) error {
 	return s.client.RemoveObject(ctx, s.bucket, objectKey, minio.RemoveObjectOptions{})
 }
 
 // ListByPrefix lists objects under prefix recursively (tmp sweeper).
-func (s *MinIOStore) ListByPrefix(ctx context.Context, prefix string) ([]ObjectInfo, error) {
+func (s *S3Store) ListByPrefix(ctx context.Context, prefix string) ([]ObjectInfo, error) {
 	var out []ObjectInfo
 	for obj := range s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
 		if obj.Err != nil {
@@ -196,7 +196,7 @@ func sha256HexToBase64(sha256Hex string) (string, error) {
 	return base64.StdEncoding.EncodeToString(raw), nil
 }
 
-func (s *MinIOStore) EnsureBucket(ctx context.Context) error {
+func (s *S3Store) EnsureBucket(ctx context.Context) error {
 	exists, err := s.client.BucketExists(ctx, s.bucket)
 	if err != nil {
 		return err

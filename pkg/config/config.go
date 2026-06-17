@@ -190,10 +190,13 @@ type ObservabilityHTTPConfig struct {
 }
 
 const (
-	StorageDriverMemory             = "memory"
-	StorageDriverPostgres           = "postgres"
-	ObjectStorageDriverMemory       = "memory"
-	ObjectStorageDriverMinIO        = "minio"
+	StorageDriverMemory       = "memory"
+	StorageDriverPostgres     = "postgres"
+	ObjectStorageDriverMemory = "memory"
+	// ObjectStorageDriverRustFS 是 S3 兼容对象存储（RustFS，替代退役的 MinIO，见 #569）。旧值
+	// "minio"/"s3" 作 legacy 别名仍被接受、归一化到本值（见 ResolveObjectStorageConfig），使存量
+	// secret/配置在切换期不中断。
+	ObjectStorageDriverRustFS       = "rustfs"
 	PresenceDriverMemory            = "memory"
 	PresenceDriverRedis             = "redis"
 	TransferConsumerMemory          = "memory"
@@ -1086,22 +1089,25 @@ func ResolveObjectStorageConfig(cfg ObjectStorageConfig, storageDriver string) (
 		if ResolveStorageDriver(storageDriver) == StorageDriverMemory {
 			driver = ObjectStorageDriverMemory
 		} else {
-			driver = ObjectStorageDriverMinIO
+			driver = ObjectStorageDriverRustFS
 		}
 	}
 	switch driver {
-	case ObjectStorageDriverMemory, ObjectStorageDriverMinIO:
-		cfg.Driver = driver
+	case ObjectStorageDriverMemory:
+		cfg.Driver = ObjectStorageDriverMemory
+	case ObjectStorageDriverRustFS, "minio", "s3":
+		// "minio"/"s3" 是 legacy 别名（MinIO 退役前的存量值），归一化到 rustfs（同走 S3 客户端）。
+		cfg.Driver = ObjectStorageDriverRustFS
 	default:
-		return cfg, fmt.Errorf("unsupported object storage driver %q; use %q for explicit dev/test memory mode or %q for MinIO/S3-compatible storage", driver, ObjectStorageDriverMemory, ObjectStorageDriverMinIO)
+		return cfg, fmt.Errorf("unsupported object storage driver %q; use %q for dev/test memory mode or %q for S3-compatible storage (RustFS)", driver, ObjectStorageDriverMemory, ObjectStorageDriverRustFS)
 	}
 
 	cfg.Endpoint = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Endpoint)), os.Getenv("OBJECT_STORAGE_ENDPOINT"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_ENDPOINT"))
 	cfg.ExternalEndpoint = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.ExternalEndpoint)), os.Getenv("OBJECT_STORAGE_EXTERNAL_ENDPOINT"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_EXTERNAL_ENDPOINT"))
 	cfg.Bucket = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Bucket)), os.Getenv("OBJECT_STORAGE_BUCKET"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_BUCKET"), defaultObjectStorageBucket)
 	cfg.Region = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Region)), os.Getenv("OBJECT_STORAGE_REGION"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_REGION"), defaultObjectStorageRegion)
-	cfg.AccessKeyID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.AccessKeyID)), os.Getenv("OBJECT_STORAGE_ACCESS_KEY_ID"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_ACCESS_KEY_ID"), os.Getenv("MINIO_ROOT_USER"))
-	cfg.SecretAccessKey = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.SecretAccessKey)), os.Getenv("OBJECT_STORAGE_SECRET_ACCESS_KEY"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_SECRET_ACCESS_KEY"), os.Getenv("MINIO_ROOT_PASSWORD"))
+	cfg.AccessKeyID = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.AccessKeyID)), os.Getenv("OBJECT_STORAGE_ACCESS_KEY_ID"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_ACCESS_KEY_ID"), os.Getenv("OSS_ROOT_USER"), os.Getenv("MINIO_ROOT_USER"))
+	cfg.SecretAccessKey = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.SecretAccessKey)), os.Getenv("OBJECT_STORAGE_SECRET_ACCESS_KEY"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_SECRET_ACCESS_KEY"), os.Getenv("OSS_ROOT_PASSWORD"), os.Getenv("MINIO_ROOT_PASSWORD"))
 
 	useSSL, err := resolveBool(cfg.UseSSL, os.Getenv("OBJECT_STORAGE_USE_SSL"), os.Getenv("AGENTS_IM_OBJECT_STORAGE_USE_SSL"))
 	if err != nil {
@@ -1128,7 +1134,7 @@ func ValidateObjectStorageConfig(cfg ObjectStorageConfig, storageDriver string) 
 	if !IsProductionEnvironment() {
 		return nil
 	}
-	if ResolveStorageDriver(storageDriver) != StorageDriverPostgres || cfg.Driver != ObjectStorageDriverMinIO {
+	if ResolveStorageDriver(storageDriver) != StorageDriverPostgres || cfg.Driver != ObjectStorageDriverRustFS {
 		return nil
 	}
 	presignEndpoint := firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.ExternalEndpoint)), strings.TrimSpace(os.ExpandEnv(cfg.Endpoint)))

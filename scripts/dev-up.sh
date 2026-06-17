@@ -97,19 +97,19 @@ load_env() {
   export REDIS_PASSWORD="${REDIS_PASSWORD:-agents_im_redis_dev_password}"
   export REDIS_ADDR="${REDIS_ADDR:-localhost:6379}"
   export REDIS_DB="${REDIS_DB:-0}"
-  export MINIO_ROOT_USER="${MINIO_ROOT_USER:-agents_im_minio}"
-  export MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-agents_im_minio_dev_password}"
-  export MINIO_API_PORT="${MINIO_API_PORT:-9000}"
-  export MINIO_CONSOLE_PORT="${MINIO_CONSOLE_PORT:-9001}"
-  export OBJECT_STORAGE_DRIVER="${OBJECT_STORAGE_DRIVER:-minio}"
-  export OBJECT_STORAGE_ENDPOINT="${OBJECT_STORAGE_ENDPOINT:-localhost:${MINIO_API_PORT}}"
-  export OBJECT_STORAGE_EXTERNAL_ENDPOINT="${OBJECT_STORAGE_EXTERNAL_ENDPOINT:-localhost:${MINIO_API_PORT}}"
+  export OSS_ROOT_USER="${OSS_ROOT_USER:-agents_im_oss}"
+  export OSS_ROOT_PASSWORD="${OSS_ROOT_PASSWORD:-agents_im_oss_dev_password}"
+  export OSS_API_PORT="${OSS_API_PORT:-9000}"
+  export OSS_CONSOLE_PORT="${OSS_CONSOLE_PORT:-9001}"
+  export OBJECT_STORAGE_DRIVER="${OBJECT_STORAGE_DRIVER:-rustfs}"
+  export OBJECT_STORAGE_ENDPOINT="${OBJECT_STORAGE_ENDPOINT:-localhost:${OSS_API_PORT}}"
+  export OBJECT_STORAGE_EXTERNAL_ENDPOINT="${OBJECT_STORAGE_EXTERNAL_ENDPOINT:-localhost:${OSS_API_PORT}}"
   export OBJECT_STORAGE_BUCKET="${OBJECT_STORAGE_BUCKET:-agents-im-media}"
   export OBJECT_STORAGE_REGION="${OBJECT_STORAGE_REGION:-us-east-1}"
   export OBJECT_STORAGE_USE_SSL="${OBJECT_STORAGE_USE_SSL:-false}"
   export OBJECT_STORAGE_EXTERNAL_USE_SSL="${OBJECT_STORAGE_EXTERNAL_USE_SSL:-${OBJECT_STORAGE_USE_SSL}}"
-  export OBJECT_STORAGE_ACCESS_KEY_ID="${OBJECT_STORAGE_ACCESS_KEY_ID:-${MINIO_ROOT_USER}}"
-  export OBJECT_STORAGE_SECRET_ACCESS_KEY="${OBJECT_STORAGE_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD}}"
+  export OBJECT_STORAGE_ACCESS_KEY_ID="${OBJECT_STORAGE_ACCESS_KEY_ID:-${OSS_ROOT_USER}}"
+  export OBJECT_STORAGE_SECRET_ACCESS_KEY="${OBJECT_STORAGE_SECRET_ACCESS_KEY:-${OSS_ROOT_PASSWORD}}"
   export DATABASE_URL="${DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable}"
   export JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-dev-jwt-secret-change-me}"
   export JWT_ACCESS_EXPIRE="${JWT_ACCESS_EXPIRE:-86400}"
@@ -180,15 +180,17 @@ wait_for_postgres() {
   exit 1
 }
 
-wait_for_minio() {
+wait_for_oss() {
   local attempt
   for attempt in $(seq 1 60); do
-    if curl --silent --fail "http://${OBJECT_STORAGE_ENDPOINT}/minio/health/live" >/dev/null 2>&1; then
+    # RustFS (S3) returns an HTTP reply (e.g. 403 for anonymous) once up; any
+    # response means the endpoint is serving, so don't use --fail.
+    if curl --silent --output /dev/null "http://${OBJECT_STORAGE_ENDPOINT}/" 2>/dev/null; then
       return 0
     fi
     sleep 1
   done
-  echo "minio did not become ready at ${OBJECT_STORAGE_ENDPOINT}" >&2
+  echo "object storage (rustfs) did not become ready at ${OBJECT_STORAGE_ENDPOINT}" >&2
   exit 1
 }
 
@@ -626,10 +628,10 @@ main() {
 
   if [[ "${WITH_MIDDLEWARE}" -eq 1 ]]; then
     require_command docker
-    docker compose up -d postgres redis minio redpanda tempo
+    docker compose up -d postgres redis rustfs redpanda tempo
     wait_for_postgres
     require_command curl
-    wait_for_minio
+    wait_for_oss
   fi
 
   if [[ "${RUN_MIGRATIONS}" -eq 1 ]]; then

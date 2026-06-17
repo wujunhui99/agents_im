@@ -17,7 +17,7 @@ bash scripts/ci/verify-migration-immutability.sh
 
 # --- dev / demo tooling content ---
 assert_present "-qF" scripts/dev-up.sh -- \
-  "docker compose up -d postgres redis minio" "bash scripts/migrate-postgres.sh" \
+  "docker compose up -d postgres redis rustfs" "bash scripts/migrate-postgres.sh" \
   "StorageDriver: postgres" "ObjectStorage:" "msggateway"
 assert_present "-qF" scripts/dev-demo-data.sh -- \
   "/auth/register" "/friends" "/groups" "/messages" "/read"
@@ -26,12 +26,12 @@ assert_present "-qF" scripts/dev-demo-data.sh -- \
 assert_present "-q" docker-compose.yml -- \
   "^  redis:" "redis:7-alpine" "agents-im-redis" "agents_im_redis_data" "REDIS_PASSWORD"
 assert_present "-q" docker-compose.yml deploy/middleware/docker-compose.yml -- \
-  "^  minio:" "minio/minio" "agents-im-minio" "MINIO_ROOT_USER" "MINIO_ROOT_PASSWORD" \
-  "MINIO_API_PORT" "MINIO_CONSOLE_PORT" "agents_im_minio_data"
+  "^  rustfs:" "rustfs/rustfs" "agents-im-rustfs" "OSS_ROOT_USER" "OSS_ROOT_PASSWORD" \
+  "OSS_API_PORT" "OSS_CONSOLE_PORT" "agents_im_rustfs_data"
 assert_present "-q" .env.example -- \
   "REDIS_ADDR" "REDIS_PASSWORD" "REDIS_DB" "PRESENCE_DRIVER" "PRESENCE_TTL_SECONDS" "PRESENCE_KEY_PREFIX"
 assert_present "-q" .env.example deploy/middleware/.env.example deploy/k8s/secrets.example.yaml -- \
-  "MINIO_ROOT_USER" "MINIO_ROOT_PASSWORD" "MINIO_API_PORT" "MINIO_CONSOLE_PORT" \
+  "OSS_ROOT_USER" "OSS_ROOT_PASSWORD" "OSS_API_PORT" "OSS_CONSOLE_PORT" \
   "OBJECT_STORAGE_DRIVER" "OBJECT_STORAGE_ENDPOINT" "OBJECT_STORAGE_EXTERNAL_ENDPOINT" "OBJECT_STORAGE_BUCKET" \
   "OBJECT_STORAGE_REGION" "OBJECT_STORAGE_USE_SSL" "OBJECT_STORAGE_EXTERNAL_USE_SSL" \
   "OBJECT_STORAGE_ACCESS_KEY_ID" "OBJECT_STORAGE_SECRET_ACCESS_KEY"
@@ -248,7 +248,7 @@ def middleware_by_name(name):
 
 expected = {
     "langfuse.agenticim.xyz": ("langfuse", 3000, "langfuse-agenticim-xyz-tls"),
-    "minio.agenticim.xyz": ("minio", 9001, "minio-agenticim-xyz-tls"),
+    "minio.agenticim.xyz": ("oss", 9001, "minio-agenticim-xyz-tls"),
 }
 for host, (svc, port, tls_secret) in expected.items():
     ingress, rule = ingress_by_host(host)
@@ -269,16 +269,16 @@ for host, (svc, port, tls_secret) in expected.items():
         sys.exit(1)
     if host == "minio.agenticim.xyz":
         middlewares = ingress.get("metadata", {}).get("annotations", {}).get("traefik.ingress.kubernetes.io/router.middlewares", "")
-        if "agents-im-minio-console-basic-auth@kubernetescrd" not in middlewares:
+        if "agents-im-oss-console-basic-auth@kubernetescrd" not in middlewares:
             print("deploy/k8s/ingress.yaml: minio.agenticim.xyz must keep basic auth", file=sys.stderr)
             sys.exit(1)
-        middleware = middleware_by_name("minio-console-basic-auth")
+        middleware = middleware_by_name("oss-console-basic-auth")
         if not middleware:
-            print("deploy/k8s/ingress.yaml: missing minio-console-basic-auth middleware", file=sys.stderr)
+            print("deploy/k8s/ingress.yaml: missing oss-console-basic-auth middleware", file=sys.stderr)
             sys.exit(1)
         basic_auth = middleware.get("spec", {}).get("basicAuth", {})
         if basic_auth.get("secret") != "observability-basic-auth" or basic_auth.get("removeHeader") is not True:
-            print("deploy/k8s/ingress.yaml: minio-console-basic-auth must use observability-basic-auth and remove Authorization header", file=sys.stderr)
+            print("deploy/k8s/ingress.yaml: oss-console-basic-auth must use observability-basic-auth and remove Authorization header", file=sys.stderr)
             sys.exit(1)
 
 jaeger_ingress, _ = ingress_by_host("jaeger.agenticim.xyz")
@@ -312,7 +312,7 @@ if "agents-im-observability-basic-auth@kubernetescrd" not in metrics_middlewares
 
 ms_media_expectations = {
     "/media": ("media-api", 8089),
-    "/agents-im-media": ("agents-im-minio", 9000),
+    "/agents-im-media": ("agents-im-oss", 9000),
 }
 for path, expected_backend in ms_media_expectations.items():
     _, service_name, service_port = backend_for_host_path("ms.agenticim.xyz", path)
