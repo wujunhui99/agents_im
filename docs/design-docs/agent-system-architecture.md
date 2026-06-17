@@ -28,7 +28,7 @@ Agent System
 
 Storage
   ├── PostgreSQL: metadata, bindings, runs, audit records
-  ├── MinIO/S3: skill files and large artifacts
+  ├── RustFS/S3: skill files and large artifacts
   └── Redis: short-lived runtime/cache/locks where needed
 ```
 
@@ -164,9 +164,9 @@ agent.create
 - `agent.create` 只能通过 `AgentCreateAdapter` 调用 Agent assembly 业务逻辑。adapter 必须从 runtime `ToolCall` 获得 `requesting_user_id`；缺失时失败。该工具不直接写库、不启动进程、不调用外部网络工具。
 - 该 package 不导入 Eino、不执行 MCP 网络调用、不执行任意本地 handler、不直接调用 Python，也不提供 shell、命令、本地进程或文件系统写入能力。
 
-### Skill Registry 与 MinIO
+### Skill Registry 与 RustFS
 
-PostgreSQL 保存 skill 元数据和文件索引，MinIO/S3-compatible object storage 保存实际文件。
+PostgreSQL 保存 skill 元数据和文件索引，RustFS (S3-compatible) object storage 保存实际文件。
 
 建议表：
 
@@ -203,11 +203,11 @@ skills/{skill_id}/versions/{version}/{file_path}
 读取规则：
 
 - Runtime 只能通过 Agent Service 的 `skill_id + file_path` 读取。
-- Runtime 不持有 MinIO root credential。
+- Runtime 不持有 RustFS root credential。
 - Agent 绑定 skill 后默认可读取该 skill 下文件。
 - 每次读取写 `skill_file_reads` 或通用 audit log。
 
-当前 registry 实现将第一版 skill 文件索引压缩在 `agent_skills` 元数据表中：`object_key`、`sha256`、`content_type`、`size_bytes` 必填，PG 不保存文件内容。`agent_skill_bindings` 表记录 Agent 白名单绑定；真正的 MinIO/S3 上传、下载、读取审计链路留给后续 storage/runtime 任务。
+当前 registry 实现将第一版 skill 文件索引压缩在 `agent_skills` 元数据表中：`object_key`、`sha256`、`content_type`、`size_bytes` 必填，PG 不保存文件内容。`agent_skill_bindings` 表记录 Agent 白名单绑定；真正的 RustFS/S3 上传、下载、读取审计链路留给后续 storage/runtime 任务。
 
 ### Agent Runtime
 
@@ -493,7 +493,7 @@ requested tool permission level
 
 1. 扩展账号类型和 Agent profile。
 2. Prompt CRUD 与 Agent 绑定。
-3. Tool registry、Skill registry、MinIO 接入。
+3. Tool registry、Skill registry、RustFS 接入。
 4. Agent runtime 最小 run 记录。
 5. Python Executor 沙箱。
 6. IM event -> Agent -> Message Service 写回闭环。
@@ -504,7 +504,7 @@ requested tool permission level
 | --- | --- | --- |
 | Python 逃逸 | 高 | 独立容器沙箱、禁网络、限资源、不挂载宿主目录。 |
 | MCP 工具越权 | 高 | 只允许管理员配置，Agent 绑定白名单，调用审计。 |
-| Skill 文件越权 | 高 | `skill_id + file_path` 授权，Runtime 不持有 MinIO 凭证。 |
+| Skill 文件越权 | 高 | `skill_id + file_path` 授权，Runtime 不持有 RustFS 凭证。 |
 | Prompt 注入 | 高 | 权限由服务端策略强制，不能靠 prompt 自律。 |
 | Agent 无限循环 | 高 | Agent 消息默认不触发 Agent，max depth/max run。 |
 | 成本失控 | 中高 | max tokens、max tool calls、预算与超时。 |
@@ -520,4 +520,4 @@ bash scripts/verify-static.sh
 docker compose config
 ```
 
-涉及 MinIO/Python Executor 的集成测试应默认跳过，只有显式环境变量存在时才运行，避免默认 `go test ./...` 依赖外部服务。
+涉及 RustFS/Python Executor 的集成测试应默认跳过，只有显式环境变量存在时才运行，避免默认 `go test ./...` 依赖外部服务。

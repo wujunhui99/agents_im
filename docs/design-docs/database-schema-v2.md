@@ -565,7 +565,7 @@ Application responsibilities:
 
 ### media_objects
 
-Purpose: unified object metadata table for uploaded/stored files used by IM and Agent features. File bytes live in OSS/S3/MinIO; PostgreSQL stores metadata and lifecycle state.
+Purpose: unified object metadata table for uploaded/stored files used by IM and Agent features. File bytes live in OSS/S3/RustFS; PostgreSQL stores metadata and lifecycle state.
 
 Decision: keep one unified `media_objects` table for all object metadata, including IM media and Agent skill files. Agent skill registry tables should still remain separate and link to media object IDs for the actual files belonging to a skill directory.
 
@@ -608,7 +608,7 @@ Media status enum, initial proposal:
 
 Storage provider enum, initial proposal:
 
-- `1`: minio
+- `1`: rustfs
 - `2`: s3
 - `3`: aliyun_oss
 - `4`: tencent_cos

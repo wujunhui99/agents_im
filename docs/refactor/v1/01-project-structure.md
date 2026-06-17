@@ -159,7 +159,7 @@ agents_im/
 │   ├── idgen/                             # ← 原 internal/idgen（Snowflake）
 │   ├── messaging/                         # ← 原 internal/messaging（Kafka producer/consumer）
 │   ├── presence/                          # ← 原 internal/presence（Redis online 状态查询，D4）
-│   ├── objectstorage/                     # ← 原 internal/objectstorage（MinIO/S3）
+│   ├── objectstorage/                     # ← 原 internal/objectstorage（RustFS/S3）
 │   ├── pythonexec/                        # ← 原 internal/agent/pythonexec
 │   └── jwtauth/                           # 无状态 JWT 验签 + 读共享 Redis `user_active_sessions:{uid}` 比对 jti（D14；非 auth 业务，纯鉴权基础设施）
 │
