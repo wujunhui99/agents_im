@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -64,7 +65,8 @@ func TestKafkaChainRoundtrip(t *testing.T) {
 	receiver := fmt.Sprintf("chainit-b-%d", uniq)
 	conv := fmt.Sprintf("single:%s:%s", sender, receiver)
 	clientMsgID := fmt.Sprintf("chainit-cmid-%d", uniq)
-	serverMsgID := fmt.Sprintf("chainit-srv-%d", uniq)
+	// message_id 自 #531 起为雪花 bigint：用 uniq(纳秒) 作合法 bigint server_msg_id（旧 "chainit-srv-…" 非数字会被落库解析拒绝）。
+	serverMsgID := strconv.FormatInt(uniq, 10)
 
 	event := messaging.MessageEvent{
 		EventID:        fmt.Sprintf("chainit-evt-%d", uniq),
