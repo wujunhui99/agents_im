@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/common/share/model"
-	"github.com/wujunhui99/agents_im/common/share/rpcerror"
+	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"

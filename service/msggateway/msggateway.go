@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wujunhui99/agents_im/common/middleware"
+	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/health"
 	"github.com/wujunhui99/agents_im/pkg/observability"

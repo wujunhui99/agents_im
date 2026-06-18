@@ -3,7 +3,7 @@ package logic
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/common/share/model"
+	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )

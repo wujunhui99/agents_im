@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/common/share/agentaudit"
+	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 )
 
 type AgentAuditRepository interface {

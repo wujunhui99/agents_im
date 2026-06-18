@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/wujunhui99/agents_im/common/share/model"
+	"github.com/wujunhui99/agents_im/pkg/model"
 )
 
 type Registry interface {

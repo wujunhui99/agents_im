@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/wujunhui99/agents_im/common/share/rpcerror"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/common/share/model"
+	"github.com/wujunhui99/agents_im/pkg/model"
 	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"

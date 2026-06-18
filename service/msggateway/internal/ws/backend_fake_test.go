@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wujunhui99/agents_im/common/share/gateway"
+	"github.com/wujunhui99/agents_im/pkg/gateway"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 

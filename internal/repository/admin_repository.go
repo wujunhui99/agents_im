@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/common/share/agentaudit"
-	"github.com/wujunhui99/agents_im/common/share/model"
+	"github.com/wujunhui99/agents_im/pkg/agentaudit"
+	"github.com/wujunhui99/agents_im/pkg/model"
 )
 
 type AccountSearchFilter struct {

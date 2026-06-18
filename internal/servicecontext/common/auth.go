@@ -1,7 +1,7 @@
 package common
 
 import (
-	"github.com/wujunhui99/agents_im/common/middleware"
+	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/pkg/config"
 )
 

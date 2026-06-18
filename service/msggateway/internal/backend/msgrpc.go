@@ -6,8 +6,8 @@ package backend
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/common/share/gateway"
-	"github.com/wujunhui99/agents_im/common/share/rpcerror"
+	"github.com/wujunhui99/agents_im/pkg/gateway"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
 )

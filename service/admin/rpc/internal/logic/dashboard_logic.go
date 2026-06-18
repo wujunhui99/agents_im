@@ -3,8 +3,8 @@ package logic
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/common/share/agentaudit"
-	"github.com/wujunhui99/agents_im/common/share/rpcerror"
+	"github.com/wujunhui99/agents_im/pkg/agentaudit"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"

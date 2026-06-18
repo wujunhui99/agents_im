@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	sharedmodel "github.com/wujunhui99/agents_im/common/share/model"
+	sharedmodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/idgen"

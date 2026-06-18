@@ -6,7 +6,7 @@ package svc
 import (
 	"errors"
 
-	"github.com/wujunhui99/agents_im/common/middleware"
+	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/adminclient"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"

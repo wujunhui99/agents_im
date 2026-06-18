@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/wujunhui99/agents_im/common/share/rpcerror"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
