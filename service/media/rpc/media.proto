@@ -5,14 +5,23 @@ package media.v1;
 option go_package = "github.com/wujunhui99/agents_im/service/media/rpc/media";
 
 // Media owns the object-storage lifecycle (avatar/attachment upload, completion,
-// download/display presigned URLs). Validation of media ownership/status is done
-// locally by callers (user-rpc set-avatar, message send) against the shared
-// media_objects table; media-rpc owns all writes + the object store.
+// download/display presigned URLs) AND media reference validation. Callers that
+// reference media (user-rpc set-avatar, message send) validate ownership/status/
+// type via the Validate* RPCs instead of reading media_objects directly — media-rpc
+// owns the table, all writes, the object store, and the validation rules (#533).
 service Media {
   rpc CreateUploadIntent(CreateUploadIntentRequest) returns (CreateUploadIntentResponse);
   rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
   rpc GetDownloadURL(GetDownloadURLRequest) returns (GetDownloadURLResponse);
   rpc GetAvatarDisplayURL(GetAvatarDisplayURLRequest) returns (GetDownloadURLResponse);
+  // ValidateAvatarMedia asserts media_id is a ready avatar object owned by owner_user_id
+  // with an allowed content_type and size. Returns InvalidArgument/Forbidden/NotFound on
+  // failure; an empty response on success (#533, replaces internal/mediavalidate).
+  rpc ValidateAvatarMedia(ValidateAvatarMediaRequest) returns (ValidateMediaResponse);
+  // ValidateMessageMedia asserts the attachment referenced by a message's content JSON
+  // ("image"|"file") is a ready, owner-owned media object of the matching purpose with
+  // allowed type/size (and, for files, content metadata matching the media object).
+  rpc ValidateMessageMedia(ValidateMessageMediaRequest) returns (ValidateMediaResponse);
 }
 
 message MediaObject {
@@ -79,3 +88,21 @@ message GetDownloadURLResponse {
 message GetAvatarDisplayURLRequest {
   string media_id = 1;
 }
+
+message ValidateAvatarMediaRequest {
+  string owner_user_id = 1;
+  string media_id = 2;
+}
+
+message ValidateMessageMediaRequest {
+  string owner_user_id = 1;
+  // content_type is the message kind: "image" or "file".
+  string content_type = 2;
+  // content is the message content JSON carrying the media reference
+  // (image: {mediaId,width,height}; file: {mediaId,filename,sizeBytes,contentType}).
+  string content = 3;
+}
+
+// ValidateMediaResponse is intentionally empty: success is signalled by a nil
+// error, failure by a gRPC status mapped from apperror.
+message ValidateMediaResponse {}

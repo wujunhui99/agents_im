@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v5.29.3
-// source: media.proto
+// source: service/media/rpc/media.proto
 
 package media
 
@@ -43,7 +43,7 @@ type MediaObject struct {
 
 func (x *MediaObject) Reset() {
 	*x = MediaObject{}
-	mi := &file_media_proto_msgTypes[0]
+	mi := &file_service_media_rpc_media_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -55,7 +55,7 @@ func (x *MediaObject) String() string {
 func (*MediaObject) ProtoMessage() {}
 
 func (x *MediaObject) ProtoReflect() protoreflect.Message {
-	mi := &file_media_proto_msgTypes[0]
+	mi := &file_service_media_rpc_media_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -68,7 +68,7 @@ func (x *MediaObject) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaObject.ProtoReflect.Descriptor instead.
 func (*MediaObject) Descriptor() ([]byte, []int) {
-	return file_media_proto_rawDescGZIP(), []int{0}
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *MediaObject) GetMediaId() string {
@@ -185,7 +185,7 @@ type CreateUploadIntentRequest struct {
 
 func (x *CreateUploadIntentRequest) Reset() {
 	*x = CreateUploadIntentRequest{}
-	mi := &file_media_proto_msgTypes[1]
+	mi := &file_service_media_rpc_media_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -197,7 +197,7 @@ func (x *CreateUploadIntentRequest) String() string {
 func (*CreateUploadIntentRequest) ProtoMessage() {}
 
 func (x *CreateUploadIntentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_media_proto_msgTypes[1]
+	mi := &file_service_media_rpc_media_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -210,7 +210,7 @@ func (x *CreateUploadIntentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUploadIntentRequest.ProtoReflect.Descriptor instead.
 func (*CreateUploadIntentRequest) Descriptor() ([]byte, []int) {
-	return file_media_proto_rawDescGZIP(), []int{1}
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CreateUploadIntentRequest) GetOwnerUserId() string {
@@ -286,7 +286,7 @@ type CreateUploadIntentResponse struct {
 
 func (x *CreateUploadIntentResponse) Reset() {
 	*x = CreateUploadIntentResponse{}
-	mi := &file_media_proto_msgTypes[2]
+	mi := &file_service_media_rpc_media_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -298,7 +298,7 @@ func (x *CreateUploadIntentResponse) String() string {
 func (*CreateUploadIntentResponse) ProtoMessage() {}
 
 func (x *CreateUploadIntentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_media_proto_msgTypes[2]
+	mi := &file_service_media_rpc_media_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -311,7 +311,7 @@ func (x *CreateUploadIntentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUploadIntentResponse.ProtoReflect.Descriptor instead.
 func (*CreateUploadIntentResponse) Descriptor() ([]byte, []int) {
-	return file_media_proto_rawDescGZIP(), []int{2}
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateUploadIntentResponse) GetMediaId() string {
@@ -359,7 +359,7 @@ type CompleteUploadRequest struct {
 
 func (x *CompleteUploadRequest) Reset() {
 	*x = CompleteUploadRequest{}
-	mi := &file_media_proto_msgTypes[3]
+	mi := &file_service_media_rpc_media_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -371,7 +371,7 @@ func (x *CompleteUploadRequest) String() string {
 func (*CompleteUploadRequest) ProtoMessage() {}
 
 func (x *CompleteUploadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_media_proto_msgTypes[3]
+	mi := &file_service_media_rpc_media_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -384,7 +384,7 @@ func (x *CompleteUploadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteUploadRequest.ProtoReflect.Descriptor instead.
 func (*CompleteUploadRequest) Descriptor() ([]byte, []int) {
-	return file_media_proto_rawDescGZIP(), []int{3}
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CompleteUploadRequest) GetOwnerUserId() string {
@@ -410,7 +410,7 @@ type CompleteUploadResponse struct {
 
 func (x *CompleteUploadResponse) Reset() {
 	*x = CompleteUploadResponse{}
-	mi := &file_media_proto_msgTypes[4]
+	mi := &file_service_media_rpc_media_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -422,7 +422,7 @@ func (x *CompleteUploadResponse) String() string {
 func (*CompleteUploadResponse) ProtoMessage() {}
 
 func (x *CompleteUploadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_media_proto_msgTypes[4]
+	mi := &file_service_media_rpc_media_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -435,7 +435,7 @@ func (x *CompleteUploadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteUploadResponse.ProtoReflect.Descriptor instead.
 func (*CompleteUploadResponse) Descriptor() ([]byte, []int) {
-	return file_media_proto_rawDescGZIP(), []int{4}
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CompleteUploadResponse) GetMedia() *MediaObject {
@@ -456,7 +456,7 @@ type GetDownloadURLRequest struct {
 
 func (x *GetDownloadURLRequest) Reset() {
 	*x = GetDownloadURLRequest{}
-	mi := &file_media_proto_msgTypes[5]
+	mi := &file_service_media_rpc_media_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -468,7 +468,7 @@ func (x *GetDownloadURLRequest) String() string {
 func (*GetDownloadURLRequest) ProtoMessage() {}
 
 func (x *GetDownloadURLRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_media_proto_msgTypes[5]
+	mi := &file_service_media_rpc_media_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -481,7 +481,7 @@ func (x *GetDownloadURLRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDownloadURLRequest.ProtoReflect.Descriptor instead.
 func (*GetDownloadURLRequest) Descriptor() ([]byte, []int) {
-	return file_media_proto_rawDescGZIP(), []int{5}
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetDownloadURLRequest) GetOwnerUserId() string {
@@ -516,7 +516,7 @@ type GetDownloadURLResponse struct {
 
 func (x *GetDownloadURLResponse) Reset() {
 	*x = GetDownloadURLResponse{}
-	mi := &file_media_proto_msgTypes[6]
+	mi := &file_service_media_rpc_media_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -528,7 +528,7 @@ func (x *GetDownloadURLResponse) String() string {
 func (*GetDownloadURLResponse) ProtoMessage() {}
 
 func (x *GetDownloadURLResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_media_proto_msgTypes[6]
+	mi := &file_service_media_rpc_media_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -541,7 +541,7 @@ func (x *GetDownloadURLResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDownloadURLResponse.ProtoReflect.Descriptor instead.
 func (*GetDownloadURLResponse) Descriptor() ([]byte, []int) {
-	return file_media_proto_rawDescGZIP(), []int{6}
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetDownloadURLResponse) GetMediaId() string {
@@ -574,7 +574,7 @@ type GetAvatarDisplayURLRequest struct {
 
 func (x *GetAvatarDisplayURLRequest) Reset() {
 	*x = GetAvatarDisplayURLRequest{}
-	mi := &file_media_proto_msgTypes[7]
+	mi := &file_service_media_rpc_media_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -586,7 +586,7 @@ func (x *GetAvatarDisplayURLRequest) String() string {
 func (*GetAvatarDisplayURLRequest) ProtoMessage() {}
 
 func (x *GetAvatarDisplayURLRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_media_proto_msgTypes[7]
+	mi := &file_service_media_rpc_media_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -599,7 +599,7 @@ func (x *GetAvatarDisplayURLRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAvatarDisplayURLRequest.ProtoReflect.Descriptor instead.
 func (*GetAvatarDisplayURLRequest) Descriptor() ([]byte, []int) {
-	return file_media_proto_rawDescGZIP(), []int{7}
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetAvatarDisplayURLRequest) GetMediaId() string {
@@ -609,11 +609,164 @@ func (x *GetAvatarDisplayURLRequest) GetMediaId() string {
 	return ""
 }
 
-var File_media_proto protoreflect.FileDescriptor
+type ValidateAvatarMediaRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OwnerUserId   string                 `protobuf:"bytes,1,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	MediaId       string                 `protobuf:"bytes,2,opt,name=media_id,json=mediaId,proto3" json:"media_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
 
-const file_media_proto_rawDesc = "" +
+func (x *ValidateAvatarMediaRequest) Reset() {
+	*x = ValidateAvatarMediaRequest{}
+	mi := &file_service_media_rpc_media_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateAvatarMediaRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateAvatarMediaRequest) ProtoMessage() {}
+
+func (x *ValidateAvatarMediaRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_media_rpc_media_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateAvatarMediaRequest.ProtoReflect.Descriptor instead.
+func (*ValidateAvatarMediaRequest) Descriptor() ([]byte, []int) {
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ValidateAvatarMediaRequest) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ValidateAvatarMediaRequest) GetMediaId() string {
+	if x != nil {
+		return x.MediaId
+	}
+	return ""
+}
+
+type ValidateMessageMediaRequest struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	OwnerUserId string                 `protobuf:"bytes,1,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	// content_type is the message kind: "image" or "file".
+	ContentType string `protobuf:"bytes,2,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	// content is the message content JSON carrying the media reference
+	// (image: {mediaId,width,height}; file: {mediaId,filename,sizeBytes,contentType}).
+	Content       string `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateMessageMediaRequest) Reset() {
+	*x = ValidateMessageMediaRequest{}
+	mi := &file_service_media_rpc_media_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateMessageMediaRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateMessageMediaRequest) ProtoMessage() {}
+
+func (x *ValidateMessageMediaRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_media_rpc_media_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateMessageMediaRequest.ProtoReflect.Descriptor instead.
+func (*ValidateMessageMediaRequest) Descriptor() ([]byte, []int) {
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ValidateMessageMediaRequest) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ValidateMessageMediaRequest) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *ValidateMessageMediaRequest) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+// ValidateMediaResponse is intentionally empty: success is signalled by a nil
+// error, failure by a gRPC status mapped from apperror.
+type ValidateMediaResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateMediaResponse) Reset() {
+	*x = ValidateMediaResponse{}
+	mi := &file_service_media_rpc_media_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateMediaResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateMediaResponse) ProtoMessage() {}
+
+func (x *ValidateMediaResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_media_rpc_media_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateMediaResponse.ProtoReflect.Descriptor instead.
+func (*ValidateMediaResponse) Descriptor() ([]byte, []int) {
+	return file_service_media_rpc_media_proto_rawDescGZIP(), []int{10}
+}
+
+var File_service_media_rpc_media_proto protoreflect.FileDescriptor
+
+const file_service_media_rpc_media_proto_rawDesc = "" +
 	"\n" +
-	"\vmedia.proto\x12\bmedia.v1\"\xa8\x03\n" +
+	"\x1dservice/media/rpc/media.proto\x12\bmedia.v1\"\xa8\x03\n" +
 	"\vMediaObject\x12\x19\n" +
 	"\bmedia_id\x18\x01 \x01(\tR\amediaId\x12\"\n" +
 	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x16\n" +
@@ -668,73 +821,90 @@ const file_media_proto_rawDesc = "" +
 	"\n" +
 	"expires_at\x18\x03 \x01(\x03R\texpiresAt\"7\n" +
 	"\x1aGetAvatarDisplayURLRequest\x12\x19\n" +
-	"\bmedia_id\x18\x01 \x01(\tR\amediaId2\xf1\x02\n" +
+	"\bmedia_id\x18\x01 \x01(\tR\amediaId\"[\n" +
+	"\x1aValidateAvatarMediaRequest\x12\"\n" +
+	"\rowner_user_id\x18\x01 \x01(\tR\vownerUserId\x12\x19\n" +
+	"\bmedia_id\x18\x02 \x01(\tR\amediaId\"~\n" +
+	"\x1bValidateMessageMediaRequest\x12\"\n" +
+	"\rowner_user_id\x18\x01 \x01(\tR\vownerUserId\x12!\n" +
+	"\fcontent_type\x18\x02 \x01(\tR\vcontentType\x12\x18\n" +
+	"\acontent\x18\x03 \x01(\tR\acontent\"\x17\n" +
+	"\x15ValidateMediaResponse2\xaf\x04\n" +
 	"\x05Media\x12_\n" +
 	"\x12CreateUploadIntent\x12#.media.v1.CreateUploadIntentRequest\x1a$.media.v1.CreateUploadIntentResponse\x12S\n" +
 	"\x0eCompleteUpload\x12\x1f.media.v1.CompleteUploadRequest\x1a .media.v1.CompleteUploadResponse\x12S\n" +
 	"\x0eGetDownloadURL\x12\x1f.media.v1.GetDownloadURLRequest\x1a .media.v1.GetDownloadURLResponse\x12]\n" +
-	"\x13GetAvatarDisplayURL\x12$.media.v1.GetAvatarDisplayURLRequest\x1a .media.v1.GetDownloadURLResponseB9Z7github.com/wujunhui99/agents_im/service/media/rpc/mediab\x06proto3"
+	"\x13GetAvatarDisplayURL\x12$.media.v1.GetAvatarDisplayURLRequest\x1a .media.v1.GetDownloadURLResponse\x12\\\n" +
+	"\x13ValidateAvatarMedia\x12$.media.v1.ValidateAvatarMediaRequest\x1a\x1f.media.v1.ValidateMediaResponse\x12^\n" +
+	"\x14ValidateMessageMedia\x12%.media.v1.ValidateMessageMediaRequest\x1a\x1f.media.v1.ValidateMediaResponseB9Z7github.com/wujunhui99/agents_im/service/media/rpc/mediab\x06proto3"
 
 var (
-	file_media_proto_rawDescOnce sync.Once
-	file_media_proto_rawDescData []byte
+	file_service_media_rpc_media_proto_rawDescOnce sync.Once
+	file_service_media_rpc_media_proto_rawDescData []byte
 )
 
-func file_media_proto_rawDescGZIP() []byte {
-	file_media_proto_rawDescOnce.Do(func() {
-		file_media_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_media_proto_rawDesc), len(file_media_proto_rawDesc)))
+func file_service_media_rpc_media_proto_rawDescGZIP() []byte {
+	file_service_media_rpc_media_proto_rawDescOnce.Do(func() {
+		file_service_media_rpc_media_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_service_media_rpc_media_proto_rawDesc), len(file_service_media_rpc_media_proto_rawDesc)))
 	})
-	return file_media_proto_rawDescData
+	return file_service_media_rpc_media_proto_rawDescData
 }
 
-var file_media_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_media_proto_goTypes = []any{
-	(*MediaObject)(nil),                // 0: media.v1.MediaObject
-	(*CreateUploadIntentRequest)(nil),  // 1: media.v1.CreateUploadIntentRequest
-	(*CreateUploadIntentResponse)(nil), // 2: media.v1.CreateUploadIntentResponse
-	(*CompleteUploadRequest)(nil),      // 3: media.v1.CompleteUploadRequest
-	(*CompleteUploadResponse)(nil),     // 4: media.v1.CompleteUploadResponse
-	(*GetDownloadURLRequest)(nil),      // 5: media.v1.GetDownloadURLRequest
-	(*GetDownloadURLResponse)(nil),     // 6: media.v1.GetDownloadURLResponse
-	(*GetAvatarDisplayURLRequest)(nil), // 7: media.v1.GetAvatarDisplayURLRequest
+var file_service_media_rpc_media_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_service_media_rpc_media_proto_goTypes = []any{
+	(*MediaObject)(nil),                 // 0: media.v1.MediaObject
+	(*CreateUploadIntentRequest)(nil),   // 1: media.v1.CreateUploadIntentRequest
+	(*CreateUploadIntentResponse)(nil),  // 2: media.v1.CreateUploadIntentResponse
+	(*CompleteUploadRequest)(nil),       // 3: media.v1.CompleteUploadRequest
+	(*CompleteUploadResponse)(nil),      // 4: media.v1.CompleteUploadResponse
+	(*GetDownloadURLRequest)(nil),       // 5: media.v1.GetDownloadURLRequest
+	(*GetDownloadURLResponse)(nil),      // 6: media.v1.GetDownloadURLResponse
+	(*GetAvatarDisplayURLRequest)(nil),  // 7: media.v1.GetAvatarDisplayURLRequest
+	(*ValidateAvatarMediaRequest)(nil),  // 8: media.v1.ValidateAvatarMediaRequest
+	(*ValidateMessageMediaRequest)(nil), // 9: media.v1.ValidateMessageMediaRequest
+	(*ValidateMediaResponse)(nil),       // 10: media.v1.ValidateMediaResponse
 }
-var file_media_proto_depIdxs = []int32{
-	0, // 0: media.v1.CompleteUploadResponse.media:type_name -> media.v1.MediaObject
-	1, // 1: media.v1.Media.CreateUploadIntent:input_type -> media.v1.CreateUploadIntentRequest
-	3, // 2: media.v1.Media.CompleteUpload:input_type -> media.v1.CompleteUploadRequest
-	5, // 3: media.v1.Media.GetDownloadURL:input_type -> media.v1.GetDownloadURLRequest
-	7, // 4: media.v1.Media.GetAvatarDisplayURL:input_type -> media.v1.GetAvatarDisplayURLRequest
-	2, // 5: media.v1.Media.CreateUploadIntent:output_type -> media.v1.CreateUploadIntentResponse
-	4, // 6: media.v1.Media.CompleteUpload:output_type -> media.v1.CompleteUploadResponse
-	6, // 7: media.v1.Media.GetDownloadURL:output_type -> media.v1.GetDownloadURLResponse
-	6, // 8: media.v1.Media.GetAvatarDisplayURL:output_type -> media.v1.GetDownloadURLResponse
-	5, // [5:9] is the sub-list for method output_type
-	1, // [1:5] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+var file_service_media_rpc_media_proto_depIdxs = []int32{
+	0,  // 0: media.v1.CompleteUploadResponse.media:type_name -> media.v1.MediaObject
+	1,  // 1: media.v1.Media.CreateUploadIntent:input_type -> media.v1.CreateUploadIntentRequest
+	3,  // 2: media.v1.Media.CompleteUpload:input_type -> media.v1.CompleteUploadRequest
+	5,  // 3: media.v1.Media.GetDownloadURL:input_type -> media.v1.GetDownloadURLRequest
+	7,  // 4: media.v1.Media.GetAvatarDisplayURL:input_type -> media.v1.GetAvatarDisplayURLRequest
+	8,  // 5: media.v1.Media.ValidateAvatarMedia:input_type -> media.v1.ValidateAvatarMediaRequest
+	9,  // 6: media.v1.Media.ValidateMessageMedia:input_type -> media.v1.ValidateMessageMediaRequest
+	2,  // 7: media.v1.Media.CreateUploadIntent:output_type -> media.v1.CreateUploadIntentResponse
+	4,  // 8: media.v1.Media.CompleteUpload:output_type -> media.v1.CompleteUploadResponse
+	6,  // 9: media.v1.Media.GetDownloadURL:output_type -> media.v1.GetDownloadURLResponse
+	6,  // 10: media.v1.Media.GetAvatarDisplayURL:output_type -> media.v1.GetDownloadURLResponse
+	10, // 11: media.v1.Media.ValidateAvatarMedia:output_type -> media.v1.ValidateMediaResponse
+	10, // 12: media.v1.Media.ValidateMessageMedia:output_type -> media.v1.ValidateMediaResponse
+	7,  // [7:13] is the sub-list for method output_type
+	1,  // [1:7] is the sub-list for method input_type
+	1,  // [1:1] is the sub-list for extension type_name
+	1,  // [1:1] is the sub-list for extension extendee
+	0,  // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_media_proto_init() }
-func file_media_proto_init() {
-	if File_media_proto != nil {
+func init() { file_service_media_rpc_media_proto_init() }
+func file_service_media_rpc_media_proto_init() {
+	if File_service_media_rpc_media_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_media_proto_rawDesc), len(file_media_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_media_rpc_media_proto_rawDesc), len(file_service_media_rpc_media_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_media_proto_goTypes,
-		DependencyIndexes: file_media_proto_depIdxs,
-		MessageInfos:      file_media_proto_msgTypes,
+		GoTypes:           file_service_media_rpc_media_proto_goTypes,
+		DependencyIndexes: file_service_media_rpc_media_proto_depIdxs,
+		MessageInfos:      file_service_media_rpc_media_proto_msgTypes,
 	}.Build()
-	File_media_proto = out.File
-	file_media_proto_goTypes = nil
-	file_media_proto_depIdxs = nil
+	File_service_media_rpc_media_proto = out.File
+	file_service_media_rpc_media_proto_goTypes = nil
+	file_service_media_rpc_media_proto_depIdxs = nil
 }

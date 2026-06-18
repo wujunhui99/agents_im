@@ -27,9 +27,10 @@ func NewUpdateUserAvatarLogic(ctx context.Context, svcCtx *svc.ServiceContext) *
 }
 
 func (l *UpdateUserAvatarLogic) UpdateUserAvatar(in *userpb.UpdateUserAvatarRequest) (*userpb.UserResponse, error) {
-	// keystone：校验头像 media 存在且类型合法（media 域读，仍走 internal）。
+	// 校验头像 media 存在/归属/类型（media 域，经 media-rpc，#533）。校验器已返回 gRPC status，
+	// 直接透传，勿再经 rpcerror.ToStatus（会把 InvalidArgument/NotFound 等折成 Internal）。
 	if err := l.svcCtx.AvatarValidator.ValidateAvatarMedia(l.ctx, in.GetUserId(), in.GetAvatarMediaId()); err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, err
 	}
 
 	userID := strings.TrimSpace(in.GetUserId())

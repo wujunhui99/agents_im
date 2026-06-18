@@ -6,6 +6,12 @@ JWTAuth:
   AccessExpire: 86400
 DataSource: ${DATABASE_URL}
 
+# MediaRPC：头像 media 校验经属主 media-rpc（#533）。
+MediaRPC:
+  Endpoints:
+    - 127.0.0.1:9096
+  Timeout: 5000
+
 Telemetry:
   Name: user-rpc
   Endpoint: 127.0.0.1:4317

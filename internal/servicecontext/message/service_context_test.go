@@ -88,9 +88,9 @@ func TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting(t *
 
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	serviceContext := NewServiceContextWithMedia(
+	serviceContext := NewServiceContextWithMediaValidator(
 		messageRepo,
-		repository.NewMemoryMediaRepository(),
+		nil,
 		nil,
 		nil,
 		config.DefaultJWTAuthConfig(),

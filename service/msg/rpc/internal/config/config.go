@@ -15,6 +15,10 @@ type Config struct {
 	// （gate #550，脱 internal/repository accountRepo 的 avatar string scan/空串写）。
 	UserRPC zrpc.RpcClientConf `json:",optional"`
 
+	// MediaRPC：SendMessage 写路径的图片/文件附件校验经属主 media-rpc
+	// （#533，脱 internal/mediavalidate 直读 media_objects）。
+	MediaRPC zrpc.RpcClientConf `json:",optional"`
+
 	// AI 托管运行时（keystone 例外：随 message-api 退役迁入，SendMessage 后触发 Agent 回复；
 	// 待 03-message-pipeline §9 B1 把触发点迁到 msgtransfer 后删除）。
 	DeepSeek         appconfig.DeepSeekConfig         `json:",optional"`

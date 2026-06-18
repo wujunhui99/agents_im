@@ -9,6 +9,12 @@ UserRPC:
     - user-rpc:9090
   Timeout: 5000
 
+# MediaRPC：SendMessage 写路径图片/文件附件校验经属主 media-rpc（#533，脱 internal/mediavalidate）。
+MediaRPC:
+  Endpoints:
+    - media-rpc:9096
+  Timeout: 5000
+
 # go-zero 自带 tracing：endpoint 由 OTLP collector 注入（空则关闭）。
 Telemetry:
   Name: msg-rpc

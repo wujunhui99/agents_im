@@ -7,7 +7,6 @@ import (
 	einoruntime "github.com/wujunhui99/agents_im/internal/agentruntime/eino"
 	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
 	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/mediavalidate"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
@@ -23,7 +22,6 @@ type ServiceContext struct {
 	AIHostingLogic    *logic.ConversationAIHostingLogic
 	FeedbackLogic     *logic.FeedbackLogic
 	MessageRepo       repository.MessageRepository
-	MediaRepo         repository.MediaRepository
 	FeedbackRepo      repository.FeedbackRepository
 	AgentHostingRepo  repository.AgentConversationHostingRepository
 	AIHostingRepo     repository.ConversationAIHostingRepository
@@ -48,22 +46,31 @@ type ConversationAIHostingRuntimeOptions struct {
 	AgentCreate      runtimetools.AgentCreateHandler
 }
 
+// allowAllMessageMediaValidator 是内存/单测 fixture：不接 media-rpc 时放行附件校验。
+// 真实链路（msg-rpc）注入 media-rpc 校验器，绝不用本类型（#533）。
+type allowAllMessageMediaValidator struct{}
+
+func (allowAllMessageMediaValidator) ValidateMessageMedia(context.Context, string, string, string) error {
+	return nil
+}
+
 func NewServiceContext(repo repository.MessageRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister) *ServiceContext {
 	return NewServiceContextWithAuth(repo, userExists, groups, config.DefaultJWTAuthConfig())
 }
 
 func NewServiceContextWithAuth(repo repository.MessageRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
-	mediaRepo := repository.NewMemoryMediaRepository()
+	// 内存/默认路径（单测、demo）不接 media-rpc，用放行校验器作 fixture；真实附件校验
+	// 由 msg-rpc 注入的 media-rpc 校验器承担（#533）。
+	return NewServiceContextWithMediaValidator(repo, allowAllMessageMediaValidator{}, userExists, groups, auth)
+}
+
+// NewServiceContextWithMediaValidator 用调用方注入的 media 校验器装配（#533：附件校验经 media-rpc，
+// 不再由本包直读 media_objects）。validator 为 nil 时回退放行校验器（仅内存/单测语义）。
+func NewServiceContextWithMediaValidator(repo repository.MessageRepository, mediaValidator logic.MessageMediaValidator, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
+	if mediaValidator == nil {
+		mediaValidator = allowAllMessageMediaValidator{}
+	}
 	feedbackRepo := repository.NewMemoryFeedbackRepository()
-	return NewServiceContextWithFeedback(repo, mediaRepo, feedbackRepo, userExists, groups, auth)
-}
-
-func NewServiceContextWithMedia(repo repository.MessageRepository, mediaRepo repository.MediaRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
-	return NewServiceContextWithFeedback(repo, mediaRepo, repository.NewMemoryFeedbackRepository(), userExists, groups, auth)
-}
-
-func NewServiceContextWithFeedback(repo repository.MessageRepository, mediaRepo repository.MediaRepository, feedbackRepo repository.FeedbackRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
-	mediaValidator := mediavalidate.NewMessageValidator(mediaRepo)
 	agentHostingRepo := repository.NewMemoryAgentConversationHostingRepository()
 	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
@@ -73,7 +80,6 @@ func NewServiceContextWithFeedback(repo repository.MessageRepository, mediaRepo 
 		AIHostingLogic:   logic.NewConversationAIHostingLogic(aiHostingRepo),
 		FeedbackLogic:    logic.NewFeedbackLogic(feedbackRepo),
 		MessageRepo:      repo,
-		MediaRepo:        mediaRepo,
 		FeedbackRepo:     feedbackRepo,
 		AgentHostingRepo: agentHostingRepo,
 		AIHostingRepo:    aiHostingRepo,

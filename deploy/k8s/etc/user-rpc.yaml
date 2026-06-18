@@ -3,6 +3,12 @@ ListenOn: 0.0.0.0:9090
 
 DataSource: ${DATABASE_URL}
 
+# MediaRPC：头像 media 校验经属主 media-rpc（#533，脱 internal/mediavalidate 直读 media_objects）。
+MediaRPC:
+  Endpoints:
+    - media-rpc:9096
+  Timeout: 5000
+
 # go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。
 Telemetry:
   Name: user-rpc
