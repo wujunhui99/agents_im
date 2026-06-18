@@ -14,20 +14,25 @@ import (
 )
 
 type (
-	CompleteUploadRequest      = media.CompleteUploadRequest
-	CompleteUploadResponse     = media.CompleteUploadResponse
-	CreateUploadIntentRequest  = media.CreateUploadIntentRequest
-	CreateUploadIntentResponse = media.CreateUploadIntentResponse
-	GetAvatarDisplayURLRequest = media.GetAvatarDisplayURLRequest
-	GetDownloadURLRequest      = media.GetDownloadURLRequest
-	GetDownloadURLResponse     = media.GetDownloadURLResponse
-	MediaObject                = media.MediaObject
+	CompleteUploadRequest       = media.CompleteUploadRequest
+	CompleteUploadResponse      = media.CompleteUploadResponse
+	CreateUploadIntentRequest   = media.CreateUploadIntentRequest
+	CreateUploadIntentResponse  = media.CreateUploadIntentResponse
+	GetAvatarDisplayURLRequest  = media.GetAvatarDisplayURLRequest
+	GetDownloadURLRequest       = media.GetDownloadURLRequest
+	GetDownloadURLResponse      = media.GetDownloadURLResponse
+	MediaObject                 = media.MediaObject
+	ValidateAvatarMediaRequest  = media.ValidateAvatarMediaRequest
+	ValidateMessageMediaRequest = media.ValidateMessageMediaRequest
+	ValidateMediaResponse       = media.ValidateMediaResponse
 
 	Media interface {
 		CreateUploadIntent(ctx context.Context, in *CreateUploadIntentRequest, opts ...grpc.CallOption) (*CreateUploadIntentResponse, error)
 		CompleteUpload(ctx context.Context, in *CompleteUploadRequest, opts ...grpc.CallOption) (*CompleteUploadResponse, error)
 		GetDownloadURL(ctx context.Context, in *GetDownloadURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error)
 		GetAvatarDisplayURL(ctx context.Context, in *GetAvatarDisplayURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error)
+		ValidateAvatarMedia(ctx context.Context, in *ValidateAvatarMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error)
+		ValidateMessageMedia(ctx context.Context, in *ValidateMessageMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error)
 	}
 
 	defaultMedia struct {
@@ -59,4 +64,14 @@ func (m *defaultMedia) GetDownloadURL(ctx context.Context, in *GetDownloadURLReq
 func (m *defaultMedia) GetAvatarDisplayURL(ctx context.Context, in *GetAvatarDisplayURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error) {
 	client := media.NewMediaClient(m.cli.Conn())
 	return client.GetAvatarDisplayURL(ctx, in, opts...)
+}
+
+func (m *defaultMedia) ValidateAvatarMedia(ctx context.Context, in *ValidateAvatarMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error) {
+	client := media.NewMediaClient(m.cli.Conn())
+	return client.ValidateAvatarMedia(ctx, in, opts...)
+}
+
+func (m *defaultMedia) ValidateMessageMedia(ctx context.Context, in *ValidateMessageMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error) {
+	client := media.NewMediaClient(m.cli.Conn())
+	return client.ValidateMessageMedia(ctx, in, opts...)
 }

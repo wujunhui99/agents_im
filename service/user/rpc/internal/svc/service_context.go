@@ -5,12 +5,13 @@ import (
 	"log"
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/mediavalidate"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
 
 	"github.com/zeromicro/go-zero/core/stores/postgres"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
 // DefaultAssistantProvisioner 是「新用户开通默认助手」的 keystone 跨域写接口（agent 域）。
@@ -20,9 +21,8 @@ type DefaultAssistantProvisioner interface {
 	EnsureForUser(ctx context.Context, accountID string) error
 }
 
-// AvatarValidator 是「头像 media 存在/类型校验」的 keystone 跨域读接口（media 域）。
-// media-rpc 设计为调用方本地校验 media_objects，暂由 internal/mediavalidate 实现注入，
-// 仍读 internal/repository；待 message 迁移后删。
+// AvatarValidator 校验头像 media 的存在/归属/类型（media 域）。#533 起经 media-rpc，
+// 不再直读 media_objects（脱 internal/mediavalidate）。
 type AvatarValidator interface {
 	ValidateAvatarMedia(ctx context.Context, ownerUserID string, mediaID string) error
 }
@@ -50,10 +50,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		log.Fatalf("backfill default assistant: %v", err)
 	}
 
-	// keystone：头像 media 校验（media 域读）。
-	mediaRepo, err := repository.NewPostgresMediaRepository(c.DataSource)
+	// 头像 media 校验经 media-rpc（#533，脱 internal/mediavalidate 直读 media_objects）。
+	mediaCli, err := zrpc.NewClient(c.MediaRPC)
 	if err != nil {
-		log.Fatalf("build media repository: %v", err)
+		log.Fatalf("build media rpc client: %v", err)
 	}
 
 	return &ServiceContext{
@@ -61,6 +61,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Accounts:        model.NewAccountsModel(conn),
 		Profiles:        model.NewProfilesModel(conn),
 		Assistant:       provisioner,
-		AvatarValidator: mediavalidate.NewAvatarValidator(mediaRepo),
+		AvatarValidator: newMediaRPCAvatarValidator(mediaclient.NewMedia(mediaCli)),
 	}
 }

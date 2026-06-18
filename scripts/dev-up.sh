@@ -269,6 +269,10 @@ write_user_rpc_config() {
 Name: user-rpc
 ListenOn: 127.0.0.1:${USER_RPC_PORT:-9090}
 DataSource: ${DATABASE_URL}
+MediaRPC:
+  Endpoints:
+    - 127.0.0.1:${MEDIA_RPC_PORT:-9096}
+  Timeout: 5000
 Telemetry:
   Name: user-rpc
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
@@ -309,6 +313,10 @@ PythonExecutor:
 UserRPC:
   Endpoints:
     - 127.0.0.1:${USER_RPC_PORT:-9090}
+  Timeout: 5000
+MediaRPC:
+  Endpoints:
+    - 127.0.0.1:${MEDIA_RPC_PORT:-9096}
   Timeout: 5000
 Kafka:
   Enabled: true
@@ -648,11 +656,12 @@ main() {
 
   stop_services
   write_configs
+  # media-rpc 先起：user-rpc（头像校验）/msg-rpc（附件校验）的 MediaRPC 客户端依赖它（#533）。
+  start_service "media-rpc"
   start_service "user-rpc"
   start_service "groups-rpc"
   start_service "msg-rpc"
   start_service "friends-rpc"
-  start_service "media-rpc"
   start_service "admin-rpc"
   start_service "auth-rpc"
   start_service "user-api"

@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v5.29.3
-// source: media.proto
+// source: service/media/rpc/media.proto
 
 package media
 
@@ -19,10 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Media_CreateUploadIntent_FullMethodName  = "/media.v1.Media/CreateUploadIntent"
-	Media_CompleteUpload_FullMethodName      = "/media.v1.Media/CompleteUpload"
-	Media_GetDownloadURL_FullMethodName      = "/media.v1.Media/GetDownloadURL"
-	Media_GetAvatarDisplayURL_FullMethodName = "/media.v1.Media/GetAvatarDisplayURL"
+	Media_CreateUploadIntent_FullMethodName   = "/media.v1.Media/CreateUploadIntent"
+	Media_CompleteUpload_FullMethodName       = "/media.v1.Media/CompleteUpload"
+	Media_GetDownloadURL_FullMethodName       = "/media.v1.Media/GetDownloadURL"
+	Media_GetAvatarDisplayURL_FullMethodName  = "/media.v1.Media/GetAvatarDisplayURL"
+	Media_ValidateAvatarMedia_FullMethodName  = "/media.v1.Media/ValidateAvatarMedia"
+	Media_ValidateMessageMedia_FullMethodName = "/media.v1.Media/ValidateMessageMedia"
 )
 
 // MediaClient is the client API for Media service.
@@ -30,14 +32,23 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // Media owns the object-storage lifecycle (avatar/attachment upload, completion,
-// download/display presigned URLs). Validation of media ownership/status is done
-// locally by callers (user-rpc set-avatar, message send) against the shared
-// media_objects table; media-rpc owns all writes + the object store.
+// download/display presigned URLs) AND media reference validation. Callers that
+// reference media (user-rpc set-avatar, message send) validate ownership/status/
+// type via the Validate* RPCs instead of reading media_objects directly — media-rpc
+// owns the table, all writes, the object store, and the validation rules (#533).
 type MediaClient interface {
 	CreateUploadIntent(ctx context.Context, in *CreateUploadIntentRequest, opts ...grpc.CallOption) (*CreateUploadIntentResponse, error)
 	CompleteUpload(ctx context.Context, in *CompleteUploadRequest, opts ...grpc.CallOption) (*CompleteUploadResponse, error)
 	GetDownloadURL(ctx context.Context, in *GetDownloadURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error)
 	GetAvatarDisplayURL(ctx context.Context, in *GetAvatarDisplayURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error)
+	// ValidateAvatarMedia asserts media_id is a ready avatar object owned by owner_user_id
+	// with an allowed content_type and size. Returns InvalidArgument/Forbidden/NotFound on
+	// failure; an empty response on success (#533, replaces internal/mediavalidate).
+	ValidateAvatarMedia(ctx context.Context, in *ValidateAvatarMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error)
+	// ValidateMessageMedia asserts the attachment referenced by a message's content JSON
+	// ("image"|"file") is a ready, owner-owned media object of the matching purpose with
+	// allowed type/size (and, for files, content metadata matching the media object).
+	ValidateMessageMedia(ctx context.Context, in *ValidateMessageMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error)
 }
 
 type mediaClient struct {
@@ -88,19 +99,48 @@ func (c *mediaClient) GetAvatarDisplayURL(ctx context.Context, in *GetAvatarDisp
 	return out, nil
 }
 
+func (c *mediaClient) ValidateAvatarMedia(ctx context.Context, in *ValidateAvatarMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidateMediaResponse)
+	err := c.cc.Invoke(ctx, Media_ValidateAvatarMedia_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mediaClient) ValidateMessageMedia(ctx context.Context, in *ValidateMessageMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidateMediaResponse)
+	err := c.cc.Invoke(ctx, Media_ValidateMessageMedia_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MediaServer is the server API for Media service.
 // All implementations must embed UnimplementedMediaServer
 // for forward compatibility.
 //
 // Media owns the object-storage lifecycle (avatar/attachment upload, completion,
-// download/display presigned URLs). Validation of media ownership/status is done
-// locally by callers (user-rpc set-avatar, message send) against the shared
-// media_objects table; media-rpc owns all writes + the object store.
+// download/display presigned URLs) AND media reference validation. Callers that
+// reference media (user-rpc set-avatar, message send) validate ownership/status/
+// type via the Validate* RPCs instead of reading media_objects directly — media-rpc
+// owns the table, all writes, the object store, and the validation rules (#533).
 type MediaServer interface {
 	CreateUploadIntent(context.Context, *CreateUploadIntentRequest) (*CreateUploadIntentResponse, error)
 	CompleteUpload(context.Context, *CompleteUploadRequest) (*CompleteUploadResponse, error)
 	GetDownloadURL(context.Context, *GetDownloadURLRequest) (*GetDownloadURLResponse, error)
 	GetAvatarDisplayURL(context.Context, *GetAvatarDisplayURLRequest) (*GetDownloadURLResponse, error)
+	// ValidateAvatarMedia asserts media_id is a ready avatar object owned by owner_user_id
+	// with an allowed content_type and size. Returns InvalidArgument/Forbidden/NotFound on
+	// failure; an empty response on success (#533, replaces internal/mediavalidate).
+	ValidateAvatarMedia(context.Context, *ValidateAvatarMediaRequest) (*ValidateMediaResponse, error)
+	// ValidateMessageMedia asserts the attachment referenced by a message's content JSON
+	// ("image"|"file") is a ready, owner-owned media object of the matching purpose with
+	// allowed type/size (and, for files, content metadata matching the media object).
+	ValidateMessageMedia(context.Context, *ValidateMessageMediaRequest) (*ValidateMediaResponse, error)
 	mustEmbedUnimplementedMediaServer()
 }
 
@@ -122,6 +162,12 @@ func (UnimplementedMediaServer) GetDownloadURL(context.Context, *GetDownloadURLR
 }
 func (UnimplementedMediaServer) GetAvatarDisplayURL(context.Context, *GetAvatarDisplayURLRequest) (*GetDownloadURLResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAvatarDisplayURL not implemented")
+}
+func (UnimplementedMediaServer) ValidateAvatarMedia(context.Context, *ValidateAvatarMediaRequest) (*ValidateMediaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ValidateAvatarMedia not implemented")
+}
+func (UnimplementedMediaServer) ValidateMessageMedia(context.Context, *ValidateMessageMediaRequest) (*ValidateMediaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ValidateMessageMedia not implemented")
 }
 func (UnimplementedMediaServer) mustEmbedUnimplementedMediaServer() {}
 func (UnimplementedMediaServer) testEmbeddedByValue()               {}
@@ -216,6 +262,42 @@ func _Media_GetAvatarDisplayURL_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Media_ValidateAvatarMedia_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateAvatarMediaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MediaServer).ValidateAvatarMedia(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Media_ValidateAvatarMedia_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MediaServer).ValidateAvatarMedia(ctx, req.(*ValidateAvatarMediaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Media_ValidateMessageMedia_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateMessageMediaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MediaServer).ValidateMessageMedia(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Media_ValidateMessageMedia_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MediaServer).ValidateMessageMedia(ctx, req.(*ValidateMessageMediaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Media_ServiceDesc is the grpc.ServiceDesc for Media service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -239,7 +321,15 @@ var Media_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetAvatarDisplayURL",
 			Handler:    _Media_GetAvatarDisplayURL_Handler,
 		},
+		{
+			MethodName: "ValidateAvatarMedia",
+			Handler:    _Media_ValidateAvatarMedia_Handler,
+		},
+		{
+			MethodName: "ValidateMessageMedia",
+			Handler:    _Media_ValidateMessageMedia_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "media.proto",
+	Metadata: "service/media/rpc/media.proto",
 }

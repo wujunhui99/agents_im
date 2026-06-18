@@ -39,6 +39,14 @@ func (notFoundMediaClient) GetAvatarDisplayURL(context.Context, *mediaclient.Get
 	return nil, status.Error(codes.NotFound, "media object not found")
 }
 
+func (notFoundMediaClient) ValidateAvatarMedia(context.Context, *mediaclient.ValidateAvatarMediaRequest, ...grpc.CallOption) (*mediaclient.ValidateMediaResponse, error) {
+	return nil, status.Error(codes.NotFound, "media object not found")
+}
+
+func (notFoundMediaClient) ValidateMessageMedia(context.Context, *mediaclient.ValidateMessageMediaRequest, ...grpc.CallOption) (*mediaclient.ValidateMediaResponse, error) {
+	return nil, status.Error(codes.NotFound, "media object not found")
+}
+
 // TestGetAvatarHandlerMapsRPCNotFoundTo404 guards the regression where a gRPC
 // NotFound from media-rpc surfaced as HTTP 500 instead of 404 (#390).
 func TestGetAvatarHandlerMapsRPCNotFoundTo404(t *testing.T) {

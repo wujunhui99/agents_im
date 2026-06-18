@@ -9,6 +9,12 @@ UserRPC:
     - 127.0.0.1:9090
   Timeout: 5000
 
+# MediaRPC：SendMessage 写路径图片/文件附件校验经属主 media-rpc（#533）。
+MediaRPC:
+  Endpoints:
+    - 127.0.0.1:9096
+  Timeout: 5000
+
 # go-zero 自带 tracing：本地上报到 docker-compose 的 tempo（OTLP gRPC）。
 Telemetry:
   Name: msg-rpc

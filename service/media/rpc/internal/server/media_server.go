@@ -42,3 +42,13 @@ func (s *MediaServer) GetAvatarDisplayURL(ctx context.Context, in *media.GetAvat
 	l := logic.NewGetAvatarDisplayURLLogic(ctx, s.svcCtx)
 	return l.GetAvatarDisplayURL(in)
 }
+
+func (s *MediaServer) ValidateAvatarMedia(ctx context.Context, in *media.ValidateAvatarMediaRequest) (*media.ValidateMediaResponse, error) {
+	l := logic.NewValidateAvatarMediaLogic(ctx, s.svcCtx)
+	return l.ValidateAvatarMedia(in)
+}
+
+func (s *MediaServer) ValidateMessageMedia(ctx context.Context, in *media.ValidateMessageMediaRequest) (*media.ValidateMediaResponse, error) {
+	l := logic.NewValidateMessageMediaLogic(ctx, s.svcCtx)
+	return l.ValidateMessageMedia(in)
+}

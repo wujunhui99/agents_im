@@ -8,12 +8,12 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/mediavalidate"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/userrpc"
@@ -60,11 +60,17 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		log.Fatalf("build groups repository: %v", err)
 	}
-	mediaRepo, err := repository.NewMediaRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build media repository: %v", err)
-	}
 	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
+
+	// 图片/文件附件校验经属主 media-rpc（#533，脱 internal/mediavalidate 直读 media_objects）。
+	if !hasRPCClientConfig(c.MediaRPC) {
+		log.Fatalf("msg-rpc requires media rpc client config (MediaRPC)")
+	}
+	mediaRPCClient, err := zrpc.NewClient(c.MediaRPC)
+	if err != nil {
+		log.Fatalf("build media rpc client: %v", err)
+	}
+	mediaValidator := newMediaRPCMessageValidator(mediaclient.NewMedia(mediaRPCClient))
 
 	// 账号读写经属主 user-rpc（gate #550，脱 internal/repository accountRepo 的 avatar string scan/空串写）。
 	if !hasRPCClientConfig(c.UserRPC) {
@@ -83,7 +89,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 	// AI 写回经本进程 SendMessage（晚绑定 svcCtx），防 PG/Redis 双 seq 分裂。
 	senderOverride := &kafkaModeSender{}
-	hosting := newConversationAIHostingRuntime(c, mediaRepo, groupsLogic, senderOverride, userCli)
+	hosting := newConversationAIHostingRuntime(c, mediaValidator, groupsLogic, senderOverride, userCli)
 
 	svcCtx := &ServiceContext{
 		Config:       c,
@@ -91,7 +97,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Threads:      model.NewConversationThreadsModel(conn),
 		States:       model.NewUserConversationStatesModel(conn),
 		Groups:       groupsLogic,
-		Media:        mediavalidate.NewMessageValidator(mediaRepo),
+		Media:        mediaValidator,
 		AgentHook:    hosting.AgentMessageHook,
 		AIHosting:    hosting.AIHostingLogic,
 		KafkaBrokers: kafkaBrokers,
@@ -137,7 +143,7 @@ func hasRPCClientConfig(conf zrpc.RpcClientConf) bool {
 // newConversationAIHostingRuntime 移植自 service/message-api/main.go 的 AI 托管接线：
 // 构造 internal messagesvc.ServiceContext（MessageLogic 仅作 Agent 回复写回通道，写同一批表 +
 // outbox，与 msg-rpc goctl 数据层共存）并 ConfigureConversationAIHosting。
-func newConversationAIHostingRuntime(c config.Config, mediaRepo repository.MediaRepository, groupsLogic *business.GroupsLogic, senderOverride agentim.MessageSender, userCli userclient.User) *messagesvc.ServiceContext {
+func newConversationAIHostingRuntime(c config.Config, mediaValidator business.MessageMediaValidator, groupsLogic *business.GroupsLogic, senderOverride agentim.MessageSender, userCli userclient.User) *messagesvc.ServiceContext {
 	messageRepo, err := repository.NewMessageRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
 	if err != nil {
 		log.Fatalf("build message repository: %v", err)
@@ -181,7 +187,7 @@ func newConversationAIHostingRuntime(c config.Config, mediaRepo repository.Media
 		log.Fatalf("build python executor: %v", err)
 	}
 
-	messageContext := messagesvc.NewServiceContextWithMedia(messageRepo, mediaRepo, nil, groupsLogic, appconfig.DefaultJWTAuthConfig())
+	messageContext := messagesvc.NewServiceContextWithMediaValidator(messageRepo, mediaValidator, nil, groupsLogic, appconfig.DefaultJWTAuthConfig())
 	messageContext.AgentHostingRepo = agentHostingRepo
 	messageContext.AIHostingRepo = aiHostingRepo
 	messageContext.AgentResolver = agentim.NewAgentRepositoryAccountResolver(agentRepo)

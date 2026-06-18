@@ -35,6 +35,14 @@ func (s stubMediaClient) GetAvatarDisplayURL(_ context.Context, in *mediaclient.
 	return &mediaclient.GetDownloadURLResponse{MediaId: in.GetMediaId(), DownloadUrl: s.avatarURL}, nil
 }
 
+func (s stubMediaClient) ValidateAvatarMedia(context.Context, *mediaclient.ValidateAvatarMediaRequest, ...grpc.CallOption) (*mediaclient.ValidateMediaResponse, error) {
+	return &mediaclient.ValidateMediaResponse{}, nil
+}
+
+func (s stubMediaClient) ValidateMessageMedia(context.Context, *mediaclient.ValidateMessageMediaRequest, ...grpc.CallOption) (*mediaclient.ValidateMediaResponse, error) {
+	return &mediaclient.ValidateMediaResponse{}, nil
+}
+
 func TestGetAvatarHandlerRedirects(t *testing.T) {
 	const wantURL = "https://agenticim.xyz/agents-im-media/avatar/x/med_y.jpg?sig=abc"
 	svcCtx := &svc.ServiceContext{
