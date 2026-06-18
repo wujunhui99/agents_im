@@ -26,11 +26,11 @@ var (
 type (
 	messagesModel interface {
 		Insert(ctx context.Context, data *Messages) (sql.Result, error)
-		FindOne(ctx context.Context, messageId string) (*Messages, error)
+		FindOne(ctx context.Context, messageId int64) (*Messages, error)
 		FindOneByConversationIdSeq(ctx context.Context, conversationId string, seq int64) (*Messages, error)
 		FindOneBySenderAccountIdClientMsgId(ctx context.Context, senderAccountId string, clientMsgId string) (*Messages, error)
 		Update(ctx context.Context, data *Messages) error
-		Delete(ctx context.Context, messageId string) error
+		Delete(ctx context.Context, messageId int64) error
 	}
 
 	defaultMessagesModel struct {
@@ -39,7 +39,7 @@ type (
 	}
 
 	Messages struct {
-		MessageId             string       `db:"message_id"`
+		MessageId             int64        `db:"message_id"`
 		ClientMsgId           string       `db:"client_msg_id"`
 		SenderAccountId       string       `db:"sender_account_id"`
 		ConversationId        string       `db:"conversation_id"`
@@ -70,13 +70,13 @@ func newMessagesModel(conn sqlx.SqlConn) *defaultMessagesModel {
 	}
 }
 
-func (m *defaultMessagesModel) Delete(ctx context.Context, messageId string) error {
+func (m *defaultMessagesModel) Delete(ctx context.Context, messageId int64) error {
 	query := fmt.Sprintf("delete from %s where message_id = $1", m.table)
 	_, err := m.conn.ExecCtx(ctx, query, messageId)
 	return err
 }
 
-func (m *defaultMessagesModel) FindOne(ctx context.Context, messageId string) (*Messages, error) {
+func (m *defaultMessagesModel) FindOne(ctx context.Context, messageId int64) (*Messages, error) {
 	query := fmt.Sprintf("select %s from %s where message_id = $1 limit 1", messagesRows, m.table)
 	var resp Messages
 	err := m.conn.QueryRowCtx(ctx, &resp, query, messageId)

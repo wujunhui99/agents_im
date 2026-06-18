@@ -11,6 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
@@ -22,6 +23,25 @@ import (
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
+// message_id 雪花中段（12 位）布局：msg HintBits=1，最高位（bit 21）单聊=1/群聊=0（100… vs 000…）；
+// 机器号靠右（低 10 位，默认 1024 实例），bit 20 为保留间隙。扩副本调 Snowflake.MachineBits
+// （机器号靠右收缩、不挪位）。见 pkg/idgen/routedflake.go 与 EPIC #527 §0。
+const (
+	msgHintBits           = 1
+	msgHintSingle         = 1 // 单聊 hint（中段最高位置 1）
+	msgHintGroup          = 0 // 群聊 hint（中段最高位置 0）
+	defaultMsgMachineBits = 10
+)
+
+// MsgHintForChatType 返回 message_id 中段最高位的路由 hint：单聊=1，群聊=0（EPIC #527 §0，
+// 供 media 等下游无需查库即可判出单/群）。
+func MsgHintForChatType(chatType string) int64 {
+	if chatType == model.ChatTypeSingle {
+		return msgHintSingle
+	}
+	return msgHintGroup
+}
+
 type ServiceContext struct {
 	Config config.Config
 
@@ -29,6 +49,9 @@ type ServiceContext struct {
 	Messages model.MessagesModel
 	Threads  model.ConversationThreadsModel
 	States   model.UserConversationStatesModel
+
+	// MsgIDGen 发 message_id 雪花 bigint（EPIC #527 §0：HintBits=1 区分单/群，含机器位防同毫秒碰撞）。
+	MsgIDGen *idgen.RoutedFlake
 
 	// 跨域 keystone 例外：SendMessage 写路径需要 inline 鉴权（群成员解析 + 媒体校验），
 	// 无法干净 BFF 化，暂依赖 internal（待 groups/media 完全 BFF/rpc 化后删）。
@@ -55,6 +78,11 @@ type ServiceContext struct {
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	conn := postgres.New(c.DataSource)
+
+	msgIDGen, err := newMsgIDGenerator(c.Snowflake)
+	if err != nil {
+		log.Fatalf("build message id generator: %v", err)
+	}
 
 	groupsRepo, err := repository.NewGroupsRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
 	if err != nil {
@@ -94,6 +122,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	svcCtx := &ServiceContext{
 		Config:       c,
 		Messages:     model.NewMessagesModel(conn),
+		MsgIDGen:     msgIDGen,
 		Threads:      model.NewConversationThreadsModel(conn),
 		States:       model.NewUserConversationStatesModel(conn),
 		Groups:       groupsLogic,
@@ -105,6 +134,25 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		agentSender:  senderOverride,
 	}
 	return svcCtx
+}
+
+// newMsgIDGenerator 构造 message_id 的 RoutedFlake（HintBits=1，单/群区分位）。机器号优先用
+// idgen.ResolveMachineID()（env AGENTS_IM_SNOWFLAKE_MACHINE_ID 或 StatefulSet pod ordinal）；解析不到时
+// 回退到配置值（默认 0，适用单副本）。多副本部署须经 env/ordinal 注入唯一机器号，否则同毫秒碰撞。
+func newMsgIDGenerator(cfg config.SnowflakeConfig) (*idgen.RoutedFlake, error) {
+	machineBits := cfg.MachineBits
+	if machineBits == 0 {
+		machineBits = defaultMsgMachineBits
+	}
+	machineID := cfg.MachineID
+	if resolved, err := idgen.ResolveMachineID(); err == nil {
+		machineID = resolved
+	}
+	return idgen.NewRoutedFlake(idgen.RoutedFlakeConfig{
+		HintBits:    msgHintBits,
+		MachineBits: machineBits,
+		MachineID:   machineID,
+	})
 }
 
 // resolveKafkaBrokers 解析 Kafka brokers。B3b 起 Kafka 是唯一写链路：

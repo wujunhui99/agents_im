@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -42,7 +43,9 @@ func TestSingleTextReadPathRoundtrip(t *testing.T) {
 	sender := fmt.Sprintf("msgit-sender-%d", uniq)
 	receiver := fmt.Sprintf("msgit-receiver-%d", uniq)
 	convID := model.SingleConversationID(sender, receiver)
-	serverMsgID := fmt.Sprintf("msgit-srv-%d", uniq)
+	// message_id 自 #531 起为雪花 bigint；这里用 uniq(纳秒) 作合法 bigint，wire 仍十进制串。
+	serverMsgIDInt := uniq
+	serverMsgID := strconv.FormatInt(serverMsgIDInt, 10)
 
 	// 播种一条 seq=1 的单聊消息（事务形状对齐 msgtransfer persist consumer）。
 	err := svcCtx.Messages.Transact(ctx, func(ctx context.Context, session sqlx.Session) error {
@@ -65,7 +68,7 @@ func TestSingleTextReadPathRoundtrip(t *testing.T) {
 			return err
 		}
 		inserted, err := msgs.InsertReturning(ctx, &model.Messages{
-			MessageId:         serverMsgID,
+			MessageId:         serverMsgIDInt,
 			ClientMsgId:       fmt.Sprintf("msgit-cmid-%d", uniq),
 			SenderAccountId:   sender,
 			ConversationId:    convID,
@@ -87,7 +90,7 @@ func TestSingleTextReadPathRoundtrip(t *testing.T) {
 		if err := states.UpsertSenderRead(ctx, sender, convID, nextSeq); err != nil {
 			return err
 		}
-		return threads.UpdateAfterMessage(ctx, convID, inserted.MessageId, nextSeq, sendTime)
+		return threads.UpdateAfterMessage(ctx, convID, strconv.FormatInt(inserted.MessageId, 10), nextSeq, sendTime)
 	})
 	if err != nil {
 		t.Fatalf("seed message: %v", err)

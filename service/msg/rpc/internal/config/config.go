@@ -27,6 +27,19 @@ type Config struct {
 
 	// Kafka 唯一写链路（03 §9 B3b）：见 KafkaConfig。
 	Kafka KafkaConfig `json:",optional"`
+
+	// Snowflake 配置 message_id 雪花生成器的机器位（EPIC #527 §0：多副本同毫秒不碰撞）。
+	Snowflake SnowflakeConfig `json:",optional"`
+}
+
+// SnowflakeConfig 配置 message_id 的 RoutedFlake 生成器。msg HintBits=1（中段最高位单/群区分）。
+type SnowflakeConfig struct {
+	// MachineBits 是机器号位宽（中段 12 位的低端）；0 时 svc 取默认值。
+	MachineBits uint `json:",optional"`
+	// MachineID 是本实例机器号。运行期优先用 idgen.ResolveMachineID()（env
+	// AGENTS_IM_SNOWFLAKE_MACHINE_ID 或 StatefulSet pod ordinal）；解析不到时回退到本值
+	// （默认 0，适用单副本 Deployment）。多副本必须经 env/ordinal 注入唯一机器号。
+	MachineID int64 `json:",optional"`
 }
 
 // KafkaConfig 是 Kafka 写链路配置（03-message-pipeline §9 B2/B3b）：SendMessage

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -168,7 +169,7 @@ func (r *PostgresMessageRepository) getMessagesInRange(ctx context.Context, conv
 	}
 
 	query := `
-select message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+select message_id::text as message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
        receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
        trigger_message_id, agent_run_id, allow_recursive_trigger,
        payload_hash, coalesce(client_send_time, server_received_at) as client_send_time,
@@ -309,7 +310,7 @@ select t.conversation_id,
        coalesce(t.last_message_id, '') as last_message_id,
        t.updated_at
 from conversation_threads t
-left join messages lm on lm.message_id = t.last_message_id
+left join messages lm on lm.message_id::text = t.last_message_id
 order by coalesce(t.last_message_at, t.updated_at) desc, t.conversation_id asc
 limit $1
 `, limit); err != nil {
@@ -470,9 +471,15 @@ func insertMessage(ctx context.Context, session sqlx.Session, input CreateMessag
 	if err != nil {
 		return postgresMessageRow{}, err
 	}
-	messageID, err := idgen.NewString()
+	// message_id 自 #531 起为雪花 bigint：keystone 写路径（多走 Kafka 退役中）沿用 legacy snowflake 串生成器，
+	// 落库前解析为 int64 绑定 bigint 主键（wire/struct 仍十进制串，ADR #529）。
+	messageIDStr, err := idgen.NewString()
 	if err != nil {
 		return postgresMessageRow{}, err
+	}
+	messageID, err := strconv.ParseInt(messageIDStr, 10, 64)
+	if err != nil {
+		return postgresMessageRow{}, apperror.Internal("could not allocate message id")
 	}
 	messageOrigin, err := messageOriginValue(input.MessageOrigin)
 	if err != nil {
@@ -487,7 +494,7 @@ insert into messages (
 	  trigger_message_id, agent_run_id, allow_recursive_trigger, payload_hash, client_send_time
 )
 values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17)
-returning message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+returning message_id::text as message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
 	      receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
 	      trigger_message_id, agent_run_id, allow_recursive_trigger,
 	      payload_hash, coalesce(client_send_time, server_received_at) as client_send_time,
@@ -564,7 +571,7 @@ select t.conversation_id,
 	       s.updated_at
 from conversation_threads t
 join user_conversation_states s on s.conversation_id = t.conversation_id
-left join messages lm on lm.message_id = t.last_message_id
+left join messages lm on lm.message_id::text = t.last_message_id
 where s.account_id = $1 and t.conversation_id = $2
 `, userID, conversationID); err != nil {
 		return ConversationSeqState{}, err
@@ -628,23 +635,28 @@ where user_conversation_states.visible_start_seq <> 0
 }
 
 func queryMessageByServerID(ctx context.Context, session sqlx.Session, serverMsgID string) (postgresMessageRow, error) {
+	// message_id 自 #531 起为 bigint：入参十进制串解析为 int64 绑定（来自 last_message_id 文本列）。
+	messageID, err := strconv.ParseInt(strings.TrimSpace(serverMsgID), 10, 64)
+	if err != nil {
+		return postgresMessageRow{}, sql.ErrNoRows
+	}
 	var row postgresMessageRow
-	err := session.QueryRowCtx(ctx, &row, `
-select message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+	err = session.QueryRowCtx(ctx, &row, `
+select message_id::text as message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
 	       receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
 	       trigger_message_id, agent_run_id, allow_recursive_trigger,
 	       payload_hash, coalesce(client_send_time, server_received_at) as client_send_time,
 	       server_received_at, updated_at
 from messages
 where message_id = $1
-`, serverMsgID)
+`, messageID)
 	return row, err
 }
 
 func queryMessageBySenderClient(ctx context.Context, session sqlx.Session, senderID string, clientMsgID string) (postgresMessageRow, error) {
 	var row postgresMessageRow
 	err := session.QueryRowCtx(ctx, &row, `
-select message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
+select message_id::text as message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
 	       receiver_account_id, group_id, content_type, content, message_origin, agent_account_id,
 	       trigger_message_id, agent_run_id, allow_recursive_trigger,
 	       payload_hash, coalesce(client_send_time, server_received_at) as client_send_time,

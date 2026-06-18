@@ -3,6 +3,7 @@ package logic
 import (
 	"database/sql"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/wujunhui99/agents_im/common/share/rpcerror"
@@ -11,6 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
+	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 )
 
@@ -21,10 +23,12 @@ import (
 // ACK 仅代表 Kafka acks=all 接受；seq 由客户端经自己的 message_received
 // push 异步回填。Deduplicated 恒为 false（dedup 收敛在 msgtransfer）。
 func (l *SendMessageLogic) sendDirectKafka(ns normalizedSend, payloadHash string) (*msg.SendMessageResponse, error) {
-	serverMsgID, err := idgen.NewString()
+	// message_id 雪花 bigint（EPIC #527 §0）：中段最高位区分单/群（单=1，群=0），wire 仍十进制字符串（ADR #529）。
+	serverMsgIDInt, err := l.svcCtx.MsgIDGen.Next(svc.MsgHintForChatType(ns.ChatType))
 	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, rpcerror.ToStatus(apperror.Internal("could not allocate message id"))
 	}
+	serverMsgID := strconv.FormatInt(serverMsgIDInt, 10)
 	eventID, err := idgen.NewString()
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
@@ -85,7 +89,7 @@ func (l *SendMessageLogic) sendDirectKafka(ns normalizedSend, payloadHash string
 		return nil, rpcerror.ToStatus(err)
 	}
 	ack := &model.Messages{
-		MessageId:             serverMsgID,
+		MessageId:             serverMsgIDInt,
 		ClientMsgId:           ns.ClientMsgID,
 		SenderAccountId:       ns.SenderID,
 		ConversationId:        ns.ConversationID,
