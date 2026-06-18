@@ -110,13 +110,17 @@ describe('avatar upload helpers', () => {
       filename: 'avatar.jpg',
       contentType: 'image/jpeg',
       sizeBytes: avatar.size,
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
     expect(uploadFetch).toHaveBeenCalledWith(
       'https://storage.test/upload/avatar',
       expect.objectContaining({
         method: 'PUT',
         body: avatar,
-        headers: { 'Content-Type': 'image/jpeg' },
+        headers: expect.objectContaining({
+          'Content-Type': 'image/jpeg',
+          'x-amz-checksum-sha256': expect.any(String),
+        }),
       }),
     );
     expect(mediaApi.completeUpload).toHaveBeenCalledWith('med_avatar_1');

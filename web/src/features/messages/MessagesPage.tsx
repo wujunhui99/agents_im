@@ -5,7 +5,8 @@ import { createContactsApi } from '../../api/contacts';
 import type { Group, GroupMember, GroupsApi } from '../../api/groups';
 import { createGroupsApi } from '../../api/groups';
 import type { MediaApi } from '../../api/media';
-import { createMediaApi, uploadMediaBytes } from '../../api/media';
+import { createMediaApi } from '../../api/media';
+import { uploadFileToMedia } from '../../utils/mediaTransfer';
 import type { AIHostingState, ConversationSeqState, MessageApi, ServerMessage } from '../../api/messages';
 import { createMessageApi } from '../../api/messages';
 import type { WebSocketFactory, WebSocketServerEvent } from '../../api/websocketClient';
@@ -461,16 +462,15 @@ export function MessagesPage({
 
     try {
       const dimensions = kind === 'image' ? await readImageDimensions(file) : undefined;
-      const uploadIntent = await mediaApi.createUploadIntent({
+      const uploaded = await uploadFileToMedia({
+        file,
         purpose: kind === 'image' ? 'message_image' : 'message_file',
+        mediaApi,
         filename,
         contentType,
-        sizeBytes: file.size,
         ...(dimensions ?? {}),
       });
-      await uploadMediaBytes(uploadIntent.uploadUrl, file, contentType);
-      const completed = await mediaApi.completeUpload(uploadIntent.mediaId);
-      const mediaId = completed.media?.mediaId ?? uploadIntent.mediaId;
+      const mediaId = uploaded.mediaId;
       const content =
         kind === 'image'
           ? JSON.stringify({ mediaId, filename, sizeBytes: file.size, contentType, ...(dimensions ?? {}) })

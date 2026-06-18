@@ -1,6 +1,6 @@
 import type { MediaApi } from '../api/media';
-import { uploadMediaBytes } from '../api/media';
 import type { UserApi, UserProfile } from '../api/user';
+import { uploadFileToMedia } from './mediaTransfer';
 
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 export const AVATAR_COMPRESS_THRESHOLD_BYTES = 3 * 1024 * 1024;
@@ -38,18 +38,16 @@ export async function uploadAvatarForProfile({
   fetchImpl = fetch,
 }: UploadAvatarOptions): Promise<UserProfile> {
   const prepared = await prepareAvatarFile(file);
-  const uploadIntent = await mediaApi.createUploadIntent({
+  const result = await uploadFileToMedia({
+    file: prepared.file,
     purpose: 'avatar',
+    mediaApi,
     filename: prepared.file.name || avatarFilename(file),
     contentType: prepared.file.type,
-    sizeBytes: prepared.file.size,
     ...(prepared.width && prepared.height ? { width: prepared.width, height: prepared.height } : {}),
+    fetchImpl,
   });
-
-  await uploadMediaBytes(uploadIntent.uploadUrl, prepared.file, prepared.file.type, fetchImpl);
-  const completed = await mediaApi.completeUpload(uploadIntent.mediaId);
-  const mediaId = completed.media?.mediaId ?? uploadIntent.mediaId;
-  return userApi.patchCurrentUserAvatar(mediaId);
+  return userApi.patchCurrentUserAvatar(result.mediaId);
 }
 
 export async function prepareAvatarFile(file: File): Promise<PreparedAvatar> {
