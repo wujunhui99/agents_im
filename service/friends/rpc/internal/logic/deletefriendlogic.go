@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/wujunhui99/agents_im/common/share/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	friends "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/svc"

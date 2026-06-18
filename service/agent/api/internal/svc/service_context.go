@@ -3,11 +3,11 @@ package svc
 import (
 	"errors"
 
-	"github.com/wujunhui99/agents_im/common/middleware"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
 	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	apiconfig "github.com/wujunhui99/agents_im/service/agent/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/userrpc"

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/common/middleware"
-	"github.com/wujunhui99/agents_im/common/share/auth/token"
+	"github.com/wujunhui99/agents_im/pkg/auth/token"
+	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"

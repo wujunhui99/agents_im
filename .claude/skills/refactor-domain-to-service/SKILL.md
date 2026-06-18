@@ -27,7 +27,7 @@ description: 把一个业务域从顶层 internal monolith（god-package interna
   goroutine），逐个确认新归属。
 - **Go `internal/` 可见性**：`service/X/rpc/internal/...` 只能被 `service/X/rpc/` 导入。需被多方导入的逻辑
   放 `service/<domain>/core`（与 rpc/api 平级）。
-- **import 顺序不是 gofmt-canonical**：本仓库 `pkg/*` 排在 `common/share/*`、`internal/*` 之前。
+- **import 顺序不是 gofmt-canonical**：本仓库 `pkg/*`（含原 `common/share/*` 已并入 `pkg/*`）排在 `internal/*` 之前。
   **绝不 `gofmt -w` 整个目录**（会重排几十个无关文件污染 diff）；新建/改动文件**照抄同目录邻居的 import 分组**，
   别按 gofmt 字母序。CI（golang:1.24-bookworm）容忍这套顺序。
 - **选叶子域先做**：先迁被依赖最少的域。判断：

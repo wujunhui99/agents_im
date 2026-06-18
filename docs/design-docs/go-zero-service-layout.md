@@ -38,7 +38,7 @@ service/
 - `rpc` 是业务与数据边界，数据库 model 代码放在对应 `service/<domain>/rpc/internal/model`。
 - `rpc` 之间不允许相互调用；跨域组合由 API/BFF 编排，或者后续通过明确的事件/消息机制解耦。
 - 不新增 `api-gateway/` 目录；需要 BFF 时使用具体 domain API 或单独的业务 API 服务，而不是一个默认全局 gateway。
-- `common/model` 默认不要创建。只有真正跨服务、稳定、非业务表的基础类型才可进入 `common/types`、`common/response`、`common/errorx` 等公共包。
+- `pkg/model` 默认不要创建。只有真正跨服务、稳定、非业务表的基础类型才可进入 `pkg/types`、`pkg/response`、`pkg/apperror` 等公共包（本仓库统一用 `pkg/*`，不再有 `common/`）。
 
 ## Git worktree 与分支
 

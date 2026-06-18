@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/common/share/agentaudit"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 )
 
 func TestAgentAuditLogicReturnsAuditWriteErrors(t *testing.T) {

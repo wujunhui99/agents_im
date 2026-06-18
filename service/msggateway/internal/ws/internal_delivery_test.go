@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/common/share/gateway/delivery"
+	"github.com/wujunhui99/agents_im/pkg/gateway/delivery"
 )
 
 func TestWebSocketGatewayInternalConversationDeliveryEndpointPushesToOnlineReceiver(t *testing.T) {

@@ -3,7 +3,7 @@ package logic
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/common/share/auth/token"
+	"github.com/wujunhui99/agents_im/pkg/auth/token"
 	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"

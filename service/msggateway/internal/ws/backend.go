@@ -3,7 +3,7 @@ package ws
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/common/share/gateway"
+	"github.com/wujunhui99/agents_im/pkg/gateway"
 )
 
 // MessageBackend 是 ws command 的消息域后端（03 §9 A3）：gateway 不再 in-process

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/common/share/agentaudit"
+	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/zeromicro/go-zero/core/stores/postgres"

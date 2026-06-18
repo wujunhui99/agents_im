@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	gatewaydelivery "github.com/wujunhui99/agents_im/common/share/gateway/delivery"
+	gatewaydelivery "github.com/wujunhui99/agents_im/pkg/gateway/delivery"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/transfer"
 )

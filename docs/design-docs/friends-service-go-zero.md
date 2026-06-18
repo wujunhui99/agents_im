@@ -50,14 +50,14 @@ service/friends/rpc/friends.proto
 service/friends/rpc/etc/friends-rpc.yaml
 service/friends/rpc/internal/{config,logic,model,server,svc}  # 业务逻辑 + goctl 数据层
 service/friends/rpc/{friends,friendsclient}     # goctl 生成的 pb / client
-common/share/model/friendship.go                # 共享数据模型（迁出 internal/model，#397）
+pkg/model/friendship.go                # 共享数据模型（迁出 internal/model，#397）
 internal/repository/postgres_user_friends.go    # 旧好友数据层（暂留喂 monolith，#426 待删）
 ```
 
 业务逻辑与好友状态机集中在 `service/friends/rpc/internal/logic`，经 `internal/svc` 注入 goctl 数据层
 `service/friends/rpc/internal/model`（`friendships` 表，#426 退役 `core`）；friends-rpc 不再依赖
 `internal/repository`。跨域好友资料由 friends-api(BFF) 聚合 user-rpc 补全。REST/RPC 的共享基础包
-（错误映射、auth/token 等）落在 `common/share/*`。
+（错误映射、auth/token 等）落在 `pkg/*`。
 
 ## 数据模型
 

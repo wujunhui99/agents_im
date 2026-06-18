@@ -8,12 +8,12 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
-	immodel "github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/internal/agentruntime"
 	runtimetools "github.com/wujunhui99/agents_im/internal/agentruntime/tools"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/config"
+	immodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 )
 

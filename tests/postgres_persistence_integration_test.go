@@ -14,10 +14,10 @@ import (
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/wujunhui99/agents_im/common/share/agentaudit"
-	"github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/model"
 )
 
 // 凭据持久化已迁出 internal/auth 到 service/auth/rpc/internal/model（goctl），

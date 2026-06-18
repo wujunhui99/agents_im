@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/wujunhui99/agents_im/common/share/gateway"
-	"github.com/wujunhui99/agents_im/common/share/gateway/delivery"
 	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/gateway"
+	"github.com/wujunhui99/agents_im/pkg/gateway/delivery"
 	"github.com/wujunhui99/agents_im/pkg/presence"
 )
 

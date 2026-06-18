@@ -3,9 +3,9 @@ package handler
 import (
 	"net/http"
 
-	"github.com/wujunhui99/agents_im/common/share/types"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
+	"github.com/wujunhui99/agents_im/pkg/types"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
 	"github.com/zeromicro/go-zero/rest/httpx"

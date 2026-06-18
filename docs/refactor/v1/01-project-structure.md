@@ -22,7 +22,7 @@
 | third (含 mail) | `service/third/rpc/internal/provider/`（provider + tencent_ses，已脱 internal） | `service/third/rpc/...`           | `service/third/rpc`      | ✅ 已迁（mail 折入新服务 third，#429）|
 | agent    | `internal/agent/`（pythonexec）、`internal/agentim/`、`internal/agentruntime/`、`internal/logic/agentlogic*` | `service/agent/api/...`          | `service/agent/api`     | 🟡 只迁了 API，业务逻辑还在 internal |
 | message  | `internal/logic/message/`、`internal/handler/message/`、`internal/servicecontext/message/`、`internal/rpcgen/message` | **不存在** `service/msg/`    | 过渡态扁平 `service/message-api`；message-rpc 寄生 `internal/rpcgen/message` | ❌ 未迁 |
-| gateway  | （已清空——ws 迁 `service/msggateway/internal/ws`，contract/delivery 迁 `common/share/gateway`） | `service/msggateway/`            | `service/msggateway`               | ✅ 已迁（#492，ws command 走 msg-rpc gRPC）|
+| gateway  | （已清空——ws 迁 `service/msggateway/internal/ws`，contract/delivery 迁 `pkg/gateway`） | `service/msggateway/`            | `service/msggateway`               | ✅ 已迁（#492，ws command 走 msg-rpc gRPC）|
 | transfer | `internal/transfer/...`                              | **不存在** `service/msgtransfer/`   | 过渡态扁平 `service/message-transfer` | ❌ 未迁 |
 | admin    | `internal/handler/admin/`、`internal/logic/admin*`、`internal/servicecontext/admin/`；`internal/adminbootstrap/` 已迁 `service/admin/api/internal/bootstrap` | `service/admin/{api,rpc}/...`      | `service/admin/{api,rpc}` | 🟡 已拆服务，仍有跨域只读/internal 债 |
 

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	sharedmodel "github.com/wujunhui99/agents_im/common/share/model"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	sharedmodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
 	mediapb "github.com/wujunhui99/agents_im/service/media/rpc/media"

@@ -6,7 +6,7 @@ package handler
 import (
 	"net/http"
 
-	"github.com/wujunhui99/agents_im/common/middleware"
+	"github.com/wujunhui99/agents_im/pkg/middleware"
 	agent "github.com/wujunhui99/agents_im/service/agent/api/internal/handler/agent"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
 

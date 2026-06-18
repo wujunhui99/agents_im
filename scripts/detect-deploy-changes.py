@@ -274,15 +274,6 @@ def classify_path(path: str, selection: DeploySelection) -> None:
                 selection.add_all_backends()
             return
 
-    if len(parts) == 2 and parts[0] == "api" and parts[1].endswith(".api"):
-        domain = parts[1][: -len(".api")]
-        service = API_SERVICES.get(domain)
-        if service is None:
-            selection.add_all_backends()
-        else:
-            selection.add_backend(service)
-        return
-
     if path.startswith("proto/"):
         if len(parts) >= 2:
             proto_name = parts[1]

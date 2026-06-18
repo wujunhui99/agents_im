@@ -124,10 +124,10 @@ for file in "${rpc_generated_proto_files[@]}"; do
 done
 
 # --- gateway / websocket / transfer code surface ---
-assert_present "-q" common/share/gateway/contract.go tests/gateway_contract_test.go -- \
+assert_present "-q" pkg/gateway/contract.go tests/gateway_contract_test.go -- \
   "send_message" "pull_messages" "get_conversation_seqs" "mark_conversation_read" "heartbeat" \
   "SendMessage" "PullMessages" "GetConversationSeqs" "MarkConversationAsRead"
-assert_present "-q" service/msggateway/internal/ws common/share/gateway/contract.go -- \
+assert_present "-q" service/msggateway/internal/ws pkg/gateway/contract.go -- \
   "HandleWebSocket" "Validate\(rawToken\)" "Register" "CommandHeartbeat" "CommandSendMessage" \
   "CommandPullMessages" "CommandGetConversationSeqs" "CommandMarkConversationRead"
 assert_present "-q" service/msggateway/internal/ws/server.go service/msggateway/internal/ws/gateway_ws_test.go -- \
@@ -150,7 +150,7 @@ rg -q "ConsumerGroup|Consumer\.Group" etc/msgtransfer.yaml pkg/config/config.go
 rg -q "Topic|Consumer\.Topic" etc/msgtransfer.yaml pkg/config/config.go
 rg -q "WorkerID|Worker\.ID" etc/msgtransfer.yaml pkg/config/config.go
 
-assert_present "-q" common/share/gateway/delivery service/msggateway/internal/ws -- \
+assert_present "-q" pkg/gateway/delivery service/msggateway/internal/ws -- \
   "type Dispatcher interface" "DeliverToUser" "DeliverToConversation" "EventMessageReceived" "EventMessageDelivered" \
   "StatusOffline" "NewInMemoryDeliveryDispatcher" "PushToUser" "PushToConversation" "UserConnections"
 assert_present "-q" service/msgtransfer/internal/transfer/gateway -- \
@@ -166,7 +166,7 @@ assert_present "-q" internal/repository service/msgtransfer/internal/transfer db
 forbid_match "removed message V2 table still referenced: message_idempotency_keys" \
   -q "message_idempotency_keys" db/migrations/001_init_postgres.sql internal/repository --glob '*.go'
 
-assert_present "-q" service/msggateway/internal/ws common/share/gateway/delivery pkg/presence -- \
+assert_present "-q" service/msggateway/internal/ws pkg/gateway/delivery pkg/presence -- \
   "WithPresenceStore" "WithPresenceTTL" "WithInstanceID" "RegisterConnection" "Heartbeat" "UnregisterConnection" \
   "ListUserConnections" "InstanceID" "StatusRouted" "type Route struct"
 rg -q "Presence:" etc/msggateway.yaml
@@ -185,7 +185,7 @@ assert_present "-q" pkg/messaging/event.go pkg/messaging/event_test.go -- \
   "chat_type" "created_at" "payload" "message.accepted" "message.read"
 
 # --- JWT auth contract ---
-for file in service/user/api/user.api service/friends/api/friends.api service/groups/api/groups.api service/msg/api/msg.api api/media.api service/agent/api/agent.api; do
+for file in service/user/api/user.api service/friends/api/friends.api service/groups/api/groups.api service/msg/api/msg.api service/media/api/media.api service/agent/api/agent.api; do
   rg -q "jwt:\s+Auth" "$file"
 done
 for file in etc/auth-api.yaml etc/user-api.yaml etc/friends-api.yaml etc/groups-api.yaml etc/msg-api.yaml etc/auth-rpc.yaml; do
