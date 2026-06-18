@@ -31,6 +31,8 @@ type (
 	GetLastMessageByConvsResponse      = msg.GetLastMessageByConvsResponse
 	GetMaxSeqsRequest                  = msg.GetMaxSeqsRequest
 	GetMaxSeqsResponse                 = msg.GetMaxSeqsResponse
+	GetMessageRefRequest               = msg.GetMessageRefRequest
+	GetMessageRefResponse              = msg.GetMessageRefResponse
 	GetServerTimeRequest               = msg.GetServerTimeRequest
 	GetServerTimeResponse              = msg.GetServerTimeResponse
 	MarkConversationAsReadRequest      = msg.MarkConversationAsReadRequest
@@ -57,6 +59,8 @@ type (
 		GetHasReadSeqs(ctx context.Context, in *GetHasReadSeqsRequest, opts ...grpc.CallOption) (*GetHasReadSeqsResponse, error)
 		// 已读
 		MarkConversationAsRead(ctx context.Context, in *MarkConversationAsReadRequest, opts ...grpc.CallOption) (*MarkConversationAsReadResponse, error)
+		// 媒体下载授权（§4）
+		GetMessageRef(ctx context.Context, in *GetMessageRefRequest, opts ...grpc.CallOption) (*GetMessageRefResponse, error)
 		// 撤回 / 删除 / 清空（stub）
 		RevokeMessage(ctx context.Context, in *RevokeMessageRequest, opts ...grpc.CallOption) (*RevokeMessageResponse, error)
 		DeleteMessages(ctx context.Context, in *DeleteMessagesRequest, opts ...grpc.CallOption) (*DeleteMessagesResponse, error)
@@ -121,6 +125,12 @@ func (m *defaultMsg) GetHasReadSeqs(ctx context.Context, in *GetHasReadSeqsReque
 func (m *defaultMsg) MarkConversationAsRead(ctx context.Context, in *MarkConversationAsReadRequest, opts ...grpc.CallOption) (*MarkConversationAsReadResponse, error) {
 	client := msg.NewMsgClient(m.cli.Conn())
 	return client.MarkConversationAsRead(ctx, in, opts...)
+}
+
+// 媒体下载授权（§4）
+func (m *defaultMsg) GetMessageRef(ctx context.Context, in *GetMessageRefRequest, opts ...grpc.CallOption) (*GetMessageRefResponse, error) {
+	client := msg.NewMsgClient(m.cli.Conn())
+	return client.GetMessageRef(ctx, in, opts...)
 }
 
 // 撤回 / 删除 / 清空（stub）

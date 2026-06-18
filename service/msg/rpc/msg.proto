@@ -24,6 +24,10 @@ service Msg {
   // 已读
   rpc MarkConversationAsRead(MarkConversationAsReadRequest) returns (MarkConversationAsReadResponse);
 
+  // 媒体下载授权（EPIC #527 §4）：media 编排 GetDownloadURL 时取消息引用，
+  // 用于「链路校验（msg 真正引用的 media == 入参 media）+ 私聊好友 / 群成员判定」。
+  rpc GetMessageRef(GetMessageRefRequest) returns (GetMessageRefResponse);
+
   // 撤回 / 删除 / 清空（stub）
   rpc RevokeMessage(RevokeMessageRequest) returns (RevokeMessageResponse);
   rpc DeleteMessages(DeleteMessagesRequest) returns (DeleteMessagesResponse);
@@ -126,6 +130,21 @@ message MarkConversationAsReadResponse {
   int64 max_seq = 3;
   int64 unread_count = 4;
   bool updated = 5;
+}
+
+// ---- GetMessageRef (媒体下载授权 §4) ----
+message GetMessageRefRequest {
+  string server_msg_id = 1;
+  // requester_account_id 用于求私聊对端（peer = 单聊 sender/receiver 中非 requester 的一方）。
+  // 群聊忽略；空或非参与方时 peer 回退到消息 receiver。
+  string requester_account_id = 2;
+}
+
+message GetMessageRefResponse {
+  string chat_type = 1;       // single / group（也可由 msg_id 类型位本地判出）
+  string group_id = 2;        // 群聊时为群 id，单聊为空
+  string peer_account_id = 3; // 私聊对端（供 friends 校验），群聊为空
+  string media_id = 4;        // content ->> 'mediaId'，无附件为空（供链路校验）
 }
 
 // ---- AppendStreamMessage (stub) ----

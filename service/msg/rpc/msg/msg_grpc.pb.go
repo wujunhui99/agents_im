@@ -27,6 +27,7 @@ const (
 	Msg_GetMaxSeqs_FullMethodName                  = "/msg.v1.Msg/GetMaxSeqs"
 	Msg_GetHasReadSeqs_FullMethodName              = "/msg.v1.Msg/GetHasReadSeqs"
 	Msg_MarkConversationAsRead_FullMethodName      = "/msg.v1.Msg/MarkConversationAsRead"
+	Msg_GetMessageRef_FullMethodName               = "/msg.v1.Msg/GetMessageRef"
 	Msg_RevokeMessage_FullMethodName               = "/msg.v1.Msg/RevokeMessage"
 	Msg_DeleteMessages_FullMethodName              = "/msg.v1.Msg/DeleteMessages"
 	Msg_ClearConversationMessages_FullMethodName   = "/msg.v1.Msg/ClearConversationMessages"
@@ -55,6 +56,9 @@ type MsgClient interface {
 	GetHasReadSeqs(ctx context.Context, in *GetHasReadSeqsRequest, opts ...grpc.CallOption) (*GetHasReadSeqsResponse, error)
 	// 已读
 	MarkConversationAsRead(ctx context.Context, in *MarkConversationAsReadRequest, opts ...grpc.CallOption) (*MarkConversationAsReadResponse, error)
+	// 媒体下载授权（EPIC #527 §4）：media 编排 GetDownloadURL 时取消息引用，
+	// 用于「链路校验（msg 真正引用的 media == 入参 media）+ 私聊好友 / 群成员判定」。
+	GetMessageRef(ctx context.Context, in *GetMessageRefRequest, opts ...grpc.CallOption) (*GetMessageRefResponse, error)
 	// 撤回 / 删除 / 清空（stub）
 	RevokeMessage(ctx context.Context, in *RevokeMessageRequest, opts ...grpc.CallOption) (*RevokeMessageResponse, error)
 	DeleteMessages(ctx context.Context, in *DeleteMessagesRequest, opts ...grpc.CallOption) (*DeleteMessagesResponse, error)
@@ -154,6 +158,16 @@ func (c *msgClient) MarkConversationAsRead(ctx context.Context, in *MarkConversa
 	return out, nil
 }
 
+func (c *msgClient) GetMessageRef(ctx context.Context, in *GetMessageRefRequest, opts ...grpc.CallOption) (*GetMessageRefResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMessageRefResponse)
+	err := c.cc.Invoke(ctx, Msg_GetMessageRef_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *msgClient) RevokeMessage(ctx context.Context, in *RevokeMessageRequest, opts ...grpc.CallOption) (*RevokeMessageResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RevokeMessageResponse)
@@ -234,6 +248,9 @@ type MsgServer interface {
 	GetHasReadSeqs(context.Context, *GetHasReadSeqsRequest) (*GetHasReadSeqsResponse, error)
 	// 已读
 	MarkConversationAsRead(context.Context, *MarkConversationAsReadRequest) (*MarkConversationAsReadResponse, error)
+	// 媒体下载授权（EPIC #527 §4）：media 编排 GetDownloadURL 时取消息引用，
+	// 用于「链路校验（msg 真正引用的 media == 入参 media）+ 私聊好友 / 群成员判定」。
+	GetMessageRef(context.Context, *GetMessageRefRequest) (*GetMessageRefResponse, error)
 	// 撤回 / 删除 / 清空（stub）
 	RevokeMessage(context.Context, *RevokeMessageRequest) (*RevokeMessageResponse, error)
 	DeleteMessages(context.Context, *DeleteMessagesRequest) (*DeleteMessagesResponse, error)
@@ -276,6 +293,9 @@ func (UnimplementedMsgServer) GetHasReadSeqs(context.Context, *GetHasReadSeqsReq
 }
 func (UnimplementedMsgServer) MarkConversationAsRead(context.Context, *MarkConversationAsReadRequest) (*MarkConversationAsReadResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MarkConversationAsRead not implemented")
+}
+func (UnimplementedMsgServer) GetMessageRef(context.Context, *GetMessageRefRequest) (*GetMessageRefResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMessageRef not implemented")
 }
 func (UnimplementedMsgServer) RevokeMessage(context.Context, *RevokeMessageRequest) (*RevokeMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeMessage not implemented")
@@ -460,6 +480,24 @@ func _Msg_MarkConversationAsRead_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_GetMessageRef_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMessageRefRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).GetMessageRef(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_GetMessageRef_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).GetMessageRef(ctx, req.(*GetMessageRefRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Msg_RevokeMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RevokeMessageRequest)
 	if err := dec(in); err != nil {
@@ -606,6 +644,10 @@ var Msg_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "MarkConversationAsRead",
 			Handler:    _Msg_MarkConversationAsRead_Handler,
+		},
+		{
+			MethodName: "GetMessageRef",
+			Handler:    _Msg_GetMessageRef_Handler,
 		},
 		{
 			MethodName: "RevokeMessage",

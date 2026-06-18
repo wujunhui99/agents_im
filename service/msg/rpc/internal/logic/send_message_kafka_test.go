@@ -6,10 +6,21 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 )
+
+// mustTestMsgIDGen 构造一个单副本（machine 0）RoutedFlake，供 SendMessage 写路径分配 message_id。
+func mustTestMsgIDGen(t *testing.T) *idgen.RoutedFlake {
+	t.Helper()
+	gen, err := idgen.NewRoutedFlake(idgen.RoutedFlakeConfig{HintBits: 1, MachineBits: 10, MachineID: 0})
+	if err != nil {
+		t.Fatalf("build test msg id generator: %v", err)
+	}
+	return gen
+}
 
 type capturedPublish struct {
 	topic string
@@ -36,7 +47,7 @@ func (f *fakePublisher) PublishEvent(_ context.Context, topic string, event mess
 // （svcCtx 不配任何 model——若误走 PG 路径会 nil panic，本身就是断言）。
 func TestSendMessageDirectKafkaPublishesSubmittedAndAcksWithoutSeq(t *testing.T) {
 	publisher := &fakePublisher{}
-	svcCtx := &svc.ServiceContext{Producer: publisher}
+	svcCtx := &svc.ServiceContext{Producer: publisher, MsgIDGen: mustTestMsgIDGen(t)}
 
 	resp, err := NewSendMessageLogic(context.Background(), svcCtx).SendMessage(&msg.SendMessageRequest{
 		SenderId:    "usr_alice",
@@ -94,7 +105,7 @@ func TestSendMessageDirectKafkaPublishesSubmittedAndAcksWithoutSeq(t *testing.T)
 
 func TestSendMessageDirectKafkaFailsClosedWhenPublishFails(t *testing.T) {
 	publisher := &fakePublisher{err: context.DeadlineExceeded}
-	svcCtx := &svc.ServiceContext{Producer: publisher}
+	svcCtx := &svc.ServiceContext{Producer: publisher, MsgIDGen: mustTestMsgIDGen(t)}
 
 	_, err := NewSendMessageLogic(context.Background(), svcCtx).SendMessage(&msg.SendMessageRequest{
 		SenderId:    "usr_alice",

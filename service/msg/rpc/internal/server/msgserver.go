@@ -67,6 +67,12 @@ func (s *MsgServer) MarkConversationAsRead(ctx context.Context, in *msg.MarkConv
 	return l.MarkConversationAsRead(in)
 }
 
+// 媒体下载授权（§4）
+func (s *MsgServer) GetMessageRef(ctx context.Context, in *msg.GetMessageRefRequest) (*msg.GetMessageRefResponse, error) {
+	l := logic.NewGetMessageRefLogic(ctx, s.svcCtx)
+	return l.GetMessageRef(in)
+}
+
 // 撤回 / 删除 / 清空（stub）
 func (s *MsgServer) RevokeMessage(ctx context.Context, in *msg.RevokeMessageRequest) (*msg.RevokeMessageResponse, error) {
 	l := logic.NewRevokeMessageLogic(ctx, s.svcCtx)

@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -157,6 +158,12 @@ func insertMessage(ctx context.Context, session sqlx.Session, msg PersistMessage
 	if err != nil {
 		return err
 	}
+	// message_id 自 #531 起为雪花 bigint：wire/event 仍承载十进制字符串（ADR #529），落库前解析为 int64。
+	// 解析失败显式报错（失败优先），不静默写坏数据。
+	messageID, err := strconv.ParseInt(strings.TrimSpace(msg.ServerMsgID), 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse message_id %q: %w", msg.ServerMsgID, err)
+	}
 	_, err = session.ExecCtx(ctx, `
 insert into messages (
   message_id, client_msg_id, sender_account_id, conversation_id, seq, conversation_type,
@@ -165,7 +172,7 @@ insert into messages (
 )
 values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17)
 on conflict (sender_account_id, client_msg_id) do nothing
-`, msg.ServerMsgID, msg.ClientMsgID, msg.SenderID, msg.ConversationID, msg.Seq, conversationType,
+`, messageID, msg.ClientMsgID, msg.SenderID, msg.ConversationID, msg.Seq, conversationType,
 		msg.ReceiverID, msg.GroupID, contentType, msg.Content, messageOrigin, msg.AgentAccountID,
 		msg.TriggerServerMsgID, msg.AgentRunID, msg.AllowRecursiveTrigger, msg.PayloadHash,
 		sql.NullTime{Time: msg.SendTime, Valid: !msg.SendTime.IsZero()})

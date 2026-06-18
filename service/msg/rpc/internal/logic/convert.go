@@ -1,6 +1,8 @@
 package logic
 
 import (
+	"strconv"
+
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
@@ -12,7 +14,7 @@ func messageToPB(m *model.Messages) *msg.Message {
 		return nil
 	}
 	return &msg.Message{
-		ServerMsgId:           m.MessageId,
+		ServerMsgId:           strconv.FormatInt(m.MessageId, 10),
 		ClientMsgId:           m.ClientMsgId,
 		ConversationId:        m.ConversationId,
 		Seq:                   m.Seq,
@@ -39,7 +41,7 @@ func messageToBusiness(m *model.Messages) business.Message {
 		return business.Message{}
 	}
 	return business.Message{
-		ServerMsgID:           m.MessageId,
+		ServerMsgID:           strconv.FormatInt(m.MessageId, 10),
 		ClientMsgID:           m.ClientMsgId,
 		ConversationID:        m.ConversationId,
 		Seq:                   m.Seq,

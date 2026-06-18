@@ -47,6 +47,12 @@ JSON / REST / WS 契约 / JWT claim / `content.mediaId` / 前端,所有 media_id
 - **与 D16 同策**:account_id 迁移就是清零重置(`020` 注释明言 "runs as part of the D16 data reset"),media/msg ID 同一前提、同一做法,避免两套迁移心智。
 - 雪花 ID **无法从旧 `med_`/旧 text msg_id 推导**(旧值非数字、不含时间/机器位),即便想保留也只能重新发号——这本身就排除了"原地转换"路径。
 
+> **更新(refine,#531 落地)**:`messages.message_id` 的迁移(`022_messages_message_id_snowflake.sql`)按 owner 指示改为**就地按 `created_at` 重算雪花、不清表**,而非 truncate:
+> - 每行用 `created_at` 构造雪花 bigint(41 时间戳 + 中段 0 + 同毫秒 `row_number` 占序列号),并同步重写自引用 `trigger_message_id` 与 `conversation_threads.last_message_id`,最后 `alter ... type bigint`。
+> - 旧值即便非数字也无妨:迁移在 `alter` 前已把所有 `message_id` 覆盖为新十进制串,`::bigint` 只对新值求值。
+> - 生产 messages 为 pre-launch 空表 / CI 全新库时,该迁移对 0 行求值,**退化为与 clean cutover 等效**;有存量时则原地转换、不丢数据。
+> - `trigger_message_id` 本次**保留 `text`**(承载十进制串,与 wire=string 一致),不随 message_id 一起改 bigint——避免 `not null default ''` → bigint 的 "0 vs 空" 语义迁移牵连 model / convert / keystone repo;#531 范围仅 `message_id` 主键类型。media_objects 仍按本 ADR 原 clean cutover(#541/#546)。
+
 ### 3. 兼容窗口:无 ✅
 
 不设新旧 ID 并存过渡期。配合 clean cutover,部署即切换:旧客户端持有的旧格式 ID 在重置后的库里查不到(消息/媒体已清),按正常 404/not-found 处理,无需特殊兼容码。
