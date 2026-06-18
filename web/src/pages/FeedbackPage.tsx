@@ -1,7 +1,8 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { CircleHelp, ImagePlus, Lightbulb, MessageSquareWarning, Sparkles, type LucideIcon } from 'lucide-react';
 import type { SubmitFeedbackRequest } from '../api/feedback';
-import { createMediaApi, uploadMediaBytes, type MediaApi } from '../api/media';
+import { createMediaApi, type MediaApi } from '../api/media';
+import { uploadFileToMedia } from '../utils/mediaTransfer';
 import { Button } from '../components/ui/Button';
 import { ListCard } from '../components/ui/ListCard';
 import { TextField } from '../components/ui/TextField';
@@ -81,16 +82,16 @@ export function FeedbackPage({ onSubmitFeedback, mediaApi = createMediaApi(), up
     const uploaded: UploadedFeedbackAttachment[] = [];
     for (const file of feedbackAttachments) {
       const contentType = file.type || 'application/octet-stream';
-      const intent = await mediaApi.createUploadIntent({
+      const result = await uploadFileToMedia({
+        file,
         purpose: 'message_image',
+        mediaApi,
         filename: file.name,
         contentType,
-        sizeBytes: file.size,
+        fetchImpl: uploadFetch,
       });
-      await uploadMediaBytes(intent.uploadUrl, file, contentType, uploadFetch);
-      const completed = await mediaApi.completeUpload(intent.mediaId);
       uploaded.push({
-        mediaId: completed.media?.mediaId ?? intent.mediaId,
+        mediaId: result.mediaId,
         filename: file.name,
         sizeBytes: file.size,
         contentType,

@@ -1383,13 +1383,17 @@ describe('MessagesPage real API mode', () => {
       filename: 'cat.jpg',
       contentType: 'image/jpeg',
       sizeBytes: image.size,
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
     expect(uploadFetch).toHaveBeenCalledWith(
       'https://storage.test/upload/cat.jpg',
       expect.objectContaining({
         method: 'PUT',
         body: image,
-        headers: { 'Content-Type': 'image/jpeg' },
+        headers: expect.objectContaining({
+          'Content-Type': 'image/jpeg',
+          'x-amz-checksum-sha256': expect.any(String),
+        }),
       }),
     );
     expect(mediaApi.completeUpload).toHaveBeenCalledWith('med_image_1');
@@ -1445,13 +1449,17 @@ describe('MessagesPage real API mode', () => {
       filename: 'report.pdf',
       contentType: 'application/pdf',
       sizeBytes: file.size,
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
     expect(uploadFetch).toHaveBeenCalledWith(
       'https://storage.test/upload/report.pdf',
       expect.objectContaining({
         method: 'PUT',
         body: file,
-        headers: { 'Content-Type': 'application/pdf' },
+        headers: expect.objectContaining({
+          'Content-Type': 'application/pdf',
+          'x-amz-checksum-sha256': expect.any(String),
+        }),
       }),
     );
     expect(mediaApi.completeUpload).toHaveBeenCalledWith('med_file_1');

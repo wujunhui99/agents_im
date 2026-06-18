@@ -86,8 +86,15 @@ describe('FeedbackPage', () => {
       filename: 'feedback-screen.png',
       contentType: 'image/png',
       sizeBytes: 1024,
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
-    expect(uploadFetch).toHaveBeenCalledWith('https://storage.test/upload/feedback-screen.png', expect.objectContaining({ method: 'PUT' }));
+    expect(uploadFetch).toHaveBeenCalledWith(
+      'https://storage.test/upload/feedback-screen.png',
+      expect.objectContaining({
+        method: 'PUT',
+        headers: expect.objectContaining({ 'x-amz-checksum-sha256': expect.any(String) }),
+      }),
+    );
     expect(mediaApi.completeUpload).toHaveBeenCalledWith('med_feedback_1');
     expect(await screen.findByRole('status')).toHaveTextContent('反馈已提交');
   });
