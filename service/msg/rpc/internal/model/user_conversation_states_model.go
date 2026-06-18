@@ -228,7 +228,7 @@ select t.conversation_id,
        s.updated_at
 from conversation_threads t
 join user_conversation_states s on s.conversation_id = t.conversation_id
-left join messages lm on lm.message_id = t.last_message_id
+left join messages lm on lm.message_id::text = t.last_message_id
 where s.account_id = $1 and t.conversation_id = $2
 `, userID, conversationID); err != nil {
 		return ConversationSeqState{}, err
