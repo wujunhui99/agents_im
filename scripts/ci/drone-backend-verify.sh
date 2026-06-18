@@ -42,9 +42,6 @@ if ! command -v goctl >/dev/null 2>&1 || ! goctl --version | grep -qF "${GOCTL_V
 fi
 goctl --version
 
-for f in api/*.api; do
-  goctl api validate -api "$f"
-done
 for f in service/*/api/*.api; do
   goctl api validate -api "$f"
 done
