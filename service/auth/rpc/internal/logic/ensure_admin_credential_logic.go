@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"

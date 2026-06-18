@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
+	"github.com/wujunhui99/agents_im/pkg/model"
 )
 
 type MemoryAgentRepository struct {

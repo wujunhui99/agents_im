@@ -1,8 +1,8 @@
 package common
 
 import (
-	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/middleware"
 )
 
 type AuthRuntime struct {

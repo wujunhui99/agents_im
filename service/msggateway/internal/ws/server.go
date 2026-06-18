@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/wujunhui99/agents_im/pkg/middleware"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/auth/token"
+	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/gateway"
 	"github.com/wujunhui99/agents_im/pkg/gateway/delivery"
-	"github.com/wujunhui99/agents_im/pkg/apperror"
-	"github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/pkg/presence"
 )

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/gateway"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/gateway"
 )
 
 // fakeBackend 是测试用 in-memory MessageBackend：seq 按会话自增、

@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"

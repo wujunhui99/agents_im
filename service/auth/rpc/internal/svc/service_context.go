@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/pkg/auth/token"
+	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/third/rpc/mailclient"

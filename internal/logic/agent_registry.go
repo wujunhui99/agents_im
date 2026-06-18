@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/model"
 )
 
 var sha256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)

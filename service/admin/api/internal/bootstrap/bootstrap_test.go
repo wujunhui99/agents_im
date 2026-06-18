@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	commonconfig "github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 
