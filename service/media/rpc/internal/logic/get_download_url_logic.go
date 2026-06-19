@@ -27,15 +27,10 @@ func NewGetDownloadURLLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Ge
 	}
 }
 
+// GetDownloadURL 纯签发整文件 presigned GET：跨域下载授权（链路校验 + 私聊好友 / 群成员）已上移
+// media-api(BFF)，本 RPC 只校验 media 存在且 ready 后签 URL，不做 requester 鉴权（EPIC #527 §4，
+// media-rpc 不发起跨域 rpc 调用，保持叶子）。
 func (l *GetDownloadURLLogic) GetDownloadURL(in *media.GetDownloadURLRequest) (*media.GetDownloadURLResponse, error) {
-	requester := in.GetRequesterUserId()
-	if requester == "" {
-		requester = in.GetOwnerUserId()
-	}
-	requester, err := validateMediaIDComponent(requester, "owner_user_id")
-	if err != nil {
-		return nil, rpcerror.ToStatus(err)
-	}
 	mediaID, err := parseMediaID(in.GetMediaId())
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
@@ -43,13 +38,6 @@ func (l *GetDownloadURLLogic) GetDownloadURL(in *media.GetDownloadURLRequest) (*
 	obj, err := mediaByID(l.ctx, l.svcCtx, mediaID)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
-	}
-	allowed, err := requesterCanAccessMedia(l.ctx, l.svcCtx, requester, in.GetMsgId(), obj)
-	if err != nil {
-		return nil, rpcerror.ToStatus(err)
-	}
-	if !allowed {
-		return nil, rpcerror.ToStatus(apperror.Forbidden("media object is not accessible by requester"))
 	}
 	if obj.Status != model.MediaStatusReady {
 		return nil, rpcerror.ToStatus(apperror.InvalidArgument("media object is not ready"))

@@ -21,6 +21,7 @@ type (
 	GetAvatarDisplayURLRequest  = media.GetAvatarDisplayURLRequest
 	GetDownloadURLRequest       = media.GetDownloadURLRequest
 	GetDownloadURLResponse      = media.GetDownloadURLResponse
+	GetMediaRequest             = media.GetMediaRequest
 	MediaObject                 = media.MediaObject
 	ValidateAvatarMediaRequest  = media.ValidateAvatarMediaRequest
 	ValidateMessageMediaRequest = media.ValidateMessageMediaRequest
@@ -29,6 +30,7 @@ type (
 	Media interface {
 		CreateUploadIntent(ctx context.Context, in *CreateUploadIntentRequest, opts ...grpc.CallOption) (*CreateUploadIntentResponse, error)
 		CompleteUpload(ctx context.Context, in *CompleteUploadRequest, opts ...grpc.CallOption) (*CompleteUploadResponse, error)
+		GetMedia(ctx context.Context, in *GetMediaRequest, opts ...grpc.CallOption) (*MediaObject, error)
 		GetDownloadURL(ctx context.Context, in *GetDownloadURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error)
 		GetAvatarDisplayURL(ctx context.Context, in *GetAvatarDisplayURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error)
 		ValidateAvatarMedia(ctx context.Context, in *ValidateAvatarMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error)
@@ -54,6 +56,11 @@ func (m *defaultMedia) CreateUploadIntent(ctx context.Context, in *CreateUploadI
 func (m *defaultMedia) CompleteUpload(ctx context.Context, in *CompleteUploadRequest, opts ...grpc.CallOption) (*CompleteUploadResponse, error) {
 	client := media.NewMediaClient(m.cli.Conn())
 	return client.CompleteUpload(ctx, in, opts...)
+}
+
+func (m *defaultMedia) GetMedia(ctx context.Context, in *GetMediaRequest, opts ...grpc.CallOption) (*MediaObject, error) {
+	client := media.NewMediaClient(m.cli.Conn())
+	return client.GetMedia(ctx, in, opts...)
 }
 
 func (m *defaultMedia) GetDownloadURL(ctx context.Context, in *GetDownloadURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error) {

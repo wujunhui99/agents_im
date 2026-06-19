@@ -19,10 +19,11 @@ import (
 )
 
 // 媒体业务规则：purpose/status 整型(model/vars.go) <-> 字符串契约映射、输入校验（只 validate 不
-// normalize，清洗由客户端负责）、对象存储 key 生成、内容类型白名单、下载授权编排。数据层走 svcCtx.MediaModel
-// (goctl)；media_id 为雪花 bigint（EPIC #527 §1，wire 十进制字符串）。下载授权（EPIC #527 §4，issue
-// #532）经属主 msg/friends/groups rpc 编排（链路校验 + 私聊单向好友 / 群成员校验），已脱
-// internal/repository 反向依赖（旧 AttachmentAccess/管理员兜底退役）。
+// normalize，清洗由客户端负责）、对象存储 key 生成、内容类型白名单。数据层走 svcCtx.MediaModel
+// (goctl)；media_id 为雪花 bigint（EPIC #527 §1，wire 十进制字符串）。
+// 下载授权（EPIC #527 §4，issue #532）的跨域编排（链路校验 + 私聊单向好友 / 群成员校验）在
+// media-api(BFF) 完成（聚合 msg/friends/groups rpc）；media-rpc 只暴露 GetMedia（元数据读）+
+// GetDownloadURL（纯签发），不发起跨域 rpc 调用、不再依赖 internal/repository。
 
 const (
 	purposeAvatar       = "avatar"
@@ -230,7 +231,7 @@ func validateAvatarMediaObject(media *model.MediaObjects) error {
 	return nil
 }
 
-// --- 数据访问 + 跨域下载鉴权 ---
+// --- 数据访问 ---
 
 func mediaByID(ctx context.Context, svcCtx *svc.ServiceContext, mediaID int64) (*model.MediaObjects, error) {
 	media, err := svcCtx.MediaModel.FindOne(ctx, mediaID)
@@ -259,65 +260,6 @@ func mediaForOwner(ctx context.Context, svcCtx *svc.ServiceContext, ownerUserID 
 		return nil, apperror.Forbidden("media object is not owned by requester")
 	}
 	return media, nil
-}
-
-// chat_type 取值（msg-rpc GetMessageRef 返回，对齐 msg model.ChatTypeSingle/Group）。
-const (
-	chatTypeSingle = "single"
-	chatTypeGroup  = "group"
-)
-
-// requesterCanAccessMedia 实现下载授权编排（EPIC #527 §4）：
-//  1. uploader 本人 → 快速放行；
-//  2. 否则经 msg-rpc GetMessageRef(msg_id) 取消息引用，做**链路校验**——消息真正引用的 media_id
-//     必须等于入参 media_id（media_id/msg_id 由客户端各自传入，不校验就能用合法 msg_id 配任意
-//     别人的 media_id 越权）；
-//  3. 私聊 → friends 单向好友校验（只看 requester→peer 这条，对方删 requester 不影响）；
-//     群聊 → groups 成员校验；失败拒绝。
-//
-// 语义均按**当前关系**：requester 删好友/退群后不可再下载历史文件、陌生人会话文件不可下载。
-func requesterCanAccessMedia(ctx context.Context, svcCtx *svc.ServiceContext, requesterUserID, msgID string, media *model.MediaObjects) (bool, error) {
-	if media.UploaderId == requesterUserID {
-		return true, nil
-	}
-
-	msgID = strings.TrimSpace(msgID)
-	if msgID == "" {
-		return false, apperror.InvalidArgument("msg_id is required to download media you did not upload")
-	}
-	if svcCtx.MessageRef == nil {
-		return false, apperror.Internal("message reference resolver is not configured")
-	}
-	chatType, groupID, peerAccountID, refMediaID, err := svcCtx.MessageRef.GetMessageRef(ctx, msgID, requesterUserID)
-	if err != nil {
-		return false, err
-	}
-
-	// 链路校验：入参 media 必须等于消息真正引用的 media（content ->> 'mediaId'）。
-	if refMediaID == "" || refMediaID != formatMediaID(media.MediaId) {
-		return false, nil
-	}
-
-	switch chatType {
-	case chatTypeSingle:
-		if peerAccountID == "" {
-			return false, nil
-		}
-		if svcCtx.Friends == nil {
-			return false, apperror.Internal("friendship checker is not configured")
-		}
-		return svcCtx.Friends.IsFriendOneWay(ctx, requesterUserID, peerAccountID)
-	case chatTypeGroup:
-		if groupID == "" {
-			return false, nil
-		}
-		if svcCtx.Groups == nil {
-			return false, apperror.Internal("group membership checker is not configured")
-		}
-		return svcCtx.Groups.IsMember(ctx, groupID, requesterUserID)
-	default:
-		return false, nil
-	}
 }
 
 // --- 对象 key 生成（内容寻址）、checksum 比对、内容类型白名单、id/metadata 构造、PB 映射 ---

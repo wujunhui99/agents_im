@@ -369,18 +369,6 @@ ObjectStorage:
   ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
   AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
   SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
-MsgRPC:
-  Endpoints:
-    - 127.0.0.1:${MSG_RPC_PORT:-9098}
-  Timeout: 5000
-FriendsRPC:
-  Endpoints:
-    - 127.0.0.1:${FRIENDS_RPC_PORT:-9092}
-  Timeout: 5000
-GroupsRPC:
-  Endpoints:
-    - 127.0.0.1:${GROUPS_RPC_PORT:-9093}
-  Timeout: 5000
 Telemetry:
   Name: media-rpc
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
@@ -400,6 +388,18 @@ Auth:
 MediaRPC:
   Endpoints:
     - 127.0.0.1:${MEDIA_RPC_PORT:-9096}
+  Timeout: 5000
+MsgRPC:
+  Endpoints:
+    - 127.0.0.1:${MSG_RPC_PORT:-9098}
+  Timeout: 5000
+FriendsRPC:
+  Endpoints:
+    - 127.0.0.1:${FRIENDS_RPC_PORT:-9092}
+  Timeout: 5000
+GroupsRPC:
+  Endpoints:
+    - 127.0.0.1:${GROUPS_RPC_PORT:-9093}
   Timeout: 5000
 Telemetry:
   Name: media-api

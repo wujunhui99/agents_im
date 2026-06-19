@@ -12,6 +12,11 @@ option go_package = "github.com/wujunhui99/agents_im/service/media/rpc/media";
 service Media {
   rpc CreateUploadIntent(CreateUploadIntentRequest) returns (CreateUploadIntentResponse);
   rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
+  // GetMedia 返回 media 元数据（uploader/status 等），供 media-api(BFF) 做下载授权时
+  // 判 uploader 快速放行（EPIC #527 §4，鉴权编排在 media-api）。
+  rpc GetMedia(GetMediaRequest) returns (MediaObject);
+  // GetDownloadURL 纯签发整文件 presigned GET：跨域下载授权（链路校验 + friends/groups）已上移
+  // media-api(BFF)，本 RPC 只校验 media 存在且 ready 后签 URL，不做 requester 鉴权（EPIC #527 §4）。
   rpc GetDownloadURL(GetDownloadURLRequest) returns (GetDownloadURLResponse);
   rpc GetAvatarDisplayURL(GetAvatarDisplayURLRequest) returns (GetDownloadURLResponse);
   // ValidateAvatarMedia asserts media_id is a ready avatar object owned by owner_user_id
@@ -73,14 +78,16 @@ message CompleteUploadResponse {
   MediaObject media = 1;
 }
 
+message GetMediaRequest {
+  string media_id = 1;
+}
+
 message GetDownloadURLRequest {
-  string owner_user_id = 1;
-  string requester_user_id = 2;
+  // 纯签发：鉴权已上移 media-api(BFF)，本 RPC 只需 media_id。
+  // 旧 owner_user_id/requester_user_id/msg_id 鉴权字段移交 media-api。
+  reserved 1, 2, 4;
+  reserved "owner_user_id", "requester_user_id", "msg_id";
   string media_id = 3;
-  // msg_id 是引用该媒体的消息 id(雪花,十进制串)。非 uploader 下载时必传:media 编排
-  // GetMessageRef(msg_id) 拿会话引用做链路校验(返回 media_id 必须等于入参 media_id,防越权)
-  // + 私聊单向好友 / 群成员校验(EPIC #527 §4)。uploader 本人下载走快速放行,可不传。
-  string msg_id = 4;
 }
 
 message GetDownloadURLResponse {

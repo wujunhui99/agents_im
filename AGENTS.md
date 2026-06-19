@@ -34,6 +34,7 @@
    goctl model pg datasource -url <本地临时PG> -table "<t1>,<t2>" -dir service/<domain>/rpc/internal/model --style go_zero
    ```
 8. **禁用顶层 `internal/`**：`agents_im/internal`（monolith god-package）在退役中，新代码一律不得 import 或修改它；数据层用 goctl model 生成到 `service/<domain>/rpc/internal/model`（无 repository 层），做法见 `.claude/skills/refactor-domain-to-service`。存量 keystone 例外按该 skill 的台账处理。
+9. **微服务分层：跨域聚合走 BFF(api)，rpc 间默认不互调**：每个 `<domain>-rpc` 只拥有并读写**本域**数据（goctl model）+ 本域纯逻辑，应是依赖图上的**叶子**；**跨域读取/编排/鉴权放在 `<domain>-api`(BFF)** —— 由 api 调多个 rpc 聚合，再回写或签发。**禁止把跨域调用塞进 rpc**，否则极易形成 `a-rpc ↔ b-rpc` 调用环（即便 `zrpc` 默认 `NonBlock` 不死锁，环也是分层坏味、难推理/难部署）。例：媒体下载授权需 msg/friends/groups 三域事实，放 `media-api` 聚合（`media-rpc.GetMedia` 判属主 → `msg/friends/groups-rpc` 判关系 → `media-rpc.GetDownloadURL` 纯签发），media-rpc 保持叶子（#532，EPIC #527 §4）。例外（keystone 过渡）：msg-rpc 写路径附件校验调 media-rpc 属可接受的**单向**边（非环）；新增依赖务必确认不成环。
 
 ## 项目目录
 

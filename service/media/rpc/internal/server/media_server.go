@@ -33,6 +33,11 @@ func (s *MediaServer) CompleteUpload(ctx context.Context, in *media.CompleteUplo
 	return l.CompleteUpload(in)
 }
 
+func (s *MediaServer) GetMedia(ctx context.Context, in *media.GetMediaRequest) (*media.MediaObject, error) {
+	l := logic.NewGetMediaLogic(ctx, s.svcCtx)
+	return l.GetMedia(in)
+}
+
 func (s *MediaServer) GetDownloadURL(ctx context.Context, in *media.GetDownloadURLRequest) (*media.GetDownloadURLResponse, error) {
 	l := logic.NewGetDownloadURLLogic(ctx, s.svcCtx)
 	return l.GetDownloadURL(in)

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
@@ -76,47 +75,8 @@ func (m *fakeMediaModel) MarkReady(_ context.Context, mediaID int64, objectKey s
 	return &copy, nil
 }
 
-// fakeMessageRef 模拟 msg-rpc GetMessageRef：按 msgID 返回会话引用（chat_type/group/peer/media）。
-type fakeMessageRef struct {
-	refs map[string]messageRef
-	err  error
-}
-
-type messageRef struct {
-	chatType string
-	groupID  string
-	peer     string
-	mediaID  string
-}
-
-func (f fakeMessageRef) GetMessageRef(_ context.Context, serverMsgID, _ string) (string, string, string, string, error) {
-	if f.err != nil {
-		return "", "", "", "", f.err
-	}
-	r, ok := f.refs[serverMsgID]
-	if !ok {
-		return "", "", "", "", apperror.NotFound("message not found")
-	}
-	return r.chatType, r.groupID, r.peer, r.mediaID, nil
-}
-
-// fakeFriends 模拟 friends-rpc 单向好友校验：只看 requester→peer 这条记录。
-type fakeFriends struct {
-	allow map[string]bool // requester|peer -> requester 仍把对方当好友
-}
-
-func (f fakeFriends) IsFriendOneWay(_ context.Context, requesterAccountID, peerAccountID string) (bool, error) {
-	return f.allow[requesterAccountID+"|"+peerAccountID], nil
-}
-
-// fakeGroupMembers 模拟 groups-rpc 成员校验。
-type fakeGroupMembers struct {
-	allow map[string]bool // groupID|user -> active 成员
-}
-
-func (f fakeGroupMembers) IsMember(_ context.Context, groupID, requesterAccountID string) (bool, error) {
-	return f.allow[groupID+"|"+requesterAccountID], nil
-}
+// 下载授权（EPIC #527 §4）的跨域编排已上移 media-api(BFF)，其链路校验 / 私聊好友 / 群成员单测
+// 见 service/media/api（用 fake msg/friends/groups 客户端）。media-rpc 这里只覆盖纯签发 + GetMedia。
 
 // newMediaIDGen 构造测试用 media_id 生成器（HintBits=0、单机 machine 0），与 svc 默认布局一致。
 func newMediaIDGen(t *testing.T) *idgen.RoutedFlake {
@@ -394,32 +354,17 @@ func TestCompleteUploadResumesWhenTmpAlreadyRenamed(t *testing.T) {
 	}
 }
 
-// --- GetDownloadURL 下载授权编排（EPIC #527 §4）---
+// --- GetDownloadURL（纯签发）+ GetMedia（元数据读）---
+// 跨域下载授权（链路校验 / 私聊好友 / 群成员）已上移 media-api(BFF)，单测见 service/media/api。
 
-const (
-	dlUploader  = "323130844539310080"
-	dlRequester = "999000111222333444"
-	dlMsgID     = "58537781550383104"
-	dlGroupID   = "77000111222333444"
-)
+const dlUploader = "323130844539310080"
 
-// downloadSvcCtx 组装一个带 media 行 + 三域 fake 的下载鉴权 svcCtx。
-func downloadSvcCtx(m *model.MediaObjects, refs map[string]messageRef, friends, members map[string]bool) *svc.ServiceContext {
-	return &svc.ServiceContext{
-		MediaModel: newFakeMediaModel(m),
-		Store:      newMemStore(),
-		MessageRef: fakeMessageRef{refs: refs},
-		Friends:    fakeFriends{allow: friends},
-		Groups:     fakeGroupMembers{allow: members},
-	}
-}
-
-// uploader 本人下载走快速放行，无需 msg_id / 跨域校验。
-func TestGetDownloadURLOwnerAllowed(t *testing.T) {
+// GetDownloadURL 纯签发：ready 的 media 直接签 URL（不做 requester 鉴权）。
+func TestGetDownloadURLSignsReadyMedia(t *testing.T) {
 	const dlID int64 = 7001
 	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageFile, "application/pdf", 2048)
-	svcCtx := downloadSvcCtx(m, nil, nil, nil)
-	resp, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, MediaId: strconv.FormatInt(dlID, 10)})
+	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore()}
+	resp, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{MediaId: strconv.FormatInt(dlID, 10)})
 	if err != nil {
 		t.Fatalf("GetDownloadURL: %v", err)
 	}
@@ -428,69 +373,33 @@ func TestGetDownloadURLOwnerAllowed(t *testing.T) {
 	}
 }
 
-// 非 uploader 未传 msg_id → InvalidArgument（无法做链路校验）。
-func TestGetDownloadURLNonOwnerRequiresMsgID(t *testing.T) {
+// GetDownloadURL 对 pending（未 ready）media 拒绝签发。
+func TestGetDownloadURLRejectsNotReady(t *testing.T) {
 	const dlID int64 = 7001
-	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageFile, "application/pdf", 2048)
-	svcCtx := downloadSvcCtx(m, nil, nil, nil)
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10)})
+	m := pendingTmpRow(t, dlID, dlUploader, sha256Hex64("a"), 2048)
+	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore()}
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{MediaId: strconv.FormatInt(dlID, 10)})
 	wantCode(t, err, codes.InvalidArgument)
 }
 
-// 链路不符：消息引用的 media_id 与入参 media_id 不一致 → 拒绝（防越权，§4 核心）。
-func TestGetDownloadURLLinkMismatchForbidden(t *testing.T) {
+// GetMedia 返回 media 元数据（供 media-api 判 uploader 快速放行）；查不到 → NotFound。
+func TestGetMediaReturnsMetadata(t *testing.T) {
 	const dlID int64 = 7001
 	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageImage, "image/jpeg", 2048)
-	// 消息真正引用的是别的 media，requester 即便对这条 msg 有权也不能借它下别人的 media。
-	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeSingle, peer: dlUploader, mediaID: "111111111111111111"}}
-	svcCtx := downloadSvcCtx(m, refs, map[string]bool{dlRequester + "|" + dlUploader: true}, nil)
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
-	wantCode(t, err, codes.PermissionDenied)
-}
-
-// 私聊：requester 仍把对方当好友（含对方已删 requester——只看 requester→peer 这条）→ 放行。
-func TestGetDownloadURLPrivateFriendAllowed(t *testing.T) {
-	const dlID int64 = 7001
-	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageImage, "image/jpeg", 2048)
-	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeSingle, peer: dlUploader, mediaID: strconv.FormatInt(dlID, 10)}}
-	// 只配 requester→peer 这条为好友；对方→requester 缺失（= 对方已删 requester），不影响放行。
-	svcCtx := downloadSvcCtx(m, refs, map[string]bool{dlRequester + "|" + dlUploader: true}, nil)
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
+	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore()}
+	resp, err := NewGetMediaLogic(context.Background(), svcCtx).GetMedia(&media.GetMediaRequest{MediaId: strconv.FormatInt(dlID, 10)})
 	if err != nil {
-		t.Fatalf("private friend download: %v", err)
+		t.Fatalf("GetMedia: %v", err)
+	}
+	if resp.GetOwnerUserId() != dlUploader || resp.GetStatus() != statusReady {
+		t.Fatalf("unexpected metadata: %+v", resp)
 	}
 }
 
-// 私聊：requester 已删对方（requester→peer 这条不在）→ 拒绝。
-func TestGetDownloadURLPrivateRequesterDeletedPeerForbidden(t *testing.T) {
-	const dlID int64 = 7001
-	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageImage, "image/jpeg", 2048)
-	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeSingle, peer: dlUploader, mediaID: strconv.FormatInt(dlID, 10)}}
-	svcCtx := downloadSvcCtx(m, refs, map[string]bool{}, nil)
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
-	wantCode(t, err, codes.PermissionDenied)
-}
-
-// 群聊：requester 是 active 成员 → 放行。
-func TestGetDownloadURLGroupMemberAllowed(t *testing.T) {
-	const dlID int64 = 7001
-	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageFile, "application/pdf", 2048)
-	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeGroup, groupID: dlGroupID, mediaID: strconv.FormatInt(dlID, 10)}}
-	svcCtx := downloadSvcCtx(m, refs, nil, map[string]bool{dlGroupID + "|" + dlRequester: true})
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
-	if err != nil {
-		t.Fatalf("group member download: %v", err)
-	}
-}
-
-// 群聊：requester 非成员（已退群）→ 拒绝。
-func TestGetDownloadURLGroupNonMemberForbidden(t *testing.T) {
-	const dlID int64 = 7001
-	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageFile, "application/pdf", 2048)
-	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeGroup, groupID: dlGroupID, mediaID: strconv.FormatInt(dlID, 10)}}
-	svcCtx := downloadSvcCtx(m, refs, nil, map[string]bool{})
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
-	wantCode(t, err, codes.PermissionDenied)
+func TestGetMediaMissingReturnsNotFound(t *testing.T) {
+	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(), Store: newMemStore()}
+	_, err := NewGetMediaLogic(context.Background(), svcCtx).GetMedia(&media.GetMediaRequest{MediaId: "999999999999999"})
+	wantCode(t, err, codes.NotFound)
 }
 
 // --- GetAvatarDisplayURL ---

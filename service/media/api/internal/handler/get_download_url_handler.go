@@ -6,13 +6,14 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/pkg/types"
+	"github.com/wujunhui99/agents_im/service/media/api/internal/logic"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/svc"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-// GetDownloadURLHandler returns a presigned download URL for media the
-// authenticated user is allowed to access (owner or message-attachment access).
+// GetDownloadURLHandler returns a presigned download URL after media-api(BFF)
+// authorizes the download (uploader fast-path, else GetMessageRef link check +
+// one-way friendship / group membership; EPIC #527 §4).
 func GetDownloadURLHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.GetMediaDownloadURLReq
@@ -25,12 +26,7 @@ func GetDownloadURLHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}
-		resp, err := svcCtx.MediaRPC.GetDownloadURL(r.Context(), &mediaclient.GetDownloadURLRequest{
-			OwnerUserId:     userID,
-			RequesterUserId: userID,
-			MediaId:         req.MediaID,
-			MsgId:           req.MsgID,
-		})
+		resp, err := logic.GetDownloadURL(r.Context(), svcCtx, userID, req.MediaID, req.MsgID)
 		if err != nil {
 			httpx.ErrorCtx(r.Context(), w, apiError(err))
 			return
