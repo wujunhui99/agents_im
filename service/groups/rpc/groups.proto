@@ -14,6 +14,8 @@ service Groups {
   rpc LeaveGroup(LeaveGroupRequest) returns (MemberResponse);
   rpc KickMember(KickMemberRequest) returns (MemberResponse);
   rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+  // IsMember 判定 user_id 当前是否为 group_id 的 active 成员（媒体下载授权 §4 群聊校验）。
+  rpc IsMember(IsMemberRequest) returns (IsMemberResponse);
 }
 
 message Group {
@@ -110,4 +112,13 @@ message MemberResponse {
 message ListMembersResponse {
   string group_id = 1;
   repeated GroupMember members = 2;
+}
+
+message IsMemberRequest {
+  string group_id = 1;
+  string user_id = 2;
+}
+
+message IsMemberResponse {
+  bool is_member = 1;
 }

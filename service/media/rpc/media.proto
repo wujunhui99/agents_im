@@ -77,6 +77,10 @@ message GetDownloadURLRequest {
   string owner_user_id = 1;
   string requester_user_id = 2;
   string media_id = 3;
+  // msg_id 是引用该媒体的消息 id(雪花,十进制串)。非 uploader 下载时必传:media 编排
+  // GetMessageRef(msg_id) 拿会话引用做链路校验(返回 media_id 必须等于入参 media_id,防越权)
+  // + 私聊单向好友 / 群成员校验(EPIC #527 §4)。uploader 本人下载走快速放行,可不传。
+  string msg_id = 4;
 }
 
 message GetDownloadURLResponse {

@@ -450,8 +450,12 @@ type GetDownloadURLRequest struct {
 	OwnerUserId     string                 `protobuf:"bytes,1,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
 	RequesterUserId string                 `protobuf:"bytes,2,opt,name=requester_user_id,json=requesterUserId,proto3" json:"requester_user_id,omitempty"`
 	MediaId         string                 `protobuf:"bytes,3,opt,name=media_id,json=mediaId,proto3" json:"media_id,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// msg_id 是引用该媒体的消息 id(雪花,十进制串)。非 uploader 下载时必传:media 编排
+	// GetMessageRef(msg_id) 拿会话引用做链路校验(返回 media_id 必须等于入参 media_id,防越权)
+	// + 私聊单向好友 / 群成员校验(EPIC #527 §4)。uploader 本人下载走快速放行,可不传。
+	MsgId         string `protobuf:"bytes,4,opt,name=msg_id,json=msgId,proto3" json:"msg_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetDownloadURLRequest) Reset() {
@@ -501,6 +505,13 @@ func (x *GetDownloadURLRequest) GetRequesterUserId() string {
 func (x *GetDownloadURLRequest) GetMediaId() string {
 	if x != nil {
 		return x.MediaId
+	}
+	return ""
+}
+
+func (x *GetDownloadURLRequest) GetMsgId() string {
+	if x != nil {
+		return x.MsgId
 	}
 	return ""
 }
@@ -810,11 +821,12 @@ const file_service_media_rpc_media_proto_rawDesc = "" +
 	"\rowner_user_id\x18\x01 \x01(\tR\vownerUserId\x12\x19\n" +
 	"\bmedia_id\x18\x02 \x01(\tR\amediaId\"E\n" +
 	"\x16CompleteUploadResponse\x12+\n" +
-	"\x05media\x18\x01 \x01(\v2\x15.media.v1.MediaObjectR\x05media\"\x82\x01\n" +
+	"\x05media\x18\x01 \x01(\v2\x15.media.v1.MediaObjectR\x05media\"\x99\x01\n" +
 	"\x15GetDownloadURLRequest\x12\"\n" +
 	"\rowner_user_id\x18\x01 \x01(\tR\vownerUserId\x12*\n" +
 	"\x11requester_user_id\x18\x02 \x01(\tR\x0frequesterUserId\x12\x19\n" +
-	"\bmedia_id\x18\x03 \x01(\tR\amediaId\"u\n" +
+	"\bmedia_id\x18\x03 \x01(\tR\amediaId\x12\x15\n" +
+	"\x06msg_id\x18\x04 \x01(\tR\x05msgId\"u\n" +
 	"\x16GetDownloadURLResponse\x12\x19\n" +
 	"\bmedia_id\x18\x01 \x01(\tR\amediaId\x12!\n" +
 	"\fdownload_url\x18\x02 \x01(\tR\vdownloadUrl\x12\x1d\n" +

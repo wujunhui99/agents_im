@@ -29,6 +29,7 @@ func GetDownloadURLHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			OwnerUserId:     userID,
 			RequesterUserId: userID,
 			MediaId:         req.MediaID,
+			MsgId:           req.MsgID,
 		})
 		if err != nil {
 			httpx.ErrorCtx(r.Context(), w, apiError(err))

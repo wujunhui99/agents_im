@@ -12,6 +12,12 @@ type Config struct {
 	ObjectStorage appconfig.ObjectStorageConfig `json:",optional"`
 	// Snowflake 配置 media_id 雪花生成器的机器位（EPIC #527 §1：多副本同毫秒不碰撞）。
 	Snowflake SnowflakeConfig `json:",optional"`
+
+	// 下载授权编排的跨域 rpc 客户端（EPIC #527 §4，替代旧 AttachmentAccess 反向依赖 internal/repository）：
+	// MsgRPC 取消息引用做链路校验，FriendsRPC 私聊单向好友校验，GroupsRPC 群成员校验。
+	MsgRPC     zrpc.RpcClientConf `json:",optional"`
+	FriendsRPC zrpc.RpcClientConf `json:",optional"`
+	GroupsRPC  zrpc.RpcClientConf `json:",optional"`
 	// tracing 用 go-zero 自带 Telemetry（ServiceConf 内，由 yaml 配置），不再用 pkg/observability。
 }
 

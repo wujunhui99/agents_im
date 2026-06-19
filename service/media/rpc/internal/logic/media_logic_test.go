@@ -11,7 +11,6 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
-	sharedmodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
@@ -77,23 +76,46 @@ func (m *fakeMediaModel) MarkReady(_ context.Context, mediaID int64, objectKey s
 	return &copy, nil
 }
 
-type fakeAccounts struct {
-	users map[string]sharedmodel.User
+// fakeMessageRef 模拟 msg-rpc GetMessageRef：按 msgID 返回会话引用（chat_type/group/peer/media）。
+type fakeMessageRef struct {
+	refs map[string]messageRef
+	err  error
 }
 
-func (f fakeAccounts) GetByID(_ context.Context, accountID string) (sharedmodel.User, error) {
-	if u, ok := f.users[accountID]; ok {
-		return u, nil
+type messageRef struct {
+	chatType string
+	groupID  string
+	peer     string
+	mediaID  string
+}
+
+func (f fakeMessageRef) GetMessageRef(_ context.Context, serverMsgID, _ string) (string, string, string, string, error) {
+	if f.err != nil {
+		return "", "", "", "", f.err
 	}
-	return sharedmodel.User{}, apperror.NotFound("account not found")
+	r, ok := f.refs[serverMsgID]
+	if !ok {
+		return "", "", "", "", apperror.NotFound("message not found")
+	}
+	return r.chatType, r.groupID, r.peer, r.mediaID, nil
 }
 
-type fakeAttachmentAccess struct {
-	allow map[string]bool // userID|mediaID(十进制串) -> allowed
+// fakeFriends 模拟 friends-rpc 单向好友校验：只看 requester→peer 这条记录。
+type fakeFriends struct {
+	allow map[string]bool // requester|peer -> requester 仍把对方当好友
 }
 
-func (f fakeAttachmentAccess) UserCanAccessMedia(_ context.Context, userID, mediaID string) (bool, error) {
-	return f.allow[userID+"|"+mediaID], nil
+func (f fakeFriends) IsFriendOneWay(_ context.Context, requesterAccountID, peerAccountID string) (bool, error) {
+	return f.allow[requesterAccountID+"|"+peerAccountID], nil
+}
+
+// fakeGroupMembers 模拟 groups-rpc 成员校验。
+type fakeGroupMembers struct {
+	allow map[string]bool // groupID|user -> active 成员
+}
+
+func (f fakeGroupMembers) IsMember(_ context.Context, groupID, requesterAccountID string) (bool, error) {
+	return f.allow[groupID+"|"+requesterAccountID], nil
 }
 
 // newMediaIDGen 构造测试用 media_id 生成器（HintBits=0、单机 machine 0），与 svc 默认布局一致。
@@ -372,13 +394,32 @@ func TestCompleteUploadResumesWhenTmpAlreadyRenamed(t *testing.T) {
 	}
 }
 
-// --- GetDownloadURL 鉴权 ---
+// --- GetDownloadURL 下载授权编排（EPIC #527 §4）---
 
+const (
+	dlUploader  = "323130844539310080"
+	dlRequester = "999000111222333444"
+	dlMsgID     = "58537781550383104"
+	dlGroupID   = "77000111222333444"
+)
+
+// downloadSvcCtx 组装一个带 media 行 + 三域 fake 的下载鉴权 svcCtx。
+func downloadSvcCtx(m *model.MediaObjects, refs map[string]messageRef, friends, members map[string]bool) *svc.ServiceContext {
+	return &svc.ServiceContext{
+		MediaModel: newFakeMediaModel(m),
+		Store:      newMemStore(),
+		MessageRef: fakeMessageRef{refs: refs},
+		Friends:    fakeFriends{allow: friends},
+		Groups:     fakeGroupMembers{allow: members},
+	}
+}
+
+// uploader 本人下载走快速放行，无需 msg_id / 跨域校验。
 func TestGetDownloadURLOwnerAllowed(t *testing.T) {
 	const dlID int64 = 7001
-	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageFile, "application/pdf", 2048)
-	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore()}
-	resp, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", MediaId: strconv.FormatInt(dlID, 10)})
+	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageFile, "application/pdf", 2048)
+	svcCtx := downloadSvcCtx(m, nil, nil, nil)
+	resp, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, MediaId: strconv.FormatInt(dlID, 10)})
 	if err != nil {
 		t.Fatalf("GetDownloadURL: %v", err)
 	}
@@ -387,41 +428,69 @@ func TestGetDownloadURLOwnerAllowed(t *testing.T) {
 	}
 }
 
-func TestGetDownloadURLNonOwnerForbidden(t *testing.T) {
+// 非 uploader 未传 msg_id → InvalidArgument（无法做链路校验）。
+func TestGetDownloadURLNonOwnerRequiresMsgID(t *testing.T) {
 	const dlID int64 = 7001
-	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageFile, "application/pdf", 2048)
-	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore(),
-		Accounts:         fakeAccounts{users: map[string]sharedmodel.User{}},
-		AttachmentAccess: fakeAttachmentAccess{allow: map[string]bool{}},
-	}
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", RequesterUserId: "999000111222333444", MediaId: strconv.FormatInt(dlID, 10)})
+	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageFile, "application/pdf", 2048)
+	svcCtx := downloadSvcCtx(m, nil, nil, nil)
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10)})
+	wantCode(t, err, codes.InvalidArgument)
+}
+
+// 链路不符：消息引用的 media_id 与入参 media_id 不一致 → 拒绝（防越权，§4 核心）。
+func TestGetDownloadURLLinkMismatchForbidden(t *testing.T) {
+	const dlID int64 = 7001
+	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageImage, "image/jpeg", 2048)
+	// 消息真正引用的是别的 media，requester 即便对这条 msg 有权也不能借它下别人的 media。
+	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeSingle, peer: dlUploader, mediaID: "111111111111111111"}}
+	svcCtx := downloadSvcCtx(m, refs, map[string]bool{dlRequester + "|" + dlUploader: true}, nil)
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
 	wantCode(t, err, codes.PermissionDenied)
 }
 
-func TestGetDownloadURLAdminAllowed(t *testing.T) {
+// 私聊：requester 仍把对方当好友（含对方已删 requester——只看 requester→peer 这条）→ 放行。
+func TestGetDownloadURLPrivateFriendAllowed(t *testing.T) {
 	const dlID int64 = 7001
-	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageFile, "application/pdf", 2048)
-	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore(),
-		Accounts: fakeAccounts{users: map[string]sharedmodel.User{"999000111222333444": {AccountType: sharedmodel.AccountTypeAdmin}}},
-	}
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", RequesterUserId: "999000111222333444", MediaId: strconv.FormatInt(dlID, 10)})
+	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageImage, "image/jpeg", 2048)
+	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeSingle, peer: dlUploader, mediaID: strconv.FormatInt(dlID, 10)}}
+	// 只配 requester→peer 这条为好友；对方→requester 缺失（= 对方已删 requester），不影响放行。
+	svcCtx := downloadSvcCtx(m, refs, map[string]bool{dlRequester + "|" + dlUploader: true}, nil)
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
 	if err != nil {
-		t.Fatalf("admin download: %v", err)
+		t.Fatalf("private friend download: %v", err)
 	}
 }
 
-func TestGetDownloadURLMessageParticipantAllowed(t *testing.T) {
+// 私聊：requester 已删对方（requester→peer 这条不在）→ 拒绝。
+func TestGetDownloadURLPrivateRequesterDeletedPeerForbidden(t *testing.T) {
 	const dlID int64 = 7001
-	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageImage, "image/jpeg", 2048)
-	receiver := "999000111222333444"
-	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore(),
-		Accounts:         fakeAccounts{users: map[string]sharedmodel.User{}},
-		AttachmentAccess: fakeAttachmentAccess{allow: map[string]bool{receiver + "|" + strconv.FormatInt(dlID, 10): true}},
-	}
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", RequesterUserId: receiver, MediaId: strconv.FormatInt(dlID, 10)})
+	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageImage, "image/jpeg", 2048)
+	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeSingle, peer: dlUploader, mediaID: strconv.FormatInt(dlID, 10)}}
+	svcCtx := downloadSvcCtx(m, refs, map[string]bool{}, nil)
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
+	wantCode(t, err, codes.PermissionDenied)
+}
+
+// 群聊：requester 是 active 成员 → 放行。
+func TestGetDownloadURLGroupMemberAllowed(t *testing.T) {
+	const dlID int64 = 7001
+	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageFile, "application/pdf", 2048)
+	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeGroup, groupID: dlGroupID, mediaID: strconv.FormatInt(dlID, 10)}}
+	svcCtx := downloadSvcCtx(m, refs, nil, map[string]bool{dlGroupID + "|" + dlRequester: true})
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
 	if err != nil {
-		t.Fatalf("participant download: %v", err)
+		t.Fatalf("group member download: %v", err)
 	}
+}
+
+// 群聊：requester 非成员（已退群）→ 拒绝。
+func TestGetDownloadURLGroupNonMemberForbidden(t *testing.T) {
+	const dlID int64 = 7001
+	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageFile, "application/pdf", 2048)
+	refs := map[string]messageRef{dlMsgID: {chatType: chatTypeGroup, groupID: dlGroupID, mediaID: strconv.FormatInt(dlID, 10)}}
+	svcCtx := downloadSvcCtx(m, refs, nil, map[string]bool{})
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: dlUploader, RequesterUserId: dlRequester, MediaId: strconv.FormatInt(dlID, 10), MsgId: dlMsgID})
+	wantCode(t, err, codes.PermissionDenied)
 }
 
 // --- GetAvatarDisplayURL ---

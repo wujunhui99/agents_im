@@ -484,6 +484,7 @@ type CompleteMediaUploadResp struct {
 
 type GetMediaDownloadURLReq struct {
 	MediaID string `path:"media_id"`
+	MsgID   string `form:"msg_id,optional"`
 }
 
 type GetMediaDownloadURLData struct {

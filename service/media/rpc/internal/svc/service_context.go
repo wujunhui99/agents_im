@@ -4,14 +4,17 @@ import (
 	"context"
 	"log"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
-	sharedmodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/objectstorage"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
+	"github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
+	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
+	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
 // media_id 雪花中段（12 位）布局：media 无单/群语义，route hint 宽度为 0（保留，恒传 0，
@@ -22,28 +25,37 @@ const (
 	defaultMediaMachineBits = 10
 )
 
-// AccountReader 读用户账号（下载鉴权的管理员判定）。由 internal/repository 满足——这是 keystone 阻塞的
-// 跨域读：暂无 user-rpc 接口可 BFF 化（见 issue #433 保留项），待 message-rpc 落地后改 BFF。
-type AccountReader interface {
-	GetByID(ctx context.Context, accountID string) (sharedmodel.User, error)
+// MessageRefResolver 取一条消息的下载授权引用（chat_type/group_id/私聊对端/引用的 media_id）。
+// 由 msg-rpc 满足（GetMessageRef，EPIC #527 §4 链路校验 + 关系判定的入口）。
+type MessageRefResolver interface {
+	GetMessageRef(ctx context.Context, serverMsgID, requesterAccountID string) (chatType, groupID, peerAccountID, mediaID string, err error)
 }
 
-// AttachmentAccessChecker 判定请求者能否访问某消息附件媒体（下载鉴权的附件可见性）。由 internal/repository
-// 的 message repo 满足，同属 keystone 阻塞的跨域读。
-type AttachmentAccessChecker interface {
-	UserCanAccessMedia(ctx context.Context, userID string, mediaID string) (bool, error)
+// FriendshipChecker 判定 requester 视角下与 peer 的单向好友关系是否仍正常（friends 双记录，
+// 只看 requester→peer 这条；requester 没删对方即放行，对方删 requester 不影响）。由 friends-rpc
+// 的 GetFriendship 满足（EPIC #527 §4 私聊校验）。
+type FriendshipChecker interface {
+	IsFriendOneWay(ctx context.Context, requesterAccountID, peerAccountID string) (bool, error)
 }
 
-// ServiceContext 持有 media-rpc 的数据层与对象存储。media_objects 写入/读取走 goctl MediaModel（脱
-// internal/repository）；下载鉴权的跨域读（Accounts/AttachmentAccess）仍读 internal/repository，待 BFF 化。
+// GroupMembershipChecker 判定 requester 当前是否为某群 active 成员。由 groups-rpc 的 IsMember
+// 满足（EPIC #527 §4 群聊校验）。
+type GroupMembershipChecker interface {
+	IsMember(ctx context.Context, groupID, requesterAccountID string) (bool, error)
+}
+
+// ServiceContext 持有 media-rpc 的数据层、对象存储与下载授权编排的跨域 rpc 客户端。
+// media_objects 写入/读取走 goctl MediaModel（脱 internal/repository）；下载授权（EPIC #527 §4）
+// 经属主 msg/friends/groups rpc 编排，不再反向依赖 internal/repository。
 type ServiceContext struct {
-	Config           config.Config
-	MediaModel       model.MediaObjectsModel
-	MediaIDGen       *idgen.RoutedFlake
-	Store            objectstorage.ObjectStore
-	Bucket           string
-	Accounts         AccountReader
-	AttachmentAccess AttachmentAccessChecker
+	Config     config.Config
+	MediaModel model.MediaObjectsModel
+	MediaIDGen *idgen.RoutedFlake
+	Store      objectstorage.ObjectStore
+	Bucket     string
+	MessageRef MessageRefResolver
+	Friends    FriendshipChecker
+	Groups     GroupMembershipChecker
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -52,15 +64,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	mediaIDGen, err := newMediaIDGenerator(c.Snowflake)
 	if err != nil {
 		log.Fatalf("build media id generator: %v", err)
-	}
-
-	accountRepo, err := repository.NewRepositoryForStorage("postgres", c.DataSource)
-	if err != nil {
-		log.Fatalf("build account repository: %v", err)
-	}
-	messageRepo, err := repository.NewMessageRepositoryForStorage("postgres", c.DataSource)
-	if err != nil {
-		log.Fatalf("build message repository: %v", err)
 	}
 
 	osCfg, err := appconfig.ResolveObjectStorageConfig(c.ObjectStorage, "postgres")
@@ -72,14 +75,38 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		log.Fatalf("build object storage: %v", err)
 	}
 
+	// 下载授权编排（EPIC #527 §4）：msg/friends/groups 是必需依赖，缺配置显式失败（失败优先）。
+	if !hasRPCClientConfig(c.MsgRPC) {
+		log.Fatalf("media-rpc requires msg rpc client config (MsgRPC) for download authorization")
+	}
+	msgRPCClient, err := zrpc.NewClient(c.MsgRPC)
+	if err != nil {
+		log.Fatalf("build msg rpc client: %v", err)
+	}
+	if !hasRPCClientConfig(c.FriendsRPC) {
+		log.Fatalf("media-rpc requires friends rpc client config (FriendsRPC) for download authorization")
+	}
+	friendsRPCClient, err := zrpc.NewClient(c.FriendsRPC)
+	if err != nil {
+		log.Fatalf("build friends rpc client: %v", err)
+	}
+	if !hasRPCClientConfig(c.GroupsRPC) {
+		log.Fatalf("media-rpc requires groups rpc client config (GroupsRPC) for download authorization")
+	}
+	groupsRPCClient, err := zrpc.NewClient(c.GroupsRPC)
+	if err != nil {
+		log.Fatalf("build groups rpc client: %v", err)
+	}
+
 	return &ServiceContext{
-		Config:           c,
-		MediaModel:       mediaModel,
-		MediaIDGen:       mediaIDGen,
-		Store:            objectStore,
-		Bucket:           osCfg.Bucket,
-		Accounts:         accountRepo,
-		AttachmentAccess: newMessageAttachmentAccessChecker(messageRepo),
+		Config:     c,
+		MediaModel: mediaModel,
+		MediaIDGen: mediaIDGen,
+		Store:      objectStore,
+		Bucket:     osCfg.Bucket,
+		MessageRef: newMsgRPCMessageRefResolver(msgclient.NewMsg(msgRPCClient)),
+		Friends:    newFriendsRPCFriendshipChecker(friendsclient.NewFriends(friendsRPCClient)),
+		Groups:     newGroupsRPCMembershipChecker(groupsclient.NewGroups(groupsRPCClient)),
 	}
 }
 
@@ -102,18 +129,67 @@ func newMediaIDGenerator(cfg config.SnowflakeConfig) (*idgen.RoutedFlake, error)
 	})
 }
 
-// messageAttachmentAccessChecker 把 message repo 的附件可见性查询适配成 AttachmentAccessChecker。
-type messageAttachmentAccessChecker struct {
-	repo repository.MessageRepository
+// hasRPCClientConfig 判断 zrpc 客户端是否已配置(target / endpoints / etcd 任一)。
+func hasRPCClientConfig(conf zrpc.RpcClientConf) bool {
+	return conf.Target != "" || len(conf.Endpoints) > 0 || (len(conf.Etcd.Hosts) > 0 && conf.Etcd.Key != "")
 }
 
-func newMessageAttachmentAccessChecker(repo repository.MessageRepository) AttachmentAccessChecker {
-	return messageAttachmentAccessChecker{repo: repo}
+// --- 跨域 rpc 客户端 → 下载授权编排接口的适配器 ---
+
+type msgRPCMessageRefResolver struct {
+	cli msgclient.Msg
 }
 
-func (c messageAttachmentAccessChecker) UserCanAccessMedia(ctx context.Context, userID string, mediaID string) (bool, error) {
-	if c.repo == nil {
-		return false, nil
+func newMsgRPCMessageRefResolver(cli msgclient.Msg) MessageRefResolver {
+	return msgRPCMessageRefResolver{cli: cli}
+}
+
+func (r msgRPCMessageRefResolver) GetMessageRef(ctx context.Context, serverMsgID, requesterAccountID string) (string, string, string, string, error) {
+	resp, err := r.cli.GetMessageRef(ctx, &msgclient.GetMessageRefRequest{
+		ServerMsgId:        serverMsgID,
+		RequesterAccountId: requesterAccountID,
+	})
+	if err != nil {
+		return "", "", "", "", rpcerror.FromStatus(err)
 	}
-	return c.repo.UserCanAccessMedia(ctx, userID, mediaID)
+	return resp.GetChatType(), resp.GetGroupId(), resp.GetPeerAccountId(), resp.GetMediaId(), nil
+}
+
+type friendsRPCFriendshipChecker struct {
+	cli friendsclient.Friends
+}
+
+func newFriendsRPCFriendshipChecker(cli friendsclient.Friends) FriendshipChecker {
+	return friendsRPCFriendshipChecker{cli: cli}
+}
+
+// IsFriendOneWay 只看 requester→peer 这条记录是否 accepted（GetFriendship 按 user→friend 有向查）。
+func (c friendsRPCFriendshipChecker) IsFriendOneWay(ctx context.Context, requesterAccountID, peerAccountID string) (bool, error) {
+	resp, err := c.cli.GetFriendship(ctx, &friendsclient.GetFriendshipRequest{
+		UserId:   requesterAccountID,
+		FriendId: peerAccountID,
+	})
+	if err != nil {
+		return false, rpcerror.FromStatus(err)
+	}
+	return resp.GetFriendship().GetIsFriend(), nil
+}
+
+type groupsRPCMembershipChecker struct {
+	cli groupsclient.Groups
+}
+
+func newGroupsRPCMembershipChecker(cli groupsclient.Groups) GroupMembershipChecker {
+	return groupsRPCMembershipChecker{cli: cli}
+}
+
+func (c groupsRPCMembershipChecker) IsMember(ctx context.Context, groupID, requesterAccountID string) (bool, error) {
+	resp, err := c.cli.IsMember(ctx, &groupsclient.IsMemberRequest{
+		GroupId: groupID,
+		UserId:  requesterAccountID,
+	})
+	if err != nil {
+		return false, rpcerror.FromStatus(err)
+	}
+	return resp.GetIsMember(), nil
 }

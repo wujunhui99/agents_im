@@ -199,3 +199,27 @@ func TestLeaveGroupOwnerOnlyMember(t *testing.T) {
 	_, err := NewLeaveGroupLogic(context.Background(), newSvc(g, m)).LeaveGroup(&groups.LeaveGroupRequest{GroupId: "g1", UserId: "owner"})
 	wantCode(t, err, codes.PermissionDenied)
 }
+
+// IsMember（媒体下载授权 §4 群聊校验）：active 成员 true、left/非成员 false。
+func TestIsMember(t *testing.T) {
+	g := &fakeGroupsModel{}
+	m := &fakeMembersModel{byKey: map[string]*model.GroupMembers{
+		"g1|active": member("g1", "active", model.MemberRoleMember, model.MemberStatusActive),
+		"g1|left":   member("g1", "left", model.MemberRoleMember, model.MemberStatusLeft),
+	}}
+	l := func() *IsMemberLogic { return NewIsMemberLogic(context.Background(), newSvc(g, m)) }
+
+	if resp, err := l().IsMember(&groups.IsMemberRequest{GroupId: "g1", UserId: "active"}); err != nil || !resp.GetIsMember() {
+		t.Fatalf("active member: resp=%v err=%v", resp, err)
+	}
+	if resp, err := l().IsMember(&groups.IsMemberRequest{GroupId: "g1", UserId: "left"}); err != nil || resp.GetIsMember() {
+		t.Fatalf("left member should not be a member: resp=%v err=%v", resp, err)
+	}
+	if resp, err := l().IsMember(&groups.IsMemberRequest{GroupId: "g1", UserId: "stranger"}); err != nil || resp.GetIsMember() {
+		t.Fatalf("non-member should be false: resp=%v err=%v", resp, err)
+	}
+	// 缺 user_id → InvalidArgument。
+	if _, err := l().IsMember(&groups.IsMemberRequest{GroupId: "g1"}); err == nil {
+		t.Fatal("missing user_id should fail")
+	}
+}

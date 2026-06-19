@@ -44,7 +44,7 @@ func (l *GetDownloadURLLogic) GetDownloadURL(in *media.GetDownloadURLRequest) (*
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	allowed, err := requesterCanAccessMedia(l.ctx, l.svcCtx, requester, obj)
+	allowed, err := requesterCanAccessMedia(l.ctx, l.svcCtx, requester, in.GetMsgId(), obj)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}

@@ -64,6 +64,9 @@ type CompleteMediaUploadResp {
 
 type GetMediaDownloadURLReq {
 	MediaID string `path:"media_id"`
+	// MsgID 是引用该媒体的消息 id（雪花,十进制串）。非 uploader 下载时必传:下载授权链路校验
+	// + 私聊单向好友 / 群成员判定（EPIC #527 §4）。uploader 本人下载走快速放行,可省。
+	MsgID string `form:"msg_id,optional"`
 }
 
 type GetMediaDownloadURLData {

@@ -13,17 +13,16 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	sharedmodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
 	mediapb "github.com/wujunhui99/agents_im/service/media/rpc/media"
 )
 
 // 媒体业务规则：purpose/status 整型(model/vars.go) <-> 字符串契约映射、输入校验（只 validate 不
-// normalize，清洗由客户端负责）、对象存储 key 生成、内容类型白名单、下载鉴权。数据层走 svcCtx.MediaModel
-// (goctl)；media_id 为雪花 bigint（EPIC #527 §1，wire 十进制字符串）。跨域下载鉴权（管理员/消息附件
-// 可见性）经 svcCtx.Accounts/AttachmentAccess 读 internal/repository，是 keystone 阻塞的过渡，待
-// message-rpc 落地后 BFF 化（见 issue #433；§4 下载授权编排见 #532）。
+// normalize，清洗由客户端负责）、对象存储 key 生成、内容类型白名单、下载授权编排。数据层走 svcCtx.MediaModel
+// (goctl)；media_id 为雪花 bigint（EPIC #527 §1，wire 十进制字符串）。下载授权（EPIC #527 §4，issue
+// #532）经属主 msg/friends/groups rpc 编排（链路校验 + 私聊单向好友 / 群成员校验），已脱
+// internal/repository 反向依赖（旧 AttachmentAccess/管理员兜底退役）。
 
 const (
 	purposeAvatar       = "avatar"
@@ -262,40 +261,63 @@ func mediaForOwner(ctx context.Context, svcCtx *svc.ServiceContext, ownerUserID 
 	return media, nil
 }
 
-func requesterCanAccessMedia(ctx context.Context, svcCtx *svc.ServiceContext, requesterUserID string, media *model.MediaObjects) (bool, error) {
+// chat_type 取值（msg-rpc GetMessageRef 返回，对齐 msg model.ChatTypeSingle/Group）。
+const (
+	chatTypeSingle = "single"
+	chatTypeGroup  = "group"
+)
+
+// requesterCanAccessMedia 实现下载授权编排（EPIC #527 §4）：
+//  1. uploader 本人 → 快速放行；
+//  2. 否则经 msg-rpc GetMessageRef(msg_id) 取消息引用，做**链路校验**——消息真正引用的 media_id
+//     必须等于入参 media_id（media_id/msg_id 由客户端各自传入，不校验就能用合法 msg_id 配任意
+//     别人的 media_id 越权）；
+//  3. 私聊 → friends 单向好友校验（只看 requester→peer 这条，对方删 requester 不影响）；
+//     群聊 → groups 成员校验；失败拒绝。
+//
+// 语义均按**当前关系**：requester 删好友/退群后不可再下载历史文件、陌生人会话文件不可下载。
+func requesterCanAccessMedia(ctx context.Context, svcCtx *svc.ServiceContext, requesterUserID, msgID string, media *model.MediaObjects) (bool, error) {
 	if media.UploaderId == requesterUserID {
 		return true, nil
 	}
-	allowed, err := requesterIsAdmin(ctx, svcCtx, requesterUserID)
-	if err != nil || allowed {
-		return allowed, err
-	}
-	return requesterCanAccessAttachment(ctx, svcCtx, requesterUserID, media)
-}
 
-func requesterIsAdmin(ctx context.Context, svcCtx *svc.ServiceContext, requesterUserID string) (bool, error) {
-	if svcCtx.Accounts == nil {
-		return false, nil
+	msgID = strings.TrimSpace(msgID)
+	if msgID == "" {
+		return false, apperror.InvalidArgument("msg_id is required to download media you did not upload")
 	}
-	user, err := svcCtx.Accounts.GetByID(ctx, requesterUserID)
+	if svcCtx.MessageRef == nil {
+		return false, apperror.Internal("message reference resolver is not configured")
+	}
+	chatType, groupID, peerAccountID, refMediaID, err := svcCtx.MessageRef.GetMessageRef(ctx, msgID, requesterUserID)
 	if err != nil {
-		if apperror.From(err).Code == apperror.CodeNotFound {
-			return false, nil
-		}
 		return false, err
 	}
-	return user.AccountType == sharedmodel.AccountTypeAdmin, nil
-}
 
-func requesterCanAccessAttachment(ctx context.Context, svcCtx *svc.ServiceContext, requesterUserID string, media *model.MediaObjects) (bool, error) {
-	if media.Purpose != model.MediaPurposeMessageImage && media.Purpose != model.MediaPurposeMessageFile {
+	// 链路校验：入参 media 必须等于消息真正引用的 media（content ->> 'mediaId'）。
+	if refMediaID == "" || refMediaID != formatMediaID(media.MediaId) {
 		return false, nil
 	}
-	if svcCtx.AttachmentAccess == nil {
+
+	switch chatType {
+	case chatTypeSingle:
+		if peerAccountID == "" {
+			return false, nil
+		}
+		if svcCtx.Friends == nil {
+			return false, apperror.Internal("friendship checker is not configured")
+		}
+		return svcCtx.Friends.IsFriendOneWay(ctx, requesterUserID, peerAccountID)
+	case chatTypeGroup:
+		if groupID == "" {
+			return false, nil
+		}
+		if svcCtx.Groups == nil {
+			return false, apperror.Internal("group membership checker is not configured")
+		}
+		return svcCtx.Groups.IsMember(ctx, groupID, requesterUserID)
+	default:
 		return false, nil
 	}
-	// content.mediaId 以十进制字符串承载（ADR #529），与本地 media_id 统一成同一字符串形比较。
-	return svcCtx.AttachmentAccess.UserCanAccessMedia(ctx, requesterUserID, formatMediaID(media.MediaId))
 }
 
 // --- 对象 key 生成（内容寻址）、checksum 比对、内容类型白名单、id/metadata 构造、PB 映射 ---
