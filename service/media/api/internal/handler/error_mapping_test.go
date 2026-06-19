@@ -31,6 +31,10 @@ func (notFoundMediaClient) CompleteUpload(context.Context, *mediaclient.Complete
 	return nil, status.Error(codes.NotFound, "media object not found")
 }
 
+func (notFoundMediaClient) GetMedia(context.Context, *mediaclient.GetMediaRequest, ...grpc.CallOption) (*mediaclient.MediaObject, error) {
+	return nil, status.Error(codes.NotFound, "media object not found")
+}
+
 func (notFoundMediaClient) GetDownloadURL(context.Context, *mediaclient.GetDownloadURLRequest, ...grpc.CallOption) (*mediaclient.GetDownloadURLResponse, error) {
 	return nil, status.Error(codes.NotFound, "media object not found")
 }

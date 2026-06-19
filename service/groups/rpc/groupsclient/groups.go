@@ -20,6 +20,8 @@ type (
 	Group               = groups.Group
 	GroupMember         = groups.GroupMember
 	GroupResponse       = groups.GroupResponse
+	IsMemberRequest     = groups.IsMemberRequest
+	IsMemberResponse    = groups.IsMemberResponse
 	JoinGroupRequest    = groups.JoinGroupRequest
 	KickMemberRequest   = groups.KickMemberRequest
 	LeaveGroupRequest   = groups.LeaveGroupRequest
@@ -40,6 +42,7 @@ type (
 		LeaveGroup(ctx context.Context, in *LeaveGroupRequest, opts ...grpc.CallOption) (*MemberResponse, error)
 		KickMember(ctx context.Context, in *KickMemberRequest, opts ...grpc.CallOption) (*MemberResponse, error)
 		ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error)
+		IsMember(ctx context.Context, in *IsMemberRequest, opts ...grpc.CallOption) (*IsMemberResponse, error)
 	}
 
 	defaultGroups struct {
@@ -96,4 +99,9 @@ func (m *defaultGroups) KickMember(ctx context.Context, in *KickMemberRequest, o
 func (m *defaultGroups) ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error) {
 	client := groups.NewGroupsClient(m.cli.Conn())
 	return client.ListMembers(ctx, in, opts...)
+}
+
+func (m *defaultGroups) IsMember(ctx context.Context, in *IsMemberRequest, opts ...grpc.CallOption) (*IsMemberResponse, error) {
+	client := groups.NewGroupsClient(m.cli.Conn())
+	return client.IsMember(ctx, in, opts...)
 }

@@ -12,6 +12,7 @@ type Config struct {
 	ObjectStorage appconfig.ObjectStorageConfig `json:",optional"`
 	// Snowflake 配置 media_id 雪花生成器的机器位（EPIC #527 §1：多副本同毫秒不碰撞）。
 	Snowflake SnowflakeConfig `json:",optional"`
+	// 下载授权（EPIC #527 §4）的跨域编排在 media-api(BFF)：media-rpc 不持跨域 rpc 客户端、保持叶子。
 	// tracing 用 go-zero 自带 Telemetry（ServiceConf 内，由 yaml 配置），不再用 pkg/observability。
 }
 

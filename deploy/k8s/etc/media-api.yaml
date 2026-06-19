@@ -10,6 +10,20 @@ MediaRPC:
     - media-rpc:9096
   Timeout: 5000
 
+# 下载授权 BFF 聚合（EPIC #527 §4，#532）：链路校验经 msg-rpc，私聊单向好友经 friends-rpc，群成员经 groups-rpc。
+MsgRPC:
+  Endpoints:
+    - msg-rpc:9098
+  Timeout: 5000
+FriendsRPC:
+  Endpoints:
+    - friends-rpc:9092
+  Timeout: 5000
+GroupsRPC:
+  Endpoints:
+    - groups-rpc:9103
+  Timeout: 5000
+
 # go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。
 Telemetry:
   Name: media-api

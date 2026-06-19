@@ -9,6 +9,19 @@ MediaRPC:
   Endpoints:
     - 127.0.0.1:9096
   Timeout: 5000
+# 下载授权 BFF 聚合（EPIC #527 §4，#532）：链路校验经 msg-rpc，私聊单向好友经 friends-rpc，群成员经 groups-rpc。
+MsgRPC:
+  Endpoints:
+    - 127.0.0.1:9098
+  Timeout: 5000
+FriendsRPC:
+  Endpoints:
+    - 127.0.0.1:9092
+  Timeout: 5000
+GroupsRPC:
+  Endpoints:
+    - 127.0.0.1:9103
+  Timeout: 5000
 
 Telemetry:
   Name: media-api

@@ -67,3 +67,8 @@ func (s *GroupsServer) ListMembers(ctx context.Context, in *groups.ListMembersRe
 	l := logic.NewListMembersLogic(ctx, s.svcCtx)
 	return l.ListMembers(in)
 }
+
+func (s *GroupsServer) IsMember(ctx context.Context, in *groups.IsMemberRequest) (*groups.IsMemberResponse, error) {
+	l := logic.NewIsMemberLogic(ctx, s.svcCtx)
+	return l.IsMember(in)
+}

@@ -27,6 +27,10 @@ func (s stubMediaClient) CompleteUpload(context.Context, *mediaclient.CompleteUp
 	return &mediaclient.CompleteUploadResponse{}, nil
 }
 
+func (s stubMediaClient) GetMedia(context.Context, *mediaclient.GetMediaRequest, ...grpc.CallOption) (*mediaclient.MediaObject, error) {
+	return &mediaclient.MediaObject{}, nil
+}
+
 func (s stubMediaClient) GetDownloadURL(context.Context, *mediaclient.GetDownloadURLRequest, ...grpc.CallOption) (*mediaclient.GetDownloadURLResponse, error) {
 	return &mediaclient.GetDownloadURLResponse{}, nil
 }

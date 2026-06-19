@@ -9,9 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
-	sharedmodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
@@ -77,24 +75,8 @@ func (m *fakeMediaModel) MarkReady(_ context.Context, mediaID int64, objectKey s
 	return &copy, nil
 }
 
-type fakeAccounts struct {
-	users map[string]sharedmodel.User
-}
-
-func (f fakeAccounts) GetByID(_ context.Context, accountID string) (sharedmodel.User, error) {
-	if u, ok := f.users[accountID]; ok {
-		return u, nil
-	}
-	return sharedmodel.User{}, apperror.NotFound("account not found")
-}
-
-type fakeAttachmentAccess struct {
-	allow map[string]bool // userID|mediaID(十进制串) -> allowed
-}
-
-func (f fakeAttachmentAccess) UserCanAccessMedia(_ context.Context, userID, mediaID string) (bool, error) {
-	return f.allow[userID+"|"+mediaID], nil
-}
+// 下载授权（EPIC #527 §4）的跨域编排已上移 media-api(BFF)，其链路校验 / 私聊好友 / 群成员单测
+// 见 service/media/api（用 fake msg/friends/groups 客户端）。media-rpc 这里只覆盖纯签发 + GetMedia。
 
 // newMediaIDGen 构造测试用 media_id 生成器（HintBits=0、单机 machine 0），与 svc 默认布局一致。
 func newMediaIDGen(t *testing.T) *idgen.RoutedFlake {
@@ -372,13 +354,17 @@ func TestCompleteUploadResumesWhenTmpAlreadyRenamed(t *testing.T) {
 	}
 }
 
-// --- GetDownloadURL 鉴权 ---
+// --- GetDownloadURL（纯签发）+ GetMedia（元数据读）---
+// 跨域下载授权（链路校验 / 私聊好友 / 群成员）已上移 media-api(BFF)，单测见 service/media/api。
 
-func TestGetDownloadURLOwnerAllowed(t *testing.T) {
+const dlUploader = "323130844539310080"
+
+// GetDownloadURL 纯签发：ready 的 media 直接签 URL（不做 requester 鉴权）。
+func TestGetDownloadURLSignsReadyMedia(t *testing.T) {
 	const dlID int64 = 7001
-	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageFile, "application/pdf", 2048)
+	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageFile, "application/pdf", 2048)
 	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore()}
-	resp, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", MediaId: strconv.FormatInt(dlID, 10)})
+	resp, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{MediaId: strconv.FormatInt(dlID, 10)})
 	if err != nil {
 		t.Fatalf("GetDownloadURL: %v", err)
 	}
@@ -387,41 +373,33 @@ func TestGetDownloadURLOwnerAllowed(t *testing.T) {
 	}
 }
 
-func TestGetDownloadURLNonOwnerForbidden(t *testing.T) {
+// GetDownloadURL 对 pending（未 ready）media 拒绝签发。
+func TestGetDownloadURLRejectsNotReady(t *testing.T) {
 	const dlID int64 = 7001
-	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageFile, "application/pdf", 2048)
-	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore(),
-		Accounts:         fakeAccounts{users: map[string]sharedmodel.User{}},
-		AttachmentAccess: fakeAttachmentAccess{allow: map[string]bool{}},
-	}
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", RequesterUserId: "999000111222333444", MediaId: strconv.FormatInt(dlID, 10)})
-	wantCode(t, err, codes.PermissionDenied)
+	m := pendingTmpRow(t, dlID, dlUploader, sha256Hex64("a"), 2048)
+	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore()}
+	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{MediaId: strconv.FormatInt(dlID, 10)})
+	wantCode(t, err, codes.InvalidArgument)
 }
 
-func TestGetDownloadURLAdminAllowed(t *testing.T) {
+// GetMedia 返回 media 元数据（供 media-api 判 uploader 快速放行）；查不到 → NotFound。
+func TestGetMediaReturnsMetadata(t *testing.T) {
 	const dlID int64 = 7001
-	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageFile, "application/pdf", 2048)
-	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore(),
-		Accounts: fakeAccounts{users: map[string]sharedmodel.User{"999000111222333444": {AccountType: sharedmodel.AccountTypeAdmin}}},
-	}
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", RequesterUserId: "999000111222333444", MediaId: strconv.FormatInt(dlID, 10)})
+	m := readyMedia(dlID, dlUploader, model.MediaPurposeMessageImage, "image/jpeg", 2048)
+	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore()}
+	resp, err := NewGetMediaLogic(context.Background(), svcCtx).GetMedia(&media.GetMediaRequest{MediaId: strconv.FormatInt(dlID, 10)})
 	if err != nil {
-		t.Fatalf("admin download: %v", err)
+		t.Fatalf("GetMedia: %v", err)
+	}
+	if resp.GetOwnerUserId() != dlUploader || resp.GetStatus() != statusReady {
+		t.Fatalf("unexpected metadata: %+v", resp)
 	}
 }
 
-func TestGetDownloadURLMessageParticipantAllowed(t *testing.T) {
-	const dlID int64 = 7001
-	m := readyMedia(dlID, "323130844539310080", model.MediaPurposeMessageImage, "image/jpeg", 2048)
-	receiver := "999000111222333444"
-	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(m), Store: newMemStore(),
-		Accounts:         fakeAccounts{users: map[string]sharedmodel.User{}},
-		AttachmentAccess: fakeAttachmentAccess{allow: map[string]bool{receiver + "|" + strconv.FormatInt(dlID, 10): true}},
-	}
-	_, err := NewGetDownloadURLLogic(context.Background(), svcCtx).GetDownloadURL(&media.GetDownloadURLRequest{OwnerUserId: "323130844539310080", RequesterUserId: receiver, MediaId: strconv.FormatInt(dlID, 10)})
-	if err != nil {
-		t.Fatalf("participant download: %v", err)
-	}
+func TestGetMediaMissingReturnsNotFound(t *testing.T) {
+	svcCtx := &svc.ServiceContext{MediaModel: newFakeMediaModel(), Store: newMemStore()}
+	_, err := NewGetMediaLogic(context.Background(), svcCtx).GetMedia(&media.GetMediaRequest{MediaId: "999999999999999"})
+	wantCode(t, err, codes.NotFound)
 }
 
 // --- GetAvatarDisplayURL ---

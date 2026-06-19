@@ -13,17 +13,17 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	sharedmodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/media/rpc/internal/svc"
 	mediapb "github.com/wujunhui99/agents_im/service/media/rpc/media"
 )
 
 // 媒体业务规则：purpose/status 整型(model/vars.go) <-> 字符串契约映射、输入校验（只 validate 不
-// normalize，清洗由客户端负责）、对象存储 key 生成、内容类型白名单、下载鉴权。数据层走 svcCtx.MediaModel
-// (goctl)；media_id 为雪花 bigint（EPIC #527 §1，wire 十进制字符串）。跨域下载鉴权（管理员/消息附件
-// 可见性）经 svcCtx.Accounts/AttachmentAccess 读 internal/repository，是 keystone 阻塞的过渡，待
-// message-rpc 落地后 BFF 化（见 issue #433；§4 下载授权编排见 #532）。
+// normalize，清洗由客户端负责）、对象存储 key 生成、内容类型白名单。数据层走 svcCtx.MediaModel
+// (goctl)；media_id 为雪花 bigint（EPIC #527 §1，wire 十进制字符串）。
+// 下载授权（EPIC #527 §4，issue #532）的跨域编排（链路校验 + 私聊单向好友 / 群成员校验）在
+// media-api(BFF) 完成（聚合 msg/friends/groups rpc）；media-rpc 只暴露 GetMedia（元数据读）+
+// GetDownloadURL（纯签发），不发起跨域 rpc 调用、不再依赖 internal/repository。
 
 const (
 	purposeAvatar       = "avatar"
@@ -231,7 +231,7 @@ func validateAvatarMediaObject(media *model.MediaObjects) error {
 	return nil
 }
 
-// --- 数据访问 + 跨域下载鉴权 ---
+// --- 数据访问 ---
 
 func mediaByID(ctx context.Context, svcCtx *svc.ServiceContext, mediaID int64) (*model.MediaObjects, error) {
 	media, err := svcCtx.MediaModel.FindOne(ctx, mediaID)
@@ -260,42 +260,6 @@ func mediaForOwner(ctx context.Context, svcCtx *svc.ServiceContext, ownerUserID 
 		return nil, apperror.Forbidden("media object is not owned by requester")
 	}
 	return media, nil
-}
-
-func requesterCanAccessMedia(ctx context.Context, svcCtx *svc.ServiceContext, requesterUserID string, media *model.MediaObjects) (bool, error) {
-	if media.UploaderId == requesterUserID {
-		return true, nil
-	}
-	allowed, err := requesterIsAdmin(ctx, svcCtx, requesterUserID)
-	if err != nil || allowed {
-		return allowed, err
-	}
-	return requesterCanAccessAttachment(ctx, svcCtx, requesterUserID, media)
-}
-
-func requesterIsAdmin(ctx context.Context, svcCtx *svc.ServiceContext, requesterUserID string) (bool, error) {
-	if svcCtx.Accounts == nil {
-		return false, nil
-	}
-	user, err := svcCtx.Accounts.GetByID(ctx, requesterUserID)
-	if err != nil {
-		if apperror.From(err).Code == apperror.CodeNotFound {
-			return false, nil
-		}
-		return false, err
-	}
-	return user.AccountType == sharedmodel.AccountTypeAdmin, nil
-}
-
-func requesterCanAccessAttachment(ctx context.Context, svcCtx *svc.ServiceContext, requesterUserID string, media *model.MediaObjects) (bool, error) {
-	if media.Purpose != model.MediaPurposeMessageImage && media.Purpose != model.MediaPurposeMessageFile {
-		return false, nil
-	}
-	if svcCtx.AttachmentAccess == nil {
-		return false, nil
-	}
-	// content.mediaId 以十进制字符串承载（ADR #529），与本地 media_id 统一成同一字符串形比较。
-	return svcCtx.AttachmentAccess.UserCanAccessMedia(ctx, requesterUserID, formatMediaID(media.MediaId))
 }
 
 // --- 对象 key 生成（内容寻址）、checksum 比对、内容类型白名单、id/metadata 构造、PB 映射 ---
