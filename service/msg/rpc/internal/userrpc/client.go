@@ -3,7 +3,7 @@
 // 不再走顶层 internal/repository accountRepo(执行 profiles.avatar_media_id 的 string scan / 空串写)。
 // 是 gate #550(avatar_media_id text→bigint)「读路径迁出 internal/」的第 3 步(继 #551 auth、#553 agent-api)。
 //
-// internal/servicecontext/message(internal，rule 8 禁改)把 Accounts 与 Friendships 都取自
+// AI 托管运行时(service/msg/rpc/internal/aihosting)把 Accounts 与 Friendships 都取自
 // ctx.AccountRepo(类型 repository.Repository)。故本适配器是 Composite：
 //   - 账号方法(Create/GetByID/ExistsByIdentifier/...)经 user-rpc；
 //   - 好友方法(EnsureAcceptedFriendship/...)委托给内部 postgres 好友 repo(friendships 表无 avatar，

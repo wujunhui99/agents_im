@@ -221,7 +221,7 @@ assert_present "-qF" db/migrations/001_init_postgres.sql -- \
   "create table if not exists accounts" "create table if not exists profiles" \
   "account_id text primary key" "account_type smallint not null default 1"
 rg -q "NewGroupsRepositoryForStorage" service/msg/rpc/internal/svc/servicecontext.go
-rg -q "NewMessageLogicWithMediaValidator" internal/servicecontext/message/service_context.go
+rg -q "NewMessageLogicWithMediaValidator" service/msg/rpc/internal/aihosting/service_context.go
 rg -q "NewMessageRepositoryForStorage" service/msg/rpc/internal/svc/servicecontext.go
 assert_present "-q" db/migrations/001_init_postgres.sql -- \
   "accounts" "profiles" "auth_credentials" "friendships" "groups" "group_members" \

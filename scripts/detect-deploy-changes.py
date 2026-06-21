@@ -84,14 +84,14 @@ FLAT_SERVICE_DIRS = {
     "service/msgtransfer/": "msgtransfer",
 }
 
-# message-api 已退役（#463）：REST 入口归 service/msg/api，AI 托管运行时随
-# internal/servicecontext/message 仅由 msg-rpc 消费（03 §9 A3 后 msggateway 走 gRPC，待 B1 迁 msgtransfer）。
+# message-api 已退役（#463）：REST 入口归 service/msg/api，AI 托管运行时（旧
+# internal/servicecontext/message）#341/A4 起重定位到 service/msg/rpc/internal/aihosting，
+# 由下方 service/<domain>/<kind> 通用规则精确路由到 msg-rpc，不再需要 internal 前缀特例。
 INTERNAL_DOMAIN_SERVICE_PREFIXES = {
     "internal/handler/admin/": ["admin-api"],
     # service/admin/{api,rpc}/** 由 service/<domain>/<kind> 通用规则精确路由；
     # 这里兜底任何 service/admin/ 顶层散文件，两者都重建。
     "service/admin/": ["admin-api", "admin-rpc"],
-    "internal/servicecontext/message/": ["msg-rpc"],
 }
 
 INTERNAL_EXACT_SERVICE_PATHS = {}

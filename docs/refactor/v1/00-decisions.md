@@ -177,7 +177,7 @@
 - **托管配置 owner = agent 域**：`conversation_ai_hosting` 表终态归 `service/agent/rpc/internal/model`（D13）；#463 临时塞进 msg.proto 的 2 个 ai-hosting RPC 随 agent-rpc 上线迁出，msg-api 的 ai-hosting 路由改 BFF 调 agent-rpc。
 - **流量预过滤是未来旋钮，不是现在的设计**：判定移走后新增的只有运输成本（每条消息一份 Kafka 事件写读，单 broker 顺序写）；量级需要时在 transfer 加"托管会话集合"Redis 缓存预过滤（只改发多发少，不改 topic/schema/消费逻辑）。
 - **agent-rpc 在 Kafka 上零生产面**：写回 IM 只经 imadapter 调 msg-rpc SendMessage（gRPC），AI 消息走与人类消息完全相同的链路。
-- **迁移路径**（与 B2 过渡态兼容，每步独立）：①D16 账号 ID 切换 + 数据清零 → ②transfer 加 toPush 的 recv_id 类型过滤（toAgent 已是全量，零改动）→ ③agent-rpc 以新 consumer group 消费（三步终判）→ ④删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（同时解锁 A4 删 `internal/servicecontext/message`）。事件 schema 无需变更。
+- **迁移路径**（与 B2 过渡态兼容，每步独立）：①D16 账号 ID 切换 + 数据清零 → ②transfer 加 toPush 的 recv_id 类型过滤（toAgent 已是全量，零改动）→ ③agent-rpc 以新 consumer group 消费（三步终判）→ ④删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（含 `service/msg/rpc/internal/aihosting`，#341 已从 internal 重定位至此；同时解锁 A4 删 `internal/logic` 消息域剩余）。事件 schema 无需变更。
 - **来源**：本轮 Claude × 用户讨论（2026-06-12，#497 初稿 / #499 / #501 修正）。
 - **影响文档**：03（§10 反向影响重写）、04（§4.2 目标链路 + §7 交集约定）、07（ai-hosting RPC 临时性注记）。
 

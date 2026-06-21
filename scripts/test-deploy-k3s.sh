@@ -213,7 +213,7 @@ fi
 DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --event-name push \
   --ref refs/heads/main \
-  internal/servicecontext/message/service_context.go)"
+  service/msg/rpc/internal/aihosting/service_context.go)"
 if ! grep -Fq "backend_services='[\"msg-rpc\"]'" <<<"${DETECT_OUTPUT}" || \
   grep -Fq 'user-api' <<<"${DETECT_OUTPUT}" || \
   ! grep -Fq "migration_required=false" <<<"${DETECT_OUTPUT}"; then
