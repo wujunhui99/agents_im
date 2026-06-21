@@ -50,6 +50,11 @@ type (
 		// ListAccountProfilesByIDs 批量取 account⋈profile（去重，WHERE account_id IN (...)）；
 		// 不存在的 id 静默跳过，返回找到的子集（不保证顺序）。
 		ListAccountProfilesByIDs(ctx context.Context, accountIDs []string) ([]*AccountProfile, error)
+		// ListAccountProfilesByType 按 account_type 取 account⋈profile（account_id 升序）。
+		ListAccountProfilesByType(ctx context.Context, accountType int64) ([]*AccountProfile, error)
+		// RenameIdentifier 把 fromIdentifier 改名为 toIdentifier 并刷新 updated_at；
+		// 原 identifier 不存在返回 ErrNotFound，目标已存在由唯一约束报 unique violation。
+		RenameIdentifier(ctx context.Context, fromIdentifier, toIdentifier string) (*AccountProfile, error)
 		// ExistsByIdentifier 报告 identifier 是否已存在。
 		ExistsByIdentifier(ctx context.Context, identifier string) (bool, error)
 		// SearchAccountProfiles 按 query 模糊搜 account⋈profile（account_id/identifier/
@@ -140,6 +145,33 @@ func (m *customAccountsModel) ListAccountProfilesByIDs(ctx context.Context, acco
 		return nil, err
 	}
 	return resp, nil
+}
+
+func (m *customAccountsModel) ListAccountProfilesByType(ctx context.Context, accountType int64) ([]*AccountProfile, error) {
+	var resp []*AccountProfile
+	query := accountProfileSelectPrefix + "where a.account_type = $1 order by a.account_id asc"
+	if err := m.conn.QueryRowsCtx(ctx, &resp, query, accountType); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (m *customAccountsModel) RenameIdentifier(ctx context.Context, fromIdentifier, toIdentifier string) (*AccountProfile, error) {
+	var accountID string
+	err := m.conn.QueryRowCtx(ctx, &accountID, `
+update accounts
+set identifier = $2, updated_at = now()
+where identifier = $1
+returning account_id
+`, fromIdentifier, toIdentifier)
+	switch err {
+	case nil:
+		return m.FindAccountProfileByID(ctx, accountID)
+	case sqlx.ErrNotFound:
+		return nil, ErrNotFound
+	default:
+		return nil, err
+	}
 }
 
 func (m *customAccountsModel) ExistsByIdentifier(ctx context.Context, identifier string) (bool, error) {

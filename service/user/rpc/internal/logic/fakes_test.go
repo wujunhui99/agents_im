@@ -89,6 +89,29 @@ func (m *fakeAccountsModel) ListAccountProfilesByIDs(_ context.Context, accountI
 	return out, nil
 }
 
+func (m *fakeAccountsModel) ListAccountProfilesByType(_ context.Context, accountType int64) ([]*model.AccountProfile, error) {
+	out := make([]*model.AccountProfile, 0, len(m.store.byID))
+	for _, rec := range m.store.byID {
+		if rec.AccountType == accountType {
+			clone := *rec
+			out = append(out, &clone)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].AccountID < out[j].AccountID })
+	return out, nil
+}
+
+func (m *fakeAccountsModel) RenameIdentifier(_ context.Context, fromIdentifier, toIdentifier string) (*model.AccountProfile, error) {
+	for _, rec := range m.store.byID {
+		if rec.Identifier == fromIdentifier {
+			rec.Identifier = toIdentifier
+			clone := *rec
+			return &clone, nil
+		}
+	}
+	return nil, model.ErrNotFound
+}
+
 func (m *fakeAccountsModel) ExistsByIdentifier(_ context.Context, identifier string) (bool, error) {
 	for _, rec := range m.store.byID {
 		if rec.Identifier == identifier {

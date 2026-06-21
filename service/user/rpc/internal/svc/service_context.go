@@ -39,13 +39,19 @@ type ServiceContext struct {
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	conn := postgres.New(c.DataSource)
+	accountsModel := model.NewAccountsModel(conn)
+	profilesModel := model.NewProfilesModel(conn)
 
-	// keystone：默认助手开通（agent 域写）。沿用 internal god-repository（account/agent/registry 同一实现）。
+	// keystone：默认助手开通（agent 域写）。agent/registry 与好友写仍走 internal god-repository
+	// （无 avatar，待 agent 域迁移后删）；但账号读写改由 assistantAccountRepo 经 user-rpc 自有
+	// goctl model 承接，脱 internal/repository 的 profiles.avatar_media_id string scan
+	// （gate #550 第 3 处存活读路径，见 assistant_account_repo.go）。
 	repo, err := repository.NewPostgresRepository(c.DataSource)
 	if err != nil {
 		log.Fatalf("build account repository: %v", err)
 	}
-	provisioner := business.NewDefaultAssistantProvisioner(repo, repo, repo)
+	accountRepo := newAssistantAccountRepo(accountsModel, profilesModel, repo)
+	provisioner := business.NewDefaultAssistantProvisioner(accountRepo, repo, repo)
 	if _, err := provisioner.Backfill(context.Background()); err != nil {
 		log.Fatalf("backfill default assistant: %v", err)
 	}
@@ -58,8 +64,8 @@ func NewServiceContext(c config.Config) *ServiceContext {
 
 	return &ServiceContext{
 		Config:          c,
-		Accounts:        model.NewAccountsModel(conn),
-		Profiles:        model.NewProfilesModel(conn),
+		Accounts:        accountsModel,
+		Profiles:        profilesModel,
 		Assistant:       provisioner,
 		AvatarValidator: newMediaRPCAvatarValidator(mediaclient.NewMedia(mediaCli)),
 	}
