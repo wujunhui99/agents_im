@@ -18,7 +18,6 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/chain"
-	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/transfer"
 )
 
 // 全链 roundtrip：publish message.submitted → toTransfer 消费（dedup + Redis seq
@@ -41,8 +40,6 @@ func TestKafkaChainRoundtrip(t *testing.T) {
 	pipeline, err := chain.New(chain.Options{
 		Kafka:      kafkaCfg,
 		DataSource: dsn,
-		Dispatcher: transfer.NoopDispatcher{},
-		WorkerID:   "chain-it",
 	})
 	if err != nil {
 		t.Fatalf("build chain: %v", err)

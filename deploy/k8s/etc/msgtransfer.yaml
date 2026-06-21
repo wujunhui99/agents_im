@@ -4,10 +4,6 @@ DryRun: false
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 
-Dispatcher:
-  Driver: gateway
-  GatewayEndpoint: http://127.0.0.1:8084
-
 Worker:
   PollIntervalMillis: 100
   RetryBackoffMillis: 1000

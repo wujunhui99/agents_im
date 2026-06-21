@@ -26,6 +26,7 @@ configMapGenerator:
       - etc/admin-api.yaml
       - etc/agent-api.yaml
       - etc/msgtransfer.yaml
+      - etc/push.yaml
       - etc/user-rpc.yaml
       - etc/auth-rpc.yaml
       - etc/friends-rpc.yaml

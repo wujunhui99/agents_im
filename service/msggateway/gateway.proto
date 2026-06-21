@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package gateway.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/service/msggateway/gatewaypb";
+
+// GatewayService 是 msggateway 的下行推送 gRPC 面（03-message-pipeline §6.2）。
+// service/push 通过 k8s headless Service DNS 拿到所有 gateway 实例，对每个实例并发
+// 调 BatchPushOneMsg（广播，不经注册中心/etcd）；每个 gateway 只投递给自己持有的
+// 本地 WebSocket 连接，并回传 per-user 投递结果。push 据此汇总判定哪些 user 真离线
+// → 二段式 toOfflinePush。
+service GatewayService {
+  rpc BatchPushOneMsg(BatchPushOneMsgReq) returns (BatchPushOneMsgResp);
+}
+
+message BatchPushOneMsgReq {
+  string conversation_id = 1;
+  repeated string push_to_user_ids = 2;
+  // event_json 是 pkg/gateway/delivery.Event（message_received）的 JSON 编码。
+  // 携 JSON 而非把 20+ 消息字段重建成 proto：与现有 dispatcher 保持线兼容，
+  // 也避免在 D6（Kafka wire 切 proto MsgData）落地前提前造型。
+  bytes event_json = 3;
+}
+
+message BatchPushOneMsgResp {
+  repeated RecipientDeliveryResult recipients = 1;
+}
+
+message RecipientDeliveryResult {
+  string user_id = 1;
+  // status 取 pkg/gateway/delivery.Status*：delivered / offline / failed / routed。
+  string status = 2;
+  string error = 3;
+}

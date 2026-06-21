@@ -1,6 +1,7 @@
 // msggateway（03 §9 A3，原 service/gateway-ws）：纯连接层——WebSocket 长连接 +
-// JWT/session 鉴权 + presence + msgtransfer 下行推送的 /internal/delivery HTTP 面。
-// 4 个 ws command 经 msg-rpc gRPC 转发，不再装配 monolith repository / AI runtime。
+// JWT/session 鉴权 + presence + 下行推送 gRPC 面（GatewayService.BatchPushOneMsg，
+// 03 §6.2，由 service/push 经 k8s headless DNS 广播）。4 个 ws command 经 msg-rpc
+// gRPC 转发，不再装配 monolith repository / AI runtime。
 package main
 
 import (
@@ -8,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,9 +23,12 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/pkg/presence"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
+	"github.com/wujunhui99/agents_im/service/msggateway/gatewaypb"
 	"github.com/wujunhui99/agents_im/service/msggateway/internal/backend"
+	"github.com/wujunhui99/agents_im/service/msggateway/internal/grpcserver"
 	gatewayws "github.com/wujunhui99/agents_im/service/msggateway/internal/ws"
 	"github.com/zeromicro/go-zero/zrpc"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -95,6 +100,10 @@ func main() {
 		errCh <- server.ListenAndServe()
 	}()
 
+	// 下行推送 gRPC server（03 §6.2）：service/push 经 k8s headless DNS 广播
+	// BatchPushOneMsg，本实例只投递给自己持有的连接。空 ListenOn = 不启用。
+	grpcServer, grpcErrCh := startGatewayGRPC(cfg.GatewayGRPC.ListenOn, wsServer)
+
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -105,13 +114,42 @@ func main() {
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("gateway server failed: %v", err)
 		}
+	case err := <-grpcErrCh:
+		if err != nil {
+			log.Fatalf("gateway push grpc server failed: %v", err)
+		}
 	}
 
+	if grpcServer != nil {
+		grpcServer.GracefulStop()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("shutdown gateway server: %v", err)
 	}
+}
+
+// startGatewayGRPC starts the downstream-push gRPC server when listenOn is set.
+// Returns the server (nil when disabled) and a channel that receives a Serve error.
+func startGatewayGRPC(listenOn string, deliverer grpcserver.PushDeliverer) (*grpc.Server, <-chan error) {
+	errCh := make(chan error, 1)
+	listenOn = strings.TrimSpace(listenOn)
+	if listenOn == "" {
+		log.Printf("gateway push grpc server disabled (GatewayGRPC.ListenOn empty)")
+		return nil, errCh
+	}
+	listener, err := net.Listen("tcp", listenOn)
+	if err != nil {
+		log.Fatalf("listen gateway push grpc %s: %v", listenOn, err)
+	}
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(observability.GRPCUnaryServerInterceptor()))
+	gatewaypb.RegisterGatewayServiceServer(grpcServer, grpcserver.New(deliverer))
+	go func() {
+		log.Printf("gateway push grpc server listening on %s", listenOn)
+		errCh <- grpcServer.Serve(listener)
+	}()
+	return grpcServer, errCh
 }
 
 func hasRPCClientConfig(conf zrpc.RpcClientConf) bool {

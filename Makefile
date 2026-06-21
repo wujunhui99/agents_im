@@ -12,7 +12,7 @@ FRONTEND_URL := http://127.0.0.1:$(FRONTEND_PORT)
 # ---- go-zero microservices (entrypoints live under service/<...>; cmd/ removed) ----
 BACKEND_SERVICES := agent-api auth-api auth-rpc friends-api friends-rpc \
 	groups-api groups-rpc user-api user-rpc \
-	msg-rpc msg-api third-rpc msggateway msgtransfer \
+	msg-rpc msg-api third-rpc msggateway msgtransfer push \
 	admin-api admin-rpc media-api media-rpc
 
 # Deployment name -> go main package path.
@@ -30,6 +30,7 @@ PKG_msg-api          := ./service/msg/api
 PKG_third-rpc        := ./service/third/rpc
 PKG_msggateway       := ./service/msggateway
 PKG_msgtransfer := ./service/msgtransfer
+PKG_push             := ./service/push
 PKG_admin-api        := ./service/admin/api
 PKG_admin-rpc        := ./service/admin/rpc
 PKG_media-api        := ./service/media/api

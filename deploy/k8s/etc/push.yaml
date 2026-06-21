@@ -1,0 +1,19 @@
+Name: push
+
+# Kafka：消费 msg.toPush.v1（在线广播）+ msg.toOfflinePush.v1（离线）。
+Kafka:
+  Brokers: redpanda.agents-im.svc.cluster.local:9092
+
+# 下行推送 gRPC 目标：msggateway 的 HEADLESS Service DNS。A 记录列出每个 gateway
+# pod IP，push 对每个 IP 建一条 gRPC 长连并广播 BatchPushOneMsg（k8s 原生服务发现，
+# 无 etcd）。RefreshSeconds 周期重解析以纳入新 pod。
+Gateway:
+  Target: msggateway-headless.agents-im.svc.cluster.local:9100
+  RefreshSeconds: 30
+  DialTimeoutSeconds: 5
+  PushTimeoutSeconds: 5
+
+Observability:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 8091

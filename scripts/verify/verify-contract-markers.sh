@@ -136,13 +136,16 @@ assert_present "-q" service/msggateway/internal/ws/server.go service/msggateway/
   "TestWebSocketGatewayPullMessagesFromMissingSeq" "TestWebSocketGatewayInvalidCommandReturnsFrontendErrorEnvelope"
 rg -q "TestWebSocketOriginPolicyUsesConfiguredExactOrigins" service/msggateway/internal/ws/server_test.go
 
-assert_present "-q" service/msgtransfer/internal/transfer -- \
-  "type MessageEvent struct" "type Envelope struct" "type EventConsumer interface" "type DeliveryDispatcher interface" \
-  "type IdempotencyStore interface" "type RetryDecision struct" "type Worker struct" "func NewWorker" \
-  "func \(w \*Worker\) Start" "func \(w \*Worker\) RunOnce" "func \(w \*Worker\) Stop" "NewInMemoryConsumer" "type NoopDispatcher struct"
-assert_present "-q" service/msgtransfer/internal/transfer/worker_test.go -- \
-  "TestWorkerConsumesEventAndMarksSuccessful" "TestWorkerIdempotencySkipsDuplicateDispatch" \
-  "TestWorkerRetryableFailureDoesNotMarkSuccessful" "TestWorkerContextCancellationStopsLoop"
+# push 服务（03 §9 C2-C3）：在线广播 + 二段式离线。gateway 投递自 msgtransfer 拆出。
+assert_present "-q" service/push/internal/gateway service/push/internal/pusher -- \
+  "type Broadcaster struct" "func \(b \*Broadcaster\) Broadcast" "type OnlineHandler struct" \
+  "type OfflineHandler struct" "type OfflinePusher interface" "AuditOfflinePusher" "TopicToOfflinePush"
+assert_present "-q" service/push/internal/gateway/broadcaster_test.go service/push/internal/pusher/online_test.go service/push/internal/pusher/offline_test.go -- \
+  "TestBroadcastAggregatesDeliveredAcrossGateways" "TestBroadcastErrorsWhenAnyGatewayFails" \
+  "TestOnlineHandlerProducesOfflineForMissedRecipients" "TestOnlineHandlerBroadcastErrorRetriesBatch" \
+  "TestOfflineHandlerPushesRecipients"
+rg -q "GroupPushOnline|GroupPushOffline" pkg/messaging/topics.go
+rg -q "LoadPushConfig" pkg/config/push.go
 
 rg -q "LoadMessageTransferConfig" pkg/config/config.go
 rg -q "msgtransfer" service/msgtransfer/msgtransfer.go etc/msgtransfer.yaml
@@ -153,16 +156,13 @@ rg -q "WorkerID|Worker\.ID" etc/msgtransfer.yaml pkg/config/config.go
 assert_present "-q" pkg/gateway/delivery service/msggateway/internal/ws -- \
   "type Dispatcher interface" "DeliverToUser" "DeliverToConversation" "EventMessageReceived" "EventMessageDelivered" \
   "StatusOffline" "NewInMemoryDeliveryDispatcher" "PushToUser" "PushToConversation" "UserConnections"
-assert_present "-q" service/msgtransfer/internal/transfer/gateway -- \
-  "type Dispatcher struct" "func NewDispatcher" "func \(d \*Dispatcher\) Dispatch" "EventMessageReceived" \
-  "DeliverToConversation" "StatusOffline" "DispatchRetryable" "ErrNoRecipients"
-assert_present "-q" service/msgtransfer/internal/transfer/gateway/dispatcher_test.go -- \
-  "TestDispatcherDeliversMessageAcceptedToGateway" "TestDispatcherOfflineRecipientsAreCompletedWithoutDeliveredUsers" \
-  "TestDispatcherNoRecipientsFailsWithoutCallingGateway" "TestWorkerIdempotencySkipsDuplicateGatewayDispatch" \
-  "TestWorkerRetryDecisionForGatewayError"
+# 下行推送 gRPC 面（03 §6.2）：msggateway 暴露 GatewayService，push 经 headless DNS 广播。
+assert_present "-q" service/msggateway/gateway.proto service/msggateway/internal/grpcserver -- \
+  "service GatewayService" "BatchPushOneMsg" "type Server struct" "PushToConversation" "delivery.Event"
+rg -q "GatewayGRPC" pkg/config/config.go etc/msggateway.yaml
 
-assert_present "-q" internal/repository service/msgtransfer/internal/transfer db/migrations/001_init_postgres.sql -- \
-  "DeliveryRecipientUserIDs" "type DeliveryAttemptRecorder interface" "MetricsDeliveryAttemptRecorder" "RecipientDeliveryResult" "message_outbox"
+assert_present "-q" internal/repository db/migrations/001_init_postgres.sql -- \
+  "DeliveryRecipientUserIDs" "message_outbox"
 forbid_match "removed message V2 table still referenced: message_idempotency_keys" \
   -q "message_idempotency_keys" db/migrations/001_init_postgres.sql internal/repository --glob '*.go'
 
@@ -252,11 +252,14 @@ assert_present "-q" pkg/health pkg/observability -- \
 for api_main in service/agent/api/agent.go; do
   rg -q "TraceMiddlewareFunc" "$api_main"
 done
-assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/msggateway/msggateway.go service/msgtransfer/msgtransfer.go -- \
+assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/msggateway/msggateway.go service/msgtransfer/msgtransfer.go service/push/push.go -- \
   "/readyz" "/metrics" "ReadinessHandler" "MetricsHandler"
-assert_present "-q" internal/logic/messagelogic.go service/msggateway/internal/ws service/msgtransfer/internal/transfer/worker.go -- \
-  "RecordMessageSend" "RecordDeliveryAttempt" "RecordTransferEvent" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"
-rg -q "Observability:" etc/msgtransfer.yaml
+assert_present "-q" internal/logic/messagelogic.go service/msggateway/internal/ws -- \
+  "RecordMessageSend" "RecordDeliveryAttempt" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"
+# push 在线/离线投递指标（03 §9 C2-C3）。
+assert_present "-q" service/push/internal/pusher pkg/observability/metrics.go -- \
+  "RecordPushOnline" "RecordPushOffline" "agents_im_push_online_total" "agents_im_push_offline_total"
+rg -q "Observability:" etc/msgtransfer.yaml etc/push.yaml
 rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
 rg -q "agents_im_message_sends_total" pkg/observability/metrics.go
 rg -q "trace_id" service/msggateway/internal/ws/server.go

@@ -601,9 +601,7 @@ OpenIM 的 msggateway 本地维护 `userMap`（`user_map.go`），不依赖 Redi
 
 | 步骤 | 内容 | 备注 |
 |------|------|------|
-| C1 | msggateway 注册 gRPC `GatewayService.BatchPushOneMsg`（additive，暂无人调） | 可与阶段 B 并行 |
-| C2 | 新建 `service/push`：消费 `msg.toPush.v1`，广播所有 gateway gRPC（§6）；msgtransfer 改 produce toPush；删 `internal/transfer/gateway_http_dispatcher.go`、`internal/transfer/gateway/` | net-new 部署单元，按 [`refactor-domain-to-service` skill] 配套清单串 Dockerfile / drone-build / deploy-k3s / detect-deploy / deployments+services / kustomization / verify 全链 |
-| C3 | 二段式离线推送：`msg.toOfflinePush.v1` producer/consumer + FCM adapter（第一版可 noop / 写 audit 表，§6.3） | 独立小 PR |
+| C1+C2+C3（✅ #342 合并落地） | 新建 `service/push`：消费 `msg.toPush.v1` → 经 **k8s headless Service DNS**（`msggateway-headless:9100`，无 etcd）广播 `GatewayService.BatchPushOneMsg` 到每个 gateway 实例 → 汇总 per-user 投递 → 在线漏投的 user 二段式 produce `msg.toOfflinePush.v1`；push 自身 offline consumer 调 `OfflinePusher`（首版 `AuditOfflinePusher`，§6.3 允许 audit-only）。msggateway 加下行推送 gRPC server（`service/msggateway/gateway.proto` → `gatewaypb`，监听 9100）。msgtransfer 只保留 produce toPush，**整包删除** `service/msgtransfer/internal/transfer/`（worker + HTTP/local gateway dispatcher + delivery-attempt recorder 随 push 拆分退役）。 | net-new 部署单元，全链已串：Dockerfile / Makefile / drone-build / deploy-k3s / detect-deploy / deployments+services（含 msggateway-headless）/ kustomization / dev-up / verify。**落地偏差**：(1) 投递 result 聚合规则——任一 gateway 报 delivered 即 delivered，否则 offline；任一 gateway RPC 失败则整批重试（不误判离线，at-least-once）；(2) 离线推送首版 `AuditOfflinePusher`（日志+`agents_im_push_offline_total` 指标，无厂商通道），FCM/APNs 等留后续；(3) push 是纯调度器无 DB，原 `delivery_attempts` PG 记录暂以指标/日志替代，落 PG 留后续。 |
 
 ### 阶段 D：读路径 + 新增 RPC（07 §8 Phase 2+3，B3 后解锁）
 
@@ -616,8 +614,8 @@ OpenIM 的 msggateway 本地维护 `userMap`（`user_map.go`），不依赖 Redi
   - `kafka_consumer_lag{topic,group}`
   - `msg_transfer_batch_size`
   - `msg_transfer_seq_malloc_duration`
-  - `push_online_delivered_total{result}`
-  - `push_offline_pushed_total{channel,result}`
+  - `agents_im_push_online_total{result}`（result=delivered/offline，✅ #342）
+  - `agents_im_push_offline_total{channel,result}`（✅ #342）
 - Loki / Tempo 链 trace_id（trace_id 通过 Kafka headers 传递）。
 
 ### 远期（原 Phase 6，可选）：MongoDB 归档
