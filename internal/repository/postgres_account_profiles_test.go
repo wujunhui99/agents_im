@@ -171,7 +171,7 @@ func TestPostgresUpdateAvatarPersistsDurableAvatarURL(t *testing.T) {
 	avatarMediaID := "med_avatar_1"
 	avatarURL := "/media/avatars/med_avatar_1"
 
-	mock.ExpectQuery(`(?s)update\s+profiles\s+.*set\s+avatar_media_id\s+=\s+\$2,\s+avatar_url\s+=\s+\$3`).
+	mock.ExpectQuery(`(?s)update\s+profiles\s+.*set\s+avatar_media_id\s+=\s+coalesce\(nullif\(\$2,\s+''\)::bigint,\s+0\),\s+avatar_url\s+=\s+\$3`).
 		WithArgs(accountID, avatarMediaID, avatarURL).
 		WillReturnRows(sqlmock.NewRows([]string{"account_id"}).AddRow(accountID))
 	mock.ExpectQuery(`(?s)from\s+accounts\s+a\s+join\s+profiles\s+p\s+on\s+p\.account_id\s+=\s+a\.account_id`).
