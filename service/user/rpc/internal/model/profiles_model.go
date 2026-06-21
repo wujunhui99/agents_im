@@ -20,7 +20,7 @@ type ProfileInsert struct {
 	Gender        int64
 	BirthDate     string
 	Region        string
-	AvatarMediaID string
+	AvatarMediaID int64
 	AvatarURL     string
 }
 
@@ -47,8 +47,9 @@ type (
 		// UpdateProfileFields 按 patch 局部更新 profiles 并刷新 updated_at；
 		// patch 无任何字段则不更新；账号不存在返回 ErrNotFound。
 		UpdateProfileFields(ctx context.Context, accountID string, patch ProfilePatch) error
-		// UpdateAvatar 更新头像 media id/url 并刷新 updated_at；账号不存在返回 ErrNotFound。
-		UpdateAvatar(ctx context.Context, accountID, avatarMediaID, avatarURL string) error
+		// UpdateAvatar 更新头像 media id/url 并刷新 updated_at；avatarMediaID 为 DB int64
+		// （0 = 无头像哨兵）；账号不存在返回 ErrNotFound。
+		UpdateAvatar(ctx context.Context, accountID string, avatarMediaID int64, avatarURL string) error
 	}
 
 	customProfilesModel struct {
@@ -117,7 +118,7 @@ func (m *customProfilesModel) UpdateProfileFields(ctx context.Context, accountID
 	}
 }
 
-func (m *customProfilesModel) UpdateAvatar(ctx context.Context, accountID, avatarMediaID, avatarURL string) error {
+func (m *customProfilesModel) UpdateAvatar(ctx context.Context, accountID string, avatarMediaID int64, avatarURL string) error {
 	var returned string
 	err := m.conn.QueryRowCtx(ctx, &returned, `
 update profiles

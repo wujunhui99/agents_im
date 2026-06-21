@@ -21,7 +21,7 @@ func toUserEntity(ap *model.AccountProfile) *userpb.UserEntity {
 		BirthDate:     ap.BirthDate,
 		Region:        ap.Region,
 		AccountType:   accountTypeFromDB(ap.AccountType),
-		AvatarMediaId: ap.AvatarMediaID,
+		AvatarMediaId: model.FormatAvatarMediaID(ap.AvatarMediaID),
 		Email:         ap.EmailNormalized,
 		AvatarUrl:     ap.AvatarURL,
 		// transport 的 created_at/updated_at 取 profile 时间戳（与 monolith 行为一致）。

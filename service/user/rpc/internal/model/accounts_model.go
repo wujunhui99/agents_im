@@ -27,7 +27,7 @@ type AccountProfile struct {
 	Gender           int64        `db:"gender"`
 	BirthDate        string       `db:"birth_date"`
 	Region           string       `db:"region"`
-	AvatarMediaID    string       `db:"avatar_media_id"`
+	AvatarMediaID    int64        `db:"avatar_media_id"`
 	AvatarURL        string       `db:"avatar_url"`
 	ProfileCreatedAt time.Time    `db:"profile_created_at"`
 	ProfileUpdatedAt time.Time    `db:"profile_updated_at"`

@@ -68,7 +68,7 @@ values ($1, $2, $3, $4, $5)
 
 		if _, err := session.ExecCtx(ctx, `
 insert into profiles (account_id, display_name, name, gender, birth_date, region, avatar_media_id, avatar_url)
-values ($1, $2, $3, $4, nullif($5, '')::date, $6, $7, $8)
+values ($1, $2, $3, $4, nullif($5, '')::date, $6, coalesce(nullif($7, '')::bigint, 0), $8)
 `, accountID, user.DisplayName, user.Name, genderToDB(user.Gender), user.BirthDate, user.Region, strings.TrimSpace(user.AvatarMediaID), strings.TrimSpace(user.AvatarURL)); err != nil {
 			return err
 		}
@@ -94,7 +94,7 @@ func (r *PostgresRepository) GetByIdentifier(ctx context.Context, identifier str
 select
   a.account_id, a.identifier, a.account_type, a.email_normalized, a.email_verified_at,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
-  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id::text as avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
 from accounts a
 join profiles p on p.account_id = a.account_id
@@ -126,7 +126,7 @@ func (r *PostgresRepository) SearchAccounts(ctx context.Context, filter AccountS
 select
   a.account_id, a.identifier, a.account_type, a.email_normalized, a.email_verified_at,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
-  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id::text as avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
 from accounts a
 join profiles p on p.account_id = a.account_id
@@ -205,7 +205,7 @@ func (r *PostgresRepository) ListByAccountType(ctx context.Context, accountType 
 select
   a.account_id, a.identifier, a.account_type, a.email_normalized, a.email_verified_at,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
-  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id::text as avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
 from accounts a
 join profiles p on p.account_id = a.account_id
@@ -250,7 +250,7 @@ const accountProfileSelectPrefix = `
 select
   a.account_id, a.identifier, a.account_type, a.email_normalized, a.email_verified_at,
   a.created_at as account_created_at, a.updated_at as account_updated_at,
-  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id, p.avatar_url,
+  p.display_name, p.name, p.gender, coalesce(p.birth_date::text, '') as birth_date, p.region, p.avatar_media_id::text as avatar_media_id, p.avatar_url,
   p.created_at as profile_created_at, p.updated_at as profile_updated_at
 from accounts a
 join profiles p on p.account_id = a.account_id
@@ -309,7 +309,7 @@ func (r *PostgresRepository) UpdateAvatar(ctx context.Context, userID string, av
 	var accountID string
 	if err := r.conn.QueryRowCtx(ctx, &accountID, `
 update profiles
-set avatar_media_id = $2, avatar_url = $3, updated_at = now()
+set avatar_media_id = coalesce(nullif($2, '')::bigint, 0), avatar_url = $3, updated_at = now()
 where account_id = $1
 returning account_id
 `, userID, strings.TrimSpace(avatarMediaID), strings.TrimSpace(avatarURL)); err != nil {
