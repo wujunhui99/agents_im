@@ -18,7 +18,7 @@ REST/Gateway 运行时上下文位于：
 | user-api | `internal/servicecontext/user` | `UserLogic`、Account repo、头像/media 上传展示依赖 |
 | friends-api | `internal/servicecontext/friends` | `FriendsLogic`、Account lookup |
 | groups-api | `internal/servicecontext/groups` | `GroupsLogic`、Groups repo、Account existence checker |
-| message-api | `internal/servicecontext/message` | `MessageLogic`、Media validator、AI hosting/audit/outbox |
+| msg-rpc（AI 托管 runtime）| `service/msg/rpc/internal/aihosting`（message-api 已退役 #463，runtime 迁入 msg-rpc；#341/A4 重定位出 `internal/servicecontext/message`）| `MessageLogic`、Media validator、AI hosting/audit |
 | agent-api | `service/agent/api/internal/svc` | `AgentLogic`、Agent repo、Account type checker |
 | msggateway | 无（03 §9 A3 起不再用 servicecontext） | msg-rpc gRPC backend（`service/msggateway/internal/backend`）、JWT auth |
 | shared auth runtime | `internal/servicecontext/common` | JWT config、optional active-session repository |

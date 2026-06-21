@@ -1,4 +1,9 @@
-package message
+// Package aihosting 装配 msg-rpc 的 AI 托管运行时（ServiceContext + ConfigureConversationAIHosting）。
+// 由 #463 从已退役的 message-api 进程迁入；#341/A4 起从顶层 internal/servicecontext/message 重定位到
+// 属主服务 service/msg/rpc 内（脱出 god-package internal/）。仍 import 的 internal/{logic,repository,
+// agentim,agentruntime,servicecontext/common}（MessageLogic / AI runtime）是 keystone 例外，待 agent 域
+// 迁移（04-agent AG-2/AG-3，03 §9 B1）解锁后整套删除。
+package aihosting
 
 import (
 	"context"

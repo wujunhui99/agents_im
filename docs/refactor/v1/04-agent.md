@@ -333,7 +333,7 @@ msg-rpc.SendMessage()
 1. **AG-4 rename** `internal/agent/pythonexec` → `pkg/pythonexec`（00-decisions D10），纯 move。
 2. **AG-5 forbidden 黑名单加注释 + config-driven**。
 3. **AG-1 建 service/agent/rpc**：定义 proto、生成代码、初始化 svc/server。
-4. **AG-2/AG-3 拆 internal/agentim**：搬到 `service/agent/rpc/internal/{trigger,orchestrator,hosting,imadapter,audit}/`；agent-rpc 以新 consumer group 消费 `agent.trigger.v1`（D15 终判），验证后删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线——这是 03 §9 A4（删 `internal/servicecontext/message`）的解锁条件。
+4. **AG-2/AG-3 拆 internal/agentim**：搬到 `service/agent/rpc/internal/{trigger,orchestrator,hosting,imadapter,audit}/`；agent-rpc 以新 consumer group 消费 `agent.trigger.v1`（D15 终判），验证后删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（含 `service/msg/rpc/internal/aihosting`，#341 已从 internal 重定位至此）——这是 03 §9 A4 删 `internal/logic` 消息域剩余的解锁条件。
 5. **AG-6 数据层改 model**（D13）：agent_* 表全部改 goctl model 落 `service/agent/rpc/internal/model/`，废 repository 层。
 6. **AG-9 LLM provider 抽象**：`service/agent/rpc/internal/runtime/llm/{factory.go, deepseek, openai, anthropic}`（00-decisions D10）。
 7. **AG-10 agent-api 改 BFF only**：删 PythonExecutor、AgentLogic 在 api svc 的依赖，全部走 agent-rpc。

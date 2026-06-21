@@ -9,12 +9,12 @@ import (
 	"github.com/wujunhui99/agents_im/internal/agentim"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	messagesvc "github.com/wujunhui99/agents_im/internal/servicecontext/message"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/aihosting"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/userrpc"
@@ -189,9 +189,9 @@ func hasRPCClientConfig(conf zrpc.RpcClientConf) bool {
 }
 
 // newConversationAIHostingRuntime 移植自 service/message-api/main.go 的 AI 托管接线：
-// 构造 internal messagesvc.ServiceContext（MessageLogic 仅作 Agent 回复写回通道，写同一批表 +
+// 构造 aihosting.ServiceContext（MessageLogic 仅作 Agent 回复写回通道，写同一批表 +
 // outbox，与 msg-rpc goctl 数据层共存）并 ConfigureConversationAIHosting。
-func newConversationAIHostingRuntime(c config.Config, mediaValidator business.MessageMediaValidator, groupsLogic *business.GroupsLogic, senderOverride agentim.MessageSender, userCli userclient.User) *messagesvc.ServiceContext {
+func newConversationAIHostingRuntime(c config.Config, mediaValidator business.MessageMediaValidator, groupsLogic *business.GroupsLogic, senderOverride agentim.MessageSender, userCli userclient.User) *aihosting.ServiceContext {
 	messageRepo, err := repository.NewMessageRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
 	if err != nil {
 		log.Fatalf("build message repository: %v", err)
@@ -235,7 +235,7 @@ func newConversationAIHostingRuntime(c config.Config, mediaValidator business.Me
 		log.Fatalf("build python executor: %v", err)
 	}
 
-	messageContext := messagesvc.NewServiceContextWithMediaValidator(messageRepo, mediaValidator, nil, groupsLogic, appconfig.DefaultJWTAuthConfig())
+	messageContext := aihosting.NewServiceContextWithMediaValidator(messageRepo, mediaValidator, nil, groupsLogic, appconfig.DefaultJWTAuthConfig())
 	messageContext.AgentHostingRepo = agentHostingRepo
 	messageContext.AIHostingRepo = aiHostingRepo
 	messageContext.AgentResolver = agentim.NewAgentRepositoryAccountResolver(agentRepo)
@@ -248,7 +248,7 @@ func newConversationAIHostingRuntime(c config.Config, mediaValidator business.Me
 	messageContext.PythonExecutor = pythonExecutor
 	// Kafka 模式：AI 写回不直写 PG（MessageLogic），改经 msg-rpc SendMessage（03 §9 B2）。
 	messageContext.AgentResponseSender = senderOverride
-	if err := messagesvc.ConfigureConversationAIHosting(messageContext, c.DeepSeek, c.LLMObservability); err != nil {
+	if err := aihosting.ConfigureConversationAIHosting(messageContext, c.DeepSeek, c.LLMObservability); err != nil {
 		log.Fatalf("configure AI conversation hosting: %v", err)
 	}
 	return messageContext
