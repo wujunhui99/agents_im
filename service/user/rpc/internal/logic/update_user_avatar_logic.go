@@ -6,6 +6,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
+	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 
@@ -41,8 +42,13 @@ func (l *UpdateUserAvatarLogic) UpdateUserAvatar(in *userpb.UpdateUserAvatarRequ
 	if mediaID == "" {
 		return nil, rpcerror.ToStatus(apperror.InvalidArgument("media_id is required"))
 	}
+	// wire 是十进制串、DB 是 bigint(#550):转成 int64 落库;URL 仍用十进制串渲染。
+	avatarMediaID, err := model.ParseAvatarMediaID(mediaID)
+	if err != nil {
+		return nil, rpcerror.ToStatus(apperror.InvalidArgument("avatar_media_id must be a decimal media id"))
+	}
 
-	if err := l.svcCtx.Profiles.UpdateAvatar(l.ctx, userID, mediaID, DurableAvatarURL(mediaID)); err != nil {
+	if err := l.svcCtx.Profiles.UpdateAvatar(l.ctx, userID, avatarMediaID, DurableAvatarURL(mediaID)); err != nil {
 		return nil, rpcerror.ToStatus(mapReadError(err))
 	}
 	ap, err := l.svcCtx.Accounts.FindAccountProfileByID(l.ctx, userID)

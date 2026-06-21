@@ -222,7 +222,7 @@ func (m *fakeProfilesModel) UpdateProfileFields(_ context.Context, accountID str
 	return nil
 }
 
-func (m *fakeProfilesModel) UpdateAvatar(_ context.Context, accountID, avatarMediaID, avatarURL string) error {
+func (m *fakeProfilesModel) UpdateAvatar(_ context.Context, accountID string, avatarMediaID int64, avatarURL string) error {
 	rec, ok := m.store.byID[accountID]
 	if !ok {
 		return model.ErrNotFound

@@ -43,7 +43,7 @@ type (
 		Gender        int64        `db:"gender"`
 		BirthDate     sql.NullTime `db:"birth_date"`
 		Region        string       `db:"region"`
-		AvatarMediaId string       `db:"avatar_media_id"`
+		AvatarMediaId int64        `db:"avatar_media_id"`
 		CreatedAt     time.Time    `db:"created_at"`
 		UpdatedAt     time.Time    `db:"updated_at"`
 		AvatarUrl     string       `db:"avatar_url"`

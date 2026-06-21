@@ -73,9 +73,11 @@ func TestUpdateUserAvatarValidatesThenUpdates(t *testing.T) {
 	val := &fakeAvatarValidator{}
 	svcCtx := newTestSvc(store, &fakeProvisioner{}, val)
 
+	// media id 现为雪花 bigint(#550),wire 走十进制串;校验 string↔int64 边界往返。
+	const mediaID = "1930000000000000001"
 	resp, err := NewUpdateUserAvatarLogic(ctx, svcCtx).UpdateUserAvatar(&userpb.UpdateUserAvatarRequest{
 		UserId:        "acct1",
-		AvatarMediaId: "med_x",
+		AvatarMediaId: mediaID,
 	})
 	if err != nil {
 		t.Fatalf("UpdateUserAvatar: %v", err)
@@ -83,10 +85,10 @@ func TestUpdateUserAvatarValidatesThenUpdates(t *testing.T) {
 	if val.calls != 1 {
 		t.Fatalf("expected avatar validator called once, got %d", val.calls)
 	}
-	if got := resp.GetUser().GetAvatarMediaId(); got != "med_x" {
+	if got := resp.GetUser().GetAvatarMediaId(); got != mediaID {
 		t.Fatalf("avatar_media_id = %q", got)
 	}
-	if got := resp.GetUser().GetAvatarUrl(); got != "/media/avatars/med_x" {
+	if got := resp.GetUser().GetAvatarUrl(); got != "/media/avatars/"+mediaID {
 		t.Fatalf("avatar_url = %q", got)
 	}
 }

@@ -55,9 +55,15 @@ func (r *assistantAccountRepo) Create(ctx context.Context, account sharemodel.Us
 		accountID = generated
 	}
 
+	// wire 头像 media id 是十进制串、DB 是 bigint(#550):转成 int64 落库(空→0 无头像)。
+	avatarMediaID, err := model.ParseAvatarMediaID(account.AvatarMediaID)
+	if err != nil {
+		return sharemodel.User{}, apperror.InvalidArgument("avatar_media_id must be a decimal media id")
+	}
+
 	// 事务边界在此（适配器扮演 Logic 角色）：accounts + profiles 两行原子写。
 	var created *model.AccountProfile
-	err := r.accounts.Transact(ctx, func(ctx context.Context, session sqlx.Session) error {
+	err = r.accounts.Transact(ctx, func(ctx context.Context, session sqlx.Session) error {
 		accounts := r.accounts.WithSession(session)
 		profiles := r.profiles.WithSession(session)
 
@@ -77,7 +83,7 @@ func (r *assistantAccountRepo) Create(ctx context.Context, account sharemodel.Us
 			Gender:        genderToDBInt(account.Gender),
 			BirthDate:     account.BirthDate,
 			Region:        account.Region,
-			AvatarMediaID: strings.TrimSpace(account.AvatarMediaID),
+			AvatarMediaID: avatarMediaID,
 			AvatarURL:     strings.TrimSpace(account.AvatarURL),
 		}); err != nil {
 			return err
@@ -153,7 +159,12 @@ func (r *assistantAccountRepo) UpdateProfile(ctx context.Context, accountID stri
 }
 
 func (r *assistantAccountRepo) UpdateAvatar(ctx context.Context, accountID, avatarMediaID, avatarURL string) (sharemodel.User, error) {
-	if err := r.profiles.UpdateAvatar(ctx, accountID, avatarMediaID, avatarURL); err != nil {
+	// repository.Repository 接口的 avatarMediaID 仍是 wire 十进制串;DB 是 bigint(#550)→ 转 int64。
+	mediaID, err := model.ParseAvatarMediaID(avatarMediaID)
+	if err != nil {
+		return sharemodel.User{}, apperror.InvalidArgument("avatar_media_id must be a decimal media id")
+	}
+	if err := r.profiles.UpdateAvatar(ctx, accountID, mediaID, avatarURL); err != nil {
 		return sharemodel.User{}, mapAssistantWriteError(err)
 	}
 	return r.GetByID(ctx, accountID)
@@ -194,7 +205,7 @@ func toShareUser(ap *model.AccountProfile) sharemodel.User {
 			Gender:        genderFromDBInt(ap.Gender),
 			BirthDate:     ap.BirthDate,
 			Region:        ap.Region,
-			AvatarMediaID: ap.AvatarMediaID,
+			AvatarMediaID: model.FormatAvatarMediaID(ap.AvatarMediaID),
 			AvatarURL:     ap.AvatarURL,
 			CreatedAt:     ap.ProfileCreatedAt.UTC(),
 			UpdatedAt:     ap.ProfileUpdatedAt.UTC(),

@@ -17,7 +17,7 @@
 - `media_objects.media_id text primary key`，当前值形如 `med_`+随机 hex（`internal/repository/media_memory.go` 仍有 `med_%06d` 占位）。
 - `messages.message_id text primary key`。
 - 消息内容里媒体引用：`content ->> 'mediaId'`（JSON **字符串**字段），image/file 两种 content 都带；被 `internal/repository/postgres_message.go:415`（`UserCanAccessMedia`）与 `message_memory.go:582` 读取。
-- 头像引用 `profiles.avatar_media_id text`、`groups.avatar_media_id text` 也指向 media_id。
+- 头像引用 `profiles.avatar_media_id`、`groups.avatar_media_id` 也指向 media_id（`profiles` 已 text→bigint，见 #550 / 迁移 `023`；`groups` 仍 `text`，待后续对齐）。
 - 前端 `web/src/api/media.ts`：`mediaId: string`，REST 路径 `/media/{mediaId}/...`、`/media/uploads/{mediaId}/complete`。
 - **先例**：account_id 已走完同类变更（**D16**，`00-decisions.md` §D16 + 迁移 `013`/`020`）——列 text→bigint，**对外仍以十进制字符串传输**，并配套**数据清零重置**。本 ADR 与 D16 保持一致。
 - **数据量**：当前生产为 pre-launch（仅 seed 助手 + 测试账号，无真实用户消息/媒体存量需要保留），与 D16 数据重置时同一前提。
