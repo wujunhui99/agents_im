@@ -1,5 +1,13 @@
 # Gateway Push Delivery Phase 1
 
+> **Update (03 §9 C2-C3, #342):** 跨进程投递已落地。msggateway 暴露下行推送 gRPC
+> `GatewayService.BatchPushOneMsg`（`service/msggateway/gateway.proto` → `gatewaypb`，
+> listen 9100，server 在 `internal/grpcserver`），内部仍复用本文的 `pkg/gateway/delivery`
+> 本地 fanout。独立的 `service/push` 消费 `msg.toPush.v1`，经 **k8s headless Service DNS**
+> (`msggateway-headless:9100`，无 etcd) 把该 gRPC 广播到每个 gateway 实例，汇总 per-user
+> 投递后对漏投 user 二段式 produce `msg.toOfflinePush.v1`（offline consumer 首版 audit-only）。
+> 本文以下为 Phase 1（本地投递契约）原始设计。
+
 Status: Implemented
 Owner: Gateway
 Related docs:

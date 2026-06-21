@@ -30,9 +30,13 @@ type APIConfig struct {
 	DeepSeek         DeepSeekConfig
 	LLMObservability LLMObservabilityConfig
 	GatewayWS        GatewayWSConfig
-	ObjectStorage    ObjectStorageConfig
-	PythonExecutor   PythonExecutorConfig
-	MailRPC          zrpc.RpcClientConf
+	// GatewayGRPC 是 msggateway 下行推送 gRPC server 的监听配置（03 §6.2）：
+	// service/push 经 k8s headless Service 把 BatchPushOneMsg 广播到每个实例。
+	// ListenOn 为空表示不启用 gRPC 推送面（纯 HTTP /ws 部署）。
+	GatewayGRPC    GatewayGRPCConfig
+	ObjectStorage  ObjectStorageConfig
+	PythonExecutor PythonExecutorConfig
+	MailRPC        zrpc.RpcClientConf
 	// MsgRPC 是 msggateway → msg-rpc 的 gRPC 客户端配置（03 §9 A3）。
 	MsgRPC zrpc.RpcClientConf
 	// UserRPC 是读用户资料的属主 user-rpc 客户端配置（gate #550：消费者脱 internal 读 profiles，
@@ -82,6 +86,11 @@ type GatewayWSConfig struct {
 	HeartbeatTimeoutSeconds   int64
 	CommandRateLimitPerSecond int
 	CommandRateLimitBurst     int
+}
+
+type GatewayGRPCConfig struct {
+	// ListenOn 形如 0.0.0.0:9100；空则不启用下行推送 gRPC server。
+	ListenOn string
 }
 
 type DeepSeekConfig struct {
@@ -427,6 +436,11 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+	cfg.GatewayGRPC.ListenOn = firstNonEmpty(
+		strings.TrimSpace(os.ExpandEnv(values["GatewayGRPC.ListenOn"])),
+		os.Getenv("GATEWAY_GRPC_LISTEN_ON"),
+		cfg.GatewayGRPC.ListenOn,
+	)
 	cfg.Tracing, err = tracingConfigFromValues(values, cfg.Tracing, cfg.Name)
 	if err != nil {
 		return cfg, err

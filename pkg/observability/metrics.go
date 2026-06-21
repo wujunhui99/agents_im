@@ -17,6 +17,8 @@ const (
 	MetricWebSocketEvents  = "agents_im_websocket_connection_events_total"
 	MetricHTTPRequests     = "agents_im_http_requests_total"
 	MetricLLMObsDropped    = "agents_im_llmobs_events_dropped_total"
+	MetricPushOnline       = "agents_im_push_online_total"
+	MetricPushOffline      = "agents_im_push_offline_total"
 
 	defaultUnknownLabelValue = "unknown"
 )
@@ -61,6 +63,16 @@ var (
 		Name: MetricLLMObsDropped,
 		Help: "LLM observability events dropped due to async sink backpressure, by backend.",
 	}, []string{"backend"})
+
+	pushOnline = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: MetricPushOnline,
+		Help: "Online push recipients by gateway broadcast result (delivered/offline).",
+	}, []string{"result"})
+
+	pushOffline = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: MetricPushOffline,
+		Help: "Offline (vendor) push recipients by channel and result.",
+	}, []string{"channel", "result"})
 )
 
 func init() {
@@ -72,7 +84,26 @@ func init() {
 		websocketEvents,
 		httpRequests,
 		llmObsDropped,
+		pushOnline,
+		pushOffline,
 	)
+}
+
+// RecordPushOnline counts online push recipients by broadcast result
+// (result: delivered / offline).
+func RecordPushOnline(result string, n int) {
+	if n <= 0 {
+		return
+	}
+	pushOnline.WithLabelValues(labelValue(result)).Add(float64(n))
+}
+
+// RecordPushOffline counts offline (vendor) push recipients by channel + result.
+func RecordPushOffline(channel, result string, n int) {
+	if n <= 0 {
+		return
+	}
+	pushOffline.WithLabelValues(labelValue(channel), labelValue(result)).Add(float64(n))
 }
 
 func RecordLLMObservabilityDrop(backend string) {

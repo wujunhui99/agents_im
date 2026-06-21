@@ -78,11 +78,7 @@ if ! grep -q 'AllowQueryToken: true' deploy/k8s/etc/msggateway.yaml; then
   exit 1
 fi
 
-# --- production msgtransfer dispatcher/consumer config ---
-if grep -A2 '^Dispatcher:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'Driver: noop'; then
-  echo "production msgtransfer must not use noop dispatcher" >&2
-  exit 1
-fi
+# --- production msgtransfer consumer config ---
 if grep -q '^DryRun: true' deploy/k8s/etc/msgtransfer.yaml; then
   echo "production msgtransfer must not run in dry-run mode" >&2
   exit 1
@@ -91,16 +87,27 @@ if grep -q '^Consumer:' deploy/k8s/etc/msgtransfer.yaml; then
   echo "legacy msgtransfer outbox consumer config resurrected (03 §9 B3b retired)" >&2
   exit 1
 fi
+if grep -q '^Dispatcher:' deploy/k8s/etc/msgtransfer.yaml; then
+  echo "msgtransfer no longer dispatches to gateway (03 §9 C2 moved push to service/push)" >&2
+  exit 1
+fi
 if ! grep -A3 '^Kafka:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'Enabled: true'; then
   echo "production msgtransfer must run the kafka chain (sole consume path after 03 §9 B3b)" >&2
   exit 1
 fi
-if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'Driver: gateway'; then
-  echo "production msgtransfer must dispatch to msggateway" >&2
+
+# --- production push (03 §9 C2-C3) + gateway gRPC push surface (§6.2) ---
+# push 经 msggateway HEADLESS Service 广播在线投递（k8s 原生发现，无 etcd）。
+if ! grep -A4 '^Gateway:' deploy/k8s/etc/push.yaml | grep -q 'Target: msggateway-headless\.agents-im\.svc\.cluster\.local:9100'; then
+  echo "production push must broadcast via the msggateway headless service" >&2
   exit 1
 fi
-if ! grep -A3 '^Dispatcher:' deploy/k8s/etc/msgtransfer.yaml | grep -q 'GatewayEndpoint: http://127\.0\.0\.1:8084'; then
-  echo "production msgtransfer must target colocated msggateway internal endpoint" >&2
+if ! grep -A2 '^Kafka:' deploy/k8s/etc/push.yaml | grep -q 'Brokers:'; then
+  echo "production push must configure kafka brokers (consumes toPush/toOfflinePush)" >&2
+  exit 1
+fi
+if ! grep -A2 '^GatewayGRPC:' deploy/k8s/etc/msggateway.yaml | grep -q 'ListenOn: 0\.0\.0\.0:9100'; then
+  echo "production msggateway must expose the downstream-push gRPC server" >&2
   exit 1
 fi
 

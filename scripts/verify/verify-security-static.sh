@@ -25,7 +25,7 @@ fi
 # Production Go code must not directly execute shell/python commands.
 forbid_match "production Go code must not directly execute shell or python commands" \
   -n '"os/exec"|exec\.Command|CommandContext\(|"(/bin/bash|/bin/sh|bash|sh|python|python3)"' \
-  service/msggateway service/msgtransfer internal --glob '*.go' --glob '!*_test.go'
+  service/msggateway service/msgtransfer service/push internal --glob '*.go' --glob '!*_test.go'
 
 # Header-based current-user auth is forbidden; tests must use Bearer JWT or an explicit reject helper.
 forbid_match "production API/code still contains header-based current user auth" \

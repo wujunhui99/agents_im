@@ -131,8 +131,6 @@ load_env() {
   # Kafka 是唯一写链路（03 §9 B3b）：msg-rpc / msgtransfer 启动必需。
   export REDPANDA_KAFKA_PORT="${REDPANDA_KAFKA_PORT:-19092}"
   export KAFKA_BROKERS="${KAFKA_BROKERS:-localhost:${REDPANDA_KAFKA_PORT}}"
-  export MESSAGE_TRANSFER_DISPATCHER_DRIVER="${MESSAGE_TRANSFER_DISPATCHER_DRIVER:-gateway}"
-  export MESSAGE_TRANSFER_GATEWAY_ENDPOINT="${MESSAGE_TRANSFER_GATEWAY_ENDPOINT:-http://127.0.0.1:${GATEWAY_WS_PORT:-8084}}"
   export MESSAGE_TRANSFER_OBSERVABILITY_ENABLED="${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED:-true}"
   export MESSAGE_TRANSFER_OBSERVABILITY_HOST="${MESSAGE_TRANSFER_OBSERVABILITY_HOST:-127.0.0.1}"
   export MESSAGE_TRANSFER_OBSERVABILITY_PORT="${MESSAGE_TRANSFER_OBSERVABILITY_PORT:-8087}"
@@ -140,6 +138,10 @@ load_env() {
   export MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS="${MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS:-100}"
   export MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS="${MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS:-1000}"
   export MESSAGE_TRANSFER_MAX_ATTEMPTS="${MESSAGE_TRANSFER_MAX_ATTEMPTS:-5}"
+  # push（03 §6 / §9 C2-C3）：下行投递调度器。gateway gRPC 推送面 + push 自身。
+  export GATEWAY_GRPC_PORT="${GATEWAY_GRPC_PORT:-9100}"
+  export PUSH_GATEWAY_TARGET="${PUSH_GATEWAY_TARGET:-127.0.0.1:${GATEWAY_GRPC_PORT}}"
+  export PUSH_OBSERVABILITY_PORT="${PUSH_OBSERVABILITY_PORT:-8091}"
 }
 
 require_command() {
@@ -453,10 +455,6 @@ DryRun: false
 StorageDriver: postgres
 DataSource: ${DATABASE_URL}
 
-Dispatcher:
-  Driver: ${MESSAGE_TRANSFER_DISPATCHER_DRIVER}
-  GatewayEndpoint: ${MESSAGE_TRANSFER_GATEWAY_ENDPOINT}
-
 Worker:
   PollIntervalMillis: ${MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS}
   RetryBackoffMillis: ${MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS}
@@ -470,6 +468,26 @@ Observability:
 Kafka:
   Enabled: true
   Brokers: ${KAFKA_BROKERS}
+YAML
+}
+
+write_push_config() {
+  cat > "${CONFIG_DIR}/push.yaml" <<YAML
+Name: push
+
+Kafka:
+  Brokers: ${KAFKA_BROKERS}
+
+Gateway:
+  Target: ${PUSH_GATEWAY_TARGET}
+  RefreshSeconds: 30
+  DialTimeoutSeconds: 5
+  PushTimeoutSeconds: 5
+
+Observability:
+  Enabled: true
+  Host: 127.0.0.1
+  Port: ${PUSH_OBSERVABILITY_PORT}
 YAML
 }
 
@@ -512,6 +530,8 @@ Telemetry:
   Endpoints:
     - 127.0.0.1:${MSG_RPC_PORT:-9098}
   Timeout: 5000
+GatewayGRPC:
+  ListenOn: 0.0.0.0:${GATEWAY_GRPC_PORT:-9100}
 Presence:
   Driver: ${PRESENCE_DRIVER}
   HeartbeatTTLSeconds: ${PRESENCE_TTL_SECONDS:-60}
@@ -563,6 +583,7 @@ Telemetry:
   write_media_rpc_config
   write_auth_rpc_config
   write_message_transfer_config
+  write_push_config
 }
 
 # Map deployment name -> go main package path. Entrypoints live in their service
@@ -587,6 +608,7 @@ service_pkg() {
     msg-api)          echo "./service/msg/api" ;;
     msggateway)       echo "./service/msggateway" ;;
     msgtransfer) echo "./service/msgtransfer" ;;
+    push)             echo "./service/push" ;;
     *) echo "unknown service: $1" >&2; return 1 ;;
   esac
 }
@@ -682,6 +704,7 @@ main() {
   start_service "msg-api"
   start_service "msggateway"
   start_service "msgtransfer"
+  start_service "push"
   start_service "groups-api"
   start_service "agent-api"
   start_service "media-api"
@@ -695,6 +718,7 @@ main() {
   if [[ "${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}" == "true" ]]; then
     wait_http "msgtransfer" "http://127.0.0.1:${MESSAGE_TRANSFER_OBSERVABILITY_PORT}/healthz"
   fi
+  wait_http "push" "http://127.0.0.1:${PUSH_OBSERVABILITY_PORT}/healthz"
   wait_http "groups-api" "http://127.0.0.1:${GROUPS_API_PORT:-8085}/healthz"
   wait_http "agent-api" "http://127.0.0.1:${AGENT_API_PORT:-8086}/healthz"
   wait_http "media-api" "http://127.0.0.1:${MEDIA_API_PORT:-8089}/healthz"

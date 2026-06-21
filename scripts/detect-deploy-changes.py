@@ -17,6 +17,7 @@ BACKEND_SERVICES = [
     "agent-api",
     "admin-api",
     "msgtransfer",
+    "push",
     "user-rpc",
     "auth-rpc",
     "friends-rpc",
@@ -82,6 +83,7 @@ API_BACKEND_SERVICES = [
 FLAT_SERVICE_DIRS = {
     "service/msggateway/": "msggateway",
     "service/msgtransfer/": "msgtransfer",
+    "service/push/": "push",
 }
 
 # message-api 已退役（#463）：REST 入口归 service/msg/api，AI 托管运行时（旧

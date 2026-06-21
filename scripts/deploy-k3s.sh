@@ -26,6 +26,7 @@ IMAGE_DEPLOYMENTS=(
   agent-api
   admin-api
   msgtransfer
+  push
   user-rpc
   auth-rpc
   friends-rpc

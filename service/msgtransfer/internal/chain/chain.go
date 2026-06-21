@@ -13,18 +13,16 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/model"
-	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/transfer"
 )
 
-// Chain wires the Kafka write pipeline (03 §9 B1): toTransfer hot path,
-// toPostgres persist consumer, and toPush → gateway dispatch via the existing
-// transfer.Worker. Runs alongside the legacy outbox worker until B3.
+// Chain wires the Kafka write pipeline (03 §9 B1): the toTransfer hot path and
+// the toPostgres persist consumer. It also produces msg.toPush.v1 — gateway
+// fan-out itself now lives in service/push (03 §9 C2), so the chain no longer
+// dispatches to the gateway.
 type Chain struct {
 	producer        *messaging.KafkaProducer
 	transferConsume *messaging.KafkaConsumer
 	persistConsume  *messaging.KafkaConsumer
-	pushConsumer    *KafkaPushConsumer
-	pushWorker      *transfer.Worker
 	transferHandler *TransferHandler
 	persistHandler  *PersistHandler
 	rdb             *redis.Client
@@ -37,18 +35,12 @@ type Chain struct {
 type Options struct {
 	Kafka      config.TransferKafkaConfig
 	DataSource string
-	Dispatcher transfer.DeliveryDispatcher
-	Recorder   transfer.DeliveryAttemptRecorder
-	WorkerID   string
 }
 
 func New(opts Options) (*Chain, error) {
 	brokers := config.KafkaBrokerList(opts.Kafka.Brokers)
 	if len(brokers) == 0 {
 		return nil, errors.New("kafka chain enabled but no brokers configured")
-	}
-	if opts.Dispatcher == nil {
-		return nil, errors.New("kafka chain requires a delivery dispatcher")
 	}
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     opts.Kafka.Redis.Addr,
@@ -88,25 +80,11 @@ func New(opts Options) (*Chain, error) {
 	if err != nil {
 		return nil, err
 	}
-	pushConsumer, err := NewKafkaPushConsumer(brokers)
-	if err != nil {
-		return nil, err
-	}
-	workerOptions := []transfer.WorkerOption{
-		transfer.WithWorkerID(opts.WorkerID + "-kafka-push"),
-		transfer.WithIdempotencyStore(transfer.NewMemoryIdempotencyStore()),
-	}
-	if opts.Recorder != nil {
-		workerOptions = append(workerOptions, transfer.WithDeliveryAttemptRecorder(opts.Recorder))
-	}
-	pushWorker := transfer.NewWorker(pushConsumer, opts.Dispatcher, workerOptions...)
 
 	return &Chain{
 		producer:        producer,
 		transferConsume: transferConsume,
 		persistConsume:  persistConsume,
-		pushConsumer:    pushConsumer,
-		pushWorker:      pushWorker,
 		transferHandler: transferHandler,
 		persistHandler:  persistHandler,
 		rdb:             rdb,
@@ -114,7 +92,7 @@ func New(opts Options) (*Chain, error) {
 	}, nil
 }
 
-// Start ensures topics then launches the three consumers. Non-blocking.
+// Start ensures topics then launches the two consumers. Non-blocking.
 func (c *Chain) Start(ctx context.Context) error {
 	ensureCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -123,7 +101,7 @@ func (c *Chain) Start(ctx context.Context) error {
 		return err
 	}
 
-	c.wg.Add(3)
+	c.wg.Add(2)
 	go func() {
 		defer c.wg.Done()
 		if err := c.transferConsume.Run(ctx, c.transferHandler.HandleBatch); err != nil && ctx.Err() == nil {
@@ -136,13 +114,6 @@ func (c *Chain) Start(ctx context.Context) error {
 			logx.Errorf("msgtransfer kafka toPostgres consumer stopped: %v", err)
 		}
 	}()
-	go func() {
-		defer c.wg.Done()
-		c.pushConsumer.Start(ctx)
-	}()
-	if err := c.pushWorker.Start(ctx); err != nil {
-		return fmt.Errorf("start kafka push worker: %w", err)
-	}
 	return nil
 }
 
@@ -161,10 +132,8 @@ func (c *Chain) Ready(ctx context.Context) error {
 func (c *Chain) Close() error {
 	stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = c.pushWorker.Stop(stopCtx)
 	_ = c.transferConsume.Close()
 	_ = c.persistConsume.Close()
-	_ = c.pushConsumer.Close()
 	_ = c.producer.Close()
 	done := make(chan struct{})
 	go func() { c.wg.Wait(); close(done) }()

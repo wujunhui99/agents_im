@@ -10,13 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/health"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/chain"
-	"github.com/wujunhui99/agents_im/service/msgtransfer/internal/transfer"
 )
 
 func readinessMessage(err error) string {
@@ -44,23 +42,15 @@ func main() {
 		}
 	}()
 
-	dispatcher := buildDispatcher(cfg)
-	recorder, err := buildDeliveryAttemptRecorder(cfg)
-	if err != nil {
-		log.Fatalf("build delivery attempt recorder: %v", err)
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	// Kafka 链路是唯一消费路径（03 §9 B3b）：legacy outbox worker 已退役，
-	// 缺 Kafka 配置直接启动失败（失败优先），不再静默空转。
+	// 缺 Kafka 配置直接启动失败（失败优先），不再静默空转。gateway 投递自
+	// 03 §9 C2 起由 service/push 负责，msgtransfer 只生产 toPush。
 	kafkaChain, err := chain.New(chain.Options{
 		Kafka:      cfg.Kafka,
 		DataSource: cfg.DataSource,
-		Dispatcher: dispatcher,
-		Recorder:   recorder,
-		WorkerID:   cfg.WorkerID,
 	})
 	if err != nil {
 		log.Fatalf("build kafka chain: %v", err)
@@ -76,14 +66,13 @@ func main() {
 	log.Printf("%s kafka chain started brokers=%s topics=%s,%s,%s,%s", cfg.Name, cfg.Kafka.Brokers,
 		messaging.TopicToTransfer, messaging.TopicToPostgres, messaging.TopicToPush, messaging.TopicAgentTrigger)
 
-	observabilityServer := startObservabilityHTTP(ctx, cfg, dispatcher, kafkaChain)
+	observabilityServer := startObservabilityHTTP(ctx, cfg, kafkaChain)
 	defer shutdownObservabilityHTTP(observabilityServer)
 
 	log.Printf(
-		"%s starting worker_id=%s dispatcher=%s storage=%s dry_run=%t",
+		"%s starting worker_id=%s storage=%s dry_run=%t",
 		cfg.Name,
 		cfg.WorkerID,
-		cfg.Dispatcher.Driver,
 		cfg.StorageDriver,
 		cfg.DryRun,
 	)
@@ -91,31 +80,7 @@ func main() {
 	log.Printf("%s stopped", cfg.Name)
 }
 
-func buildDispatcher(cfg config.MessageTransferConfig) transfer.DeliveryDispatcher {
-	switch cfg.Dispatcher.Driver {
-	case config.TransferDispatcherGateway:
-		return transfer.NewGatewayHTTPDispatcher(transfer.GatewayHTTPDispatcherConfig{
-			Endpoint: cfg.Dispatcher.GatewayEndpoint,
-		})
-	default:
-		return transfer.NoopDispatcher{}
-	}
-}
-
-func buildDeliveryAttemptRecorder(cfg config.MessageTransferConfig) (transfer.DeliveryAttemptRecorder, error) {
-	switch cfg.StorageDriver {
-	case config.StorageDriverPostgres:
-		repo, err := repository.NewPostgresMessageRepository(cfg.DataSource)
-		if err != nil {
-			return nil, err
-		}
-		return transfer.NewRepositoryDeliveryAttemptRecorder(repo), nil
-	default:
-		return transfer.NewRepositoryDeliveryAttemptRecorder(repository.NewMemoryMessageRepository()), nil
-	}
-}
-
-func startObservabilityHTTP(ctx context.Context, cfg config.MessageTransferConfig, dispatcher transfer.DeliveryDispatcher, kafkaChain *chain.Chain) *http.Server {
+func startObservabilityHTTP(ctx context.Context, cfg config.MessageTransferConfig, kafkaChain *chain.Chain) *http.Server {
 	if !cfg.Observability.Enabled {
 		return nil
 	}
@@ -125,7 +90,6 @@ func startObservabilityHTTP(ctx context.Context, cfg config.MessageTransferConfi
 	mux.HandleFunc("/readyz", health.ReadinessHandler(cfg.Name, func(r *http.Request) []health.Check {
 		err := kafkaChain.Ready(r.Context())
 		return []health.Check{
-			health.ComponentCheck("delivery_dispatcher", dispatcher != nil, "configured"),
 			health.ComponentCheck("kafka_chain", err == nil, readinessMessage(err)),
 		}
 	}))

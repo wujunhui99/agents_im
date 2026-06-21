@@ -1,0 +1,19 @@
+Name: push
+
+# Kafka：消费 msg.toPush.v1（在线广播）+ msg.toOfflinePush.v1（离线）。
+# 本地由 dev-up/docker-compose 起 redpanda，KAFKA_BROKERS 默认 localhost:19092。
+Kafka:
+  Brokers: ${KAFKA_BROKERS}
+
+# 下行推送 gRPC 目标：本地单实例 msggateway gRPC（9100）。生产用 headless Service
+# DNS（所有 gateway pod IP，无 etcd），见 deploy/k8s/etc/push.yaml。
+Gateway:
+  Target: 127.0.0.1:9100
+  RefreshSeconds: 30
+  DialTimeoutSeconds: 5
+  PushTimeoutSeconds: 5
+
+Observability:
+  Enabled: true
+  Host: 127.0.0.1
+  Port: 8091

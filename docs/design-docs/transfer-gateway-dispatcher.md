@@ -1,6 +1,8 @@
 # Transfer Gateway Dispatcher
 
-Status: Implemented  
+> ⚠️ **Superseded (03 §9 C2, #342).** msgtransfer 不再投递到 gateway——`service/msgtransfer/internal/transfer/`（worker + 本 HTTP/local gateway dispatcher）已整包删除。在线投递改由独立 `service/push` 经 `GatewayService.BatchPushOneMsg` gRPC 广播完成，见 [`gateway-push-delivery.md`](./gateway-push-delivery.md) 与 `docs/refactor/v1/03-message-pipeline.md` §6。本文仅作历史归档。
+
+Status: Superseded (#342)  
 Owner: Message Transfer / Gateway  
 Related docs:
 - [`message-transfer-worker.md`](./message-transfer-worker.md)
