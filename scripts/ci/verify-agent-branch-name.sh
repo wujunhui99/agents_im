@@ -46,6 +46,7 @@ Rules:
   - first segment <type> must be one of: $(join_by ', ' "${ALLOWED_TYPES[@]}")
   - second segment <agent-name> is required and must be one of: $(join_by ', ' "${TRUSTED_AGENTS[@]}")
   - third segment must start with issue-<number>-, for example issue-20-login-ci
+    (exception: 'docs' branches skip the Issue, so a plain <task-desc> slug is allowed)
   - use lowercase English slugs separated by '-'
 
 Branches without a trusted agent name in the second path segment are rejected.
@@ -80,7 +81,13 @@ if ! contains "${agent_name}" "${TRUSTED_AGENTS[@]}"; then
   fail
 fi
 
-if [[ ! "${issue_slug}" =~ ^issue-[0-9]+-[a-z0-9][a-z0-9-]*$ ]]; then
+# docs 类型免 Issue（见 AGENTS.md 工作流）：第三段用纯 <task-desc> slug；
+# 其余类型仍强制 issue-<number>- 段。
+if [[ "${branch_type}" == "docs" ]]; then
+  if [[ ! "${issue_slug}" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+    fail
+  fi
+elif [[ ! "${issue_slug}" =~ ^issue-[0-9]+-[a-z0-9][a-z0-9-]*$ ]]; then
   fail
 fi
 

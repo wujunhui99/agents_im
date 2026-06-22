@@ -8,10 +8,11 @@
 
 - `main`: 唯一长期主分支和发布分支，改动通过 PR 合入。
 - Task branch: `<type>/<agent-id>/issue-<number>-<task-desc>`，例如 `fix/codex/issue-123-login-error`。
+- 纯文档分支（`docs` 类型、免 Issue）：第三段用纯 `<task-desc>`，不带 `issue-<number>-`，例如 `docs/claude/agents-workflow-rebase`。
 - Current agent ids: `claude`, `codex`.
 - Branch `type`: `feature`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `perf`, `style`, `hotfix`.
 
-CI gate `scripts/ci/verify-agent-branch-name.sh` enforces the task branch format for PR builds.
+CI gate `scripts/ci/verify-agent-branch-name.sh` enforces the task branch format for PR builds（`docs` 类型放行无 `issue-` 段的纯 slug，其余类型仍强制）。
 
 ## Worktree
 
@@ -25,6 +26,8 @@ git worktree add \
   origin/main
 ```
 
+先 `git fetch origin` 再基于 `origin/main` 建：`origin/main` 是本地远程跟踪 ref，只随 fetch 更新；漏 fetch 会从滞后的 main 起步（与主工作区当前 checkout 的分支无关，因为 worktree 从你传入的 ref 拉分支）。勿用本地 `main`（更易滞后）。
+
 The `.claude/worktrees/` directory is ignored; do not add worktrees as gitlinks.
 
 ## Commit And PR Rules
@@ -34,8 +37,9 @@ Commit 与 PR 规则：
 - Commit subject: `<type>(<scope>)[<agent-id>]: <short title>`.
 - Required trailers: `Issue`, `Agent`, `Human-Owner`.
 - PR target: `main`.
-- PR body: exactly one `Closes #<issue>`, `Fixes #<issue>`, or `Resolves #<issue>`.
-- Every development PR solves one Issue.
+- PR body: exactly one `Closes #<issue>`, `Fixes #<issue>`, or `Resolves #<issue>`（纯文档分支免 Issue，故无此行）。
+- Every development PR solves one Issue（纯文档分支例外，免 Issue）。
+- push/PR 前 rebase 最新 `main`（`git fetch origin main && git rebase origin/main`）；PR 期间 `main` 推进就再 rebase。Drone clone 会把 PR test-merge 进 `main`，落后分支会在 clone 阶段冲突致 CI 失败。
 
 ## Local Verification
 
