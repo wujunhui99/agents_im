@@ -1,0 +1,19 @@
+Name: msgtransfer
+WorkerID: ${MESSAGE_TRANSFER_WORKER_ID}
+DryRun: false
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
+
+Worker:
+  PollIntervalMillis: ${MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS}
+  RetryBackoffMillis: ${MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS}
+  MaxAttempts: ${MESSAGE_TRANSFER_MAX_ATTEMPTS}
+
+Observability:
+  Enabled: ${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}
+  Host: ${MESSAGE_TRANSFER_OBSERVABILITY_HOST}
+  Port: ${MESSAGE_TRANSFER_OBSERVABILITY_PORT}
+
+Kafka:
+  Enabled: true
+  Brokers: ${KAFKA_BROKERS}

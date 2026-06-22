@@ -10,31 +10,12 @@ FRONTEND_LOG := .dev/logs/frontend.log
 FRONTEND_URL := http://127.0.0.1:$(FRONTEND_PORT)
 
 # ---- go-zero microservices (entrypoints live under service/<...>; cmd/ removed) ----
-BACKEND_SERVICES := agent-api auth-api auth-rpc friends-api friends-rpc \
-	groups-api groups-rpc user-api user-rpc \
-	msg-rpc msg-api third-rpc msggateway msgtransfer push \
-	admin-api admin-rpc media-api media-rpc
-
-# Deployment name -> go main package path.
-PKG_agent-api        := ./service/agent/api
-PKG_auth-api         := ./service/auth/api
-PKG_auth-rpc         := ./service/auth/rpc
-PKG_friends-api      := ./service/friends/api
-PKG_friends-rpc      := ./service/friends/rpc
-PKG_groups-api       := ./service/groups/api
-PKG_groups-rpc       := ./service/groups/rpc
-PKG_user-api         := ./service/user/api
-PKG_user-rpc         := ./service/user/rpc
-PKG_msg-rpc          := ./service/msg/rpc
-PKG_msg-api          := ./service/msg/api
-PKG_third-rpc        := ./service/third/rpc
-PKG_msggateway       := ./service/msggateway
-PKG_msgtransfer := ./service/msgtransfer
-PKG_push             := ./service/push
-PKG_admin-api        := ./service/admin/api
-PKG_admin-rpc        := ./service/admin/rpc
-PKG_media-api        := ./service/media/api
-PKG_media-rpc        := ./service/media/rpc
+# Service list + go main package paths come from scripts/services.json (single
+# source of truth, shared with detect-deploy-changes.py / deploy-k3s.sh / dev-up.sh).
+# One python call emits "name=pkg" pairs; the rest is pure make string ops.
+_SERVICES_KV := $(shell python3 -c "import json;print(' '.join('%s=%s'%(s['name'],s['package']) for s in json.load(open('scripts/services.json'))['backend']))")
+BACKEND_SERVICES := $(foreach kv,$(_SERVICES_KV),$(word 1,$(subst =, ,$(kv))))
+$(foreach kv,$(_SERVICES_KV),$(eval PKG_$(word 1,$(subst =, ,$(kv))) := $(word 2,$(subst =, ,$(kv)))))
 
 CFG_media-api        := service/media/api/etc/media-api.yaml
 CFG_media-rpc        := service/media/rpc/etc/media-rpc.yaml

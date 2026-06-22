@@ -16,39 +16,11 @@ RESTART_SERVICES="${RESTART_SERVICES:-}"
 RESTART_ROLLOUT="${RESTART_ROLLOUT:-false}"
 RENDER_ONLY="${RENDER_ONLY:-false}"
 
-IMAGE_DEPLOYMENTS=(
-  user-api
-  auth-api
-  friends-api
-  msg-api
-  msggateway
-  groups-api
-  agent-api
-  admin-api
-  msgtransfer
-  push
-  user-rpc
-  auth-rpc
-  friends-rpc
-  groups-rpc
-  msg-rpc
-  third-rpc
-  media-api
-  media-rpc
-  admin-rpc
-  web
-)
-
-RESTARTABLE_DEPLOYMENTS=(
-  "${IMAGE_DEPLOYMENTS[@]}"
-  agents-im-minio-proxy
-  prometheus
-  grafana
-  loki
-  tempo
-  otel-collector
-  langfuse
-)
+# Service registry comes from scripts/services.json (single source of truth),
+# shared with detect-deploy-changes.py and dev-up.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/services.sh"
+mapfile -t IMAGE_DEPLOYMENTS < <(services_backend_names; services_web_name)
+mapfile -t RESTARTABLE_DEPLOYMENTS < <(printf '%s\n' "${IMAGE_DEPLOYMENTS[@]}"; services_infra_names)
 
 require() {
   if ! command -v "$1" >/dev/null 2>&1; then

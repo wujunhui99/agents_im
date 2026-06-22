@@ -1,0 +1,29 @@
+Name: msggateway
+Host: 127.0.0.1
+Port: ${GATEWAY_WS_PORT}
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: ${JWT_ACCESS_EXPIRE}
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}
+MsgRPC:
+  Endpoints:
+    - 127.0.0.1:${MSG_RPC_PORT}
+  Timeout: 5000
+GatewayGRPC:
+  ListenOn: 0.0.0.0:${GATEWAY_GRPC_PORT}
+Presence:
+  Driver: ${PRESENCE_DRIVER}
+  HeartbeatTTLSeconds: ${PRESENCE_TTL_SECONDS}
+  KeyPrefix: ${PRESENCE_KEY_PREFIX}
+GatewayWS:
+  AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}
+  AllowQueryToken: ${GATEWAY_WS_ALLOW_QUERY_TOKEN}
+  PingIntervalSeconds: ${GATEWAY_WS_PING_INTERVAL_SECONDS}
+  HeartbeatTimeoutSeconds: ${GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS}
+  CommandRateLimitPerSecond: ${GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND}
+  CommandRateLimitBurst: ${GATEWAY_WS_COMMAND_RATE_LIMIT_BURST}

@@ -1,0 +1,16 @@
+Name: agent-api
+Host: 127.0.0.1
+Port: ${AGENT_API_PORT}
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: ${JWT_ACCESS_EXPIRE}
+StorageDriver: postgres
+DataSource: ${DATABASE_URL}
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT}
+  Timeout: 5000

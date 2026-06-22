@@ -1,0 +1,8 @@
+Name: friends-rpc
+ListenOn: 127.0.0.1:${FRIENDS_RPC_PORT}
+DataSource: ${DATABASE_URL}
+Telemetry:
+  Name: friends-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

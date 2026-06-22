@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Shared service registry (package paths) — single source of truth.
+source "${ROOT_DIR}/scripts/services.sh"
 STATE_DIR="${AGENTS_IM_DEV_STATE_DIR:-${ROOT_DIR}/.dev}"
 CONFIG_DIR="${STATE_DIR}/etc"
 BIN_DIR="${STATE_DIR}/bin"
@@ -142,6 +144,34 @@ load_env() {
   export GATEWAY_GRPC_PORT="${GATEWAY_GRPC_PORT:-9100}"
   export PUSH_GATEWAY_TARGET="${PUSH_GATEWAY_TARGET:-127.0.0.1:${GATEWAY_GRPC_PORT}}"
   export PUSH_OBSERVABILITY_PORT="${PUSH_OBSERVABILITY_PORT:-8091}"
+
+  # Service host ports. Exported so the config templates in scripts/dev/etc/ can be
+  # rendered with plain ${VAR} expansion (no per-template :- defaults).
+  export USER_API_PORT="${USER_API_PORT:-8080}"
+  export AUTH_API_PORT="${AUTH_API_PORT:-8081}"
+  export FRIENDS_API_PORT="${FRIENDS_API_PORT:-8082}"
+  export GATEWAY_WS_PORT="${GATEWAY_WS_PORT:-8084}"
+  export GROUPS_API_PORT="${GROUPS_API_PORT:-8085}"
+  export AGENT_API_PORT="${AGENT_API_PORT:-8086}"
+  export ADMIN_API_PORT="${ADMIN_API_PORT:-8088}"
+  export MEDIA_API_PORT="${MEDIA_API_PORT:-8089}"
+  export MSG_API_PORT="${MSG_API_PORT:-8090}"
+  export USER_RPC_PORT="${USER_RPC_PORT:-9090}"
+  export AUTH_RPC_PORT="${AUTH_RPC_PORT:-9091}"
+  export FRIENDS_RPC_PORT="${FRIENDS_RPC_PORT:-9092}"
+  export GROUPS_RPC_PORT="${GROUPS_RPC_PORT:-9093}"
+  export MAIL_RPC_PORT="${MAIL_RPC_PORT:-9095}"
+  export MEDIA_RPC_PORT="${MEDIA_RPC_PORT:-9096}"
+  export ADMIN_RPC_PORT="${ADMIN_RPC_PORT:-9097}"
+  export MSG_RPC_PORT="${MSG_RPC_PORT:-9098}"
+  export PRESENCE_TTL_SECONDS="${PRESENCE_TTL_SECONDS:-60}"
+  export PRESENCE_KEY_PREFIX="${PRESENCE_KEY_PREFIX:-agents_im:presence}"
+  export ADMIN_BOOTSTRAP_IDENTIFIER="${ADMIN_BOOTSTRAP_IDENTIFIER:-amin}"
+  export ADMIN_BOOTSTRAP_PASSWORD="${ADMIN_BOOTSTRAP_PASSWORD:-}"
+  export ADMIN_BOOTSTRAP_DISPLAY_NAME="${ADMIN_BOOTSTRAP_DISPLAY_NAME:-管理后台管理员}"
+  export DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-}"
+  export DEEPSEEK_BASE_URL="${DEEPSEEK_BASE_URL:-}"
+  export DEEPSEEK_MODEL="${DEEPSEEK_MODEL:-}"
 }
 
 require_command() {
@@ -196,427 +226,27 @@ wait_for_oss() {
   exit 1
 }
 
-write_api_config() {
-  local name="$1"
-  local port="$2"
-  local extra="${3:-}"
-
-  cat > "${CONFIG_DIR}/${name}.yaml" <<YAML
-Name: ${name}
-Host: 127.0.0.1
-Port: ${port}
-Auth:
-  AccessSecret: ${JWT_ACCESS_SECRET}
-  AccessExpire: ${JWT_ACCESS_EXPIRE}
-StorageDriver: postgres
-DataSource: ${DATABASE_URL}
-Redis:
-  Addr: ${REDIS_ADDR}
-  Password: ${REDIS_PASSWORD}
-  DB: ${REDIS_DB}
-${extra}
-YAML
-}
-
-write_auth_rpc_config() {
-  cat > "${CONFIG_DIR}/auth-rpc.yaml" <<YAML
-Name: auth-rpc
-ListenOn: 127.0.0.1:${AUTH_RPC_PORT:-9091}
-TokenAuth:
-  AccessSecret: ${JWT_ACCESS_SECRET}
-  AccessExpire: ${JWT_ACCESS_EXPIRE}
-DataSource: ${DATABASE_URL}
-SessionRedis:
-  Addr: ${REDIS_ADDR}
-  Password: ${REDIS_PASSWORD}
-  DB: ${REDIS_DB}
-MailRPC:
-  Endpoints:
-    - 127.0.0.1:${MAIL_RPC_PORT:-9095}
-  Timeout: 5000
-UserRPC:
-  Endpoints:
-    - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000
-Telemetry:
-  Name: auth-rpc
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-YAML
-}
-
-write_auth_api_config() {
-  cat > "${CONFIG_DIR}/auth-api.yaml" <<YAML
-Name: auth-api
-Host: 127.0.0.1
-Port: ${AUTH_API_PORT:-8081}
-Auth:
-  AccessSecret: ${JWT_ACCESS_SECRET}
-  AccessExpire: ${JWT_ACCESS_EXPIRE}
-AuthRPC:
-  Endpoints:
-    - 127.0.0.1:${AUTH_RPC_PORT:-9091}
-  Timeout: 5000
-Telemetry:
-  Name: auth-api
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-YAML
-}
-
-write_user_rpc_config() {
-  cat > "${CONFIG_DIR}/user-rpc.yaml" <<YAML
-Name: user-rpc
-ListenOn: 127.0.0.1:${USER_RPC_PORT:-9090}
-DataSource: ${DATABASE_URL}
-MediaRPC:
-  Endpoints:
-    - 127.0.0.1:${MEDIA_RPC_PORT:-9096}
-  Timeout: 5000
-Telemetry:
-  Name: user-rpc
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-YAML
-}
-
-write_groups_rpc_config() {
-  cat > "${CONFIG_DIR}/groups-rpc.yaml" <<YAML
-Name: groups-rpc
-ListenOn: 127.0.0.1:${GROUPS_RPC_PORT:-9093}
-DataSource: ${DATABASE_URL}
-Telemetry:
-  Name: groups-rpc
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-YAML
-}
-
-write_msg_rpc_config() {
-  cat > "${CONFIG_DIR}/msg-rpc.yaml" <<YAML
-Name: msg-rpc
-ListenOn: 127.0.0.1:${MSG_RPC_PORT:-9098}
-DataSource: ${DATABASE_URL}
-Telemetry:
-  Name: msg-rpc
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-DeepSeek:
-  APIKey: ${DEEPSEEK_API_KEY:-}
-  BaseURL: ${DEEPSEEK_BASE_URL:-}
-  Model: ${DEEPSEEK_MODEL:-}
-PythonExecutor:
-  Backend: disabled
-UserRPC:
-  Endpoints:
-    - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000
-MediaRPC:
-  Endpoints:
-    - 127.0.0.1:${MEDIA_RPC_PORT:-9096}
-  Timeout: 5000
-Kafka:
-  Enabled: true
-  Brokers: ${KAFKA_BROKERS}
-YAML
-}
-
-write_friends_rpc_config() {
-  cat > "${CONFIG_DIR}/friends-rpc.yaml" <<YAML
-Name: friends-rpc
-ListenOn: 127.0.0.1:${FRIENDS_RPC_PORT:-9092}
-DataSource: ${DATABASE_URL}
-Telemetry:
-  Name: friends-rpc
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-YAML
-}
-
-write_admin_rpc_config() {
-  cat > "${CONFIG_DIR}/admin-rpc.yaml" <<YAML
-Name: admin-rpc
-ListenOn: 127.0.0.1:${ADMIN_RPC_PORT:-9097}
-DataSource: ${DATABASE_URL}
-UserRPC:
-  Endpoints:
-    - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000
-Telemetry:
-  Name: admin-rpc
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-YAML
-}
-
-write_media_rpc_config() {
-  cat > "${CONFIG_DIR}/media-rpc.yaml" <<YAML
-Name: media-rpc
-ListenOn: 127.0.0.1:${MEDIA_RPC_PORT:-9096}
-DataSource: ${DATABASE_URL}
-ObjectStorage:
-  Driver: ${OBJECT_STORAGE_DRIVER}
-  Endpoint: ${OBJECT_STORAGE_ENDPOINT}
-  ExternalEndpoint: ${OBJECT_STORAGE_EXTERNAL_ENDPOINT}
-  Bucket: ${OBJECT_STORAGE_BUCKET}
-  Region: ${OBJECT_STORAGE_REGION}
-  UseSSL: ${OBJECT_STORAGE_USE_SSL}
-  ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
-  AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
-  SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
-Telemetry:
-  Name: media-rpc
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-YAML
-}
-
-write_media_api_config() {
-  cat > "${CONFIG_DIR}/media-api.yaml" <<YAML
-Name: media-api
-Host: 127.0.0.1
-Port: ${MEDIA_API_PORT:-8089}
-Auth:
-  AccessSecret: ${JWT_ACCESS_SECRET}
-  AccessExpire: ${JWT_ACCESS_EXPIRE}
-MediaRPC:
-  Endpoints:
-    - 127.0.0.1:${MEDIA_RPC_PORT:-9096}
-  Timeout: 5000
-MsgRPC:
-  Endpoints:
-    - 127.0.0.1:${MSG_RPC_PORT:-9098}
-  Timeout: 5000
-FriendsRPC:
-  Endpoints:
-    - 127.0.0.1:${FRIENDS_RPC_PORT:-9092}
-  Timeout: 5000
-GroupsRPC:
-  Endpoints:
-    - 127.0.0.1:${GROUPS_RPC_PORT:-9093}
-  Timeout: 5000
-Telemetry:
-  Name: media-api
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-YAML
-}
-
-write_admin_api_config() {
-  cat > "${CONFIG_DIR}/admin-api.yaml" <<YAML
-Name: admin-api
-Host: 127.0.0.1
-Port: ${ADMIN_API_PORT:-8088}
-Auth:
-  AccessSecret: ${JWT_ACCESS_SECRET}
-  AccessExpire: ${JWT_ACCESS_EXPIRE}
-AdminRPC:
-  Endpoints:
-    - 127.0.0.1:${ADMIN_RPC_PORT:-9097}
-  Timeout: 5000
-UserRPC:
-  Endpoints:
-    - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000
-AuthRPC:
-  Endpoints:
-    - 127.0.0.1:${AUTH_RPC_PORT:-9091}
-  Timeout: 5000
-AdminBootstrap:
-  Identifier: ${ADMIN_BOOTSTRAP_IDENTIFIER:-amin}
-  Password: ${ADMIN_BOOTSTRAP_PASSWORD:-}
-  DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME:-管理后台管理员}
-Redis:
-  Addr: ${REDIS_ADDR}
-  Password: ${REDIS_PASSWORD}
-  DB: ${REDIS_DB}
-Telemetry:
-  Name: admin-api
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc
-YAML
-}
-
-write_message_transfer_config() {
-  cat > "${CONFIG_DIR}/msgtransfer.yaml" <<YAML
-Name: msgtransfer
-WorkerID: ${MESSAGE_TRANSFER_WORKER_ID}
-DryRun: false
-StorageDriver: postgres
-DataSource: ${DATABASE_URL}
-
-Worker:
-  PollIntervalMillis: ${MESSAGE_TRANSFER_POLL_INTERVAL_MILLIS}
-  RetryBackoffMillis: ${MESSAGE_TRANSFER_RETRY_BACKOFF_MILLIS}
-  MaxAttempts: ${MESSAGE_TRANSFER_MAX_ATTEMPTS}
-
-Observability:
-  Enabled: ${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}
-  Host: ${MESSAGE_TRANSFER_OBSERVABILITY_HOST}
-  Port: ${MESSAGE_TRANSFER_OBSERVABILITY_PORT}
-
-Kafka:
-  Enabled: true
-  Brokers: ${KAFKA_BROKERS}
-YAML
-}
-
-write_push_config() {
-  cat > "${CONFIG_DIR}/push.yaml" <<YAML
-Name: push
-
-Kafka:
-  Brokers: ${KAFKA_BROKERS}
-
-Gateway:
-  Target: ${PUSH_GATEWAY_TARGET}
-  RefreshSeconds: 30
-  DialTimeoutSeconds: 5
-  PushTimeoutSeconds: 5
-
-Observability:
-  Enabled: true
-  Host: 127.0.0.1
-  Port: ${PUSH_OBSERVABILITY_PORT}
-YAML
-}
-
-write_configs() {
+render_configs() {
+  # Render every dev config from its scripts/dev/etc/<name>.yaml.tmpl template,
+  # expanding ${VAR} placeholders from the environment exported by load_env.
+  # Config lives in the templates (data); this script only orchestrates.
   mkdir -p "${CONFIG_DIR}"
-  write_api_config "user-api" "${USER_API_PORT:-8080}" "UserRPC:
-  Endpoints:
-    - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000
-ObjectStorage:
-  Driver: ${OBJECT_STORAGE_DRIVER}
-  Endpoint: ${OBJECT_STORAGE_ENDPOINT}
-  ExternalEndpoint: ${OBJECT_STORAGE_EXTERNAL_ENDPOINT}
-  Bucket: ${OBJECT_STORAGE_BUCKET}
-  Region: ${OBJECT_STORAGE_REGION}
-  UseSSL: ${OBJECT_STORAGE_USE_SSL}
-  ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
-  AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
-  SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
-Telemetry:
-  Name: user-api
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc"
-  write_auth_api_config
-  write_api_config "friends-api" "${FRIENDS_API_PORT:-8082}" "FriendsRPC:
-  Endpoints:
-    - 127.0.0.1:${FRIENDS_RPC_PORT:-9092}
-  Timeout: 5000
-UserRPC:
-  Endpoints:
-    - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000
-Telemetry:
-  Name: friends-api
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc"
-  write_api_config "msggateway" "${GATEWAY_WS_PORT:-8084}" "MsgRPC:
-  Endpoints:
-    - 127.0.0.1:${MSG_RPC_PORT:-9098}
-  Timeout: 5000
-GatewayGRPC:
-  ListenOn: 0.0.0.0:${GATEWAY_GRPC_PORT:-9100}
-Presence:
-  Driver: ${PRESENCE_DRIVER}
-  HeartbeatTTLSeconds: ${PRESENCE_TTL_SECONDS:-60}
-  KeyPrefix: ${PRESENCE_KEY_PREFIX:-agents_im:presence}
-GatewayWS:
-  AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}
-  AllowQueryToken: ${GATEWAY_WS_ALLOW_QUERY_TOKEN}
-  PingIntervalSeconds: ${GATEWAY_WS_PING_INTERVAL_SECONDS}
-  HeartbeatTimeoutSeconds: ${GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS}
-  CommandRateLimitPerSecond: ${GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND}
-  CommandRateLimitBurst: ${GATEWAY_WS_COMMAND_RATE_LIMIT_BURST}"
-  write_api_config "groups-api" "${GROUPS_API_PORT:-8085}" "GroupsRPC:
-  Endpoints:
-    - 127.0.0.1:${GROUPS_RPC_PORT:-9093}
-  Timeout: 5000
-UserRPC:
-  Endpoints:
-    - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000
-Telemetry:
-  Name: groups-api
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc"
-  write_api_config "msg-api" "${MSG_API_PORT:-8090}" "MsgRPC:
-  Endpoints:
-    - 127.0.0.1:${MSG_RPC_PORT:-9098}
-  Timeout: 5000
-AdminRPC:
-  Endpoints:
-    - 127.0.0.1:${ADMIN_RPC_PORT:-9097}
-  Timeout: 5000
-Telemetry:
-  Name: msg-api
-  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT:-4317}
-  Sampler: 1.0
-  Batcher: otlpgrpc"
-  write_api_config "agent-api" "${AGENT_API_PORT:-8086}" "UserRPC:
-  Endpoints:
-    - 127.0.0.1:${USER_RPC_PORT:-9090}
-  Timeout: 5000"
-  write_media_api_config
-  write_admin_api_config
-  write_user_rpc_config
-  write_groups_rpc_config
-  write_msg_rpc_config
-  write_friends_rpc_config
-  write_admin_rpc_config
-  write_media_rpc_config
-  write_auth_rpc_config
-  write_message_transfer_config
-  write_push_config
-}
-
-# Map deployment name -> go main package path. Entrypoints live in their service
-# directories (cmd/ was removed).
-service_pkg() {
-  case "$1" in
-    agent-api)        echo "./service/agent/api" ;;
-    auth-api)         echo "./service/auth/api" ;;
-    auth-rpc)         echo "./service/auth/rpc" ;;
-    friends-api)      echo "./service/friends/api" ;;
-    friends-rpc)      echo "./service/friends/rpc" ;;
-    admin-api)        echo "./service/admin/api" ;;
-    admin-rpc)        echo "./service/admin/rpc" ;;
-    media-api)        echo "./service/media/api" ;;
-    media-rpc)        echo "./service/media/rpc" ;;
-    groups-api)       echo "./service/groups/api" ;;
-    groups-rpc)       echo "./service/groups/rpc" ;;
-    third-rpc)         echo "./service/third/rpc" ;;
-    user-api)         echo "./service/user/api" ;;
-    user-rpc)         echo "./service/user/rpc" ;;
-    msg-rpc)          echo "./service/msg/rpc" ;;
-    msg-api)          echo "./service/msg/api" ;;
-    msggateway)       echo "./service/msggateway" ;;
-    msgtransfer) echo "./service/msgtransfer" ;;
-    push)             echo "./service/push" ;;
-    *) echo "unknown service: $1" >&2; return 1 ;;
-  esac
+  local tmpl name
+  for tmpl in "${ROOT_DIR}"/scripts/dev/etc/*.yaml.tmpl; do
+    name="$(basename "${tmpl}" .yaml.tmpl)"
+    python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(open(sys.argv[1]).read()))' \
+      "${tmpl}" > "${CONFIG_DIR}/${name}.yaml"
+  done
 }
 
 build_service() {
   local name="$1"
   local pkg
-  pkg="$(service_pkg "${name}")"
+  # Go main package path comes from the shared registry (scripts/services.json).
+  if ! pkg="$(services_package "${name}")"; then
+    echo "unknown service: ${name}" >&2
+    return 1
+  fi
   mkdir -p "${BIN_DIR}"
   echo "building ${name}"
   go build -o "${BIN_DIR}/${name}" "${pkg}"
@@ -687,9 +317,10 @@ main() {
 
   require_command go
   require_command curl
+  require_command python3
 
   stop_services
-  write_configs
+  render_configs
   # media-rpc 先起：user-rpc（头像校验）/msg-rpc（附件校验）的 MediaRPC 客户端依赖它（#533）。
   start_service "media-rpc"
   start_service "user-rpc"

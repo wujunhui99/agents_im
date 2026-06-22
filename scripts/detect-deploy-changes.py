@@ -4,43 +4,21 @@ from __future__ import annotations
 import argparse
 import json
 import shlex
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 
-BACKEND_SERVICES = [
-    "user-api",
-    "auth-api",
-    "friends-api",
-    "msg-api",
-    "msggateway",
-    "groups-api",
-    "agent-api",
-    "admin-api",
-    "msgtransfer",
-    "push",
-    "user-rpc",
-    "auth-rpc",
-    "friends-rpc",
-    "groups-rpc",
-    "msg-rpc",
-    "third-rpc",
-    "media-api",
-    "media-rpc",
-    "admin-rpc",
-]
+def _load_registry() -> tuple[list[str], list[str], str]:
+    """Read the service registry (single source of truth) from services.json."""
+    registry = json.loads((Path(__file__).resolve().parent / "services.json").read_text())
+    backend = [s["name"] for s in registry["backend"]]
+    return backend, registry["infra"], registry["web"]
 
-ALL_IMAGE_SERVICES = [*BACKEND_SERVICES, "web"]
 
-CONFIG_ROLLOUT_SERVICES = [
-    *ALL_IMAGE_SERVICES,
-    "agents-im-minio-proxy",
-    "prometheus",
-    "grafana",
-    "loki",
-    "tempo",
-    "otel-collector",
-    "langfuse",
-]
+BACKEND_SERVICES, _INFRA_SERVICES, _WEB_SERVICE = _load_registry()
+
+ALL_IMAGE_SERVICES = [*BACKEND_SERVICES, _WEB_SERVICE]
+
+CONFIG_ROLLOUT_SERVICES = [*ALL_IMAGE_SERVICES, *_INFRA_SERVICES]
 
 OBSERVABILITY_MANIFEST_ROLLOUTS = {
     "deploy/k8s/prometheus-grafana.yaml": ["prometheus", "grafana"],
@@ -69,15 +47,6 @@ PROTO_DOMAINS = {
     "message": "messagepb",
     "mail": "mailpb",
 }
-
-API_BACKEND_SERVICES = [
-    "user-api",
-    "auth-api",
-    "friends-api",
-    "msg-api",
-    "groups-api",
-    "agent-api",
-]
 
 # Non-go-zero services whose main lives directly under service/<name>/ (cmd/ removed).
 FLAT_SERVICE_DIRS = {
@@ -120,12 +89,9 @@ class DeploySelection:
         for service in services:
             self.add_backend(service)
 
-    def add_api_backends(self) -> None:
-        self.add_backends(API_BACKEND_SERVICES)
-
     def add_web(self) -> None:
-        self.image_services.add("web")
-        self.rollout_services.add("web")
+        self.image_services.add(_WEB_SERVICE)
+        self.rollout_services.add(_WEB_SERVICE)
 
     def add_rollout(self, service: str, *, restart: bool = True) -> None:
         self.rollout_services.add(service)
@@ -202,9 +168,13 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         "scripts/ci/drone-deploy.sh",
         "scripts/ci/drone-detect-deploy.sh",
         "scripts/detect-deploy-changes.py",
+        "scripts/services.json",
+        "scripts/services.sh",
     }:
         # CI/deploy orchestration changes should exercise deploy/runtime wiring
         # without rebuilding every service image on each deploy-script fix.
+        # services.json/services.sh are the deploy-time service registry read by
+        # deploy-k3s.sh, so they take the same config-only path.
         selection.add_rollout("groups-rpc")
         return
 
@@ -212,9 +182,12 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         "scripts/drone-watch.sh",
         "scripts/bootstrap-server.sh",
         "scripts/test-deploy-k3s.sh",
-    }:
-        # Agent-local tooling, one-time server provisioning, and the deploy-script
-        # test harness never affect the deployed app — must not hit the fail-safe
+        "scripts/dev-up.sh",
+        "scripts/dev-demo-data.sh",
+    } or path.startswith("scripts/dev/"):
+        # Agent-local tooling, one-time server provisioning, the deploy-script test
+        # harness, and the local dev-up stack (incl. its scripts/dev/ config
+        # templates) never affect the deployed app — must not hit the fail-safe
         # full rebuild below.
         return
 

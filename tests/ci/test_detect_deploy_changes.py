@@ -96,6 +96,27 @@ class DetectDeployChangesTest(unittest.TestCase):
             self.assertEqual(out["build_required"], "false", path)
             self.assertEqual(out["deploy_required"], "false", path)
 
+    def test_local_dev_stack_does_not_deploy(self):
+        # The dev-up local stack and its scripts/dev/ config templates only run on
+        # a developer machine; they never affect the deployed app.
+        for path in [
+            "scripts/dev-up.sh",
+            "scripts/dev-demo-data.sh",
+            "scripts/dev/etc/user-api.yaml.tmpl",
+        ]:
+            out = self.detect([path])
+            self.assertEqual(out["build_required"], "false", path)
+            self.assertEqual(out["deploy_required"], "false", path)
+
+    def test_service_registry_takes_config_only_path(self):
+        # services.json / services.sh are the deploy-time service registry read by
+        # deploy-k3s.sh: a config-only rollout, not a full image rebuild.
+        for path in ["scripts/services.json", "scripts/services.sh"]:
+            out = self.detect([path])
+            self.assertEqual(out["build_required"], "false", path)
+            self.assertEqual(out["deploy_required"], "true", path)
+            self.assertEqual(out["config_only"], "true", path)
+
     def test_ci_verification_scripts_do_not_deploy(self):
         # Verification-only CI scripts run inside the pipeline; the deploy
         # orchestration trio (drone-build-images/drone-deploy/drone-detect-deploy)
