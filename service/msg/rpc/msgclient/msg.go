@@ -14,34 +14,34 @@ import (
 )
 
 type (
-	AppendStreamMessageRequest         = msg.AppendStreamMessageRequest
-	AppendStreamMessageResponse        = msg.AppendStreamMessageResponse
-	ClearConversationMessagesRequest   = msg.ClearConversationMessagesRequest
-	ClearConversationMessagesResponse  = msg.ClearConversationMessagesResponse
-	ConversationSeqState               = msg.ConversationSeqState
-	DeleteMessagesRequest              = msg.DeleteMessagesRequest
-	DeleteMessagesResponse             = msg.DeleteMessagesResponse
-	GetConversationsSeqStateRequest    = msg.GetConversationsSeqStateRequest
-	GetConversationsSeqStateResponse   = msg.GetConversationsSeqStateResponse
-	GetHasReadSeqsRequest              = msg.GetHasReadSeqsRequest
-	GetHasReadSeqsResponse             = msg.GetHasReadSeqsResponse
-	GetLastMessageByConvsRequest       = msg.GetLastMessageByConvsRequest
-	GetLastMessageByConvsResponse      = msg.GetLastMessageByConvsResponse
-	GetMaxSeqsRequest                  = msg.GetMaxSeqsRequest
-	GetMaxSeqsResponse                 = msg.GetMaxSeqsResponse
-	GetMessageRefRequest               = msg.GetMessageRefRequest
-	GetMessageRefResponse              = msg.GetMessageRefResponse
-	GetServerTimeRequest               = msg.GetServerTimeRequest
-	GetServerTimeResponse              = msg.GetServerTimeResponse
-	MarkConversationAsReadRequest      = msg.MarkConversationAsReadRequest
-	MarkConversationAsReadResponse     = msg.MarkConversationAsReadResponse
-	Message                            = msg.Message
-	PullMessagesRequest                = msg.PullMessagesRequest
-	PullMessagesResponse               = msg.PullMessagesResponse
-	RevokeMessageRequest               = msg.RevokeMessageRequest
-	RevokeMessageResponse              = msg.RevokeMessageResponse
-	SendMessageRequest                 = msg.SendMessageRequest
-	SendMessageResponse                = msg.SendMessageResponse
+	AppendStreamMessageRequest        = msg.AppendStreamMessageRequest
+	AppendStreamMessageResponse       = msg.AppendStreamMessageResponse
+	ClearConversationMessagesRequest  = msg.ClearConversationMessagesRequest
+	ClearConversationMessagesResponse = msg.ClearConversationMessagesResponse
+	ConversationSeqState              = msg.ConversationSeqState
+	DeleteMessagesRequest             = msg.DeleteMessagesRequest
+	DeleteMessagesResponse            = msg.DeleteMessagesResponse
+	GetConversationsSeqStateRequest   = msg.GetConversationsSeqStateRequest
+	GetConversationsSeqStateResponse  = msg.GetConversationsSeqStateResponse
+	GetHasReadSeqsRequest             = msg.GetHasReadSeqsRequest
+	GetHasReadSeqsResponse            = msg.GetHasReadSeqsResponse
+	GetLastMessageByConvsRequest      = msg.GetLastMessageByConvsRequest
+	GetLastMessageByConvsResponse     = msg.GetLastMessageByConvsResponse
+	GetMaxSeqsRequest                 = msg.GetMaxSeqsRequest
+	GetMaxSeqsResponse                = msg.GetMaxSeqsResponse
+	GetMessageRefRequest              = msg.GetMessageRefRequest
+	GetMessageRefResponse             = msg.GetMessageRefResponse
+	GetServerTimeRequest              = msg.GetServerTimeRequest
+	GetServerTimeResponse             = msg.GetServerTimeResponse
+	MarkConversationAsReadRequest     = msg.MarkConversationAsReadRequest
+	MarkConversationAsReadResponse    = msg.MarkConversationAsReadResponse
+	Message                           = msg.Message
+	PullMessagesRequest               = msg.PullMessagesRequest
+	PullMessagesResponse              = msg.PullMessagesResponse
+	RevokeMessageRequest              = msg.RevokeMessageRequest
+	RevokeMessageResponse             = msg.RevokeMessageResponse
+	SendMessageRequest                = msg.SendMessageRequest
+	SendMessageResponse               = msg.SendMessageResponse
 
 	Msg interface {
 		// 写

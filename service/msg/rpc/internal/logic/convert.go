@@ -33,7 +33,6 @@ func messageToPB(m *model.Messages) *msg.Message {
 	}
 }
 
-
 func seqStateToPB(s model.ConversationSeqState) *msg.ConversationSeqState {
 	out := &msg.ConversationSeqState{
 		ConversationId: s.ConversationID,

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
+	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 
 func llmObsStartedFromRequest(trigger AgentTrigger, req agentruntime.RunRequest, startedAt time.Time) llmobs.Event {

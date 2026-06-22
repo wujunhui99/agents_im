@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 
 func TestGroupExplicitTargetAgentCreatesOneRunAndMessageServiceReply(t *testing.T) {

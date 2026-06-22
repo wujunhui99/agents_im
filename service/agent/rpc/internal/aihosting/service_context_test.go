@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 )
 
 func TestConfigureConversationAIHostingFailsOnMissingRequiredDependencies(t *testing.T) {

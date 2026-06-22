@@ -9,9 +9,6 @@ package aihosting
 import (
 	"context"
 
-	agentim "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
-	einoruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/eino"
-	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
@@ -19,6 +16,9 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	agentim "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
+	einoruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/eino"
+	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 )
 
 type ServiceContext struct {
