@@ -764,8 +764,7 @@ spec:
       labels:
         app: msg-rpc
     spec:
-      # AI 托管 PythonExecutor K8S backend 需要的 RBAC（随 message-api 退役迁入）。
-      serviceAccountName: python-executor-controller
+      # AI 托管（含 PythonExecutor K8S RBAC）已迁出至 agent-rpc（#340）。
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
@@ -792,6 +791,57 @@ spec:
           ports:
             - name: grpc
               containerPort: 9098
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-rpc
+  namespace: agents-im
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent-rpc
+  template:
+    metadata:
+      labels:
+        app: agent-rpc
+    spec:
+      # AI 托管运行时（含 PythonExecutor K8S backend）随 agent 域归位迁入（#340）：需 RBAC。
+      serviceAccountName: python-executor-controller
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: agent-rpc
+          image: ghcr.io/wujunhui99/agents_im/agent-rpc:__IMAGE_TAG_REQUIRED__
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/agent-rpc.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: grpc
+              containerPort: 9099
           livenessProbe:
             tcpSocket:
               port: grpc

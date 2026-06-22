@@ -19,4 +19,6 @@ type Config struct {
 	Redis    appconfig.RedisConfig `json:",optional"`
 	MsgRPC   zrpc.RpcClientConf
 	AdminRPC zrpc.RpcClientConf
+	// AgentRPC：AI 托管开关 CRUD owner = agent 域（#340），ai-hosting 路由 BFF 调 agent-rpc。
+	AgentRPC zrpc.RpcClientConf
 }

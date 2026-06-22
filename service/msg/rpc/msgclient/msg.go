@@ -18,11 +18,9 @@ type (
 	AppendStreamMessageResponse        = msg.AppendStreamMessageResponse
 	ClearConversationMessagesRequest   = msg.ClearConversationMessagesRequest
 	ClearConversationMessagesResponse  = msg.ClearConversationMessagesResponse
-	ConversationAIHostingState         = msg.ConversationAIHostingState
 	ConversationSeqState               = msg.ConversationSeqState
 	DeleteMessagesRequest              = msg.DeleteMessagesRequest
 	DeleteMessagesResponse             = msg.DeleteMessagesResponse
-	GetConversationAIHostingRequest    = msg.GetConversationAIHostingRequest
 	GetConversationsSeqStateRequest    = msg.GetConversationsSeqStateRequest
 	GetConversationsSeqStateResponse   = msg.GetConversationsSeqStateResponse
 	GetHasReadSeqsRequest              = msg.GetHasReadSeqsRequest
@@ -44,7 +42,6 @@ type (
 	RevokeMessageResponse              = msg.RevokeMessageResponse
 	SendMessageRequest                 = msg.SendMessageRequest
 	SendMessageResponse                = msg.SendMessageResponse
-	UpdateConversationAIHostingRequest = msg.UpdateConversationAIHostingRequest
 
 	Msg interface {
 		// 写
@@ -67,9 +64,6 @@ type (
 		ClearConversationMessages(ctx context.Context, in *ClearConversationMessagesRequest, opts ...grpc.CallOption) (*ClearConversationMessagesResponse, error)
 		// 时间（stub）
 		GetServerTime(ctx context.Context, in *GetServerTimeRequest, opts ...grpc.CallOption) (*GetServerTimeResponse, error)
-		// AI 托管开关（keystone 例外：随 message-api 退役落到 msg-rpc，待 agent 域 rpc / 03 §9 B1 后迁出）
-		GetConversationAIHosting(ctx context.Context, in *GetConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error)
-		UpdateConversationAIHosting(ctx context.Context, in *UpdateConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error)
 	}
 
 	defaultMsg struct {
@@ -153,15 +147,4 @@ func (m *defaultMsg) ClearConversationMessages(ctx context.Context, in *ClearCon
 func (m *defaultMsg) GetServerTime(ctx context.Context, in *GetServerTimeRequest, opts ...grpc.CallOption) (*GetServerTimeResponse, error) {
 	client := msg.NewMsgClient(m.cli.Conn())
 	return client.GetServerTime(ctx, in, opts...)
-}
-
-// AI 托管开关（keystone 例外：随 message-api 退役落到 msg-rpc，待 agent 域 rpc / 03 §9 B1 后迁出）
-func (m *defaultMsg) GetConversationAIHosting(ctx context.Context, in *GetConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error) {
-	client := msg.NewMsgClient(m.cli.Conn())
-	return client.GetConversationAIHosting(ctx, in, opts...)
-}
-
-func (m *defaultMsg) UpdateConversationAIHosting(ctx context.Context, in *UpdateConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error) {
-	client := msg.NewMsgClient(m.cli.Conn())
-	return client.UpdateConversationAIHosting(ctx, in, opts...)
 }

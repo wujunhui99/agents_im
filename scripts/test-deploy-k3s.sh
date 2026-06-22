@@ -213,11 +213,11 @@ fi
 DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --event-name push \
   --ref refs/heads/main \
-  service/msg/rpc/internal/aihosting/service_context.go)"
-if ! grep -Fq "backend_services='[\"msg-rpc\"]'" <<<"${DETECT_OUTPUT}" || \
+  service/agent/rpc/internal/aihosting/service_context.go)"
+if ! grep -Fq "backend_services='[\"agent-rpc\"]'" <<<"${DETECT_OUTPUT}" || \
   grep -Fq 'user-api' <<<"${DETECT_OUTPUT}" || \
   ! grep -Fq "migration_required=false" <<<"${DETECT_OUTPUT}"; then
-  echo "expected AI hosting runtime changes to rebuild msg-rpc only without migrations" >&2
+  echo "expected AI hosting runtime changes to rebuild agent-rpc only without migrations" >&2
   printf '%s\n' "${DETECT_OUTPUT}" >&2
   exit 1
 fi
@@ -227,7 +227,7 @@ DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --ref refs/heads/main \
   db/migrations/202605260001_example.sql)"
 if ! grep -Fq "migration_required=true" <<<"${DETECT_OUTPUT}" || \
-  ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"msg-api\",\"msggateway\",\"groups-api\",\"agent-api\",\"admin-api\",\"msgtransfer\",\"push\",\"user-rpc\",\"auth-rpc\",\"friends-rpc\",\"groups-rpc\",\"msg-rpc\",\"third-rpc\",\"media-api\",\"media-rpc\",\"admin-rpc\"]'" <<<"${DETECT_OUTPUT}"; then
+  ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"msg-api\",\"msggateway\",\"groups-api\",\"agent-api\",\"admin-api\",\"msgtransfer\",\"push\",\"user-rpc\",\"auth-rpc\",\"friends-rpc\",\"groups-rpc\",\"msg-rpc\",\"agent-rpc\",\"third-rpc\",\"media-api\",\"media-rpc\",\"admin-rpc\"]'" <<<"${DETECT_OUTPUT}"; then
   echo "expected executable migration changes to require migrations and rebuild all backends" >&2
   printf '%s\n' "${DETECT_OUTPUT}" >&2
   exit 1

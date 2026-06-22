@@ -26,6 +26,7 @@
     { "name": "friends-rpc", "package": "./service/friends/rpc" },
     { "name": "groups-rpc", "package": "./service/groups/rpc" },
     { "name": "msg-rpc", "package": "./service/msg/rpc" },
+    { "name": "agent-rpc", "package": "./service/agent/rpc" },
     { "name": "third-rpc", "package": "./service/third/rpc" },
     { "name": "media-api", "package": "./service/media/api" },
     { "name": "media-rpc", "package": "./service/media/rpc" },

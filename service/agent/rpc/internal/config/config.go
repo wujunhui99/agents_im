@@ -1,0 +1,41 @@
+package config
+
+import (
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/zeromicro/go-zero/zrpc"
+)
+
+// Config 是 agent-rpc 的配置：既是 gRPC server（AI 托管开关 CRUD，04-agent §3.2），
+// 也是 agent.trigger.v1 的 Kafka 消费者 worker（D15 终判 → runtime → 写回，§4.2）。
+// tracing 用 go-zero 自带 Telemetry（在 RpcServerConf.ServiceConf 内，由 yaml 配置）。
+type Config struct {
+	zrpc.RpcServerConf
+
+	// DataSource 是 agent 域数据层（keystone internal/repository：agent registry /
+	// audit / hosting / conv_hosting / messages 历史读）。Postgres-only。
+	DataSource string `json:",optional"`
+
+	// MsgRPC：AI 回复写回经属主 msg-rpc gRPC SendMessage（imadapter，D15 step ④）。
+	// AI 消息走与人类消息完全相同的 Kafka 链路，由消费端递归闸门防再触发。
+	MsgRPC zrpc.RpcClientConf `json:",optional"`
+
+	// UserRPC：agent-create 工具路径的账号读写经属主 user-rpc（gate #550，脱
+	// internal accountRepo 的 avatar string scan / 空串写）。
+	UserRPC zrpc.RpcClientConf `json:",optional"`
+
+	// DeepSeek / LLMObservability / PythonExecutor：runtime 与工具配置。
+	DeepSeek         appconfig.DeepSeekConfig         `json:",optional"`
+	LLMObservability appconfig.LLMObservabilityConfig `json:",optional"`
+	PythonExecutor   appconfig.PythonExecutorConfig   `json:",optional"`
+
+	// Kafka：agent.trigger.v1 消费链路（独立 consumer group，与已退役的 msg-rpc
+	// 回流 consumer 隔离）。
+	Kafka KafkaConf `json:",optional"`
+}
+
+type KafkaConf struct {
+	// Brokers 是逗号分隔的 bootstrap 列表；env KAFKA_BROKERS 覆盖。
+	Brokers string `json:",optional"`
+	// Group 是 agent.trigger.v1 的消费组。
+	Group string `json:",default=agent-trigger"`
+}

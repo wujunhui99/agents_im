@@ -9,9 +9,9 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
+	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/types"
-	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -35,7 +35,7 @@ func (l *GetConversationAIHostingLogic) GetConversationAIHosting(req *types.Conv
 	if err != nil {
 		return nil, err
 	}
-	result, err := l.svcCtx.MsgRPC.GetConversationAIHosting(l.ctx, &msgpb.GetConversationAIHostingRequest{
+	result, err := l.svcCtx.AgentRPC.GetConversationAIHosting(l.ctx, &agentpb.GetConversationAIHostingRequest{
 		OwnerAccountId: userID,
 		ConversationId: req.ConversationID,
 	})

@@ -164,6 +164,7 @@ load_env() {
   export MEDIA_RPC_PORT="${MEDIA_RPC_PORT:-9096}"
   export ADMIN_RPC_PORT="${ADMIN_RPC_PORT:-9097}"
   export MSG_RPC_PORT="${MSG_RPC_PORT:-9098}"
+  export AGENT_RPC_PORT="${AGENT_RPC_PORT:-9099}"
   export PRESENCE_TTL_SECONDS="${PRESENCE_TTL_SECONDS:-60}"
   export PRESENCE_KEY_PREFIX="${PRESENCE_KEY_PREFIX:-agents_im:presence}"
   export ADMIN_BOOTSTRAP_IDENTIFIER="${ADMIN_BOOTSTRAP_IDENTIFIER:-amin}"
@@ -329,6 +330,8 @@ main() {
   start_service "friends-rpc"
   start_service "admin-rpc"
   start_service "auth-rpc"
+  # agent-rpc 依赖 msg-rpc/user-rpc，且 msg-api 依赖 agent-rpc（AI 托管 CRUD）：故在两者之间启动。
+  start_service "agent-rpc"
   start_service "user-api"
   start_service "auth-api"
   start_service "friends-api"
