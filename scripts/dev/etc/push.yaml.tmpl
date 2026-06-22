@@ -1,0 +1,15 @@
+Name: push
+
+Kafka:
+  Brokers: ${KAFKA_BROKERS}
+
+Gateway:
+  Target: ${PUSH_GATEWAY_TARGET}
+  RefreshSeconds: 30
+  DialTimeoutSeconds: 5
+  PushTimeoutSeconds: 5
+
+Observability:
+  Enabled: true
+  Host: 127.0.0.1
+  Port: ${PUSH_OBSERVABILITY_PORT}

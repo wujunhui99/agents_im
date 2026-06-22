@@ -1,0 +1,34 @@
+{
+  "_comment": "Single source of truth for the service registry. Consumed by detect-deploy-changes.py, deploy-k3s.sh, and dev-up.sh (via services.sh). 'backend' order is canonical and significant. Adding/removing a deployed service: edit here only.",
+  "web": "web",
+  "infra": [
+    "agents-im-minio-proxy",
+    "prometheus",
+    "grafana",
+    "loki",
+    "tempo",
+    "otel-collector",
+    "langfuse"
+  ],
+  "backend": [
+    { "name": "user-api", "package": "./service/user/api" },
+    { "name": "auth-api", "package": "./service/auth/api" },
+    { "name": "friends-api", "package": "./service/friends/api" },
+    { "name": "msg-api", "package": "./service/msg/api" },
+    { "name": "msggateway", "package": "./service/msggateway" },
+    { "name": "groups-api", "package": "./service/groups/api" },
+    { "name": "agent-api", "package": "./service/agent/api" },
+    { "name": "admin-api", "package": "./service/admin/api" },
+    { "name": "msgtransfer", "package": "./service/msgtransfer" },
+    { "name": "push", "package": "./service/push" },
+    { "name": "user-rpc", "package": "./service/user/rpc" },
+    { "name": "auth-rpc", "package": "./service/auth/rpc" },
+    { "name": "friends-rpc", "package": "./service/friends/rpc" },
+    { "name": "groups-rpc", "package": "./service/groups/rpc" },
+    { "name": "msg-rpc", "package": "./service/msg/rpc" },
+    { "name": "third-rpc", "package": "./service/third/rpc" },
+    { "name": "media-api", "package": "./service/media/api" },
+    { "name": "media-rpc", "package": "./service/media/rpc" },
+    { "name": "admin-rpc", "package": "./service/admin/rpc" }
+  ]
+}

@@ -1,0 +1,8 @@
+Name: groups-rpc
+ListenOn: 127.0.0.1:${GROUPS_RPC_PORT}
+DataSource: ${DATABASE_URL}
+Telemetry:
+  Name: groups-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

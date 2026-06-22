@@ -1,0 +1,12 @@
+Name: user-rpc
+ListenOn: 127.0.0.1:${USER_RPC_PORT}
+DataSource: ${DATABASE_URL}
+MediaRPC:
+  Endpoints:
+    - 127.0.0.1:${MEDIA_RPC_PORT}
+  Timeout: 5000
+Telemetry:
+  Name: user-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

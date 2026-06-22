@@ -1,0 +1,31 @@
+Name: admin-api
+Host: 127.0.0.1
+Port: ${ADMIN_API_PORT}
+Auth:
+  AccessSecret: ${JWT_ACCESS_SECRET}
+  AccessExpire: ${JWT_ACCESS_EXPIRE}
+AdminRPC:
+  Endpoints:
+    - 127.0.0.1:${ADMIN_RPC_PORT}
+  Timeout: 5000
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT}
+  Timeout: 5000
+AuthRPC:
+  Endpoints:
+    - 127.0.0.1:${AUTH_RPC_PORT}
+  Timeout: 5000
+AdminBootstrap:
+  Identifier: ${ADMIN_BOOTSTRAP_IDENTIFIER}
+  Password: ${ADMIN_BOOTSTRAP_PASSWORD}
+  DisplayName: ${ADMIN_BOOTSTRAP_DISPLAY_NAME}
+Redis:
+  Addr: ${REDIS_ADDR}
+  Password: ${REDIS_PASSWORD}
+  DB: ${REDIS_DB}
+Telemetry:
+  Name: admin-api
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

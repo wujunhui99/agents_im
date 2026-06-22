@@ -41,9 +41,14 @@ PY
 bash scripts/ci/verify-migration-immutability.sh
 
 # --- dev / demo tooling content ---
+# dev-up.sh orchestrates the local stack; per-service config now lives in the
+# scripts/dev/etc/*.yaml.tmpl templates it renders at startup, so assert the
+# storage/object-storage content there rather than inline in the script.
 assert_present "-qF" scripts/dev-up.sh -- \
   "docker compose up -d postgres redis rustfs" "bash scripts/migrate-postgres.sh" \
-  "StorageDriver: postgres" "ObjectStorage:" "msggateway"
+  "scripts/dev/etc" "msggateway"
+assert_present "-qF" scripts/dev/etc -- \
+  "StorageDriver: postgres" "ObjectStorage:"
 assert_present "-qF" scripts/dev-demo-data.sh -- \
   "/auth/register" "/friends" "/groups" "/messages" "/read"
 
