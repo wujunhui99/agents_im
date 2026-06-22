@@ -3,8 +3,9 @@ Host: 0.0.0.0
 Port: 8084
 
 # 下行推送 gRPC server（03 §6.2）：service/push 经 headless Service 广播 BatchPushOneMsg。
+# 端口 9101（非 9100）：msggateway 用 hostNetwork，9100 已被 node-exporter hostPort 占用（#599）。
 GatewayGRPC:
-  ListenOn: 0.0.0.0:9100
+  ListenOn: 0.0.0.0:9101
 
 Auth:
   AccessSecret: ${JWT_ACCESS_SECRET}

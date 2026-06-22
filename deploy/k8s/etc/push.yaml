@@ -8,7 +8,7 @@ Kafka:
 # pod IP，push 对每个 IP 建一条 gRPC 长连并广播 BatchPushOneMsg（k8s 原生服务发现，
 # 无 etcd）。RefreshSeconds 周期重解析以纳入新 pod。
 Gateway:
-  Target: msggateway-headless.agents-im.svc.cluster.local:9100
+  Target: msggateway-headless.agents-im.svc.cluster.local:9101
   RefreshSeconds: 30
   DialTimeoutSeconds: 5
   PushTimeoutSeconds: 5
