@@ -1,0 +1,55 @@
+Name: agent-rpc
+ListenOn: 0.0.0.0:9099
+
+DataSource: ${DATABASE_URL}
+
+# AI 回复写回经属主 msg-rpc gRPC SendMessage（imadapter，#340 D15 step ④）。
+MsgRPC:
+  Endpoints:
+    - msg-rpc:9098
+  Timeout: 5000
+
+# agent-create 工具路径账号读写经属主 user-rpc（gate #550，脱 internal accountRepo）。
+UserRPC:
+  Endpoints:
+    - user-rpc:9090
+  Timeout: 5000
+
+# go-zero 自带 tracing：endpoint 由 OTLP collector 注入（空则关闭）。
+Telemetry:
+  Name: agent-rpc
+  Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Sampler: 1.0
+  Batcher: otlpgrpc
+
+# AI 托管运行时（随 agent 域归位迁入，#340）。
+DeepSeek:
+  APIKey: ${DEEPSEEK_API_KEY}
+  BaseURL: ${DEEPSEEK_BASE_URL}
+  Model: ${DEEPSEEK_MODEL}
+LLMObservability:
+  Enabled: false
+  Backend: ${LLM_OBSERVABILITY_BACKEND}
+  CaptureOutput: false
+  MaxOutputBytes: 2048
+  Langfuse:
+    Host: ${LANGFUSE_HOST}
+    PublicKey: ${LANGFUSE_PUBLIC_KEY}
+    SecretKey: ${LANGFUSE_SECRET_KEY}
+PythonExecutor:
+  Backend: ${PYTHON_EXECUTOR_BACKEND}
+  DefaultTimeoutSeconds: ${PYTHON_EXECUTOR_DEFAULT_TIMEOUT_SECONDS}
+  MaxTimeoutSeconds: ${PYTHON_EXECUTOR_MAX_TIMEOUT_SECONDS}
+  DefaultMemoryMiB: ${PYTHON_EXECUTOR_DEFAULT_MEMORY_MIB}
+  MaxMemoryMiB: ${PYTHON_EXECUTOR_MAX_MEMORY_MIB}
+  MaxOutputBytes: ${PYTHON_EXECUTOR_MAX_OUTPUT_BYTES}
+  K8S:
+    Namespace: ${PYTHON_EXECUTOR_K8S_NAMESPACE}
+    Image: ${PYTHON_EXECUTOR_K8S_IMAGE}
+    ServiceAccountName: ${PYTHON_EXECUTOR_K8S_SERVICE_ACCOUNT_NAME}
+    RuntimeClassName: ${PYTHON_EXECUTOR_K8S_RUNTIME_CLASS_NAME}
+
+# agent.trigger.v1 消费（独立 consumer group，与已退役的 msg-rpc 回流 consumer 隔离）。
+Kafka:
+  Brokers: redpanda.agents-im.svc.cluster.local:9092
+  Group: agent-trigger

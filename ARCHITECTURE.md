@@ -89,8 +89,8 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 负责 Agent 生命周期、配置组装、运行时能力和工具调用审计。第一版设计见 [`docs/product-specs/agent-system.md`](./docs/product-specs/agent-system.md) 和 [`docs/design-docs/agent-system-architecture.md`](./docs/design-docs/agent-system-architecture.md)。核心能力包括：
 
 - 在账号系统中配合 `user` / `agent` / `admin` 账号类型，让 Agent 账号作为 IM 会话成员参与单聊和群聊。
-- 当前 `service/agent/api`（入口 `agent.go`，直接装配 `internal/*`）启动，`service/agent/api/agent.api` 提供 Agent profile 管理基础，配置单独持久化到 `agents` 表；创建 Agent 必须通过 Account Service 资料能力验证绑定账号为 `account_type=agent`，验证不可用时必须失败。当前没有真实 Agent RPC/proto contract，不能创建空 RPC scaffold 冒充服务边界。
-- `service/agent`（扁平 main，issue #503 骨架，未部署）以独立 consumer group `agent-trigger` 消费 `agent.trigger.v1`，承载 D15 三步终判（origin 防递归 → D16 账号 ID 类型位判 agent 收信 → conversation hosting）；runtime / IM 写回 / hosting 查询均为显式 mock driver（零副作用），真实实现随 [`docs/refactor/v1/04-agent.md`](./docs/refactor/v1/04-agent.md) §5 落地。过渡期真实 AI 回复仍由 msg-rpc 内 `agent.trigger.v1` 回流 consumer 产生。
+- `service/agent/api`（入口 `agent.go`）提供 Agent profile 管理 BFF，`service/agent/api/agent.api` 配置持久化到 `agents` 表；创建 Agent 必须通过 Account Service 资料能力验证绑定账号为 `account_type=agent`，验证不可用时必须失败。
+- `service/agent/rpc`（入口 `agent.go`，`agent.proto`，#340 落地）是 agent 域属主服务，**双角色单进程**：gRPC server 暴露 AI 托管开关 CRUD（`Get/UpdateConversationAIHosting`，数据 owner = agent 域，由 msg-api BFF 调用）；同时以独立 consumer group `agent-trigger` 消费 `agent.trigger.v1`，承载 D15 三步终判（origin 防递归 → D16 账号 ID 类型位判 agent 收信 → `conversation_ai_hosting` 托管），命中后经 `internal/orchestrator` 跑 runtime（LLM + tools）并由 `internal/imadapter` 经 msg-rpc gRPC `SendMessage` 写回 AI 消息（AI 消息走与人类消息完全相同的 Kafka 链路，递归闸门终止循环）。msg-rpc 不再跑任何 agent runtime、不消费 `agent.trigger.v1`。
 - 管理系统提示词、工具、Agent skills 和 Agent 配置，并将元数据持久化在 PostgreSQL。
 - 使用系统提示词、工具和 skills 组装 Agent runtime。
 - 通过 RustFS (S3-compatible) object storage 保存 Agent skill 文件；Agent 绑定 skill 后默认可读取该 skill 文件，但不能越权读取其他文件。
@@ -98,13 +98,13 @@ IM 后端 MVP 范围和前端对接契约见 [`docs/product-specs/backend-mvp.md
 - 当前 Agent registry 基线已提供 prompt/tool/skill 元数据与 Agent 白名单绑定的 Go logic/repository 和 PostgreSQL schema；该基线不执行工具、不调用 LLM、不上传或读取对象存储二进制内容。
 - 当前 Agent runtime provider 基线已提供 CloudWeGo Eino + DeepSeek ChatModel adapter/config，读取 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`；缺少 API key 时构造模型必须失败，不提供 mock/fake response。
 - 当前 AI Hosting LLM observability 通过 `internal/llmobs` 和 Eino callback seam 发出 run/generation 事件；默认 noop/test sink 不联网，Langfuse 是目标后端但 live export 未实现时必须显式失败，设计见 [`docs/design-docs/llm-observability.md`](./docs/design-docs/llm-observability.md)。
-- 当前 Agent runtime 工具解析契约位于 `internal/agentruntime/tools`：运行时必须从 `AgentRegistryRepository` 读取 Agent 工具绑定并重新校验工具状态、管理员配置、MCP server 状态和安全 transport；该契约只产出 Eino 可适配的安全 metadata/adapter seam，不执行 MCP 网络调用，也不提供 shell、命令、本地进程、stdio MCP、Python 或文件系统写入工具。
+- 当前 Agent runtime 工具解析契约位于 `service/agent/rpc/internal/runtime/tools`：运行时必须从 `AgentRegistryRepository` 读取 Agent 工具绑定并重新校验工具状态、管理员配置、MCP server 状态和安全 transport；该契约只产出 Eino 可适配的安全 metadata/adapter seam，不执行 MCP 网络调用，也不提供 shell、命令、本地进程、stdio MCP、Python 或文件系统写入工具。
 - Agent run、tool call、skill file read、Python exec 审计记录使用 append-only 审计表保存；摘要字段必须脱敏，Python 代码只保存 hash/大小摘要。
 - 第一版不提供 shell/命令行脚本执行能力；Python 执行必须通过受限沙箱、限时限资源、默认无网络，并记录审计。
-- 当前 Python executor 只提供 `internal/agent/pythonexec` 契约和 disabled 默认实现；未配置真实沙箱时必须返回 `ErrPythonExecutorDisabled`，不得在 Go 主服务进程内直接运行 Python 或 shell。
-- 当前 Eino runtime core 只提供 `internal/agentruntime` 本地接口、领域请求/结果类型和 fail-first 归一化校验；不导入 Eino、不调用 LLM、不执行工具、不写回 IM。设计见 [`docs/design-docs/agent-runtime-eino.md`](./docs/design-docs/agent-runtime-eino.md)。
+- Python executor 契约位于 `pkg/pythonexec`（跨服务 infra，D10），disabled 默认实现；未配置真实沙箱时必须返回 `ErrPythonExecutorDisabled`，不得在 Go 主服务进程内直接运行 Python 或 shell。
+- Eino runtime core 位于 `service/agent/rpc/internal/runtime`：本地接口、领域请求/结果类型、fail-first 归一化校验，以及 Eino + DeepSeek ChatModel adapter。设计见 [`docs/design-docs/agent-runtime-eino.md`](./docs/design-docs/agent-runtime-eino.md)。
 - Agent 响应必须通过 Message Service 写回 IM，不能绕过 IM 消息链路或直接推送 WebSocket。
-- Agent-IM 第一阶段 Go 契约位于 `internal/agentim`：定义用户私聊 Agent、群聊 @Agent、管理员手动 run 三类触发；`AgentRunOrchestrator` 通过 `RuntimeRequestBuilder` 调用统一的 `internal/agentruntime.Runtime`，响应 writer 只依赖 `MessageLogic.SendMessage` / Message Service seam，并通过 Agent 消息元数据默认阻止递归触发。Agent 会话托管第一阶段由 `MessageLogic` 的 `MessageCreatedHook` 把已持久化的 `message.created` 快照交给 `ConversationHostingService`，读取 `agent_conversation_hosting` 配置和 `agent_trigger_idempotency`，再通过同一 Message Service 写回 AI 消息。
+- Agent-IM 编排契约位于 `service/agent/rpc/internal/orchestrator`：定义用户私聊 Agent、群聊 @Agent、管理员手动 run 三类触发；`AgentRunOrchestrator` 通过 `RuntimeRequestBuilder` 调用 `internal/runtime.Runtime`，响应 writer 经 `internal/imadapter`（msg-rpc gRPC `SendMessage`）写回，并通过 Agent 消息元数据默认阻止递归触发。会话托管由 agent-rpc 的 `agent.trigger.v1` consumer 经 `trigger.Judge` 终判后交给 `ConversationHostingService`，读取 `agent_conversation_hosting` / `conversation_ai_hosting` 配置和 `agent_trigger_idempotency`（幂等），再写回 AI 消息。
 
 ### Webhook Dispatcher
 

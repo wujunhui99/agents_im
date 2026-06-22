@@ -11,6 +11,10 @@ MsgRPC:
 AdminRPC:
   Target: dns:///admin-rpc:9097
   Timeout: 5000
+# AI 托管开关 CRUD owner = agent 域（#340），ai-hosting 路由 BFF 调 agent-rpc。
+AgentRPC:
+  Target: dns:///agent-rpc:9099
+  Timeout: 5000
 # go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。
 Telemetry:
   Name: msg-api

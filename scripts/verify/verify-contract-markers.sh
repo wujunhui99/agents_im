@@ -53,15 +53,16 @@ assert_present "-q" service/msg/rpc/msg.proto db/migrations/003_agent_conversati
   "message_origin" "agent_account_id" "trigger_server_msg_id" "agent_run_id" "allow_recursive_trigger"
 assert_present "-q" service/msg/api/msg.api web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx -- \
   "messageOrigin" "agentAccountId" "triggerServerMsgId" "agentRunId" "allowRecursiveTrigger"
-assert_present "-q" internal/logic/messagelogic.go internal/agentim internal/repository db/migrations/003_agent_conversation_hosting.sql -- \
+# AI 托管编排已迁出至属主 service/agent/rpc/internal/{orchestrator,aihosting}（#340）。
+assert_present "-q" internal/logic/messagelogic.go service/agent/rpc/internal/orchestrator service/agent/rpc/internal/aihosting internal/repository db/migrations/003_agent_conversation_hosting.sql -- \
   "MessageCreatedHook" "SetMessageCreatedHook" "message.created:" "NewConversationHostingService" "OnMessageCreated" \
   "TryStartAgentTrigger" "FinishAgentTrigger" "agent_conversation_hosting" "agent_trigger_idempotency" \
   "MessageServiceResponseWriter" "SendMessage\(ctx"
-assert_present "-q" internal/agentim/hosting_test.go web/src/features/messages/MessagesPage.test.tsx -- \
+assert_present "-q" service/agent/rpc/internal/orchestrator/hosting_test.go web/src/features/messages/MessagesPage.test.tsx -- \
   "TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates" "SetMessageCreatedHook" \
   "AI Agent" "messageOrigin: 'ai'" "deterministic-test"
-forbid_match "agentim must write responses through MessageLogic/Message Service, not message repository or direct DB insert" \
-  -n "CreateMessageIdempotent|insert into messages|insertMessage" internal/agentim --glob '*.go'
+forbid_match "agent orchestrator must write responses through MessageLogic/Message Service, not message repository or direct DB insert" \
+  -n "CreateMessageIdempotent|insert into messages|insertMessage" service/agent/rpc/internal/orchestrator --glob '*.go'
 
 # --- generated rpc/proto artifacts present and correct ---
 rpc_generated_servers=(
@@ -221,8 +222,9 @@ assert_present "-qF" db/migrations/001_init_postgres.sql -- \
   "create table if not exists accounts" "create table if not exists profiles" \
   "account_id text primary key" "account_type smallint not null default 1"
 rg -q "NewGroupsRepositoryForStorage" service/msg/rpc/internal/svc/servicecontext.go
-rg -q "NewMessageLogicWithMediaValidator" service/msg/rpc/internal/aihosting/service_context.go
-rg -q "NewMessageRepositoryForStorage" service/msg/rpc/internal/svc/servicecontext.go
+rg -q "NewMessageLogicWithMediaValidator" service/agent/rpc/internal/aihosting/service_context.go
+# AI 托管运行时的 message 历史读数据层随 agent 域归位（#340）。
+rg -q "NewMessageRepositoryForStorage" service/agent/rpc/internal/svc/servicecontext.go
 assert_present "-q" db/migrations/001_init_postgres.sql -- \
   "accounts" "profiles" "auth_credentials" "friendships" "groups" "group_members" \
   "media_objects" "messages" "conversation_threads" "user_conversation_states" "message_outbox"
@@ -263,7 +265,7 @@ rg -q "Observability:" etc/msgtransfer.yaml etc/push.yaml
 rg -q "MESSAGE_TRANSFER_OBSERVABILITY_PORT" .env.example
 rg -q "agents_im_message_sends_total" pkg/observability/metrics.go
 rg -q "trace_id" service/msggateway/internal/ws/server.go
-assert_present "-q" pkg/llmobs internal/agentim internal/agentruntime/eino pkg/config .env.example -- \
+assert_present "-q" pkg/llmobs service/agent/rpc/internal/orchestrator service/agent/rpc/internal/runtime/eino pkg/config .env.example -- \
   "RuntimeModeAIHostingAutoReply" "NewEinoCallbackHandler" "ErrLangfuseConfigMissing" "langfuseIngestionPath" \
   "LLMObservability" "LANGFUSE_PUBLIC_KEY"
 rg -q "LLM_OBSERVABILITY_BACKEND=noop" .env.example

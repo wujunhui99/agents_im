@@ -3,6 +3,7 @@ package msg
 import (
 	"strings"
 
+	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/types"
 	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 )
@@ -62,7 +63,7 @@ func pbToSeqState(s *msgpb.ConversationSeqState) types.ConversationSeqState {
 	return state
 }
 
-func pbToAIHostingData(s *msgpb.ConversationAIHostingState) types.ConversationAIHostingData {
+func pbToAIHostingData(s *agentpb.ConversationAIHostingState) types.ConversationAIHostingData {
 	if s == nil {
 		return types.ConversationAIHostingData{}
 	}

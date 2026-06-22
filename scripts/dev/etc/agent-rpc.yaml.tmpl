@@ -1,0 +1,25 @@
+Name: agent-rpc
+ListenOn: 127.0.0.1:${AGENT_RPC_PORT}
+DataSource: ${DATABASE_URL}
+Telemetry:
+  Name: agent-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}
+  Sampler: 1.0
+  Batcher: otlpgrpc
+DeepSeek:
+  APIKey: ${DEEPSEEK_API_KEY}
+  BaseURL: ${DEEPSEEK_BASE_URL}
+  Model: ${DEEPSEEK_MODEL}
+PythonExecutor:
+  Backend: disabled
+MsgRPC:
+  Endpoints:
+    - 127.0.0.1:${MSG_RPC_PORT}
+  Timeout: 5000
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:${USER_RPC_PORT}
+  Timeout: 5000
+Kafka:
+  Brokers: ${KAFKA_BROKERS}
+  Group: agent-trigger

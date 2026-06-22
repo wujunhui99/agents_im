@@ -55,9 +55,9 @@ FLAT_SERVICE_DIRS = {
     "service/push/": "push",
 }
 
-# message-api 已退役（#463）：REST 入口归 service/msg/api，AI 托管运行时（旧
-# internal/servicecontext/message）#341/A4 起重定位到 service/msg/rpc/internal/aihosting，
-# 由下方 service/<domain>/<kind> 通用规则精确路由到 msg-rpc，不再需要 internal 前缀特例。
+# message-api 已退役（#463）：REST 入口归 service/msg/api。AI 托管运行时 + 开关 CRUD
+# #340 起整体迁出至属主 service/agent/rpc（trigger/runtime/hosting/orchestrator/imadapter），
+# 由下方 service/<domain>/<kind> 通用规则精确路由到 agent-rpc / msg-rpc，无需 internal 前缀特例。
 INTERNAL_DOMAIN_SERVICE_PREFIXES = {
     "internal/handler/admin/": ["admin-api"],
     # service/admin/{api,rpc}/** 由 service/<domain>/<kind> 通用规则精确路由；

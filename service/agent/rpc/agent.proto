@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/wujunhui99/agents_im/service/agent/rpc/agent";
+
+// Agent 是 agent 域 RPC（04-agent §3.2，#340）。agent-rpc 同时是 agent.trigger.v1
+// 的消费者 worker（见 agent.go），gRPC 面当前只暴露 AI 托管开关 CRUD ——
+// 数据 owner = agent 域（#463 临时塞进 msg.proto 的两个 RPC 随本 issue 迁出）。
+service Agent {
+  // AI 托管开关：普通用户在双人单聊里开关「由 AI 代我回复」。
+  rpc GetConversationAIHosting(GetConversationAIHostingRequest) returns (ConversationAIHostingState);
+  rpc UpdateConversationAIHosting(UpdateConversationAIHostingRequest) returns (ConversationAIHostingState);
+}
+
+// ---- ConversationAIHosting ----
+message GetConversationAIHostingRequest {
+  string owner_account_id = 1;
+  string conversation_id = 2;
+}
+
+message UpdateConversationAIHostingRequest {
+  string owner_account_id = 1;
+  string conversation_id = 2;
+  bool enabled = 3;
+}
+
+message ConversationAIHostingState {
+  string conversation_id = 1;
+  string chat_type = 2;
+  bool enabled = 3;
+  bool available = 4;
+  bool peer_enabled = 5;
+  string unavailable_reason = 6;
+  int64 max_recent_messages = 7;
+  bool summary_enabled = 8;
+}

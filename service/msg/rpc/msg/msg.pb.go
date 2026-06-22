@@ -1764,219 +1764,6 @@ func (x *GetServerTimeResponse) GetServerTime() int64 {
 	return 0
 }
 
-// ---- ConversationAIHosting ----
-type GetConversationAIHostingRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	OwnerAccountId string                 `protobuf:"bytes,1,opt,name=owner_account_id,json=ownerAccountId,proto3" json:"owner_account_id,omitempty"`
-	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *GetConversationAIHostingRequest) Reset() {
-	*x = GetConversationAIHostingRequest{}
-	mi := &file_service_msg_rpc_msg_proto_msgTypes[28]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetConversationAIHostingRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetConversationAIHostingRequest) ProtoMessage() {}
-
-func (x *GetConversationAIHostingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_msg_rpc_msg_proto_msgTypes[28]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetConversationAIHostingRequest.ProtoReflect.Descriptor instead.
-func (*GetConversationAIHostingRequest) Descriptor() ([]byte, []int) {
-	return file_service_msg_rpc_msg_proto_rawDescGZIP(), []int{28}
-}
-
-func (x *GetConversationAIHostingRequest) GetOwnerAccountId() string {
-	if x != nil {
-		return x.OwnerAccountId
-	}
-	return ""
-}
-
-func (x *GetConversationAIHostingRequest) GetConversationId() string {
-	if x != nil {
-		return x.ConversationId
-	}
-	return ""
-}
-
-type UpdateConversationAIHostingRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	OwnerAccountId string                 `protobuf:"bytes,1,opt,name=owner_account_id,json=ownerAccountId,proto3" json:"owner_account_id,omitempty"`
-	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Enabled        bool                   `protobuf:"varint,3,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *UpdateConversationAIHostingRequest) Reset() {
-	*x = UpdateConversationAIHostingRequest{}
-	mi := &file_service_msg_rpc_msg_proto_msgTypes[29]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateConversationAIHostingRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateConversationAIHostingRequest) ProtoMessage() {}
-
-func (x *UpdateConversationAIHostingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_msg_rpc_msg_proto_msgTypes[29]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateConversationAIHostingRequest.ProtoReflect.Descriptor instead.
-func (*UpdateConversationAIHostingRequest) Descriptor() ([]byte, []int) {
-	return file_service_msg_rpc_msg_proto_rawDescGZIP(), []int{29}
-}
-
-func (x *UpdateConversationAIHostingRequest) GetOwnerAccountId() string {
-	if x != nil {
-		return x.OwnerAccountId
-	}
-	return ""
-}
-
-func (x *UpdateConversationAIHostingRequest) GetConversationId() string {
-	if x != nil {
-		return x.ConversationId
-	}
-	return ""
-}
-
-func (x *UpdateConversationAIHostingRequest) GetEnabled() bool {
-	if x != nil {
-		return x.Enabled
-	}
-	return false
-}
-
-type ConversationAIHostingState struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	ConversationId    string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	ChatType          string                 `protobuf:"bytes,2,opt,name=chat_type,json=chatType,proto3" json:"chat_type,omitempty"`
-	Enabled           bool                   `protobuf:"varint,3,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	Available         bool                   `protobuf:"varint,4,opt,name=available,proto3" json:"available,omitempty"`
-	PeerEnabled       bool                   `protobuf:"varint,5,opt,name=peer_enabled,json=peerEnabled,proto3" json:"peer_enabled,omitempty"`
-	UnavailableReason string                 `protobuf:"bytes,6,opt,name=unavailable_reason,json=unavailableReason,proto3" json:"unavailable_reason,omitempty"`
-	MaxRecentMessages int64                  `protobuf:"varint,7,opt,name=max_recent_messages,json=maxRecentMessages,proto3" json:"max_recent_messages,omitempty"`
-	SummaryEnabled    bool                   `protobuf:"varint,8,opt,name=summary_enabled,json=summaryEnabled,proto3" json:"summary_enabled,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *ConversationAIHostingState) Reset() {
-	*x = ConversationAIHostingState{}
-	mi := &file_service_msg_rpc_msg_proto_msgTypes[30]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ConversationAIHostingState) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ConversationAIHostingState) ProtoMessage() {}
-
-func (x *ConversationAIHostingState) ProtoReflect() protoreflect.Message {
-	mi := &file_service_msg_rpc_msg_proto_msgTypes[30]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ConversationAIHostingState.ProtoReflect.Descriptor instead.
-func (*ConversationAIHostingState) Descriptor() ([]byte, []int) {
-	return file_service_msg_rpc_msg_proto_rawDescGZIP(), []int{30}
-}
-
-func (x *ConversationAIHostingState) GetConversationId() string {
-	if x != nil {
-		return x.ConversationId
-	}
-	return ""
-}
-
-func (x *ConversationAIHostingState) GetChatType() string {
-	if x != nil {
-		return x.ChatType
-	}
-	return ""
-}
-
-func (x *ConversationAIHostingState) GetEnabled() bool {
-	if x != nil {
-		return x.Enabled
-	}
-	return false
-}
-
-func (x *ConversationAIHostingState) GetAvailable() bool {
-	if x != nil {
-		return x.Available
-	}
-	return false
-}
-
-func (x *ConversationAIHostingState) GetPeerEnabled() bool {
-	if x != nil {
-		return x.PeerEnabled
-	}
-	return false
-}
-
-func (x *ConversationAIHostingState) GetUnavailableReason() string {
-	if x != nil {
-		return x.UnavailableReason
-	}
-	return ""
-}
-
-func (x *ConversationAIHostingState) GetMaxRecentMessages() int64 {
-	if x != nil {
-		return x.MaxRecentMessages
-	}
-	return 0
-}
-
-func (x *ConversationAIHostingState) GetSummaryEnabled() bool {
-	if x != nil {
-		return x.SummaryEnabled
-	}
-	return false
-}
-
 var File_service_msg_rpc_msg_proto protoreflect.FileDescriptor
 
 const file_service_msg_rpc_msg_proto_rawDesc = "" +
@@ -2121,24 +1908,7 @@ const file_service_msg_rpc_msg_proto_rawDesc = "" +
 	"\x14GetServerTimeRequest\"8\n" +
 	"\x15GetServerTimeResponse\x12\x1f\n" +
 	"\vserver_time\x18\x01 \x01(\x03R\n" +
-	"serverTime\"t\n" +
-	"\x1fGetConversationAIHostingRequest\x12(\n" +
-	"\x10owner_account_id\x18\x01 \x01(\tR\x0eownerAccountId\x12'\n" +
-	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\"\x91\x01\n" +
-	"\"UpdateConversationAIHostingRequest\x12(\n" +
-	"\x10owner_account_id\x18\x01 \x01(\tR\x0eownerAccountId\x12'\n" +
-	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x18\n" +
-	"\aenabled\x18\x03 \x01(\bR\aenabled\"\xc5\x02\n" +
-	"\x1aConversationAIHostingState\x12'\n" +
-	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x1b\n" +
-	"\tchat_type\x18\x02 \x01(\tR\bchatType\x12\x18\n" +
-	"\aenabled\x18\x03 \x01(\bR\aenabled\x12\x1c\n" +
-	"\tavailable\x18\x04 \x01(\bR\tavailable\x12!\n" +
-	"\fpeer_enabled\x18\x05 \x01(\bR\vpeerEnabled\x12-\n" +
-	"\x12unavailable_reason\x18\x06 \x01(\tR\x11unavailableReason\x12.\n" +
-	"\x13max_recent_messages\x18\a \x01(\x03R\x11maxRecentMessages\x12'\n" +
-	"\x0fsummary_enabled\x18\b \x01(\bR\x0esummaryEnabled2\xd1\n" +
-	"\n" +
+	"serverTime2\xf9\b\n" +
 	"\x03Msg\x12F\n" +
 	"\vSendMessage\x12\x1a.msg.v1.SendMessageRequest\x1a\x1b.msg.v1.SendMessageResponse\x12^\n" +
 	"\x13AppendStreamMessage\x12\".msg.v1.AppendStreamMessageRequest\x1a#.msg.v1.AppendStreamMessageResponse\x12I\n" +
@@ -2153,9 +1923,7 @@ const file_service_msg_rpc_msg_proto_rawDesc = "" +
 	"\rRevokeMessage\x12\x1c.msg.v1.RevokeMessageRequest\x1a\x1d.msg.v1.RevokeMessageResponse\x12O\n" +
 	"\x0eDeleteMessages\x12\x1d.msg.v1.DeleteMessagesRequest\x1a\x1e.msg.v1.DeleteMessagesResponse\x12p\n" +
 	"\x19ClearConversationMessages\x12(.msg.v1.ClearConversationMessagesRequest\x1a).msg.v1.ClearConversationMessagesResponse\x12L\n" +
-	"\rGetServerTime\x12\x1c.msg.v1.GetServerTimeRequest\x1a\x1d.msg.v1.GetServerTimeResponse\x12g\n" +
-	"\x18GetConversationAIHosting\x12'.msg.v1.GetConversationAIHostingRequest\x1a\".msg.v1.ConversationAIHostingState\x12m\n" +
-	"\x1bUpdateConversationAIHosting\x12*.msg.v1.UpdateConversationAIHostingRequest\x1a\".msg.v1.ConversationAIHostingStateB5Z3github.com/wujunhui99/agents_im/service/msg/rpc/msgb\x06proto3"
+	"\rGetServerTime\x12\x1c.msg.v1.GetServerTimeRequest\x1a\x1d.msg.v1.GetServerTimeResponseB5Z3github.com/wujunhui99/agents_im/service/msg/rpc/msgb\x06proto3"
 
 var (
 	file_service_msg_rpc_msg_proto_rawDescOnce sync.Once
@@ -2169,42 +1937,39 @@ func file_service_msg_rpc_msg_proto_rawDescGZIP() []byte {
 	return file_service_msg_rpc_msg_proto_rawDescData
 }
 
-var file_service_msg_rpc_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_service_msg_rpc_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_service_msg_rpc_msg_proto_goTypes = []any{
-	(*Message)(nil),                            // 0: msg.v1.Message
-	(*ConversationSeqState)(nil),               // 1: msg.v1.ConversationSeqState
-	(*SendMessageRequest)(nil),                 // 2: msg.v1.SendMessageRequest
-	(*SendMessageResponse)(nil),                // 3: msg.v1.SendMessageResponse
-	(*PullMessagesRequest)(nil),                // 4: msg.v1.PullMessagesRequest
-	(*PullMessagesResponse)(nil),               // 5: msg.v1.PullMessagesResponse
-	(*GetConversationsSeqStateRequest)(nil),    // 6: msg.v1.GetConversationsSeqStateRequest
-	(*GetConversationsSeqStateResponse)(nil),   // 7: msg.v1.GetConversationsSeqStateResponse
-	(*MarkConversationAsReadRequest)(nil),      // 8: msg.v1.MarkConversationAsReadRequest
-	(*MarkConversationAsReadResponse)(nil),     // 9: msg.v1.MarkConversationAsReadResponse
-	(*GetMessageRefRequest)(nil),               // 10: msg.v1.GetMessageRefRequest
-	(*GetMessageRefResponse)(nil),              // 11: msg.v1.GetMessageRefResponse
-	(*AppendStreamMessageRequest)(nil),         // 12: msg.v1.AppendStreamMessageRequest
-	(*AppendStreamMessageResponse)(nil),        // 13: msg.v1.AppendStreamMessageResponse
-	(*GetLastMessageByConvsRequest)(nil),       // 14: msg.v1.GetLastMessageByConvsRequest
-	(*GetLastMessageByConvsResponse)(nil),      // 15: msg.v1.GetLastMessageByConvsResponse
-	(*GetMaxSeqsRequest)(nil),                  // 16: msg.v1.GetMaxSeqsRequest
-	(*GetMaxSeqsResponse)(nil),                 // 17: msg.v1.GetMaxSeqsResponse
-	(*GetHasReadSeqsRequest)(nil),              // 18: msg.v1.GetHasReadSeqsRequest
-	(*GetHasReadSeqsResponse)(nil),             // 19: msg.v1.GetHasReadSeqsResponse
-	(*RevokeMessageRequest)(nil),               // 20: msg.v1.RevokeMessageRequest
-	(*RevokeMessageResponse)(nil),              // 21: msg.v1.RevokeMessageResponse
-	(*DeleteMessagesRequest)(nil),              // 22: msg.v1.DeleteMessagesRequest
-	(*DeleteMessagesResponse)(nil),             // 23: msg.v1.DeleteMessagesResponse
-	(*ClearConversationMessagesRequest)(nil),   // 24: msg.v1.ClearConversationMessagesRequest
-	(*ClearConversationMessagesResponse)(nil),  // 25: msg.v1.ClearConversationMessagesResponse
-	(*GetServerTimeRequest)(nil),               // 26: msg.v1.GetServerTimeRequest
-	(*GetServerTimeResponse)(nil),              // 27: msg.v1.GetServerTimeResponse
-	(*GetConversationAIHostingRequest)(nil),    // 28: msg.v1.GetConversationAIHostingRequest
-	(*UpdateConversationAIHostingRequest)(nil), // 29: msg.v1.UpdateConversationAIHostingRequest
-	(*ConversationAIHostingState)(nil),         // 30: msg.v1.ConversationAIHostingState
-	nil,                                        // 31: msg.v1.GetLastMessageByConvsResponse.LastMessagesEntry
-	nil,                                        // 32: msg.v1.GetMaxSeqsResponse.MaxSeqsEntry
-	nil,                                        // 33: msg.v1.GetHasReadSeqsResponse.HasReadSeqsEntry
+	(*Message)(nil),                           // 0: msg.v1.Message
+	(*ConversationSeqState)(nil),              // 1: msg.v1.ConversationSeqState
+	(*SendMessageRequest)(nil),                // 2: msg.v1.SendMessageRequest
+	(*SendMessageResponse)(nil),               // 3: msg.v1.SendMessageResponse
+	(*PullMessagesRequest)(nil),               // 4: msg.v1.PullMessagesRequest
+	(*PullMessagesResponse)(nil),              // 5: msg.v1.PullMessagesResponse
+	(*GetConversationsSeqStateRequest)(nil),   // 6: msg.v1.GetConversationsSeqStateRequest
+	(*GetConversationsSeqStateResponse)(nil),  // 7: msg.v1.GetConversationsSeqStateResponse
+	(*MarkConversationAsReadRequest)(nil),     // 8: msg.v1.MarkConversationAsReadRequest
+	(*MarkConversationAsReadResponse)(nil),    // 9: msg.v1.MarkConversationAsReadResponse
+	(*GetMessageRefRequest)(nil),              // 10: msg.v1.GetMessageRefRequest
+	(*GetMessageRefResponse)(nil),             // 11: msg.v1.GetMessageRefResponse
+	(*AppendStreamMessageRequest)(nil),        // 12: msg.v1.AppendStreamMessageRequest
+	(*AppendStreamMessageResponse)(nil),       // 13: msg.v1.AppendStreamMessageResponse
+	(*GetLastMessageByConvsRequest)(nil),      // 14: msg.v1.GetLastMessageByConvsRequest
+	(*GetLastMessageByConvsResponse)(nil),     // 15: msg.v1.GetLastMessageByConvsResponse
+	(*GetMaxSeqsRequest)(nil),                 // 16: msg.v1.GetMaxSeqsRequest
+	(*GetMaxSeqsResponse)(nil),                // 17: msg.v1.GetMaxSeqsResponse
+	(*GetHasReadSeqsRequest)(nil),             // 18: msg.v1.GetHasReadSeqsRequest
+	(*GetHasReadSeqsResponse)(nil),            // 19: msg.v1.GetHasReadSeqsResponse
+	(*RevokeMessageRequest)(nil),              // 20: msg.v1.RevokeMessageRequest
+	(*RevokeMessageResponse)(nil),             // 21: msg.v1.RevokeMessageResponse
+	(*DeleteMessagesRequest)(nil),             // 22: msg.v1.DeleteMessagesRequest
+	(*DeleteMessagesResponse)(nil),            // 23: msg.v1.DeleteMessagesResponse
+	(*ClearConversationMessagesRequest)(nil),  // 24: msg.v1.ClearConversationMessagesRequest
+	(*ClearConversationMessagesResponse)(nil), // 25: msg.v1.ClearConversationMessagesResponse
+	(*GetServerTimeRequest)(nil),              // 26: msg.v1.GetServerTimeRequest
+	(*GetServerTimeResponse)(nil),             // 27: msg.v1.GetServerTimeResponse
+	nil,                                       // 28: msg.v1.GetLastMessageByConvsResponse.LastMessagesEntry
+	nil,                                       // 29: msg.v1.GetMaxSeqsResponse.MaxSeqsEntry
+	nil,                                       // 30: msg.v1.GetHasReadSeqsResponse.HasReadSeqsEntry
 }
 var file_service_msg_rpc_msg_proto_depIdxs = []int32{
 	0,  // 0: msg.v1.ConversationSeqState.last_message:type_name -> msg.v1.Message
@@ -2212,9 +1977,9 @@ var file_service_msg_rpc_msg_proto_depIdxs = []int32{
 	0,  // 2: msg.v1.PullMessagesResponse.messages:type_name -> msg.v1.Message
 	1,  // 3: msg.v1.GetConversationsSeqStateResponse.states:type_name -> msg.v1.ConversationSeqState
 	0,  // 4: msg.v1.AppendStreamMessageResponse.message:type_name -> msg.v1.Message
-	31, // 5: msg.v1.GetLastMessageByConvsResponse.last_messages:type_name -> msg.v1.GetLastMessageByConvsResponse.LastMessagesEntry
-	32, // 6: msg.v1.GetMaxSeqsResponse.max_seqs:type_name -> msg.v1.GetMaxSeqsResponse.MaxSeqsEntry
-	33, // 7: msg.v1.GetHasReadSeqsResponse.has_read_seqs:type_name -> msg.v1.GetHasReadSeqsResponse.HasReadSeqsEntry
+	28, // 5: msg.v1.GetLastMessageByConvsResponse.last_messages:type_name -> msg.v1.GetLastMessageByConvsResponse.LastMessagesEntry
+	29, // 6: msg.v1.GetMaxSeqsResponse.max_seqs:type_name -> msg.v1.GetMaxSeqsResponse.MaxSeqsEntry
+	30, // 7: msg.v1.GetHasReadSeqsResponse.has_read_seqs:type_name -> msg.v1.GetHasReadSeqsResponse.HasReadSeqsEntry
 	0,  // 8: msg.v1.GetLastMessageByConvsResponse.LastMessagesEntry.value:type_name -> msg.v1.Message
 	2,  // 9: msg.v1.Msg.SendMessage:input_type -> msg.v1.SendMessageRequest
 	12, // 10: msg.v1.Msg.AppendStreamMessage:input_type -> msg.v1.AppendStreamMessageRequest
@@ -2229,25 +1994,21 @@ var file_service_msg_rpc_msg_proto_depIdxs = []int32{
 	22, // 19: msg.v1.Msg.DeleteMessages:input_type -> msg.v1.DeleteMessagesRequest
 	24, // 20: msg.v1.Msg.ClearConversationMessages:input_type -> msg.v1.ClearConversationMessagesRequest
 	26, // 21: msg.v1.Msg.GetServerTime:input_type -> msg.v1.GetServerTimeRequest
-	28, // 22: msg.v1.Msg.GetConversationAIHosting:input_type -> msg.v1.GetConversationAIHostingRequest
-	29, // 23: msg.v1.Msg.UpdateConversationAIHosting:input_type -> msg.v1.UpdateConversationAIHostingRequest
-	3,  // 24: msg.v1.Msg.SendMessage:output_type -> msg.v1.SendMessageResponse
-	13, // 25: msg.v1.Msg.AppendStreamMessage:output_type -> msg.v1.AppendStreamMessageResponse
-	5,  // 26: msg.v1.Msg.PullMessages:output_type -> msg.v1.PullMessagesResponse
-	15, // 27: msg.v1.Msg.GetLastMessageByConvs:output_type -> msg.v1.GetLastMessageByConvsResponse
-	7,  // 28: msg.v1.Msg.GetConversationsSeqState:output_type -> msg.v1.GetConversationsSeqStateResponse
-	17, // 29: msg.v1.Msg.GetMaxSeqs:output_type -> msg.v1.GetMaxSeqsResponse
-	19, // 30: msg.v1.Msg.GetHasReadSeqs:output_type -> msg.v1.GetHasReadSeqsResponse
-	9,  // 31: msg.v1.Msg.MarkConversationAsRead:output_type -> msg.v1.MarkConversationAsReadResponse
-	11, // 32: msg.v1.Msg.GetMessageRef:output_type -> msg.v1.GetMessageRefResponse
-	21, // 33: msg.v1.Msg.RevokeMessage:output_type -> msg.v1.RevokeMessageResponse
-	23, // 34: msg.v1.Msg.DeleteMessages:output_type -> msg.v1.DeleteMessagesResponse
-	25, // 35: msg.v1.Msg.ClearConversationMessages:output_type -> msg.v1.ClearConversationMessagesResponse
-	27, // 36: msg.v1.Msg.GetServerTime:output_type -> msg.v1.GetServerTimeResponse
-	30, // 37: msg.v1.Msg.GetConversationAIHosting:output_type -> msg.v1.ConversationAIHostingState
-	30, // 38: msg.v1.Msg.UpdateConversationAIHosting:output_type -> msg.v1.ConversationAIHostingState
-	24, // [24:39] is the sub-list for method output_type
-	9,  // [9:24] is the sub-list for method input_type
+	3,  // 22: msg.v1.Msg.SendMessage:output_type -> msg.v1.SendMessageResponse
+	13, // 23: msg.v1.Msg.AppendStreamMessage:output_type -> msg.v1.AppendStreamMessageResponse
+	5,  // 24: msg.v1.Msg.PullMessages:output_type -> msg.v1.PullMessagesResponse
+	15, // 25: msg.v1.Msg.GetLastMessageByConvs:output_type -> msg.v1.GetLastMessageByConvsResponse
+	7,  // 26: msg.v1.Msg.GetConversationsSeqState:output_type -> msg.v1.GetConversationsSeqStateResponse
+	17, // 27: msg.v1.Msg.GetMaxSeqs:output_type -> msg.v1.GetMaxSeqsResponse
+	19, // 28: msg.v1.Msg.GetHasReadSeqs:output_type -> msg.v1.GetHasReadSeqsResponse
+	9,  // 29: msg.v1.Msg.MarkConversationAsRead:output_type -> msg.v1.MarkConversationAsReadResponse
+	11, // 30: msg.v1.Msg.GetMessageRef:output_type -> msg.v1.GetMessageRefResponse
+	21, // 31: msg.v1.Msg.RevokeMessage:output_type -> msg.v1.RevokeMessageResponse
+	23, // 32: msg.v1.Msg.DeleteMessages:output_type -> msg.v1.DeleteMessagesResponse
+	25, // 33: msg.v1.Msg.ClearConversationMessages:output_type -> msg.v1.ClearConversationMessagesResponse
+	27, // 34: msg.v1.Msg.GetServerTime:output_type -> msg.v1.GetServerTimeResponse
+	22, // [22:35] is the sub-list for method output_type
+	9,  // [9:22] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -2264,7 +2025,7 @@ func file_service_msg_rpc_msg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_msg_rpc_msg_proto_rawDesc), len(file_service_msg_rpc_msg_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   34,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -1,24 +1,20 @@
 package svc
 
 import (
+	"context"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/agentim"
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
-	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
-	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/aihosting"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
-	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/userrpc"
-	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/zrpc"
 )
@@ -58,22 +54,13 @@ type ServiceContext struct {
 	Groups business.GroupMemberLister
 	Media  business.MessageMediaValidator
 
-	// AI 托管（keystone 例外：随 message-api 退役迁入，待 03-message-pipeline §9 B1 把
-	// 触发点迁到 msgtransfer / agent 域 rpc 落地后删除）。
-	// AgentHook 在 SendMessage 持久化后触发 Agent 回复（语义对齐原 message-api 进程内
-	// MessageLogic.SetMessageCreatedHook）；AIHosting 服务 Get/UpdateConversationAIHosting RPC。
-	AgentHook business.MessageCreatedHook
-	AIHosting *business.ConversationAIHostingLogic
-
-	// Kafka 写路径（03 §9 B2/B3b）：SendMessage 只 publish msg.toTransfer.v1，
-	// AI 写回也经本进程 SendMessage（防 PG/Redis 双 seq 分裂），AI 触发由
-	// agent.trigger.v1 consumer（msg.go 启动）回流到 AgentHook。
+	// Kafka 写路径（03 §9 B2/B3b）：SendMessage 只 publish msg.toTransfer.v1。
 	// B3b 起旧 PG 同步写路径已退役，Kafka 是唯一写链路（缺配置启动失败）。
+	// AI 托管已整体迁出至属主 agent-rpc（#340，D15 step ④）：msg-rpc 不再跑 agent
+	// runtime、不消费 agent.trigger.v1、不持 AI 托管开关——AI 消息经 agent-rpc 的
+	// imadapter 以普通 SendMessage gRPC 写回，走与人类消息完全相同的本写路径。
 	KafkaBrokers []string
 	Producer     EventPublisher
-
-	// agentSender 是 Kafka 模式下 AI 写回的晚绑定承载体（见 agent_sender.go）。
-	agentSender *kafkaModeSender
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -100,24 +87,11 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 	mediaValidator := newMediaRPCMessageValidator(mediaclient.NewMedia(mediaRPCClient))
 
-	// 账号读写经属主 user-rpc（gate #550，脱 internal/repository accountRepo 的 avatar string scan/空串写）。
-	if !hasRPCClientConfig(c.UserRPC) {
-		log.Fatalf("msg-rpc requires user rpc client config (UserRPC)")
-	}
-	userRPCClient, err := zrpc.NewClient(c.UserRPC)
-	if err != nil {
-		log.Fatalf("build user rpc client: %v", err)
-	}
-	userCli := userclient.NewUser(userRPCClient)
-
 	kafkaBrokers := resolveKafkaBrokers(c)
 	producer, err := messaging.NewKafkaProducer(kafkaBrokers)
 	if err != nil {
 		log.Fatalf("build kafka producer: %v", err)
 	}
-	// AI 写回经本进程 SendMessage（晚绑定 svcCtx），防 PG/Redis 双 seq 分裂。
-	senderOverride := &kafkaModeSender{}
-	hosting := newConversationAIHostingRuntime(c, mediaValidator, groupsLogic, senderOverride, userCli)
 
 	svcCtx := &ServiceContext{
 		Config:       c,
@@ -127,11 +101,8 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		States:       model.NewUserConversationStatesModel(conn),
 		Groups:       groupsLogic,
 		Media:        mediaValidator,
-		AgentHook:    hosting.AgentMessageHook,
-		AIHosting:    hosting.AIHostingLogic,
 		KafkaBrokers: kafkaBrokers,
 		Producer:     producer,
-		agentSender:  senderOverride,
 	}
 	return svcCtx
 }
@@ -188,68 +159,8 @@ func hasRPCClientConfig(conf zrpc.RpcClientConf) bool {
 	return conf.Target != "" || len(conf.Endpoints) > 0 || (len(conf.Etcd.Hosts) > 0 && conf.Etcd.Key != "")
 }
 
-// newConversationAIHostingRuntime 移植自 service/message-api/main.go 的 AI 托管接线：
-// 构造 aihosting.ServiceContext（MessageLogic 仅作 Agent 回复写回通道，写同一批表 +
-// outbox，与 msg-rpc goctl 数据层共存）并 ConfigureConversationAIHosting。
-func newConversationAIHostingRuntime(c config.Config, mediaValidator business.MessageMediaValidator, groupsLogic *business.GroupsLogic, senderOverride agentim.MessageSender, userCli userclient.User) *aihosting.ServiceContext {
-	messageRepo, err := repository.NewMessageRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build message repository: %v", err)
-	}
-	// friendshipRepo 提供 agent-create 工具路径的好友写（friendships 表无 avatar，非 #550 blocker）。
-	friendshipRepo, err := repository.NewRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build account repository: %v", err)
-	}
-	// AccountRepo = Composite：账号读写经 user-rpc（脱 internal avatar 读写），好友写委托 postgres repo。
-	accountRepo := userrpc.NewComposite(userCli, friendshipRepo)
-	agentHostingRepo, err := repository.NewAgentConversationHostingRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build agent hosting repository: %v", err)
-	}
-	agentRepo, err := repository.NewAgentRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build agent repository: %v", err)
-	}
-	agentRegistryRepo, err := repository.NewAgentRegistryRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build agent registry repository: %v", err)
-	}
-	aiHostingRepo, err := repository.NewConversationAIHostingRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build AI hosting repository: %v", err)
-	}
-	agentAuditRepo, err := repository.NewAgentAuditRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build agent audit repository: %v", err)
-	}
-	var pythonExecutorClient pythonexec.KubernetesSandboxClient
-	if c.PythonExecutor.Backend == appconfig.PythonExecutorBackendK8S {
-		pythonExecutorClient, err = pythonexec.NewInClusterKubernetesSandboxClient()
-		if err != nil {
-			log.Fatalf("build python executor kubernetes client: %v", err)
-		}
-	}
-	pythonExecutor, err := pythonexec.NewExecutorFromConfig(c.PythonExecutor, pythonExecutorClient)
-	if err != nil {
-		log.Fatalf("build python executor: %v", err)
-	}
-
-	messageContext := aihosting.NewServiceContextWithMediaValidator(messageRepo, mediaValidator, nil, groupsLogic, appconfig.DefaultJWTAuthConfig())
-	messageContext.AgentHostingRepo = agentHostingRepo
-	messageContext.AIHostingRepo = aiHostingRepo
-	messageContext.AgentResolver = agentim.NewAgentRepositoryAccountResolver(agentRepo)
-	messageContext.AccountRepo = accountRepo
-	messageContext.AgentRepo = agentRepo
-	messageContext.AIHostingLogic = business.NewConversationAIHostingLogic(aiHostingRepo).WithAgentAccountResolver(messageContext.AgentResolver)
-	messageContext.AgentAuditRepo = agentAuditRepo
-	messageContext.AgentAuditLogic = business.NewAgentAuditLogic(agentAuditRepo)
-	messageContext.AgentRegistryRepo = agentRegistryRepo
-	messageContext.PythonExecutor = pythonExecutor
-	// Kafka 模式：AI 写回不直写 PG（MessageLogic），改经 msg-rpc SendMessage（03 §9 B2）。
-	messageContext.AgentResponseSender = senderOverride
-	if err := aihosting.ConfigureConversationAIHosting(messageContext, c.DeepSeek, c.LLMObservability); err != nil {
-		log.Fatalf("configure AI conversation hosting: %v", err)
-	}
-	return messageContext
+// EventPublisher 是 SendMessage Kafka 写路径需要的最小 producer 面
+// （生产实现 messaging.KafkaProducer；测试注入 fake）。
+type EventPublisher interface {
+	PublishEvent(ctx context.Context, topic string, event messaging.MessageEvent) error
 }

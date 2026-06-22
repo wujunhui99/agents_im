@@ -29,7 +29,7 @@ forbid_match "production Go code must not directly execute shell or python comma
 
 # Header-based current-user auth is forbidden; tests must use Bearer JWT or an explicit reject helper.
 forbid_match "production API/code still contains header-based current user auth" \
-  -n "X-User-Id|CurrentUserID|currentUserID" api internal service/msggateway service/msgtransfer service/msg
+  -n "X-User-Id|CurrentUserID|currentUserID" internal service/msggateway service/msgtransfer service/msg service/agent
 
 legacy_x_user_id_sets="$(rg -n 'Header\.Set\("X-User-Id"' tests internal || true)"
 if [[ -n "$legacy_x_user_id_sets" ]]; then

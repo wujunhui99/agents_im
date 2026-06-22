@@ -323,6 +323,15 @@ msg-rpc.SendMessage()
 > 不加 api/rpc 子目录）internal/{trigger,runtime,imadapter,consumer} 即本节终判 +
 > runtime + 写回的接口面，当前全部 mock driver（零副作用）；toPush 过滤挂
 > `Kafka.TypedAccountIds` 开关默认关（①未做前类型位是噪声）。详见 03 §10。
+>
+> **✅ ③④ 已落地（#340）**：`internal/agentim`→`service/agent/rpc/internal/orchestrator`、
+> `internal/agentruntime`→`.../internal/runtime` 整体迁入属主；mock driver 换真实——
+> `trigger.Judge` 三步终判（hosting 查询走 `hosting.Store` over `conversation_ai_hosting`）、
+> `consumer` 调 `ConversationHostingService.ScheduleTrigger`（幂等 + 已读 + 异步 run）、
+> `imadapter.MsgRPCSender` 经 msg-rpc gRPC 写回。`service/agent/rpc` 升为正式 gRPC
+> server + worker 双角色（`agent.proto`，独立 consumer group `agent-trigger`）。同步删
+> msg-rpc 内回流 consumer（`agent_trigger.go`/`agent_sender.go`）+ `newConversationAIHostingRuntime`
+> 接线，msg-rpc 不再持 agent runtime/UserRPC/DeepSeek/PythonExecutor 配置。
 
 ---
 
@@ -332,8 +341,8 @@ msg-rpc.SendMessage()
 
 1. **AG-4 rename** `internal/agent/pythonexec` → `pkg/pythonexec`（00-decisions D10），纯 move。
 2. **AG-5 forbidden 黑名单加注释 + config-driven**。
-3. **AG-1 建 service/agent/rpc**：定义 proto、生成代码、初始化 svc/server。
-4. **AG-2/AG-3 拆 internal/agentim**：搬到 `service/agent/rpc/internal/{trigger,orchestrator,hosting,imadapter,audit}/`；agent-rpc 以新 consumer group 消费 `agent.trigger.v1`（D15 终判），验证后删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（含 `service/msg/rpc/internal/aihosting`，#341 已从 internal 重定位至此）——这是 03 §9 A4 删 `internal/logic` 消息域剩余的解锁条件。
+3. **AG-1 建 service/agent/rpc** ✅（#340）：`agent.proto`（AI 托管开关 CRUD）+ goctl/protoc 生成 + svc/server/main（gRPC server + Kafka worker 双角色）。
+4. **AG-2/AG-3 拆 internal/agentim** ✅（#340）：已搬到 `service/agent/rpc/internal/{trigger,orchestrator,runtime,hosting,imadapter}/`；agent-rpc 以新 consumer group 消费 `agent.trigger.v1`（D15 终判），已删 msg-rpc 内回流 consumer 与 `newConversationAIHostingRuntime` 整套接线（含 `service/msg/rpc/internal/aihosting`）——解锁 03 §9 A4。`audit` 复用 `internal/logic.AgentAuditLogic`（keystone，AG-6/D13 前）。
 5. **AG-6 数据层改 model**（D13）：agent_* 表全部改 goctl model 落 `service/agent/rpc/internal/model/`，废 repository 层。
 6. **AG-9 LLM provider 抽象**：`service/agent/rpc/internal/runtime/llm/{factory.go, deepseek, openai, anthropic}`（00-decisions D10）。
 7. **AG-10 agent-api 改 BFF only**：删 PythonExecutor、AgentLogic 在 api svc 的依赖，全部走 agent-rpc。
@@ -362,4 +371,4 @@ msg-rpc.SendMessage()
 - agent-rpc 消费这个 topic（group `agent-trigger`）做**全部终判**（①origin 防递归 ②ID 类型位判 agent 收信 ③conversation_ai_hosting 判托管）后跑 RunOrchestrator——transfer 与 msg-rpc **不查**旁路域、不调旁路 RPC（D15/D16）；
 - 写回 IM 通过 msg-rpc gRPC（imadapter）→ msg-rpc 再 `producer.Publish(msg.toTransfer.v1)`，**AI 消息走与人类消息完全相同的 Kafka 链路**（00-decisions D1：没有 outbox 这种特殊路径）；
 - 防递归第一道闸在 transfer 轻判（origin=ai 不 produce），trigger event 的 `source_agent_run_id` + `hostingService` 幂等表兜底，不依赖 outbox 字段；
-- #463 临时塞进 msg.proto 的 `Get/UpdateConversationAIHosting` 随 agent-rpc 上线迁出（hosting 配置 owner = agent 域），msg-api 的 ai-hosting 路由改 BFF 调 agent-rpc。
+- ~~#463 临时塞进 msg.proto 的 `Get/UpdateConversationAIHosting` 随 agent-rpc 上线迁出（hosting 配置 owner = agent 域），msg-api 的 ai-hosting 路由改 BFF 调 agent-rpc。~~ **✅ 已落地（#340）**：两个 RPC 移到 `agent.proto`（`Agent.Get/UpdateConversationAIHosting`），从 msg.proto/msg-rpc 删除；msg-api ai-hosting 路由改调 agent-rpc。

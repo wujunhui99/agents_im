@@ -1,0 +1,32 @@
+# agent-rpc 本地默认配置（`go run ./service/agent/rpc`）。dev 用 scripts/dev/etc/agent-rpc.yaml.tmpl
+# 渲染、部署用 deploy/k8s/etc/agent-rpc.yaml。gRPC server（AI 托管开关 CRUD）+ agent.trigger.v1
+# 消费 worker（D15 终判 → runtime → imadapter 写回）。
+Name: agent-rpc
+ListenOn: 127.0.0.1:9099
+
+DataSource: ${DATABASE_URL}
+
+# AI 回复写回经属主 msg-rpc gRPC SendMessage（imadapter）。
+MsgRPC:
+  Endpoints:
+    - 127.0.0.1:9098
+  Timeout: 5000
+# agent-create 工具账号读写经属主 user-rpc。
+UserRPC:
+  Endpoints:
+    - 127.0.0.1:9090
+  Timeout: 5000
+
+DeepSeek:
+  APIKey: ${DEEPSEEK_API_KEY}
+  BaseURL: ${DEEPSEEK_BASE_URL}
+  Model: ${DEEPSEEK_MODEL}
+LLMObservability:
+  Enabled: false
+PythonExecutor:
+  Backend: disabled
+
+# agent.trigger.v1 消费（独立 consumer group）；env KAFKA_BROKERS 覆盖。
+Kafka:
+  Brokers: ${KAFKA_BROKERS}
+  Group: agent-trigger

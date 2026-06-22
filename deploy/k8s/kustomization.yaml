@@ -32,6 +32,7 @@ configMapGenerator:
       - etc/friends-rpc.yaml
       - etc/groups-rpc.yaml
       - etc/msg-rpc.yaml
+      - etc/agent-rpc.yaml
       - etc/third-rpc.yaml
       - etc/media-rpc.yaml
       - etc/media-api.yaml
