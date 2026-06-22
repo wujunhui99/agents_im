@@ -20,13 +20,15 @@ Use an isolated worktree when running parallel or risky work:
 
 ```bash
 git fetch origin
+# 失败优先：断言 origin/main 已是远端真·tip，再建分支（防复用滞后/漏跑的 fetch）。
+[ "$(git rev-parse origin/main)" = "$(git ls-remote origin main | cut -f1)" ] || { echo "origin/main 滞后,重 fetch"; exit 1; }
 git worktree add \
   -b fix/codex/issue-123-login-error \
   .claude/worktrees/issue-123-login-error \
   origin/main
 ```
 
-先 `git fetch origin` 再基于 `origin/main` 建：`origin/main` 是本地远程跟踪 ref，只随 fetch 更新；漏 fetch 会从滞后的 main 起步（与主工作区当前 checkout 的分支无关，因为 worktree 从你传入的 ref 拉分支）。勿用本地 `main`（更易滞后）。
+先 `git fetch origin` 再基于 `origin/main` 建：`origin/main` 是本地远程跟踪 ref，只随 fetch 更新；漏 fetch 会从滞后的 main 起步（与主工作区当前 checkout 的分支无关，因为 worktree 从你传入的 ref 拉分支）。勿用本地 `main`（更易滞后）。上面的 `git ls-remote` 断言把"基线必须新鲜"变成会 fail 的检查而非自觉：fetch 紧贴这一步跑，对不上就重 fetch，别在滞后 ref 上开分支。
 
 The `.claude/worktrees/` directory is ignored; do not add worktrees as gitlinks.
 
@@ -39,7 +41,7 @@ Commit 与 PR 规则：
 - PR target: `main`.
 - PR body: exactly one `Closes #<issue>`, `Fixes #<issue>`, or `Resolves #<issue>`（纯文档分支免 Issue，故无此行）。
 - Every development PR solves one Issue（纯文档分支例外，免 Issue）。
-- push/PR 前 rebase 最新 `main`（`git fetch origin main && git rebase origin/main`）；PR 期间 `main` 推进就再 rebase。Drone clone 会把 PR test-merge 进 `main`，落后分支会在 clone 阶段冲突致 CI 失败。
+- push/PR 前 rebase 最新 `main`（`git fetch origin main && git rebase origin/main`）；rebase 前同样跑 `[ "$(git rev-parse origin/main)" = "$(git ls-remote origin main | cut -f1)" ]` 断言确认基线新鲜。PR 期间 `main` 推进就再 fetch+rebase。Drone clone 会把 PR test-merge 进 `main`，落后分支会在 clone 阶段冲突致 CI 失败。
 
 ## Local Verification
 

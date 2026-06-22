@@ -5,6 +5,11 @@
 ## 工作流
 
 - 端到端流程：Issue -> `git fetch origin main` 后基于 `origin/main` 建 worktree + 任务分支 -> 实现与验证 -> commit -> push/PR 前再 `git fetch` 并 rebase `origin/main` -> PR(body 含 `Closes #<issue>`) -> CI/部署/回归验证。每个开发 PR 只解决一个 Issue。PR 期间 `main` 推进就重新 fetch+rebase，避免 Drone clone 的 test-merge 冲突致 CI 失败。`origin/main` 是本地远程跟踪 ref，只随 `git fetch` 更新——不 fetch 就建 worktree/rebase 会从滞后的 main 起步（与主工作区当前 checkout 无关）。
+- **基线必须新鲜（失败优先，别只靠"记得 fetch"）**：`git fetch origin` 要**紧贴**建 worktree / rebase 那一步执行，不复用本会话早先的 fetch；动手前断言本地 `origin/main` 已是远端真·tip，不一致（fetch 漏跑/网络失败/复用滞后 ref）就 fail 重来，禁止在滞后 ref 上开分支或 rebase：
+  ```bash
+  git fetch origin
+  [ "$(git rev-parse origin/main)" = "$(git ls-remote origin main | cut -f1)" ] || { echo "origin/main 滞后,重 fetch"; exit 1; }
+  ```
 - 分支命名：`<type>/<agent-id>/issue-<number>-<task-desc>`；`<type>` 用全称（`feature` 非 `feat`，取值见 GIT_WORKFLOW.md）、`<agent-id>` 用可信 Agent 名（`claude`/`codex`），CI 用 `scripts/ci/verify-agent-branch-name.sh` 校验。纯文档分支（`docs` 类型、免 Issue）第三段用 `<task-desc>`，不带 `issue-<number>-`。commit 用 Agent identity、规范 subject 与 trailers。
 - 纯文档改动免 Issue：仍走 worktree + `docs` 任务分支、rebase、push、PR、CI（与标准流程一致，仅去掉创建 Issue）；分支第三段用 `<task-desc>`，PR body 无 `Closes #`。
 - 解决 GitHub Issue 后必须评论一次，简要说明实现方式。
