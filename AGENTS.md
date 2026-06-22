@@ -4,9 +4,9 @@
 
 ## 工作流
 
-- 端到端流程：Issue -> worktree + 任务分支 -> 实现与验证 -> commit -> PR(body 含 `Closes #<issue>`) -> CI/部署/回归验证。每个开发 PR 只解决一个 Issue。
-- 分支命名：`<type>/<agent-id>/issue-<number>-<task-desc>`；`<type>` 用全称（`feature` 非 `feat`，取值见 GIT_WORKFLOW.md）、`<agent-id>` 用可信 Agent 名（`claude`/`codex`），CI 用 `scripts/ci/verify-agent-branch-name.sh` 校验。commit 用 Agent identity、规范 subject 与 trailers。
-- 纯文档改动免独立 worktree：在任务分支（`<type>` 用 `docs`）直接改文档、push、PR、merge；仍走 Issue 与 CI。
+- 端到端流程：Issue -> `git fetch origin main` 后基于 `origin/main` 建 worktree + 任务分支 -> 实现与验证 -> commit -> push/PR 前再 `git fetch` 并 rebase `origin/main` -> PR(body 含 `Closes #<issue>`) -> CI/部署/回归验证。每个开发 PR 只解决一个 Issue。PR 期间 `main` 推进就重新 fetch+rebase，避免 Drone clone 的 test-merge 冲突致 CI 失败。`origin/main` 是本地远程跟踪 ref，只随 `git fetch` 更新——不 fetch 就建 worktree/rebase 会从滞后的 main 起步（与主工作区当前 checkout 无关）。
+- 分支命名：`<type>/<agent-id>/issue-<number>-<task-desc>`；`<type>` 用全称（`feature` 非 `feat`，取值见 GIT_WORKFLOW.md）、`<agent-id>` 用可信 Agent 名（`claude`/`codex`），CI 用 `scripts/ci/verify-agent-branch-name.sh` 校验。纯文档分支（`docs` 类型、免 Issue）第三段用 `<task-desc>`，不带 `issue-<number>-`。commit 用 Agent identity、规范 subject 与 trailers。
+- 纯文档改动免 Issue：仍走 worktree + `docs` 任务分支、rebase、push、PR、CI（与标准流程一致，仅去掉创建 Issue）；分支第三段用 `<task-desc>`，PR body 无 `Closes #`。
 - 解决 GitHub Issue 后必须评论一次，简要说明实现方式。
 - Claude Code 后台执行 `scripts/drone-watch.sh`；Codex 前台执行或自行轮询后台日志，必须报告 Drone 结果。
 - Git/PR 操作细节与本地验证命令见 [`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md)。
