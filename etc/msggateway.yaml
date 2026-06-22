@@ -4,7 +4,7 @@ Port: 8084
 
 # 下行推送 gRPC server（03 §6.2）：service/push 调 BatchPushOneMsg 投递给本实例连接。
 GatewayGRPC:
-  ListenOn: 0.0.0.0:9100
+  ListenOn: 0.0.0.0:9101
 
 Auth:
   AccessSecret: dev-jwt-secret-change-me

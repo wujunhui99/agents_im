@@ -310,7 +310,7 @@ spec:
             - name: http
               containerPort: 8084
             - name: grpc
-              containerPort: 9100
+              containerPort: 9101
           livenessProbe:
             httpGet:
               path: /healthz

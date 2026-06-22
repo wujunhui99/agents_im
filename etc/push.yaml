@@ -5,10 +5,10 @@ Name: push
 Kafka:
   Brokers: ${KAFKA_BROKERS}
 
-# 下行推送 gRPC 目标：本地单实例 msggateway gRPC（9100）。生产用 headless Service
+# 下行推送 gRPC 目标：本地单实例 msggateway gRPC（9101）。生产用 headless Service
 # DNS（所有 gateway pod IP，无 etcd），见 deploy/k8s/etc/push.yaml。
 Gateway:
-  Target: 127.0.0.1:9100
+  Target: 127.0.0.1:9101
   RefreshSeconds: 30
   DialTimeoutSeconds: 5
   PushTimeoutSeconds: 5

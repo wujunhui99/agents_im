@@ -43,11 +43,11 @@ spec:
   selector: { app: msggateway }
   ports:
     - { name: http, port: 8084, targetPort: 8084 }
-    - { name: grpc, port: 9100, targetPort: 9100 }
+    - { name: grpc, port: 9101, targetPort: 9101 }
 ---
 # Headless Service: DNS A records resolve to EVERY msggateway pod IP, so
 # service/push can dial each instance and broadcast BatchPushOneMsg (k8s-native
-# service discovery, no etcd; 03 §6.2). Target: msggateway-headless:9100.
+# service discovery, no etcd; 03 §6.2). Target: msggateway-headless:9101.
 apiVersion: v1
 kind: Service
 metadata:
@@ -58,7 +58,7 @@ spec:
   publishNotReadyAddresses: true
   selector: { app: msggateway }
   ports:
-    - { name: grpc, port: 9100, targetPort: 9100 }
+    - { name: grpc, port: 9101, targetPort: 9101 }
 ---
 apiVersion: v1
 kind: Service
