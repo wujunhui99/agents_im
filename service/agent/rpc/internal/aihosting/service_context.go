@@ -18,6 +18,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	agentim "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	einoruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/eino"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 )
@@ -38,8 +39,13 @@ type ServiceContext struct {
 	AgentResolver     convhosting.AgentAccountExistenceChecker
 	AccountRepo       repository.Repository
 	AgentRepo         repository.AgentRepository
+	// AgentRegistryRepo 是 internal keystone 注册表数据层,仅喂 agent.create(AgentAssemblyLogic)
+	// 写路径,待后续 PR 随 internal 退役(#605 非目标:CreateAgentFromTool saga 拆解)。
 	AgentRegistryRepo repository.AgentRegistryRepository
-	PythonExecutor    pythonexec.Executor
+	// AgentRegistryReader 是 agent 自有 goctl 注册表只读 Store,喂 runtime tool 解析 + 请求
+	// 构建器(#605:读路径已脱 internal/repository)。
+	AgentRegistryReader registry.Reader
+	PythonExecutor      pythonexec.Executor
 	// AgentResponseSender 覆盖 AI 写回通道（默认 MessageLogic 直写 PG）。
 	// agent-rpc worker 注入 imadapter.MsgRPCSender（经 msg-rpc gRPC SendMessage 走 Kafka）。
 	AgentResponseSender agentim.MessageSender
@@ -51,9 +57,12 @@ type ServiceContext struct {
 type ConversationAIHostingRuntimeOptions struct {
 	DeepSeek         config.DeepSeekConfig
 	LLMObservability config.LLMObservabilityConfig
-	AgentRegistry    repository.AgentRegistryRepository
-	PythonExecutor   pythonexec.Executor
-	AgentCreate      runtimetools.AgentCreateHandler
+	// AgentRegistry 仅供 agent.create keystone(AgentAssemblyLogic)使用(internal,写路径)。
+	AgentRegistry repository.AgentRegistryRepository
+	// AgentRegistryReader 供 runtime tool 解析 + 请求构建器使用(agent 自有 goctl Store,读路径)。
+	AgentRegistryReader registry.Reader
+	PythonExecutor      pythonexec.Executor
+	AgentCreate         runtimetools.AgentCreateHandler
 }
 
 // allowAllMessageMediaValidator 是内存/单测 fixture：不接 media-rpc 时放行附件校验。
@@ -106,6 +115,7 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 	}
 	if ctx != nil {
 		opts.AgentRegistry = ctx.AgentRegistryRepo
+		opts.AgentRegistryReader = ctx.AgentRegistryReader
 		opts.PythonExecutor = ctx.PythonExecutor
 		opts.AgentCreate = agentCreateHandlerFromContext(ctx, opts.AgentRegistry)
 	}
@@ -152,7 +162,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	if _, ok := llmObsSink.(*llmobs.LangfuseSink); ok {
 		llmObsSink = llmobs.NewAsyncSink(llmObsSink, llmObsConfig.Backend, 0)
 	}
-	toolProvider, err := newConversationAIHostingToolProviderWithAgentCreate(opts.AgentRegistry, opts.PythonExecutor, opts.AgentCreate)
+	toolProvider, err := newConversationAIHostingToolProviderWithAgentCreate(opts.AgentRegistryReader, opts.PythonExecutor, opts.AgentCreate)
 	if err != nil {
 		return err
 	}
@@ -168,7 +178,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 			MessageRepository: ctx.MessageRepo,
 			HostingStore:      ctx.AIHostingStore,
 			AgentRepository:   agentRepositoryFromResolver(ctx.AgentResolver),
-			AgentRegistry:     opts.AgentRegistry,
+			AgentRegistry:     opts.AgentRegistryReader,
 			DeepSeek:          opts.DeepSeek,
 			MaxRecentMessages: 30,
 		}),
@@ -232,12 +242,12 @@ func llmObservabilityConfig(obs config.LLMObservabilityConfig) llmobs.Config {
 	}
 }
 
-func newConversationAIHostingToolProvider(registryRepo repository.AgentRegistryRepository, executor pythonexec.Executor) (runtimetools.Provider, error) {
-	return newConversationAIHostingToolProviderWithAgentCreate(registryRepo, executor, nil)
+func newConversationAIHostingToolProvider(registryReader runtimetools.Registry, executor pythonexec.Executor) (runtimetools.Provider, error) {
+	return newConversationAIHostingToolProviderWithAgentCreate(registryReader, executor, nil)
 }
 
-func newConversationAIHostingToolProviderWithAgentCreate(registryRepo repository.AgentRegistryRepository, executor pythonexec.Executor, agentCreate runtimetools.AgentCreateHandler) (runtimetools.Provider, error) {
-	if registryRepo == nil {
+func newConversationAIHostingToolProviderWithAgentCreate(registryReader runtimetools.Registry, executor pythonexec.Executor, agentCreate runtimetools.AgentCreateHandler) (runtimetools.Provider, error) {
+	if registryReader == nil {
 		return nil, nil
 	}
 	pythonCatalog := runtimetools.NewDefaultLocalAdapterCatalog(executor)
@@ -255,7 +265,7 @@ func newConversationAIHostingToolProviderWithAgentCreate(registryRepo repository
 		return pythonCatalog.LookupToolAdapter(spec)
 	})
 	return runtimetools.NewResolver(
-		registryRepo,
+		registryReader,
 		runtimetools.WithAdapterCatalog(catalog),
 	)
 }

@@ -21,11 +21,21 @@ const (
 	defaultAssistantRuntimeName    = "Conversation AI Hosting"
 )
 
+// AgentRegistryReader 是请求构建器所需的注册表只读视图(prompt/tool 绑定解析)。
+// 由 agent-rpc 自有 goctl 注册表 Store(service/agent/rpc/internal/registry)满足,
+// 不再依赖 internal/repository(#605)。
+type AgentRegistryReader interface {
+	ListPromptBindings(ctx context.Context, agentID string) ([]model.AgentPromptBinding, error)
+	GetPrompt(ctx context.Context, promptID string) (model.AgentPrompt, error)
+	ListToolBindings(ctx context.Context, agentID string) ([]model.AgentToolBinding, error)
+	GetTool(ctx context.Context, toolID string) (model.AgentTool, error)
+}
+
 type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 	MessageRepository repository.MessageRepository
 	HostingStore      convhosting.Store
 	AgentRepository   repository.AgentRepository
-	AgentRegistry     repository.AgentRegistryRepository
+	AgentRegistry     AgentRegistryReader
 	DeepSeek          config.DeepSeekConfig
 	MaxRecentMessages int
 }
@@ -34,7 +44,7 @@ type ConversationAIHostingRuntimeRequestBuilder struct {
 	messageRepo       repository.MessageRepository
 	hostingStore      convhosting.Store
 	agentRepo         repository.AgentRepository
-	agentRegistry     repository.AgentRegistryRepository
+	agentRegistry     AgentRegistryReader
 	deepSeek          config.DeepSeekConfig
 	maxRecentMessages int
 }
