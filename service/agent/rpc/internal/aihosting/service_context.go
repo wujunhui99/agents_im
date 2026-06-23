@@ -16,6 +16,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	agentim "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
 	einoruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/eino"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
@@ -25,16 +26,16 @@ type ServiceContext struct {
 	common.AuthRuntime
 	MessageLogic      *logic.MessageLogic
 	AgentMessageHook  logic.MessageCreatedHook
-	AIHostingLogic    *logic.ConversationAIHostingLogic
+	AIHostingLogic    *convhosting.ConversationAIHostingLogic
 	FeedbackLogic     *logic.FeedbackLogic
 	MessageRepo       repository.MessageRepository
 	FeedbackRepo      repository.FeedbackRepository
 	AgentHostingRepo  repository.AgentConversationHostingRepository
-	AIHostingRepo     repository.ConversationAIHostingRepository
+	AIHostingStore    convhosting.Store
 	GroupMembers      logic.GroupMemberLister
 	AgentAuditLogic   *logic.AgentAuditLogic
 	AgentAuditRepo    repository.AgentAuditRepository
-	AgentResolver     logic.AgentAccountExistenceChecker
+	AgentResolver     convhosting.AgentAccountExistenceChecker
 	AccountRepo       repository.Repository
 	AgentRepo         repository.AgentRepository
 	AgentRegistryRepo repository.AgentRegistryRepository
@@ -81,17 +82,17 @@ func NewServiceContextWithMediaValidator(repo repository.MessageRepository, medi
 	}
 	feedbackRepo := repository.NewMemoryFeedbackRepository()
 	agentHostingRepo := repository.NewMemoryAgentConversationHostingRepository()
-	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
+	aiHostingStore := convhosting.NewMemoryStore()
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{
 		AuthRuntime:      common.NewAuthRuntime(auth),
 		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaValidator),
-		AIHostingLogic:   logic.NewConversationAIHostingLogic(aiHostingRepo),
+		AIHostingLogic:   convhosting.NewConversationAIHostingLogic(aiHostingStore),
 		FeedbackLogic:    logic.NewFeedbackLogic(feedbackRepo),
 		MessageRepo:      repo,
 		FeedbackRepo:     feedbackRepo,
 		AgentHostingRepo: agentHostingRepo,
-		AIHostingRepo:    aiHostingRepo,
+		AIHostingStore:   aiHostingStore,
 		GroupMembers:     groups,
 		AgentAuditLogic:  logic.NewAgentAuditLogic(agentAuditRepo),
 		AgentAuditRepo:   agentAuditRepo,
@@ -118,11 +119,11 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	if ctx.AgentHostingRepo == nil {
 		return apperror.Internal("agent conversation hosting repository is not configured")
 	}
-	if ctx.AIHostingRepo == nil {
-		return apperror.Internal("conversation AI hosting repository is not configured")
+	if ctx.AIHostingStore == nil {
+		return apperror.Internal("conversation AI hosting store is not configured")
 	}
 	if ctx.AIHostingLogic == nil {
-		ctx.AIHostingLogic = logic.NewConversationAIHostingLogic(ctx.AIHostingRepo)
+		ctx.AIHostingLogic = convhosting.NewConversationAIHostingLogic(ctx.AIHostingStore)
 	}
 	if ctx.AgentResolver != nil {
 		ctx.AIHostingLogic.WithAgentAccountResolver(ctx.AgentResolver)
@@ -165,7 +166,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 		Runtime: einoruntime.NewDeepSeekRuntime(opts.DeepSeek, runtimeOptions...),
 		RequestBuilder: agentim.NewConversationAIHostingRuntimeRequestBuilder(agentim.ConversationAIHostingRuntimeRequestBuilderConfig{
 			MessageRepository: ctx.MessageRepo,
-			HostingRepository: ctx.AIHostingRepo,
+			HostingStore:      ctx.AIHostingStore,
 			AgentRepository:   agentRepositoryFromResolver(ctx.AgentResolver),
 			AgentRegistry:     opts.AgentRegistry,
 			DeepSeek:          opts.DeepSeek,
@@ -180,7 +181,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	}
 	hosting, err := agentim.NewConversationHostingService(agentim.ConversationHostingConfig{
 		Repository:           ctx.AgentHostingRepo,
-		AIHostingRepository:  ctx.AIHostingRepo,
+		AIHostingStore:       ctx.AIHostingStore,
 		Runner:               orchestrator,
 		AgentAccountResolver: ctx.AgentResolver,
 		GroupMembers:         ctx.GroupMembers,
@@ -195,7 +196,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	return nil
 }
 
-func agentRepositoryFromResolver(resolver logic.AgentAccountExistenceChecker) repository.AgentRepository {
+func agentRepositoryFromResolver(resolver convhosting.AgentAccountExistenceChecker) repository.AgentRepository {
 	if typed, ok := resolver.(interface {
 		AgentRepository() repository.AgentRepository
 	}); ok {

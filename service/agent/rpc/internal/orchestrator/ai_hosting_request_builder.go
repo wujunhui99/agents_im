@@ -11,6 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 
@@ -22,7 +23,7 @@ const (
 
 type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 	MessageRepository repository.MessageRepository
-	HostingRepository repository.ConversationAIHostingRepository
+	HostingStore      convhosting.Store
 	AgentRepository   repository.AgentRepository
 	AgentRegistry     repository.AgentRegistryRepository
 	DeepSeek          config.DeepSeekConfig
@@ -31,7 +32,7 @@ type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 
 type ConversationAIHostingRuntimeRequestBuilder struct {
 	messageRepo       repository.MessageRepository
-	hostingRepo       repository.ConversationAIHostingRepository
+	hostingStore      convhosting.Store
 	agentRepo         repository.AgentRepository
 	agentRegistry     repository.AgentRegistryRepository
 	deepSeek          config.DeepSeekConfig
@@ -45,7 +46,7 @@ func NewConversationAIHostingRuntimeRequestBuilder(cfg ConversationAIHostingRunt
 	}
 	return &ConversationAIHostingRuntimeRequestBuilder{
 		messageRepo:       cfg.MessageRepository,
-		hostingRepo:       cfg.HostingRepository,
+		hostingStore:      cfg.HostingStore,
 		agentRepo:         cfg.AgentRepository,
 		agentRegistry:     cfg.AgentRegistry,
 		deepSeek:          cfg.DeepSeek,
@@ -62,8 +63,8 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 	}
 
 	maxRecent := b.maxRecentMessages
-	if b.hostingRepo != nil {
-		setting, err := b.hostingRepo.GetConversationAIHostingSetting(ctx, trigger.AgentUserID, trigger.ConversationID)
+	if b.hostingStore != nil {
+		setting, err := b.hostingStore.GetConversationAIHostingSetting(ctx, trigger.AgentUserID, trigger.ConversationID)
 		if err != nil && apperror.From(err).Code != apperror.CodeNotFound {
 			return agentruntime.RunRequest{}, err
 		}
