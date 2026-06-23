@@ -25,20 +25,20 @@ import (
 
 type ServiceContext struct {
 	common.AuthRuntime
-	MessageLogic      *logic.MessageLogic
-	AgentMessageHook  logic.MessageCreatedHook
-	AIHostingLogic    *convhosting.ConversationAIHostingLogic
-	FeedbackLogic     *logic.FeedbackLogic
-	MessageRepo       repository.MessageRepository
-	FeedbackRepo      repository.FeedbackRepository
-	AgentHostingRepo  repository.AgentConversationHostingRepository
-	AIHostingStore    convhosting.Store
-	GroupMembers      logic.GroupMemberLister
-	AgentAuditLogic   *logic.AgentAuditLogic
-	AgentAuditRepo    repository.AgentAuditRepository
-	AgentResolver     convhosting.AgentAccountExistenceChecker
-	AccountRepo       repository.Repository
-	AgentRepo         repository.AgentRepository
+	MessageLogic     *logic.MessageLogic
+	AgentMessageHook logic.MessageCreatedHook
+	AIHostingLogic   *convhosting.ConversationAIHostingLogic
+	FeedbackLogic    *logic.FeedbackLogic
+	MessageRepo      repository.MessageRepository
+	FeedbackRepo     repository.FeedbackRepository
+	AgentHostingRepo repository.AgentConversationHostingRepository
+	AIHostingStore   convhosting.Store
+	GroupMembers     logic.GroupMemberLister
+	AgentAuditLogic  *logic.AgentAuditLogic
+	AgentAuditRepo   repository.AgentAuditRepository
+	AgentResolver    convhosting.AgentAccountExistenceChecker
+	AccountRepo      repository.Repository
+	AgentRepo        repository.AgentRepository
 	// AgentRegistryRepo 是 internal keystone 注册表数据层,仅喂 agent.create(AgentAssemblyLogic)
 	// 写路径,待后续 PR 随 internal 退役(#605 非目标:CreateAgentFromTool saga 拆解)。
 	AgentRegistryRepo repository.AgentRegistryRepository
