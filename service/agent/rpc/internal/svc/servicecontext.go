@@ -18,6 +18,7 @@ import (
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/hosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/imadapter"
 	orchestrator "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/trigger"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/userrpc"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
@@ -118,6 +119,9 @@ func buildHostingRuntime(c config.Config, userCli userclient.User, responseSende
 	}
 	// conversation_ai_hosting 数据层已脱 internal/repository，改 agent 自有 goctl model（AG-6 ① / D13）。
 	aiHostingStore := convhosting.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
+	// 注册表只读路径（runtime tool 解析 + 请求构建）改 agent 自有 goctl model（#605）。
+	// 写路径（agent.create keystone）仍用上面的 agentRegistryRepo，待后续 PR 迁出 internal。
+	agentRegistryReader := registry.NewStore(appconfig.ResolveDataSource(c.DataSource))
 	agentAuditRepo, err := repository.NewAgentAuditRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
 	if err != nil {
 		log.Fatalf("build agent audit repository: %v", err)
@@ -146,6 +150,7 @@ func buildHostingRuntime(c config.Config, userCli userclient.User, responseSende
 	hostingCtx.AgentAuditRepo = agentAuditRepo
 	hostingCtx.AgentAuditLogic = business.NewAgentAuditLogic(agentAuditRepo)
 	hostingCtx.AgentRegistryRepo = agentRegistryRepo
+	hostingCtx.AgentRegistryReader = agentRegistryReader
 	hostingCtx.PythonExecutor = pythonExecutor
 	// AI 写回经 msg-rpc gRPC SendMessage（imadapter），AI 消息走与人类消息相同的 Kafka 链路。
 	hostingCtx.AgentResponseSender = responseSender
