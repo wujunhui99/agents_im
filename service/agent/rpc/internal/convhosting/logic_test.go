@@ -1,18 +1,24 @@
-package logic
+package convhosting
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
+func singleConv(a, b string) string {
+	users := []string{a, b}
+	sort.Strings(users)
+	return "single:" + users[0] + ":" + users[1]
+}
+
 func TestConversationAIHostingDefaultEnableDisableAndPeerConflict(t *testing.T) {
 	ctx := context.Background()
-	hosting := NewConversationAIHostingLogic(repository.NewMemoryConversationAIHostingRepository())
-	conversationID := repository.SingleConversationID("usr_a", "usr_b")
+	hosting := NewConversationAIHostingLogic(NewMemoryStore())
+	conversationID := singleConv("usr_a", "usr_b")
 
 	initial, err := hosting.GetConversationAIHosting(ctx, GetConversationAIHostingRequest{
 		OwnerAccountID: "usr_a",
@@ -87,11 +93,11 @@ func TestConversationAIHostingDefaultEnableDisableAndPeerConflict(t *testing.T) 
 
 func TestConversationAIHostingRejectsNonParticipantsAndGroups(t *testing.T) {
 	ctx := context.Background()
-	hosting := NewConversationAIHostingLogic(repository.NewMemoryConversationAIHostingRepository())
+	hosting := NewConversationAIHostingLogic(NewMemoryStore())
 
 	_, err := hosting.GetConversationAIHosting(ctx, GetConversationAIHostingRequest{
 		OwnerAccountID: "usr_outsider",
-		ConversationID: repository.SingleConversationID("usr_a", "usr_b"),
+		ConversationID: singleConv("usr_a", "usr_b"),
 	})
 	if apperror.From(err).Code != apperror.CodeForbidden {
 		t.Fatalf("non-participant read error = %v, want forbidden", err)
@@ -99,7 +105,7 @@ func TestConversationAIHostingRejectsNonParticipantsAndGroups(t *testing.T) {
 
 	_, err = hosting.UpdateConversationAIHosting(ctx, UpdateConversationAIHostingRequest{
 		OwnerAccountID: "usr_outsider",
-		ConversationID: repository.SingleConversationID("usr_a", "usr_b"),
+		ConversationID: singleConv("usr_a", "usr_b"),
 		Enabled:        true,
 	})
 	if apperror.From(err).Code != apperror.CodeForbidden {
@@ -108,7 +114,7 @@ func TestConversationAIHostingRejectsNonParticipantsAndGroups(t *testing.T) {
 
 	_, err = hosting.GetConversationAIHosting(ctx, GetConversationAIHostingRequest{
 		OwnerAccountID: "usr_a",
-		ConversationID: repository.GroupConversationID("grp_1"),
+		ConversationID: "group:grp_1",
 	})
 	if apperror.From(err).Code != apperror.CodeInvalidArgument {
 		t.Fatalf("group read error = %v, want invalid argument", err)
@@ -117,10 +123,10 @@ func TestConversationAIHostingRejectsNonParticipantsAndGroups(t *testing.T) {
 
 func TestConversationAIHostingRejectsAgentConversation(t *testing.T) {
 	ctx := context.Background()
-	hosting := NewConversationAIHostingLogic(repository.NewMemoryConversationAIHostingRepository()).WithAgentAccountResolver(AgentAccountExistenceCheckerFunc(func(_ context.Context, accountID string) (bool, error) {
+	hosting := NewConversationAIHostingLogic(NewMemoryStore()).WithAgentAccountResolver(AgentAccountExistenceCheckerFunc(func(_ context.Context, accountID string) (bool, error) {
 		return accountID == "agent_creator", nil
 	}))
-	conversationID := repository.SingleConversationID("usr_new", "agent_creator")
+	conversationID := singleConv("usr_new", "agent_creator")
 
 	status, err := hosting.GetConversationAIHosting(ctx, GetConversationAIHostingRequest{
 		OwnerAccountID: "usr_new",

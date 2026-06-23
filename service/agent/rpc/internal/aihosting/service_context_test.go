@@ -12,6 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 )
 
@@ -57,10 +58,10 @@ func TestConfigureConversationAIHostingFailsOnMissingRequiredDependencies(t *tes
 			name: "missing conversation AI hosting repository",
 			ctx: func() *ServiceContext {
 				ctx := completeAIHostingServiceContext()
-				ctx.AIHostingRepo = nil
+				ctx.AIHostingStore = nil
 				return ctx
 			}(),
-			wantErr: "conversation AI hosting repository is not configured",
+			wantErr: "conversation AI hosting store is not configured",
 		},
 		{
 			name: "missing agent audit repository",
@@ -100,7 +101,7 @@ func TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting(t *
 	}
 
 	conversationID := repository.SingleConversationID("usr_hosted_owner", "usr_peer")
-	if _, err := serviceContext.AIHostingRepo.SetConversationAIHostingEnabled(ctx, repository.ConversationAIHostingUpdate{
+	if _, err := serviceContext.AIHostingStore.SetConversationAIHostingEnabled(ctx, convhosting.Update{
 		OwnerAccountID:    "usr_hosted_owner",
 		ConversationID:    conversationID,
 		Enabled:           true,
@@ -212,13 +213,13 @@ func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testin
 func completeAIHostingServiceContext() *ServiceContext {
 	messageRepo := repository.NewMemoryMessageRepository()
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
-	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
+	aiHostingStore := convhosting.NewMemoryStore()
 	return &ServiceContext{
 		MessageLogic:     business.NewMessageLogic(messageRepo),
 		MessageRepo:      messageRepo,
 		AgentHostingRepo: repository.NewMemoryAgentConversationHostingRepository(),
-		AIHostingRepo:    aiHostingRepo,
-		AIHostingLogic:   business.NewConversationAIHostingLogic(aiHostingRepo),
+		AIHostingStore:   aiHostingStore,
+		AIHostingLogic:   convhosting.NewConversationAIHostingLogic(aiHostingStore),
 		AgentAuditRepo:   agentAuditRepo,
 		AgentAuditLogic:  business.NewAgentAuditLogic(agentAuditRepo),
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aihosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/consumer"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/hosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/imadapter"
 	orchestrator "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
@@ -24,8 +25,9 @@ import (
 
 // ServiceContext 装配 agent-rpc：gRPC 面（AI 托管开关 CRUD，经 Hosting.AIHostingLogic）
 // + agent.trigger.v1 消费 worker（Consumer：judge 终判 → ScheduleTrigger）。AI 回复写回
-// 经 imadapter.MsgRPCSender → msg-rpc gRPC SendMessage（D15 step ④）。仍 import 的
-// internal/{logic,repository} 是 keystone 例外（agent 数据层未 goctl 化，AG-6/D13 前）。
+// 经 imadapter.MsgRPCSender → msg-rpc gRPC SendMessage（D15 step ④）。conversation_ai_hosting
+// 数据层已 goctl 化（convhosting，AG-6 ①/D13）；仍 import 的 internal/{logic,repository}
+// 是剩余 keystone 例外（agent registry/audit/message 等数据层未 goctl 化，AG-6 ②③… 前）。
 type ServiceContext struct {
 	Config   config.Config
 	Hosting  *aihosting.ServiceContext
@@ -59,8 +61,8 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	hostingCtx := buildHostingRuntime(c, userCli, imadapter.NewMsgRPCSender(msgRPCClient))
 
 	// trigger.Judge 终判第 3 步（hosting 查询）直接读 agent 域 conversation_ai_hosting
-	// （hosting.Store over keystone repo；AG-6 后改 goctl model）。
-	hostingStore, err := hosting.NewStore(hostingCtx.AIHostingRepo)
+	// （hosting.Store over agent 自有 convhosting.Store / goctl model；AG-6 ① 已脱 internal）。
+	hostingStore, err := hosting.NewStore(hostingCtx.AIHostingStore)
 	if err != nil {
 		log.Fatalf("build hosting store: %v", err)
 	}
@@ -114,10 +116,8 @@ func buildHostingRuntime(c config.Config, userCli userclient.User, responseSende
 	if err != nil {
 		log.Fatalf("build agent registry repository: %v", err)
 	}
-	aiHostingRepo, err := repository.NewConversationAIHostingRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build AI hosting repository: %v", err)
-	}
+	// conversation_ai_hosting 数据层已脱 internal/repository，改 agent 自有 goctl model（AG-6 ① / D13）。
+	aiHostingStore := convhosting.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
 	agentAuditRepo, err := repository.NewAgentAuditRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
 	if err != nil {
 		log.Fatalf("build agent audit repository: %v", err)
@@ -138,11 +138,11 @@ func buildHostingRuntime(c config.Config, userCli userclient.User, responseSende
 	// MessageLogic 在本进程只作运行时数据层（历史读）与被覆盖的 fallback sender，传 nil 用放行 fixture。
 	hostingCtx := aihosting.NewServiceContextWithMediaValidator(messageRepo, nil, nil, groupsLogic, appconfig.DefaultJWTAuthConfig())
 	hostingCtx.AgentHostingRepo = agentHostingRepo
-	hostingCtx.AIHostingRepo = aiHostingRepo
+	hostingCtx.AIHostingStore = aiHostingStore
 	hostingCtx.AgentResolver = orchestrator.NewAgentRepositoryAccountResolver(agentRepo)
 	hostingCtx.AccountRepo = accountRepo
 	hostingCtx.AgentRepo = agentRepo
-	hostingCtx.AIHostingLogic = business.NewConversationAIHostingLogic(aiHostingRepo).WithAgentAccountResolver(hostingCtx.AgentResolver)
+	hostingCtx.AIHostingLogic = convhosting.NewConversationAIHostingLogic(aiHostingStore).WithAgentAccountResolver(hostingCtx.AgentResolver)
 	hostingCtx.AgentAuditRepo = agentAuditRepo
 	hostingCtx.AgentAuditLogic = business.NewAgentAuditLogic(agentAuditRepo)
 	hostingCtx.AgentRegistryRepo = agentRegistryRepo

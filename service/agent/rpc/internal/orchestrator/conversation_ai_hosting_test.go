@@ -11,6 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 
@@ -19,7 +20,7 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogic(messageRepo)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
-	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
+	aiHostingStore := convhosting.NewMemoryStore()
 	agentRepo := repository.NewMemoryAgentRepository()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
@@ -61,7 +62,7 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	}
 	hosting, err := NewConversationHostingService(ConversationHostingConfig{
 		Repository:           hostingRepo,
-		AIHostingRepository:  aiHostingRepo,
+		AIHostingStore:       aiHostingStore,
 		Runner:               orchestrator,
 		AgentAccountResolver: NewAgentRepositoryAccountResolver(agentRepo),
 	})
@@ -101,7 +102,7 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogic(messageRepo)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
-	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
+	aiHostingStore := convhosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {
@@ -140,10 +141,10 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 		t.Fatalf("new orchestrator: %v", err)
 	}
 	hosting, err := NewConversationHostingService(ConversationHostingConfig{
-		Repository:          hostingRepo,
-		AIHostingRepository: aiHostingRepo,
-		Runner:              orchestrator,
-		ReadMarker:          NewMessageRepositoryReadMarker(messageRepo),
+		Repository:     hostingRepo,
+		AIHostingStore: aiHostingStore,
+		Runner:         orchestrator,
+		ReadMarker:     NewMessageRepositoryReadMarker(messageRepo),
 	})
 	if err != nil {
 		t.Fatalf("new hosting: %v", err)
@@ -151,7 +152,7 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 	messageLogic.SetMessageCreatedHook(hosting)
 
 	conversationID := repository.SingleConversationID("usr_a", "usr_b")
-	if _, err := aiHostingRepo.SetConversationAIHostingEnabled(ctx, repository.ConversationAIHostingUpdate{
+	if _, err := aiHostingStore.SetConversationAIHostingEnabled(ctx, convhosting.Update{
 		OwnerAccountID:    "usr_a",
 		ConversationID:    conversationID,
 		Enabled:           true,
@@ -251,7 +252,7 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogic(messageRepo)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
-	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
+	aiHostingStore := convhosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {
@@ -277,10 +278,10 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 		t.Fatalf("new orchestrator: %v", err)
 	}
 	hosting, err := NewConversationHostingService(ConversationHostingConfig{
-		Repository:          hostingRepo,
-		AIHostingRepository: aiHostingRepo,
-		Runner:              orchestrator,
-		ReadMarker:          NewMessageRepositoryReadMarker(messageRepo),
+		Repository:     hostingRepo,
+		AIHostingStore: aiHostingStore,
+		Runner:         orchestrator,
+		ReadMarker:     NewMessageRepositoryReadMarker(messageRepo),
 	})
 	if err != nil {
 		t.Fatalf("new hosting: %v", err)
@@ -288,7 +289,7 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 	messageLogic.SetMessageCreatedHook(hosting)
 
 	conversationID := repository.SingleConversationID("usr_a", "usr_b")
-	if _, err := aiHostingRepo.SetConversationAIHostingEnabled(ctx, repository.ConversationAIHostingUpdate{
+	if _, err := aiHostingStore.SetConversationAIHostingEnabled(ctx, convhosting.Update{
 		OwnerAccountID:    "usr_a",
 		ConversationID:    conversationID,
 		Enabled:           true,
@@ -347,7 +348,7 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogic(messageRepo)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
-	aiHostingRepo := repository.NewMemoryConversationAIHostingRepository()
+	aiHostingStore := convhosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {
@@ -368,10 +369,10 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 		t.Fatalf("new orchestrator: %v", err)
 	}
 	hosting, err := NewConversationHostingService(ConversationHostingConfig{
-		Repository:          hostingRepo,
-		AIHostingRepository: aiHostingRepo,
-		Runner:              orchestrator,
-		ReadMarker:          NewMessageRepositoryReadMarker(messageRepo),
+		Repository:     hostingRepo,
+		AIHostingStore: aiHostingStore,
+		Runner:         orchestrator,
+		ReadMarker:     NewMessageRepositoryReadMarker(messageRepo),
 	})
 	if err != nil {
 		t.Fatalf("new hosting: %v", err)
@@ -379,7 +380,7 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 	messageLogic.SetMessageCreatedHook(hosting)
 
 	conversationID := repository.SingleConversationID("usr_a", "usr_b")
-	if _, err := aiHostingRepo.SetConversationAIHostingEnabled(ctx, repository.ConversationAIHostingUpdate{
+	if _, err := aiHostingStore.SetConversationAIHostingEnabled(ctx, convhosting.Update{
 		OwnerAccountID:    "usr_a",
 		ConversationID:    conversationID,
 		Enabled:           true,

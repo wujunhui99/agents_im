@@ -11,6 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -70,7 +71,7 @@ func (r AgentRepositoryAccountResolver) AgentRepository() repository.AgentReposi
 
 type ConversationHostingConfig struct {
 	Repository           repository.AgentConversationHostingRepository
-	AIHostingRepository  repository.ConversationAIHostingRepository
+	AIHostingStore       convhosting.Store
 	Runner               AgentTriggerRunner
 	AgentAccountResolver AgentAccountResolver
 	GroupMembers         logic.GroupMemberLister
@@ -81,7 +82,7 @@ type ConversationHostingConfig struct {
 
 type ConversationHostingService struct {
 	repo          repository.AgentConversationHostingRepository
-	aiHostingRepo repository.ConversationAIHostingRepository
+	aiHostingRepo convhosting.Store
 	runner        AgentTriggerRunner
 	agentResolver AgentAccountResolver
 	groupMembers  logic.GroupMemberLister
@@ -117,7 +118,7 @@ func NewConversationHostingService(config ConversationHostingConfig) (*Conversat
 	}
 	return &ConversationHostingService{
 		repo:          config.Repository,
-		aiHostingRepo: config.AIHostingRepository,
+		aiHostingRepo: config.AIHostingStore,
 		runner:        config.Runner,
 		agentResolver: config.AgentAccountResolver,
 		groupMembers:  config.GroupMembers,

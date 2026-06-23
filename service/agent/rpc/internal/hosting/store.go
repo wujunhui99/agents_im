@@ -1,35 +1,35 @@
 // Package hosting backs trigger.Judge step 3: "is this conversation AI-hosted,
 // and by which agent" (D15). The data owner is the agent domain
 // (conversation_ai_hosting); the message main chain never performs this lookup.
-// Today it reads through the keystone internal/repository data layer; it moves
-// to a service/agent/rpc/internal/model goctl model when AG-6 (D13) lands.
+// It reads through the agent-owned convhosting.Store (goctl model backed; AG-6 ①
+// 数据层脱 internal/repository, D13).
 package hosting
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 )
 
 // Store implements trigger.HostingStore over the conversation_ai_hosting table.
 type Store struct {
-	repo repository.ConversationAIHostingRepository
+	store convhosting.Store
 }
 
-// NewStore builds the hosting store. A nil repository is a fail-first wiring error.
-func NewStore(repo repository.ConversationAIHostingRepository) (*Store, error) {
-	if repo == nil {
-		return nil, fmt.Errorf("hosting store requires a conversation AI hosting repository")
+// NewStore builds the hosting store. A nil store is a fail-first wiring error.
+func NewStore(store convhosting.Store) (*Store, error) {
+	if store == nil {
+		return nil, fmt.Errorf("hosting store requires a conversation AI hosting store")
 	}
-	return &Store{repo: repo}, nil
+	return &Store{store: store}, nil
 }
 
 // HostingAgent returns the hosting agent account id when the conversation is
 // AI-hosted and enabled. A missing row is "not hosted" (not an error).
 func (s *Store) HostingAgent(ctx context.Context, conversationID string) (string, bool, error) {
-	setting, err := s.repo.GetEnabledConversationAIHosting(ctx, conversationID)
+	setting, err := s.store.GetEnabledConversationAIHosting(ctx, conversationID)
 	if err != nil {
 		if apperror.From(err).Code == apperror.CodeNotFound {
 			return "", false, nil
