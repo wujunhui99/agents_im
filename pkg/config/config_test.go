@@ -278,6 +278,66 @@ MailRPC:
 	}
 }
 
+func TestLoadAPIConfigParsesAgentRPCYAMLListEndpoints(t *testing.T) {
+	// 回归 #613：agent-api 转纯 BFF（#608）后硬要求 AgentRPC 客户端配置，但
+	// LoadAPIConfig 早先漏接 AgentRPC，导致 cfg.AgentRPC 恒空 → agent-api CrashLoop。
+	for _, key := range []string{
+		"AGENTS_IM_AGENT_RPC_TARGET", "AGENT_RPC_TARGET",
+		"AGENTS_IM_AGENT_RPC_ENDPOINTS", "AGENT_RPC_ENDPOINTS",
+	} {
+		t.Setenv(key, "")
+	}
+
+	configPath := filepath.Join(t.TempDir(), "agent-api.yaml")
+	err := os.WriteFile(configPath, []byte(`
+Name: agent-api
+Host: 0.0.0.0
+Port: 8086
+AgentRPC:
+  Endpoints:
+    - agent-rpc:9099
+  Timeout: 5000
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if len(cfg.AgentRPC.Endpoints) != 1 || cfg.AgentRPC.Endpoints[0] != "agent-rpc:9099" {
+		t.Fatalf("agent rpc endpoints = %v, want [agent-rpc:9099]", cfg.AgentRPC.Endpoints)
+	}
+	if cfg.AgentRPC.Timeout != 5000 {
+		t.Fatalf("agent rpc timeout = %d, want 5000", cfg.AgentRPC.Timeout)
+	}
+	if !cfg.AgentRPC.NonBlock {
+		t.Fatalf("agent rpc NonBlock = false, want true")
+	}
+}
+
+func TestLoadAPIConfigResolvesAgentRPCTargetFromEnv(t *testing.T) {
+	t.Setenv("AGENTS_IM_AGENT_RPC_ENDPOINTS", "")
+	t.Setenv("AGENT_RPC_ENDPOINTS", "")
+	t.Setenv("AGENTS_IM_AGENT_RPC_TARGET", "")
+	t.Setenv("AGENT_RPC_TARGET", "agent-rpc:9099")
+
+	configPath := filepath.Join(t.TempDir(), "agent-api.yaml")
+	err := os.WriteFile(configPath, []byte("Name: agent-api\nHost: 0.0.0.0\nPort: 8086\n"), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadAPIConfig(configPath)
+	if err != nil {
+		t.Fatalf("load api config: %v", err)
+	}
+	if cfg.AgentRPC.Target != "agent-rpc:9099" {
+		t.Fatalf("agent rpc target = %q, want agent-rpc:9099", cfg.AgentRPC.Target)
+	}
+}
+
 func TestLoadRPCConfigParsesMailRPCYAMLListEndpoints(t *testing.T) {
 	clearMailRPCEnv(t)
 
