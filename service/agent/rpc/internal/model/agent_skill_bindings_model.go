@@ -1,6 +1,10 @@
 package model
 
-import "github.com/zeromicro/go-zero/core/stores/sqlx"
+import (
+	"context"
+
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
+)
 
 var _ AgentSkillBindingsModel = (*customAgentSkillBindingsModel)(nil)
 
@@ -10,6 +14,9 @@ type (
 	AgentSkillBindingsModel interface {
 		agentSkillBindingsModel
 		withSession(session sqlx.Session) AgentSkillBindingsModel
+
+		// BindOne 幂等绑定（已存在返回 created=false）。
+		BindOne(ctx context.Context, agentID, skillID int64, createdBy string) (*AgentSkillBindings, bool, error)
 	}
 
 	customAgentSkillBindingsModel struct {

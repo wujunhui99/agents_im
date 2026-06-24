@@ -9,6 +9,16 @@ MediaRPC:
     - media-rpc:9096
   Timeout: 5000
 
+# 默认助手开通编排（#606）：agent 域装配经 agent-rpc、好友建立经 friends-rpc（单向叶子，不成环）。
+AgentRPC:
+  Endpoints:
+    - agent-rpc:9099
+  Timeout: 5000
+FriendsRPC:
+  Endpoints:
+    - friends-rpc:9092
+  Timeout: 5000
+
 # go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。
 Telemetry:
   Name: user-rpc

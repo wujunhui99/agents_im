@@ -13,6 +13,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
+	registrypkg "github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 )
 
@@ -142,7 +143,7 @@ func TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting(t *
 
 func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testing.T) {
 	ctx := context.Background()
-	registryRepo := repository.NewMemoryAgentRegistryRepository()
+	registryRepo := registrypkg.NewMemoryStore()
 	if _, err := registryRepo.RegisterTool(ctx, model.AgentTool{
 		ToolID:           "tool_python_execute",
 		Name:             model.LocalToolHandlerPythonExecute,

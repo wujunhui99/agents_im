@@ -1,84 +1,92 @@
 package agent
 
 import (
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/types"
+	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
 )
 
-func optionalAgentString(value string) *string {
-	if value == "" {
-		return nil
-	}
-	return &value
-}
+// convert.go 把 agent-rpc 的 proto 响应映射成 agent-api 的 BFF 视图类型（#606：纯 BFF over gRPC）。
 
-func agentResp(agent business.AgentInfo) *types.AgentResp {
+func agentRespFromPB(entity *agentpb.AgentEntity) *types.AgentResp {
 	return &types.AgentResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
-		Data:    agentType(agent),
+		Data:    agentTypeFromPB(entity),
 	}
 }
 
-func agentDefinitionResp(definition business.AgentDefinition) *types.AgentDefinitionResp {
+func agentTypeFromPB(entity *agentpb.AgentEntity) types.Agent {
+	if entity == nil {
+		return types.Agent{}
+	}
+	return types.Agent{
+		AgentID:     entity.GetAgentId(),
+		IMUserID:    entity.GetImUserId(),
+		Name:        entity.GetName(),
+		Description: entity.GetDescription(),
+		Status:      entity.GetStatus(),
+		CreatedBy:   entity.GetCreatedBy(),
+		CreatedAt:   entity.GetCreatedAt(),
+		UpdatedAt:   entity.GetUpdatedAt(),
+	}
+}
+
+func agentDefinitionRespFromPB(definition *agentpb.AgentDefinition) *types.AgentDefinitionResp {
 	return &types.AgentDefinitionResp{
 		Code:    string(apperror.CodeOK),
 		Message: "ok",
 		Data: types.AgentDefinitionData{
-			Agent:        agentType(definition.Agent),
-			SystemPrompt: agentDefinitionPrompt(definition.SystemPrompt),
-			Tools:        agentDefinitionTools(definition.Tools),
+			Agent:        agentTypeFromPB(definition.GetAgent()),
+			SystemPrompt: agentDefinitionPromptFromPB(definition.GetSystemPrompt()),
+			Tools:        agentDefinitionToolsFromPB(definition.GetTools()),
 		},
 	}
 }
 
-func agentType(agent business.AgentInfo) types.Agent {
-	return types.Agent{
-		AgentID:     agent.AgentID,
-		IMUserID:    agent.IMUserID,
-		Name:        agent.Name,
-		Description: agent.Description,
-		Status:      agent.Status,
-		CreatedBy:   agent.CreatedBy,
-		CreatedAt:   agent.CreatedAt,
-		UpdatedAt:   agent.UpdatedAt,
+func agentDefinitionPromptFromPB(prompt *agentpb.AgentPromptDefinition) types.AgentDefinitionPrompt {
+	if prompt == nil {
+		return types.AgentDefinitionPrompt{}
 	}
-}
-
-func agentDefinitionPrompt(prompt business.AgentPromptDefinition) types.AgentDefinitionPrompt {
 	return types.AgentDefinitionPrompt{
-		PromptID:            prompt.PromptID,
-		Name:                prompt.Name,
-		Description:         prompt.Description,
-		Content:             prompt.Content,
-		VariablesSchemaJSON: prompt.VariablesSchemaJSON,
-		Version:             prompt.Version,
-		Status:              prompt.Status,
-		CreatedBy:           prompt.CreatedBy,
-		CreatedAt:           prompt.CreatedAt,
-		UpdatedAt:           prompt.UpdatedAt,
+		PromptID:            prompt.GetPromptId(),
+		Name:                prompt.GetName(),
+		Description:         prompt.GetDescription(),
+		Content:             prompt.GetContent(),
+		VariablesSchemaJSON: prompt.GetVariablesSchemaJson(),
+		Version:             prompt.GetVersion(),
+		Status:              prompt.GetStatus(),
+		CreatedBy:           prompt.GetCreatedBy(),
+		CreatedAt:           prompt.GetCreatedAt(),
+		UpdatedAt:           prompt.GetUpdatedAt(),
 	}
 }
 
-func agentDefinitionTools(tools []business.AgentToolDefinition) []types.AgentDefinitionTool {
+func agentDefinitionToolsFromPB(tools []*agentpb.AgentToolDefinition) []types.AgentDefinitionTool {
 	result := make([]types.AgentDefinitionTool, 0, len(tools))
 	for _, tool := range tools {
 		result = append(result, types.AgentDefinitionTool{
-			ToolID:           tool.ToolID,
-			Name:             tool.Name,
-			Description:      tool.Description,
-			ToolType:         tool.ToolType,
-			MCPServerID:      tool.MCPServerID,
-			MCPToolName:      tool.MCPToolName,
-			LocalHandlerKey:  tool.LocalHandlerKey,
-			BuiltinKey:       tool.BuiltinKey,
-			InputSchemaJSON:  tool.InputSchemaJSON,
-			OutputSchemaJSON: tool.OutputSchemaJSON,
-			PermissionLevel:  tool.PermissionLevel,
-			Status:           tool.Status,
-			AdminConfigured:  tool.AdminConfigured,
+			ToolID:           tool.GetToolId(),
+			Name:             tool.GetName(),
+			Description:      tool.GetDescription(),
+			ToolType:         tool.GetToolType(),
+			MCPServerID:      tool.GetMcpServerId(),
+			MCPToolName:      tool.GetMcpToolName(),
+			LocalHandlerKey:  tool.GetLocalHandlerKey(),
+			BuiltinKey:       tool.GetBuiltinKey(),
+			InputSchemaJSON:  tool.GetInputSchemaJson(),
+			OutputSchemaJSON: tool.GetOutputSchemaJson(),
+			PermissionLevel:  tool.GetPermissionLevel(),
+			Status:           tool.GetStatus(),
+			AdminConfigured:  tool.GetAdminConfigured(),
 		})
 	}
 	return result
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }

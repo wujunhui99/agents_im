@@ -1,6 +1,10 @@
 package model
 
-import "github.com/zeromicro/go-zero/core/stores/sqlx"
+import (
+	"context"
+
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
+)
 
 var _ AgentSkillsModel = (*customAgentSkillsModel)(nil)
 
@@ -10,6 +14,9 @@ type (
 	AgentSkillsModel interface {
 		agentSkillsModel
 		withSession(session sqlx.Session) AgentSkillsModel
+
+		// InsertReturning 插入并返回库生成的完整行（skill_id 自增）。
+		InsertReturning(ctx context.Context, data *AgentSkills) (*AgentSkills, error)
 	}
 
 	customAgentSkillsModel struct {

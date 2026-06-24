@@ -5,6 +5,15 @@ MediaRPC:
   Endpoints:
     - 127.0.0.1:${MEDIA_RPC_PORT}
   Timeout: 5000
+# 默认助手开通编排（#606）：agent 域装配经 agent-rpc、好友建立经 friends-rpc（单向叶子，不成环）。
+AgentRPC:
+  Endpoints:
+    - 127.0.0.1:${AGENT_RPC_PORT}
+  Timeout: 5000
+FriendsRPC:
+  Endpoints:
+    - 127.0.0.1:${FRIENDS_RPC_PORT}
+  Timeout: 5000
 Telemetry:
   Name: user-rpc
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}

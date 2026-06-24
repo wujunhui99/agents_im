@@ -21,6 +21,1089 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// ---- agent CRUD ----
+type AgentEntity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ImUserId      string                 `protobuf:"bytes,3,opt,name=im_user_id,json=imUserId,proto3" json:"im_user_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Status        string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	CreatedBy     string                 `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentEntity) Reset() {
+	*x = AgentEntity{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentEntity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentEntity) ProtoMessage() {}
+
+func (x *AgentEntity) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentEntity.ProtoReflect.Descriptor instead.
+func (*AgentEntity) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *AgentEntity) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *AgentEntity) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *AgentEntity) GetImUserId() string {
+	if x != nil {
+		return x.ImUserId
+	}
+	return ""
+}
+
+func (x *AgentEntity) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AgentEntity) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AgentEntity) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AgentEntity) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return ""
+}
+
+func (x *AgentEntity) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *AgentEntity) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type CreateAgentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ImUserId      string                 `protobuf:"bytes,2,opt,name=im_user_id,json=imUserId,proto3" json:"im_user_id,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	CreatedBy     string                 `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAgentRequest) Reset() {
+	*x = CreateAgentRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAgentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAgentRequest) ProtoMessage() {}
+
+func (x *CreateAgentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAgentRequest.ProtoReflect.Descriptor instead.
+func (*CreateAgentRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *CreateAgentRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *CreateAgentRequest) GetImUserId() string {
+	if x != nil {
+		return x.ImUserId
+	}
+	return ""
+}
+
+func (x *CreateAgentRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateAgentRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CreateAgentRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *CreateAgentRequest) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return ""
+}
+
+type AgentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Agent         *AgentEntity           `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentResponse) Reset() {
+	*x = AgentResponse{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentResponse) ProtoMessage() {}
+
+func (x *AgentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentResponse.ProtoReflect.Descriptor instead.
+func (*AgentResponse) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AgentResponse) GetAgent() *AgentEntity {
+	if x != nil {
+		return x.Agent
+	}
+	return nil
+}
+
+type GetAgentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAgentRequest) Reset() {
+	*x = GetAgentRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAgentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAgentRequest) ProtoMessage() {}
+
+func (x *GetAgentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAgentRequest.ProtoReflect.Descriptor instead.
+func (*GetAgentRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetAgentRequest) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+type ListAgentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	CreatedBy     string                 `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	Limit         int64                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int64                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentsRequest) Reset() {
+	*x = ListAgentsRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentsRequest) ProtoMessage() {}
+
+func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentsRequest.ProtoReflect.Descriptor instead.
+func (*ListAgentsRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListAgentsRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ListAgentsRequest) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return ""
+}
+
+func (x *ListAgentsRequest) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListAgentsRequest) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+type ListAgentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Agents        []*AgentEntity         `protobuf:"bytes,1,rep,name=agents,proto3" json:"agents,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentsResponse) Reset() {
+	*x = ListAgentsResponse{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentsResponse) ProtoMessage() {}
+
+func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentsResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentsResponse) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListAgentsResponse) GetAgents() []*AgentEntity {
+	if x != nil {
+		return x.Agents
+	}
+	return nil
+}
+
+type UpdateAgentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,3,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAgentRequest) Reset() {
+	*x = UpdateAgentRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAgentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAgentRequest) ProtoMessage() {}
+
+func (x *UpdateAgentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAgentRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAgentRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *UpdateAgentRequest) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *UpdateAgentRequest) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *UpdateAgentRequest) GetDescription() string {
+	if x != nil && x.Description != nil {
+		return *x.Description
+	}
+	return ""
+}
+
+type UpdateAgentStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAgentStatusRequest) Reset() {
+	*x = UpdateAgentStatusRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAgentStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAgentStatusRequest) ProtoMessage() {}
+
+func (x *UpdateAgentStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAgentStatusRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAgentStatusRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *UpdateAgentStatusRequest) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *UpdateAgentStatusRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+// ---- agent 定义 ----
+type AgentPromptDefinition struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PromptId            string                 `protobuf:"bytes,1,opt,name=prompt_id,json=promptId,proto3" json:"prompt_id,omitempty"`
+	Name                string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description         string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Content             string                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	VariablesSchemaJson string                 `protobuf:"bytes,5,opt,name=variables_schema_json,json=variablesSchemaJson,proto3" json:"variables_schema_json,omitempty"`
+	Version             string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
+	Status              string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
+	CreatedBy           string                 `protobuf:"bytes,8,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedAt           string                 `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt           string                 `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *AgentPromptDefinition) Reset() {
+	*x = AgentPromptDefinition{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentPromptDefinition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentPromptDefinition) ProtoMessage() {}
+
+func (x *AgentPromptDefinition) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentPromptDefinition.ProtoReflect.Descriptor instead.
+func (*AgentPromptDefinition) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AgentPromptDefinition) GetPromptId() string {
+	if x != nil {
+		return x.PromptId
+	}
+	return ""
+}
+
+func (x *AgentPromptDefinition) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AgentPromptDefinition) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AgentPromptDefinition) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *AgentPromptDefinition) GetVariablesSchemaJson() string {
+	if x != nil {
+		return x.VariablesSchemaJson
+	}
+	return ""
+}
+
+func (x *AgentPromptDefinition) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *AgentPromptDefinition) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AgentPromptDefinition) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return ""
+}
+
+func (x *AgentPromptDefinition) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *AgentPromptDefinition) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type AgentToolDefinition struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ToolId           string                 `protobuf:"bytes,1,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
+	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description      string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	ToolType         string                 `protobuf:"bytes,4,opt,name=tool_type,json=toolType,proto3" json:"tool_type,omitempty"`
+	McpServerId      string                 `protobuf:"bytes,5,opt,name=mcp_server_id,json=mcpServerId,proto3" json:"mcp_server_id,omitempty"`
+	McpToolName      string                 `protobuf:"bytes,6,opt,name=mcp_tool_name,json=mcpToolName,proto3" json:"mcp_tool_name,omitempty"`
+	LocalHandlerKey  string                 `protobuf:"bytes,7,opt,name=local_handler_key,json=localHandlerKey,proto3" json:"local_handler_key,omitempty"`
+	BuiltinKey       string                 `protobuf:"bytes,8,opt,name=builtin_key,json=builtinKey,proto3" json:"builtin_key,omitempty"`
+	InputSchemaJson  string                 `protobuf:"bytes,9,opt,name=input_schema_json,json=inputSchemaJson,proto3" json:"input_schema_json,omitempty"`
+	OutputSchemaJson string                 `protobuf:"bytes,10,opt,name=output_schema_json,json=outputSchemaJson,proto3" json:"output_schema_json,omitempty"`
+	PermissionLevel  string                 `protobuf:"bytes,11,opt,name=permission_level,json=permissionLevel,proto3" json:"permission_level,omitempty"`
+	Status           string                 `protobuf:"bytes,12,opt,name=status,proto3" json:"status,omitempty"`
+	AdminConfigured  bool                   `protobuf:"varint,13,opt,name=admin_configured,json=adminConfigured,proto3" json:"admin_configured,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *AgentToolDefinition) Reset() {
+	*x = AgentToolDefinition{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentToolDefinition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentToolDefinition) ProtoMessage() {}
+
+func (x *AgentToolDefinition) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentToolDefinition.ProtoReflect.Descriptor instead.
+func (*AgentToolDefinition) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AgentToolDefinition) GetToolId() string {
+	if x != nil {
+		return x.ToolId
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetToolType() string {
+	if x != nil {
+		return x.ToolType
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetMcpServerId() string {
+	if x != nil {
+		return x.McpServerId
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetMcpToolName() string {
+	if x != nil {
+		return x.McpToolName
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetLocalHandlerKey() string {
+	if x != nil {
+		return x.LocalHandlerKey
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetBuiltinKey() string {
+	if x != nil {
+		return x.BuiltinKey
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetInputSchemaJson() string {
+	if x != nil {
+		return x.InputSchemaJson
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetOutputSchemaJson() string {
+	if x != nil {
+		return x.OutputSchemaJson
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetPermissionLevel() string {
+	if x != nil {
+		return x.PermissionLevel
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AgentToolDefinition) GetAdminConfigured() bool {
+	if x != nil {
+		return x.AdminConfigured
+	}
+	return false
+}
+
+type AgentDefinition struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Agent         *AgentEntity           `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
+	SystemPrompt  *AgentPromptDefinition `protobuf:"bytes,2,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"`
+	Tools         []*AgentToolDefinition `protobuf:"bytes,3,rep,name=tools,proto3" json:"tools,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentDefinition) Reset() {
+	*x = AgentDefinition{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentDefinition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentDefinition) ProtoMessage() {}
+
+func (x *AgentDefinition) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentDefinition.ProtoReflect.Descriptor instead.
+func (*AgentDefinition) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AgentDefinition) GetAgent() *AgentEntity {
+	if x != nil {
+		return x.Agent
+	}
+	return nil
+}
+
+func (x *AgentDefinition) GetSystemPrompt() *AgentPromptDefinition {
+	if x != nil {
+		return x.SystemPrompt
+	}
+	return nil
+}
+
+func (x *AgentDefinition) GetTools() []*AgentToolDefinition {
+	if x != nil {
+		return x.Tools
+	}
+	return nil
+}
+
+type GetAgentDefinitionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	RequestedBy   string                 `protobuf:"bytes,2,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAgentDefinitionRequest) Reset() {
+	*x = GetAgentDefinitionRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAgentDefinitionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAgentDefinitionRequest) ProtoMessage() {}
+
+func (x *GetAgentDefinitionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAgentDefinitionRequest.ProtoReflect.Descriptor instead.
+func (*GetAgentDefinitionRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetAgentDefinitionRequest) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *GetAgentDefinitionRequest) GetRequestedBy() string {
+	if x != nil {
+		return x.RequestedBy
+	}
+	return ""
+}
+
+type UpdateAgentDefinitionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	SystemPrompt  string                 `protobuf:"bytes,2,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"`
+	ToolNames     []string               `protobuf:"bytes,3,rep,name=tool_names,json=toolNames,proto3" json:"tool_names,omitempty"`
+	UpdatedBy     string                 `protobuf:"bytes,4,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAgentDefinitionRequest) Reset() {
+	*x = UpdateAgentDefinitionRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAgentDefinitionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAgentDefinitionRequest) ProtoMessage() {}
+
+func (x *UpdateAgentDefinitionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAgentDefinitionRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAgentDefinitionRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *UpdateAgentDefinitionRequest) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *UpdateAgentDefinitionRequest) GetSystemPrompt() string {
+	if x != nil {
+		return x.SystemPrompt
+	}
+	return ""
+}
+
+func (x *UpdateAgentDefinitionRequest) GetToolNames() []string {
+	if x != nil {
+		return x.ToolNames
+	}
+	return nil
+}
+
+func (x *UpdateAgentDefinitionRequest) GetUpdatedBy() string {
+	if x != nil {
+		return x.UpdatedBy
+	}
+	return ""
+}
+
+type AgentDefinitionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Definition    *AgentDefinition       `protobuf:"bytes,1,opt,name=definition,proto3" json:"definition,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentDefinitionResponse) Reset() {
+	*x = AgentDefinitionResponse{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentDefinitionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentDefinitionResponse) ProtoMessage() {}
+
+func (x *AgentDefinitionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentDefinitionResponse.ProtoReflect.Descriptor instead.
+func (*AgentDefinitionResponse) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AgentDefinitionResponse) GetDefinition() *AgentDefinition {
+	if x != nil {
+		return x.Definition
+	}
+	return nil
+}
+
+// ---- 默认助手装配 ----
+type EnsureDefaultAssistantRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnsureDefaultAssistantRequest) Reset() {
+	*x = EnsureDefaultAssistantRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnsureDefaultAssistantRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnsureDefaultAssistantRequest) ProtoMessage() {}
+
+func (x *EnsureDefaultAssistantRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnsureDefaultAssistantRequest.ProtoReflect.Descriptor instead.
+func (*EnsureDefaultAssistantRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *EnsureDefaultAssistantRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type EnsureDefaultAssistantResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	PromptId      string                 `protobuf:"bytes,2,opt,name=prompt_id,json=promptId,proto3" json:"prompt_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnsureDefaultAssistantResponse) Reset() {
+	*x = EnsureDefaultAssistantResponse{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnsureDefaultAssistantResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnsureDefaultAssistantResponse) ProtoMessage() {}
+
+func (x *EnsureDefaultAssistantResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnsureDefaultAssistantResponse.ProtoReflect.Descriptor instead.
+func (*EnsureDefaultAssistantResponse) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *EnsureDefaultAssistantResponse) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *EnsureDefaultAssistantResponse) GetPromptId() string {
+	if x != nil {
+		return x.PromptId
+	}
+	return ""
+}
+
 // ---- ConversationAIHosting ----
 type GetConversationAIHostingRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -32,7 +1115,7 @@ type GetConversationAIHostingRequest struct {
 
 func (x *GetConversationAIHostingRequest) Reset() {
 	*x = GetConversationAIHostingRequest{}
-	mi := &file_service_agent_rpc_agent_proto_msgTypes[0]
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +1127,7 @@ func (x *GetConversationAIHostingRequest) String() string {
 func (*GetConversationAIHostingRequest) ProtoMessage() {}
 
 func (x *GetConversationAIHostingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_agent_rpc_agent_proto_msgTypes[0]
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +1140,7 @@ func (x *GetConversationAIHostingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConversationAIHostingRequest.ProtoReflect.Descriptor instead.
 func (*GetConversationAIHostingRequest) Descriptor() ([]byte, []int) {
-	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{0}
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetConversationAIHostingRequest) GetOwnerAccountId() string {
@@ -85,7 +1168,7 @@ type UpdateConversationAIHostingRequest struct {
 
 func (x *UpdateConversationAIHostingRequest) Reset() {
 	*x = UpdateConversationAIHostingRequest{}
-	mi := &file_service_agent_rpc_agent_proto_msgTypes[1]
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -97,7 +1180,7 @@ func (x *UpdateConversationAIHostingRequest) String() string {
 func (*UpdateConversationAIHostingRequest) ProtoMessage() {}
 
 func (x *UpdateConversationAIHostingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_agent_rpc_agent_proto_msgTypes[1]
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -110,7 +1193,7 @@ func (x *UpdateConversationAIHostingRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use UpdateConversationAIHostingRequest.ProtoReflect.Descriptor instead.
 func (*UpdateConversationAIHostingRequest) Descriptor() ([]byte, []int) {
-	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{1}
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *UpdateConversationAIHostingRequest) GetOwnerAccountId() string {
@@ -150,7 +1233,7 @@ type ConversationAIHostingState struct {
 
 func (x *ConversationAIHostingState) Reset() {
 	*x = ConversationAIHostingState{}
-	mi := &file_service_agent_rpc_agent_proto_msgTypes[2]
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -162,7 +1245,7 @@ func (x *ConversationAIHostingState) String() string {
 func (*ConversationAIHostingState) ProtoMessage() {}
 
 func (x *ConversationAIHostingState) ProtoReflect() protoreflect.Message {
-	mi := &file_service_agent_rpc_agent_proto_msgTypes[2]
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -175,7 +1258,7 @@ func (x *ConversationAIHostingState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConversationAIHostingState.ProtoReflect.Descriptor instead.
 func (*ConversationAIHostingState) Descriptor() ([]byte, []int) {
-	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{2}
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ConversationAIHostingState) GetConversationId() string {
@@ -238,7 +1321,108 @@ var File_service_agent_rpc_agent_proto protoreflect.FileDescriptor
 
 const file_service_agent_rpc_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x1dservice/agent/rpc/agent.proto\x12\bagent.v1\"t\n" +
+	"\x1dservice/agent/rpc/agent.proto\x12\bagent.v1\"\x90\x02\n" +
+	"\vAgentEntity\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x1c\n" +
+	"\n" +
+	"im_user_id\x18\x03 \x01(\tR\bimUserId\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"created_by\x18\a \x01(\tR\tcreatedBy\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\b \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\t \x01(\tR\tupdatedAt\"\xbe\x01\n" +
+	"\x12CreateAgentRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1c\n" +
+	"\n" +
+	"im_user_id\x18\x02 \x01(\tR\bimUserId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"created_by\x18\x06 \x01(\tR\tcreatedBy\"<\n" +
+	"\rAgentResponse\x12+\n" +
+	"\x05agent\x18\x01 \x01(\v2\x15.agent.v1.AgentEntityR\x05agent\",\n" +
+	"\x0fGetAgentRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\"x\n" +
+	"\x11ListAgentsRequest\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"created_by\x18\x02 \x01(\tR\tcreatedBy\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x03R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x04 \x01(\x03R\x06offset\"C\n" +
+	"\x12ListAgentsResponse\x12-\n" +
+	"\x06agents\x18\x01 \x03(\v2\x15.agent.v1.AgentEntityR\x06agents\"\x88\x01\n" +
+	"\x12UpdateAgentRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x17\n" +
+	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12%\n" +
+	"\vdescription\x18\x03 \x01(\tH\x01R\vdescription\x88\x01\x01B\a\n" +
+	"\x05_nameB\x0e\n" +
+	"\f_description\"M\n" +
+	"\x18UpdateAgentStatusRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\"\xc7\x02\n" +
+	"\x15AgentPromptDefinition\x12\x1b\n" +
+	"\tprompt_id\x18\x01 \x01(\tR\bpromptId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\tR\acontent\x122\n" +
+	"\x15variables_schema_json\x18\x05 \x01(\tR\x13variablesSchemaJson\x12\x18\n" +
+	"\aversion\x18\x06 \x01(\tR\aversion\x12\x16\n" +
+	"\x06status\x18\a \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"created_by\x18\b \x01(\tR\tcreatedBy\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\t \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\n" +
+	" \x01(\tR\tupdatedAt\"\xde\x03\n" +
+	"\x13AgentToolDefinition\x12\x17\n" +
+	"\atool_id\x18\x01 \x01(\tR\x06toolId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1b\n" +
+	"\ttool_type\x18\x04 \x01(\tR\btoolType\x12\"\n" +
+	"\rmcp_server_id\x18\x05 \x01(\tR\vmcpServerId\x12\"\n" +
+	"\rmcp_tool_name\x18\x06 \x01(\tR\vmcpToolName\x12*\n" +
+	"\x11local_handler_key\x18\a \x01(\tR\x0flocalHandlerKey\x12\x1f\n" +
+	"\vbuiltin_key\x18\b \x01(\tR\n" +
+	"builtinKey\x12*\n" +
+	"\x11input_schema_json\x18\t \x01(\tR\x0finputSchemaJson\x12,\n" +
+	"\x12output_schema_json\x18\n" +
+	" \x01(\tR\x10outputSchemaJson\x12)\n" +
+	"\x10permission_level\x18\v \x01(\tR\x0fpermissionLevel\x12\x16\n" +
+	"\x06status\x18\f \x01(\tR\x06status\x12)\n" +
+	"\x10admin_configured\x18\r \x01(\bR\x0fadminConfigured\"\xb9\x01\n" +
+	"\x0fAgentDefinition\x12+\n" +
+	"\x05agent\x18\x01 \x01(\v2\x15.agent.v1.AgentEntityR\x05agent\x12D\n" +
+	"\rsystem_prompt\x18\x02 \x01(\v2\x1f.agent.v1.AgentPromptDefinitionR\fsystemPrompt\x123\n" +
+	"\x05tools\x18\x03 \x03(\v2\x1d.agent.v1.AgentToolDefinitionR\x05tools\"Y\n" +
+	"\x19GetAgentDefinitionRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12!\n" +
+	"\frequested_by\x18\x02 \x01(\tR\vrequestedBy\"\x9c\x01\n" +
+	"\x1cUpdateAgentDefinitionRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12#\n" +
+	"\rsystem_prompt\x18\x02 \x01(\tR\fsystemPrompt\x12\x1d\n" +
+	"\n" +
+	"tool_names\x18\x03 \x03(\tR\ttoolNames\x12\x1d\n" +
+	"\n" +
+	"updated_by\x18\x04 \x01(\tR\tupdatedBy\"T\n" +
+	"\x17AgentDefinitionResponse\x129\n" +
+	"\n" +
+	"definition\x18\x01 \x01(\v2\x19.agent.v1.AgentDefinitionR\n" +
+	"definition\">\n" +
+	"\x1dEnsureDefaultAssistantRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"X\n" +
+	"\x1eEnsureDefaultAssistantResponse\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x1b\n" +
+	"\tprompt_id\x18\x02 \x01(\tR\bpromptId\"t\n" +
 	"\x1fGetConversationAIHostingRequest\x12(\n" +
 	"\x10owner_account_id\x18\x01 \x01(\tR\x0eownerAccountId\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\"\x91\x01\n" +
@@ -254,10 +1438,19 @@ const file_service_agent_rpc_agent_proto_rawDesc = "" +
 	"\fpeer_enabled\x18\x05 \x01(\bR\vpeerEnabled\x12-\n" +
 	"\x12unavailable_reason\x18\x06 \x01(\tR\x11unavailableReason\x12.\n" +
 	"\x13max_recent_messages\x18\a \x01(\x03R\x11maxRecentMessages\x12'\n" +
-	"\x0fsummary_enabled\x18\b \x01(\bR\x0esummaryEnabled2\xe7\x01\n" +
+	"\x0fsummary_enabled\x18\b \x01(\bR\x0esummaryEnabled2\xfd\x06\n" +
 	"\x05Agent\x12k\n" +
 	"\x18GetConversationAIHosting\x12).agent.v1.GetConversationAIHostingRequest\x1a$.agent.v1.ConversationAIHostingState\x12q\n" +
-	"\x1bUpdateConversationAIHosting\x12,.agent.v1.UpdateConversationAIHostingRequest\x1a$.agent.v1.ConversationAIHostingStateB9Z7github.com/wujunhui99/agents_im/service/agent/rpc/agentb\x06proto3"
+	"\x1bUpdateConversationAIHosting\x12,.agent.v1.UpdateConversationAIHostingRequest\x1a$.agent.v1.ConversationAIHostingState\x12D\n" +
+	"\vCreateAgent\x12\x1c.agent.v1.CreateAgentRequest\x1a\x17.agent.v1.AgentResponse\x12>\n" +
+	"\bGetAgent\x12\x19.agent.v1.GetAgentRequest\x1a\x17.agent.v1.AgentResponse\x12G\n" +
+	"\n" +
+	"ListAgents\x12\x1b.agent.v1.ListAgentsRequest\x1a\x1c.agent.v1.ListAgentsResponse\x12D\n" +
+	"\vUpdateAgent\x12\x1c.agent.v1.UpdateAgentRequest\x1a\x17.agent.v1.AgentResponse\x12P\n" +
+	"\x11UpdateAgentStatus\x12\".agent.v1.UpdateAgentStatusRequest\x1a\x17.agent.v1.AgentResponse\x12\\\n" +
+	"\x12GetAgentDefinition\x12#.agent.v1.GetAgentDefinitionRequest\x1a!.agent.v1.AgentDefinitionResponse\x12b\n" +
+	"\x15UpdateAgentDefinition\x12&.agent.v1.UpdateAgentDefinitionRequest\x1a!.agent.v1.AgentDefinitionResponse\x12k\n" +
+	"\x16EnsureDefaultAssistant\x12'.agent.v1.EnsureDefaultAssistantRequest\x1a(.agent.v1.EnsureDefaultAssistantResponseB9Z7github.com/wujunhui99/agents_im/service/agent/rpc/agentb\x06proto3"
 
 var (
 	file_service_agent_rpc_agent_proto_rawDescOnce sync.Once
@@ -271,22 +1464,60 @@ func file_service_agent_rpc_agent_proto_rawDescGZIP() []byte {
 	return file_service_agent_rpc_agent_proto_rawDescData
 }
 
-var file_service_agent_rpc_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_service_agent_rpc_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_service_agent_rpc_agent_proto_goTypes = []any{
-	(*GetConversationAIHostingRequest)(nil),    // 0: agent.v1.GetConversationAIHostingRequest
-	(*UpdateConversationAIHostingRequest)(nil), // 1: agent.v1.UpdateConversationAIHostingRequest
-	(*ConversationAIHostingState)(nil),         // 2: agent.v1.ConversationAIHostingState
+	(*AgentEntity)(nil),                        // 0: agent.v1.AgentEntity
+	(*CreateAgentRequest)(nil),                 // 1: agent.v1.CreateAgentRequest
+	(*AgentResponse)(nil),                      // 2: agent.v1.AgentResponse
+	(*GetAgentRequest)(nil),                    // 3: agent.v1.GetAgentRequest
+	(*ListAgentsRequest)(nil),                  // 4: agent.v1.ListAgentsRequest
+	(*ListAgentsResponse)(nil),                 // 5: agent.v1.ListAgentsResponse
+	(*UpdateAgentRequest)(nil),                 // 6: agent.v1.UpdateAgentRequest
+	(*UpdateAgentStatusRequest)(nil),           // 7: agent.v1.UpdateAgentStatusRequest
+	(*AgentPromptDefinition)(nil),              // 8: agent.v1.AgentPromptDefinition
+	(*AgentToolDefinition)(nil),                // 9: agent.v1.AgentToolDefinition
+	(*AgentDefinition)(nil),                    // 10: agent.v1.AgentDefinition
+	(*GetAgentDefinitionRequest)(nil),          // 11: agent.v1.GetAgentDefinitionRequest
+	(*UpdateAgentDefinitionRequest)(nil),       // 12: agent.v1.UpdateAgentDefinitionRequest
+	(*AgentDefinitionResponse)(nil),            // 13: agent.v1.AgentDefinitionResponse
+	(*EnsureDefaultAssistantRequest)(nil),      // 14: agent.v1.EnsureDefaultAssistantRequest
+	(*EnsureDefaultAssistantResponse)(nil),     // 15: agent.v1.EnsureDefaultAssistantResponse
+	(*GetConversationAIHostingRequest)(nil),    // 16: agent.v1.GetConversationAIHostingRequest
+	(*UpdateConversationAIHostingRequest)(nil), // 17: agent.v1.UpdateConversationAIHostingRequest
+	(*ConversationAIHostingState)(nil),         // 18: agent.v1.ConversationAIHostingState
 }
 var file_service_agent_rpc_agent_proto_depIdxs = []int32{
-	0, // 0: agent.v1.Agent.GetConversationAIHosting:input_type -> agent.v1.GetConversationAIHostingRequest
-	1, // 1: agent.v1.Agent.UpdateConversationAIHosting:input_type -> agent.v1.UpdateConversationAIHostingRequest
-	2, // 2: agent.v1.Agent.GetConversationAIHosting:output_type -> agent.v1.ConversationAIHostingState
-	2, // 3: agent.v1.Agent.UpdateConversationAIHosting:output_type -> agent.v1.ConversationAIHostingState
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0,  // 0: agent.v1.AgentResponse.agent:type_name -> agent.v1.AgentEntity
+	0,  // 1: agent.v1.ListAgentsResponse.agents:type_name -> agent.v1.AgentEntity
+	0,  // 2: agent.v1.AgentDefinition.agent:type_name -> agent.v1.AgentEntity
+	8,  // 3: agent.v1.AgentDefinition.system_prompt:type_name -> agent.v1.AgentPromptDefinition
+	9,  // 4: agent.v1.AgentDefinition.tools:type_name -> agent.v1.AgentToolDefinition
+	10, // 5: agent.v1.AgentDefinitionResponse.definition:type_name -> agent.v1.AgentDefinition
+	16, // 6: agent.v1.Agent.GetConversationAIHosting:input_type -> agent.v1.GetConversationAIHostingRequest
+	17, // 7: agent.v1.Agent.UpdateConversationAIHosting:input_type -> agent.v1.UpdateConversationAIHostingRequest
+	1,  // 8: agent.v1.Agent.CreateAgent:input_type -> agent.v1.CreateAgentRequest
+	3,  // 9: agent.v1.Agent.GetAgent:input_type -> agent.v1.GetAgentRequest
+	4,  // 10: agent.v1.Agent.ListAgents:input_type -> agent.v1.ListAgentsRequest
+	6,  // 11: agent.v1.Agent.UpdateAgent:input_type -> agent.v1.UpdateAgentRequest
+	7,  // 12: agent.v1.Agent.UpdateAgentStatus:input_type -> agent.v1.UpdateAgentStatusRequest
+	11, // 13: agent.v1.Agent.GetAgentDefinition:input_type -> agent.v1.GetAgentDefinitionRequest
+	12, // 14: agent.v1.Agent.UpdateAgentDefinition:input_type -> agent.v1.UpdateAgentDefinitionRequest
+	14, // 15: agent.v1.Agent.EnsureDefaultAssistant:input_type -> agent.v1.EnsureDefaultAssistantRequest
+	18, // 16: agent.v1.Agent.GetConversationAIHosting:output_type -> agent.v1.ConversationAIHostingState
+	18, // 17: agent.v1.Agent.UpdateConversationAIHosting:output_type -> agent.v1.ConversationAIHostingState
+	2,  // 18: agent.v1.Agent.CreateAgent:output_type -> agent.v1.AgentResponse
+	2,  // 19: agent.v1.Agent.GetAgent:output_type -> agent.v1.AgentResponse
+	5,  // 20: agent.v1.Agent.ListAgents:output_type -> agent.v1.ListAgentsResponse
+	2,  // 21: agent.v1.Agent.UpdateAgent:output_type -> agent.v1.AgentResponse
+	2,  // 22: agent.v1.Agent.UpdateAgentStatus:output_type -> agent.v1.AgentResponse
+	13, // 23: agent.v1.Agent.GetAgentDefinition:output_type -> agent.v1.AgentDefinitionResponse
+	13, // 24: agent.v1.Agent.UpdateAgentDefinition:output_type -> agent.v1.AgentDefinitionResponse
+	15, // 25: agent.v1.Agent.EnsureDefaultAssistant:output_type -> agent.v1.EnsureDefaultAssistantResponse
+	16, // [16:26] is the sub-list for method output_type
+	6,  // [6:16] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_service_agent_rpc_agent_proto_init() }
@@ -294,13 +1525,14 @@ func file_service_agent_rpc_agent_proto_init() {
 	if File_service_agent_rpc_agent_proto != nil {
 		return
 	}
+	file_service_agent_rpc_agent_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_agent_rpc_agent_proto_rawDesc), len(file_service_agent_rpc_agent_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

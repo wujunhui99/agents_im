@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 )
 
 func TestStaticAdapterCatalogLooksUpAdapterByToolID(t *testing.T) {
@@ -28,7 +28,7 @@ func TestStaticAdapterCatalogLooksUpAdapterByToolID(t *testing.T) {
 
 func TestDefaultLocalAdapterCatalogResolvesPythonExecuteWithDisabledDefault(t *testing.T) {
 	ctx := context.Background()
-	repo := repository.NewMemoryAgentRegistryRepository()
+	repo := registry.NewMemoryStore()
 	seedPythonExecuteTool(t, ctx, repo, "agent_support", "tool_python")
 	resolver, err := NewResolver(repo, WithAdapterCatalog(NewDefaultLocalAdapterCatalog(nil)))
 	if err != nil {

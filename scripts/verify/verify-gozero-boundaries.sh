@@ -80,7 +80,8 @@ for api_spec in \
   "service/user/api:(repository|model|objectstorage|servicecontext/user)" \
   "service/auth/api:(repository|model|objectstorage|auth/repository|servicecontext/auth)" \
   "service/groups/api:(repository|model|objectstorage|servicecontext/groups)" \
-  "service/friends/api:(repository|model|objectstorage|servicecontext/friends)"; do
+  "service/friends/api:(repository|model|objectstorage|servicecontext/friends)" \
+  "service/agent/api:(repository|model|objectstorage|servicecontext/agent)"; do
   api_dir="${api_spec%%:*}"
   api_pkgs="${api_spec##*:}"
   forbid_match "${api_dir} must not own data access; use RPC/BFF calls" \

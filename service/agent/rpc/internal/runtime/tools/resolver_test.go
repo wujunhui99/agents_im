@@ -6,14 +6,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 )
 
 func TestResolverResolvesAllowedBoundMCPTool(t *testing.T) {
 	ctx := context.Background()
-	repo := repository.NewMemoryAgentRegistryRepository()
+	repo := registry.NewMemoryStore()
 	seedMCPTool(t, ctx, repo, seedMCPToolInput{
 		AgentID: "agent_support",
 		ToolID:  "tool_calendar",
@@ -51,7 +51,7 @@ func TestResolverResolvesAllowedBoundMCPTool(t *testing.T) {
 
 func TestResolverRejectsMissingBinding(t *testing.T) {
 	ctx := context.Background()
-	repo := repository.NewMemoryAgentRegistryRepository()
+	repo := registry.NewMemoryStore()
 	seedMCPTool(t, ctx, repo, seedMCPToolInput{
 		AgentID: "other_agent",
 		ToolID:  "tool_calendar",
@@ -77,7 +77,7 @@ func TestResolverRejectsDisabledAndArchivedTools(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			repo := repository.NewMemoryAgentRegistryRepository()
+			repo := registry.NewMemoryStore()
 			seedMCPTool(t, ctx, repo, seedMCPToolInput{
 				AgentID:    "agent_support",
 				ToolID:     "tool_calendar",
@@ -118,7 +118,7 @@ func TestResolverRejectsNonAdminMCPPolicy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			repo := repository.NewMemoryAgentRegistryRepository()
+			repo := registry.NewMemoryStore()
 			seedMCPTool(t, ctx, repo, seedMCPToolInput{
 				AgentID:          "agent_support",
 				ToolID:           "tool_calendar",
@@ -167,7 +167,7 @@ func TestResolverRejectsUnsafeMCPTransportAndProcessMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			repo := repository.NewMemoryAgentRegistryRepository()
+			repo := registry.NewMemoryStore()
 			seedMCPTool(t, ctx, repo, seedMCPToolInput{
 				AgentID:            "agent_support",
 				ToolID:             "tool_calendar",
@@ -187,7 +187,7 @@ func TestResolverRejectsUnsafeMCPTransportAndProcessMetadata(t *testing.T) {
 
 func TestResolverLocalToolMetadataFailsClosedWithoutAdapter(t *testing.T) {
 	ctx := context.Background()
-	repo := repository.NewMemoryAgentRegistryRepository()
+	repo := registry.NewMemoryStore()
 	seedLocalTool(t, ctx, repo, "agent_support", "tool_context")
 	resolver := newResolver(t, repo)
 
@@ -230,7 +230,7 @@ func TestResolverLocalToolMetadataFailsClosedWithoutAdapter(t *testing.T) {
 
 func TestResolverAllowsPythonExecuteLocalTool(t *testing.T) {
 	ctx := context.Background()
-	repo := repository.NewMemoryAgentRegistryRepository()
+	repo := registry.NewMemoryStore()
 	seedPythonExecuteTool(t, ctx, repo, "agent_support", "tool_python")
 	resolver := newResolver(t, repo)
 
@@ -264,7 +264,7 @@ type seedMCPToolInput struct {
 	MCPServerConfig    string
 }
 
-func seedMCPTool(t *testing.T, ctx context.Context, repo *repository.MemoryAgentRegistryRepository, input seedMCPToolInput) {
+func seedMCPTool(t *testing.T, ctx context.Context, repo *registry.MemoryStore, input seedMCPToolInput) {
 	t.Helper()
 	toolStatus := input.ToolStatus
 	if toolStatus == "" {
@@ -335,7 +335,7 @@ func seedMCPTool(t *testing.T, ctx context.Context, repo *repository.MemoryAgent
 	}
 }
 
-func seedLocalTool(t *testing.T, ctx context.Context, repo *repository.MemoryAgentRegistryRepository, agentID string, toolID string) {
+func seedLocalTool(t *testing.T, ctx context.Context, repo *registry.MemoryStore, agentID string, toolID string) {
 	t.Helper()
 	_, err := repo.RegisterTool(ctx, model.AgentTool{
 		ToolID:           toolID,
@@ -362,7 +362,7 @@ func seedLocalTool(t *testing.T, ctx context.Context, repo *repository.MemoryAge
 	}
 }
 
-func seedPythonExecuteTool(t *testing.T, ctx context.Context, repo *repository.MemoryAgentRegistryRepository, agentID string, toolID string) {
+func seedPythonExecuteTool(t *testing.T, ctx context.Context, repo *registry.MemoryStore, agentID string, toolID string) {
 	t.Helper()
 	_, err := repo.RegisterTool(ctx, model.AgentTool{
 		ToolID:           toolID,
@@ -389,7 +389,7 @@ func seedPythonExecuteTool(t *testing.T, ctx context.Context, repo *repository.M
 	}
 }
 
-func newResolver(t *testing.T, repo *repository.MemoryAgentRegistryRepository) *Resolver {
+func newResolver(t *testing.T, repo *registry.MemoryStore) *Resolver {
 	t.Helper()
 	resolver, err := NewResolver(repo)
 	if err != nil {

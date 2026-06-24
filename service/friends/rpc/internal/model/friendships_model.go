@@ -23,6 +23,9 @@ type (
 		FindPairForUpdate(ctx context.Context, accountID, friendID string) (*Friendships, error)
 		// UpsertStatus 新增或覆盖 account->friend 单向关系为指定 status（created_at/updated_at 重置为 now）。
 		UpsertStatus(ctx context.Context, accountID, friendID string, status int64) (*Friendships, error)
+		// EnsureAccepted 幂等地把 account->friend 单向关系置为 accepted：不存在则插入，存在则只更新
+		// status/updated_at（保留 created_at），供 EnsureFriendship 重复调用不重置好友建立时间。
+		EnsureAccepted(ctx context.Context, accountID, friendID string) (*Friendships, error)
 		// ListByAccountStatus 返回某账号作为发起方、处于指定 status 的关系，按 friend_account_id 升序。
 		ListByAccountStatus(ctx context.Context, accountID string, status int64) ([]*Friendships, error)
 		// ListByFriendStatus 返回某账号作为接收方、处于指定 status 的关系，按 account_id 升序。
@@ -77,6 +80,20 @@ set status = excluded.status,
 returning %s`, m.table, friendshipsRows)
 	var resp Friendships
 	if err := m.conn.QueryRowCtx(ctx, &resp, query, accountID, friendID, status); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (m *customFriendshipsModel) EnsureAccepted(ctx context.Context, accountID, friendID string) (*Friendships, error) {
+	query := fmt.Sprintf(`insert into %s (account_id, friend_account_id, status)
+values ($1, $2, $3)
+on conflict (account_id, friend_account_id) do update
+set status = excluded.status,
+    updated_at = now()
+returning %s`, m.table, friendshipsRows)
+	var resp Friendships
+	if err := m.conn.QueryRowCtx(ctx, &resp, query, accountID, friendID, FriendshipStatusAccepted); err != nil {
 		return nil, err
 	}
 	return &resp, nil

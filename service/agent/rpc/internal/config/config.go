@@ -19,9 +19,12 @@ type Config struct {
 	// AI 消息走与人类消息完全相同的 Kafka 链路，由消费端递归闸门防再触发。
 	MsgRPC zrpc.RpcClientConf `json:",optional"`
 
-	// UserRPC：agent-create 工具路径的账号读写经属主 user-rpc（gate #550，脱
-	// internal accountRepo 的 avatar string scan / 空串写）。
+	// UserRPC：agent-create 工具路径的账号读/建经属主 user-rpc（#606，脱 internal accountRepo）。
 	UserRPC zrpc.RpcClientConf `json:",optional"`
+
+	// FriendsRPC：agent-create 工具路径建好友经属主 friends-rpc EnsureFriendship（#606，
+	// 取代 internal/repository.EnsureAcceptedFriendship；单向叶子调用，不成环）。
+	FriendsRPC zrpc.RpcClientConf `json:",optional"`
 
 	// DeepSeek / LLMObservability / PythonExecutor：runtime 与工具配置。
 	DeepSeek         appconfig.DeepSeekConfig         `json:",optional"`

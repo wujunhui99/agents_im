@@ -92,17 +92,6 @@ func NewMediaRepositoryForStorage(driver string, dataSource string) (MediaReposi
 	return NewPostgresMediaRepository(appconfig.ResolveDataSource(dataSource))
 }
 
-func NewAgentRepositoryForStorage(driver string, dataSource string) (AgentRepository, error) {
-	storageDriver, err := repositoryStorageDriver(driver)
-	if err != nil {
-		return nil, err
-	}
-	if storageDriver == appconfig.StorageDriverMemory {
-		return NewMemoryAgentRepository(), nil
-	}
-	return NewPostgresRepository(appconfig.ResolveDataSource(dataSource))
-}
-
 func NewAgentAuditRepositoryForStorage(driver string, dataSource string) (AgentAuditRepository, error) {
 	storageDriver, err := repositoryStorageDriver(driver)
 	if err != nil {
@@ -123,17 +112,6 @@ func NewTaskReportRepositoryForStorage(driver string, dataSource string) (TaskRe
 		return NewMemoryTaskReportRepository(), nil
 	}
 	return NewPostgresTaskReportRepository(appconfig.ResolveDataSource(dataSource))
-}
-
-func NewAgentRegistryRepositoryForStorage(driver string, dataSource string) (AgentRegistryRepository, error) {
-	storageDriver, err := repositoryStorageDriver(driver)
-	if err != nil {
-		return nil, err
-	}
-	if storageDriver == appconfig.StorageDriverMemory {
-		return NewMemoryAgentRegistryRepository(), nil
-	}
-	return NewPostgresAgentRegistryRepository(appconfig.ResolveDataSource(dataSource))
 }
 
 func NewAgentConversationHostingRepositoryForStorage(driver string, dataSource string) (AgentConversationHostingRepository, error) {

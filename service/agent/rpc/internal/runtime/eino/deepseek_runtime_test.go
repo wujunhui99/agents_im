@@ -8,11 +8,11 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	immodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 )
@@ -403,7 +403,7 @@ func TestDeepSeekRuntimeEnforcesMaxToolCalls(t *testing.T) {
 
 func pythonExecuteToolProvider(t *testing.T, ctx context.Context, executor pythonexec.Executor) runtimetools.Provider {
 	t.Helper()
-	repo := repository.NewMemoryAgentRegistryRepository()
+	repo := registry.NewMemoryStore()
 	_, err := repo.RegisterTool(ctx, immodel.AgentTool{
 		ToolID:           "tool_python_execute",
 		Name:             immodel.LocalToolHandlerPythonExecute,
@@ -437,7 +437,7 @@ func pythonExecuteToolProvider(t *testing.T, ctx context.Context, executor pytho
 
 func agentCreateToolProvider(t *testing.T, ctx context.Context, handler runtimetools.AgentCreateHandler) runtimetools.Provider {
 	t.Helper()
-	repo := repository.NewMemoryAgentRegistryRepository()
+	repo := registry.NewMemoryStore()
 	_, err := repo.RegisterTool(ctx, immodel.AgentTool{
 		ToolID:           "tool_agent_create",
 		Name:             immodel.LocalToolHandlerAgentCreate,

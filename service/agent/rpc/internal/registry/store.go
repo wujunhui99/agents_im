@@ -33,30 +33,34 @@ type Reader interface {
 	GetMCPServer(ctx context.Context, serverID string) (model.AgentMCPServer, error)
 }
 
-// Store 是 Reader 的 goctl model 实现。
+// Store 是 Reader 的 goctl model 实现，并在 write.go 扩出注册表写路径（#606）。
 type Store struct {
 	prompts        rpcmodel.AgentPromptsModel
 	tools          rpcmodel.AgentToolsModel
 	mcpServers     rpcmodel.McpServersModel
+	skills         rpcmodel.AgentSkillsModel
 	promptBindings rpcmodel.AgentPromptBindingsModel
 	toolBindings   rpcmodel.AgentToolBindingsModel
+	skillBindings  rpcmodel.AgentSkillBindingsModel
 }
 
 var _ Reader = (*Store)(nil)
 
-// NewStore 用数据源构建 model-backed 注册表只读 Store。
+// NewStore 用数据源构建 model-backed 注册表 Store（读 + 写）。
 func NewStore(dataSource string) *Store {
 	return NewStoreFromConn(postgres.New(dataSource))
 }
 
-// NewStoreFromConn 用已建连接构建 model-backed 注册表只读 Store。
+// NewStoreFromConn 用已建连接构建 model-backed 注册表 Store（读 + 写）。
 func NewStoreFromConn(conn sqlx.SqlConn) *Store {
 	return &Store{
 		prompts:        rpcmodel.NewAgentPromptsModel(conn),
 		tools:          rpcmodel.NewAgentToolsModel(conn),
 		mcpServers:     rpcmodel.NewMcpServersModel(conn),
+		skills:         rpcmodel.NewAgentSkillsModel(conn),
 		promptBindings: rpcmodel.NewAgentPromptBindingsModel(conn),
 		toolBindings:   rpcmodel.NewAgentToolBindingsModel(conn),
+		skillBindings:  rpcmodel.NewAgentSkillBindingsModel(conn),
 	}
 }
 
@@ -156,6 +160,10 @@ func (s *Store) GetMCPServer(ctx context.Context, serverID string) (model.AgentM
 	if err != nil {
 		return model.AgentMCPServer{}, mapNotFound(err, "mcp server not found")
 	}
+	return mcpServerFromModel(row), nil
+}
+
+func mcpServerFromModel(row *rpcmodel.McpServers) model.AgentMCPServer {
 	return model.AgentMCPServer{
 		ServerID:         formatID(row.ServerId),
 		Name:             row.Name,
@@ -169,7 +177,7 @@ func (s *Store) GetMCPServer(ctx context.Context, serverID string) (model.AgentM
 		CreatedBy:        row.CreatedBy,
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
-	}, nil
+	}
 }
 
 func promptFromModel(row *rpcmodel.AgentPrompts) model.AgentPrompt {

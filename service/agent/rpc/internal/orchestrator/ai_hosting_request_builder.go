@@ -34,7 +34,7 @@ type AgentRegistryReader interface {
 type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 	MessageRepository repository.MessageRepository
 	HostingStore      convhosting.Store
-	AgentRepository   repository.AgentRepository
+	AgentRepository   AgentReader
 	AgentRegistry     AgentRegistryReader
 	DeepSeek          config.DeepSeekConfig
 	MaxRecentMessages int
@@ -43,7 +43,7 @@ type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 type ConversationAIHostingRuntimeRequestBuilder struct {
 	messageRepo       repository.MessageRepository
 	hostingStore      convhosting.Store
-	agentRepo         repository.AgentRepository
+	agentRepo         AgentReader
 	agentRegistry     AgentRegistryReader
 	deepSeek          config.DeepSeekConfig
 	maxRecentMessages int

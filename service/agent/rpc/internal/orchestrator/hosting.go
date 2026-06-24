@@ -43,11 +43,17 @@ func (f AgentAccountResolverFunc) IsActiveAgentAccount(ctx context.Context, acco
 	return f(ctx, accountID)
 }
 
-type AgentRepositoryAccountResolver struct {
-	repo repository.AgentRepository
+// AgentReader 是 orchestrator 所需的 agents 表只读视图（#606：agents 数据层脱 internal/repository
+// → agent 自有 goctl AgentStore，本接口由其实现）。仅用 GetAgentByIMUserID 判活跃 agent 账号。
+type AgentReader interface {
+	GetAgentByIMUserID(ctx context.Context, imUserID string) (model.Agent, error)
 }
 
-func NewAgentRepositoryAccountResolver(repo repository.AgentRepository) AgentRepositoryAccountResolver {
+type AgentRepositoryAccountResolver struct {
+	repo AgentReader
+}
+
+func NewAgentRepositoryAccountResolver(repo AgentReader) AgentRepositoryAccountResolver {
 	return AgentRepositoryAccountResolver{repo: repo}
 }
 
@@ -65,7 +71,7 @@ func (r AgentRepositoryAccountResolver) IsActiveAgentAccount(ctx context.Context
 	return agent.Status == model.AgentStatusActive, nil
 }
 
-func (r AgentRepositoryAccountResolver) AgentRepository() repository.AgentRepository {
+func (r AgentRepositoryAccountResolver) AgentRepository() AgentReader {
 	return r.repo
 }
 

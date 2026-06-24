@@ -9,6 +9,8 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
+	registrypkg "github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 
@@ -94,7 +96,7 @@ func TestBuilderUsesStoredAgentProfileWhenTriggerTargetsAgentAccount(t *testing.
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogic(messageRepo)
-	agentRepo := repository.NewMemoryAgentRepository()
+	agentRepo := agentlogic.NewMemoryAgentStore()
 	agent, err := agentRepo.CreateAgent(ctx, model.Agent{
 		AgentID:     "agent_default_assistant",
 		AccountID:   "agent_creator",
@@ -153,8 +155,8 @@ func TestBuilderUsesStoredAgentProfileWhenTriggerTargetsAgentAccount(t *testing.
 func TestBuilderUsesStoredAgentRuntimeDefinition(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	agentRepo := repository.NewMemoryAgentRepository()
-	registry := repository.NewMemoryAgentRegistryRepository()
+	agentRepo := agentlogic.NewMemoryAgentStore()
+	registry := registrypkg.NewMemoryStore()
 	agent, err := agentRepo.CreateAgent(ctx, model.Agent{
 		AgentID:     "agent_runtime_definition",
 		AccountID:   "agent_runtime_account",

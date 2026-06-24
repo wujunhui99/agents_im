@@ -79,10 +79,7 @@ func registerObservabilityHandlers(server *rest.Server, serviceContext *svc.Serv
 			Handler: health.ReadinessHandler("agent-api", func(*http.Request) []health.Check {
 				return []health.Check{
 					componentCheck("auth_config", serviceContext != nil && serviceContext.AuthConfig().AccessSecret != "", "configured"),
-					componentCheck("agent_logic", serviceContext != nil && serviceContext.AgentLogic != nil, "configured"),
-					componentCheck("agent_definition_logic", serviceContext != nil && serviceContext.AgentDefinitionLogic != nil, "configured"),
-					componentCheck("agent_repository", serviceContext != nil && serviceContext.AgentRepo != nil, "configured"),
-					componentCheck("agent_registry_repository", serviceContext != nil && serviceContext.AgentRegistryRepo != nil, "configured"),
+					componentCheck("agent_rpc", serviceContext != nil && serviceContext.AgentRPC != nil, "configured"),
 				}
 			}),
 		},

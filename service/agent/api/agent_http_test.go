@@ -10,28 +10,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/auth/token"
 	"github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/response"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
+	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/agentclient"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
+	"google.golang.org/grpc"
 )
 
+// TestAgentHTTPHandlers 验证 agent-api 纯 BFF（#606）：HTTP 路由经鉴权后转发 agent-rpc gRPC，
+// 响应映射回 BFF 视图；账号类型等业务校验由 agent-rpc 负责（fake 用 status error 模拟，BFF 经
+// rpcerror.FromStatus 还原 apperror → HTTP code）。
 func TestAgentHTTPHandlers(t *testing.T) {
-	serviceContext := svc.NewServiceContextWithAuth(
-		repository.NewMemoryAgentRepository(),
-		testAccountTypeChecker{accountTypes: map[string]string{
-			"usr_agent": logic.AccountTypeAgent,
-			"usr_user":  string(model.AccountTypeUser),
-		}},
-		testJWTAuthConfig(),
-	)
+	fake := &fakeAgentRPC{}
+	serviceContext := svc.NewServiceContextWithAuth(fake, testJWTAuthConfig())
 	mux := newAgentAPIServiceRouter(t, serviceContext)
 	adminBearer := bearerTokenForUser(t, "usr_admin")
 
@@ -50,53 +48,24 @@ func TestAgentHTTPHandlers(t *testing.T) {
 		t.Fatalf("create agent status = %d, body = %s", createResp.Code, createResp.Body.String())
 	}
 	assertNoSecretFields(t, createResp.Body.String())
-
-	var created envelope[logic.AgentInfo]
+	if fake.lastCreate.GetCreatedBy() != "usr_admin" || fake.lastCreate.GetImUserId() != "usr_agent" {
+		t.Fatalf("BFF did not forward created_by/im_user_id: %+v", fake.lastCreate)
+	}
+	var created envelope[agentView]
 	decodeEnvelope(t, createResp.Body.Bytes(), &created)
-	if created.Data.AgentID == "" || created.Data.CreatedBy != "usr_admin" {
+	if created.Data.AgentID != "ag_1" || created.Data.CreatedBy != "usr_admin" {
 		t.Fatalf("unexpected created agent: %+v", created.Data)
 	}
 
-	getResp := httptest.NewRecorder()
-	getReq := httptest.NewRequest(http.MethodGet, "/agents/"+created.Data.AgentID, nil)
-	getReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(getResp, getReq)
-	if getResp.Code != http.StatusOK {
-		t.Fatalf("get agent status = %d, body = %s", getResp.Code, getResp.Body.String())
-	}
-
-	updateResp := httptest.NewRecorder()
-	updateReq := newJSONRequest(http.MethodPatch, "/agents/"+created.Data.AgentID, `{"name":"Renamed Bot"}`)
-	updateReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(updateResp, updateReq)
-	if updateResp.Code != http.StatusOK {
-		t.Fatalf("update agent status = %d, body = %s", updateResp.Code, updateResp.Body.String())
-	}
-
 	statusResp := httptest.NewRecorder()
-	statusReq := newJSONRequest(http.MethodPatch, "/agents/"+created.Data.AgentID+"/status", `{"status":"active"}`)
+	statusReq := newJSONRequest(http.MethodPatch, "/agents/ag_1/status", `{"status":"active"}`)
 	statusReq.Header.Set("Authorization", adminBearer)
 	mux.ServeHTTP(statusResp, statusReq)
 	if statusResp.Code != http.StatusOK {
 		t.Fatalf("status update = %d, body = %s", statusResp.Code, statusResp.Body.String())
 	}
-	var activated envelope[logic.AgentInfo]
-	decodeEnvelope(t, statusResp.Body.Bytes(), &activated)
-	if activated.Data.Status != logic.AgentStatusActive {
-		t.Fatalf("unexpected activated agent: %+v", activated.Data)
-	}
-
-	listResp := httptest.NewRecorder()
-	listReq := httptest.NewRequest(http.MethodGet, "/agents?status=active", nil)
-	listReq.Header.Set("Authorization", adminBearer)
-	mux.ServeHTTP(listResp, listReq)
-	if listResp.Code != http.StatusOK {
-		t.Fatalf("list status = %d, body = %s", listResp.Code, listResp.Body.String())
-	}
-	var listed envelope[logic.ListAgentsResponse]
-	decodeEnvelope(t, listResp.Body.Bytes(), &listed)
-	if len(listed.Data.Agents) != 1 || listed.Data.Agents[0].AgentID != created.Data.AgentID {
-		t.Fatalf("unexpected list response: %+v", listed.Data.Agents)
+	if fake.lastStatus.GetStatus() != "active" || fake.lastStatus.GetAgentId() != "ag_1" {
+		t.Fatalf("BFF did not forward status update: %+v", fake.lastStatus)
 	}
 
 	forbiddenResp := httptest.NewRecorder()
@@ -108,17 +77,42 @@ func TestAgentHTTPHandlers(t *testing.T) {
 	}
 
 	deleteResp := httptest.NewRecorder()
-	deleteReq := httptest.NewRequest(http.MethodDelete, "/agents/"+created.Data.AgentID, nil)
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/agents/ag_1", nil)
 	deleteReq.Header.Set("Authorization", adminBearer)
 	mux.ServeHTTP(deleteResp, deleteReq)
 	if deleteResp.Code != http.StatusOK {
 		t.Fatalf("delete/archive status = %d, body = %s", deleteResp.Code, deleteResp.Body.String())
 	}
-	var archived envelope[logic.AgentInfo]
-	decodeEnvelope(t, deleteResp.Body.Bytes(), &archived)
-	if archived.Data.Status != logic.AgentStatusArchived {
-		t.Fatalf("delete should archive agent: %+v", archived.Data)
+	if fake.lastStatus.GetStatus() != "archived" {
+		t.Fatalf("delete should archive via status update, got %q", fake.lastStatus.GetStatus())
 	}
+}
+
+// --- fake agent-rpc client (BFF target) ---
+
+type fakeAgentRPC struct {
+	agentclient.Agent
+	lastCreate *agentpb.CreateAgentRequest
+	lastStatus *agentpb.UpdateAgentStatusRequest
+}
+
+func (f *fakeAgentRPC) CreateAgent(_ context.Context, in *agentpb.CreateAgentRequest, _ ...grpc.CallOption) (*agentpb.AgentResponse, error) {
+	f.lastCreate = in
+	if in.GetImUserId() == "usr_user" {
+		return nil, rpcerror.ToStatus(apperror.Forbidden("account_type must be agent"))
+	}
+	return &agentpb.AgentResponse{Agent: &agentpb.AgentEntity{
+		AgentId:   "ag_1",
+		ImUserId:  in.GetImUserId(),
+		Name:      in.GetName(),
+		Status:    "disabled",
+		CreatedBy: in.GetCreatedBy(),
+	}}, nil
+}
+
+func (f *fakeAgentRPC) UpdateAgentStatus(_ context.Context, in *agentpb.UpdateAgentStatusRequest, _ ...grpc.CallOption) (*agentpb.AgentResponse, error) {
+	f.lastStatus = in
+	return &agentpb.AgentResponse{Agent: &agentpb.AgentEntity{AgentId: in.GetAgentId(), Status: in.GetStatus()}}, nil
 }
 
 // --- self-contained test helpers (agent service in-process HTTP harness) ---
@@ -165,6 +159,12 @@ func newJSONRequest(method string, target string, body string) *http.Request {
 	return req
 }
 
+type agentView struct {
+	AgentID   string `json:"agent_id"`
+	Status    string `json:"status"`
+	CreatedBy string `json:"created_by"`
+}
+
 type envelope[T any] struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
@@ -187,19 +187,4 @@ func assertNoSecretFields(t *testing.T, body string) {
 			t.Fatalf("response leaked forbidden field %q: %s", forbidden, body)
 		}
 	}
-}
-
-type testAccountTypeChecker struct {
-	accountTypes map[string]string
-}
-
-func (c testAccountTypeChecker) EnsureUserAccountType(_ context.Context, userID string, accountType string) error {
-	actual, exists := c.accountTypes[userID]
-	if !exists {
-		return apperror.NotFound("user not found")
-	}
-	if actual != accountType {
-		return apperror.Forbidden("im_user_id must reference account_type=agent")
-	}
-	return nil
 }

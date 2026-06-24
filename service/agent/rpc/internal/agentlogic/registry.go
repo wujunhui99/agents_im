@@ -1,4 +1,4 @@
-package logic
+package agentlogic
 
 import (
 	"context"
@@ -7,19 +7,19 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
 )
 
 var sha256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
+// AgentRegistryLogic 是注册表写/校验业务逻辑（#606，脱 internal/logic.AgentRegistryLogic）。
 type AgentRegistryLogic struct {
-	repo repository.AgentRegistryRepository
+	registry RegistryStore
 }
 
-func NewAgentRegistryLogic(repo repository.AgentRegistryRepository) *AgentRegistryLogic {
-	return &AgentRegistryLogic{repo: repo}
+func NewAgentRegistryLogic(registry RegistryStore) *AgentRegistryLogic {
+	return &AgentRegistryLogic{registry: registry}
 }
 
 type CreateAgentPromptRequest struct {
@@ -115,7 +115,7 @@ func (l *AgentRegistryLogic) CreatePrompt(ctx context.Context, req CreateAgentPr
 		return model.AgentPrompt{}, apperror.InvalidArgument("variables_schema_json must be valid JSON")
 	}
 
-	return l.repo.CreatePrompt(ctx, model.AgentPrompt{
+	return l.registry.CreatePrompt(ctx, model.AgentPrompt{
 		Name:                name,
 		Description:         strings.TrimSpace(req.Description),
 		Content:             content,
@@ -139,7 +139,7 @@ func (l *AgentRegistryLogic) BindPrompt(ctx context.Context, req BindAgentPrompt
 	if createdBy == "" {
 		return model.AgentPromptBinding{}, false, apperror.InvalidArgument("created_by is required")
 	}
-	prompt, err := l.repo.GetPrompt(ctx, promptID)
+	prompt, err := l.registry.GetPrompt(ctx, promptID)
 	if err != nil {
 		return model.AgentPromptBinding{}, false, err
 	}
@@ -147,7 +147,7 @@ func (l *AgentRegistryLogic) BindPrompt(ctx context.Context, req BindAgentPrompt
 		return model.AgentPromptBinding{}, false, apperror.InvalidArgument("only active prompts can be bound to agents")
 	}
 
-	return l.repo.BindPrompt(ctx, model.AgentPromptBinding{
+	return l.registry.BindPrompt(ctx, model.AgentPromptBinding{
 		AgentID:   agentID,
 		PromptID:  promptID,
 		CreatedBy: createdBy,
@@ -184,7 +184,7 @@ func (l *AgentRegistryLogic) RegisterMCPServer(ctx context.Context, req Register
 		return model.AgentMCPServer{}, apperror.InvalidArgument("created_by is required")
 	}
 
-	return l.repo.CreateMCPServer(ctx, model.AgentMCPServer{
+	return l.registry.CreateMCPServer(ctx, model.AgentMCPServer{
 		Name:             name,
 		Transport:        req.Transport,
 		URL:              serverURL,
@@ -243,7 +243,7 @@ func (l *AgentRegistryLogic) RegisterTool(ctx context.Context, req RegisterAgent
 		return model.AgentTool{}, err
 	}
 
-	return l.repo.RegisterTool(ctx, tool)
+	return l.registry.RegisterTool(ctx, tool)
 }
 
 func (l *AgentRegistryLogic) BindTool(ctx context.Context, req BindAgentToolRequest) (model.AgentToolBinding, bool, error) {
@@ -259,7 +259,7 @@ func (l *AgentRegistryLogic) BindTool(ctx context.Context, req BindAgentToolRequ
 	if createdBy == "" {
 		return model.AgentToolBinding{}, false, apperror.InvalidArgument("created_by is required")
 	}
-	tool, err := l.repo.GetTool(ctx, toolID)
+	tool, err := l.registry.GetTool(ctx, toolID)
 	if err != nil {
 		return model.AgentToolBinding{}, false, err
 	}
@@ -267,7 +267,7 @@ func (l *AgentRegistryLogic) BindTool(ctx context.Context, req BindAgentToolRequ
 		return model.AgentToolBinding{}, false, apperror.InvalidArgument("only active tools can be bound to agents")
 	}
 	if tool.ToolType == model.AgentToolTypeMCP {
-		server, err := l.repo.GetMCPServer(ctx, tool.MCPServerID)
+		server, err := l.registry.GetMCPServer(ctx, tool.MCPServerID)
 		if err != nil {
 			return model.AgentToolBinding{}, false, err
 		}
@@ -276,7 +276,7 @@ func (l *AgentRegistryLogic) BindTool(ctx context.Context, req BindAgentToolRequ
 		}
 	}
 
-	return l.repo.BindTool(ctx, model.AgentToolBinding{
+	return l.registry.BindTool(ctx, model.AgentToolBinding{
 		AgentID:   agentID,
 		ToolID:    toolID,
 		CreatedBy: createdBy,
@@ -292,7 +292,7 @@ func (l *AgentRegistryLogic) CanAgentUseTool(ctx context.Context, agentID string
 	if toolID == "" {
 		return false, apperror.InvalidArgument("tool_id is required")
 	}
-	tool, err := l.repo.GetTool(ctx, toolID)
+	tool, err := l.registry.GetTool(ctx, toolID)
 	if err != nil {
 		return false, err
 	}
@@ -300,7 +300,7 @@ func (l *AgentRegistryLogic) CanAgentUseTool(ctx context.Context, agentID string
 		return false, nil
 	}
 	if tool.ToolType == model.AgentToolTypeMCP {
-		server, err := l.repo.GetMCPServer(ctx, tool.MCPServerID)
+		server, err := l.registry.GetMCPServer(ctx, tool.MCPServerID)
 		if err != nil {
 			return false, err
 		}
@@ -308,7 +308,7 @@ func (l *AgentRegistryLogic) CanAgentUseTool(ctx context.Context, agentID string
 			return false, nil
 		}
 	}
-	if _, err := l.repo.GetToolBinding(ctx, agentID, toolID); err != nil {
+	if _, err := l.registry.GetToolBinding(ctx, agentID, toolID); err != nil {
 		if appErr := apperror.From(err); appErr.Code == apperror.CodeNotFound {
 			return false, nil
 		}
@@ -349,7 +349,7 @@ func (l *AgentRegistryLogic) RegisterSkill(ctx context.Context, req RegisterAgen
 		return model.AgentSkill{}, apperror.InvalidArgument("created_by is required")
 	}
 
-	return l.repo.RegisterSkill(ctx, model.AgentSkill{
+	return l.registry.RegisterSkill(ctx, model.AgentSkill{
 		Name:        name,
 		Description: strings.TrimSpace(req.Description),
 		Version:     version,
@@ -375,7 +375,7 @@ func (l *AgentRegistryLogic) BindSkill(ctx context.Context, req BindAgentSkillRe
 	if createdBy == "" {
 		return model.AgentSkillBinding{}, false, apperror.InvalidArgument("created_by is required")
 	}
-	skill, err := l.repo.GetSkill(ctx, skillID)
+	skill, err := l.registry.GetSkill(ctx, skillID)
 	if err != nil {
 		return model.AgentSkillBinding{}, false, err
 	}
@@ -383,7 +383,7 @@ func (l *AgentRegistryLogic) BindSkill(ctx context.Context, req BindAgentSkillRe
 		return model.AgentSkillBinding{}, false, apperror.InvalidArgument("only active skills can be bound to agents")
 	}
 
-	return l.repo.BindSkill(ctx, model.AgentSkillBinding{
+	return l.registry.BindSkill(ctx, model.AgentSkillBinding{
 		AgentID:   agentID,
 		SkillID:   skillID,
 		CreatedBy: createdBy,
@@ -402,7 +402,7 @@ func (l *AgentRegistryLogic) validateToolShape(ctx context.Context, tool model.A
 		if tool.LocalHandlerKey != "" || tool.BuiltinKey != "" {
 			return apperror.InvalidArgument("mcp tools cannot include local handler or builtin keys")
 		}
-		server, err := l.repo.GetMCPServer(ctx, tool.MCPServerID)
+		server, err := l.registry.GetMCPServer(ctx, tool.MCPServerID)
 		if err != nil {
 			return err
 		}
