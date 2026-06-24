@@ -473,6 +473,10 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+	cfg.AgentRPC, err = agentRPCConfigFromValues(values)
+	if err != nil {
+		return cfg, err
+	}
 
 	return cfg, nil
 }
@@ -1360,6 +1364,35 @@ func userRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, erro
 		cfg.Timeout = timeout
 	}
 	return ResolveUserRPCConfig(cfg), nil
+}
+
+func agentRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error) {
+	cfg := zrpc.RpcClientConf{
+		Target:    firstNonEmpty(values["AgentRPC.Target"], values["AgentRPCTarget"]),
+		Endpoints: brokerListFromValue(firstNonEmpty(values["AgentRPC.Endpoints"], values["AgentRPCEndpoints"])),
+	}
+	if value := firstNonEmpty(values["AgentRPC.Timeout"], values["AgentRPCTimeout"]); strings.TrimSpace(value) != "" {
+		timeout, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Timeout = timeout
+	}
+	return ResolveAgentRPCConfig(cfg), nil
+}
+
+// ResolveAgentRPCConfig 解析 agent-api（纯 BFF，#606）→ 属主 agent-rpc 客户端配置；env 兜底
+// AGENT_RPC_TARGET / AGENTS_IM_AGENT_RPC_TARGET（同 UserRPC 模式）。
+func ResolveAgentRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
+	cfg.Target = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Target)), os.Getenv("AGENTS_IM_AGENT_RPC_TARGET"), os.Getenv("AGENT_RPC_TARGET"))
+	if len(cfg.Endpoints) == 0 {
+		cfg.Endpoints = brokerListFromValue(firstNonEmpty(os.Getenv("AGENTS_IM_AGENT_RPC_ENDPOINTS"), os.Getenv("AGENT_RPC_ENDPOINTS")))
+	}
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = 5000
+	}
+	cfg.NonBlock = true
+	return cfg
 }
 
 // ResolveUserRPCConfig 解析读用户资料的 user-rpc 客户端配置；env 兜底
