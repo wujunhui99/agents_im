@@ -6,29 +6,12 @@ import (
 	"testing"
 
 	"github.com/wujunhui99/agents_im/pkg/model"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registrytest"
 )
-
-func TestStaticAdapterCatalogLooksUpAdapterByToolID(t *testing.T) {
-	spec := validPythonExecuteToolSpec()
-	adapter := fakeAdapter{spec: spec}
-	catalog := NewStaticAdapterCatalog(adapter)
-
-	resolved, found, err := catalog.LookupToolAdapter(spec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !found {
-		t.Fatal("expected adapter")
-	}
-	if resolved.Spec().ToolID != spec.ToolID {
-		t.Fatalf("adapter mismatch: %+v", resolved.Spec())
-	}
-}
 
 func TestDefaultLocalAdapterCatalogResolvesPythonExecuteWithDisabledDefault(t *testing.T) {
 	ctx := context.Background()
-	repo := registry.NewMemoryStore()
+	repo := registrytest.NewMemoryStore()
 	seedPythonExecuteTool(t, ctx, repo, "agent_support", "tool_python")
 	resolver, err := NewResolver(repo, WithAdapterCatalog(NewDefaultLocalAdapterCatalog(nil)))
 	if err != nil {

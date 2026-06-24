@@ -110,14 +110,6 @@ func ResolveTracingConfig(cfg TracingConfig, defaultServiceName string) (Tracing
 	return cfg, nil
 }
 
-func InitTracing(ctx context.Context, cfg TracingConfig) (TracingShutdown, error) {
-	resolved, err := ResolveTracingConfig(cfg, cfg.ServiceName)
-	if err != nil {
-		return nil, err
-	}
-	return initResolvedTracing(ctx, resolved)
-}
-
 func InitServiceTracing(ctx context.Context, cfg TracingConfig, serviceName string) (TracingShutdown, error) {
 	resolved, err := ResolveTracingConfig(cfg, serviceName)
 	if err != nil {
@@ -159,10 +151,6 @@ func initResolvedTracing(ctx context.Context, resolved TracingConfig) (TracingSh
 		tracingEnabled.Store(false)
 		return provider.Shutdown(shutdownCtx)
 	}, nil
-}
-
-func TracingEnabled() bool {
-	return tracingEnabled.Load()
 }
 
 func TraceUIBaseURLFromEnv() string {

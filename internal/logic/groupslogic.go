@@ -22,26 +22,6 @@ type UserLogicExistenceChecker struct {
 	userLogic *UserLogic
 }
 
-func NewUserLogicExistenceChecker(userLogic *UserLogic) UserLogicExistenceChecker {
-	return UserLogicExistenceChecker{userLogic: userLogic}
-}
-
-func (c UserLogicExistenceChecker) EnsureUserExists(ctx context.Context, userID string) error {
-	if c.userLogic == nil {
-		return apperror.Internal("user existence checker is not configured")
-	}
-
-	_, err := c.userLogic.GetUserByID(ctx, GetUserByIDRequest{UserID: userID})
-	return err
-}
-
-func (c UserLogicExistenceChecker) LookupUserProfile(ctx context.Context, userID string) (UserProfile, error) {
-	if c.userLogic == nil {
-		return UserProfile{}, apperror.Internal("user profile lookup is not configured")
-	}
-	return c.userLogic.GetUserByID(ctx, GetUserByIDRequest{UserID: userID})
-}
-
 type GroupsLogic struct {
 	repo       repository.GroupsRepository
 	userExists UserExistenceChecker
@@ -506,11 +486,6 @@ func (l *GroupsLogic) ensureUserExists(ctx context.Context, userID string) error
 		return apperror.Internal("user existence checker is not configured")
 	}
 	return l.userExists.EnsureUserExists(ctx, userID)
-}
-
-func (l *GroupsLogic) ensureActiveMember(ctx context.Context, groupID string, userID string) error {
-	_, err := l.activeMember(ctx, groupID, userID)
-	return err
 }
 
 func (l *GroupsLogic) activeMember(ctx context.Context, groupID string, userID string) (model.GroupMember, error) {

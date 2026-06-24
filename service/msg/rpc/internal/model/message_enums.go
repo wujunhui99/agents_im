@@ -1,13 +1,11 @@
 package model
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
@@ -129,19 +127,6 @@ const (
 	pgUniqueViolationCode = "23505"
 	pgCheckViolationCode  = "23514"
 )
-
-func isPostgresCode(err error, code string) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == code
-}
-
-func IsPostgresUniqueViolation(err error) bool {
-	return isPostgresCode(err, pgUniqueViolationCode)
-}
-
-func IsPostgresCheckViolation(err error) bool {
-	return isPostgresCode(err, pgCheckViolationCode)
-}
 
 // SingleConversationID / GroupConversationID 复刻 internal/repository 的会话 id 约定。
 func SingleConversationID(userA, userB string) string {

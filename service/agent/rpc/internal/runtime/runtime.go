@@ -32,12 +32,6 @@ type Runtime interface {
 	Run(ctx context.Context, req RunRequest) (RunResult, error)
 }
 
-type RuntimeFunc func(ctx context.Context, req RunRequest) (RunResult, error)
-
-func (f RuntimeFunc) Run(ctx context.Context, req RunRequest) (RunResult, error) {
-	return f(ctx, req)
-}
-
 type RunRequest struct {
 	RunID              string                `json:"run_id,omitempty"`
 	RequestID          string                `json:"request_id"`

@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
-	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/middleware"
 	apiconfig "github.com/wujunhui99/agents_im/service/agent/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/agentclient"
@@ -38,15 +37,6 @@ func NewServiceContextFromConfig(c apiconfig.Config) (*ServiceContext, error) {
 	}
 	serviceContext.Sessions = middleware.NewRedisSessionStore(c.Redis)
 	return serviceContext, nil
-}
-
-// NewServiceContextWithAuth 供单测构造（注入 fake agent-rpc 客户端 + 鉴权配置）。
-func NewServiceContextWithAuth(agentRPC agentclient.Agent, auth config.JWTAuthConfig) *ServiceContext {
-	return &ServiceContext{
-		AuthRuntime: common.NewAuthRuntime(auth),
-		Config:      apiconfig.Config{Auth: auth},
-		AgentRPC:    agentRPC,
-	}
 }
 
 // hasRPCClientConfig 判断 zrpc 客户端是否已配置（target / endpoints / etcd 任一）。

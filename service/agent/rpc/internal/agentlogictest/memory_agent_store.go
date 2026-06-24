@@ -1,4 +1,4 @@
-package agentlogic
+package agentlogictest
 
 import (
 	"context"

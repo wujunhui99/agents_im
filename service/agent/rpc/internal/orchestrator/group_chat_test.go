@@ -169,7 +169,7 @@ func newGroupAgentHarness(t *testing.T, activeMemberIDs []string) *groupAgentHar
 
 	messageRepo := repository.NewMemoryMessageRepository()
 	groups := newAgentIMTestGroupMemberLister("grp_agent_chat", activeMemberIDs)
-	messageLogic := logic.NewMessageLogicWithValidators(messageRepo, nil, groups)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, groups, nil)
 	hostingRepo := &recordingAgentHostingRepository{inner: repository.NewMemoryAgentConversationHostingRepository()}
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	auditLogic := logic.NewAgentAuditLogic(auditRepo)
@@ -183,7 +183,7 @@ func newGroupAgentHarness(t *testing.T, activeMemberIDs []string) *groupAgentHar
 		messageLogic: messageLogic,
 		hostingRepo:  hostingRepo,
 	}
-	runtime := agentruntime.RuntimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
+	runtime := runtimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
 		h.mu.Lock()
 		h.runtimeCalls++
 		h.runtimeRequests = append(h.runtimeRequests, req)
@@ -195,7 +195,7 @@ func newGroupAgentHarness(t *testing.T, activeMemberIDs []string) *groupAgentHar
 	})
 	orchestrator, err := NewAgentRunOrchestrator(AgentRunOrchestratorConfig{
 		Runtime: runtime,
-		RequestBuilder: RuntimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return groupRuntimeRequest(trigger), nil
 		}),
 		Audit:  auditLogic,

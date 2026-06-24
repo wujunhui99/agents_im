@@ -156,7 +156,7 @@ rg -q "WorkerID|Worker\.ID" etc/msgtransfer.yaml pkg/config/config.go
 
 assert_present "-q" pkg/gateway/delivery service/msggateway/internal/ws -- \
   "type Dispatcher interface" "DeliverToUser" "DeliverToConversation" "EventMessageReceived" "EventMessageDelivered" \
-  "StatusOffline" "NewInMemoryDeliveryDispatcher" "PushToUser" "PushToConversation" "UserConnections"
+  "StatusOffline" "NewPresenceAwareDeliveryDispatcher" "PushToUser" "PushToConversation" "UserConnections"
 # 下行推送 gRPC 面（03 §6.2）：msggateway 暴露 GatewayService，push 经 headless DNS 广播。
 assert_present "-q" service/msggateway/gateway.proto service/msggateway/internal/grpcserver -- \
   "service GatewayService" "BatchPushOneMsg" "type Server struct" "PushToConversation" "delivery.Event"
@@ -214,8 +214,8 @@ rg -q "PasswordHash" service/auth/rpc/internal/model/auth_credentials_model.go
 assert_present "-q" internal -- \
   "CodeForbidden" "sender is not a group member" "group membership validator is not configured" \
   "group owner cannot leave as the only active member"
-assert_present "-q" tests -- \
-  "TestMessageGroupSendRequiresActiveMembership" "client-group-outsider" "client-group-left"
+assert_present "-q" internal/logic -- \
+  "TestGroupSendUsesActiveParticipantsForRecipientsAndVisibility" "client-group-active" "usr_left"
 
 # --- account/persistence schema & storage wiring ---
 assert_present "-qF" db/migrations/001_init_postgres.sql -- \

@@ -6,9 +6,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogictest"
+
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registrytest"
 )
 
 // fakeAccountPort 是 AccountPort 测试桩：内存账号表，Create 分配 acc_<seq> 主键。
@@ -78,7 +80,7 @@ func TestAgentAssemblyCreateAgentFromToolHappyPath(t *testing.T) {
 	accounts.seed(model.User{AccountID: "acc_creator", Identifier: DefaultAssistantIdentifier, AccountType: model.AccountTypeAgent})
 	accounts.seed(model.User{AccountID: "usr_1", Identifier: "alice", AccountType: model.AccountTypeUser})
 
-	agents := NewMemoryAgentStore()
+	agents := agentlogictest.NewMemoryAgentStore()
 	creator, err := agents.CreateAgent(ctx, model.Agent{
 		AccountID: "acc_creator",
 		Name:      DefaultAssistantAgentName,
@@ -89,7 +91,7 @@ func TestAgentAssemblyCreateAgentFromToolHappyPath(t *testing.T) {
 		t.Fatalf("seed creator agent: %v", err)
 	}
 
-	reg := registry.NewMemoryStore()
+	reg := registrytest.NewMemoryStore()
 	if _, err := reg.RegisterTool(ctx, model.AgentTool{
 		Name:            model.BuiltinToolReadConversationContext,
 		ToolType:        model.AgentToolTypeBuiltin,
@@ -147,7 +149,7 @@ func TestAgentAssemblyCreateAgentFromToolRejectsNonAssistantCaller(t *testing.T)
 	// caller agent account is an agent but NOT the default assistant identifier.
 	accounts.seed(model.User{AccountID: "acc_other", Identifier: "other_agent", AccountType: model.AccountTypeAgent})
 
-	agents := NewMemoryAgentStore()
+	agents := agentlogictest.NewMemoryAgentStore()
 	caller, err := agents.CreateAgent(ctx, model.Agent{
 		AccountID: "acc_other",
 		Name:      "Other",
@@ -162,7 +164,7 @@ func TestAgentAssemblyCreateAgentFromToolRejectsNonAssistantCaller(t *testing.T)
 		Accounts:    accounts,
 		Friendships: &fakeFriendPort{},
 		Agents:      agents,
-		Registry:    registry.NewMemoryStore(),
+		Registry:    registrytest.NewMemoryStore(),
 	})
 
 	_, err = assembly.CreateAgentFromTool(ctx, AgentCreateToolRequest{

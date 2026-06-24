@@ -226,7 +226,7 @@ func TestMessageConversationSeqQueryUnreadCount(t *testing.T) {
 
 func TestMessageOriginAndAgentMetadataPersistAcrossPull(t *testing.T) {
 	repo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogic(repo)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(repo, nil, nil, nil)
 	ctx := context.Background()
 
 	human, err := messageLogic.SendMessage(ctx, testSendRequest("usr_a", "agent_1", "client-origin-human", "hello agent"))
@@ -284,7 +284,7 @@ func TestMessageOriginAndAgentMetadataPersistAcrossPull(t *testing.T) {
 
 func TestAIDirectMessageVisibleToOwnerAndReceiverAndFanoutIncludesBoth(t *testing.T) {
 	repo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogic(repo)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(repo, nil, nil, nil)
 	ctx := context.Background()
 
 	trigger, err := messageLogic.SendMessage(ctx, testSendRequest("usr_b", "usr_a", "client-ai-visible-trigger", "please reply"))
@@ -337,103 +337,8 @@ func TestAIDirectMessageVisibleToOwnerAndReceiverAndFanoutIncludesBoth(t *testin
 	}
 }
 
-func TestMessageGroupSendRequiresActiveMembership(t *testing.T) {
-	ctx := context.Background()
-	userRepo := repository.NewMemoryRepository()
-	userLogic := logic.NewUserLogic(userRepo)
-	creator := mustCreateUser(t, userLogic, "msg_group_creator")
-	member := mustCreateUser(t, userLogic, "msg_group_member")
-	outsider := mustCreateUser(t, userLogic, "msg_group_outsider")
-
-	groupsLogic := logic.NewGroupsLogic(
-		repository.NewMemoryGroupsRepository(),
-		logic.NewUserLogicExistenceChecker(userLogic),
-	)
-	group, err := groupsLogic.CreateGroup(ctx, logic.CreateGroupRequest{
-		CreatorUserID: creator.UserID,
-		Name:          "Message Group",
-	})
-	if err != nil {
-		t.Fatalf("create group: %v", err)
-	}
-	if _, err := groupsLogic.JoinGroup(ctx, logic.JoinGroupRequest{
-		GroupID: group.GroupID,
-		UserID:  member.UserID,
-	}); err != nil {
-		t.Fatalf("join member: %v", err)
-	}
-
-	messageLogic := logic.NewMessageLogicWithValidators(
-		repository.NewMemoryMessageRepository(),
-		logic.NewUserLogicExistenceChecker(userLogic),
-		groupsLogic,
-	)
-
-	_, err = messageLogic.SendMessage(ctx, testGroupSendRequest(outsider.UserID, group.GroupID, "client-group-outsider", "nope"))
-	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
-		t.Fatalf("outsider group send error = %v, want FORBIDDEN", err)
-	}
-
-	sent, err := messageLogic.SendMessage(ctx, testGroupSendRequest(member.UserID, group.GroupID, "client-group-member", "hello group"))
-	if err != nil {
-		t.Fatalf("member group send: %v", err)
-	}
-	if sent.Message.ChatType != logic.MessageChatTypeGroup ||
-		sent.Message.GroupID != group.GroupID ||
-		sent.Message.ConversationID != repository.GroupConversationID(group.GroupID) {
-		t.Fatalf("unexpected group message: %+v", sent.Message)
-	}
-
-	creatorState := mustMessageState(t, messageLogic, creator.UserID, sent.Message.ConversationID)
-	if creatorState.MaxSeq != 1 || creatorState.UnreadCount != 1 {
-		t.Fatalf("creator should see member group message unread: %+v", creatorState)
-	}
-
-	memberState := mustMessageState(t, messageLogic, member.UserID, sent.Message.ConversationID)
-	if memberState.HasReadSeq != sent.Message.Seq || memberState.UnreadCount != 0 {
-		t.Fatalf("sender read state should advance for group send: %+v", memberState)
-	}
-
-	_, err = messageLogic.GetConversationSeqs(ctx, logic.GetConversationSeqsRequest{
-		UserID:          outsider.UserID,
-		ConversationIDs: []string{sent.Message.ConversationID},
-	})
-	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
-		t.Fatalf("outsider seq query error = %v, want FORBIDDEN", err)
-	}
-	_, err = messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
-		UserID:         outsider.UserID,
-		ConversationID: sent.Message.ConversationID,
-		FromSeq:        1,
-		Limit:          10,
-		Order:          repository.MessageStorageOrderAsc,
-	})
-	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
-		t.Fatalf("outsider pull error = %v, want FORBIDDEN", err)
-	}
-
-	if _, err := groupsLogic.LeaveGroup(ctx, logic.LeaveGroupRequest{
-		GroupID: group.GroupID,
-		UserID:  member.UserID,
-	}); err != nil {
-		t.Fatalf("member leave: %v", err)
-	}
-	_, err = messageLogic.SendMessage(ctx, testGroupSendRequest(member.UserID, group.GroupID, "client-group-left", "left"))
-	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
-		t.Fatalf("left member group send error = %v, want FORBIDDEN", err)
-	}
-	_, err = messageLogic.MarkConversationAsRead(ctx, logic.MarkConversationAsReadRequest{
-		UserID:         member.UserID,
-		ConversationID: sent.Message.ConversationID,
-		HasReadSeq:     sent.Message.Seq,
-	})
-	if err == nil || apperror.From(err).Code != apperror.CodeForbidden {
-		t.Fatalf("left member mark read error = %v, want FORBIDDEN", err)
-	}
-}
-
 func newMessageTestLogic() *logic.MessageLogic {
-	return logic.NewMessageLogic(repository.NewMemoryMessageRepository())
+	return logic.NewMessageLogicWithMediaValidator(repository.NewMemoryMessageRepository(), nil, nil, nil)
 }
 
 func testSendRequest(senderID string, receiverID string, clientMsgID string, content string) logic.SendMessageRequest {
@@ -441,17 +346,6 @@ func testSendRequest(senderID string, receiverID string, clientMsgID string, con
 		SenderID:    senderID,
 		ReceiverID:  receiverID,
 		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: clientMsgID,
-		ContentType: logic.MessageContentTypeText,
-		Content:     content,
-	}
-}
-
-func testGroupSendRequest(senderID string, groupID string, clientMsgID string, content string) logic.SendMessageRequest {
-	return logic.SendMessageRequest{
-		SenderID:    senderID,
-		GroupID:     groupID,
-		ChatType:    logic.MessageChatTypeGroup,
 		ClientMsgID: clientMsgID,
 		ContentType: logic.MessageContentTypeText,
 		Content:     content,

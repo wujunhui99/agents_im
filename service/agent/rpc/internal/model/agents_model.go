@@ -15,7 +15,6 @@ type (
 	// and implement the added methods in customAgentsModel.
 	AgentsModel interface {
 		agentsModel
-		withSession(session sqlx.Session) AgentsModel
 
 		// InsertReturning 插入一行并返回数据库生成的完整行（agent_id 自增、created_at/updated_at）。
 		InsertReturning(ctx context.Context, data *Agents) (*Agents, error)
@@ -37,10 +36,6 @@ func NewAgentsModel(conn sqlx.SqlConn) AgentsModel {
 	return &customAgentsModel{
 		defaultAgentsModel: newAgentsModel(conn),
 	}
-}
-
-func (m *customAgentsModel) withSession(session sqlx.Session) AgentsModel {
-	return NewAgentsModel(sqlx.NewSqlConnFromSession(session))
 }
 
 const agentsReturning = "agent_id, account_id, name, description, status, created_by, created_at, updated_at"

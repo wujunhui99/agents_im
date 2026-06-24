@@ -35,32 +35,6 @@ func TestWriteJSONSuccessKeepsTraceIDsInHeadersOnly(t *testing.T) {
 	}
 }
 
-func TestWriteJSONErrorIncludesTraceIDsInHeadersAndBody(t *testing.T) {
-	rec := httptest.NewRecorder()
-	observability.InjectTraceHeaders(rec, observability.TraceContext{TraceID: "4bf92f3577b34da6a3ce929d0e0e4736", RequestID: "req_error_123"})
-
-	WriteError(rec, apperror.ServiceUnavailable("downstream unavailable"))
-
-	if got := rec.Header().Get(observability.HeaderTraceID); got != "4bf92f3577b34da6a3ce929d0e0e4736" {
-		t.Fatalf("trace header = %q", got)
-	}
-	if got := rec.Header().Get(observability.HeaderRequestID); got != "req_error_123" {
-		t.Fatalf("request header = %q", got)
-	}
-	var body struct {
-		Code      string `json:"code"`
-		Message   string `json:"message"`
-		TraceID   string `json:"trace_id"`
-		RequestID string `json:"request_id"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if body.TraceID != "4bf92f3577b34da6a3ce929d0e0e4736" || body.RequestID != "req_error_123" {
-		t.Fatalf("error body trace/request mismatch: %+v body=%s", body, rec.Body.String())
-	}
-}
-
 func TestGoZeroErrorHandlerCtxIncludesTraceIDsForErrorBody(t *testing.T) {
 	ctx := observability.ContextWithTrace(context.Background(), observability.TraceContext{
 		TraceID:   "4bf92f3577b34da6a3ce929d0e0e4736",

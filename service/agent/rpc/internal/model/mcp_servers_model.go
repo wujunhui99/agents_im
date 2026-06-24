@@ -13,7 +13,6 @@ type (
 	// and implement the added methods in customMcpServersModel.
 	McpServersModel interface {
 		mcpServersModel
-		withSession(session sqlx.Session) McpServersModel
 
 		// InsertReturning 插入并返回库生成的完整行（server_id 自增、jsonb config 列）。
 		InsertReturning(ctx context.Context, data *McpServers) (*McpServers, error)
@@ -29,8 +28,4 @@ func NewMcpServersModel(conn sqlx.SqlConn) McpServersModel {
 	return &customMcpServersModel{
 		defaultMcpServersModel: newMcpServersModel(conn),
 	}
-}
-
-func (m *customMcpServersModel) withSession(session sqlx.Session) McpServersModel {
-	return NewMcpServersModel(sqlx.NewSqlConnFromSession(session))
 }

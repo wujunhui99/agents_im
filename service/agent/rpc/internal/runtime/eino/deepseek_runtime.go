@@ -52,12 +52,6 @@ func WithToolProvider(provider runtimetools.Provider) DeepSeekRuntimeOption {
 	}
 }
 
-func WithChatModelFactory(factory func(ctx context.Context, cfg config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error)) DeepSeekRuntimeOption {
-	return func(runtime *DeepSeekRuntime) {
-		runtime.chatModelFactory = factory
-	}
-}
-
 func NewDeepSeekRuntime(cfg config.DeepSeekConfig, opts ...DeepSeekRuntimeOption) *DeepSeekRuntime {
 	runtime := &DeepSeekRuntime{cfg: cfg, chatModelFactory: llmdeepseek.NewChatModel}
 	for _, opt := range opts {

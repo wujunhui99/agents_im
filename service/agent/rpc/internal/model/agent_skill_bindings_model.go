@@ -13,7 +13,6 @@ type (
 	// and implement the added methods in customAgentSkillBindingsModel.
 	AgentSkillBindingsModel interface {
 		agentSkillBindingsModel
-		withSession(session sqlx.Session) AgentSkillBindingsModel
 
 		// BindOne 幂等绑定（已存在返回 created=false）。
 		BindOne(ctx context.Context, agentID, skillID int64, createdBy string) (*AgentSkillBindings, bool, error)
@@ -29,8 +28,4 @@ func NewAgentSkillBindingsModel(conn sqlx.SqlConn) AgentSkillBindingsModel {
 	return &customAgentSkillBindingsModel{
 		defaultAgentSkillBindingsModel: newAgentSkillBindingsModel(conn),
 	}
-}
-
-func (m *customAgentSkillBindingsModel) withSession(session sqlx.Session) AgentSkillBindingsModel {
-	return NewAgentSkillBindingsModel(sqlx.NewSqlConnFromSession(session))
 }

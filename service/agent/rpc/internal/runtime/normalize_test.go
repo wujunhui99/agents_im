@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -241,23 +240,6 @@ func TestNormalizeRunResultValidatesRequiredFieldsAndUsage(t *testing.T) {
 	for _, invalid := range invalidResults {
 		_, err := NormalizeRunResult(invalid)
 		assertInvalidArgument(t, err)
-	}
-}
-
-func TestRuntimeFuncImplementsRuntime(t *testing.T) {
-	var runtime Runtime = RuntimeFunc(func(ctx context.Context, req RunRequest) (RunResult, error) {
-		if err := req.Validate(); err != nil {
-			return RunResult{}, err
-		}
-		return RunResult{RunID: "run_1", FinalText: "ok"}, nil
-	})
-
-	result, err := runtime.Run(context.Background(), validRunRequest())
-	if err != nil {
-		t.Fatalf("runtime run: %v", err)
-	}
-	if result.RunID != "run_1" || result.FinalText != "ok" {
-		t.Fatalf("unexpected result: %+v", result)
 	}
 }
 

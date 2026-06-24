@@ -57,12 +57,6 @@ func WithAdapterCatalog(catalog AdapterCatalog) ResolverOption {
 	}
 }
 
-func WithResolutionAuditHook(hook ResolutionAuditHook) ResolverOption {
-	return func(r *Resolver) {
-		r.auditHook = hook
-	}
-}
-
 type Resolver struct {
 	registry  Registry
 	catalog   AdapterCatalog

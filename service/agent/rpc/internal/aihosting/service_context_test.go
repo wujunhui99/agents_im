@@ -13,7 +13,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
-	registrypkg "github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registrytest"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 )
 
@@ -143,7 +143,7 @@ func TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting(t *
 
 func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testing.T) {
 	ctx := context.Background()
-	registryRepo := registrypkg.NewMemoryStore()
+	registryRepo := registrytest.NewMemoryStore()
 	if _, err := registryRepo.RegisterTool(ctx, model.AgentTool{
 		ToolID:           "tool_python_execute",
 		Name:             model.LocalToolHandlerPythonExecute,
@@ -175,7 +175,7 @@ func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testin
 		},
 	}
 
-	provider, err := newConversationAIHostingToolProvider(registryRepo, executor)
+	provider, err := newConversationAIHostingToolProviderWithAgentCreate(registryRepo, executor, nil)
 	if err != nil {
 		t.Fatalf("build runtime tool provider: %v", err)
 	}
@@ -216,7 +216,7 @@ func completeAIHostingServiceContext() *ServiceContext {
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	aiHostingStore := convhosting.NewMemoryStore()
 	return &ServiceContext{
-		MessageLogic:     business.NewMessageLogic(messageRepo),
+		MessageLogic:     business.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil),
 		MessageRepo:      messageRepo,
 		AgentHostingRepo: repository.NewMemoryAgentConversationHostingRepository(),
 		AIHostingStore:   aiHostingStore,

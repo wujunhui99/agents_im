@@ -23,7 +23,7 @@ func TestGroupSendUsesActiveParticipantsForRecipientsAndVisibility(t *testing.T)
 			{UserID: "usr_left", State: "left"},
 		},
 	}
-	messageLogic := NewMessageLogicWithValidators(repo, nil, groups)
+	messageLogic := NewMessageLogicWithMediaValidator(repo, nil, groups, nil)
 
 	sent, err := messageLogic.SendMessage(ctx, groupSendRequest("usr_sender", "grp_delivery", "client-group-active", "hello"))
 	if err != nil {
@@ -52,7 +52,7 @@ func TestGroupMemberLeftCannotSeeNewMessages(t *testing.T) {
 			{UserID: "usr_later_left", State: "active"},
 		},
 	}
-	messageLogic := NewMessageLogicWithValidators(repo, nil, groups)
+	messageLogic := NewMessageLogicWithMediaValidator(repo, nil, groups, nil)
 
 	first, err := messageLogic.SendMessage(ctx, groupSendRequest("usr_sender", "grp_visibility", "client-group-first", "first"))
 	if err != nil {
@@ -109,7 +109,7 @@ func TestGroupNewMemberHistoryStartsAfterJoinBoundary(t *testing.T) {
 			{UserID: "usr_receiver", State: "active"},
 		},
 	}
-	messageLogic := NewMessageLogicWithValidators(repo, nil, groups)
+	messageLogic := NewMessageLogicWithMediaValidator(repo, nil, groups, nil)
 
 	first, err := messageLogic.SendMessage(ctx, groupSendRequest("usr_sender", "grp_joined_only", "client-before-join", "before join"))
 	if err != nil {
@@ -155,7 +155,7 @@ func TestMessageLogicSendInputBounds(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("accepts client message and content at max length", func(t *testing.T) {
-		messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
+		messageLogic := NewMessageLogicWithMediaValidator(repository.NewMemoryMessageRepository(), nil, nil, nil)
 		result, err := messageLogic.SendMessage(ctx, logicTestSendRequest(
 			"usr_bound_sender",
 			"usr_bound_receiver",
@@ -171,7 +171,7 @@ func TestMessageLogicSendInputBounds(t *testing.T) {
 	})
 
 	t.Run("rejects overlong client message id", func(t *testing.T) {
-		messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
+		messageLogic := NewMessageLogicWithMediaValidator(repository.NewMemoryMessageRepository(), nil, nil, nil)
 		_, err := messageLogic.SendMessage(ctx, logicTestSendRequest(
 			"usr_client_sender",
 			"usr_client_receiver",
@@ -182,7 +182,7 @@ func TestMessageLogicSendInputBounds(t *testing.T) {
 	})
 
 	t.Run("rejects overlong content", func(t *testing.T) {
-		messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
+		messageLogic := NewMessageLogicWithMediaValidator(repository.NewMemoryMessageRepository(), nil, nil, nil)
 		_, err := messageLogic.SendMessage(ctx, logicTestSendRequest(
 			"usr_content_sender",
 			"usr_content_receiver",
@@ -193,7 +193,7 @@ func TestMessageLogicSendInputBounds(t *testing.T) {
 	})
 
 	t.Run("rejects conversation delimiter in single chat ids", func(t *testing.T) {
-		messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
+		messageLogic := NewMessageLogicWithMediaValidator(repository.NewMemoryMessageRepository(), nil, nil, nil)
 		_, err := messageLogic.SendMessage(ctx, logicTestSendRequest(
 			"usr:sender",
 			"usr_receiver",
@@ -212,7 +212,7 @@ func TestMessageLogicSendInputBounds(t *testing.T) {
 	})
 
 	t.Run("rejects conversation delimiter in group id", func(t *testing.T) {
-		messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
+		messageLogic := NewMessageLogicWithMediaValidator(repository.NewMemoryMessageRepository(), nil, nil, nil)
 		_, err := messageLogic.SendMessage(ctx, SendMessageRequest{
 			SenderID:    "usr_group_sender",
 			GroupID:     "grp:bad",
@@ -225,7 +225,7 @@ func TestMessageLogicSendInputBounds(t *testing.T) {
 	})
 
 	t.Run("rejects derived conversation id beyond pullable length", func(t *testing.T) {
-		messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
+		messageLogic := NewMessageLogicWithMediaValidator(repository.NewMemoryMessageRepository(), nil, nil, nil)
 		_, err := messageLogic.SendMessage(ctx, logicTestSendRequest(
 			strings.Repeat("a", 128),
 			strings.Repeat("b", 128),
@@ -238,7 +238,7 @@ func TestMessageLogicSendInputBounds(t *testing.T) {
 
 func TestMessageLogicPullBoundsAndParticipantAccess(t *testing.T) {
 	ctx := context.Background()
-	messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
+	messageLogic := NewMessageLogicWithMediaValidator(repository.NewMemoryMessageRepository(), nil, nil, nil)
 
 	var conversationID string
 	for i := 1; i <= 501; i++ {

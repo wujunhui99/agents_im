@@ -111,22 +111,3 @@ func recipientCandidates(event messaging.MessageEvent) []string {
 	candidates = append(candidates, event.Payload.VisibleUserIDs...)
 	return candidates
 }
-
-// MockHostingStore is the scaffold HostingStore (issue #503): a static
-// conversation_id → agent_account_id map. The real implementation reads the
-// agent domain's conversation_ai_hosting table (D13 goctl model).
-type MockHostingStore struct {
-	hosted map[string]string
-}
-
-func NewMockHostingStore(hosted map[string]string) *MockHostingStore {
-	if hosted == nil {
-		hosted = map[string]string{}
-	}
-	return &MockHostingStore{hosted: hosted}
-}
-
-func (s *MockHostingStore) HostingAgent(_ context.Context, conversationID string) (string, bool, error) {
-	agentID, ok := s.hosted[conversationID]
-	return agentID, ok, nil
-}

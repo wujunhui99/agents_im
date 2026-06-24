@@ -10,7 +10,7 @@ import (
 	rpcmodel "github.com/wujunhui99/agents_im/service/agent/rpc/internal/model"
 )
 
-// write.go 给 registry.Store 补 #606 注册表写路径（AgentRegistryLogic / AgentAssemblyLogic /
+// write.go 给 registry.Store 补 #606 注册表写路径（AgentAssemblyLogic /
 // DefaultAssistant 装配所需），全部走 agent 自有 goctl model（无 internal/repository）。对外 string ID，
 // 内部 string↔int64 转换；唯一冲突→AlreadyExists、外键冲突→NotFound、check 冲突→InvalidArgument。
 

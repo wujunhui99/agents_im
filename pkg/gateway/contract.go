@@ -184,86 +184,6 @@ type ConversationSeqState struct {
 	LastMessage    *MessageSnapshot `json:"lastMessage,omitempty"`
 }
 
-func MessageCommandMappings() []CommandRPCMapping {
-	mappings := []CommandRPCMapping{
-		{
-			Command: CommandSendMessage,
-			RPC:     RPCSendMessage,
-			RequestFields: []FieldMapping{
-				{CommandField: "connection.user_id", RPCField: "sender_id"},
-				{CommandField: "payload.receiverId", RPCField: "receiver_id"},
-				{CommandField: "payload.groupId", RPCField: "group_id"},
-				{CommandField: "payload.chatType", RPCField: "chat_type"},
-				{CommandField: "payload.clientMsgId", RPCField: "client_msg_id"},
-				{CommandField: "payload.contentType", RPCField: "content_type"},
-				{CommandField: "payload.content", RPCField: "content"},
-			},
-			ResponseFields: []FieldMapping{
-				{CommandField: "payload.message", RPCField: "message"},
-				{CommandField: "payload.deduplicated", RPCField: "deduplicated"},
-			},
-		},
-		{
-			Command: CommandPullMessages,
-			RPC:     RPCPullMessages,
-			RequestFields: []FieldMapping{
-				{CommandField: "connection.user_id", RPCField: "user_id"},
-				{CommandField: "payload.conversationId", RPCField: "conversation_id"},
-				{CommandField: "payload.fromSeq", RPCField: "from_seq"},
-				{CommandField: "payload.toSeq", RPCField: "to_seq"},
-				{CommandField: "payload.limit", RPCField: "limit"},
-				{CommandField: "payload.order", RPCField: "order"},
-			},
-			ResponseFields: []FieldMapping{
-				{CommandField: "payload.messages", RPCField: "messages"},
-				{CommandField: "payload.isEnd", RPCField: "is_end"},
-				{CommandField: "payload.nextSeq", RPCField: "next_seq"},
-			},
-		},
-		{
-			Command: CommandGetConversationSeqs,
-			RPC:     RPCGetConversationSeqs,
-			RequestFields: []FieldMapping{
-				{CommandField: "connection.user_id", RPCField: "user_id"},
-				{CommandField: "payload.conversationIds", RPCField: "conversation_ids"},
-			},
-			ResponseFields: []FieldMapping{
-				{CommandField: "payload.states", RPCField: "states"},
-			},
-		},
-		{
-			Command: CommandMarkConversationRead,
-			RPC:     RPCMarkConversationAsRead,
-			RequestFields: []FieldMapping{
-				{CommandField: "connection.user_id", RPCField: "user_id"},
-				{CommandField: "payload.conversationId", RPCField: "conversation_id"},
-				{CommandField: "payload.hasReadSeq", RPCField: "has_read_seq"},
-			},
-			ResponseFields: []FieldMapping{
-				{CommandField: "payload.conversationId", RPCField: "conversation_id"},
-				{CommandField: "payload.hasReadSeq", RPCField: "has_read_seq"},
-				{CommandField: "payload.maxSeq", RPCField: "max_seq"},
-				{CommandField: "payload.unreadCount", RPCField: "unread_count"},
-				{CommandField: "payload.updated", RPCField: "updated"},
-			},
-		},
-	}
-
-	for i := range mappings {
-		mappings[i] = cloneMapping(mappings[i])
-	}
-	return mappings
-}
-
-func MessageCommandMapping(command string) (CommandRPCMapping, bool) {
-	for _, mapping := range MessageCommandMappings() {
-		if mapping.Command == command {
-			return mapping, true
-		}
-	}
-	return CommandRPCMapping{}, false
-}
-
 func MapSendMessageRequest(userID string, req SendMessageCommandRequest) SendMessageRPCRequest {
 	return SendMessageRPCRequest{
 		SenderID:    userID,
@@ -331,10 +251,4 @@ func MapMarkConversationReadResponse(resp MarkConversationAsReadRPCResponse) Mar
 		UnreadCount:    resp.UnreadCount,
 		Updated:        resp.Updated,
 	}
-}
-
-func cloneMapping(mapping CommandRPCMapping) CommandRPCMapping {
-	mapping.RequestFields = append([]FieldMapping(nil), mapping.RequestFields...)
-	mapping.ResponseFields = append([]FieldMapping(nil), mapping.ResponseFields...)
-	return mapping
 }

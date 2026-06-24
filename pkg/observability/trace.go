@@ -212,10 +212,6 @@ func TraceIDFromContext(ctx context.Context) string {
 	return TraceContextFromContext(ctx).TraceID
 }
 
-func RequestIDFromContext(ctx context.Context) string {
-	return TraceContextFromContext(ctx).RequestID
-}
-
 func InjectTraceHeaders(w http.ResponseWriter, traceContext TraceContext) {
 	if w == nil {
 		return

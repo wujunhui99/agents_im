@@ -12,7 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/config"
 	immodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registrytest"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 )
@@ -52,12 +52,18 @@ func TestDeepSeekRuntimeFailsClosedWhenProviderConfigMissing(t *testing.T) {
 	}
 }
 
+func withTestChatModel(factory deepSeekChatModelFactory) DeepSeekRuntimeOption {
+	return func(runtime *DeepSeekRuntime) {
+		runtime.chatModelFactory = factory
+	}
+}
+
 func TestDeepSeekRuntimeGeneratedRunIDIsPostgresAuditCompatible(t *testing.T) {
 	ctx := context.Background()
 	fakeModel := &scriptedToolCallingModel{responses: []*schema.Message{schema.AssistantMessage("ok", nil)}}
 	runtime := NewDeepSeekRuntime(
 		config.DeepSeekConfig{APIKey: "test-key", BaseURL: "https://deepseek.example.invalid", Model: "deepseek-test"},
-		WithChatModelFactory(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
+		withTestChatModel(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
 			return fakeModel, nil
 		}),
 	)
@@ -168,7 +174,7 @@ func TestDeepSeekRuntimeExecutesPythonToolCallAndContinuesToFinalAnswer(t *testi
 	}
 	runtime := NewDeepSeekRuntime(
 		config.DeepSeekConfig{APIKey: "test-key", BaseURL: "https://deepseek.example.invalid", Model: "deepseek-test"},
-		WithChatModelFactory(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
+		withTestChatModel(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
 			return fakeModel, nil
 		}),
 		WithToolProvider(toolProvider),
@@ -238,7 +244,7 @@ func TestDeepSeekRuntimeExecutesAgentCreateWithSafeToolAlias(t *testing.T) {
 	}
 	runtime := NewDeepSeekRuntime(
 		config.DeepSeekConfig{APIKey: "test-key", BaseURL: "https://deepseek.example.invalid", Model: "deepseek-test"},
-		WithChatModelFactory(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
+		withTestChatModel(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
 			return fakeModel, nil
 		}),
 		WithToolProvider(toolProvider),
@@ -298,7 +304,7 @@ func TestDeepSeekRuntimeContinuesWhenAgentCreateRejectsUnsupportedToolName(t *te
 	}
 	runtime := NewDeepSeekRuntime(
 		config.DeepSeekConfig{APIKey: "test-key", BaseURL: "https://deepseek.example.invalid", Model: "deepseek-test"},
-		WithChatModelFactory(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
+		withTestChatModel(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
 			return fakeModel, nil
 		}),
 		WithToolProvider(toolProvider),
@@ -344,7 +350,7 @@ func TestDeepSeekRuntimeReturnsVisibleErrorWhenPythonExecutorDisabled(t *testing
 	}
 	runtime := NewDeepSeekRuntime(
 		config.DeepSeekConfig{APIKey: "test-key", BaseURL: "https://deepseek.example.invalid", Model: "deepseek-test"},
-		WithChatModelFactory(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
+		withTestChatModel(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
 			return fakeModel, nil
 		}),
 		WithToolProvider(pythonExecuteToolProvider(t, ctx, pythonexec.NewDisabledExecutor())),
@@ -382,7 +388,7 @@ func TestDeepSeekRuntimeEnforcesMaxToolCalls(t *testing.T) {
 	}
 	runtime := NewDeepSeekRuntime(
 		config.DeepSeekConfig{APIKey: "test-key", BaseURL: "https://deepseek.example.invalid", Model: "deepseek-test"},
-		WithChatModelFactory(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
+		withTestChatModel(func(context.Context, config.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
 			return fakeModel, nil
 		}),
 		WithToolProvider(pythonExecuteToolProvider(t, ctx, &runtimeFakePythonExecutor{
@@ -403,7 +409,7 @@ func TestDeepSeekRuntimeEnforcesMaxToolCalls(t *testing.T) {
 
 func pythonExecuteToolProvider(t *testing.T, ctx context.Context, executor pythonexec.Executor) runtimetools.Provider {
 	t.Helper()
-	repo := registry.NewMemoryStore()
+	repo := registrytest.NewMemoryStore()
 	_, err := repo.RegisterTool(ctx, immodel.AgentTool{
 		ToolID:           "tool_python_execute",
 		Name:             immodel.LocalToolHandlerPythonExecute,
@@ -437,7 +443,7 @@ func pythonExecuteToolProvider(t *testing.T, ctx context.Context, executor pytho
 
 func agentCreateToolProvider(t *testing.T, ctx context.Context, handler runtimetools.AgentCreateHandler) runtimetools.Provider {
 	t.Helper()
-	repo := registry.NewMemoryStore()
+	repo := registrytest.NewMemoryStore()
 	_, err := repo.RegisterTool(ctx, immodel.AgentTool{
 		ToolID:           "tool_agent_create",
 		Name:             immodel.LocalToolHandlerAgentCreate,

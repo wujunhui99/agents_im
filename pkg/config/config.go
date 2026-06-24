@@ -273,18 +273,6 @@ func DefaultAPIConfig() APIConfig {
 	}
 }
 
-func DefaultRPCConfig() RPCConfig {
-	return RPCConfig{
-		Name:          "user-rpc",
-		ListenOn:      "0.0.0.0:9090",
-		Auth:          DefaultJWTAuthConfig(),
-		StorageDriver: StorageDriverMemory,
-		Redis:         DefaultRedisConfig(),
-		Presence:      DefaultPresenceConfig(),
-		Tracing:       observability.TracingConfig{},
-	}
-}
-
 func DefaultJWTAuthConfig() JWTAuthConfig {
 	return JWTAuthConfig{
 		AccessSecret: "dev-jwt-secret-change-me",
@@ -474,55 +462,6 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 		return cfg, err
 	}
 	cfg.AgentRPC, err = agentRPCConfigFromValues(values)
-	if err != nil {
-		return cfg, err
-	}
-
-	return cfg, nil
-}
-
-func LoadRPCConfig(path string) (RPCConfig, error) {
-	cfg := DefaultRPCConfig()
-	values, err := readFlatYAML(path)
-	if err != nil {
-		return cfg, err
-	}
-
-	if value := values["Name"]; value != "" {
-		cfg.Name = value
-	}
-	if value := values["ListenOn"]; value != "" {
-		cfg.ListenOn = value
-	}
-	if value := strings.TrimSpace(os.ExpandEnv(values["Auth.AccessSecret"])); value != "" {
-		cfg.Auth.AccessSecret = value
-	}
-	if value := strings.TrimSpace(os.ExpandEnv(values["Auth.AccessExpire"])); value != "" {
-		expire, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.Auth.AccessExpire = expire
-	}
-	if value := firstNonEmpty(values["StorageDriver"], values["Repository"]); value != "" {
-		cfg.StorageDriver = ResolveStorageDriver(value)
-	} else {
-		cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
-	}
-	cfg.DataSource = ResolveDataSource(values["DataSource"])
-	cfg.Redis, err = redisConfigFromValues(values)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Presence, err = presenceConfigFromValues(values)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Tracing, err = tracingConfigFromValues(values, cfg.Tracing, cfg.Name)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.MailRPC, err = mailRPCConfigFromValues(values)
 	if err != nil {
 		return cfg, err
 	}

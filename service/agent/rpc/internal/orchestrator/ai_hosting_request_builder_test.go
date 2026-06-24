@@ -5,19 +5,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogictest"
+
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
-	registrypkg "github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registrytest"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 
 func TestConversationAIHostingRuntimeRequestBuilderUsesBoundedRecentMessages(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogic(messageRepo)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	conversationID := repository.SingleConversationID("usr_a", "usr_b")
 	clearTask := "你能帮我对比一下 Python 和 Go 语言的性能吗？"
 	for seq := 1; seq <= 5; seq++ {
@@ -95,8 +96,8 @@ func TestConversationAIHostingRuntimeRequestBuilderRejectsNonSingleConversation(
 func TestBuilderUsesStoredAgentProfileWhenTriggerTargetsAgentAccount(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogic(messageRepo)
-	agentRepo := agentlogic.NewMemoryAgentStore()
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
+	agentRepo := agentlogictest.NewMemoryAgentStore()
 	agent, err := agentRepo.CreateAgent(ctx, model.Agent{
 		AgentID:     "agent_default_assistant",
 		AccountID:   "agent_creator",
@@ -155,8 +156,8 @@ func TestBuilderUsesStoredAgentProfileWhenTriggerTargetsAgentAccount(t *testing.
 func TestBuilderUsesStoredAgentRuntimeDefinition(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	agentRepo := agentlogic.NewMemoryAgentStore()
-	registry := registrypkg.NewMemoryStore()
+	agentRepo := agentlogictest.NewMemoryAgentStore()
+	registry := registrytest.NewMemoryStore()
 	agent, err := agentRepo.CreateAgent(ctx, model.Agent{
 		AgentID:     "agent_runtime_definition",
 		AccountID:   "agent_runtime_account",
@@ -202,7 +203,7 @@ func TestBuilderUsesStoredAgentRuntimeDefinition(t *testing.T) {
 	if _, _, err := registry.BindTool(ctx, model.AgentToolBinding{AgentID: agent.AgentID, ToolID: tool.ToolID, CreatedBy: "usr_owner"}); err != nil {
 		t.Fatal(err)
 	}
-	messageLogic := logic.NewMessageLogic(messageRepo)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	conversationID := repository.SingleConversationID("agent_runtime_account", "usr_peer")
 	if _, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
 		SenderID:    "usr_peer",

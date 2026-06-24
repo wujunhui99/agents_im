@@ -34,13 +34,6 @@ type MessageCreatedHook interface {
 
 type MessageCreatedHookFunc func(ctx context.Context, input MessageCreatedHookInput) error
 
-func (f MessageCreatedHookFunc) OnMessageCreated(ctx context.Context, input MessageCreatedHookInput) error {
-	if f == nil {
-		return nil
-	}
-	return f(ctx, input)
-}
-
 type MessageCreatedHookInput struct {
 	EventID               string
 	OperationID           string
@@ -61,14 +54,6 @@ type MessageLogic struct {
 
 type MessageMediaValidator interface {
 	ValidateMessageMedia(ctx context.Context, ownerUserID string, contentType string, content string) error
-}
-
-func NewMessageLogic(repo repository.MessageRepository) *MessageLogic {
-	return &MessageLogic{repo: repo}
-}
-
-func NewMessageLogicWithValidators(repo repository.MessageRepository, userExists UserExistenceChecker, groups GroupMemberLister) *MessageLogic {
-	return &MessageLogic{repo: repo, userExists: userExists, groups: groups}
 }
 
 func NewMessageLogicWithMediaValidator(repo repository.MessageRepository, userExists UserExistenceChecker, groups GroupMemberLister, media MessageMediaValidator) *MessageLogic {
