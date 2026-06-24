@@ -7,10 +7,10 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
-	registrypkg "github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
+	registrypkg "github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 

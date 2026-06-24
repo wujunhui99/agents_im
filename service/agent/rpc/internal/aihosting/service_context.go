@@ -266,4 +266,3 @@ func newConversationAIHostingToolProviderWithAgentCreate(registryReader runtimet
 		runtimetools.WithAdapterCatalog(catalog),
 	)
 }
-
