@@ -449,19 +449,19 @@ func LoadAPIConfig(path string) (APIConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
-	cfg.MailRPC, err = mailRPCConfigFromValues(values)
+	cfg.MailRPC, err = rpcClientConfigFromValues(values, mailRPCSpec)
 	if err != nil {
 		return cfg, err
 	}
-	cfg.MsgRPC, err = msgRPCConfigFromValues(values)
+	cfg.MsgRPC, err = rpcClientConfigFromValues(values, msgRPCSpec)
 	if err != nil {
 		return cfg, err
 	}
-	cfg.UserRPC, err = userRPCConfigFromValues(values)
+	cfg.UserRPC, err = rpcClientConfigFromValues(values, userRPCSpec)
 	if err != nil {
 		return cfg, err
 	}
-	cfg.AgentRPC, err = agentRPCConfigFromValues(values)
+	cfg.AgentRPC, err = rpcClientConfigFromValues(values, agentRPCSpec)
 	if err != nil {
 		return cfg, err
 	}
@@ -1260,118 +1260,107 @@ func tracingConfigFromValues(values map[string]string, current observability.Tra
 	return observability.ResolveTracingConfig(cfg, serviceName)
 }
 
-func mailRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error) {
-	cfg := zrpc.RpcClientConf{
-		Target:    firstNonEmpty(values["MailRPC.Target"], values["MailRPCTarget"]),
-		Endpoints: brokerListFromValue(firstNonEmpty(values["MailRPC.Endpoints"], values["MailRPCEndpoints"])),
-	}
-	if value := firstNonEmpty(values["MailRPC.Timeout"], values["MailRPCTimeout"]); strings.TrimSpace(value) != "" {
-		timeout, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.Timeout = timeout
-	}
-	return ResolveMailRPCConfig(cfg), nil
+// rpcClientConfigSpec 描述某个 RPC 客户端配置的差异点：YAML key 前缀、env 兜底 key、
+// 默认 timeout。mail/msg/user/agent 四组 zrpc 客户端配置结构一致，仅这些参数不同，
+// 共用 rpcClientConfigFromValues + resolveRPCClientConfig，避免逐域复制粘贴。
+type rpcClientConfigSpec struct {
+	prefix          string
+	targetEnvKeys   []string
+	endpointEnvKeys []string
+	defaultTimeout  int64
 }
 
-func msgRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error) {
-	cfg := zrpc.RpcClientConf{
-		Target:    firstNonEmpty(values["MsgRPC.Target"], values["MsgRPCTarget"]),
-		Endpoints: brokerListFromValue(firstNonEmpty(values["MsgRPC.Endpoints"], values["MsgRPCEndpoints"])),
+var (
+	mailRPCSpec = rpcClientConfigSpec{
+		prefix:          "MailRPC",
+		targetEnvKeys:   []string{"AUTH_MAIL_RPC_TARGET", "AGENTS_IM_MAIL_RPC_TARGET", "MAIL_RPC_TARGET"},
+		endpointEnvKeys: []string{"AUTH_MAIL_RPC_ENDPOINTS", "AGENTS_IM_MAIL_RPC_ENDPOINTS", "MAIL_RPC_ENDPOINTS"},
+		defaultTimeout:  2000,
 	}
-	if value := firstNonEmpty(values["MsgRPC.Timeout"], values["MsgRPCTimeout"]); strings.TrimSpace(value) != "" {
+	msgRPCSpec = rpcClientConfigSpec{
+		prefix:          "MsgRPC",
+		targetEnvKeys:   []string{"AGENTS_IM_MSG_RPC_TARGET", "MSG_RPC_TARGET"},
+		endpointEnvKeys: []string{"AGENTS_IM_MSG_RPC_ENDPOINTS", "MSG_RPC_ENDPOINTS"},
+		defaultTimeout:  5000,
+	}
+	userRPCSpec = rpcClientConfigSpec{
+		prefix:          "UserRPC",
+		targetEnvKeys:   []string{"AGENTS_IM_USER_RPC_TARGET", "USER_RPC_TARGET"},
+		endpointEnvKeys: []string{"AGENTS_IM_USER_RPC_ENDPOINTS", "USER_RPC_ENDPOINTS"},
+		defaultTimeout:  5000,
+	}
+	agentRPCSpec = rpcClientConfigSpec{
+		prefix:          "AgentRPC",
+		targetEnvKeys:   []string{"AGENTS_IM_AGENT_RPC_TARGET", "AGENT_RPC_TARGET"},
+		endpointEnvKeys: []string{"AGENTS_IM_AGENT_RPC_ENDPOINTS", "AGENT_RPC_ENDPOINTS"},
+		defaultTimeout:  5000,
+	}
+)
+
+// rpcClientConfigFromValues 按 spec 从扁平 YAML 读取 zrpc 客户端配置（Target/Endpoints/Timeout），
+// 再经 resolveRPCClientConfig 套用 env 兜底与默认值。
+func rpcClientConfigFromValues(values map[string]string, spec rpcClientConfigSpec) (zrpc.RpcClientConf, error) {
+	cfg := zrpc.RpcClientConf{
+		Target:    firstNonEmpty(values[spec.prefix+".Target"], values[spec.prefix+"Target"]),
+		Endpoints: brokerListFromValue(firstNonEmpty(values[spec.prefix+".Endpoints"], values[spec.prefix+"Endpoints"])),
+	}
+	if value := firstNonEmpty(values[spec.prefix+".Timeout"], values[spec.prefix+"Timeout"]); strings.TrimSpace(value) != "" {
 		timeout, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
 		if err != nil {
 			return cfg, err
 		}
 		cfg.Timeout = timeout
 	}
-	return ResolveMsgRPCConfig(cfg), nil
+	return resolveRPCClientConfig(cfg, spec), nil
 }
 
-func userRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error) {
-	cfg := zrpc.RpcClientConf{
-		Target:    firstNonEmpty(values["UserRPC.Target"], values["UserRPCTarget"]),
-		Endpoints: brokerListFromValue(firstNonEmpty(values["UserRPC.Endpoints"], values["UserRPCEndpoints"])),
+// resolveRPCClientConfig 套用 spec 的 env 兜底（target / endpoints）、默认 timeout 与 NonBlock。
+// YAML 取到的 Target 经 ExpandEnv 后优先，其次按 spec.targetEnvKeys 顺序兜底。
+func resolveRPCClientConfig(cfg zrpc.RpcClientConf, spec rpcClientConfigSpec) zrpc.RpcClientConf {
+	targetCandidates := make([]string, 0, len(spec.targetEnvKeys)+1)
+	targetCandidates = append(targetCandidates, strings.TrimSpace(os.ExpandEnv(cfg.Target)))
+	for _, key := range spec.targetEnvKeys {
+		targetCandidates = append(targetCandidates, os.Getenv(key))
 	}
-	if value := firstNonEmpty(values["UserRPC.Timeout"], values["UserRPCTimeout"]); strings.TrimSpace(value) != "" {
-		timeout, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
-		if err != nil {
-			return cfg, err
+	cfg.Target = firstNonEmpty(targetCandidates...)
+	if len(cfg.Endpoints) == 0 {
+		endpointCandidates := make([]string, 0, len(spec.endpointEnvKeys))
+		for _, key := range spec.endpointEnvKeys {
+			endpointCandidates = append(endpointCandidates, os.Getenv(key))
 		}
-		cfg.Timeout = timeout
+		cfg.Endpoints = brokerListFromValue(firstNonEmpty(endpointCandidates...))
 	}
-	return ResolveUserRPCConfig(cfg), nil
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = spec.defaultTimeout
+	}
+	cfg.NonBlock = true
+	return cfg
 }
 
-func agentRPCConfigFromValues(values map[string]string) (zrpc.RpcClientConf, error) {
-	cfg := zrpc.RpcClientConf{
-		Target:    firstNonEmpty(values["AgentRPC.Target"], values["AgentRPCTarget"]),
-		Endpoints: brokerListFromValue(firstNonEmpty(values["AgentRPC.Endpoints"], values["AgentRPCEndpoints"])),
-	}
-	if value := firstNonEmpty(values["AgentRPC.Timeout"], values["AgentRPCTimeout"]); strings.TrimSpace(value) != "" {
-		timeout, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.Timeout = timeout
-	}
-	return ResolveAgentRPCConfig(cfg), nil
+// 以下 exported wrapper 保留稳定符号供外部调用与契约守卫使用，委托到 resolveRPCClientConfig。
+
+// ResolveMailRPCConfig 解析邮件 third-rpc 客户端配置；env 兜底 AUTH_MAIL_RPC_TARGET /
+// AGENTS_IM_MAIL_RPC_TARGET / MAIL_RPC_TARGET。
+func ResolveMailRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
+	return resolveRPCClientConfig(cfg, mailRPCSpec)
+}
+
+// ResolveMsgRPCConfig 解析 msggateway → msg-rpc 客户端配置；env 兜底 MSG_RPC_TARGET /
+// AGENTS_IM_MSG_RPC_TARGET。
+func ResolveMsgRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
+	return resolveRPCClientConfig(cfg, msgRPCSpec)
+}
+
+// ResolveUserRPCConfig 解析读用户资料的 user-rpc 客户端配置；env 兜底 USER_RPC_TARGET /
+// AGENTS_IM_USER_RPC_TARGET。
+func ResolveUserRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
+	return resolveRPCClientConfig(cfg, userRPCSpec)
 }
 
 // ResolveAgentRPCConfig 解析 agent-api（纯 BFF，#606）→ 属主 agent-rpc 客户端配置；env 兜底
-// AGENT_RPC_TARGET / AGENTS_IM_AGENT_RPC_TARGET（同 UserRPC 模式）。
+// AGENT_RPC_TARGET / AGENTS_IM_AGENT_RPC_TARGET。
 func ResolveAgentRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
-	cfg.Target = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Target)), os.Getenv("AGENTS_IM_AGENT_RPC_TARGET"), os.Getenv("AGENT_RPC_TARGET"))
-	if len(cfg.Endpoints) == 0 {
-		cfg.Endpoints = brokerListFromValue(firstNonEmpty(os.Getenv("AGENTS_IM_AGENT_RPC_ENDPOINTS"), os.Getenv("AGENT_RPC_ENDPOINTS")))
-	}
-	if cfg.Timeout <= 0 {
-		cfg.Timeout = 5000
-	}
-	cfg.NonBlock = true
-	return cfg
-}
-
-// ResolveUserRPCConfig 解析读用户资料的 user-rpc 客户端配置；env 兜底
-// USER_RPC_TARGET / AGENTS_IM_USER_RPC_TARGET（同 MsgRPC 模式）。
-func ResolveUserRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
-	cfg.Target = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Target)), os.Getenv("AGENTS_IM_USER_RPC_TARGET"), os.Getenv("USER_RPC_TARGET"))
-	if len(cfg.Endpoints) == 0 {
-		cfg.Endpoints = brokerListFromValue(firstNonEmpty(os.Getenv("AGENTS_IM_USER_RPC_ENDPOINTS"), os.Getenv("USER_RPC_ENDPOINTS")))
-	}
-	if cfg.Timeout <= 0 {
-		cfg.Timeout = 5000
-	}
-	cfg.NonBlock = true
-	return cfg
-}
-
-// ResolveMsgRPCConfig 解析 msggateway → msg-rpc 客户端配置；env 兜底
-// MSG_RPC_TARGET / AGENTS_IM_MSG_RPC_TARGET（同 MailRPC 模式）。
-func ResolveMsgRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
-	cfg.Target = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Target)), os.Getenv("AGENTS_IM_MSG_RPC_TARGET"), os.Getenv("MSG_RPC_TARGET"))
-	if len(cfg.Endpoints) == 0 {
-		cfg.Endpoints = brokerListFromValue(firstNonEmpty(os.Getenv("AGENTS_IM_MSG_RPC_ENDPOINTS"), os.Getenv("MSG_RPC_ENDPOINTS")))
-	}
-	if cfg.Timeout <= 0 {
-		cfg.Timeout = 5000
-	}
-	cfg.NonBlock = true
-	return cfg
-}
-
-func ResolveMailRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
-	cfg.Target = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Target)), os.Getenv("AUTH_MAIL_RPC_TARGET"), os.Getenv("AGENTS_IM_MAIL_RPC_TARGET"), os.Getenv("MAIL_RPC_TARGET"))
-	if len(cfg.Endpoints) == 0 {
-		cfg.Endpoints = brokerListFromValue(firstNonEmpty(os.Getenv("AUTH_MAIL_RPC_ENDPOINTS"), os.Getenv("AGENTS_IM_MAIL_RPC_ENDPOINTS"), os.Getenv("MAIL_RPC_ENDPOINTS")))
-	}
-	if cfg.Timeout <= 0 {
-		cfg.Timeout = 2000
-	}
-	cfg.NonBlock = true
-	return cfg
+	return resolveRPCClientConfig(cfg, agentRPCSpec)
 }
 
 func deepSeekConfigFromValues(values map[string]string) DeepSeekConfig {
