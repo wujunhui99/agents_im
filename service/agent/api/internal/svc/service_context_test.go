@@ -1,24 +1,16 @@
 package svc
 
 import (
+	"errors"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/pkg/config"
-	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	apiconfig "github.com/wujunhui99/agents_im/service/agent/api/internal/config"
 )
 
-func TestServiceContextDefaultsPythonExecutorDisabled(t *testing.T) {
-	ctx := NewServiceContextWithAuth(repository.NewMemoryAgentRepository(), nil, config.DefaultJWTAuthConfig())
-	if _, ok := ctx.PythonExecutor.(*pythonexec.DisabledExecutor); !ok {
-		t.Fatalf("default python executor should be disabled, got %T", ctx.PythonExecutor)
-	}
-}
-
-func TestServiceContextAcceptsConfiguredPythonExecutor(t *testing.T) {
-	executor := pythonexec.NewDisabledExecutor()
-	ctx := NewServiceContextWithAuthAndPythonExecutor(repository.NewMemoryAgentRepository(), nil, config.DefaultJWTAuthConfig(), executor)
-	if ctx.PythonExecutor != executor {
-		t.Fatalf("python executor injection mismatch: got %T", ctx.PythonExecutor)
+// agent-api 是纯 BFF（#606）：缺 agent-rpc 客户端配置须显式失败（不静默回退）。
+func TestNewServiceContextFromConfigRequiresAgentRPC(t *testing.T) {
+	_, err := NewServiceContextFromConfig(apiconfig.Config{})
+	if !errors.Is(err, ErrAgentRPCConfigRequired) {
+		t.Fatalf("expected ErrAgentRPCConfigRequired, got %v", err)
 	}
 }

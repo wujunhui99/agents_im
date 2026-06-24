@@ -21,6 +21,14 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Agent_GetConversationAIHosting_FullMethodName    = "/agent.v1.Agent/GetConversationAIHosting"
 	Agent_UpdateConversationAIHosting_FullMethodName = "/agent.v1.Agent/UpdateConversationAIHosting"
+	Agent_CreateAgent_FullMethodName                 = "/agent.v1.Agent/CreateAgent"
+	Agent_GetAgent_FullMethodName                    = "/agent.v1.Agent/GetAgent"
+	Agent_ListAgents_FullMethodName                  = "/agent.v1.Agent/ListAgents"
+	Agent_UpdateAgent_FullMethodName                 = "/agent.v1.Agent/UpdateAgent"
+	Agent_UpdateAgentStatus_FullMethodName           = "/agent.v1.Agent/UpdateAgentStatus"
+	Agent_GetAgentDefinition_FullMethodName          = "/agent.v1.Agent/GetAgentDefinition"
+	Agent_UpdateAgentDefinition_FullMethodName       = "/agent.v1.Agent/UpdateAgentDefinition"
+	Agent_EnsureDefaultAssistant_FullMethodName      = "/agent.v1.Agent/EnsureDefaultAssistant"
 )
 
 // AgentClient is the client API for Agent service.
@@ -28,12 +36,25 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // Agent 是 agent 域 RPC（04-agent §3.2，#340）。agent-rpc 同时是 agent.trigger.v1
-// 的消费者 worker（见 agent.go），gRPC 面当前只暴露 AI 托管开关 CRUD ——
-// 数据 owner = agent 域（#463 临时塞进 msg.proto 的两个 RPC 随本 issue 迁出）。
+// 的消费者 worker（见 agent.go）。数据 owner = agent 域：#606 起 agents 表 + agent 定义
+// （系统提示词 + 工具绑定）数据层脱 internal/，gRPC 面新增 agent CRUD + 定义 + 默认助手装配，
+// 供 agent-api BFF（去 in-process logic / 去直连 DB）与 user-rpc 装配编排消费。
 type AgentClient interface {
 	// AI 托管开关：普通用户在双人单聊里开关「由 AI 代我回复」。
 	GetConversationAIHosting(ctx context.Context, in *GetConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error)
 	UpdateConversationAIHosting(ctx context.Context, in *UpdateConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error)
+	// ---- agent CRUD（#606，agent-api BFF 经此面，不再 in-process logic / 直连 DB）----
+	CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error)
+	GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error)
+	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
+	UpdateAgent(ctx context.Context, in *UpdateAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error)
+	UpdateAgentStatus(ctx context.Context, in *UpdateAgentStatusRequest, opts ...grpc.CallOption) (*AgentResponse, error)
+	// ---- agent 定义（系统提示词 + 工具绑定）----
+	GetAgentDefinition(ctx context.Context, in *GetAgentDefinitionRequest, opts ...grpc.CallOption) (*AgentDefinitionResponse, error)
+	UpdateAgentDefinition(ctx context.Context, in *UpdateAgentDefinitionRequest, opts ...grpc.CallOption) (*AgentDefinitionResponse, error)
+	// EnsureDefaultAssistant 幂等装配默认助手的 agent 域部分（agent 行 + 提示词 + 工具绑定）。
+	// 由 user-rpc 装配编排调用（账号属 user 域已建，好友由 user-rpc 经 friends-rpc 建）。
+	EnsureDefaultAssistant(ctx context.Context, in *EnsureDefaultAssistantRequest, opts ...grpc.CallOption) (*EnsureDefaultAssistantResponse, error)
 }
 
 type agentClient struct {
@@ -64,17 +85,110 @@ func (c *agentClient) UpdateConversationAIHosting(ctx context.Context, in *Updat
 	return out, nil
 }
 
+func (c *agentClient) CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentResponse)
+	err := c.cc.Invoke(ctx, Agent_CreateAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentResponse)
+	err := c.cc.Invoke(ctx, Agent_GetAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentsResponse)
+	err := c.cc.Invoke(ctx, Agent_ListAgents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) UpdateAgent(ctx context.Context, in *UpdateAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentResponse)
+	err := c.cc.Invoke(ctx, Agent_UpdateAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) UpdateAgentStatus(ctx context.Context, in *UpdateAgentStatusRequest, opts ...grpc.CallOption) (*AgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentResponse)
+	err := c.cc.Invoke(ctx, Agent_UpdateAgentStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) GetAgentDefinition(ctx context.Context, in *GetAgentDefinitionRequest, opts ...grpc.CallOption) (*AgentDefinitionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentDefinitionResponse)
+	err := c.cc.Invoke(ctx, Agent_GetAgentDefinition_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) UpdateAgentDefinition(ctx context.Context, in *UpdateAgentDefinitionRequest, opts ...grpc.CallOption) (*AgentDefinitionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentDefinitionResponse)
+	err := c.cc.Invoke(ctx, Agent_UpdateAgentDefinition_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) EnsureDefaultAssistant(ctx context.Context, in *EnsureDefaultAssistantRequest, opts ...grpc.CallOption) (*EnsureDefaultAssistantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EnsureDefaultAssistantResponse)
+	err := c.cc.Invoke(ctx, Agent_EnsureDefaultAssistant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServer is the server API for Agent service.
 // All implementations must embed UnimplementedAgentServer
 // for forward compatibility.
 //
 // Agent 是 agent 域 RPC（04-agent §3.2，#340）。agent-rpc 同时是 agent.trigger.v1
-// 的消费者 worker（见 agent.go），gRPC 面当前只暴露 AI 托管开关 CRUD ——
-// 数据 owner = agent 域（#463 临时塞进 msg.proto 的两个 RPC 随本 issue 迁出）。
+// 的消费者 worker（见 agent.go）。数据 owner = agent 域：#606 起 agents 表 + agent 定义
+// （系统提示词 + 工具绑定）数据层脱 internal/，gRPC 面新增 agent CRUD + 定义 + 默认助手装配，
+// 供 agent-api BFF（去 in-process logic / 去直连 DB）与 user-rpc 装配编排消费。
 type AgentServer interface {
 	// AI 托管开关：普通用户在双人单聊里开关「由 AI 代我回复」。
 	GetConversationAIHosting(context.Context, *GetConversationAIHostingRequest) (*ConversationAIHostingState, error)
 	UpdateConversationAIHosting(context.Context, *UpdateConversationAIHostingRequest) (*ConversationAIHostingState, error)
+	// ---- agent CRUD（#606，agent-api BFF 经此面，不再 in-process logic / 直连 DB）----
+	CreateAgent(context.Context, *CreateAgentRequest) (*AgentResponse, error)
+	GetAgent(context.Context, *GetAgentRequest) (*AgentResponse, error)
+	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
+	UpdateAgent(context.Context, *UpdateAgentRequest) (*AgentResponse, error)
+	UpdateAgentStatus(context.Context, *UpdateAgentStatusRequest) (*AgentResponse, error)
+	// ---- agent 定义（系统提示词 + 工具绑定）----
+	GetAgentDefinition(context.Context, *GetAgentDefinitionRequest) (*AgentDefinitionResponse, error)
+	UpdateAgentDefinition(context.Context, *UpdateAgentDefinitionRequest) (*AgentDefinitionResponse, error)
+	// EnsureDefaultAssistant 幂等装配默认助手的 agent 域部分（agent 行 + 提示词 + 工具绑定）。
+	// 由 user-rpc 装配编排调用（账号属 user 域已建，好友由 user-rpc 经 friends-rpc 建）。
+	EnsureDefaultAssistant(context.Context, *EnsureDefaultAssistantRequest) (*EnsureDefaultAssistantResponse, error)
 	mustEmbedUnimplementedAgentServer()
 }
 
@@ -90,6 +204,30 @@ func (UnimplementedAgentServer) GetConversationAIHosting(context.Context, *GetCo
 }
 func (UnimplementedAgentServer) UpdateConversationAIHosting(context.Context, *UpdateConversationAIHostingRequest) (*ConversationAIHostingState, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateConversationAIHosting not implemented")
+}
+func (UnimplementedAgentServer) CreateAgent(context.Context, *CreateAgentRequest) (*AgentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAgent not implemented")
+}
+func (UnimplementedAgentServer) GetAgent(context.Context, *GetAgentRequest) (*AgentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAgent not implemented")
+}
+func (UnimplementedAgentServer) ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgents not implemented")
+}
+func (UnimplementedAgentServer) UpdateAgent(context.Context, *UpdateAgentRequest) (*AgentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAgent not implemented")
+}
+func (UnimplementedAgentServer) UpdateAgentStatus(context.Context, *UpdateAgentStatusRequest) (*AgentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAgentStatus not implemented")
+}
+func (UnimplementedAgentServer) GetAgentDefinition(context.Context, *GetAgentDefinitionRequest) (*AgentDefinitionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAgentDefinition not implemented")
+}
+func (UnimplementedAgentServer) UpdateAgentDefinition(context.Context, *UpdateAgentDefinitionRequest) (*AgentDefinitionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAgentDefinition not implemented")
+}
+func (UnimplementedAgentServer) EnsureDefaultAssistant(context.Context, *EnsureDefaultAssistantRequest) (*EnsureDefaultAssistantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EnsureDefaultAssistant not implemented")
 }
 func (UnimplementedAgentServer) mustEmbedUnimplementedAgentServer() {}
 func (UnimplementedAgentServer) testEmbeddedByValue()               {}
@@ -148,6 +286,150 @@ func _Agent_UpdateConversationAIHosting_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agent_CreateAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).CreateAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_CreateAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).CreateAgent(ctx, req.(*CreateAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_GetAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).GetAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_GetAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).GetAgent(ctx, req.(*GetAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_ListAgents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).ListAgents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_ListAgents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).ListAgents(ctx, req.(*ListAgentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_UpdateAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).UpdateAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_UpdateAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).UpdateAgent(ctx, req.(*UpdateAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_UpdateAgentStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAgentStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).UpdateAgentStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_UpdateAgentStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).UpdateAgentStatus(ctx, req.(*UpdateAgentStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_GetAgentDefinition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAgentDefinitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).GetAgentDefinition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_GetAgentDefinition_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).GetAgentDefinition(ctx, req.(*GetAgentDefinitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_UpdateAgentDefinition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAgentDefinitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).UpdateAgentDefinition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_UpdateAgentDefinition_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).UpdateAgentDefinition(ctx, req.(*UpdateAgentDefinitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_EnsureDefaultAssistant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnsureDefaultAssistantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).EnsureDefaultAssistant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_EnsureDefaultAssistant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).EnsureDefaultAssistant(ctx, req.(*EnsureDefaultAssistantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Agent_ServiceDesc is the grpc.ServiceDesc for Agent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -162,6 +444,38 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateConversationAIHosting",
 			Handler:    _Agent_UpdateConversationAIHosting_Handler,
+		},
+		{
+			MethodName: "CreateAgent",
+			Handler:    _Agent_CreateAgent_Handler,
+		},
+		{
+			MethodName: "GetAgent",
+			Handler:    _Agent_GetAgent_Handler,
+		},
+		{
+			MethodName: "ListAgents",
+			Handler:    _Agent_ListAgents_Handler,
+		},
+		{
+			MethodName: "UpdateAgent",
+			Handler:    _Agent_UpdateAgent_Handler,
+		},
+		{
+			MethodName: "UpdateAgentStatus",
+			Handler:    _Agent_UpdateAgentStatus_Handler,
+		},
+		{
+			MethodName: "GetAgentDefinition",
+			Handler:    _Agent_GetAgentDefinition_Handler,
+		},
+		{
+			MethodName: "UpdateAgentDefinition",
+			Handler:    _Agent_UpdateAgentDefinition_Handler,
+		},
+		{
+			MethodName: "EnsureDefaultAssistant",
+			Handler:    _Agent_EnsureDefaultAssistant_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

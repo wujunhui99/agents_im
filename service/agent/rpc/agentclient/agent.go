@@ -14,14 +14,41 @@ import (
 )
 
 type (
+	AgentDefinition                    = agent.AgentDefinition
+	AgentDefinitionResponse            = agent.AgentDefinitionResponse
+	AgentEntity                        = agent.AgentEntity
+	AgentPromptDefinition              = agent.AgentPromptDefinition
+	AgentResponse                      = agent.AgentResponse
+	AgentToolDefinition                = agent.AgentToolDefinition
 	ConversationAIHostingState         = agent.ConversationAIHostingState
+	CreateAgentRequest                 = agent.CreateAgentRequest
+	EnsureDefaultAssistantRequest      = agent.EnsureDefaultAssistantRequest
+	EnsureDefaultAssistantResponse     = agent.EnsureDefaultAssistantResponse
+	GetAgentDefinitionRequest          = agent.GetAgentDefinitionRequest
+	GetAgentRequest                    = agent.GetAgentRequest
 	GetConversationAIHostingRequest    = agent.GetConversationAIHostingRequest
+	ListAgentsRequest                  = agent.ListAgentsRequest
+	ListAgentsResponse                 = agent.ListAgentsResponse
+	UpdateAgentDefinitionRequest       = agent.UpdateAgentDefinitionRequest
+	UpdateAgentRequest                 = agent.UpdateAgentRequest
+	UpdateAgentStatusRequest           = agent.UpdateAgentStatusRequest
 	UpdateConversationAIHostingRequest = agent.UpdateConversationAIHostingRequest
 
 	Agent interface {
 		// AI 托管开关：普通用户在双人单聊里开关「由 AI 代我回复」。
 		GetConversationAIHosting(ctx context.Context, in *GetConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error)
 		UpdateConversationAIHosting(ctx context.Context, in *UpdateConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error)
+		// ---- agent CRUD（#606，agent-api BFF 经此面，不再 in-process logic / 直连 DB）----
+		CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error)
+		GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error)
+		ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
+		UpdateAgent(ctx context.Context, in *UpdateAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error)
+		UpdateAgentStatus(ctx context.Context, in *UpdateAgentStatusRequest, opts ...grpc.CallOption) (*AgentResponse, error)
+		// ---- agent 定义（系统提示词 + 工具绑定）----
+		GetAgentDefinition(ctx context.Context, in *GetAgentDefinitionRequest, opts ...grpc.CallOption) (*AgentDefinitionResponse, error)
+		UpdateAgentDefinition(ctx context.Context, in *UpdateAgentDefinitionRequest, opts ...grpc.CallOption) (*AgentDefinitionResponse, error)
+		// EnsureDefaultAssistant 幂等装配默认助手的 agent 域部分（agent 行 + 提示词 + 工具绑定）。
+		EnsureDefaultAssistant(ctx context.Context, in *EnsureDefaultAssistantRequest, opts ...grpc.CallOption) (*EnsureDefaultAssistantResponse, error)
 	}
 
 	defaultAgent struct {
@@ -35,6 +62,7 @@ func NewAgent(cli zrpc.Client) Agent {
 	}
 }
 
+// AI 托管开关：普通用户在双人单聊里开关「由 AI 代我回复」。
 func (m *defaultAgent) GetConversationAIHosting(ctx context.Context, in *GetConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error) {
 	client := agent.NewAgentClient(m.cli.Conn())
 	return client.GetConversationAIHosting(ctx, in, opts...)
@@ -43,4 +71,47 @@ func (m *defaultAgent) GetConversationAIHosting(ctx context.Context, in *GetConv
 func (m *defaultAgent) UpdateConversationAIHosting(ctx context.Context, in *UpdateConversationAIHostingRequest, opts ...grpc.CallOption) (*ConversationAIHostingState, error) {
 	client := agent.NewAgentClient(m.cli.Conn())
 	return client.UpdateConversationAIHosting(ctx, in, opts...)
+}
+
+// ---- agent CRUD（#606，agent-api BFF 经此面，不再 in-process logic / 直连 DB）----
+func (m *defaultAgent) CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.CreateAgent(ctx, in, opts...)
+}
+
+func (m *defaultAgent) GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.GetAgent(ctx, in, opts...)
+}
+
+func (m *defaultAgent) ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.ListAgents(ctx, in, opts...)
+}
+
+func (m *defaultAgent) UpdateAgent(ctx context.Context, in *UpdateAgentRequest, opts ...grpc.CallOption) (*AgentResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.UpdateAgent(ctx, in, opts...)
+}
+
+func (m *defaultAgent) UpdateAgentStatus(ctx context.Context, in *UpdateAgentStatusRequest, opts ...grpc.CallOption) (*AgentResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.UpdateAgentStatus(ctx, in, opts...)
+}
+
+// ---- agent 定义（系统提示词 + 工具绑定）----
+func (m *defaultAgent) GetAgentDefinition(ctx context.Context, in *GetAgentDefinitionRequest, opts ...grpc.CallOption) (*AgentDefinitionResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.GetAgentDefinition(ctx, in, opts...)
+}
+
+func (m *defaultAgent) UpdateAgentDefinition(ctx context.Context, in *UpdateAgentDefinitionRequest, opts ...grpc.CallOption) (*AgentDefinitionResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.UpdateAgentDefinition(ctx, in, opts...)
+}
+
+// EnsureDefaultAssistant 幂等装配默认助手的 agent 域部分（agent 行 + 提示词 + 工具绑定）。
+func (m *defaultAgent) EnsureDefaultAssistant(ctx context.Context, in *EnsureDefaultAssistantRequest, opts ...grpc.CallOption) (*EnsureDefaultAssistantResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.EnsureDefaultAssistant(ctx, in, opts...)
 }

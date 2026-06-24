@@ -5,12 +5,142 @@ package agent.v1;
 option go_package = "github.com/wujunhui99/agents_im/service/agent/rpc/agent";
 
 // Agent 是 agent 域 RPC（04-agent §3.2，#340）。agent-rpc 同时是 agent.trigger.v1
-// 的消费者 worker（见 agent.go），gRPC 面当前只暴露 AI 托管开关 CRUD ——
-// 数据 owner = agent 域（#463 临时塞进 msg.proto 的两个 RPC 随本 issue 迁出）。
+// 的消费者 worker（见 agent.go）。数据 owner = agent 域：#606 起 agents 表 + agent 定义
+// （系统提示词 + 工具绑定）数据层脱 internal/，gRPC 面新增 agent CRUD + 定义 + 默认助手装配，
+// 供 agent-api BFF（去 in-process logic / 去直连 DB）与 user-rpc 装配编排消费。
 service Agent {
   // AI 托管开关：普通用户在双人单聊里开关「由 AI 代我回复」。
   rpc GetConversationAIHosting(GetConversationAIHostingRequest) returns (ConversationAIHostingState);
   rpc UpdateConversationAIHosting(UpdateConversationAIHostingRequest) returns (ConversationAIHostingState);
+
+  // ---- agent CRUD（#606，agent-api BFF 经此面，不再 in-process logic / 直连 DB）----
+  rpc CreateAgent(CreateAgentRequest) returns (AgentResponse);
+  rpc GetAgent(GetAgentRequest) returns (AgentResponse);
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  rpc UpdateAgent(UpdateAgentRequest) returns (AgentResponse);
+  rpc UpdateAgentStatus(UpdateAgentStatusRequest) returns (AgentResponse);
+
+  // ---- agent 定义（系统提示词 + 工具绑定）----
+  rpc GetAgentDefinition(GetAgentDefinitionRequest) returns (AgentDefinitionResponse);
+  rpc UpdateAgentDefinition(UpdateAgentDefinitionRequest) returns (AgentDefinitionResponse);
+
+  // EnsureDefaultAssistant 幂等装配默认助手的 agent 域部分（agent 行 + 提示词 + 工具绑定）。
+  // 由 user-rpc 装配编排调用（账号属 user 域已建，好友由 user-rpc 经 friends-rpc 建）。
+  rpc EnsureDefaultAssistant(EnsureDefaultAssistantRequest) returns (EnsureDefaultAssistantResponse);
+}
+
+// ---- agent CRUD ----
+message AgentEntity {
+  string agent_id = 1;
+  string account_id = 2;
+  string im_user_id = 3;
+  string name = 4;
+  string description = 5;
+  string status = 6;
+  string created_by = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message CreateAgentRequest {
+  string account_id = 1;
+  string im_user_id = 2;
+  string name = 3;
+  string description = 4;
+  string status = 5;
+  string created_by = 6;
+}
+
+message AgentResponse {
+  AgentEntity agent = 1;
+}
+
+message GetAgentRequest {
+  string agent_id = 1;
+}
+
+message ListAgentsRequest {
+  string status = 1;
+  string created_by = 2;
+  int64 limit = 3;
+  int64 offset = 4;
+}
+
+message ListAgentsResponse {
+  repeated AgentEntity agents = 1;
+}
+
+message UpdateAgentRequest {
+  string agent_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message UpdateAgentStatusRequest {
+  string agent_id = 1;
+  string status = 2;
+}
+
+// ---- agent 定义 ----
+message AgentPromptDefinition {
+  string prompt_id = 1;
+  string name = 2;
+  string description = 3;
+  string content = 4;
+  string variables_schema_json = 5;
+  string version = 6;
+  string status = 7;
+  string created_by = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+message AgentToolDefinition {
+  string tool_id = 1;
+  string name = 2;
+  string description = 3;
+  string tool_type = 4;
+  string mcp_server_id = 5;
+  string mcp_tool_name = 6;
+  string local_handler_key = 7;
+  string builtin_key = 8;
+  string input_schema_json = 9;
+  string output_schema_json = 10;
+  string permission_level = 11;
+  string status = 12;
+  bool admin_configured = 13;
+}
+
+message AgentDefinition {
+  AgentEntity agent = 1;
+  AgentPromptDefinition system_prompt = 2;
+  repeated AgentToolDefinition tools = 3;
+}
+
+message GetAgentDefinitionRequest {
+  string agent_id = 1;
+  string requested_by = 2;
+}
+
+message UpdateAgentDefinitionRequest {
+  string agent_id = 1;
+  string system_prompt = 2;
+  repeated string tool_names = 3;
+  string updated_by = 4;
+}
+
+message AgentDefinitionResponse {
+  AgentDefinition definition = 1;
+}
+
+// ---- 默认助手装配 ----
+message EnsureDefaultAssistantRequest {
+  string account_id = 1;
+}
+
+message EnsureDefaultAssistantResponse {
+  string agent_id = 1;
+  string prompt_id = 2;
 }
 
 // ---- ConversationAIHosting ----

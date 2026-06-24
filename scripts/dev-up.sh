@@ -324,14 +324,16 @@ main() {
   render_configs
   # media-rpc 先起：user-rpc（头像校验）/msg-rpc（附件校验）的 MediaRPC 客户端依赖它（#533）。
   start_service "media-rpc"
-  start_service "user-rpc"
   start_service "groups-rpc"
   start_service "msg-rpc"
   start_service "friends-rpc"
   start_service "admin-rpc"
   start_service "auth-rpc"
-  # agent-rpc 依赖 msg-rpc/user-rpc，且 msg-api 依赖 agent-rpc（AI 托管 CRUD）：故在两者之间启动。
+  # agent-rpc / friends-rpc 必须在 user-rpc 之前就绪：user-rpc 启动即 Backfill 默认助手，
+  # 同步调 agent-rpc.EnsureDefaultAssistant + friends-rpc.EnsureFriendship（#606，单向叶子不成环）。
+  # agent-rpc 对 msg-rpc/user-rpc 的客户端是 NonBlock，仅运行时调用，故可先于 user-rpc 起。
   start_service "agent-rpc"
+  start_service "user-rpc"
   start_service "user-api"
   start_service "auth-api"
   start_service "friends-api"

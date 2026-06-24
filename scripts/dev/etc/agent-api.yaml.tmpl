@@ -4,13 +4,12 @@ Port: ${AGENT_API_PORT}
 Auth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: ${JWT_ACCESS_EXPIRE}
-StorageDriver: postgres
-DataSource: ${DATABASE_URL}
 Redis:
   Addr: ${REDIS_ADDR}
   Password: ${REDIS_PASSWORD}
   DB: ${REDIS_DB}
-UserRPC:
+# agent-api 转纯 BFF（#606）：agent CRUD / 定义经属主 agent-rpc gRPC，不再 in-process logic / 直连 DB。
+AgentRPC:
   Endpoints:
-    - 127.0.0.1:${USER_RPC_PORT}
+    - 127.0.0.1:${AGENT_RPC_PORT}
   Timeout: 5000

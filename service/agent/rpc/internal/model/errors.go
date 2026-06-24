@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	pgUniqueViolationCode = "23505"
-	pgCheckViolationCode  = "23514"
+	pgUniqueViolationCode     = "23505"
+	pgCheckViolationCode      = "23514"
+	pgForeignKeyViolationCode = "23503"
 )
 
 func isPostgresCode(err error, code string) bool {
@@ -26,4 +27,10 @@ func IsUniqueViolation(err error) bool {
 // 由 Logic/Store 层映射成 apperror.InvalidArgument。
 func IsCheckViolation(err error) bool {
 	return isPostgresCode(err, pgCheckViolationCode)
+}
+
+// IsForeignKeyViolation 报告 err 是否为 postgres 外键约束冲突（如绑定引用不存在的 prompt/tool/mcp）。
+// 由 Logic/Store 层映射成 apperror.NotFound。
+func IsForeignKeyViolation(err error) bool {
+	return isPostgresCode(err, pgForeignKeyViolationCode)
 }

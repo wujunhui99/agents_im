@@ -42,6 +42,9 @@ type APIConfig struct {
 	// UserRPC 是读用户资料的属主 user-rpc 客户端配置（gate #550：消费者脱 internal 读 profiles，
 	// 经属主 rpc 而非 internal/repository；#551 auth、#553 起 agent-api 等）。
 	UserRPC zrpc.RpcClientConf
+	// AgentRPC 是 agent 域属主 agent-rpc 客户端配置（#606：agent-api 转纯 BFF，agent CRUD /
+	// 定义经 agent-rpc gRPC，不再 in-process logic / 直连 DB）。
+	AgentRPC zrpc.RpcClientConf
 }
 
 type AdminBootstrapConfig struct {

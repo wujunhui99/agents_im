@@ -12,6 +12,11 @@ service Friends {
   rpc ListFriendRequests(ListFriendRequestsRequest) returns (ListFriendRequestsResponse);
   rpc AcceptFriendRequest(FriendRequestDecisionRequest) returns (FriendRequestDecisionResponse);
   rpc RejectFriendRequest(FriendRequestDecisionRequest) returns (FriendRequestDecisionResponse);
+  // EnsureFriendship 幂等地建立 user_id <-> friend_id 的双向 accepted 好友关系（不触发请求/审批流）。
+  // 供默认助手开通（user-rpc 装配）与 agent.create 工具路径（agent-rpc）跨域建好友使用——
+  // 取代旧 internal/repository.EnsureAcceptedFriendship。调用方负责账号存在性（friends-rpc 是叶子，
+  // 不读 accounts）。重复调用不重置 created_at。
+  rpc EnsureFriendship(EnsureFriendshipRequest) returns (EnsureFriendshipResponse);
 }
 
 message FriendProfile {
@@ -94,4 +99,13 @@ message FriendRequestDecisionRequest {
 message FriendRequestDecisionResponse {
   Friendship friendship = 1;
   bool updated = 2;
+}
+
+message EnsureFriendshipRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message EnsureFriendshipResponse {
+  Friendship friendship = 1;
 }

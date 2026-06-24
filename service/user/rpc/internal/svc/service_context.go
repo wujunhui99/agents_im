@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/agentclient"
+	"github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
 	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
@@ -14,9 +14,8 @@ import (
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
-// DefaultAssistantProvisioner 是「新用户开通默认助手」的 keystone 跨域写接口（agent 域）。
-// 无 agent-rpc 可 BFF，暂由 internal/logic 实现注入，仍读/写 internal/repository；
-// 待 agent/message 迁移后删（见 docs/refactor/v1/progress/02-microservices.md）。
+// DefaultAssistantProvisioner 是「新用户开通默认助手」的跨域编排接口（#606：account=user 域本地、
+// agent 域经 agent-rpc、好友经 friends-rpc）。由 user-rpc 装配，详见 default_assistant.go。
 type DefaultAssistantProvisioner interface {
 	EnsureForUser(ctx context.Context, accountID string) error
 }
@@ -32,7 +31,6 @@ type ServiceContext struct {
 	Accounts model.AccountsModel
 	Profiles model.ProfilesModel
 
-	// keystone 跨域例外（仍依赖 internal），见各接口注释。
 	Assistant       DefaultAssistantProvisioner
 	AvatarValidator AvatarValidator
 }
@@ -42,16 +40,25 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	accountsModel := model.NewAccountsModel(conn)
 	profilesModel := model.NewProfilesModel(conn)
 
-	// keystone：默认助手开通（agent 域写）。agent/registry 与好友写仍走 internal god-repository
-	// （无 avatar，待 agent 域迁移后删）；但账号读写改由 assistantAccountRepo 经 user-rpc 自有
-	// goctl model 承接，脱 internal/repository 的 profiles.avatar_media_id string scan
-	// （gate #550 第 3 处存活读路径，见 assistant_account_repo.go）。
-	repo, err := repository.NewPostgresRepository(c.DataSource)
-	if err != nil {
-		log.Fatalf("build account repository: %v", err)
+	if !hasRPCClientConfig(c.AgentRPC) {
+		log.Fatalf("user-rpc requires agent rpc client config (AgentRPC) for default assistant provisioning")
 	}
-	accountRepo := newAssistantAccountRepo(accountsModel, profilesModel, repo)
-	provisioner := business.NewDefaultAssistantProvisioner(accountRepo, repo, repo)
+	if !hasRPCClientConfig(c.FriendsRPC) {
+		log.Fatalf("user-rpc requires friends rpc client config (FriendsRPC) for default assistant friendship")
+	}
+	agentRPCClient, err := zrpc.NewClient(c.AgentRPC)
+	if err != nil {
+		log.Fatalf("build agent rpc client: %v", err)
+	}
+	friendsRPCClient, err := zrpc.NewClient(c.FriendsRPC)
+	if err != nil {
+		log.Fatalf("build friends rpc client: %v", err)
+	}
+
+	// 默认助手账号读写经 user-rpc 自有 goctl model（bigint-safe，gate #550）；agent 域装配 + 好友建立
+	// 经 agent-rpc / friends-rpc（#606，脱 internal/repository agent registry 写与 EnsureAcceptedFriendship）。
+	accountRepo := newAssistantAccountRepo(accountsModel, profilesModel, nil)
+	provisioner := newDefaultAssistantProvisioner(accountRepo, agentclient.NewAgent(agentRPCClient), friendsclient.NewFriends(friendsRPCClient))
 	if _, err := provisioner.Backfill(context.Background()); err != nil {
 		log.Fatalf("backfill default assistant: %v", err)
 	}
@@ -69,4 +76,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Assistant:       provisioner,
 		AvatarValidator: newMediaRPCAvatarValidator(mediaclient.NewMedia(mediaCli)),
 	}
+}
+
+// hasRPCClientConfig 判断 zrpc 客户端是否已配置（target / endpoints / etcd 任一）。
+func hasRPCClientConfig(conf zrpc.RpcClientConf) bool {
+	return conf.Target != "" || len(conf.Endpoints) > 0 || (len(conf.Etcd.Hosts) > 0 && conf.Etcd.Key != "")
 }

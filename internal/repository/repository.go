@@ -34,7 +34,6 @@ type AccountRepository interface {
 type UserRepository = AccountRepository
 
 type FriendshipRepository interface {
-	EnsureAcceptedFriendship(ctx context.Context, userID string, friendID string) error
 	AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error)
 	AcceptFriendRequest(ctx context.Context, userID string, requesterID string) (model.Friendship, bool, error)
 	RejectFriendRequest(ctx context.Context, userID string, requesterID string) (model.Friendship, bool, error)

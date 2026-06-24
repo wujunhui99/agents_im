@@ -321,40 +321,6 @@ returning account_id
 	return r.GetByID(ctx, accountID)
 }
 
-func (r *PostgresRepository) EnsureAcceptedFriendship(ctx context.Context, userID string, friendID string) error {
-	if strings.TrimSpace(userID) == strings.TrimSpace(friendID) {
-		return apperror.InvalidArgument("cannot add self as friend")
-	}
-
-	err := r.withTx(ctx, func(ctx context.Context, session sqlx.Session) error {
-		var accountCount int64
-		if err := session.QueryRowCtx(ctx, &accountCount, `
-select count(*)
-from accounts
-where account_id in ($1, $2)
-`, userID, friendID); err != nil {
-			return err
-		}
-		if accountCount != 2 {
-			return apperror.NotFound("account not found")
-		}
-		if _, err := upsertFriendshipPreserveCreatedAt(ctx, session, userID, friendID, model.FriendshipStatusAccepted); err != nil {
-			return err
-		}
-		if _, err := upsertFriendshipPreserveCreatedAt(ctx, session, friendID, userID, model.FriendshipStatusAccepted); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		if isPostgresCheckViolation(err) {
-			return apperror.InvalidArgument("invalid friendship")
-		}
-		return err
-	}
-	return nil
-}
-
 func (r *PostgresRepository) AddFriend(ctx context.Context, userID string, friendID string) (model.Friendship, bool, error) {
 	var friendship model.Friendship
 	created := true
@@ -598,21 +564,6 @@ values ($1, $2, $3)
 on conflict (account_id, friend_account_id) do update
 set status = excluded.status,
     created_at = now(),
-    updated_at = now()
-returning account_id, friend_account_id, status, created_at, updated_at
-`, userID, friendID, friendshipStatusToDB(status)); err != nil {
-		return model.Friendship{}, err
-	}
-	return row.friendship(), nil
-}
-
-func upsertFriendshipPreserveCreatedAt(ctx context.Context, session sqlx.Session, userID string, friendID string, status string) (model.Friendship, error) {
-	var row postgresFriendshipRow
-	if err := session.QueryRowCtx(ctx, &row, `
-insert into friendships (account_id, friend_account_id, status)
-values ($1, $2, $3)
-on conflict (account_id, friend_account_id) do update
-set status = excluded.status,
     updated_at = now()
 returning account_id, friend_account_id, status, created_at, updated_at
 `, userID, friendID, friendshipStatusToDB(status)); err != nil {

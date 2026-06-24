@@ -37,15 +37,14 @@ type ServiceContext struct {
 	AgentAuditLogic  *logic.AgentAuditLogic
 	AgentAuditRepo   repository.AgentAuditRepository
 	AgentResolver    convhosting.AgentAccountExistenceChecker
-	AccountRepo      repository.Repository
-	AgentRepo        repository.AgentRepository
-	// AgentRegistryRepo 是 internal keystone 注册表数据层,仅喂 agent.create(AgentAssemblyLogic)
-	// 写路径,待后续 PR 随 internal 退役(#605 非目标:CreateAgentFromTool saga 拆解)。
-	AgentRegistryRepo repository.AgentRegistryRepository
 	// AgentRegistryReader 是 agent 自有 goctl 注册表只读 Store,喂 runtime tool 解析 + 请求
 	// 构建器(#605:读路径已脱 internal/repository)。
 	AgentRegistryReader registry.Reader
-	PythonExecutor      pythonexec.Executor
+	// AgentCreate 是 agent.create 工具处理器,由 svc 用 agent 自有 agentlogic.AgentAssemblyLogic
+	// (goctl + user-rpc/friends-rpc 端口)装配注入(#606:写路径脱 internal/repository、saga 拆解)。
+	// 内存/单测路径留 nil → agent.create 工具不可用。
+	AgentCreate    runtimetools.AgentCreateHandler
+	PythonExecutor pythonexec.Executor
 	// AgentResponseSender 覆盖 AI 写回通道（默认 MessageLogic 直写 PG）。
 	// agent-rpc worker 注入 imadapter.MsgRPCSender（经 msg-rpc gRPC SendMessage 走 Kafka）。
 	AgentResponseSender agentim.MessageSender
@@ -57,12 +56,11 @@ type ServiceContext struct {
 type ConversationAIHostingRuntimeOptions struct {
 	DeepSeek         config.DeepSeekConfig
 	LLMObservability config.LLMObservabilityConfig
-	// AgentRegistry 仅供 agent.create keystone(AgentAssemblyLogic)使用(internal,写路径)。
-	AgentRegistry repository.AgentRegistryRepository
 	// AgentRegistryReader 供 runtime tool 解析 + 请求构建器使用(agent 自有 goctl Store,读路径)。
 	AgentRegistryReader registry.Reader
 	PythonExecutor      pythonexec.Executor
-	AgentCreate         runtimetools.AgentCreateHandler
+	// AgentCreate 是 agent.create 工具处理器(agent 自有 agentlogic 装配,由 svc 注入)。
+	AgentCreate runtimetools.AgentCreateHandler
 }
 
 // allowAllMessageMediaValidator 是内存/单测 fixture：不接 media-rpc 时放行附件校验。
@@ -114,10 +112,9 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 		LLMObservability: obs,
 	}
 	if ctx != nil {
-		opts.AgentRegistry = ctx.AgentRegistryRepo
 		opts.AgentRegistryReader = ctx.AgentRegistryReader
 		opts.PythonExecutor = ctx.PythonExecutor
-		opts.AgentCreate = agentCreateHandlerFromContext(ctx, opts.AgentRegistry)
+		opts.AgentCreate = ctx.AgentCreate
 	}
 	return ConfigureConversationAIHostingWithRuntimeOptions(ctx, opts)
 }
@@ -206,9 +203,9 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	return nil
 }
 
-func agentRepositoryFromResolver(resolver convhosting.AgentAccountExistenceChecker) repository.AgentRepository {
+func agentRepositoryFromResolver(resolver convhosting.AgentAccountExistenceChecker) agentim.AgentReader {
 	if typed, ok := resolver.(interface {
-		AgentRepository() repository.AgentRepository
+		AgentRepository() agentim.AgentReader
 	}); ok {
 		return typed.AgentRepository()
 	}
@@ -270,38 +267,3 @@ func newConversationAIHostingToolProviderWithAgentCreate(registryReader runtimet
 	)
 }
 
-func agentCreateHandlerFromContext(ctx *ServiceContext, registry repository.AgentRegistryRepository) runtimetools.AgentCreateHandler {
-	if ctx == nil || ctx.AccountRepo == nil || ctx.AgentRepo == nil || registry == nil {
-		return nil
-	}
-	assembly := logic.NewAgentAssemblyLogic(logic.AgentAssemblyDependencies{
-		Accounts:    ctx.AccountRepo,
-		Friendships: ctx.AccountRepo,
-		Agents:      ctx.AgentRepo,
-		Registry:    registry,
-	})
-	return runtimetools.AgentCreateHandlerFunc(func(ctx context.Context, req runtimetools.AgentCreateRequest) (runtimetools.AgentCreateResponse, error) {
-		created, err := assembly.CreateAgentFromTool(ctx, logic.AgentCreateToolRequest{
-			CreatorAgentID:   req.CreatorAgentID,
-			RequestingUserID: req.RequestingUserID,
-			Identifier:       req.Identifier,
-			Name:             req.Name,
-			Description:      req.Description,
-			SystemPrompt:     req.SystemPrompt,
-			ToolNames:        req.ToolNames,
-		})
-		if err != nil {
-			return runtimetools.AgentCreateResponse{}, err
-		}
-		return runtimetools.AgentCreateResponse{
-			AgentID:      created.AgentID,
-			AccountID:    created.AccountID,
-			Identifier:   created.Identifier,
-			Name:         created.Name,
-			Description:  created.Description,
-			PromptID:     created.PromptID,
-			ToolNames:    created.ToolNames,
-			FriendUserID: created.FriendUserID,
-		}, nil
-	})
-}

@@ -1,33 +1,35 @@
-package logic
+package agentlogic
 
 import (
 	"context"
 	"strings"
 	"unicode"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/model"
 )
 
 const (
-	defaultCreatedAgentDescription = "Created by agent_creator"
-	defaultCreatedAgentPromptName  = "agent_system_prompt"
+	defaultCreatedAgentPromptName = "agent_system_prompt"
 )
 
+// AgentAssemblyLogic 是 agent 定义（系统提示词 + 工具绑定）读写 + agent.create 工具 saga 的业务逻辑
+// （#606，脱 internal/logic.AgentAssemblyLogic）。跨域写——账号经 AccountPort(user-rpc)、好友经
+// FriendPort(friends-rpc)——按 #555 先例转尽力而为非事务（不再有 PostgresRepository 单库事务）：
+// 失败显式返回，可能留下孤儿 agent 账号（概率极低，幂等 ensure 可纠）。
 type AgentAssemblyLogic struct {
-	accounts    repository.AccountRepository
-	friendships repository.FriendshipRepository
-	agents      repository.AgentRepository
-	registry    repository.AgentRegistryRepository
+	accounts    AccountPort
+	friendships FriendPort
+	agents      AgentStore
+	registry    RegistryStore
 }
 
 type AgentAssemblyDependencies struct {
-	Accounts    repository.AccountRepository
-	Friendships repository.FriendshipRepository
-	Agents      repository.AgentRepository
-	Registry    repository.AgentRegistryRepository
+	Accounts    AccountPort
+	Friendships FriendPort
+	Agents      AgentStore
+	Registry    RegistryStore
 }
 
 func NewAgentAssemblyLogic(deps AgentAssemblyDependencies) *AgentAssemblyLogic {
@@ -40,50 +42,50 @@ func NewAgentAssemblyLogic(deps AgentAssemblyDependencies) *AgentAssemblyLogic {
 }
 
 type AgentPromptDefinition struct {
-	PromptID            string `json:"prompt_id"`
-	Name                string `json:"name"`
-	Description         string `json:"description"`
-	Content             string `json:"content"`
-	VariablesSchemaJSON string `json:"variables_schema_json"`
-	Version             string `json:"version"`
-	Status              string `json:"status"`
-	CreatedBy           string `json:"created_by"`
-	CreatedAt           string `json:"created_at"`
-	UpdatedAt           string `json:"updated_at"`
+	PromptID            string
+	Name                string
+	Description         string
+	Content             string
+	VariablesSchemaJSON string
+	Version             string
+	Status              string
+	CreatedBy           string
+	CreatedAt           string
+	UpdatedAt           string
 }
 
 type AgentToolDefinition struct {
-	ToolID           string `json:"tool_id"`
-	Name             string `json:"name"`
-	Description      string `json:"description"`
-	ToolType         string `json:"tool_type"`
-	MCPServerID      string `json:"mcp_server_id"`
-	MCPToolName      string `json:"mcp_tool_name"`
-	LocalHandlerKey  string `json:"local_handler_key"`
-	BuiltinKey       string `json:"builtin_key"`
-	InputSchemaJSON  string `json:"input_schema_json"`
-	OutputSchemaJSON string `json:"output_schema_json"`
-	PermissionLevel  string `json:"permission_level"`
-	Status           string `json:"status"`
-	AdminConfigured  bool   `json:"admin_configured"`
+	ToolID           string
+	Name             string
+	Description      string
+	ToolType         string
+	MCPServerID      string
+	MCPToolName      string
+	LocalHandlerKey  string
+	BuiltinKey       string
+	InputSchemaJSON  string
+	OutputSchemaJSON string
+	PermissionLevel  string
+	Status           string
+	AdminConfigured  bool
 }
 
 type AgentDefinition struct {
-	Agent        AgentInfo             `json:"agent"`
-	SystemPrompt AgentPromptDefinition `json:"system_prompt"`
-	Tools        []AgentToolDefinition `json:"tools"`
+	Agent        AgentInfo
+	SystemPrompt AgentPromptDefinition
+	Tools        []AgentToolDefinition
 }
 
 type AgentDefinitionRequest struct {
-	AgentID     string `json:"agent_id"`
-	RequestedBy string `json:"requested_by"`
+	AgentID     string
+	RequestedBy string
 }
 
 type UpdateAgentDefinitionRequest struct {
-	AgentID      string   `json:"agent_id"`
-	SystemPrompt string   `json:"system_prompt"`
-	ToolNames    []string `json:"tool_names"`
-	UpdatedBy    string   `json:"updated_by"`
+	AgentID      string
+	SystemPrompt string
+	ToolNames    []string
+	UpdatedBy    string
 }
 
 type AgentCreateToolRequest struct {
@@ -97,14 +99,14 @@ type AgentCreateToolRequest struct {
 }
 
 type AgentCreateToolResponse struct {
-	AgentID      string   `json:"agent_id"`
-	AccountID    string   `json:"account_id"`
-	Identifier   string   `json:"identifier"`
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	PromptID     string   `json:"prompt_id"`
-	ToolNames    []string `json:"tool_names"`
-	FriendUserID string   `json:"friend_user_id"`
+	AgentID      string
+	AccountID    string
+	Identifier   string
+	Name         string
+	Description  string
+	PromptID     string
+	ToolNames    []string
+	FriendUserID string
 }
 
 func (l *AgentAssemblyLogic) GetAgentDefinition(ctx context.Context, req AgentDefinitionRequest) (AgentDefinition, error) {
@@ -197,35 +199,11 @@ func (l *AgentAssemblyLogic) UpdateAgentDefinition(ctx context.Context, req Upda
 	return l.GetAgentDefinition(ctx, AgentDefinitionRequest{AgentID: agentID, RequestedBy: updatedBy})
 }
 
+// CreateAgentFromTool 是 agent.create 工具 saga（跨 user/agent/friends 三域，尽力而为非事务）。
 func (l *AgentAssemblyLogic) CreateAgentFromTool(ctx context.Context, req AgentCreateToolRequest) (AgentCreateToolResponse, error) {
 	if err := l.ensureCreateToolConfigured(); err != nil {
 		return AgentCreateToolResponse{}, err
 	}
-	if postgresRepo, ok := l.accounts.(*repository.PostgresRepository); ok {
-		var response AgentCreateToolResponse
-		err := postgresRepo.TransactRepository(ctx, func(txRepo *repository.PostgresRepository) error {
-			txLogic := NewAgentAssemblyLogic(AgentAssemblyDependencies{
-				Accounts:    txRepo,
-				Friendships: txRepo,
-				Agents:      txRepo,
-				Registry:    txRepo,
-			})
-			created, err := txLogic.createAgentFromTool(ctx, req)
-			if err != nil {
-				return err
-			}
-			response = created
-			return nil
-		})
-		if err != nil {
-			return AgentCreateToolResponse{}, err
-		}
-		return response, nil
-	}
-	return l.createAgentFromTool(ctx, req)
-}
-
-func (l *AgentAssemblyLogic) createAgentFromTool(ctx context.Context, req AgentCreateToolRequest) (AgentCreateToolResponse, error) {
 	creatorAgentID, err := normalizeRequiredID(req.CreatorAgentID, "creator_agent_id")
 	if err != nil {
 		return AgentCreateToolResponse{}, err
@@ -272,16 +250,17 @@ func (l *AgentAssemblyLogic) createAgentFromTool(ctx context.Context, req AgentC
 		return AgentCreateToolResponse{}, err
 	}
 
-	account, err := NewUserLogic(l.accounts).CreateUser(ctx, CreateUserRequest{
+	account, err := l.accounts.Create(ctx, model.User{
 		Identifier:  identifier,
 		DisplayName: name,
 		Name:        name,
-		AccountType: string(model.AccountTypeAgent),
+		Gender:      genderUnknown,
+		AccountType: model.AccountTypeAgent,
 	})
 	if err != nil {
 		return AgentCreateToolResponse{}, err
 	}
-	agentLogic := NewAgentLogic(l.agents, NewUserLogicAccountTypeChecker(NewUserLogic(l.accounts)))
+	agentLogic := NewAgentLogic(l.agents, l.accounts)
 	agent, err := agentLogic.CreateAgent(ctx, CreateAgentRequest{
 		AccountID:   account.AccountID,
 		Name:        name,
@@ -320,7 +299,7 @@ func (l *AgentAssemblyLogic) createAgentFromTool(ctx context.Context, req AgentC
 	if _, err := l.registry.ReplaceToolBindings(ctx, agent.AgentID, toolIDs, requestingUserID); err != nil {
 		return AgentCreateToolResponse{}, err
 	}
-	if err := l.friendships.EnsureAcceptedFriendship(ctx, requestingUserID, account.AccountID); err != nil {
+	if err := l.friendships.EnsureFriendship(ctx, requestingUserID, account.AccountID); err != nil {
 		return AgentCreateToolResponse{}, err
 	}
 	return AgentCreateToolResponse{
@@ -537,7 +516,7 @@ func normalizeToolNames(values []string) ([]string, error) {
 
 func (l *AgentAssemblyLogic) createAgentIdentifier(ctx context.Context, requested string, name string) (string, error) {
 	if strings.TrimSpace(requested) != "" {
-		return NormalizeIdentifier(requested)
+		return normalizeIdentifier(requested)
 	}
 	base := identifierBaseFromName(name)
 	for attempt := 0; attempt < 5; attempt++ {
@@ -545,7 +524,7 @@ func (l *AgentAssemblyLogic) createAgentIdentifier(ctx context.Context, requeste
 		if err != nil {
 			return "", err
 		}
-		candidate, err := NormalizeIdentifier(identifierWithSuffix(base, generated))
+		candidate, err := normalizeIdentifier(identifierWithSuffix(base, generated))
 		if err != nil {
 			return "", err
 		}

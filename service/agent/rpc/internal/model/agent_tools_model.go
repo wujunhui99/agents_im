@@ -1,6 +1,10 @@
 package model
 
-import "github.com/zeromicro/go-zero/core/stores/sqlx"
+import (
+	"context"
+
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
+)
 
 var _ AgentToolsModel = (*customAgentToolsModel)(nil)
 
@@ -10,6 +14,13 @@ type (
 	AgentToolsModel interface {
 		agentToolsModel
 		withSession(session sqlx.Session) AgentToolsModel
+
+		// InsertReturning 插入并返回库生成的完整行（tool_id 自增、jsonb schema 列）。
+		InsertReturning(ctx context.Context, data *AgentTools) (*AgentTools, error)
+		// UpsertByName 按 name 唯一键 upsert（DefaultAssistant 幂等装配工具），返回结果行。
+		UpsertByName(ctx context.Context, data *AgentTools) (*AgentTools, error)
+		// ListActive 列出 status='active' 的工具，按 name 升序（agent.create 默认可绑工具集来源）。
+		ListActive(ctx context.Context) ([]*AgentTools, error)
 	}
 
 	customAgentToolsModel struct {

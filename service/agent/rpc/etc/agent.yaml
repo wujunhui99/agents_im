@@ -16,6 +16,11 @@ UserRPC:
   Endpoints:
     - 127.0.0.1:9090
   Timeout: 5000
+# agent-create / 默认助手好友建立经属主 friends-rpc（#606，单向叶子，不成环）。
+FriendsRPC:
+  Endpoints:
+    - 127.0.0.1:9092
+  Timeout: 5000
 
 DeepSeek:
   APIKey: ${DEEPSEEK_API_KEY}

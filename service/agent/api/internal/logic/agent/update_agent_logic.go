@@ -3,9 +3,10 @@ package agent
 import (
 	"context"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/types"
+	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -16,21 +17,17 @@ type UpdateAgentLogic struct {
 }
 
 func NewUpdateAgentLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateAgentLogic {
-	return &UpdateAgentLogic{
-		Logger: logx.WithContext(ctx),
-		ctx:    ctx,
-		svcCtx: svcCtx,
-	}
+	return &UpdateAgentLogic{Logger: logx.WithContext(ctx), ctx: ctx, svcCtx: svcCtx}
 }
 
 func (l *UpdateAgentLogic) UpdateAgent(req *types.UpdateAgentReq) (*types.AgentResp, error) {
-	agent, err := l.svcCtx.AgentLogic.UpdateAgent(l.ctx, business.UpdateAgentRequest{
-		AgentID:     req.AgentID,
-		Name:        optionalAgentString(req.Name),
-		Description: optionalAgentString(req.Description),
+	resp, err := l.svcCtx.AgentRPC.UpdateAgent(l.ctx, &agentpb.UpdateAgentRequest{
+		AgentId:     req.AgentID,
+		Name:        optionalString(req.Name),
+		Description: optionalString(req.Description),
 	})
 	if err != nil {
-		return nil, err
+		return nil, rpcerror.FromStatus(err)
 	}
-	return agentResp(agent), nil
+	return agentRespFromPB(resp.GetAgent()), nil
 }

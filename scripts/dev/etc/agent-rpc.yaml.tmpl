@@ -20,6 +20,11 @@ UserRPC:
   Endpoints:
     - 127.0.0.1:${USER_RPC_PORT}
   Timeout: 5000
+# agent-create / 默认助手好友建立经属主 friends-rpc（#606，单向叶子，不成环）。
+FriendsRPC:
+  Endpoints:
+    - 127.0.0.1:${FRIENDS_RPC_PORT}
+  Timeout: 5000
 Kafka:
   Brokers: ${KAFKA_BROKERS}
   Group: agent-trigger

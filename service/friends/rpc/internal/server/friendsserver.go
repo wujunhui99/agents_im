@@ -57,3 +57,8 @@ func (s *FriendsServer) RejectFriendRequest(ctx context.Context, in *friends.Fri
 	l := logic.NewRejectFriendRequestLogic(ctx, s.svcCtx)
 	return l.RejectFriendRequest(in)
 }
+
+func (s *FriendsServer) EnsureFriendship(ctx context.Context, in *friends.EnsureFriendshipRequest) (*friends.EnsureFriendshipResponse, error) {
+	l := logic.NewEnsureFriendshipLogic(ctx, s.svcCtx)
+	return l.EnsureFriendship(in)
+}

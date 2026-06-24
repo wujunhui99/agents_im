@@ -18,6 +18,8 @@ type (
 	AddFriendResponse             = friends.AddFriendResponse
 	DeleteFriendRequest           = friends.DeleteFriendRequest
 	DeleteFriendResponse          = friends.DeleteFriendResponse
+	EnsureFriendshipRequest       = friends.EnsureFriendshipRequest
+	EnsureFriendshipResponse      = friends.EnsureFriendshipResponse
 	FriendProfile                 = friends.FriendProfile
 	FriendRequestDecisionRequest  = friends.FriendRequestDecisionRequest
 	FriendRequestDecisionResponse = friends.FriendRequestDecisionResponse
@@ -37,6 +39,8 @@ type (
 		ListFriendRequests(ctx context.Context, in *ListFriendRequestsRequest, opts ...grpc.CallOption) (*ListFriendRequestsResponse, error)
 		AcceptFriendRequest(ctx context.Context, in *FriendRequestDecisionRequest, opts ...grpc.CallOption) (*FriendRequestDecisionResponse, error)
 		RejectFriendRequest(ctx context.Context, in *FriendRequestDecisionRequest, opts ...grpc.CallOption) (*FriendRequestDecisionResponse, error)
+		// EnsureFriendship 幂等地建立 user_id <-> friend_id 的双向 accepted 好友关系（不触发请求/审批流）。
+		EnsureFriendship(ctx context.Context, in *EnsureFriendshipRequest, opts ...grpc.CallOption) (*EnsureFriendshipResponse, error)
 	}
 
 	defaultFriends struct {
@@ -83,4 +87,10 @@ func (m *defaultFriends) AcceptFriendRequest(ctx context.Context, in *FriendRequ
 func (m *defaultFriends) RejectFriendRequest(ctx context.Context, in *FriendRequestDecisionRequest, opts ...grpc.CallOption) (*FriendRequestDecisionResponse, error) {
 	client := friends.NewFriendsClient(m.cli.Conn())
 	return client.RejectFriendRequest(ctx, in, opts...)
+}
+
+// EnsureFriendship 幂等地建立 user_id <-> friend_id 的双向 accepted 好友关系（不触发请求/审批流）。
+func (m *defaultFriends) EnsureFriendship(ctx context.Context, in *EnsureFriendshipRequest, opts ...grpc.CallOption) (*EnsureFriendshipResponse, error) {
+	client := friends.NewFriendsClient(m.cli.Conn())
+	return client.EnsureFriendship(ctx, in, opts...)
 }

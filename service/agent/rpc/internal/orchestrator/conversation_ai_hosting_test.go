@@ -8,6 +8,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
@@ -21,7 +22,7 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	messageLogic := logic.NewMessageLogic(messageRepo)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
 	aiHostingStore := convhosting.NewMemoryStore()
-	agentRepo := repository.NewMemoryAgentRepository()
+	agentRepo := agentlogic.NewMemoryAgentStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {

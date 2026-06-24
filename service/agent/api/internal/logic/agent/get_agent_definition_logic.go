@@ -1,15 +1,13 @@
-// Code scaffolded by goctl. Safe to edit.
-// goctl 1.10.1
-
 package agent
 
 import (
 	"context"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/types"
+	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -20,11 +18,7 @@ type GetAgentDefinitionLogic struct {
 }
 
 func NewGetAgentDefinitionLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetAgentDefinitionLogic {
-	return &GetAgentDefinitionLogic{
-		Logger: logx.WithContext(ctx),
-		ctx:    ctx,
-		svcCtx: svcCtx,
-	}
+	return &GetAgentDefinitionLogic{Logger: logx.WithContext(ctx), ctx: ctx, svcCtx: svcCtx}
 }
 
 func (l *GetAgentDefinitionLogic) GetAgentDefinition(req *types.AgentPathReq) (*types.AgentDefinitionResp, error) {
@@ -32,12 +26,12 @@ func (l *GetAgentDefinitionLogic) GetAgentDefinition(req *types.AgentPathReq) (*
 	if err != nil {
 		return nil, err
 	}
-	definition, err := l.svcCtx.AgentDefinitionLogic.GetAgentDefinition(l.ctx, business.AgentDefinitionRequest{
-		AgentID:     req.AgentID,
+	resp, err := l.svcCtx.AgentRPC.GetAgentDefinition(l.ctx, &agentpb.GetAgentDefinitionRequest{
+		AgentId:     req.AgentID,
 		RequestedBy: requestedBy,
 	})
 	if err != nil {
-		return nil, err
+		return nil, rpcerror.FromStatus(err)
 	}
-	return agentDefinitionResp(definition), nil
+	return agentDefinitionRespFromPB(resp.GetDefinition()), nil
 }
