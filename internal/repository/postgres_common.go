@@ -48,17 +48,6 @@ func (r *PostgresRepository) withTx(ctx context.Context, fn func(ctx context.Con
 	return r.conn.TransactCtx(ctx, fn)
 }
 
-func NewRepositoryForStorage(driver string, dataSource string) (Repository, error) {
-	storageDriver, err := repositoryStorageDriver(driver)
-	if err != nil {
-		return nil, err
-	}
-	if storageDriver == appconfig.StorageDriverMemory {
-		return NewMemoryRepository(), nil
-	}
-	return NewPostgresRepository(appconfig.ResolveDataSource(dataSource))
-}
-
 func NewGroupsRepositoryForStorage(driver string, dataSource string) (GroupsRepository, error) {
 	storageDriver, err := repositoryStorageDriver(driver)
 	if err != nil {
@@ -81,17 +70,6 @@ func NewMessageRepositoryForStorage(driver string, dataSource string) (MessageRe
 	return NewPostgresMessageRepository(appconfig.ResolveDataSource(dataSource))
 }
 
-func NewMediaRepositoryForStorage(driver string, dataSource string) (MediaRepository, error) {
-	storageDriver, err := repositoryStorageDriver(driver)
-	if err != nil {
-		return nil, err
-	}
-	if storageDriver == appconfig.StorageDriverMemory {
-		return NewMemoryMediaRepository(), nil
-	}
-	return NewPostgresMediaRepository(appconfig.ResolveDataSource(dataSource))
-}
-
 func NewAgentAuditRepositoryForStorage(driver string, dataSource string) (AgentAuditRepository, error) {
 	storageDriver, err := repositoryStorageDriver(driver)
 	if err != nil {
@@ -101,17 +79,6 @@ func NewAgentAuditRepositoryForStorage(driver string, dataSource string) (AgentA
 		return NewMemoryAgentAuditRepository(), nil
 	}
 	return NewPostgresAgentAuditRepository(appconfig.ResolveDataSource(dataSource))
-}
-
-func NewTaskReportRepositoryForStorage(driver string, dataSource string) (TaskReportRepository, error) {
-	storageDriver, err := repositoryStorageDriver(driver)
-	if err != nil {
-		return nil, err
-	}
-	if storageDriver == appconfig.StorageDriverMemory {
-		return NewMemoryTaskReportRepository(), nil
-	}
-	return NewPostgresTaskReportRepository(appconfig.ResolveDataSource(dataSource))
 }
 
 func NewAgentConversationHostingRepositoryForStorage(driver string, dataSource string) (AgentConversationHostingRepository, error) {

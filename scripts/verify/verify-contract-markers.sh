@@ -232,7 +232,9 @@ rg -q "StorageDriver" pkg/config/config.go etc/*.yaml
 rg -q "ObjectStorageConfig" pkg/config/config.go
 rg -q "NewStore" pkg/objectstorage/factory.go
 rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/s3.go
-rg -q "NewMediaRepositoryForStorage" internal/repository/postgres_common.go service/user/api/user.go service/msg/rpc/internal/svc/servicecontext.go
+# media 对象存储数据层已迁 service/media（media-rpc goctl MediaObjectsModel + objectstorage），
+# 内部 internal/repository media 工厂已退役（#609）。
+rg -q "NewMediaObjectsModel" service/media/rpc/internal/svc/service_context.go
 rg -q "ValidateMessageMedia" internal/logic/messagelogic.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql
 rg -q "NewPostgresRepository" internal/repository/postgres_common.go
