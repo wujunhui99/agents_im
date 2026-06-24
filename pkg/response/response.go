@@ -22,11 +22,6 @@ func WriteOK(w http.ResponseWriter, data interface{}) {
 	WriteJSON(w, http.StatusOK, string(apperror.CodeOK), "ok", data)
 }
 
-func WriteError(w http.ResponseWriter, err error) {
-	appErr := apperror.From(err)
-	WriteJSON(w, apperror.HTTPStatus(err), string(appErr.Code), appErr.Message, nil)
-}
-
 func WriteJSON(w http.ResponseWriter, status int, code string, message string, data interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	envelope := Envelope{
@@ -42,10 +37,6 @@ func WriteJSON(w http.ResponseWriter, status int, code string, message string, d
 	}
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(envelope)
-}
-
-func GoZeroErrorHandler(err error) (int, any) {
-	return GoZeroErrorHandlerCtx(context.Background(), err)
 }
 
 func GoZeroErrorHandlerCtx(ctx context.Context, err error) (int, any) {

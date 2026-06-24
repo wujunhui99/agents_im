@@ -49,14 +49,6 @@ func NewHMACTokenManager(secret string, ttl time.Duration) *HMACTokenManager {
 	}
 }
 
-func NewHMACTokenManagerWithClock(secret string, ttl time.Duration, now func() time.Time) *HMACTokenManager {
-	manager := NewHMACTokenManager(secret, ttl)
-	if now != nil {
-		manager.now = now
-	}
-	return manager
-}
-
 func (m *HMACTokenManager) Issue(userID string, identifier string, device string, loginIP string) (string, Claims, error) {
 	userID = strings.TrimSpace(userID)
 	identifier = strings.TrimSpace(identifier)

@@ -23,9 +23,6 @@ func TestAccountIDGeneratorEncodesFacet(t *testing.T) {
 		if got := AccountFacet(id); got != facet {
 			t.Fatalf("AccountFacet(%d) = %v, want %v", id, got, facet)
 		}
-		if got := ToPush(id); got != facet.ToPush() {
-			t.Fatalf("ToPush(%d) = %v, want %v", id, got, facet.ToPush())
-		}
 		if got := IsAgent(id); got != (facet == FacetAgent) {
 			t.Fatalf("IsAgent(%d) = %v, want %v", id, got, facet == FacetAgent)
 		}

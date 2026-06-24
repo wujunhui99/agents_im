@@ -181,13 +181,6 @@ func logBatchError(group string, attempt int, err error) {
 	logx.Errorf("kafka consumer group=%s attempt=%d batch error: %v", group, attempt, err)
 }
 
-func (c *KafkaConsumer) Ping(ctx context.Context) error {
-	if c == nil || c.client == nil {
-		return errors.New("kafka consumer is closed")
-	}
-	return c.client.Ping(ctx)
-}
-
 func (c *KafkaConsumer) Close() error {
 	if c != nil && c.client != nil {
 		c.client.Close()

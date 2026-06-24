@@ -28,6 +28,12 @@ func (r *recordingScheduler) ScheduleTrigger(_ context.Context, trig orchestrato
 	return true, nil
 }
 
+type testHostingStore struct{}
+
+func (testHostingStore) HostingAgent(context.Context, string) (string, bool, error) {
+	return "", false, nil
+}
+
 func triggerRecord(t *testing.T, eventID, sender, receiver string) *kgo.Record {
 	t.Helper()
 	event := messaging.MessageEvent{
@@ -69,7 +75,7 @@ func TestHandleBatchSchedulesAgentInboxTrigger(t *testing.T) {
 		t.Fatalf("mint agent id: %v", err)
 	}
 
-	judge, err := trigger.NewJudge(trigger.NewMockHostingStore(nil))
+	judge, err := trigger.NewJudge(testHostingStore{})
 	if err != nil {
 		t.Fatalf("new judge: %v", err)
 	}
@@ -100,7 +106,7 @@ func TestHandleBatchSchedulesAgentInboxTrigger(t *testing.T) {
 }
 
 func TestHandleBatchSkipsMalformedAndNonTriggering(t *testing.T) {
-	judge, _ := trigger.NewJudge(trigger.NewMockHostingStore(nil))
+	judge, _ := trigger.NewJudge(testHostingStore{})
 	scheduler := &recordingScheduler{}
 	pipeline, err := New(judge, scheduler)
 	if err != nil {

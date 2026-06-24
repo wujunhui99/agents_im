@@ -13,7 +13,6 @@ type (
 	// and implement the added methods in customAgentToolsModel.
 	AgentToolsModel interface {
 		agentToolsModel
-		withSession(session sqlx.Session) AgentToolsModel
 
 		// InsertReturning 插入并返回库生成的完整行（tool_id 自增、jsonb schema 列）。
 		InsertReturning(ctx context.Context, data *AgentTools) (*AgentTools, error)
@@ -33,8 +32,4 @@ func NewAgentToolsModel(conn sqlx.SqlConn) AgentToolsModel {
 	return &customAgentToolsModel{
 		defaultAgentToolsModel: newAgentToolsModel(conn),
 	}
-}
-
-func (m *customAgentToolsModel) withSession(session sqlx.Session) AgentToolsModel {
-	return NewAgentToolsModel(sqlx.NewSqlConnFromSession(session))
 }

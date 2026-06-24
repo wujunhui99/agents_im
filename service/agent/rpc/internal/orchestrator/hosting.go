@@ -23,25 +23,11 @@ type AgentTriggerRunner interface {
 
 type AgentTriggerRunnerFunc func(ctx context.Context, trigger AgentTrigger) (AgentRunOrchestratorResult, error)
 
-func (f AgentTriggerRunnerFunc) Run(ctx context.Context, trigger AgentTrigger) (AgentRunOrchestratorResult, error) {
-	if f == nil {
-		return AgentRunOrchestratorResult{}, apperror.Internal("agent trigger runner is not configured")
-	}
-	return f(ctx, trigger)
-}
-
 type AgentAccountResolver interface {
 	IsActiveAgentAccount(ctx context.Context, accountID string) (bool, error)
 }
 
 type AgentAccountResolverFunc func(ctx context.Context, accountID string) (bool, error)
-
-func (f AgentAccountResolverFunc) IsActiveAgentAccount(ctx context.Context, accountID string) (bool, error) {
-	if f == nil {
-		return false, nil
-	}
-	return f(ctx, accountID)
-}
 
 // AgentReader 是 orchestrator 所需的 agents 表只读视图（#606：agents 数据层脱 internal/repository
 // → agent 自有 goctl AgentStore，本接口由其实现）。仅用 GetAgentByIMUserID 判活跃 agent 账号。

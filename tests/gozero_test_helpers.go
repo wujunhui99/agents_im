@@ -2,7 +2,6 @@ package tests
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/auth/token"
 	"github.com/wujunhui99/agents_im/pkg/config"
 )
@@ -46,22 +44,6 @@ func bearerTokenForUser(t *testing.T, userID string) string {
 		t.Fatalf("issue test jwt: %v", err)
 	}
 	return "Bearer " + rawToken
-}
-
-func mustCreateUser(t *testing.T, userLogic *logic.UserLogic, identifier string) logic.UserProfile {
-	t.Helper()
-
-	return mustCreateUserWithName(t, userLogic, identifier, "")
-}
-
-func mustCreateUserWithName(t *testing.T, userLogic *logic.UserLogic, identifier string, displayName string) logic.UserProfile {
-	t.Helper()
-
-	user, err := userLogic.CreateUser(context.Background(), logic.CreateUserRequest{Identifier: identifier, DisplayName: displayName})
-	if err != nil {
-		t.Fatalf("create user %q: %v", identifier, err)
-	}
-	return user
 }
 
 type envelope[T any] struct {

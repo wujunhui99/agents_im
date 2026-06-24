@@ -6,12 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogictest"
+
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
@@ -19,10 +20,10 @@ import (
 func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogic(messageRepo)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
 	aiHostingStore := convhosting.NewMemoryStore()
-	agentRepo := agentlogic.NewMemoryAgentStore()
+	agentRepo := agentlogictest.NewMemoryAgentStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {
@@ -40,7 +41,7 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	}
 
 	runtimeCalls := 0
-	runtime := agentruntime.RuntimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
+	runtime := runtimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
 		runtimeCalls++
 		if req.AgentUserID != "agent_creator" || req.RequestingUserID != "usr_new" {
 			t.Fatalf("runtime request used wrong agent/user: %+v", req)
@@ -52,7 +53,7 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	})
 	orchestrator, err := NewAgentRunOrchestrator(AgentRunOrchestratorConfig{
 		Runtime: runtime,
-		RequestBuilder: RuntimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return hostedRuntimeRequest(trigger), nil
 		}),
 		Audit:  logic.NewAgentAuditLogic(auditRepo),
@@ -101,7 +102,7 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogic(messageRepo)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
 	aiHostingStore := convhosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
@@ -113,7 +114,7 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 	runtimeCalls := 0
 	runtimeStarted := make(chan struct{})
 	releaseRuntime := make(chan struct{})
-	runtime := agentruntime.RuntimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
+	runtime := runtimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
 		runtimeCalls++
 		if runtimeCalls == 1 {
 			close(runtimeStarted)
@@ -129,7 +130,7 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 	})
 	orchestrator, err := NewAgentRunOrchestrator(AgentRunOrchestratorConfig{
 		Runtime: runtime,
-		RequestBuilder: RuntimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return hostedRuntimeRequest(trigger), nil
 		}),
 		Audit:  logic.NewAgentAuditLogic(auditRepo),
@@ -251,7 +252,7 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogic(messageRepo)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
 	aiHostingStore := convhosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
@@ -262,14 +263,14 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 
 	runtimeCalls := 0
 	releaseRuntime := make(chan struct{})
-	runtime := agentruntime.RuntimeFunc(func(context.Context, agentruntime.RunRequest) (agentruntime.RunResult, error) {
+	runtime := runtimeFunc(func(context.Context, agentruntime.RunRequest) (agentruntime.RunResult, error) {
 		runtimeCalls++
 		<-releaseRuntime
 		return agentruntime.RunResult{RunID: "run_hosted_1", FinalText: "托管回复"}, nil
 	})
 	orchestrator, err := NewAgentRunOrchestrator(AgentRunOrchestratorConfig{
 		Runtime: runtime,
-		RequestBuilder: RuntimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return hostedRuntimeRequest(trigger), nil
 		}),
 		Audit:  logic.NewAgentAuditLogic(auditRepo),
@@ -347,7 +348,7 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifiesUser(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogic(messageRepo)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
 	aiHostingStore := convhosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
@@ -357,10 +358,10 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 	}
 	missingProviderErr := config.ErrDeepSeekAPIKeyMissing
 	orchestrator, err := NewAgentRunOrchestrator(AgentRunOrchestratorConfig{
-		Runtime: agentruntime.RuntimeFunc(func(context.Context, agentruntime.RunRequest) (agentruntime.RunResult, error) {
+		Runtime: runtimeFunc(func(context.Context, agentruntime.RunRequest) (agentruntime.RunResult, error) {
 			return agentruntime.RunResult{}, missingProviderErr
 		}),
-		RequestBuilder: RuntimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return hostedRuntimeRequest(trigger), nil
 		}),
 		Audit:  logic.NewAgentAuditLogic(auditRepo),

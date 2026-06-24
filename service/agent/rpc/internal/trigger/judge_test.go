@@ -51,9 +51,18 @@ func acceptedEvent(sender, receiver, chatType string, visible []string) messagin
 	}
 }
 
+type testHostingStore struct {
+	hosted map[string]string
+}
+
+func (s testHostingStore) HostingAgent(_ context.Context, conversationID string) (string, bool, error) {
+	agentID, ok := s.hosted[conversationID]
+	return agentID, ok, nil
+}
+
 func TestEvaluateRecursionGateDropsAIOrigin(t *testing.T) {
 	userID, agentID, secondAgentID := mintIDs(t)
-	judge, err := NewJudge(NewMockHostingStore(map[string]string{"conv-1": secondAgentID}))
+	judge, err := NewJudge(testHostingStore{hosted: map[string]string{"conv-1": secondAgentID}})
 	if err != nil {
 		t.Fatalf("new judge: %v", err)
 	}
@@ -82,7 +91,7 @@ func TestEvaluateRecursionGateDropsAIOrigin(t *testing.T) {
 
 func TestEvaluateAgentInboxSingleChat(t *testing.T) {
 	userID, agentID, _ := mintIDs(t)
-	judge, _ := NewJudge(NewMockHostingStore(nil))
+	judge, _ := NewJudge(testHostingStore{})
 
 	got, err := judge.Evaluate(context.Background(),
 		acceptedEvent(userID, agentID, messaging.ChatTypeSingle, []string{userID, agentID}))
@@ -99,7 +108,7 @@ func TestEvaluateAgentInboxSingleChat(t *testing.T) {
 
 func TestEvaluateGroupMembersDedupAgents(t *testing.T) {
 	userID, agentID, secondAgentID := mintIDs(t)
-	judge, _ := NewJudge(NewMockHostingStore(nil))
+	judge, _ := NewJudge(testHostingStore{})
 
 	event := acceptedEvent(userID, "", messaging.ChatTypeGroup,
 		[]string{userID, agentID, secondAgentID, agentID})
@@ -124,7 +133,7 @@ func TestEvaluateHostingTrigger(t *testing.T) {
 	userID, agentID, _ := mintIDs(t)
 	otherUser := userID + "1" // numeric-string, still user-typed bits are irrelevant here
 
-	judge, _ := NewJudge(NewMockHostingStore(map[string]string{"conv-1": agentID}))
+	judge, _ := NewJudge(testHostingStore{hosted: map[string]string{"conv-1": agentID}})
 
 	// Human → human conversation hosted by an agent that is not a recipient.
 	got, err := judge.Evaluate(context.Background(),
@@ -139,7 +148,7 @@ func TestEvaluateHostingTrigger(t *testing.T) {
 
 func TestEvaluateHostingDedupsAgainstInbox(t *testing.T) {
 	userID, agentID, _ := mintIDs(t)
-	judge, _ := NewJudge(NewMockHostingStore(map[string]string{"conv-1": agentID}))
+	judge, _ := NewJudge(testHostingStore{hosted: map[string]string{"conv-1": agentID}})
 
 	got, err := judge.Evaluate(context.Background(),
 		acceptedEvent(userID, agentID, messaging.ChatTypeSingle, []string{userID, agentID}))
@@ -156,7 +165,7 @@ func TestEvaluateHostingDedupsAgainstInbox(t *testing.T) {
 
 func TestEvaluateSenderNeverSelfTriggers(t *testing.T) {
 	_, agentID, secondAgentID := mintIDs(t)
-	judge, _ := NewJudge(NewMockHostingStore(map[string]string{"conv-1": agentID}))
+	judge, _ := NewJudge(testHostingStore{hosted: map[string]string{"conv-1": agentID}})
 
 	// Agent-origin marked recursive: gate passes, but the sending agent itself
 	// must not trigger — only the receiving agent does.
@@ -174,7 +183,7 @@ func TestEvaluateSenderNeverSelfTriggers(t *testing.T) {
 }
 
 func TestEvaluateLegacyIDsDoNotTrigger(t *testing.T) {
-	judge, _ := NewJudge(NewMockHostingStore(nil))
+	judge, _ := NewJudge(testHostingStore{})
 	got, err := judge.Evaluate(context.Background(),
 		acceptedEvent("user-a", "agent_creator", messaging.ChatTypeSingle, []string{"user-a", "agent_creator"}))
 	if err != nil {

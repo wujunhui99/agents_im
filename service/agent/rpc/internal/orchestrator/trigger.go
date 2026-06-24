@@ -51,45 +51,6 @@ func BuildMessageCreatedTriggers(event MessageCreatedEvent, policy TriggerPolicy
 	return triggers, nil
 }
 
-func NewAdminManualRunTrigger(req AdminManualRunRequest) (AgentTrigger, error) {
-	requestID, err := normalizeRequired(req.RequestID, "request_id")
-	if err != nil {
-		return AgentTrigger{}, err
-	}
-	adminUserID, err := normalizeRequired(req.AdminUserID, "admin_user_id")
-	if err != nil {
-		return AgentTrigger{}, err
-	}
-	agentUserID, err := normalizeRequired(req.AgentUserID, "agent_user_id")
-	if err != nil {
-		return AgentTrigger{}, err
-	}
-	conversationID, err := normalizeRequired(req.ConversationID, "conversation_id")
-	if err != nil {
-		return AgentTrigger{}, err
-	}
-	conversationType, err := normalizeConversationType(req.ConversationType)
-	if err != nil {
-		return AgentTrigger{}, err
-	}
-	promptText, err := normalizeRequired(req.PromptText, "prompt_text")
-	if err != nil {
-		return AgentTrigger{}, err
-	}
-
-	return AgentTrigger{
-		RequestID:        requestID,
-		OperationID:      normalizeOptional(req.OperationID),
-		TraceID:          normalizeOptional(req.TraceID),
-		TriggerType:      TriggerTypeAdminManualRun,
-		AgentUserID:      agentUserID,
-		RequestingUserID: adminUserID,
-		ConversationID:   conversationID,
-		ConversationType: conversationType,
-		PromptText:       promptText,
-	}, nil
-}
-
 func validateMessageCreatedEvent(event MessageCreatedEvent) error {
 	if _, err := normalizeRequired(event.EventID, "event_id"); err != nil {
 		return err

@@ -1,7 +1,6 @@
 package model
 
 import (
-	"strings"
 	"time"
 )
 
@@ -38,42 +37,4 @@ type MediaObject struct {
 	Status           MediaStatus
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
-}
-
-func (m MediaObject) Clone() MediaObject {
-	return m
-}
-
-func NormalizeMediaPurpose(value string) (MediaPurpose, bool) {
-	purpose := MediaPurpose(strings.ToLower(strings.TrimSpace(value)))
-	if purpose.IsValid() {
-		return purpose, true
-	}
-	return "", false
-}
-
-func (p MediaPurpose) IsValid() bool {
-	switch p {
-	case MediaPurposeAvatar, MediaPurposeMessageImage, MediaPurposeMessageFile, MediaPurposeAgentSkill:
-		return true
-	default:
-		return false
-	}
-}
-
-func NormalizeMediaStatus(value string) (MediaStatus, bool) {
-	status := MediaStatus(strings.ToLower(strings.TrimSpace(value)))
-	if status.IsValid() {
-		return status, true
-	}
-	return "", false
-}
-
-func (s MediaStatus) IsValid() bool {
-	switch s {
-	case MediaStatusPending, MediaStatusReady, MediaStatusRejected, MediaStatusDeleted:
-		return true
-	default:
-		return false
-	}
 }

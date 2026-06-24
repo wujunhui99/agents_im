@@ -14,7 +14,7 @@ import (
 func TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogic(messageRepo)
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	auditLogic := logic.NewAgentAuditLogic(auditRepo)
@@ -23,7 +23,7 @@ func TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates
 		t.Fatalf("new response writer: %v", err)
 	}
 	runtimeCalls := 0
-	runtime := agentruntime.RuntimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
+	runtime := runtimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
 		runtimeCalls++
 		return agentruntime.RunResult{
 			RunID:     "run_hosted_1",
@@ -32,7 +32,7 @@ func TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates
 	})
 	orchestrator, err := NewAgentRunOrchestrator(AgentRunOrchestratorConfig{
 		Runtime: runtime,
-		RequestBuilder: RuntimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return hostedRuntimeRequest(trigger), nil
 		}),
 		Audit:  auditLogic,

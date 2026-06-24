@@ -71,16 +71,6 @@ func (allowAllMessageMediaValidator) ValidateMessageMedia(context.Context, strin
 	return nil
 }
 
-func NewServiceContext(repo repository.MessageRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister) *ServiceContext {
-	return NewServiceContextWithAuth(repo, userExists, groups, config.DefaultJWTAuthConfig())
-}
-
-func NewServiceContextWithAuth(repo repository.MessageRepository, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
-	// 内存/默认路径（单测、demo）不接 media-rpc，用放行校验器作 fixture；真实附件校验
-	// 由 msg-rpc 注入的 media-rpc 校验器承担（#533）。
-	return NewServiceContextWithMediaValidator(repo, allowAllMessageMediaValidator{}, userExists, groups, auth)
-}
-
 // NewServiceContextWithMediaValidator 用调用方注入的 media 校验器装配（#533：附件校验经 media-rpc，
 // 不再由本包直读 media_objects）。validator 为 nil 时回退放行校验器（仅内存/单测语义）。
 func NewServiceContextWithMediaValidator(repo repository.MessageRepository, mediaValidator logic.MessageMediaValidator, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
@@ -237,10 +227,6 @@ func llmObservabilityConfig(obs config.LLMObservabilityConfig) llmobs.Config {
 			SecretKey: obs.Langfuse.SecretKey,
 		},
 	}
-}
-
-func newConversationAIHostingToolProvider(registryReader runtimetools.Registry, executor pythonexec.Executor) (runtimetools.Provider, error) {
-	return newConversationAIHostingToolProviderWithAgentCreate(registryReader, executor, nil)
 }
 
 func newConversationAIHostingToolProviderWithAgentCreate(registryReader runtimetools.Registry, executor pythonexec.Executor, agentCreate runtimetools.AgentCreateHandler) (runtimetools.Provider, error) {

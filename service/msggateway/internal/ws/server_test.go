@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/auth/token"
 	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/gateway"
 	"github.com/wujunhui99/agents_im/pkg/gateway/delivery"
-	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/pkg/presence"
 )
 
@@ -109,7 +109,7 @@ func TestWebSocketQueryTokenAuthCanBeEnabled(t *testing.T) {
 func TestWebSocketHandshakeRejectsInactiveSessionToken(t *testing.T) {
 	auth := testAuthConfig()
 	manager := token.NewHMACTokenManager(auth.AccessSecret, time.Duration(auth.AccessExpire)*time.Second)
-	sessionStore := middleware.NewMemorySessionStore()
+	sessionStore := newTestSessionStore()
 	userID := "usr_ws_active_session"
 	const device = "web"
 	inactiveToken, _, err := manager.Issue(userID, userID, device, "")
@@ -125,7 +125,8 @@ func TestWebSocketHandshakeRejectsInactiveSessionToken(t *testing.T) {
 		t.Fatalf("store active session: %v", err)
 	}
 
-	_, server, cleanup := newWSTestServer(t, WithTokenManager(manager), WithSessionStore(sessionStore))
+	app, server, cleanup := newWSTestServer(t, WithSessionStore(sessionStore))
+	app.tokenManager = manager
 	defer cleanup()
 
 	inactiveConn, inactiveResp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), bearerHeader(inactiveToken))
@@ -417,7 +418,29 @@ func newWSTestServer(t *testing.T, opts ...ServerOption) (*Server, *httptest.Ser
 
 func newCommandTestServer() (*Server, *recordingDeliveryDispatcher) {
 	recorder := &recordingDeliveryDispatcher{}
-	return NewServer(config.DefaultJWTAuthConfig(), newFakeBackend(), WithDeliveryDispatcher(recorder)), recorder
+	app := NewServer(config.DefaultJWTAuthConfig(), newFakeBackend())
+	app.dispatcher = recorder
+	return app, recorder
+}
+
+type testSessionStore struct {
+	active map[string]string
+}
+
+func newTestSessionStore() *testSessionStore {
+	return &testSessionStore{active: map[string]string{}}
+}
+
+func (s *testSessionStore) SetActive(_ context.Context, userID, device, jti string, _ time.Duration) error {
+	s.active[userID+"\x00"+device] = jti
+	return nil
+}
+
+func (s *testSessionStore) Validate(_ context.Context, userID, device, jti string) error {
+	if s.active[userID+"\x00"+device] != jti {
+		return apperror.Unauthenticated("token session is not active")
+	}
+	return nil
 }
 
 func dispatchSendCommand(t *testing.T, server *Server, userID string, requestID string, payload map[string]interface{}) responseFrame {

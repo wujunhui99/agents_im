@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogictest"
+
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
 )
@@ -27,7 +29,7 @@ func (f fakeAccountReader) ExistsByIdentifier(context.Context, string) (bool, er
 
 func TestAgentLogicCreateRequiresAgentAccountType(t *testing.T) {
 	ctx := context.Background()
-	logic := NewAgentLogic(NewMemoryAgentStore(), fakeAccountReader{accounts: map[string]model.AccountType{
+	logic := NewAgentLogic(agentlogictest.NewMemoryAgentStore(), fakeAccountReader{accounts: map[string]model.AccountType{
 		"usr_agent": model.AccountTypeAgent,
 		"usr_user":  model.AccountTypeUser,
 	}})
@@ -56,7 +58,7 @@ func TestAgentLogicCreateRequiresAgentAccountType(t *testing.T) {
 
 func TestAgentLogicUpdateListStatusFlow(t *testing.T) {
 	ctx := context.Background()
-	store := NewMemoryAgentStore()
+	store := agentlogictest.NewMemoryAgentStore()
 	logic := NewAgentLogic(store, fakeAccountReader{accounts: map[string]model.AccountType{"usr_agent": model.AccountTypeAgent}})
 
 	created, err := logic.CreateAgent(ctx, CreateAgentRequest{IMUserID: "usr_agent", Name: "Bot", CreatedBy: "usr_admin"})

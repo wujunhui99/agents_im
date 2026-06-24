@@ -1,4 +1,4 @@
-package registry
+package registrytest
 
 import (
 	"strconv"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 )
 
 // MemoryStore 是注册表的内存实现，仅供单测 fixture 使用（替代旧 internal/repository.MemoryAgentRegistryRepository，
@@ -26,7 +27,7 @@ type MemoryStore struct {
 	skillBindings  map[string][]model.AgentSkillBinding
 }
 
-var _ Reader = (*MemoryStore)(nil)
+var _ registry.Reader = (*MemoryStore)(nil)
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{

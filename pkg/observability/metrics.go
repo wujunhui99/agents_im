@@ -122,10 +122,6 @@ func RecordDeliveryAttempt(status string) {
 	deliveryAttempts.WithLabelValues(labelValue(status)).Inc()
 }
 
-func RecordTransferEvent(result string) {
-	transferEvents.WithLabelValues(labelValue(result)).Inc()
-}
-
 func SetWebSocketConnections(count int) {
 	if count < 0 {
 		count = 0

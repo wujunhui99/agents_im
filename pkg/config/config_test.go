@@ -63,30 +63,6 @@ Auth:
 	}
 }
 
-func TestLoadRPCConfigResolvesAuthSecretFromEnvPlaceholder(t *testing.T) {
-	t.Setenv("JWT_ACCESS_SECRET", "unit-test-shared-rpc-jwt-secret")
-	configPath := filepath.Join(t.TempDir(), "rpc.yaml")
-	if err := os.WriteFile(configPath, []byte(`
-Name: message-rpc
-Auth:
-  AccessSecret: ${JWT_ACCESS_SECRET}
-  AccessExpire: 7200
-`), 0o600); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	cfg, err := LoadRPCConfig(configPath)
-	if err != nil {
-		t.Fatalf("load rpc config: %v", err)
-	}
-	if cfg.Auth.AccessSecret != "unit-test-shared-rpc-jwt-secret" {
-		t.Fatalf("rpc auth access secret was not resolved from env placeholder")
-	}
-	if cfg.Auth.AccessExpire != 7200 {
-		t.Fatalf("rpc auth access expire = %d, want 7200", cfg.Auth.AccessExpire)
-	}
-}
-
 func TestLoadAPIConfigResolvesRedisAndPresenceFromFile(t *testing.T) {
 	t.Setenv("REDIS_PASSWORD", "")
 	t.Setenv("REDIS_DB", "")
@@ -335,35 +311,6 @@ func TestLoadAPIConfigResolvesAgentRPCTargetFromEnv(t *testing.T) {
 	}
 	if cfg.AgentRPC.Target != "agent-rpc:9099" {
 		t.Fatalf("agent rpc target = %q, want agent-rpc:9099", cfg.AgentRPC.Target)
-	}
-}
-
-func TestLoadRPCConfigParsesMailRPCYAMLListEndpoints(t *testing.T) {
-	clearMailRPCEnv(t)
-
-	configPath := filepath.Join(t.TempDir(), "auth-rpc.yaml")
-	err := os.WriteFile(configPath, []byte(`
-Name: auth-rpc
-ListenOn: 127.0.0.1:19091
-MailRPC:
-  Endpoints:
-    - 127.0.0.1:19095
-    - third-rpc:9095
-  Timeout: 5000
-`), 0o600)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := LoadRPCConfig(configPath)
-	if err != nil {
-		t.Fatalf("load rpc config: %v", err)
-	}
-	if len(cfg.MailRPC.Endpoints) != 2 {
-		t.Fatalf("mail rpc endpoint count = %d, want 2", len(cfg.MailRPC.Endpoints))
-	}
-	if cfg.MailRPC.Timeout != 5000 {
-		t.Fatalf("mail rpc timeout = %d, want 5000", cfg.MailRPC.Timeout)
 	}
 }
 

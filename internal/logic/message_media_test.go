@@ -82,7 +82,7 @@ func TestMessageLogicSkipsMediaValidatorForText(t *testing.T) {
 }
 
 func TestTextMessagesContinueWithoutMediaValidator(t *testing.T) {
-	messageLogic := NewMessageLogic(repository.NewMemoryMessageRepository())
+	messageLogic := NewMessageLogicWithMediaValidator(repository.NewMemoryMessageRepository(), nil, nil, nil)
 	if _, err := messageLogic.SendMessage(context.Background(), logicTestSendRequest("usr_text_a", "usr_text_b", "client-text-no-media", "hello")); err != nil {
 		t.Fatalf("text message without media validator: %v", err)
 	}

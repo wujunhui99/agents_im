@@ -19,10 +19,6 @@ type InMemoryDeliveryDispatcher struct {
 	instanceID  string
 }
 
-func NewInMemoryDeliveryDispatcher(manager *ConnectionManager) *InMemoryDeliveryDispatcher {
-	return &InMemoryDeliveryDispatcher{connections: manager}
-}
-
 func NewPresenceAwareDeliveryDispatcher(manager *ConnectionManager, store presence.PresenceStore, instanceID string) *InMemoryDeliveryDispatcher {
 	return &InMemoryDeliveryDispatcher{
 		connections: manager,

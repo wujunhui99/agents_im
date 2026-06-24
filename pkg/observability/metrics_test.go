@@ -11,7 +11,6 @@ func TestMetricsHandlerExposesPrometheusText(t *testing.T) {
 	RecordMessageSend("accepted", "single")
 	RecordDeliveryAttempt("delivered")
 	RecordDeliveryAttempt("delivered")
-	RecordTransferEvent("failed")
 	SetWebSocketConnections(3)
 
 	rec := httptest.NewRecorder()
@@ -22,7 +21,6 @@ func TestMetricsHandlerExposesPrometheusText(t *testing.T) {
 		"# TYPE agents_im_message_sends_total counter",
 		`agents_im_message_sends_total{chat_type="single",status="accepted"} 1`,
 		`agents_im_delivery_attempts_total{status="delivered"} 2`,
-		`agents_im_transfer_events_total{result="failed"} 1`,
 		"agents_im_websocket_connections 3",
 	} {
 		if !strings.Contains(body, expected) {

@@ -14,7 +14,6 @@ type (
 	// and implement the added methods in customAuthEmailVerificationTokensModel.
 	AuthEmailVerificationTokensModel interface {
 		authEmailVerificationTokensModel
-		withSession(session sqlx.Session) AuthEmailVerificationTokensModel
 		// Latest 取 (purpose,email) 最近一条 token；无记录返回 ErrNotFound。
 		Latest(ctx context.Context, purpose int64, emailNormalized string) (*AuthEmailVerificationTokens, error)
 		// SupersedeAndInsert 在一个事务内把 (purpose,email) 现存未消费 token 标记为已消费，
@@ -37,10 +36,6 @@ func NewAuthEmailVerificationTokensModel(conn sqlx.SqlConn) AuthEmailVerificatio
 	return &customAuthEmailVerificationTokensModel{
 		defaultAuthEmailVerificationTokensModel: newAuthEmailVerificationTokensModel(conn),
 	}
-}
-
-func (m *customAuthEmailVerificationTokensModel) withSession(session sqlx.Session) AuthEmailVerificationTokensModel {
-	return NewAuthEmailVerificationTokensModel(sqlx.NewSqlConnFromSession(session))
 }
 
 func (m *customAuthEmailVerificationTokensModel) Latest(ctx context.Context, purpose int64, emailNormalized string) (*AuthEmailVerificationTokens, error) {

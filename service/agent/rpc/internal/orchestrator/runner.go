@@ -23,15 +23,6 @@ type RuntimeRequestBuilder interface {
 	BuildRuntimeRequest(ctx context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error)
 }
 
-type RuntimeRequestBuilderFunc func(ctx context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error)
-
-func (f RuntimeRequestBuilderFunc) BuildRuntimeRequest(ctx context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
-	if f == nil {
-		return agentruntime.RunRequest{}, apperror.Internal("agent runtime request builder is not configured")
-	}
-	return f(ctx, trigger)
-}
-
 type AgentRunAuditRecorder interface {
 	RecordAgentRun(ctx context.Context, input agentaudit.CreateRunInput) (agentaudit.AgentRun, error)
 }

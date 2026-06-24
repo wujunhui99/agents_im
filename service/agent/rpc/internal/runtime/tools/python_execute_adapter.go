@@ -65,18 +65,6 @@ func NewPythonExecuteAdapter(spec ToolSpec, executor pythonexec.Executor, opts .
 	return &PythonExecuteAdapter{spec: spec, executor: executor, config: config}, nil
 }
 
-func WithPythonExecuteFileAllowlist(entries map[string]pythonexec.FileAllowlistEntry) PythonExecuteAdapterOption {
-	return func(config *pythonExecuteAdapterConfig) {
-		config.fileAllowlist = make(map[string]pythonexec.FileAllowlistEntry, len(entries))
-		for key, entry := range entries {
-			normalized := strings.TrimSpace(key)
-			if normalized != "" {
-				config.fileAllowlist[normalized] = entry
-			}
-		}
-	}
-}
-
 func (a *PythonExecuteAdapter) Spec() ToolSpec {
 	if a == nil {
 		return ToolSpec{}

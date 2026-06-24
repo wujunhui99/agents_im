@@ -20,16 +20,6 @@ type AgentAccountExistenceChecker interface {
 	IsActiveAgentAccount(ctx context.Context, accountID string) (bool, error)
 }
 
-// AgentAccountExistenceCheckerFunc 把普通函数适配为 AgentAccountExistenceChecker。
-type AgentAccountExistenceCheckerFunc func(ctx context.Context, accountID string) (bool, error)
-
-func (f AgentAccountExistenceCheckerFunc) IsActiveAgentAccount(ctx context.Context, accountID string) (bool, error) {
-	if f == nil {
-		return false, nil
-	}
-	return f(ctx, accountID)
-}
-
 // ConversationAIHostingLogic 持有 AI 托管开关的业务规则（同会话仅一方可开启、不可托管与
 // AI 助手的会话等），背靠 Store 数据层。原 internal/logic.ConversationAIHostingLogic 迁入属主。
 type ConversationAIHostingLogic struct {

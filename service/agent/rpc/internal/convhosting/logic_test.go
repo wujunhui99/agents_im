@@ -15,6 +15,12 @@ func singleConv(a, b string) string {
 	return "single:" + users[0] + ":" + users[1]
 }
 
+type agentAccountExistenceCheckerFunc func(ctx context.Context, accountID string) (bool, error)
+
+func (f agentAccountExistenceCheckerFunc) IsActiveAgentAccount(ctx context.Context, accountID string) (bool, error) {
+	return f(ctx, accountID)
+}
+
 func TestConversationAIHostingDefaultEnableDisableAndPeerConflict(t *testing.T) {
 	ctx := context.Background()
 	hosting := NewConversationAIHostingLogic(NewMemoryStore())
@@ -123,7 +129,7 @@ func TestConversationAIHostingRejectsNonParticipantsAndGroups(t *testing.T) {
 
 func TestConversationAIHostingRejectsAgentConversation(t *testing.T) {
 	ctx := context.Background()
-	hosting := NewConversationAIHostingLogic(NewMemoryStore()).WithAgentAccountResolver(AgentAccountExistenceCheckerFunc(func(_ context.Context, accountID string) (bool, error) {
+	hosting := NewConversationAIHostingLogic(NewMemoryStore()).WithAgentAccountResolver(agentAccountExistenceCheckerFunc(func(_ context.Context, accountID string) (bool, error) {
 		return accountID == "agent_creator", nil
 	}))
 	conversationID := singleConv("usr_new", "agent_creator")

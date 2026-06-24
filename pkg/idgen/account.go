@@ -15,7 +15,7 @@ import (
 //	 1 bit  sign (always 0 — positive ids keep conversation_id string order +
 //	        readable decimal transport)
 //	41 bits timestamp, 1ms granularity since accountEpoch (~69.7 years)
-//	 3 bits account-facet (see Facet below; only bit0 / toPush defined today)
+//	 3 bits account-facet (see Facet below; agent vs human-side defined today)
 //	 9 bits machine id (512 instances)
 //	10 bits sequence (1024 ids / ms / instance ≈ 1M ids/s/instance)
 //
@@ -29,7 +29,7 @@ import (
 // granular type (admin/test/user/…) lives only in accounts.account_type.
 //
 // Hard rule (D16 解析纪律): facet bits may ONLY be read through AccountFacet /
-// ToPush / IsAgent / IsAgentAccountID in this package — no scattered bit
+// IsAgent / IsAgentAccountID in this package — no scattered bit
 // arithmetic in services. Only positions that genuinely need it (msgtransfer
 // toPush filtering, agent-rpc trigger final judgment, admin/debug tooling) may
 // branch on it.
@@ -52,17 +52,18 @@ const (
 	accountFacetMask    = int64(-1) ^ (int64(-1) << accountFacetBits)
 )
 
-// Facet is the 3-bit account-facet encoded in every account id. Only bit0
-// (toPush) is defined today; bit1-2 are reserved (must be 0) and only become
-// issuable through this allowlist. It is kept in lockstep with the agent-ness
-// of accounts.account_type at creation time (double-source invariant, D16).
+// Facet is the 3-bit account-facet encoded in every account id. Only the
+// agent vs human-side split is defined today; bit1-2 are reserved (must be 0)
+// and only become issuable through this allowlist. It is kept in lockstep with
+// the agent-ness of accounts.account_type at creation time (double-source
+// invariant, D16).
 type Facet int64
 
 const (
-	// FacetAgent (toPush=0): agent account — no connection surface, never in
+	// FacetAgent: agent account — no connection surface, never in
 	// push fanout, is a trigger source.
 	FacetAgent Facet = 0b000
-	// FacetHuman (toPush=1): human-side account (user / admin / test / … all
+	// FacetHuman: human-side account (user / admin / test / … all
 	// non-agent types) — has a connection surface, receives pushes.
 	FacetHuman Facet = 0b001
 )
@@ -70,22 +71,6 @@ const (
 // Valid reports whether the facet is issuable (reserved bits must be 0).
 func (f Facet) Valid() bool {
 	return f == FacetAgent || f == FacetHuman
-}
-
-// ToPush reports whether bit0 (the push-surface bit) is set.
-func (f Facet) ToPush() bool {
-	return int64(f)&0b001 == 0b001
-}
-
-func (f Facet) String() string {
-	switch f {
-	case FacetAgent:
-		return "agent"
-	case FacetHuman:
-		return "human"
-	default:
-		return fmt.Sprintf("facet(%d)", int64(f))
-	}
 }
 
 // AccountFacet extracts the facet bits from a typed account id. It does not
@@ -96,14 +81,7 @@ func AccountFacet(id int64) Facet {
 	return Facet((id >> accountFacetShift) & accountFacetMask)
 }
 
-// ToPush reports whether the account id carries the push-surface bit (bit0).
-func ToPush(id int64) bool {
-	return AccountFacet(id).ToPush()
-}
-
-// IsAgent reports whether the account id carries the agent facet exactly
-// (facet == FacetAgent). Distinct from !ToPush only for the (currently
-// unissued) reserved facets.
+// IsAgent reports whether the account id carries the agent facet exactly.
 func IsAgent(id int64) bool {
 	return AccountFacet(id) == FacetAgent
 }

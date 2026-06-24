@@ -13,7 +13,6 @@ type (
 	// and implement the added methods in customAgentPromptsModel.
 	AgentPromptsModel interface {
 		agentPromptsModel
-		withSession(session sqlx.Session) AgentPromptsModel
 
 		// InsertReturning 插入并返回库生成的完整行（prompt_id 自增、jsonb 列）。
 		InsertReturning(ctx context.Context, data *AgentPrompts) (*AgentPrompts, error)
@@ -29,8 +28,4 @@ func NewAgentPromptsModel(conn sqlx.SqlConn) AgentPromptsModel {
 	return &customAgentPromptsModel{
 		defaultAgentPromptsModel: newAgentPromptsModel(conn),
 	}
-}
-
-func (m *customAgentPromptsModel) withSession(session sqlx.Session) AgentPromptsModel {
-	return NewAgentPromptsModel(sqlx.NewSqlConnFromSession(session))
 }

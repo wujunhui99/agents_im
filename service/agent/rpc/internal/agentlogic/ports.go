@@ -37,7 +37,7 @@ type FriendPort interface {
 	EnsureFriendship(ctx context.Context, userID string, friendID string) error
 }
 
-// AgentStore 是 agents 表读写端口（属主 agent 域，goctl model 实现 PgAgentStore，测试用 MemoryAgentStore）。
+// AgentStore 是 agents 表读写端口（属主 agent 域，goctl model 实现 PgAgentStore）。
 // 对外 string agent_id；GetAgentByIMUserID 满足 orchestrator.AgentReader（im_user_id == account_id）。
 type AgentStore interface {
 	CreateAgent(ctx context.Context, agent model.Agent) (model.Agent, error)

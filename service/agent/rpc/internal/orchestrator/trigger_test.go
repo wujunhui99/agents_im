@@ -151,28 +151,3 @@ func TestMessageCreatedEventAllowsExplicitAgentRecursion(t *testing.T) {
 		t.Fatalf("trigger type = %q, want %q", triggers[0].TriggerType, TriggerTypeGroupMention)
 	}
 }
-
-func TestNewAdminManualRunTrigger(t *testing.T) {
-	trigger, err := NewAdminManualRunTrigger(AdminManualRunRequest{
-		RequestID:        "manual_req_1",
-		OperationID:      "op_manual_1",
-		TraceID:          "trace_manual_1",
-		AdminUserID:      "admin_1",
-		AgentUserID:      "agent_1",
-		ConversationID:   "single:agent_1:user_1",
-		ConversationType: ConversationTypeSingle,
-		PromptText:       "rerun this conversation",
-	})
-	if err != nil {
-		t.Fatalf("manual trigger: %v", err)
-	}
-	if trigger.TriggerType != TriggerTypeAdminManualRun {
-		t.Fatalf("trigger type = %q, want %q", trigger.TriggerType, TriggerTypeAdminManualRun)
-	}
-	if trigger.RequestingUserID != "admin_1" {
-		t.Fatalf("requesting user id = %q", trigger.RequestingUserID)
-	}
-	if trigger.TriggerMessageID != "" {
-		t.Fatalf("manual run unexpectedly had trigger message id: %+v", trigger)
-	}
-}

@@ -14,7 +14,6 @@ type (
 	// and implement the added methods in customAgentToolBindingsModel.
 	AgentToolBindingsModel interface {
 		agentToolBindingsModel
-		withSession(session sqlx.Session) AgentToolBindingsModel
 
 		// FindByAgentId 列出某 agent 的全部 tool 绑定，按 tool_id 稳定排序。
 		FindByAgentId(ctx context.Context, agentId int64) ([]*AgentToolBindings, error)
@@ -43,8 +42,4 @@ func NewAgentToolBindingsModel(conn sqlx.SqlConn) AgentToolBindingsModel {
 	return &customAgentToolBindingsModel{
 		defaultAgentToolBindingsModel: newAgentToolBindingsModel(conn),
 	}
-}
-
-func (m *customAgentToolBindingsModel) withSession(session sqlx.Session) AgentToolBindingsModel {
-	return NewAgentToolBindingsModel(sqlx.NewSqlConnFromSession(session))
 }

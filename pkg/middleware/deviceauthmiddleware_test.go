@@ -7,15 +7,36 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/response"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
+type testSessionStore struct {
+	active map[string]string
+}
+
+func newTestSessionStore() *testSessionStore {
+	return &testSessionStore{active: map[string]string{}}
+}
+
+func (s *testSessionStore) SetActive(_ context.Context, userID, device, jti string, _ time.Duration) error {
+	s.active[userID+"\x00"+device] = jti
+	return nil
+}
+
+func (s *testSessionStore) Validate(_ context.Context, userID, device, jti string) error {
+	if s.active[userID+"\x00"+device] != jti {
+		return apperror.Unauthenticated("token session is not active")
+	}
+	return nil
+}
+
 func TestDeviceAuthMiddleware(t *testing.T) {
 	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
 
-	store := NewMemorySessionStore()
+	store := newTestSessionStore()
 	if err := store.SetActive(context.Background(), "usr_1", "web", "jti-active", time.Hour); err != nil {
 		t.Fatalf("set active: %v", err)
 	}

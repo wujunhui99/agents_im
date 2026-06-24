@@ -136,45 +136,15 @@ func NewServer(auth config.JWTAuthConfig, backend MessageBackend, opts ...Server
 	return server
 }
 
-func WithConnectionManager(manager *ConnectionManager) ServerOption {
-	return func(s *Server) {
-		if manager != nil {
-			s.connections = manager
-		}
-	}
-}
-
-func WithTokenManager(manager token.Manager) ServerOption {
-	return func(s *Server) {
-		if manager != nil {
-			s.tokenManager = manager
-		}
-	}
-}
-
 func WithSessionStore(store middleware.SessionStore) ServerOption {
 	return func(s *Server) {
 		s.sessions = store
 	}
 }
 
-func WithNow(now func() time.Time) ServerOption {
-	return func(s *Server) {
-		if now != nil {
-			s.now = now
-		}
-	}
-}
-
 func WithPresenceStore(store presence.PresenceStore) ServerOption {
 	return func(s *Server) {
 		s.presence = store
-	}
-}
-
-func WithDeliveryDispatcher(dispatcher delivery.Dispatcher) ServerOption {
-	return func(s *Server) {
-		s.dispatcher = dispatcher
 	}
 }
 

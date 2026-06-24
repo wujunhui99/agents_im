@@ -13,7 +13,6 @@ type (
 	// and implement the added methods in customConversationAiHostingSettingsModel.
 	ConversationAiHostingSettingsModel interface {
 		conversationAiHostingSettingsModel
-		withSession(session sqlx.Session) ConversationAiHostingSettingsModel
 
 		// FindEnabledByConversationId 返回会话内当前已开启的托管行（partial unique index 保证至多一行）。
 		// 无开启行返回 ErrNotFound。
@@ -33,10 +32,6 @@ func NewConversationAiHostingSettingsModel(conn sqlx.SqlConn) ConversationAiHost
 	return &customConversationAiHostingSettingsModel{
 		defaultConversationAiHostingSettingsModel: newConversationAiHostingSettingsModel(conn),
 	}
-}
-
-func (m *customConversationAiHostingSettingsModel) withSession(session sqlx.Session) ConversationAiHostingSettingsModel {
-	return NewConversationAiHostingSettingsModel(sqlx.NewSqlConnFromSession(session))
 }
 
 func (m *customConversationAiHostingSettingsModel) FindEnabledByConversationId(ctx context.Context, conversationId string) (*ConversationAiHostingSettings, error) {

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/pkg/auth/token"
-	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
@@ -108,10 +107,26 @@ func (s *stubUserRPC) GetUserByID(_ context.Context, _ *userclient.GetUserByIDRe
 	return s.byID, s.byIDErr
 }
 
+type testSessionStore struct {
+	active map[string]string
+}
+
+func (s *testSessionStore) SetActive(_ context.Context, userID, device, jti string, _ time.Duration) error {
+	s.active[userID+"\x00"+device] = jti
+	return nil
+}
+
+func (s *testSessionStore) Validate(_ context.Context, userID, device, jti string) error {
+	if s.active[userID+"\x00"+device] != jti {
+		return status.Error(codes.Unauthenticated, "token session is not active")
+	}
+	return nil
+}
+
 func newFlowSvc(creds model.AuthCredentialsModel, evs model.AuthEmailVerificationTokensModel, users userclient.User) *svc.ServiceContext {
 	return &svc.ServiceContext{
 		Tokens:             token.NewHMACTokenManager("test-secret", time.Hour),
-		Sessions:           middleware.NewMemorySessionStore(),
+		Sessions:           &testSessionStore{active: map[string]string{}},
 		Users:              users,
 		Credentials:        creds,
 		EmailVerifications: evs,
