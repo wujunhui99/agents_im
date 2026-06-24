@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
@@ -37,17 +36,6 @@ type postgresFeedbackRow struct {
 	AdminNote  sql.NullString `db:"admin_note"`
 	CreatedAt  time.Time      `db:"created_at"`
 	UpdatedAt  time.Time      `db:"updated_at"`
-}
-
-func NewFeedbackRepositoryForStorage(driver string, dataSource string) (FeedbackRepository, error) {
-	storageDriver, err := repositoryStorageDriver(driver)
-	if err != nil {
-		return nil, err
-	}
-	if storageDriver == appconfig.StorageDriverMemory {
-		return NewMemoryFeedbackRepository(), nil
-	}
-	return NewPostgresFeedbackRepository(appconfig.ResolveDataSource(dataSource))
 }
 
 func NewPostgresFeedbackRepository(dataSource string) (*PostgresFeedbackRepository, error) {

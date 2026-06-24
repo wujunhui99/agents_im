@@ -98,24 +98,11 @@ type MessageStorageConversationSeqState struct {
 	UpdatedAt      time.Time
 }
 
-func MessageStorageSingleConversationID(userA string, userB string) string {
-	lower, higher := MessageStorageOrderedSingleUsers(userA, userB)
-	return "single:" + lower + ":" + higher
-}
-
 func MessageStorageOrderedSingleUsers(userA string, userB string) (string, string) {
 	if userA <= userB {
 		return userA, userB
 	}
 	return userB, userA
-}
-
-func MessageStorageGroupConversationID(groupID string) string {
-	return "group:" + groupID
-}
-
-func MessageStorageUnreadCount(maxSeq int64, hasReadSeq int64) int64 {
-	return MessageStorageUnreadCountFromVisibleStart(maxSeq, hasReadSeq, 0)
 }
 
 func MessageStorageUnreadCountFromVisibleStart(maxSeq int64, hasReadSeq int64, visibleStartSeq int64) int64 {
@@ -126,11 +113,4 @@ func MessageStorageUnreadCountFromVisibleStart(maxSeq int64, hasReadSeq int64, v
 		return 0
 	}
 	return maxSeq - hasReadSeq
-}
-
-func MessageStorageAdvanceReadSeq(current int64, candidate int64) int64 {
-	if candidate > current {
-		return candidate
-	}
-	return current
 }

@@ -266,10 +266,6 @@ returning group_id, name, description, creator_account_id, created_at, updated_a
 	return row, err
 }
 
-func insertGroupMember(ctx context.Context, session sqlx.Session, groupID string, userID string) (postgresGroupMemberRow, error) {
-	return insertGroupMemberWithRole(ctx, session, groupID, userID, groupMemberRoleDBOwner)
-}
-
 func insertGroupMemberWithRole(ctx context.Context, session sqlx.Session, groupID string, userID string, role int16) (postgresGroupMemberRow, error) {
 	var row postgresGroupMemberRow
 	err := session.QueryRowCtx(ctx, &row, `

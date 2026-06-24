@@ -23,16 +23,6 @@ const (
 	groupMemberRoleDBAdmin    int16 = 3
 	groupMemberStatusDBActive int16 = 1
 	groupMemberStatusDBLeft   int16 = 2
-
-	mediaStorageProviderDBS3   int16 = 1
-	mediaPurposeDBAvatar       int16 = 1
-	mediaPurposeDBMessageImage int16 = 2
-	mediaPurposeDBMessageFile  int16 = 3
-	mediaPurposeDBAgentSkill   int16 = 4
-	mediaStatusDBPending       int16 = 1
-	mediaStatusDBReady         int16 = 2
-	mediaStatusDBRejected      int16 = 3
-	mediaStatusDBDeleted       int16 = 4
 )
 
 func accountTypeToDB(t model.AccountType) int16 {
@@ -127,17 +117,6 @@ func memberStateFromDB(v int16) string {
 	return model.MemberStateActive
 }
 
-func memberRoleToDB(role string) int16 {
-	switch role {
-	case model.MemberRoleOwner:
-		return groupMemberRoleDBOwner
-	case model.MemberRoleAdmin:
-		return groupMemberRoleDBAdmin
-	default:
-		return groupMemberRoleDBMember
-	}
-}
-
 func memberRoleFromDB(v int16) string {
 	switch v {
 	case groupMemberRoleDBOwner:
@@ -146,59 +125,5 @@ func memberRoleFromDB(v int16) string {
 		return model.MemberRoleAdmin
 	default:
 		return model.MemberRoleMember
-	}
-}
-
-func mediaPurposeToDB(p model.MediaPurpose) int16 {
-	switch p {
-	case model.MediaPurposeAvatar:
-		return mediaPurposeDBAvatar
-	case model.MediaPurposeMessageImage:
-		return mediaPurposeDBMessageImage
-	case model.MediaPurposeMessageFile:
-		return mediaPurposeDBMessageFile
-	case model.MediaPurposeAgentSkill:
-		return mediaPurposeDBAgentSkill
-	default:
-		return mediaPurposeDBMessageFile
-	}
-}
-
-func mediaPurposeFromDB(v int16) model.MediaPurpose {
-	switch v {
-	case mediaPurposeDBAvatar:
-		return model.MediaPurposeAvatar
-	case mediaPurposeDBMessageImage:
-		return model.MediaPurposeMessageImage
-	case mediaPurposeDBAgentSkill:
-		return model.MediaPurposeAgentSkill
-	default:
-		return model.MediaPurposeMessageFile
-	}
-}
-
-func mediaStatusToDB(s model.MediaStatus) int16 {
-	switch s {
-	case model.MediaStatusReady:
-		return mediaStatusDBReady
-	case model.MediaStatusRejected:
-		return mediaStatusDBRejected
-	case model.MediaStatusDeleted:
-		return mediaStatusDBDeleted
-	default:
-		return mediaStatusDBPending
-	}
-}
-
-func mediaStatusFromDB(v int16) model.MediaStatus {
-	switch v {
-	case mediaStatusDBReady:
-		return model.MediaStatusReady
-	case mediaStatusDBRejected:
-		return model.MediaStatusRejected
-	case mediaStatusDBDeleted:
-		return model.MediaStatusDeleted
-	default:
-		return model.MediaStatusPending
 	}
 }
