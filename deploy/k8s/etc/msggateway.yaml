@@ -20,7 +20,7 @@ Presence:
 GatewayWS:
   # Environment-specific exact browser origins, for example production or gray/staging hostnames.
   AllowedOrigins:
-    - https://agenticim.xyz
+    - ${GATEWAY_WS_ALLOWED_ORIGINS}
   # Browser-native WebSocket cannot set Authorization headers; keep origins explicit behind ingress.
   AllowQueryToken: true
   PingIntervalSeconds: 30
