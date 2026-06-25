@@ -403,5 +403,53 @@ for required in ("LANGFUSE_DATABASE_URL", "NEXTAUTH_SECRET", "SALT", "ENCRYPTION
 PY
 
 # --- deploy script smoke gates ---
+python3 - <<'PY'
+import json
+import sys
+import yaml
+
+with open("scripts/services.json", encoding="utf-8") as f:
+    registry = json.load(f)
+backend = {item["name"] for item in registry["backend"]}
+apps = backend | {registry["web"]}
+
+with open("deploy/k8s/deployments.yaml", encoding="utf-8") as f:
+    docs = [doc for doc in yaml.safe_load_all(f) if doc]
+
+deployments = {
+    doc.get("metadata", {}).get("name"): doc
+    for doc in docs
+    if doc.get("kind") == "Deployment"
+}
+
+for service in sorted(apps):
+    deployment = deployments.get(service)
+    if deployment is None:
+        print(f"deploy/k8s/deployments.yaml: missing Deployment/{service}", file=sys.stderr)
+        sys.exit(1)
+    if deployment.get("spec", {}).get("strategy", {}).get("type") != "Recreate":
+        print(f"deploy/k8s/deployments.yaml: Deployment/{service} must use Recreate strategy", file=sys.stderr)
+        sys.exit(1)
+
+for service in sorted(backend):
+    containers = deployments[service].get("spec", {}).get("template", {}).get("spec", {}).get("containers") or []
+    container = next((item for item in containers if item.get("name") == service), None)
+    if not container:
+        print(f"deploy/k8s/deployments.yaml: Deployment/{service} missing container {service}", file=sys.stderr)
+        sys.exit(1)
+    if container.get("command") != [f"/app/bin/{service}"]:
+        print(f"deploy/k8s/deployments.yaml: Deployment/{service} must command /app/bin/{service}", file=sys.stderr)
+        sys.exit(1)
+PY
+
+if grep -q 'RESTART_ROLLOUT=' scripts/ci/drone-deploy.sh; then
+  echo "drone-deploy.sh must not force RESTART_ROLLOUT for every deploy" >&2
+  exit 1
+fi
+if ! grep -q 'BACKEND_IMAGE_NAME' scripts/deploy-k3s.sh || ! grep -q 'image_for_service' scripts/deploy-k3s.sh; then
+  echo "deploy-k3s.sh must render selected backend services to the unified backend image" >&2
+  exit 1
+fi
+
 bash scripts/test-deploy-k3s.sh
 bash scripts/test-no-latest-images.sh

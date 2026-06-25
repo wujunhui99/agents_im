@@ -114,7 +114,7 @@ The local message chain mirrors production (03 §9 B3b single rail): `docker com
 
 ## Ports
 
-服务名和 go main package path 的单一事实源是 `scripts/services.json`(被 `Makefile`、`scripts/deploy-k3s.sh`、`scripts/detect-deploy-changes.py`、`scripts/dev-up.sh` 共用);新增/删除部署服务只改这一处。本地各服务的配置模板在 `scripts/dev/etc/*.yaml.tmpl`(数据),`scripts/dev-up.sh` 用环境变量渲染它们;启动顺序和默认端口以 `scripts/dev-up.sh` 为准。下表只作常用端口概览。
+服务名和 go main package path 的单一事实源是 `scripts/services.json`(被 `Makefile`、`Dockerfile`、`scripts/deploy-k3s.sh`、`scripts/detect-deploy-changes.py`、`scripts/dev-up.sh` 共用);新增/删除部署服务只改这一处。生产后端镜像是统一的 `backend:<sha>`，Deployment 通过 `command: ["/app/bin/<service>"]` 选择具体 binary；web 仍是独立镜像。本地各服务的配置模板在 `scripts/dev/etc/*.yaml.tmpl`(数据),`scripts/dev-up.sh` 用环境变量渲染它们;启动顺序和默认端口以 `scripts/dev-up.sh` 为准。下表只作常用端口概览。
 
 | Service | URL |
 | --- | --- |

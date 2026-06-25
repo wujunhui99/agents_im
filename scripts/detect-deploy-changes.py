@@ -2,19 +2,26 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import shlex
+import shutil
+import subprocess
 from pathlib import Path, PurePosixPath
 
 
-def _load_registry() -> tuple[list[str], list[str], str]:
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_registry() -> tuple[list[str], dict[str, str], list[str], str]:
     """Read the service registry (single source of truth) from services.json."""
     registry = json.loads((Path(__file__).resolve().parent / "services.json").read_text())
     backend = [s["name"] for s in registry["backend"]]
-    return backend, registry["infra"], registry["web"]
+    packages = {s["name"]: s["package"] for s in registry["backend"]}
+    return backend, packages, registry["infra"], registry["web"]
 
 
-BACKEND_SERVICES, _INFRA_SERVICES, _WEB_SERVICE = _load_registry()
+BACKEND_SERVICES, BACKEND_SERVICE_PACKAGES, _INFRA_SERVICES, _WEB_SERVICE = _load_registry()
 
 ALL_IMAGE_SERVICES = [*BACKEND_SERVICES, _WEB_SERVICE]
 
@@ -122,6 +129,10 @@ def is_doc_only(path: str) -> bool:
     return path.startswith("docs/") or name == "README.md" or name.endswith(".md")
 
 
+def is_go_test_file(path: str) -> bool:
+    return path.endswith("_test.go")
+
+
 def is_meta_dotpath(path: str) -> bool:
     # Top-level dotfiles / dotdirs (e.g. .claude/, .github/, .gitignore)
     # are tooling/meta and never affect the deployed app, so they must not trigger
@@ -147,6 +158,77 @@ def add_config_rollout(selection: DeploySelection, service: str | None) -> None:
         selection.add_all_rollouts()
 
 
+def go_tool_available() -> bool:
+    return shutil.which("go") is not None
+
+
+@functools.cache
+def go_list_import_path(package_dir: str) -> str | None:
+    if not go_tool_available():
+        return None
+    full_dir = REPO_ROOT / package_dir
+    if not full_dir.exists() or not full_dir.is_dir():
+        return None
+    result = subprocess.run(
+        ["go", "list", "-f", "{{.ImportPath}}", f"./{package_dir}"],
+        cwd=REPO_ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+@functools.cache
+def go_list_service_deps(service: str) -> frozenset[str] | None:
+    if not go_tool_available():
+        return None
+    package = BACKEND_SERVICE_PACKAGES[service]
+    result = subprocess.run(
+        ["go", "list", "-deps", package],
+        cwd=REPO_ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    return frozenset(line for line in result.stdout.splitlines() if line)
+
+
+def add_go_import_dependents(path: str, selection: DeploySelection) -> bool:
+    """Route production Go changes by actual service import graph when possible.
+
+    Returns True when the path was handled. If Go metadata is unavailable (for
+    example a deleted file or a runner without the Go toolchain), callers should
+    fall back to the conservative path rules below.
+    """
+    if not path.endswith(".go"):
+        return False
+    if is_go_test_file(path):
+        return True
+
+    package_dir = normalize_path(str(PurePosixPath(path).parent))
+    package_import = go_list_import_path(package_dir)
+    if package_import is None:
+        return False
+
+    affected: list[str] = []
+    for service in BACKEND_SERVICES:
+        deps = go_list_service_deps(service)
+        if deps is None:
+            return False
+        if package_import in deps:
+            affected.append(service)
+
+    selection.add_backends(affected)
+    return True
+
+
 def classify_path(path: str, selection: DeploySelection) -> None:
     if not path:
         return
@@ -158,6 +240,9 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         return
 
     if is_doc_only(path):
+        return
+
+    if add_go_import_dependents(path, selection):
         return
 
     if path in {

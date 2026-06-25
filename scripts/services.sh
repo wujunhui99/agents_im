@@ -4,7 +4,7 @@
 # python3 (already a hard dependency of deploy-k3s.sh).
 #
 #   source scripts/services.sh
-#   mapfile -t backend < <(services_backend_names)   # 18 deployed backends, canonical order
+#   mapfile -t backend < <(services_backend_names)   # deployed backends, canonical order
 #   mapfile -t infra   < <(services_infra_names)     # monitoring / infra deployments
 #   pkg="$(services_package user-api)"               # go main package for a backend
 

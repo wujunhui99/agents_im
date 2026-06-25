@@ -1,51 +1,37 @@
 # syntax=docker/dockerfile:1.7
 FROM golang:1.25-alpine AS backend-builder
 WORKDIR /src
-RUN apk add --no-cache git
+RUN apk add --no-cache git python3
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
-ARG SERVICE
-RUN test -n "$SERVICE"
-# Map deployment name -> go-zero main package path. Entrypoints live in their
-# service directories (cmd/ was removed); deploy still passes SERVICE=<name>.
+# Build all backend entrypoints once. Deployment manifests select the concrete
+# binary with container command, so the CI path pushes one backend image instead
+# of one image per backend service.
 RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    set -eu; \
-    case "$SERVICE" in \
-      agent-api)        pkg=./service/agent/api ;; \
-      auth-api)         pkg=./service/auth/api ;; \
-      auth-rpc)         pkg=./service/auth/rpc ;; \
-      friends-api)      pkg=./service/friends/api ;; \
-      friends-rpc)      pkg=./service/friends/rpc ;; \
-      groups-api)       pkg=./service/groups/api ;; \
-      groups-rpc)       pkg=./service/groups/rpc ;; \
-      third-rpc)         pkg=./service/third/rpc ;; \
-      user-api)         pkg=./service/user/api ;; \
-      user-rpc)         pkg=./service/user/rpc ;; \
-      media-api)        pkg=./service/media/api ;; \
-      media-rpc)        pkg=./service/media/rpc ;; \
-      msg-rpc)          pkg=./service/msg/rpc ;; \
-      agent-rpc)        pkg=./service/agent/rpc ;; \
-      msg-api)          pkg=./service/msg/api ;; \
-      msggateway)       pkg=./service/msggateway ;; \
-      admin-api)        pkg=./service/admin/api ;; \
-      admin-rpc)        pkg=./service/admin/rpc ;; \
-      msgtransfer) pkg=./service/msgtransfer ;; \
-      push)             pkg=./service/push ;; \
-      *) echo "unknown SERVICE: $SERVICE" >&2; exit 1 ;; \
-    esac; \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o /out/service "$pkg"
+    --mount=type=cache,target=/root/.cache/go-build <<'EOF'
+set -eu
+mkdir -p /out/bin
+python3 - <<'PY' | while read -r name pkg; do
+import json
+from pathlib import Path
+
+registry = json.loads(Path("scripts/services.json").read_text())
+for service in registry["backend"]:
+    print(service["name"], service["package"])
+PY
+  echo "building ${name} from ${pkg}"
+  CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o "/out/bin/${name}" "${pkg}"
+done
+EOF
 
 FROM alpine:3.22 AS backend
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
-ARG SERVICE
-RUN test -n "$SERVICE"
-COPY --from=backend-builder /out/service /app/service
+COPY --from=backend-builder /out/bin /app/bin
 COPY etc /app/etc
 EXPOSE 8080 8081 8082 8083 8084 8085 8086 8088 9090 9091 9092 9093 9094 9095 9097 9098 9099 9100
-ENTRYPOINT ["/app/service"]
+ENTRYPOINT ["/app/bin/user-api"]
 
 FROM node:22-alpine AS web-builder
 WORKDIR /src/web

@@ -4,6 +4,7 @@ set -euo pipefail
 NAMESPACE="${NAMESPACE:-agents-im}"
 IMAGE_REGISTRY="${IMAGE_REGISTRY:-ghcr.io/wujunhui99/agents_im}"
 IMAGE_TAG="${IMAGE_TAG:-}"
+BACKEND_IMAGE_NAME="${BACKEND_IMAGE_NAME:-backend}"
 MANIFEST_DIR="${MANIFEST_DIR:-deploy/k8s}"
 KUBECTL="${KUBECTL:-kubectl}"
 GHCR_USERNAME="${GHCR_USERNAME:-}"
@@ -19,7 +20,8 @@ RENDER_ONLY="${RENDER_ONLY:-false}"
 # Service registry comes from scripts/services.json (single source of truth),
 # shared with detect-deploy-changes.py and dev-up.sh.
 source "$(dirname "${BASH_SOURCE[0]}")/services.sh"
-mapfile -t IMAGE_DEPLOYMENTS < <(services_backend_names; services_web_name)
+WEB_DEPLOYMENT="$(services_web_name)"
+mapfile -t IMAGE_DEPLOYMENTS < <(services_backend_names; printf '%s\n' "${WEB_DEPLOYMENT}")
 mapfile -t RESTARTABLE_DEPLOYMENTS < <(printf '%s\n' "${IMAGE_DEPLOYMENTS[@]}"; services_infra_names)
 
 require() {
@@ -124,12 +126,21 @@ current_image_for() {
   return 1
 }
 
+image_for_service() {
+  local service="$1"
+  if [[ "${service}" == "${WEB_DEPLOYMENT}" ]]; then
+    printf '%s/%s:%s\n' "${IMAGE_REGISTRY}" "${service}" "${IMAGE_TAG}"
+  else
+    printf '%s/%s:%s\n' "${IMAGE_REGISTRY}" "${BACKEND_IMAGE_NAME}" "${IMAGE_TAG}"
+  fi
+}
+
 build_image_overrides() {
   local selected=("$@")
   local service image
   for service in "${IMAGE_DEPLOYMENTS[@]}"; do
     if array_contains "${service}" "${selected[@]}"; then
-      printf '%s=%s\n' "${service}" "${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"
+      printf '%s=%s\n' "${service}" "$(image_for_service "${service}")"
       continue
     fi
     image="$(current_image_for "${service}")"
@@ -139,7 +150,7 @@ build_image_overrides() {
       # Fresh clusters have no current image to preserve. Use the immutable
       # deployment tag so a full manifest apply can create all Deployments
       # without falling back to placeholders or mutable latest tags.
-      printf '%s=%s\n' "${service}" "${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"
+      printf '%s=%s\n' "${service}" "$(image_for_service "${service}")"
     fi
   done
 }
@@ -240,7 +251,7 @@ verify_deployed_images() {
 
   for service in "$@"; do
     [[ -z "${service}" ]] && continue
-    expected="${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"
+    expected="$(image_for_service "${service}")"
     deployment_image="$(${KUBECTL} -n "${NAMESPACE}" get deployment "${service}" -o "jsonpath={.spec.template.spec.containers[?(@.name=='${service}')].image}")"
     if [[ "${deployment_image}" != "${expected}" ]]; then
       echo "deployment/${service} image mismatch: expected=${expected} actual=${deployment_image}" >&2

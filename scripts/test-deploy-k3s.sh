@@ -32,7 +32,7 @@ case "${1:-}" in
     if [[ "${2:-}" == "deployment" || "${2:-}" == "deploy" ]]; then
       service="${3:-}"
       case "${service}" in
-        msg-api) echo 'ghcr.io/wujunhui99/agents_im/msg-api:new-message-sha' ;;
+        msg-api) echo 'ghcr.io/wujunhui99/agents_im/backend:new-message-sha' ;;
         web) echo 'ghcr.io/wujunhui99/agents_im/web:new-web-sha' ;;
         user-rpc) echo 'ghcr.io/wujunhui99/agents_im/user-rpc:stable-backend' ;;
         auth-rpc) echo 'ghcr.io/wujunhui99/agents_im/auth-rpc:stable-backend' ;;
@@ -58,7 +58,7 @@ case "${1:-}" in
       image="ghcr.io/wujunhui99/agents_im/${service}:stable-backend"
       case "${service}" in
         web) image='ghcr.io/wujunhui99/agents_im/web:new-web-sha' ;;
-        msg-api) image='ghcr.io/wujunhui99/agents_im/msg-api:new-message-sha' ;;
+        msg-api) image='ghcr.io/wujunhui99/agents_im/backend:new-message-sha' ;;
       esac
       cat <<JSON
 {"items":[{"metadata":{"name":"${service}-pod"},"status":{"phase":"Running","containerStatuses":[{"name":"${service}","ready":true,"imageID":"ghcr.io/wujunhui99/agents_im/${service}@sha256:testdigest"}]},"spec":{"containers":[{"name":"${service}","image":"${image}"}]}}]}
@@ -429,8 +429,8 @@ if grep -Fq "jsonpath={.data.DATABASE_URL}" "${CALL_LOG}"; then
   exit 1
 fi
 
-if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/msg-api:new-message-sha" "${CALL_LOG}"; then
-  echo "expected msg-api image to be rendered to the new release tag when explicit DATABASE_URL is provided" >&2
+if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/backend:new-message-sha" "${CALL_LOG}"; then
+  echo "expected msg-api image to be rendered to the unified backend release tag when explicit DATABASE_URL is provided" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
