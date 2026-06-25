@@ -35,10 +35,13 @@ forbid_match "account_type docs/frontend must use user|agent|admin; normal may a
   -n 'account_type.*normal|normal.*account_type|`normal`' web/src/api/user.ts
 
 # Localized WeChat-style shell strings across the core frontend surfaces.
+# styles/ is searched as a directory: #656 split styles.css into 13 modules and
+# moved the wechat-green token to styles/base.css, so target the dir (not a single
+# file) to survive future module reshuffles.
 assert_present "-qF" \
   web/src/App.tsx web/src/components/ui/NavigationBar.tsx web/src/components/ui/TabBar.tsx \
   web/src/components/ContactsPage.tsx web/src/features/messages/MessagesPage.tsx \
-  web/src/pages/DiscoverPage.tsx web/src/styles.css -- \
+  web/src/pages/DiscoverPage.tsx web/src/styles -- \
   "消息" "联系人" "发现" "我的" 'role="tab"' "wechat-green"
 
 # No production mock message flow.
