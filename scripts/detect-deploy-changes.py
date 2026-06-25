@@ -35,6 +35,18 @@ OBSERVABILITY_MANIFEST_ROLLOUTS = {
     "deploy/k8s/langfuse.yaml": ["langfuse"],
 }
 
+# k8s resources that take effect immediately on kubectl apply — no pod restart needed.
+# Changes here trigger deploy (so kubectl apply runs) but skip kubectl rollout restart
+# for all infra/middleware services.
+K8S_APPLY_ONLY_MANIFESTS = {
+    "deploy/k8s/kustomization.yaml",
+    "deploy/k8s/namespace.yaml",
+    "deploy/k8s/ingress.yaml",
+    "deploy/k8s/services.yaml",
+    "deploy/k8s/python-executor-rbac.yaml",
+    "deploy/k8s/cert-manager-issuers.yaml",
+}
+
 API_SERVICES = {
     "user": "user-api",
     "auth": "auth-api",
@@ -293,10 +305,17 @@ def classify_path(path: str, selection: DeploySelection) -> None:
         add_config_rollout(selection, service)
         return
 
+    if path == "deploy/k8s/secrets.example.yaml":
+        return
+
     if path.startswith("deploy/k8s/"):
         observability_rollouts = OBSERVABILITY_MANIFEST_ROLLOUTS.get(path)
         if observability_rollouts is not None:
             selection.add_rollouts(observability_rollouts)
+        elif path in K8S_APPLY_ONLY_MANIFESTS:
+            # Routing/RBAC/ingress resources take effect on apply — use canary rollout
+            # so the deploy step runs without restarting infra middleware.
+            selection.add_rollout("groups-rpc", restart=False)
         else:
             selection.add_all_rollouts()
         return

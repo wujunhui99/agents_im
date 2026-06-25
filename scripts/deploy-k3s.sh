@@ -347,10 +347,20 @@ apply_manifests() {
   mapfile -t rollout_wait_services < <(
     unique_services "${selected_image_services[@]}" "${restart_rollout_services[@]:-}"
   )
+  local -a rollout_pids=()
   for service in "${rollout_wait_services[@]}"; do
     [[ -z "${service}" ]] && continue
-    ${KUBECTL} -n "${NAMESPACE}" rollout status "deployment/${service}" --timeout=180s
+    ${KUBECTL} -n "${NAMESPACE}" rollout status "deployment/${service}" --timeout=180s &
+    rollout_pids+=("$!")
   done
+  local rollout_failed=0
+  for pid in "${rollout_pids[@]}"; do
+    wait "${pid}" || rollout_failed=1
+  done
+  if ((rollout_failed)); then
+    echo "One or more rollout status checks failed." >&2
+    exit 1
+  fi
 
   if ((${#selected_image_services[@]} > 0)); then
     verify_deployed_images "${selected_image_services[@]}"

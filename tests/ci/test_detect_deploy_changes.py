@@ -165,6 +165,30 @@ class DetectDeployChangesTest(unittest.TestCase):
         self.assertEqual(out["build_required"], "false")
         self.assertEqual(out["deploy_required"], "false")
 
+    def test_k8s_apply_only_manifests_deploy_without_infra_restart(self):
+        # Routing/RBAC/ingress manifests take effect on kubectl apply — deploy runs
+        # but no infra middleware restart (groups-rpc canary, restart=False).
+        for path in [
+            "deploy/k8s/kustomization.yaml",
+            "deploy/k8s/namespace.yaml",
+            "deploy/k8s/ingress.yaml",
+            "deploy/k8s/services.yaml",
+            "deploy/k8s/python-executor-rbac.yaml",
+            "deploy/k8s/cert-manager-issuers.yaml",
+        ]:
+            out = self.detect([path])
+            self.assertEqual(out["build_required"], "false", path)
+            self.assertEqual(out["deploy_required"], "true", path)
+            self.assertEqual(out["config_only"], "true", path)
+            self.assertIn("groups-rpc", out["rollout_services"], path)
+            # No explicit restart — infra middleware not in restart_services.
+            self.assertEqual(out["restart_services"], "''", path)
+
+    def test_k8s_secrets_example_does_not_deploy(self):
+        out = self.detect(["deploy/k8s/secrets.example.yaml"])
+        self.assertEqual(out["build_required"], "false")
+        self.assertEqual(out["deploy_required"], "false")
+
 
 if __name__ == "__main__":
     unittest.main()
