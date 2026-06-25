@@ -189,6 +189,36 @@ func TestWebSocketPingLoopSendsPingFrames(t *testing.T) {
 	}
 }
 
+func TestWebSocketApplicationHeartbeatExtendsReadDeadline(t *testing.T) {
+	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
+		PingIntervalSeconds:       30,
+		HeartbeatTimeoutSeconds:   1,
+		CommandRateLimitPerSecond: 100,
+		CommandRateLimitBurst:     100,
+	}))
+	defer cleanup()
+
+	conn, resp, err := websocket.DefaultDialer.Dial(testWSURL(server.URL, ""), authHeader(t, "usr_app_heartbeat_deadline"))
+	if err != nil {
+		t.Fatalf("dial websocket for app heartbeat deadline: status=%v err=%v", responseStatus(resp), err)
+	}
+	defer conn.Close()
+
+	time.Sleep(500 * time.Millisecond)
+	writeTestCommand(t, conn, "req-app-heartbeat-1")
+	first := readTestResponse(t, conn)
+	if first.Status != gateway.AckStatusOK {
+		t.Fatalf("first heartbeat status = %q, want ok: %+v", first.Status, first)
+	}
+
+	time.Sleep(700 * time.Millisecond)
+	writeTestCommand(t, conn, "req-app-heartbeat-2")
+	second := readTestResponse(t, conn)
+	if second.Status != gateway.AckStatusOK {
+		t.Fatalf("second heartbeat status = %q, want ok: %+v", second.Status, second)
+	}
+}
+
 func TestWebSocketCommandRateLimitReturnsErrorEnvelope(t *testing.T) {
 	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
 		PingIntervalSeconds:       30,

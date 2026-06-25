@@ -396,19 +396,21 @@ func (s *Server) validateActiveSession(ctx context.Context, userID, device, jti 
 
 func (s *Server) readLoop(ctx context.Context, conn *Connection) {
 	conn.ws.SetReadLimit(defaultReadLimit)
-	_ = conn.ws.SetReadDeadline(s.now().Add(s.heartbeatTimeout()))
+	_ = s.extendReadDeadline(conn)
 	conn.ws.SetPongHandler(func(string) error {
 		conn.touch(s.now())
 		_ = s.refreshPresence(ctx, conn)
-		return conn.ws.SetReadDeadline(s.now().Add(s.heartbeatTimeout()))
+		return s.extendReadDeadline(conn)
 	})
 
 	for {
 		messageType, raw, err := conn.ws.ReadMessage()
 		if err != nil {
+			logWebSocketReadClosed(conn, err)
 			return
 		}
 		conn.touch(s.now())
+		_ = s.extendReadDeadline(conn)
 		if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
 			continue
 		}
@@ -422,6 +424,13 @@ func (s *Server) readLoop(ctx context.Context, conn *Connection) {
 			return
 		}
 	}
+}
+
+func (s *Server) extendReadDeadline(conn *Connection) error {
+	if conn == nil || conn.ws == nil {
+		return nil
+	}
+	return conn.ws.SetReadDeadline(s.now().Add(s.heartbeatTimeout()))
 }
 
 func (s *Server) pingLoop(ctx context.Context, conn *Connection) {
@@ -859,6 +868,26 @@ func logWebSocketCommand(conn *Connection, traceContext observability.TraceConte
 		resp.Type,
 		resp.Status,
 		code,
+	)
+}
+
+func logWebSocketReadClosed(conn *Connection, err error) {
+	if conn == nil || err == nil {
+		return
+	}
+	closeCode := 0
+	var closeErr *websocket.CloseError
+	if errors.As(err, &closeErr) {
+		closeCode = closeErr.Code
+	}
+	log.Printf(
+		"websocket_read_closed trace_id=%s request_id=%s connection_id=%s user_id=%s close_code=%d error=%q",
+		conn.TraceID,
+		conn.RequestID,
+		conn.ID,
+		conn.UserID,
+		closeCode,
+		err.Error(),
 	)
 }
 

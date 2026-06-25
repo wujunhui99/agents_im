@@ -76,7 +76,7 @@ GatewayWS:
 | `AllowedOrigins` | empty | Comma-separated exact `http(s)://host[:port]` origins. Empty means no browser cross-origin access; same-origin requests are accepted only when the request host/proto matches the browser `Origin`. Wildcards are rejected. |
 | `AllowQueryToken` | `false` | Enables `?token=` for constrained clients such as browser-native WebSocket, which cannot set `Authorization` headers. Use only with same-origin or tightly scoped `AllowedOrigins` because URL tokens can leak through logs or history. |
 | `PingIntervalSeconds` | `30` | Server WebSocket ping interval. |
-| `HeartbeatTimeoutSeconds` | `75` | Read deadline extended by pong frames; dead or non-responsive peers are closed after this timeout. |
+| `HeartbeatTimeoutSeconds` | `75` | Read deadline extended by pong frames and valid client messages such as app-level `heartbeat`; dead or non-responsive peers are closed after this timeout. |
 | `CommandRateLimitPerSecond` | `20` | Per-connection command token refill rate. |
 | `CommandRateLimitBurst` | `40` | Per-connection command burst capacity. |
 
@@ -168,6 +168,7 @@ It supports multiple connections per user for multi-device clients. It also expo
 - App-level `heartbeat` is implemented in phase 1.
 - The server sends WebSocket ping frames every `GatewayWS.PingIntervalSeconds`.
 - WebSocket pong updates connection last-seen time and extends the read deadline by `GatewayWS.HeartbeatTimeoutSeconds`.
+- Any valid client frame also extends the read deadline. This lets the app-level `heartbeat` keep connections alive on mobile browsers or WebViews that do not reliably process WebSocket control ping/pong while the page is active.
 - Each connection has a token-bucket command limiter. Exceeding it returns the normal command ACK envelope with `status=error` and `error.code=RATE_LIMITED`.
 - Reconnect compensation remains client-driven through `get_conversation_seqs` and `pull_messages`; the stable frontend contract is [`websocket-reconnect-sync.md`](./websocket-reconnect-sync.md).
 - Delivery ACK and server-pushed message fanout are future work tied to Kafka/Push/Presence integration.
@@ -183,7 +184,7 @@ Required validation:
 - `bash scripts/verify-static.sh`
 - `docker compose config`
 
-Tests cover missing/invalid token rejection, valid token from header/configured query-token auth, origin policy, ping loop, rate limiting, heartbeat, `send_message`, and `pull_messages` with memory storage.
+Tests cover missing/invalid token rejection, valid token from header/configured query-token auth, origin policy, ping loop, application heartbeat read-deadline renewal, rate limiting, heartbeat, `send_message`, and `pull_messages` with memory storage.
 
 
 ## Local Live Delivery On WebSocket Send

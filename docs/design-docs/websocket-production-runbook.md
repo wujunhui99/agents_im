@@ -420,6 +420,7 @@ kubectl -n agents-im logs deploy/msggateway --since=20m | grep -Ei 'websocket|ha
 - `websocket_handshake_failed status=unauthorized`
 - Origin 相关拒绝
 - `websocket_connected`
+- `websocket_read_closed`，其中 `error` 可区分 read timeout、client close、abnormal EOF 等断线原因；只记录 trace/request/connection/user 与 close code，不记录 token。
 - `websocket_disconnected`
 
 ### message-transfer
@@ -445,6 +446,7 @@ kubectl -n agents-im get deploy msggateway message-transfer -o wide
 ### 生产行为判定
 
 - `101 + no frame + refresh sees message`：fanout 问题。
+- 周期性 `websocket_read_closed ... i/o timeout` 且前端持续重连：优先查客户端是否定期发送应用层 `heartbeat`、gateway 是否已部署“收到有效客户端帧也续 read deadline”的版本，以及移动浏览器/WebView 是否吞掉 WebSocket control pong。
 - `401`：token/query token/JWT 问题。
 - `403` 或浏览器 close `1006`：Origin/Ingress/upgrade 问题。
 - `POST /messages 200 + DB 有消息 + Kafka 无事件`：outbox publisher 问题。
