@@ -27,7 +27,7 @@ forbid_match "frontend must not introduce Material Web or MUI heavy dependencies
 
 # Message UI must not sort confirmed messages by sendTime (authoritative seq only).
 forbid_match "message UI must not sort confirmed messages by sendTime" \
-  -n "sort\([^\n]*sendTime|sendTime - .*sendTime|sendTime.* - .*sendTime" web/src/features/messages/MessagesPage.tsx
+  -n "sort\([^\n]*sendTime|sendTime - .*sendTime|sendTime.* - .*sendTime" web/src/features/messages --glob '*.ts' --glob '*.tsx'
 
 # account_type union must be user|agent|admin (no legacy "normal").
 rg -qF "account_type?: 'user' | 'agent' | 'admin'" web/src/api/user.ts

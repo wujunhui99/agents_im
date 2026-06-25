@@ -485,7 +485,7 @@ The backend verifies owner, pending status, object existence, size, and content 
 ### Download URL
 
 ```http
-GET /media/med_000001/download-url
+GET /media/med_000001/download-url?msg_id=msg_000001
 Authorization: Bearer <access_token>
 ```
 
@@ -501,7 +501,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-Download URLs require the requester to be the media owner or a conversation participant who can see a message attachment referencing the media. Non-message media remains owner-only.
+Download URLs require the requester to be the media owner or a conversation participant who can see a message attachment referencing the media. For image/file message attachments, clients pass the attachment message's `serverMsgId` as `msg_id`; uploader-owned media can omit it. Non-message media remains owner-only.
 
 ## Messages REST
 

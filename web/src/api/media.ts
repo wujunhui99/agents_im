@@ -49,10 +49,14 @@ export type GetMediaDownloadURLResponse = {
   expiresAt: number;
 };
 
+export type GetMediaDownloadURLOptions = {
+  msgId?: string;
+};
+
 export type MediaApi = {
   createUploadIntent: (request: CreateMediaUploadRequest) => Promise<CreateMediaUploadResponse>;
   completeUpload: (mediaId: string) => Promise<CompleteMediaUploadResponse>;
-  getDownloadURL: (mediaId: string) => Promise<GetMediaDownloadURLResponse>;
+  getDownloadURL: (mediaId: string, options?: GetMediaDownloadURLOptions) => Promise<GetMediaDownloadURLResponse>;
 };
 
 export function createMediaApi(api: ApiClient = createApiClient()): MediaApi {
@@ -63,8 +67,14 @@ export function createMediaApi(api: ApiClient = createApiClient()): MediaApi {
     completeUpload(mediaId) {
       return api.post<CompleteMediaUploadResponse>(`/media/uploads/${encodeURIComponent(mediaId)}/complete`);
     },
-    getDownloadURL(mediaId) {
-      return api.get<GetMediaDownloadURLResponse>(`/media/${encodeURIComponent(mediaId)}/download-url`);
+    getDownloadURL(mediaId, options) {
+      const params = new URLSearchParams();
+      const msgId = options?.msgId?.trim();
+      if (msgId) {
+        params.set('msg_id', msgId);
+      }
+      const query = params.toString();
+      return api.get<GetMediaDownloadURLResponse>(`/media/${encodeURIComponent(mediaId)}/download-url${query ? `?${query}` : ''}`);
     },
   };
 }
