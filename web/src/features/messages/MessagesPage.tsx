@@ -176,6 +176,7 @@ export function MessagesPage({
       url: webSocketUrl,
       token: webSocketToken,
       webSocketFactory,
+      reconnect: true,
       onAuthFailure,
       onEvent: (event) => {
         const message = webSocketEventToServerMessage(event);
@@ -186,7 +187,14 @@ export function MessagesPage({
         setStatus('收到新消息');
       },
       onClose: () => {
-        setStatus((current) => (current === '收到新消息' ? current : 'WebSocket 已断开'));
+        setStatus((current) => (current === '收到新消息' ? current : 'WebSocket 已断开，正在重连'));
+      },
+      onReconnecting: (_attempt, delayMs) => {
+        const seconds = Math.round(delayMs / 1000);
+        setStatus(`正在重连 (${seconds}s 后)`);
+      },
+      onOpen: () => {
+        setStatus((current) => (current.startsWith('正在重连') || current === 'WebSocket 已断开，正在重连' ? '已重连' : current));
       },
     });
 
