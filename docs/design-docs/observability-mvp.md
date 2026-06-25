@@ -77,6 +77,10 @@ HTTP middleware accepts `X-Trace-Id`, `X-Request-Id`, or W3C `traceparent`. If n
 
 WebSocket handshake reuses the HTTP trace context. Command ACK and error frames include `trace_id`, and command logs include `trace_id`, `request_id`, `connection_id`, `user_id`, command type, status, and error code only. Payloads, auth headers, tokens, and query strings are not logged.
 
+### Logging convention: always carry the trace
+
+Error/diagnostic logs MUST use `logx.WithContext(ctx).Errorf(...)`, never the global `logx.Errorf(...)`. go-zero derives `trace_id` from the ctx span, so only `WithContext(ctx)` writes `trace_id` into the log line; a global log has no `trace_id` and cannot be grep'd by it (you can only correlate via the request's stat-log timestamp — an extra, lossy hop). For ctx-less pure functions that map errors (e.g. `pkg/rpcerror.ToStatus(err)`), do not log inside them — either log in a layer that has ctx (the server-side `observability.ErrorLogUnaryServerInterceptor`, #632) or preserve the cause (return an error that exposes only a generic message to the client via `GRPCStatus()` while keeping the cause via `Unwrap()`), so the interceptor logs cause + `trace_id` on one line. Origin: #624 — a silent `Internal` 500 (model scan error) whose real cause was logged nowhere.
+
 ## Security Notes
 
 - Logging code records `URL.Path`, not `RequestURI`, so `/ws?token=[REDACTED]` query tokens are not written by the new trace middleware.
