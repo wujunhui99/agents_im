@@ -1,7 +1,10 @@
 package rpcerror
 
 import (
+	"errors"
+
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -41,7 +44,13 @@ func ToStatus(err error) error {
 		return nil
 	}
 
-	appErr := apperror.From(err)
+	// 裸 error（非 apperror）会被兜底成 Internal，原始真因既不回传也会丢——
+	// 先打日志再吞，避免无信息 500（#628；#624 的 model scan 报错即被此吞掉）。
+	var appErr *apperror.Error
+	if !errors.As(err, &appErr) {
+		logx.Errorf("rpcerror: unhandled error mapped to Internal: %+v", err)
+		appErr = apperror.Internal("internal server error")
+	}
 	switch appErr.Code {
 	case apperror.CodeInvalidArgument:
 		return status.Error(codes.InvalidArgument, appErr.Message)
