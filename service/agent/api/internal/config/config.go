@@ -12,8 +12,10 @@ import (
 
 type Config struct {
 	rest.RestConf
-	Auth     appconfig.JWTAuthConfig
-	Tracing  observability.TracingConfig
+	Auth appconfig.JWTAuthConfig
+	// Tracing 由 ConfigMap 注入的 AGENTS_IM_* 环境变量驱动，yaml 不带 Tracing 块；
+	// 标 optional 让 conf.MustLoad 缺失时取零值，再由 ResolveTracingConfig 走 env/默认值。
+	Tracing  observability.TracingConfig `json:",optional"`
 	AgentRPC zrpc.RpcClientConf
 	Redis    appconfig.RedisConfig `json:",optional"`
 }
