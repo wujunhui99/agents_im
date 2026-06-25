@@ -20,9 +20,14 @@ curl "http://<jaeger-host>/api/traces/<x-trace-id>"
 |--------|----------|
 | 401/403 | token 过期/无效；路由鉴权配置；JWT secret 不一致 |
 | 503 | RPC endpoint 配置错误；依赖服务未启动；配置未正确加载 |
-| 500 | nil pointer；DB 连接串错误；handler 未处理 RPC error |
+| 500 | nil pointer；DB 连接串错误；handler 未处理 RPC error；model scan 类型不匹配 |
 
 不要预设是某个已知 bug——先用上面表格缩小方向，再进第 2 节按层扫描确认范围。
+
+**`500 "internal server error"` 是 `apperror.From` 兜底任意非 apperror 的通用文案——真因不在 message 里，且常没打日志。** 别纠结 message：
+- 按 trace_id 看「最后一条成功 SQL」之后断在哪跳；某跳（如 model scan）**无日志却返回 raw error** = 该跳内部失败被吞。
+- DB 层疑点用只读副本复现 go-zero 真实查询路径（一眼看到 raw error）：`secret/pg-replica/.env` + `postgres.New(dsn)` 调 model 方法。例：`QueryRowCtx` 扫单列进 `*time.Time` 报 `not matching destination to scan`（go-zero 把 time.Time 当 struct）→ 改单字段 struct（#624）。
+- **「首次 500、二次 400/已存在」= 副作用先提交、后续步骤才失败**（验证码已消费、行已写）——查那个「已提交但流程没走完」的写操作。
 
 ## 2. 相似漏洞扫描 — 修之前先确认范围
 
