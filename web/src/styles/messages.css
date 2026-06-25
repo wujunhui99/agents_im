@@ -1,0 +1,219 @@
+.message-sender-name {
+  display: block;
+  margin: 0 0 3px 8px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-type-body-small);
+}
+
+.message-thread {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--md-space-3);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 14px 14px 18px;
+}
+
+.message-date-separator {
+  align-self: center;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.message-date-separator span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--md-sys-color-on-surface-variant);
+  background: color-mix(in srgb, var(--md-sys-color-surface-container-high), transparent 8%);
+  box-shadow: var(--md-elevation-level1);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.message-row {
+  display: flex;
+}
+
+.message-incoming {
+  justify-content: flex-start;
+}
+
+.message-outgoing {
+  justify-content: flex-end;
+}
+
+.message-body {
+  max-width: 78%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.message-origin-badge,
+.conversation-origin-badge {
+  width: max-content;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: #0f766e;
+  background: #dff7ef;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.conversation-origin-badge {
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.message-origin-system,
+.conversation-origin-system {
+  color: #475569;
+  background: #e5e7eb;
+}
+
+.md-message-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.md-message-bubble p {
+  position: relative;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--md-shape-corner-large);
+  color: var(--md-sys-color-on-surface);
+  background: var(--md-sys-color-surface);
+  box-shadow: var(--md-elevation-level1);
+  font-size: 15px;
+  line-height: var(--md-line-height-normal);
+  overflow-wrap: anywhere;
+}
+
+.md-message-bubble-text-with-status {
+  min-width: 96px;
+  padding-right: 92px;
+  padding-bottom: 16px;
+}
+
+.md-message-bubble-outgoing p {
+  color: var(--md-sys-color-on-primary-container);
+  background: var(--md-sys-color-primary-container);
+}
+
+.md-message-bubble-metadata {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.message-origin-ai .md-message-bubble p {
+  border: 1px solid rgba(15, 118, 110, 0.22);
+}
+
+.message-status {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.message-metadata {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.message-time {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.message-status-check {
+  color: rgba(65, 73, 68, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.message-status-read {
+  color: var(--app-accent-blue);
+}
+
+.message-status-failed {
+  color: var(--md-sys-color-error);
+}
+
+.message-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-attachment svg {
+  flex: 0 0 auto;
+}
+
+.message-composer {
+  min-height: 64px;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--md-space-2);
+  padding: 8px 10px 10px;
+  background: var(--md-sys-color-surface-container-low);
+  border-top: 1px solid rgba(113, 122, 117, 0.18);
+}
+
+.message-attachment-button {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--md-shape-corner-full);
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+}
+
+.message-attachment-button:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary), transparent 90%);
+}
+
+.message-attachment-button.is-disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.message-composer-field {
+  flex: 1;
+  margin: 0;
+}
+
+.message-composer-field .md-text-field-control {
+  min-height: 44px;
+  border-radius: var(--md-shape-corner-full);
+  background: var(--md-sys-color-surface);
+}
+
+.message-send-button {
+  min-width: 82px;
+  height: 42px;
+  padding: 0 14px;
+}
