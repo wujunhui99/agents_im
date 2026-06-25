@@ -17,7 +17,9 @@ Presence:
   HeartbeatTTLSeconds: 60
   KeyPrefix: agents_im:presence
 GatewayWS:
-  AllowedOrigins: http://localhost:5173,http://127.0.0.1:5173
+  AllowedOrigins:
+    - http://localhost:5173
+    - http://127.0.0.1:5173
   AllowQueryToken: true
   PingIntervalSeconds: 30
   HeartbeatTimeoutSeconds: 75

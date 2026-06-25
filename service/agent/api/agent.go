@@ -9,12 +9,13 @@ import (
 	"log"
 	"net/http"
 
-	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/health"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/pkg/response"
+	apiconfig "github.com/wujunhui99/agents_im/service/agent/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/handler"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
+	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
@@ -28,13 +29,10 @@ func main() {
 // run starts the agent-api service: it loads config, wires the goctl-generated
 // API internals, and serves.
 func run(configFile string) {
-	cfg, err := appconfig.LoadAPIConfig(configFile)
-	if err != nil {
-		log.Fatalf("load api config: %v", err)
-	}
-	restConf := appconfig.ToRestConf(cfg)
+	var c apiconfig.Config
+	conf.MustLoad(configFile, &c, conf.UseEnv())
 
-	shutdownTracing, err := observability.InitServiceTracing(context.Background(), cfg.Tracing, cfg.Name)
+	shutdownTracing, err := observability.InitServiceTracing(context.Background(), c.Tracing, c.Name)
 	if err != nil {
 		log.Fatalf("init tracing: %v", err)
 	}
@@ -44,18 +42,18 @@ func run(configFile string) {
 		}
 	}()
 
-	serviceContext, err := svc.NewServiceContextFromConfig(cfg)
+	serviceContext, err := svc.NewServiceContextFromConfig(c)
 	if err != nil {
 		log.Fatalf("build agent api service context: %v", err)
 	}
 
 	httpx.SetErrorHandlerCtx(response.GoZeroErrorHandlerCtx)
-	server := rest.MustNewServer(restConf, rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
+	server := rest.MustNewServer(c.RestConf, rest.WithUnauthorizedCallback(response.GoZeroUnauthorizedCallback))
 	defer server.Stop()
 	server.Use(observability.TraceMiddlewareFunc)
 	registerAgentAPIServiceHandlers(server, serviceContext)
 
-	log.Printf("%s listening on %s:%d", cfg.Name, cfg.Host, cfg.Port)
+	log.Printf("%s listening on %s:%d", c.Name, c.Host, c.Port)
 	server.Start()
 }
 

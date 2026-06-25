@@ -17,7 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/health"
 	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/pkg/observability"
@@ -25,8 +24,10 @@ import (
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
 	"github.com/wujunhui99/agents_im/service/msggateway/gatewaypb"
 	"github.com/wujunhui99/agents_im/service/msggateway/internal/backend"
+	gwconfig "github.com/wujunhui99/agents_im/service/msggateway/internal/config"
 	"github.com/wujunhui99/agents_im/service/msggateway/internal/grpcserver"
 	gatewayws "github.com/wujunhui99/agents_im/service/msggateway/internal/ws"
+	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
 )
@@ -35,10 +36,9 @@ func main() {
 	configFile := flag.String("f", "etc/msggateway.yaml", "config file")
 	flag.Parse()
 
-	cfg, err := config.LoadAPIConfig(*configFile)
-	if err != nil {
-		log.Fatalf("load msggateway config: %v", err)
-	}
+	var cfg gwconfig.Config
+	conf.MustLoad(*configFile, &cfg, conf.UseEnv())
+
 	shutdownTracing, err := observability.InitServiceTracing(context.Background(), cfg.Tracing, cfg.Name)
 	if err != nil {
 		log.Fatalf("init tracing: %v", err)
