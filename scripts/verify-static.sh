@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Static verification orchestrator.
+# Static verification orchestrator (backend / infra gates).
 #
 # Preflight (required files + shell syntax) then runs the themed gates under
 # scripts/verify/. Each gate is also runnable standalone:
@@ -7,7 +7,8 @@
 #   scripts/verify/verify-gozero-boundaries.sh  go-zero layering boundaries
 #   scripts/verify/verify-contract-markers.sh   API/proto/schema/code contract surface
 #   scripts/verify/verify-deploy-static.sh      deploy / CI / middleware / k8s config
-#   scripts/verify/verify-frontend-static.sh    web/ frontend gates
+#   scripts/verify/verify-frontend-static.sh    web/ frontend gates (NOT run here;
+#       runs in the frontend-verification CI step — this orchestrator is backend-only)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/verify/lib.sh"
@@ -67,6 +68,8 @@ bash "${SCRIPT_DIR}/verify/verify-security-static.sh"
 bash "${SCRIPT_DIR}/verify/verify-gozero-boundaries.sh"
 bash "${SCRIPT_DIR}/verify/verify-contract-markers.sh"
 bash "${SCRIPT_DIR}/verify/verify-deploy-static.sh"
-bash "${SCRIPT_DIR}/verify/verify-frontend-static.sh"
+# verify-frontend-static.sh deliberately runs in the frontend-verification CI
+# step (scripts/ci/drone-frontend-verify.sh), not here: the backend step should
+# not gate on frontend (web/) source.
 
 echo "static verification passed"
