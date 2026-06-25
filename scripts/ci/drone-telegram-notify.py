@@ -88,6 +88,22 @@ def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
 
 
+def env_int(name: str, default: int) -> int:
+    raw = env(name)
+    try:
+        return int(raw) if raw else default
+    except ValueError:
+        return default
+
+
+def env_float(name: str, default: float) -> float:
+    raw = env(name)
+    try:
+        return float(raw) if raw else default
+    except ValueError:
+        return default
+
+
 def git_output(*args: str) -> str:
     try:
         return subprocess.check_output(["git", *args], text=True, stderr=subprocess.DEVNULL).strip()
@@ -330,20 +346,44 @@ def send_telegram(text: str) -> None:
             "disable_web_page_preview": "true",
         }
     ).encode()
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    request = urllib.request.Request(url, data=data, method="POST")
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            payload = response.read().decode("utf-8", errors="replace")
-            if response.status >= 300:
-                raise RuntimeError(f"Telegram API returned HTTP {response.status}: {payload}")
-            parsed = json.loads(payload)
-            if not parsed.get("ok"):
-                raise RuntimeError(f"Telegram API returned not ok: {payload}")
-    except Exception as exc:
-        print(f"failed to send Telegram notification: {exc}", file=sys.stderr)
-        raise
+    api_base = (env("TELEGRAM_API_BASE") or "https://api.telegram.org").rstrip("/")
+    url = f"{api_base}/bot{token}/sendMessage"
+    # Telegram egress from the CI runner is occasionally flaky (TLS handshake
+    # timeouts); retry transient failures with backoff before giving up.
+    attempts = max(1, env_int("TELEGRAM_MAX_ATTEMPTS", 3))
+    backoff = max(0.0, env_float("TELEGRAM_RETRY_BACKOFF_SECONDS", 3.0))
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, attempts + 1):
+        request = urllib.request.Request(url, data=data, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                payload = response.read().decode("utf-8", errors="replace")
+                if response.status >= 300:
+                    raise RuntimeError(f"Telegram API returned HTTP {response.status}: {payload}")
+                parsed = json.loads(payload)
+                if not parsed.get("ok"):
+                    raise RuntimeError(f"Telegram API returned not ok: {payload}")
+            return
+        except Exception as exc:
+            last_exc = exc
+            print(
+                f"Telegram notification attempt {attempt}/{attempts} failed: {exc}",
+                file=sys.stderr,
+            )
+            if attempt < attempts and backoff > 0:
+                time.sleep(backoff * attempt)
+    raise RuntimeError(f"failed to send Telegram notification after {attempts} attempts: {last_exc}")
 
 
 if __name__ == "__main__":
-    send_telegram(render_message())
+    # Notification is a best-effort side effect: a flaky Telegram egress must
+    # never red-fail an otherwise-healthy pipeline (the deploy/verify steps
+    # already reflect real pipeline health). Log loudly, then exit 0.
+    try:
+        send_telegram(render_message())
+    except Exception as exc:
+        print(
+            f"Telegram notification failed; not failing the build (best-effort): {exc}",
+            file=sys.stderr,
+        )
+        sys.exit(0)
