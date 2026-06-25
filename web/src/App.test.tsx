@@ -8,7 +8,18 @@ import type { UserProfile, UserProfilePatch } from './api/user';
 import type { WebSocketFactory, WebSocketLike } from './api/websocketClient';
 import { AUTH_STORAGE_KEY, type AuthSession } from './auth/session';
 
-const stylesCss = readFileSync('src/styles.css', 'utf8');
+function resolveImports(css: string, baseDir: string): string {
+  return css.replace(/@import\s+"([^"]+)";/g, (_match, path) => {
+    const resolved = `${baseDir}/${path.replace(/^\.\//, '')}`;
+    try {
+      return resolveImports(readFileSync(resolved, 'utf8'), resolved.replace(/\/[^/]+$/, ''));
+    } catch {
+      return '';
+    }
+  });
+}
+
+const stylesCss = resolveImports(readFileSync('src/styles.css', 'utf8'), 'src');
 
 const initialProfile: UserProfile = {
   user_id: '1001',
