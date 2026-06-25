@@ -115,6 +115,24 @@ class DroneTelegramNotifyAttributionTest(unittest.TestCase):
         self.assertIn("Attribution: devops owner", result.stdout)
         self.assertNotIn("Attribution mismatch", result.stdout)
 
+    def test_unreachable_telegram_is_best_effort_and_does_not_fail_build(self) -> None:
+        # Point the API at a closed local port so the send always fails fast,
+        # then assert the script retries and still exits 0 (best-effort) — a
+        # flaky Telegram egress must not red-fail a healthy pipeline (#659).
+        result = self.run_notify(
+            DRONE_TELEGRAM_DRY_RUN="0",
+            TELEGRAM_BOT_TOKEN="dummy-token",
+            TELEGRAM_CHAT_ID="123456",
+            TELEGRAM_API_BASE="http://127.0.0.1:1",
+            TELEGRAM_MAX_ATTEMPTS="2",
+            TELEGRAM_RETRY_BACKOFF_SECONDS="0",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("attempt 1/2 failed", result.stderr)
+        self.assertIn("attempt 2/2 failed", result.stderr)
+        self.assertIn("best-effort", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
