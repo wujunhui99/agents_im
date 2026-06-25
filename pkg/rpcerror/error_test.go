@@ -1,54 +1,51 @@
 package rpcerror
 
 import (
-	"bytes"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// captureLog 把 logx 输出重定向到 buffer，返回读取函数与还原函数。
-func captureLog(t *testing.T) (read func() string, restore func()) {
-	t.Helper()
-	var buf bytes.Buffer
-	logx.SetWriter(logx.NewWriter(&buf))
-	return buf.String, func() { logx.Reset() }
-}
-
-func TestToStatusLogsRawErrorAndBucketsInternal(t *testing.T) {
-	read, restore := captureLog(t)
-	defer restore()
-
+func TestToStatusRawErrorPreservesCauseHidesFromClient(t *testing.T) {
 	raw := errors.New("not matching destination to scan")
-	st, _ := status.FromError(ToStatus(raw))
+	out := ToStatus(raw)
+
+	// 客户端只见通用 Internal 文案（不泄露内部细节）。
+	st, _ := status.FromError(out)
 	if st.Code() != codes.Internal {
 		t.Fatalf("code = %v, want Internal", st.Code())
 	}
 	if st.Message() != "internal server error" {
 		t.Fatalf("client message leaked internals: %q", st.Message())
 	}
-	if !strings.Contains(read(), "not matching destination to scan") {
-		t.Fatalf("raw cause not logged; log = %q", read())
+
+	// 服务端可经 Unwrap 拿到原始 cause（供拦截器带 trace_id 落盘、按 trace_id 查）。
+	if !errors.Is(out, raw) {
+		t.Fatalf("cause not preserved for server-side logging: %v", out)
+	}
+	if got := out.Error(); got != "internal server error: not matching destination to scan" {
+		t.Fatalf("server-side Error() = %q, want cause included", got)
 	}
 }
 
-func TestToStatusDoesNotLogAppErrors(t *testing.T) {
-	read, restore := captureLog(t)
-	defer restore()
-
-	st, _ := status.FromError(ToStatus(apperror.InvalidArgument("bad email")))
-	if st.Code() != codes.InvalidArgument || st.Message() != "bad email" {
-		t.Fatalf("mapping wrong: code=%v msg=%q", st.Code(), st.Message())
+func TestToStatusAppErrorsMapDirectly(t *testing.T) {
+	cases := []struct {
+		err  error
+		code codes.Code
+		msg  string
+	}{
+		{apperror.InvalidArgument("bad email"), codes.InvalidArgument, "bad email"},
+		{apperror.AlreadyExists("email already exists"), codes.AlreadyExists, "email already exists"},
+		{apperror.Internal("intentional internal"), codes.Internal, "intentional internal"},
 	}
-	// 显式 apperror.Internal 也不应被当作「未处理裸 error」打日志。
-	_ = ToStatus(apperror.Internal("intentional internal"))
-	if strings.Contains(read(), "unhandled error mapped to Internal") {
-		t.Fatalf("apperror should not trigger unhandled-error log; log = %q", read())
+	for _, c := range cases {
+		st, _ := status.FromError(ToStatus(c.err))
+		if st.Code() != c.code || st.Message() != c.msg {
+			t.Fatalf("map %v -> code=%v msg=%q, want code=%v msg=%q", c.err, st.Code(), st.Message(), c.code, c.msg)
+		}
 	}
 }
 

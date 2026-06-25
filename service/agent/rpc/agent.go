@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/wujunhui99/agents_im/pkg/messaging"
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/agent"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/server"
@@ -62,6 +63,8 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	// 统一记录 server-fault 错误（带 trace_id），避免 handler 返回 Internal 时服务端沉默（#630）。
+	s.AddUnaryInterceptors(observability.ErrorLogUnaryServerInterceptor())
 	defer s.Stop()
 
 	fmt.Printf("agent-rpc serving at %s, consuming %s (group=%s)...\n", c.ListenOn, messaging.TopicAgentTrigger, ctx.KafkaGroup)
