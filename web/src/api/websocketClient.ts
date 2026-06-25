@@ -70,6 +70,9 @@ export type MessageWebSocketClientOptions = {
   webSocketFactory?: WebSocketFactory;
   heartbeatIntervalMs?: number;
   heartbeatAckTimeoutMs?: number;
+  reconnect?: boolean;
+  reconnectDelayMs?: number;
+  maxReconnectDelayMs?: number;
   requestIdFactory?: () => string;
   onOpen?: (event: Event) => void;
   onAck?: (ack: WebSocketAck) => void;
@@ -79,6 +82,7 @@ export type MessageWebSocketClientOptions = {
   onAuthFailure?: (failure: WebSocketAuthFailure) => void;
   onHeartbeatTimeout?: (requestId: string) => void;
   onMalformedMessage?: (data: string) => void;
+  onReconnecting?: (attemptNumber: number, delayMs: number) => void;
 };
 
 export class MessageWebSocketClient {
@@ -87,8 +91,14 @@ export class MessageWebSocketClient {
   private heartbeatAckTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingHeartbeatRequestId: string | null = null;
   private heartbeatSequence = 0;
+  private closed = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectDelay = 0;
+  private reconnectAttempt = 0;
 
-  constructor(private readonly options: MessageWebSocketClientOptions) {}
+  constructor(private readonly options: MessageWebSocketClientOptions) {
+    this.reconnectDelay = options.reconnectDelayMs ?? 1000;
+  }
 
   connect() {
     if (this.socket && this.socket.readyState <= 1) {
@@ -97,6 +107,8 @@ export class MessageWebSocketClient {
 
     const socket = this.getFactory()(this.buildUrl());
     socket.onopen = (event) => {
+      this.reconnectDelay = this.options.reconnectDelayMs ?? 1000;
+      this.reconnectAttempt = 0;
       this.startHeartbeat();
       this.options.onOpen?.(event);
     };
@@ -109,10 +121,14 @@ export class MessageWebSocketClient {
     };
     socket.onclose = (event) => {
       this.stopHeartbeat();
-      if (isAuthFailureClose(event)) {
+      const authFailure = isAuthFailureClose(event);
+      if (authFailure) {
         this.options.onAuthFailure?.({ source: 'close', code: event.code, reason: event.reason });
       }
       this.options.onClose?.(event);
+      if (!this.closed && !authFailure && this.options.reconnect !== false) {
+        this.scheduleReconnect();
+      }
     };
     socket.onmessage = (event) => this.handleMessage(event.data);
     this.socket = socket;
@@ -127,9 +143,35 @@ export class MessageWebSocketClient {
   }
 
   close(code?: number, reason?: string) {
+    this.closed = true;
+    this.clearReconnectTimer();
     this.stopHeartbeat();
     this.socket?.close(code, reason);
     this.socket = null;
+  }
+
+  private scheduleReconnect() {
+    this.clearReconnectTimer();
+    const delay = this.reconnectDelay;
+    this.reconnectAttempt += 1;
+    const attempt = this.reconnectAttempt;
+    this.options.onReconnecting?.(attempt, delay);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (!this.closed) {
+        this.socket = null;
+        this.connect();
+      }
+    }, delay);
+    const nextDelay = delay * 2;
+    this.reconnectDelay = Math.min(nextDelay, this.options.maxReconnectDelayMs ?? 30000);
+  }
+
+  private clearReconnectTimer() {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
   }
 
   private getFactory(): WebSocketFactory {
@@ -164,6 +206,8 @@ export class MessageWebSocketClient {
       const ack = normalizeAck(parsed);
       this.handleAck(ack);
       if (isAuthFailureAck(ack)) {
+        this.closed = true;
+        this.clearReconnectTimer();
         this.options.onAuthFailure?.({
           source: 'ack',
           code: ack.error?.code ?? '',
@@ -180,6 +224,8 @@ export class MessageWebSocketClient {
         data: parsed.data,
       };
       if (isAuthFailureServerEvent(event)) {
+        this.closed = true;
+        this.clearReconnectTimer();
         this.options.onAuthFailure?.({ source: 'event', type: event.type, data: event.data });
         return;
       }
