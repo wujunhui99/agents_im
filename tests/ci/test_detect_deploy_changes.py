@@ -77,12 +77,28 @@ class DetectDeployChangesTest(unittest.TestCase):
         self.assertEqual(out["web_required"], "true")
         self.assertEqual(out["migration_required"], "true")
 
-    def test_shared_internal_package_is_conservative(self):
-        # Shared internal packages can be imported widely → rebuild all backends.
+    def test_shared_internal_package_uses_import_graph(self):
+        # Shared packages are routed by go list -deps when the package is present;
+        # this keeps deploys narrower than the old fail-safe all-backends path.
         out = self.detect(["internal/repository/message_memory.go"])
         self.assertEqual(out["build_required"], "true")
-        self.assertIn("user-api", out["backend_services"])
-        self.assertIn("msg-api", out["backend_services"])
+        self.assertIn("user-rpc", out["backend_services"])
+        self.assertIn("msg-rpc", out["backend_services"])
+        self.assertIn("agent-rpc", out["backend_services"])
+        self.assertIn("admin-rpc", out["backend_services"])
+        self.assertNotIn("user-api", out["backend_services"])
+        self.assertNotIn("msg-api", out["backend_services"])
+
+    def test_go_test_files_do_not_deploy(self):
+        out = self.detect(["service/agent/rpc/internal/aihosting/service_context_test.go"])
+        self.assertEqual(out["build_required"], "false")
+        self.assertEqual(out["deploy_required"], "false")
+
+    def test_pkg_change_uses_import_graph(self):
+        out = self.detect(["pkg/gateway/contract.go"])
+        self.assertEqual(out["build_required"], "true")
+        self.assertIn("msggateway", out["backend_services"])
+        self.assertNotIn("user-api", out["backend_services"])
 
     def test_local_tooling_scripts_do_not_deploy(self):
         # Agent watcher / provisioning / deploy-script test harness never affect

@@ -86,7 +86,8 @@ Current mitigation:
 
 - `scripts/deploy-k3s.sh` renders `deploy/k8s`, substitutes safe immutable application image tags before apply, and still applies Deployment spec/config changes.
 - It uses `${IMAGE_TAG}` only for selected services and keeps currently deployed images for non-selected services.
-- It only runs `kubectl set image` for selected services after apply; non-selected services are not explicitly changed.
+- Backend Deployments now point selected services at one immutable `ghcr.io/wujunhui99/agents_im/backend:${IMAGE_TAG}` image; each Deployment chooses its own binary with `command: ["/app/bin/<service>"]`. The web Deployment still uses `web:${IMAGE_TAG}`.
+- It does not run post-apply `kubectl set image`; image safety is handled in the rendered manifest before apply.
 - Business Deployment manifest images use a placeholder tag instead of a mutable tag, and `scripts/test-no-latest-images.sh` prevents runtime `:latest` usage from returning.
 - `scripts/test-deploy-k3s.sh` has regression coverage for web-only and config-only deploys.
 
@@ -99,7 +100,7 @@ bash scripts/test-no-latest-images.sh
 
 ## Pitfall: config-only deploys still restart services
 
-Config-only changes can still affect runtime because ConfigMaps/Secrets and deployment templates roll pods. Treat config-only deploys as real releases:
+Config-only changes can still affect runtime because ConfigMaps/Secrets and deployment templates roll pods. Drone now restarts only detector-selected rollout services rather than every app service. Treat config-only deploys as real releases:
 
 - inspect rollout status for affected services;
 - inspect logs if readiness does not become green;

@@ -149,13 +149,21 @@ trigger:
 
 steps:
   - name: detect changes
-    image: alpine/git:2.45.2
+    image: golang:1.25-alpine
+    environment:
+      GOMODCACHE: /ci-cache/go/mod
+      GOCACHE: /ci-cache/go/build
     commands:
-      - apk add --no-cache bash python3
+      - apk add --no-cache bash git python3
       - bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
+    volumes:
+      - name: ci_cache
+        path: /ci-cache
 
   - name: build image benchmark
     image: docker.io/library/docker:29-cli
+    depends_on:
+      - detect changes
     environment:
       GHCR_USERNAME:
         from_secret: ghcr_username
@@ -168,7 +176,7 @@ steps:
       DRONE_IMAGE_BUILD_ONLY: "true"
     commands:
       - apk add --no-cache bash python3
-      - test -f .drone-deploy.env || bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
+      - test -f .drone-deploy.env
       - bash scripts/ci/drone-build-images.sh
     volumes:
       - name: docker_sock
@@ -182,7 +190,7 @@ steps:
       - apk add --no-cache bash python3 curl
       - curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl
       - chmod +x /usr/local/bin/kubectl
-      - test -f .drone-deploy.env || bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
+      - test -f .drone-deploy.env
       - . ./.drone-deploy.env
       - IMAGE_TAG="${DRONE_COMMIT_SHA}" SKIP_SET_IMAGE=false IMAGE_SERVICES="${image_services_space}" KUBECTL=kubectl ./scripts/deploy-k3s.sh --render-only >/tmp/rendered.yaml
       - test -s /tmp/rendered.yaml
@@ -207,6 +215,9 @@ steps:
         - failure
 
 volumes:
+  - name: ci_cache
+    host:
+      path: /opt/agents-im/ci-cache
   - name: docker_sock
     host:
       path: /var/run/docker.sock
@@ -224,13 +235,21 @@ trigger:
 
 steps:
   - name: detect changes
-    image: alpine/git:2.45.2
+    image: golang:1.25-alpine
+    environment:
+      GOMODCACHE: /ci-cache/go/mod
+      GOCACHE: /ci-cache/go/build
     commands:
-      - apk add --no-cache bash python3
+      - apk add --no-cache bash git python3
       - bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
+    volumes:
+      - name: ci_cache
+        path: /ci-cache
 
   - name: build images
     image: docker.io/library/docker:29-cli
+    depends_on:
+      - detect changes
     environment:
       GHCR_USERNAME:
         from_secret: ghcr_username
@@ -241,7 +260,7 @@ steps:
       DRONE_EXPORT_WEB_CACHE: "true"
     commands:
       - apk add --no-cache bash python3
-      - test -f .drone-deploy.env || bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env
+      - test -f .drone-deploy.env
       - bash scripts/ci/drone-build-images.sh
     volumes:
       - name: docker_sock
@@ -260,7 +279,7 @@ steps:
       DRONE_DEPLOY_LOCAL: "1"
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
     commands:
-      - test -f .drone-deploy.env || (apk add --no-cache bash python3 && bash scripts/ci/drone-detect-deploy.sh .drone-deploy.env)
+      - test -f .drone-deploy.env
       - if ! grep -q "^deploy_required=true$" .drone-deploy.env; then echo "No deployment required."; exit 0; fi
       - . ./.drone-deploy.env
       - apk add --no-cache bash python3 tar curl
@@ -329,6 +348,9 @@ steps:
         - failure
 
 volumes:
+  - name: ci_cache
+    host:
+      path: /opt/agents-im/ci-cache
   - name: docker_sock
     host:
       path: /var/run/docker.sock

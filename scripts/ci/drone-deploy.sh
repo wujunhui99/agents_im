@@ -26,9 +26,6 @@ tar \
   --exclude='web/dist' \
   -czf - . | tar -xzf - -C /opt/agents-im/repo
 
-# Always restart all app services so pods pick up the latest secret values.
-restart_rollout=true
-
 skip_set_image=true
 if [[ "${build_required}" == "true" ]]; then
   skip_set_image=false
@@ -86,5 +83,4 @@ IMAGE_REGISTRY="${registry}" \
   IMAGE_SERVICES="${image_services_space}" \
   ROLLOUT_SERVICES="${rollout_services}" \
   RESTART_SERVICES="${restart_services}" \
-  RESTART_ROLLOUT="${restart_rollout}" \
   ./scripts/deploy-k3s.sh

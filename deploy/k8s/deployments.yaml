@@ -5,6 +5,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: user-api
@@ -23,6 +25,7 @@ spec:
         - name: user-api
           image: ghcr.io/wujunhui99/agents_im/user-api:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/user-api"]
           args: ["-f", "/config/user-api.yaml"]
           envFrom:
             - configMapRef:
@@ -60,6 +63,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: auth-api
@@ -78,6 +83,7 @@ spec:
         - name: auth-api
           image: ghcr.io/wujunhui99/agents_im/auth-api:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/auth-api"]
           args: ["-f", "/config/auth-api.yaml"]
           envFrom:
             - configMapRef:
@@ -115,6 +121,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: friends-api
@@ -133,6 +141,7 @@ spec:
         - name: friends-api
           image: ghcr.io/wujunhui99/agents_im/friends-api:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/friends-api"]
           args: ["-f", "/config/friends-api.yaml"]
           envFrom:
             - configMapRef:
@@ -170,6 +179,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: msg-api
@@ -188,6 +199,7 @@ spec:
         - name: msg-api
           image: ghcr.io/wujunhui99/agents_im/msg-api:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/msg-api"]
           args: ["-f", "/config/msg-api.yaml"]
           envFrom:
             - configMapRef:
@@ -225,6 +237,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: admin-api
@@ -241,6 +255,7 @@ spec:
         - name: admin-api
           image: ghcr.io/wujunhui99/agents_im/admin-api:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/admin-api"]
           args: ["-f", "/config/admin-api.yaml"]
           envFrom:
             - configMapRef:
@@ -278,6 +293,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: msggateway
@@ -296,6 +313,7 @@ spec:
         - name: msggateway
           image: ghcr.io/wujunhui99/agents_im/msggateway:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/msggateway"]
           args: ["-f", "/config/msggateway.yaml"]
           envFrom:
             - configMapRef:
@@ -335,6 +353,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: groups-api
@@ -353,6 +373,7 @@ spec:
         - name: groups-api
           image: ghcr.io/wujunhui99/agents_im/groups-api:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/groups-api"]
           args: ["-f", "/config/groups-api.yaml"]
           envFrom:
             - configMapRef:
@@ -390,6 +411,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: agent-api
@@ -409,6 +432,7 @@ spec:
         - name: agent-api
           image: ghcr.io/wujunhui99/agents_im/agent-api:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/agent-api"]
           args: ["-f", "/config/agent-api.yaml"]
           envFrom:
             - configMapRef:
@@ -446,6 +470,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: msgtransfer
@@ -464,6 +490,7 @@ spec:
         - name: msgtransfer
           image: ghcr.io/wujunhui99/agents_im/msgtransfer:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/msgtransfer"]
           args: ["-f", "/config/msgtransfer.yaml"]
           envFrom:
             - configMapRef:
@@ -501,6 +528,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: push
@@ -519,6 +548,7 @@ spec:
         - name: push
           image: ghcr.io/wujunhui99/agents_im/push:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/push"]
           args: ["-f", "/config/push.yaml"]
           envFrom:
             - configMapRef:
@@ -556,6 +586,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: user-rpc
@@ -570,6 +602,7 @@ spec:
         - name: user-rpc
           image: ghcr.io/wujunhui99/agents_im/user-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/user-rpc"]
           args: ["-f", "/config/user-rpc.yaml"]
           envFrom:
             - configMapRef:
@@ -605,6 +638,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: auth-rpc
@@ -619,6 +654,7 @@ spec:
         - name: auth-rpc
           image: ghcr.io/wujunhui99/agents_im/auth-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/auth-rpc"]
           args: ["-f", "/config/auth-rpc.yaml"]
           env:
             # Temporary compatibility guard until duplicate auth.proto descriptors are fully regenerated.
@@ -658,6 +694,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: friends-rpc
@@ -672,6 +710,7 @@ spec:
         - name: friends-rpc
           image: ghcr.io/wujunhui99/agents_im/friends-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/friends-rpc"]
           args: ["-f", "/config/friends-rpc.yaml"]
           envFrom:
             - configMapRef:
@@ -707,6 +746,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: groups-rpc
@@ -721,6 +762,7 @@ spec:
         - name: groups-rpc
           image: ghcr.io/wujunhui99/agents_im/groups-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/groups-rpc"]
           args: ["-f", "/config/groups-rpc.yaml"]
           envFrom:
             - configMapRef:
@@ -756,6 +798,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: msg-rpc
@@ -771,6 +815,7 @@ spec:
         - name: msg-rpc
           image: ghcr.io/wujunhui99/agents_im/msg-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/msg-rpc"]
           args: ["-f", "/config/msg-rpc.yaml"]
           env:
             # RoutedFlake (msg_id) 机器号。单副本下常量 "0" 即唯一。
@@ -813,6 +858,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: agent-rpc
@@ -829,6 +876,7 @@ spec:
         - name: agent-rpc
           image: ghcr.io/wujunhui99/agents_im/agent-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/agent-rpc"]
           args: ["-f", "/config/agent-rpc.yaml"]
           envFrom:
             - configMapRef:
@@ -864,6 +912,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: third-rpc
@@ -878,6 +928,7 @@ spec:
         - name: third-rpc
           image: ghcr.io/wujunhui99/agents_im/third-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/third-rpc"]
           args: ["-f", "/config/third-rpc.yaml"]
           envFrom:
             - configMapRef:
@@ -953,6 +1004,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: web
@@ -988,6 +1041,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: media-rpc
@@ -1002,6 +1057,7 @@ spec:
         - name: media-rpc
           image: ghcr.io/wujunhui99/agents_im/media-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/media-rpc"]
           args: ["-f", "/config/media-rpc.yaml"]
           env:
             # RoutedFlake (media_id) 机器号。单副本下常量 "0" 即唯一;media 与
@@ -1045,6 +1101,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: media-api
@@ -1063,6 +1121,7 @@ spec:
         - name: media-api
           image: ghcr.io/wujunhui99/agents_im/media-api:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/media-api"]
           args: ["-f", "/config/media-api.yaml"]
           envFrom:
             - configMapRef:
@@ -1100,6 +1159,8 @@ metadata:
   namespace: agents-im
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: admin-rpc
@@ -1114,6 +1175,7 @@ spec:
         - name: admin-rpc
           image: ghcr.io/wujunhui99/agents_im/admin-rpc:__IMAGE_TAG_REQUIRED__
           imagePullPolicy: IfNotPresent
+          command: ["/app/bin/admin-rpc"]
           args: ["-f", "/config/admin-rpc.yaml"]
           envFrom:
             - configMapRef:
