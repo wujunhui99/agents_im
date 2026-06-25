@@ -243,11 +243,8 @@ export function MessagesPage({
     if (!selectedConversation) {
       return;
     }
-    if (selectedConversation.unread <= 0) {
-      return;
-    }
 
-    const visibleMaxSeq = maxReadableSeq(selectedConversation.messages);
+    const visibleMaxSeq = maxReadableSeq(selectedConversation.messages.filter((m) => m.direction === 'incoming'));
     if (visibleMaxSeq === undefined || visibleMaxSeq <= (selectedConversation.hasReadSeq ?? 0)) {
       return;
     }
