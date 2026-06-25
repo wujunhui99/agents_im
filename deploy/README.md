@@ -75,6 +75,7 @@ Ingress 路由要点：
 
 路由事实源是 `deploy/k8s/ingress.yaml`；下列内容只作排查入口概览。
 
+- `agenticim.xyz` / `ms.agenticim.xyz` 的 HTTP 入口必须永久跳转到 HTTPS，并对浏览器响应 HSTS。浏览器 WebSocket 使用 query token，禁止让用户页面停留在 `http://agenticim.xyz` 后生成明文 `ws://agenticim.xyz/ws?token=[REDACTED]`。
 - `/auth` -> `auth-api`
 - `/me`、`/users`、`/accounts` -> `user-api`
 - `/friends` -> `friends-api`
