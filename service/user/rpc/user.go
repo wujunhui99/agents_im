@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
@@ -34,6 +35,8 @@ func run(configFile string) {
 			reflection.Register(grpcServer)
 		}
 	})
+	// 统一记录 server-fault 错误（带 trace_id），避免 handler 返回 Internal 时服务端沉默（#630）。
+	s.AddUnaryInterceptors(observability.ErrorLogUnaryServerInterceptor())
 	defer s.Stop()
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
