@@ -52,11 +52,13 @@ func (l *RegisterLogic) Register(in *auth.RegisterRequest) (*auth.AuthResponse, 
 		return nil, rpcerror.ToStatus(apperror.AlreadyExists("identifier already exists"))
 	}
 
-	verifiedAt, err := l.consumeRegistrationEmailCode(email, code)
-	if err != nil {
+	// 邮箱占用检查前置于消费验证码：邮箱已注册时直接返回 AlreadyExists，
+	// 不烧掉用户刚收到的验证码（否则重复注册第二次会误报 code invalid/expired）。
+	if err := l.ensureEmailAvailable(email); err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	if err := l.ensureEmailAvailable(email); err != nil {
+	verifiedAt, err := l.consumeRegistrationEmailCode(email, code)
+	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
 
