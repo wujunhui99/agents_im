@@ -283,6 +283,46 @@ def middleware_by_name(name):
             return doc
     return None
 
+main_ingress = next(
+    (
+        doc
+        for doc in docs
+        if doc.get("kind") == "Ingress" and doc.get("metadata", {}).get("name") == "agents-im"
+    ),
+    None,
+)
+if not main_ingress:
+    print("deploy/k8s/ingress.yaml: missing main agents-im ingress", file=sys.stderr)
+    sys.exit(1)
+main_middlewares = main_ingress.get("metadata", {}).get("annotations", {}).get(
+    "traefik.ingress.kubernetes.io/router.middlewares",
+    "",
+)
+if "agents-im-public-web-chain@kubernetescrd" not in main_middlewares:
+    print("deploy/k8s/ingress.yaml: main ingress must force HTTPS for browser WebSocket safety", file=sys.stderr)
+    sys.exit(1)
+
+force_https = middleware_by_name("force-https")
+redirect_scheme = (force_https or {}).get("spec", {}).get("redirectScheme", {})
+if redirect_scheme.get("scheme") != "https" or redirect_scheme.get("permanent") is not True:
+    print("deploy/k8s/ingress.yaml: force-https middleware must permanently redirect to https", file=sys.stderr)
+    sys.exit(1)
+
+security_headers = middleware_by_name("browser-security-headers")
+headers = (security_headers or {}).get("spec", {}).get("headers", {})
+if headers.get("stsSeconds", 0) < 31536000 or headers.get("forceSTSHeader") is not True:
+    print("deploy/k8s/ingress.yaml: browser-security-headers must enable HSTS", file=sys.stderr)
+    sys.exit(1)
+
+public_chain = middleware_by_name("public-web-chain")
+chain_names = [
+    item.get("name")
+    for item in (public_chain or {}).get("spec", {}).get("chain", {}).get("middlewares", []) or []
+]
+if chain_names != ["force-https", "browser-security-headers"]:
+    print("deploy/k8s/ingress.yaml: public-web-chain must apply force-https then browser-security-headers", file=sys.stderr)
+    sys.exit(1)
+
 expected = {
     "langfuse.agenticim.xyz": ("langfuse", 3000, "langfuse-agenticim-xyz-tls"),
     "rustfs.agenticim.xyz": ("oss", 9001, "rustfs-agenticim-xyz-tls"),

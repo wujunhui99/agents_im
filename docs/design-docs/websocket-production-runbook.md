@@ -170,6 +170,36 @@ fi
 rg -F -q 'AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}' deploy/k8s/etc/msggateway.yaml
 ```
 
+## 坑 2.5：HTTP 页面会生成 `ws://` 并被 Origin 白名单拒绝
+
+### 症状
+
+- Via、vivo 自带浏览器等移动浏览器一直重连，PC 或移动 Chrome 正常。
+- 控制台报 `Error during WebSocket handshake: Unexpected response code: 403`。
+- 失败 URL 是 `ws://agenticim.xyz/ws?token=[REDACTED]`，不是 `wss://agenticim.xyz/ws?token=[REDACTED]`。
+
+### 原因
+
+前端 WebSocket URL 按当前页面协议生成：`https:` 页面生成 `wss://`，`http:` 页面生成 `ws://`。如果生产 HTTP 入口直接返回页面而不跳 HTTPS，某些移动浏览器会停留在 `http://agenticim.xyz`，随后浏览器 WebSocket 携带 `Origin: http://agenticim.xyz`。生产 gateway 的 `GATEWAY_WS_ALLOWED_ORIGINS` 只允许 `https://agenticim.xyz`，所以升级阶段由 `gorilla/websocket` 返回 403。这是正确的安全拒绝；不要把 `http://agenticim.xyz` 加入 Origin 白名单，因为 query token 会暴露在明文 WebSocket URL 中。
+
+### 必须配置
+
+`deploy/k8s/ingress.yaml` 的主 Ingress 必须挂 HTTPS 强制跳转中间件链：
+
+```yaml
+traefik.ingress.kubernetes.io/router.middlewares: agents-im-public-web-chain@kubernetescrd
+```
+
+该链必须先永久跳转到 HTTPS，再给浏览器响应 HSTS。
+
+### 防回归
+
+本地静态校验：
+
+```bash
+bash scripts/verify/verify-deploy-static.sh
+```
+
 ## 坑 3：WebSocket 握手成功不代表实时推送成功
 
 ### 症状
