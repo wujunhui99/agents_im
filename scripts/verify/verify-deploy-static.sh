@@ -67,17 +67,18 @@ assert_present "-q" .env.example deploy/middleware/.env.example deploy/k8s/secre
   "OBJECT_STORAGE_ACCESS_KEY_ID" "OBJECT_STORAGE_SECRET_ACCESS_KEY"
 
 # --- production msggateway origin / query-token config ---
-rg -q "msggateway" service/msggateway/msggateway.go etc/msggateway.yaml
-rg -q "AllowQueryToken: true" deploy/k8s/etc/msggateway.yaml
-rg -q 'GATEWAY_WS_ALLOW_QUERY_TOKEN: "true"' deploy/k8s/configmap.yaml
-rg -q 'GATEWAY_WS_ALLOWED_ORIGINS: "https://agenticim\.xyz"' deploy/k8s/configmap.yaml
+assert_present "-q" service/msggateway/msggateway.go etc/msggateway.yaml -- "msggateway"
+assert_present "-q" deploy/k8s/etc/msggateway.yaml -- "AllowQueryToken: true"
+assert_present "-q" deploy/k8s/configmap.yaml -- 'GATEWAY_WS_ALLOW_QUERY_TOKEN: "true"'
+assert_present "-q" deploy/k8s/configmap.yaml -- 'GATEWAY_WS_ALLOWED_ORIGINS: "https://agenticim\.xyz"'
 if rg -q 'GATEWAY_WS_ALLOWED_ORIGINS:\s*""' deploy/k8s/configmap.yaml; then
   echo "production k8s websocket origins must not be empty" >&2
   exit 1
 fi
-rg -F -q 'AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}' deploy/k8s/etc/msggateway.yaml
-rg -q 'AllowedOrigins: http://localhost:5173,http://127\.0\.0\.1:5173' etc/msggateway.yaml
-rg -q "AllowQueryToken: true" etc/msggateway.yaml
+# AllowedOrigins is a YAML list; k8s uses env-var placeholder as a single list item.
+assert_present "-qF" deploy/k8s/etc/msggateway.yaml -- '- ${GATEWAY_WS_ALLOWED_ORIGINS}'
+assert_present "-q" etc/msggateway.yaml -- '- http://localhost:5173'
+assert_present "-q" etc/msggateway.yaml -- "AllowQueryToken: true"
 if ! grep -q 'AllowQueryToken: true' deploy/k8s/etc/msggateway.yaml; then
   echo "production msggateway must allow query token for browser WebSocket" >&2
   exit 1

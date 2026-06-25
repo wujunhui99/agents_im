@@ -10,8 +10,6 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	gozerotrace "github.com/zeromicro/go-zero/core/trace"
-	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 	"gopkg.in/yaml.v3"
 )
@@ -254,25 +252,6 @@ var ErrDeepSeekAPIKeyMissing = errors.New("deepseek API key is required: set DEE
 var ErrDeepSeekAPIKeyPlaceholder = errors.New("deepseek API key is a placeholder: set a real DEEPSEEK_API_KEY")
 var ErrObjectStorageExternalEndpointLoopback = errors.New("object storage external endpoint cannot be loopback in production")
 
-func DefaultAPIConfig() APIConfig {
-	return APIConfig{
-		Name:             "user-api",
-		Host:             "0.0.0.0",
-		Port:             8080,
-		Auth:             DefaultJWTAuthConfig(),
-		AdminBootstrap:   DefaultAdminBootstrapConfig(),
-		StorageDriver:    StorageDriverMemory,
-		Redis:            DefaultRedisConfig(),
-		Presence:         DefaultPresenceConfig(),
-		Tracing:          observability.TracingConfig{},
-		DeepSeek:         DefaultDeepSeekConfig(),
-		LLMObservability: DefaultLLMObservabilityConfig(),
-		GatewayWS:        DefaultGatewayWSConfig(),
-		ObjectStorage:    DefaultObjectStorageConfig(),
-		PythonExecutor:   DefaultPythonExecutorConfig(),
-	}
-}
-
 func DefaultJWTAuthConfig() JWTAuthConfig {
 	return JWTAuthConfig{
 		AccessSecret: "dev-jwt-secret-change-me",
@@ -313,13 +292,6 @@ func DefaultGatewayWSConfig() GatewayWSConfig {
 	}
 }
 
-func DefaultDeepSeekConfig() DeepSeekConfig {
-	return DeepSeekConfig{
-		BaseURL: DefaultDeepSeekBaseURL,
-		Model:   DefaultDeepSeekModel,
-	}
-}
-
 func DefaultLLMObservabilityConfig() LLMObservabilityConfig {
 	return LLMObservabilityConfig{
 		Enabled:        false,
@@ -328,14 +300,6 @@ func DefaultLLMObservabilityConfig() LLMObservabilityConfig {
 		Langfuse: LangfuseObservabilityConfig{
 			Host: DefaultLangfuseHost,
 		},
-	}
-}
-
-func DefaultObjectStorageConfig() ObjectStorageConfig {
-	return ObjectStorageConfig{
-		Driver: ObjectStorageDriverMemory,
-		Bucket: defaultObjectStorageBucket,
-		Region: defaultObjectStorageRegion,
 	}
 }
 
@@ -376,97 +340,6 @@ func DefaultMessageTransferConfig() MessageTransferConfig {
 			Port:    defaultTransferObservabilityPort,
 		},
 	}
-}
-
-func LoadAPIConfig(path string) (APIConfig, error) {
-	cfg := DefaultAPIConfig()
-	values, err := readFlatYAML(path)
-	if err != nil {
-		return cfg, err
-	}
-
-	if value := values["Name"]; value != "" {
-		cfg.Name = value
-	}
-	if value := values["Host"]; value != "" {
-		cfg.Host = value
-	}
-	if value := values["Port"]; value != "" {
-		port, err := strconv.Atoi(value)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.Port = port
-	}
-	if value := strings.TrimSpace(os.ExpandEnv(values["Auth.AccessSecret"])); value != "" {
-		cfg.Auth.AccessSecret = value
-	}
-	if value := strings.TrimSpace(os.ExpandEnv(values["Auth.AccessExpire"])); value != "" {
-		expire, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.Auth.AccessExpire = expire
-	}
-	cfg.AdminBootstrap = adminBootstrapConfigFromValues(values)
-	if value := firstNonEmpty(values["StorageDriver"], values["Repository"]); value != "" {
-		cfg.StorageDriver = ResolveStorageDriver(value)
-	} else {
-		cfg.StorageDriver = ResolveStorageDriver(cfg.StorageDriver)
-	}
-	cfg.DataSource = ResolveDataSource(values["DataSource"])
-	cfg.Redis, err = redisConfigFromValues(values)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Presence, err = presenceConfigFromValues(values)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.GatewayWS, err = gatewayWSConfigFromValues(values)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.GatewayGRPC.ListenOn = firstNonEmpty(
-		strings.TrimSpace(os.ExpandEnv(values["GatewayGRPC.ListenOn"])),
-		os.Getenv("GATEWAY_GRPC_LISTEN_ON"),
-		cfg.GatewayGRPC.ListenOn,
-	)
-	cfg.Tracing, err = tracingConfigFromValues(values, cfg.Tracing, cfg.Name)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.DeepSeek = deepSeekConfigFromValues(values)
-	cfg.LLMObservability, err = llmObservabilityConfigFromValues(values)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.ObjectStorage, err = objectStorageConfigFromValues(values, cfg.StorageDriver)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.PythonExecutor, err = pythonExecutorConfigFromValues(values)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.MailRPC, err = rpcClientConfigFromValues(values, mailRPCSpec)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.MsgRPC, err = rpcClientConfigFromValues(values, msgRPCSpec)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.UserRPC, err = rpcClientConfigFromValues(values, userRPCSpec)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.AgentRPC, err = rpcClientConfigFromValues(values, agentRPCSpec)
-	if err != nil {
-		return cfg, err
-	}
-
-	return cfg, nil
 }
 
 func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
@@ -583,36 +456,6 @@ func LoadMessageTransferConfig(path string) (MessageTransferConfig, error) {
 	}
 	cfg = ResolveMessageTransferConfig(cfg)
 	return cfg, nil
-}
-
-func ToRestConf(cfg APIConfig) rest.RestConf {
-	var restConf rest.RestConf
-	restConf.Name = cfg.Name
-	restConf.Host = cfg.Host
-	restConf.Port = cfg.Port
-	restConf.Telemetry = GoZeroTelemetryConfig(cfg.Tracing, cfg.Name)
-	return restConf
-}
-
-func GoZeroTelemetryConfig(cfg observability.TracingConfig, serviceName string) gozerotrace.Config {
-	resolved, err := observability.ResolveTracingConfig(cfg, serviceName)
-	if err != nil {
-		return gozerotrace.Config{Name: strings.TrimSpace(serviceName), Disabled: true}
-	}
-	telemetry := gozerotrace.Config{
-		Name:     resolved.ServiceName,
-		Endpoint: resolved.OTLPEndpoint,
-		Sampler:  resolved.SamplerRatio,
-		Disabled: !resolved.Enabled,
-	}
-	switch resolved.Protocol {
-	case observability.TracingProtocolHTTP:
-		telemetry.Batcher = "otlphttp"
-		telemetry.OtlpHttpSecure = !resolved.Insecure
-	default:
-		telemetry.Batcher = "otlpgrpc"
-	}
-	return telemetry
 }
 
 func ResolveStorageDriver(value string) string {
@@ -1141,94 +984,6 @@ func isPlaceholderDeepSeekAPIKey(value string) bool {
 	}
 }
 
-func adminBootstrapConfigFromValues(values map[string]string) AdminBootstrapConfig {
-	cfg := DefaultAdminBootstrapConfig()
-	if value := firstNonEmpty(values["AdminBootstrap.Identifier"], os.Getenv("ADMIN_BOOTSTRAP_IDENTIFIER")); value != "" {
-		cfg.Identifier = strings.TrimSpace(os.ExpandEnv(value))
-	}
-	if value := firstNonEmpty(values["AdminBootstrap.Password"], os.Getenv("ADMIN_BOOTSTRAP_PASSWORD")); value != "" {
-		cfg.Password = os.ExpandEnv(value)
-	}
-	if value := firstNonEmpty(values["AdminBootstrap.DisplayName"], os.Getenv("ADMIN_BOOTSTRAP_DISPLAY_NAME")); value != "" {
-		cfg.DisplayName = strings.TrimSpace(os.ExpandEnv(value))
-	}
-	return cfg
-}
-
-func redisConfigFromValues(values map[string]string) (RedisConfig, error) {
-	cfg := RedisConfig{
-		Addr:     firstNonEmpty(values["Redis.Addr"], values["RedisAddr"]),
-		Password: firstNonEmpty(values["Redis.Password"], values["RedisPassword"]),
-		DB:       0,
-	}
-	if value := firstNonEmpty(values["Redis.DB"], values["RedisDB"]); strings.TrimSpace(value) != "" {
-		db, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
-		if err != nil {
-			return cfg, err
-		}
-		cfg.DB = db
-	}
-	return ResolveRedisConfig(cfg)
-}
-
-func presenceConfigFromValues(values map[string]string) (PresenceConfig, error) {
-	cfg := PresenceConfig{
-		Driver:              firstNonEmpty(values["Presence.Driver"], values["PresenceDriver"]),
-		HeartbeatTTLSeconds: 0,
-		KeyPrefix:           firstNonEmpty(values["Presence.KeyPrefix"], values["PresenceKeyPrefix"]),
-	}
-	if value := firstNonEmpty(values["Presence.HeartbeatTTLSeconds"], values["PresenceTTLSeconds"]); strings.TrimSpace(value) != "" {
-		ttl, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.HeartbeatTTLSeconds = ttl
-	}
-	return ResolvePresenceConfig(cfg)
-}
-
-func gatewayWSConfigFromValues(values map[string]string) (GatewayWSConfig, error) {
-	cfg := GatewayWSConfig{
-		AllowedOrigins: originListFromValue(firstNonEmpty(values["GatewayWS.AllowedOrigins"], values["GatewayWSAllowedOrigins"])),
-	}
-	if value := firstNonEmpty(values["GatewayWS.AllowQueryToken"], values["GatewayWSAllowQueryToken"]); strings.TrimSpace(value) != "" {
-		allowQueryToken, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
-		if err != nil {
-			return cfg, err
-		}
-		cfg.AllowQueryToken = allowQueryToken
-	}
-	if value := firstNonEmpty(values["GatewayWS.PingIntervalSeconds"], values["GatewayWSPingIntervalSeconds"]); strings.TrimSpace(value) != "" {
-		seconds, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.PingIntervalSeconds = seconds
-	}
-	if value := firstNonEmpty(values["GatewayWS.HeartbeatTimeoutSeconds"], values["GatewayWSHeartbeatTimeoutSeconds"]); strings.TrimSpace(value) != "" {
-		seconds, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.HeartbeatTimeoutSeconds = seconds
-	}
-	if value := firstNonEmpty(values["GatewayWS.CommandRateLimitPerSecond"], values["GatewayWSCommandRateLimitPerSecond"]); strings.TrimSpace(value) != "" {
-		limit, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
-		if err != nil {
-			return cfg, err
-		}
-		cfg.CommandRateLimitPerSecond = limit
-	}
-	if value := firstNonEmpty(values["GatewayWS.CommandRateLimitBurst"], values["GatewayWSCommandRateLimitBurst"]); strings.TrimSpace(value) != "" {
-		burst, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
-		if err != nil {
-			return cfg, err
-		}
-		cfg.CommandRateLimitBurst = burst
-	}
-	return ResolveGatewayWSConfig(cfg)
-}
-
 func tracingConfigFromValues(values map[string]string, current observability.TracingConfig, serviceName string) (observability.TracingConfig, error) {
 	cfg := current
 	if value := firstNonEmpty(values["Tracing.Enabled"], values["TracingEnabled"]); strings.TrimSpace(value) != "" {
@@ -1262,7 +1017,7 @@ func tracingConfigFromValues(values map[string]string, current observability.Tra
 
 // rpcClientConfigSpec 描述某个 RPC 客户端配置的差异点：YAML key 前缀、env 兜底 key、
 // 默认 timeout。mail/msg/user/agent 四组 zrpc 客户端配置结构一致，仅这些参数不同，
-// 共用 rpcClientConfigFromValues + resolveRPCClientConfig，避免逐域复制粘贴。
+// 共用 resolveRPCClientConfig，避免逐域复制粘贴。
 type rpcClientConfigSpec struct {
 	prefix          string
 	targetEnvKeys   []string
@@ -1296,23 +1051,6 @@ var (
 		defaultTimeout:  5000,
 	}
 )
-
-// rpcClientConfigFromValues 按 spec 从扁平 YAML 读取 zrpc 客户端配置（Target/Endpoints/Timeout），
-// 再经 resolveRPCClientConfig 套用 env 兜底与默认值。
-func rpcClientConfigFromValues(values map[string]string, spec rpcClientConfigSpec) (zrpc.RpcClientConf, error) {
-	cfg := zrpc.RpcClientConf{
-		Target:    firstNonEmpty(values[spec.prefix+".Target"], values[spec.prefix+"Target"]),
-		Endpoints: brokerListFromValue(firstNonEmpty(values[spec.prefix+".Endpoints"], values[spec.prefix+"Endpoints"])),
-	}
-	if value := firstNonEmpty(values[spec.prefix+".Timeout"], values[spec.prefix+"Timeout"]); strings.TrimSpace(value) != "" {
-		timeout, err := strconv.ParseInt(strings.TrimSpace(os.ExpandEnv(value)), 10, 64)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.Timeout = timeout
-	}
-	return resolveRPCClientConfig(cfg, spec), nil
-}
 
 // resolveRPCClientConfig 套用 spec 的 env 兜底（target / endpoints）、默认 timeout 与 NonBlock。
 // YAML 取到的 Target 经 ExpandEnv 后优先，其次按 spec.targetEnvKeys 顺序兜底。
@@ -1361,132 +1099,6 @@ func ResolveUserRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
 // AGENT_RPC_TARGET / AGENTS_IM_AGENT_RPC_TARGET。
 func ResolveAgentRPCConfig(cfg zrpc.RpcClientConf) zrpc.RpcClientConf {
 	return resolveRPCClientConfig(cfg, agentRPCSpec)
-}
-
-func deepSeekConfigFromValues(values map[string]string) DeepSeekConfig {
-	cfg := DeepSeekConfig{
-		APIKey:  firstNonEmpty(values["DeepSeek.APIKey"], values["DeepSeekAPIKey"]),
-		BaseURL: firstNonEmpty(values["DeepSeek.BaseURL"], values["DeepSeekBaseURL"]),
-		Model:   firstNonEmpty(values["DeepSeek.Model"], values["DeepSeekModel"]),
-	}
-	return ResolveDeepSeekConfig(cfg)
-}
-
-func llmObservabilityConfigFromValues(values map[string]string) (LLMObservabilityConfig, error) {
-	cfg := DefaultLLMObservabilityConfig()
-	if value := firstNonEmpty(values["LLMObservability.Enabled"], values["LLMObs.Enabled"]); strings.TrimSpace(value) != "" {
-		enabled, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
-		if err != nil {
-			return cfg, err
-		}
-		cfg.Enabled = enabled
-	}
-	cfg.Backend = firstNonEmpty(values["LLMObservability.Backend"], values["LLMObs.Backend"], cfg.Backend)
-	if value := firstNonEmpty(values["LLMObservability.CaptureOutput"], values["LLMObs.CaptureOutput"]); strings.TrimSpace(value) != "" {
-		captureOutput, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
-		if err != nil {
-			return cfg, err
-		}
-		cfg.CaptureOutput = captureOutput
-	}
-	if value := firstNonEmpty(values["LLMObservability.MaxOutputBytes"], values["LLMObs.MaxOutputBytes"]); strings.TrimSpace(value) != "" {
-		maxOutputBytes, err := strconv.Atoi(strings.TrimSpace(os.ExpandEnv(value)))
-		if err != nil {
-			return cfg, err
-		}
-		cfg.MaxOutputBytes = maxOutputBytes
-	}
-	cfg.Langfuse = LangfuseObservabilityConfig{
-		Host:      firstNonEmpty(values["LLMObservability.Langfuse.Host"], values["LLMObs.Langfuse.Host"], values["Langfuse.Host"]),
-		PublicKey: firstNonEmpty(values["LLMObservability.Langfuse.PublicKey"], values["LLMObs.Langfuse.PublicKey"], values["Langfuse.PublicKey"]),
-		SecretKey: firstNonEmpty(values["LLMObservability.Langfuse.SecretKey"], values["LLMObs.Langfuse.SecretKey"], values["Langfuse.SecretKey"]),
-	}
-	return ResolveLLMObservabilityConfig(cfg)
-}
-
-func pythonExecutorConfigFromValues(values map[string]string) (PythonExecutorConfig, error) {
-	cfg := PythonExecutorConfig{
-		Backend: firstNonEmpty(values["PythonExecutor.Backend"], values["PythonExecutorBackend"]),
-		K8S: PythonExecutorK8SConfig{
-			Namespace:          firstNonEmpty(values["PythonExecutor.K8S.Namespace"], values["PythonExecutorK8S.Namespace"], values["PythonExecutorK8SNamespace"]),
-			Image:              firstNonEmpty(values["PythonExecutor.K8S.Image"], values["PythonExecutorK8S.Image"], values["PythonExecutorK8SImage"]),
-			ServiceAccountName: firstNonEmpty(values["PythonExecutor.K8S.ServiceAccountName"], values["PythonExecutorK8S.ServiceAccountName"], values["PythonExecutorK8SServiceAccountName"]),
-			RuntimeClassName:   firstNonEmpty(values["PythonExecutor.K8S.RuntimeClassName"], values["PythonExecutorK8S.RuntimeClassName"], values["PythonExecutorK8SRuntimeClassName"]),
-		},
-	}
-	if value := firstNonEmpty(values["PythonExecutor.DefaultTimeoutSeconds"], values["PythonExecutorDefaultTimeoutSeconds"]); strings.TrimSpace(value) != "" {
-		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
-			seconds, err := strconv.Atoi(expanded)
-			if err != nil {
-				return cfg, err
-			}
-			cfg.DefaultTimeoutSeconds = seconds
-		}
-	}
-	if value := firstNonEmpty(values["PythonExecutor.MaxTimeoutSeconds"], values["PythonExecutorMaxTimeoutSeconds"]); strings.TrimSpace(value) != "" {
-		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
-			seconds, err := strconv.Atoi(expanded)
-			if err != nil {
-				return cfg, err
-			}
-			cfg.MaxTimeoutSeconds = seconds
-		}
-	}
-	if value := firstNonEmpty(values["PythonExecutor.DefaultMemoryMiB"], values["PythonExecutorDefaultMemoryMiB"]); strings.TrimSpace(value) != "" {
-		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
-			memoryMiB, err := strconv.Atoi(expanded)
-			if err != nil {
-				return cfg, err
-			}
-			cfg.DefaultMemoryMiB = memoryMiB
-		}
-	}
-	if value := firstNonEmpty(values["PythonExecutor.MaxMemoryMiB"], values["PythonExecutorMaxMemoryMiB"]); strings.TrimSpace(value) != "" {
-		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
-			memoryMiB, err := strconv.Atoi(expanded)
-			if err != nil {
-				return cfg, err
-			}
-			cfg.MaxMemoryMiB = memoryMiB
-		}
-	}
-	if value := firstNonEmpty(values["PythonExecutor.MaxOutputBytes"], values["PythonExecutorMaxOutputBytes"]); strings.TrimSpace(value) != "" {
-		if expanded := strings.TrimSpace(os.ExpandEnv(value)); expanded != "" {
-			maxOutputBytes, err := strconv.ParseInt(expanded, 10, 64)
-			if err != nil {
-				return cfg, err
-			}
-			cfg.MaxOutputBytes = maxOutputBytes
-		}
-	}
-	return ResolvePythonExecutorConfig(cfg)
-}
-
-func objectStorageConfigFromValues(values map[string]string, storageDriver string) (ObjectStorageConfig, error) {
-	cfg := ObjectStorageConfig{
-		Driver:           firstNonEmpty(values["ObjectStorage.Driver"], values["ObjectStorageDriver"]),
-		Endpoint:         firstNonEmpty(values["ObjectStorage.Endpoint"], values["ObjectStorageEndpoint"]),
-		ExternalEndpoint: firstNonEmpty(values["ObjectStorage.ExternalEndpoint"], values["ObjectStorageExternalEndpoint"]),
-		Bucket:           firstNonEmpty(values["ObjectStorage.Bucket"], values["ObjectStorageBucket"]),
-		Region:           firstNonEmpty(values["ObjectStorage.Region"], values["ObjectStorageRegion"]),
-		AccessKeyID:      firstNonEmpty(values["ObjectStorage.AccessKeyID"], values["ObjectStorageAccessKeyID"]),
-		SecretAccessKey:  firstNonEmpty(values["ObjectStorage.SecretAccessKey"], values["ObjectStorageSecretAccessKey"]),
-	}
-	if value := firstNonEmpty(values["ObjectStorage.UseSSL"], values["ObjectStorageUseSSL"]); strings.TrimSpace(value) != "" {
-		useSSL, err := strconv.ParseBool(strings.TrimSpace(os.ExpandEnv(value)))
-		if err != nil {
-			return cfg, err
-		}
-		cfg.UseSSL = useSSL
-	}
-	if value := firstNonEmpty(values["ObjectStorage.ExternalUseSSL"], values["ObjectStorageExternalUseSSL"]); strings.TrimSpace(value) != "" {
-		externalUseSSL, err := parseOptionalBool(value)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.ExternalUseSSL = externalUseSSL
-	}
-	return ResolveObjectStorageConfig(cfg, storageDriver)
 }
 
 func observabilityHTTPConfigFromValues(values map[string]string, current ObservabilityHTTPConfig) (ObservabilityHTTPConfig, error) {
