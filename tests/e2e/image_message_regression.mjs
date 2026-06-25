@@ -183,7 +183,7 @@ async function main() {
     recordStep(observations, 'preview-open-close', 'completed');
 
     recordStep(observations, 'authorized-download-url-works-for-receiver', 'started');
-    const downloadResult = await verifyDownload(config, observations, bPage, accountB, imageSend.mediaId);
+    const downloadResult = await verifyDownload(config, observations, bPage, accountB, imageSend.mediaId, imageSend.serverMsgId);
     observations.download = redactObject(downloadResult);
     recordStep(observations, 'authorized-download-url-works-for-receiver', 'completed', observations.download);
 
@@ -712,9 +712,12 @@ async function openAndClosePreview(page) {
   await dialog.waitFor({ state: 'detached', timeout: 5_000 });
 }
 
-async function verifyDownload(config, observations, page, account, mediaId) {
+async function verifyDownload(config, observations, page, account, mediaId, serverMsgId) {
   if (!mediaId) {
     throw new HarnessError('mediaId is required for download verification', {}, CLASSIFICATION.PREVIEW_DOWNLOAD_FAILED);
+  }
+  if (!serverMsgId) {
+    throw new HarnessError('serverMsgId is required for receiver download verification', { mediaId }, CLASSIFICATION.PREVIEW_DOWNLOAD_FAILED);
   }
 
   await page.getByRole('button', { name: `预览${IMAGE_LABEL}` }).first().click();
@@ -749,7 +752,7 @@ async function verifyDownload(config, observations, page, account, mediaId) {
   const response = await apiRequest(config, observations, {
     label: 'B requests authorized image download URL',
     method: 'GET',
-    path: `/media/${encodeURIComponent(mediaId)}/download-url`,
+    path: `/media/${encodeURIComponent(mediaId)}/download-url?msg_id=${encodeURIComponent(serverMsgId)}`,
     token: account.token,
   });
   const downloadUrl = String(response.data?.downloadUrl ?? '');

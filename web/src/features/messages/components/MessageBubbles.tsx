@@ -1,6 +1,6 @@
 import { Download, FileText, Image as ImageIcon, RefreshCw, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { MediaApi } from '../../../api/media';
+import type { GetMediaDownloadURLOptions, MediaApi } from '../../../api/media';
 import { Button } from '../../../components/ui/Button';
 import type { ChatMessage } from '../../../models/messages';
 import type { MediaDownloadHandler } from '../types';
@@ -13,6 +13,11 @@ import {
   parseFileMessagePayload,
   parseImageMessagePayload,
 } from '../utils/mediaUtils';
+
+function mediaDownloadOptions(serverMsgId?: string): GetMediaDownloadURLOptions | undefined {
+  const msgId = serverMsgId?.trim();
+  return msgId ? { msgId } : undefined;
+}
 
 export function FileMessageBubble({
   message,
@@ -45,7 +50,7 @@ export function FileMessageBubble({
     setDownloading(true);
     setDownloadError('');
     try {
-      const result = await mediaApi.getDownloadURL(mediaId);
+      const result = await mediaApi.getDownloadURL(mediaId, mediaDownloadOptions(message.serverMsgId));
       downloadMedia(result.downloadUrl, filename);
       onStatus('已获取文件下载链接');
     } catch {
@@ -100,6 +105,7 @@ export function ImageMessageBubble({
 }) {
   const payload = useMemo(() => parseImageMessagePayload(message.content), [message.content]);
   const mediaId = payload.mediaId;
+  const serverMsgId = message.serverMsgId;
   const filename = imageMessageFilename(payload);
   const label = imageDisplayLabel(payload);
   const [imageUrl, setImageUrl] = useState('');
@@ -119,7 +125,7 @@ export function ImageMessageBubble({
     setLoading(true);
     setLoadError('');
     mediaApi
-      .getDownloadURL(mediaId)
+      .getDownloadURL(mediaId, mediaDownloadOptions(serverMsgId))
       .then((result) => { if (!cancelled) setImageUrl(result.downloadUrl); })
       .catch(() => {
         if (!cancelled) {
@@ -130,14 +136,14 @@ export function ImageMessageBubble({
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [mediaApi, mediaId, onStatus]);
+  }, [mediaApi, mediaId, onStatus, serverMsgId]);
 
   async function retryLoad() {
     if (!mediaId || loading) return;
     setLoading(true);
     setLoadError('');
     try {
-      const result = await mediaApi.getDownloadURL(mediaId);
+      const result = await mediaApi.getDownloadURL(mediaId, mediaDownloadOptions(serverMsgId));
       setImageUrl(result.downloadUrl);
     } catch {
       const msg = '图片加载失败，请稍后重试';
@@ -158,7 +164,7 @@ export function ImageMessageBubble({
     setDownloading(true);
     setDownloadError('');
     try {
-      const result = await mediaApi.getDownloadURL(mediaId);
+      const result = await mediaApi.getDownloadURL(mediaId, mediaDownloadOptions(serverMsgId));
       downloadMedia(result.downloadUrl, filename);
       onStatus('已获取图片下载链接');
     } catch {

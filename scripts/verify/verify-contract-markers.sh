@@ -26,7 +26,11 @@ assert_present "-q" service/msg/api/msg.api -- \
 # --- message ordering contract (schema + code + tests, backend & web) ---
 assert_present "-q" db/migrations/001_init_postgres.sql -- \
   "messages_conversation_seq_uniq" "messages_sender_client_msg_uniq" "conversation_threads"
-assert_present "-q" internal/repository/postgres_message.go web/src/features/messages/MessagesPage.tsx -- \
+assert_present "-q" \
+  internal/repository/postgres_message.go \
+  web/src/features/messages/MessagesPage.tsx \
+  web/src/features/messages/utils/messageOrdering.ts \
+  web/src/features/messages/utils/conversationUtils.ts -- \
   "for update" "existingMessageForIdempotency" "orderedChatMessages" "conversationHasInFlightSend"
 assert_present "-q" internal/repository/message_repository_contract_test.go web/src/features/messages/MessagesPage.test.tsx -- \
   "concurrent same conversation sends allocate contiguous seqs" "last message state follows max seq" \

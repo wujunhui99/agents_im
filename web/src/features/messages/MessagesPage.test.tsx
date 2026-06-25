@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { MessagesPage } from './MessagesPage';
 import type { ContactsApi } from '../../api/contacts';
 import type { Group, GroupMember, GroupsApi } from '../../api/groups';
-import type { CompleteMediaUploadResponse, CreateMediaUploadRequest, CreateMediaUploadResponse, MediaApi } from '../../api/media';
+import type {
+  CompleteMediaUploadResponse,
+  CreateMediaUploadRequest,
+  CreateMediaUploadResponse,
+  GetMediaDownloadURLOptions,
+  MediaApi,
+} from '../../api/media';
 import type { AIHostingState, MessageApi, SendMessageRequest, SendMessageResponse, ServerMessage } from '../../api/messages';
 import type { WebSocketFactory, WebSocketLike } from '../../api/websocketClient';
 import type { UserApi, UserProfile, UserProfilePatch } from '../../api/user';
@@ -229,7 +235,9 @@ function createContactsApiWithAcceptedPeerAvatar(): ContactsApi {
 type TestMediaApi = MediaApi & {
   createUploadIntent: Mock<(request: CreateMediaUploadRequest) => Promise<CreateMediaUploadResponse>>;
   completeUpload: Mock<(mediaId: string) => Promise<CompleteMediaUploadResponse>>;
-  getDownloadURL: Mock<(mediaId: string) => Promise<{ mediaId: string; downloadUrl: string; expiresAt: number }>>;
+  getDownloadURL: Mock<
+    (mediaId: string, options?: GetMediaDownloadURLOptions) => Promise<{ mediaId: string; downloadUrl: string; expiresAt: number }>
+  >;
 };
 
 function createMediaApi(overrides?: Partial<TestMediaApi>): TestMediaApi {
@@ -1599,7 +1607,7 @@ describe('MessagesPage real API mode', () => {
 
     await user.click(downloadButton);
 
-    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_file_1'));
+    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_file_1', { msgId: 'srv_download_file_2' }));
     expect(downloadMedia).toHaveBeenCalledWith('https://media.test/download/med_file_1', 'report.pdf');
     expect(screen.getByRole('status')).toHaveTextContent('已获取文件下载链接');
   });
@@ -1622,7 +1630,7 @@ describe('MessagesPage real API mode', () => {
       'https://media.test/download/med_history_image',
     );
     expect(within(log).queryByText(imageContent)).not.toBeInTheDocument();
-    expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_history_image');
+    expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_history_image', { msgId: 'srv_1' });
   });
 
   it('renders live websocket image messages as image bubbles without refresh', async () => {
@@ -1656,6 +1664,7 @@ describe('MessagesPage real API mode', () => {
       'src',
       'https://media.test/download/med_live_image',
     );
+    expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_live_image', { msgId: 'srv_live_image' });
   });
 
   it('opens and closes image preview from the image bubble', async () => {
@@ -1701,7 +1710,7 @@ describe('MessagesPage real API mode', () => {
     await user.click(await screen.findByRole('button', { name: /图片 download.jpg/ }));
     await user.click(await screen.findByRole('button', { name: '下载图片 download.jpg' }));
 
-    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_download_image'));
+    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_download_image', { msgId: 'srv_1' }));
     expect(downloadMedia).toHaveBeenCalledWith('https://media.test/download/med_download_image', 'download.jpg');
   });
 
@@ -1734,7 +1743,7 @@ describe('MessagesPage real API mode', () => {
 
     await user.click(within(log).getByRole('button', { name: '下载文件 history.pdf' }));
 
-    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_history_file'));
+    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_history_file', { msgId: 'srv_1' }));
     expect(downloadMedia).toHaveBeenCalledWith('https://media.test/download/med_history_file', 'history.pdf');
     expect(screen.getByRole('status')).toHaveTextContent('已获取文件下载链接');
   });
@@ -1775,7 +1784,7 @@ describe('MessagesPage real API mode', () => {
     const log = await screen.findByRole('log', { name: '聊天消息' });
     await user.click(await within(log).findByRole('button', { name: '下载文件 live.pdf' }));
 
-    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_live_file'));
+    await waitFor(() => expect(mediaApi.getDownloadURL).toHaveBeenCalledWith('med_live_file', { msgId: 'srv_live_file' }));
     expect(downloadMedia).toHaveBeenCalledWith('https://media.test/download/med_live_file', 'live.pdf');
   });
 
