@@ -199,8 +199,8 @@ rg -q "AccessExpire" pkg/config/config.go service/auth/rpc/internal/config/confi
 rg -q "user_id" pkg/ctxuser/user.go
 rg -q "ctxuser\.UserID" service/msg/api/internal/logic/msg
 rg -q "sender_id must match authenticated user" service/msg/api/internal/logic/msg/send_message_logic.go
-assert_present "-q" tests -- \
-  "bearerTokenForUser"
+# JWT 鉴权契约由各 owner service 测试独立钉住（下方 service/msg/api + service/msggateway，
+# 及 service/auth/rpc auth_flow_test 的 Issue/ValidateToken）；legacy monolith tests/ HTTP helper 已退役（#620）。
 assert_present "-q" service/msggateway/internal/ws -- \
   "invalid token status"
 assert_present "-q" service/msg/api/internal/logic/msg -- \
