@@ -1096,6 +1096,80 @@ describe('MessagesPage real API mode', () => {
     expect(within(row).queryByText('2')).not.toBeInTheDocument();
   });
 
+  it('marks an incoming live message as read when the conversation is already open', async () => {
+    const user = userEvent.setup();
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'history message' })]);
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    await waitFor(() => expect(messageApi.markRead).toHaveBeenCalledWith(conversationId, { hasReadSeq: 1 }));
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_live_incoming', seq: 2, content: 'new incoming message' }));
+    });
+
+    expect(await screen.findByText('new incoming message')).toBeInTheDocument();
+    await waitFor(() => expect(messageApi.markRead).toHaveBeenCalledWith(conversationId, { hasReadSeq: 2 }));
+  });
+
+  it('marks an incoming live message as read even when the user sends a message in the same window', async () => {
+    const user = userEvent.setup();
+    const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({
+      deduplicated: false,
+      message: serverMessage({
+        serverMsgId: 'srv_outgoing',
+        clientMsgId: request.clientMsgId,
+        seq: 3,
+        senderId: currentUserId,
+        receiverId: peerUserId,
+        chatType: 'single',
+        content: request.content,
+        sendTime: 1777464500000,
+        createdAt: 1777464500000,
+      }),
+    }));
+    const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'history' })], sendMessage);
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    await waitFor(() => expect(messageApi.markRead).toHaveBeenCalledWith(conversationId, { hasReadSeq: 1 }));
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_incoming', seq: 2, content: 'incoming from peer' }));
+    });
+    expect(await screen.findByText('incoming from peer')).toBeInTheDocument();
+
+    await user.type(screen.getByRole('textbox', { name: '输入消息' }), 'my reply');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalled());
+
+    await waitFor(() => expect(messageApi.markRead).toHaveBeenCalledWith(conversationId, { hasReadSeq: 2 }));
+  });
+
   it('keeps mark-read failures visible instead of faking success', async () => {
     const user = userEvent.setup();
     const messageApi = createMessageApi([serverMessage({ seq: 1, content: 'unread that fails read ack' })]);
