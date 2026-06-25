@@ -96,15 +96,20 @@ returning attempt_count`, id, now.UTC())
 }
 
 func (m *customAuthEmailVerificationTokensModel) Consume(ctx context.Context, id string, now time.Time) (time.Time, error) {
-	var consumedAt time.Time
-	err := m.conn.QueryRowCtx(ctx, &consumedAt, `
+	// 扫进单字段 struct（带 db tag），不能直接扫进 *time.Time：
+	// go-zero sqlx 把 time.Time（struct kind）当作待字段映射的 struct，
+	// 直接扫单列会返回 "not matching destination to scan"。
+	var row struct {
+		ConsumedAt time.Time `db:"consumed_at"`
+	}
+	err := m.conn.QueryRowCtx(ctx, &row, `
 update `+m.table+`
 set consumed_at = $2, attempt_count = attempt_count + 1, updated_at = $2
 where id = $1 and consumed_at is null and expires_at > $2
 returning consumed_at`, id, now.UTC())
 	switch err {
 	case nil:
-		return consumedAt, nil
+		return row.ConsumedAt, nil
 	case sqlx.ErrNotFound:
 		return time.Time{}, ErrNotFound
 	default:
