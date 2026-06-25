@@ -576,8 +576,11 @@ button.md-list-item:hover,
 }
 
 .auth-frame {
-  grid-template-rows: auto auto 1fr;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 64px 28px 28px;
+  overflow-y: auto;
   background:
     linear-gradient(180deg, rgba(182, 241, 217, 0.55), transparent 280px),
     var(--md-sys-color-surface-container);
@@ -643,7 +646,8 @@ button.md-list-item:hover,
 .auth-switch {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
+  margin-top: auto;
+  padding-top: 20px;
 }
 
 .auth-switch .md-button-text {
