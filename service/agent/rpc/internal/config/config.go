@@ -27,9 +27,10 @@ type Config struct {
 	FriendsRPC zrpc.RpcClientConf `json:",optional"`
 
 	// DeepSeek / LLMObservability / PythonExecutor：runtime 与工具配置。
-	DeepSeek         appconfig.DeepSeekConfig         `json:",optional"`
-	LLMObservability appconfig.LLMObservabilityConfig `json:",optional"`
-	PythonExecutor   appconfig.PythonExecutorConfig   `json:",optional"`
+	// DeepSeek/LLMObservability 已搬到本域（#663）；PythonExecutor 仍在 pkg/config（第三类待迁）。
+	DeepSeek         DeepSeekConfig                 `json:",optional"`
+	LLMObservability LLMObservabilityConfig         `json:",optional"`
+	PythonExecutor   appconfig.PythonExecutorConfig `json:",optional"`
 
 	// Kafka：agent.trigger.v1 消费链路（独立 consumer group，与已退役的 msg-rpc
 	// 回流 consumer 隔离）。

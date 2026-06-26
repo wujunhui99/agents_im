@@ -19,6 +19,6 @@ type Config struct {
 	// Redis 同理走 env/默认值：本地 etc/msggateway.yaml 不带 Redis 块，缺失时
 	// NewRedisSessionStore 回落到 DefaultRedisConfig().Addr（localhost:6379），保持 #655 前行为。
 	Redis       appconfig.RedisConfig `json:",optional"`
-	GatewayWS   appconfig.GatewayWSConfig
-	GatewayGRPC appconfig.GatewayGRPCConfig
+	GatewayWS   GatewayWSConfig
+	GatewayGRPC GatewayGRPCConfig
 }

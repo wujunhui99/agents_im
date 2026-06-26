@@ -18,6 +18,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/gateway"
 	"github.com/wujunhui99/agents_im/pkg/gateway/delivery"
 	"github.com/wujunhui99/agents_im/pkg/presence"
+	gwconfig "github.com/wujunhui99/agents_im/service/msggateway/internal/config"
 )
 
 func TestWebSocketOriginPolicyAllowsSameOriginByDefault(t *testing.T) {
@@ -50,7 +51,7 @@ func TestWebSocketOriginPolicyRejectsCrossOriginByDefault(t *testing.T) {
 }
 
 func TestWebSocketOriginPolicyUsesConfiguredExactOrigins(t *testing.T) {
-	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
+	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(gwconfig.GatewayWSConfig{
 		AllowedOrigins:            []string{"https://chat.example.com"},
 		CommandRateLimitPerSecond: 100,
 		CommandRateLimitBurst:     100,
@@ -92,7 +93,7 @@ func TestWebSocketQueryTokenAuthIsDisabledByDefault(t *testing.T) {
 }
 
 func TestWebSocketQueryTokenAuthCanBeEnabled(t *testing.T) {
-	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
+	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(gwconfig.GatewayWSConfig{
 		AllowQueryToken:           true,
 		CommandRateLimitPerSecond: 100,
 		CommandRateLimitBurst:     100,
@@ -146,7 +147,7 @@ func TestWebSocketHandshakeRejectsInactiveSessionToken(t *testing.T) {
 }
 
 func TestWebSocketPingLoopSendsPingFrames(t *testing.T) {
-	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
+	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(gwconfig.GatewayWSConfig{
 		PingIntervalSeconds:       1,
 		HeartbeatTimeoutSeconds:   5,
 		CommandRateLimitPerSecond: 100,
@@ -190,7 +191,7 @@ func TestWebSocketPingLoopSendsPingFrames(t *testing.T) {
 }
 
 func TestWebSocketCommandRateLimitReturnsErrorEnvelope(t *testing.T) {
-	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
+	_, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(gwconfig.GatewayWSConfig{
 		PingIntervalSeconds:       30,
 		HeartbeatTimeoutSeconds:   75,
 		CommandRateLimitPerSecond: 1,
@@ -221,7 +222,7 @@ func TestWebSocketCommandRateLimitReturnsErrorEnvelope(t *testing.T) {
 }
 
 func TestWebSocketLaterConnectionReplacesExistingUserConnection(t *testing.T) {
-	app, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(config.GatewayWSConfig{
+	app, server, cleanup := newWSTestServer(t, WithGatewayWSConfig(gwconfig.GatewayWSConfig{
 		PingIntervalSeconds:       30,
 		HeartbeatTimeoutSeconds:   75,
 		CommandRateLimitPerSecond: 100,
@@ -263,7 +264,7 @@ func TestWebSocketHeartbeatTimeoutUnregistersPresence(t *testing.T) {
 	app, server, cleanup := newWSTestServer(t,
 		WithPresenceStore(store),
 		WithPresenceTTL(5*time.Second),
-		WithGatewayWSConfig(config.GatewayWSConfig{
+		WithGatewayWSConfig(gwconfig.GatewayWSConfig{
 			PingIntervalSeconds:       30,
 			HeartbeatTimeoutSeconds:   1,
 			CommandRateLimitPerSecond: 100,
@@ -301,7 +302,7 @@ func TestGatewayInternalUserPresenceEndpointReportsOnlineState(t *testing.T) {
 	app, server, cleanup := newWSTestServer(t,
 		WithPresenceStore(store),
 		WithPresenceTTL(5*time.Second),
-		WithGatewayWSConfig(config.GatewayWSConfig{
+		WithGatewayWSConfig(gwconfig.GatewayWSConfig{
 			PingIntervalSeconds:       30,
 			HeartbeatTimeoutSeconds:   75,
 			CommandRateLimitPerSecond: 100,

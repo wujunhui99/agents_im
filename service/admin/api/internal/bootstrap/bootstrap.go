@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	commonconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
+	commonconfig "github.com/wujunhui99/agents_im/service/admin/api/internal/config"
 	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/authclient"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"

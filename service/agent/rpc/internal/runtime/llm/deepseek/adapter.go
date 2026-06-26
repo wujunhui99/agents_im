@@ -6,7 +6,7 @@ import (
 
 	einodeepseek "github.com/cloudwego/eino-ext/components/model/deepseek"
 	einomodel "github.com/cloudwego/eino/components/model"
-	appconfig "github.com/wujunhui99/agents_im/pkg/config"
+	appconfig "github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 )
 
 func NewChatModel(ctx context.Context, cfg appconfig.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
