@@ -74,6 +74,7 @@ Key steps:
 
 - `detect changes`: always runs PR policy gates, computes the PR diff, and writes whether frontend, Markdown, and backend verification are required.
 - `backend-verification`: exits successfully without backend work when the diff is only `web/` and `.md` files; otherwise runs go-zero API validation, Go formatting check, `go test ./...`, `docker compose config -q`, and static verification.
+- `frontend-static-verification`: exits successfully unless a `web/` path changed; otherwise runs frontend static gates with `alpine/git:2.45.2` plus lightweight `bash`/`ripgrep` packages.
 - `frontend-verification`: exits successfully without npm work unless a `web/` path changed; otherwise runs `npm --prefix web ci`, lint, tests, and build.
 - `markdown-link-check`: exits successfully without link checking unless a `.md` path changed.
 - `postgres-integration`: exits successfully without PostgreSQL work when the diff is only `web/` and `.md` files; otherwise runs migrations against an isolated PostgreSQL service and then `go test -tags=integration ./tests`.
