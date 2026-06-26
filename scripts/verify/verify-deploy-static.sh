@@ -8,9 +8,10 @@ cd "$(git rev-parse --show-toplevel)"
 
 # --- Drone pipeline + migration immutability ---
 assert_present "-qF" .drone.yml -- \
-  "kind: pipeline" "detect changes" "backend-verification" "postgres-integration" "deploy-main" \
+  "kind: pipeline" "detect changes" "backend-verification" "frontend-static-verification" "postgres-integration" "deploy-main" \
   "bash scripts/ci/drone-run-if-required.sh" "bash scripts/ci/drone-backend-verify.sh" \
-  "bash scripts/ci/drone-frontend-verify.sh" "bash scripts/ci/drone-postgres-integration.sh" \
+  "bash scripts/ci/drone-frontend-verify.sh" "bash scripts/verify/verify-frontend-static.sh" \
+  "bash scripts/ci/drone-postgres-integration.sh" \
   "bash scripts/ci/drone-detect-changes.sh" \
   "bash scripts/ci/drone-detect-deploy.sh" "bash scripts/ci/drone-build-images.sh" "bash scripts/ci/drone-deploy.sh" \
   "from_secret: ghcr_token" "postgres:16-alpine" "ghcr.io/wujunhui99/agents_im"

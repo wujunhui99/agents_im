@@ -83,6 +83,14 @@ steps:
       - name: ci_cache
         path: /ci-cache
 
+  - name: frontend-static-verification
+    image: alpine/git:2.45.2
+    depends_on:
+      - detect changes
+    commands:
+      - apk add --no-cache bash ripgrep
+      - bash scripts/ci/drone-run-if-required.sh frontend_required "frontend static verification" bash scripts/verify/verify-frontend-static.sh
+
   # 从 backend-verification 拆出（原先为跑 npx 在 golang 镜像里装 NodeSource node）。
   - name: markdown-link-check
     image: node:20-bookworm-slim
@@ -117,6 +125,7 @@ steps:
       - detect changes
       - backend-verification
       - frontend-verification
+      - frontend-static-verification
       - markdown-link-check
       - postgres-integration
     environment:
