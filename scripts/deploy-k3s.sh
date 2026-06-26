@@ -275,7 +275,15 @@ if not items:
 verified = 0
 for pod in items:
     name = pod.get("metadata", {}).get("name", "<unknown>")
+    metadata = pod.get("metadata", {})
     phase = pod.get("status", {}).get("phase", "")
+    # Skip non-live pods: terminal-phase leftovers (k3s graceful-shutdown leaves
+    # old replicas in Succeeded/Failed after a node reboot and does not always GC
+    # them) and pods already being deleted. They are not serving traffic, so they
+    # must not fail verification of a rollout that the controller reported healthy.
+    if phase in ("Succeeded", "Failed") or metadata.get("deletionTimestamp"):
+        print(f"skipping non-live pod/{name} for {service}: phase={phase} deleting={bool(metadata.get('deletionTimestamp'))}")
+        continue
     containers = {c.get("name"): c for c in pod.get("spec", {}).get("containers", [])}
     statuses = {s.get("name"): s for s in pod.get("status", {}).get("containerStatuses", [])}
     container = containers.get(service)
