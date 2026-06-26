@@ -1,5 +1,5 @@
 import { ChevronLeft, FileText, Image as ImageIcon } from 'lucide-react';
-import { Fragment, useMemo, type ReactNode } from 'react';
+import { Fragment, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { MediaApi } from '../../../api/media';
 import { Avatar } from '../../../components/ui/Avatar';
 import { Button } from '../../../components/ui/Button';
@@ -113,6 +113,24 @@ export function ChatWindow({
   onRetryAIHosting: () => void;
 }) {
   const sortedMessages = useMemo(() => orderedChatMessages(conversation.messages), [conversation.messages]);
+  const messageThreadRef = useRef<HTMLDivElement>(null);
+  const latestMessage = sortedMessages[sortedMessages.length - 1];
+  const latestMessageScrollKey = latestMessage
+    ? [
+        conversation.id,
+        sortedMessages.length,
+        latestMessage.id,
+        latestMessage.serverMsgId ?? '',
+        latestMessage.seq ?? '',
+        latestMessage.status,
+      ].join(':')
+    : `${conversation.id}:empty`;
+
+  useLayoutEffect(() => {
+    const messageThread = messageThreadRef.current;
+    if (!messageThread) return;
+    messageThread.scrollTop = messageThread.scrollHeight;
+  }, [latestMessageScrollKey]);
 
   const headerTitleContent = (
     <>
@@ -144,7 +162,13 @@ export function ChatWindow({
         <AIHostingControl hosting={aiHosting} onToggle={onToggleAIHosting} onRetry={onRetryAIHosting} />
       ) : null}
       <p className="inline-status" role="status">{status}</p>
-      <div className="message-thread" role="log" aria-label="聊天消息" data-testid="message-thread-scroll-region">
+      <div
+        className="message-thread"
+        role="log"
+        aria-label="聊天消息"
+        data-testid="message-thread-scroll-region"
+        ref={messageThreadRef}
+      >
         {sortedMessages.map((message, index) => (
           <Fragment key={message.id}>
             {shouldRenderDateSeparator(message, sortedMessages[index - 1]) ? <MessageDateSeparator timestamp={message.sendTime} /> : null}

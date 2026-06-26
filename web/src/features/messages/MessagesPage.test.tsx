@@ -1132,6 +1132,39 @@ describe('MessagesPage real API mode', () => {
     await waitFor(() => expect(messageApi.markRead).toHaveBeenCalledWith(conversationId, { hasReadSeq: 2 }));
   });
 
+  it('scrolls the open chat to the newest live incoming message', async () => {
+    const user = userEvent.setup();
+    const manyMessages = Array.from({ length: 60 }, (_, index) =>
+      serverMessage({ seq: index + 1, content: `历史消息 ${index + 1}` }),
+    );
+    const messageApi = createMessageApi(manyMessages);
+    const { sockets, factory } = createFakeWebSocketFactory();
+
+    render(
+      <MessagesPage
+        currentUserId={currentUserId}
+        messageApi={messageApi}
+        webSocketFactory={factory}
+        webSocketUrl="ws://127.0.0.1/ws"
+        webSocketToken="test-token"
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /未知联系人/ }));
+    const messageThread = await screen.findByTestId('message-thread-scroll-region');
+    Object.defineProperty(messageThread, 'scrollHeight', { configurable: true, value: 2400 });
+    messageThread.scrollTop = 320;
+
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0].open();
+      sockets[0].receive(messageReceivedEvent({ serverMsgId: 'srv_live_scroll', seq: 61, content: '最新收到的信息' }));
+    });
+
+    expect(await screen.findByText('最新收到的信息')).toBeInTheDocument();
+    expect(messageThread.scrollTop).toBe(2400);
+  });
+
   it('marks an incoming live message as read even when the user sends a message in the same window', async () => {
     const user = userEvent.setup();
     const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({

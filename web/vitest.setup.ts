@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 // to work.  Without a valid file path it provides a stub with null prototype and no
 // Storage methods (clear, getItem, setItem, …).  Replace it with a plain in-memory
 // implementation so tests can call localStorage.clear() and friends normally.
-if (typeof localStorage !== 'undefined' && typeof localStorage.clear !== 'function') {
+if (typeof localStorage === 'undefined' || typeof localStorage.clear !== 'function') {
   const store = new Map<string, string>();
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
