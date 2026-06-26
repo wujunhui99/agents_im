@@ -80,9 +80,9 @@ func LoadPushConfig(path string) (PushConfig, error) {
 		return cfg, err
 	}
 
-	cfg.Kafka.Brokers = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(values["Kafka.Brokers"])), cfg.Kafka.Brokers)
+	cfg.Kafka.Brokers = FirstNonEmpty(strings.TrimSpace(os.ExpandEnv(values["Kafka.Brokers"])), cfg.Kafka.Brokers)
 
-	cfg.Gateway.Target = firstNonEmpty(
+	cfg.Gateway.Target = FirstNonEmpty(
 		strings.TrimSpace(os.ExpandEnv(values["Gateway.Target"])),
 		strings.TrimSpace(os.ExpandEnv(values["Gateway.Endpoint"])),
 		cfg.Gateway.Target,
@@ -107,12 +107,12 @@ func LoadPushConfig(path string) (PushConfig, error) {
 
 // ResolvePushConfig applies env fallbacks + defaults, mirroring the transfer worker.
 func ResolvePushConfig(cfg PushConfig) PushConfig {
-	cfg.Name = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "push")
+	cfg.Name = FirstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Name)), "push")
 	if tracing, err := observability.ResolveTracingConfig(cfg.Tracing, cfg.Name); err == nil {
 		cfg.Tracing = tracing
 	}
-	cfg.Kafka.Brokers = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Kafka.Brokers)), os.Getenv("KAFKA_BROKERS"))
-	cfg.Gateway.Target = firstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Gateway.Target)), os.Getenv("PUSH_GATEWAY_TARGET"))
+	cfg.Kafka.Brokers = FirstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Kafka.Brokers)), os.Getenv("KAFKA_BROKERS"))
+	cfg.Gateway.Target = FirstNonEmpty(strings.TrimSpace(os.ExpandEnv(cfg.Gateway.Target)), os.Getenv("PUSH_GATEWAY_TARGET"))
 	if cfg.Gateway.RefreshSeconds <= 0 {
 		cfg.Gateway.RefreshSeconds = defaultPushGatewayRefreshSecs
 	}

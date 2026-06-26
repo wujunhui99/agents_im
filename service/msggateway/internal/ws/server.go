@@ -23,6 +23,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/pkg/presence"
+	gwconfig "github.com/wujunhui99/agents_im/service/msggateway/internal/config"
 )
 
 const CommandHeartbeat = gateway.CommandHeartbeat
@@ -44,7 +45,7 @@ type Server struct {
 	presence     presence.PresenceStore
 	presenceTTL  time.Duration
 	instanceID   string
-	wsConfig     config.GatewayWSConfig
+	wsConfig     gwconfig.GatewayWSConfig
 	configErr    error
 	origins      map[string]struct{}
 	upgrader     websocket.Upgrader
@@ -111,7 +112,7 @@ type heartbeatData struct {
 
 func NewServer(auth config.JWTAuthConfig, backend MessageBackend, opts ...ServerOption) *Server {
 	auth = normalizeAuth(auth)
-	wsConfig, wsConfigErr := config.ResolveGatewayWSConfig(config.GatewayWSConfig{})
+	wsConfig, wsConfigErr := gwconfig.ResolveGatewayWSConfig(gwconfig.GatewayWSConfig{})
 
 	server := &Server{
 		auth:         auth,
@@ -164,7 +165,7 @@ func WithInstanceID(instanceID string) ServerOption {
 	}
 }
 
-func WithGatewayWSConfig(wsConfig config.GatewayWSConfig) ServerOption {
+func WithGatewayWSConfig(wsConfig gwconfig.GatewayWSConfig) ServerOption {
 	return func(s *Server) {
 		s.wsConfig = wsConfig
 		s.configErr = nil
@@ -172,7 +173,7 @@ func WithGatewayWSConfig(wsConfig config.GatewayWSConfig) ServerOption {
 }
 
 func (s *Server) configureWebSocket() {
-	resolved, err := config.ResolveGatewayWSConfig(s.wsConfig)
+	resolved, err := gwconfig.ResolveGatewayWSConfig(s.wsConfig)
 	if err != nil {
 		s.configErr = err
 		s.origins = nil
@@ -755,14 +756,14 @@ func sameRequestOrigin(r *http.Request) string {
 
 func (s *Server) pingInterval() time.Duration {
 	if s.wsConfig.PingIntervalSeconds <= 0 {
-		return time.Duration(config.DefaultGatewayWSConfig().PingIntervalSeconds) * time.Second
+		return time.Duration(gwconfig.DefaultGatewayWSConfig().PingIntervalSeconds) * time.Second
 	}
 	return time.Duration(s.wsConfig.PingIntervalSeconds) * time.Second
 }
 
 func (s *Server) heartbeatTimeout() time.Duration {
 	if s.wsConfig.HeartbeatTimeoutSeconds <= 0 {
-		return time.Duration(config.DefaultGatewayWSConfig().HeartbeatTimeoutSeconds) * time.Second
+		return time.Duration(gwconfig.DefaultGatewayWSConfig().HeartbeatTimeoutSeconds) * time.Second
 	}
 	return time.Duration(s.wsConfig.HeartbeatTimeoutSeconds) * time.Second
 }
@@ -776,7 +777,7 @@ type commandRateLimiter struct {
 	now    func() time.Time
 }
 
-func newCommandRateLimiter(wsConfig config.GatewayWSConfig, now func() time.Time) *commandRateLimiter {
+func newCommandRateLimiter(wsConfig gwconfig.GatewayWSConfig, now func() time.Time) *commandRateLimiter {
 	if wsConfig.CommandRateLimitPerSecond <= 0 {
 		return nil
 	}

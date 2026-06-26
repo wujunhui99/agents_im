@@ -13,9 +13,10 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	"github.com/wujunhui99/agents_im/pkg/config"
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	agentim "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
@@ -73,7 +74,7 @@ func (allowAllMessageMediaValidator) ValidateMessageMedia(context.Context, strin
 
 // NewServiceContextWithMediaValidator 用调用方注入的 media 校验器装配（#533：附件校验经 media-rpc，
 // 不再由本包直读 media_objects）。validator 为 nil 时回退放行校验器（仅内存/单测语义）。
-func NewServiceContextWithMediaValidator(repo repository.MessageRepository, mediaValidator logic.MessageMediaValidator, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth config.JWTAuthConfig) *ServiceContext {
+func NewServiceContextWithMediaValidator(repo repository.MessageRepository, mediaValidator logic.MessageMediaValidator, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth appconfig.JWTAuthConfig) *ServiceContext {
 	if mediaValidator == nil {
 		mediaValidator = allowAllMessageMediaValidator{}
 	}

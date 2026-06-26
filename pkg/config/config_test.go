@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,131 +69,6 @@ func clearPythonExecutorEnv(t *testing.T) {
 	}
 }
 
-func TestResolveLLMObservabilityDefaultsLangfuseHost(t *testing.T) {
-	t.Setenv("LANGFUSE_HOST", "")
-	t.Setenv("LANGFUSE_BASE_URL", "")
-	t.Setenv("LANGFUSE_PUBLIC_KEY", "")
-	t.Setenv("LANGFUSE_SECRET_KEY", "")
-
-	cfg, err := ResolveLLMObservabilityConfig(LLMObservabilityConfig{})
-	if err != nil {
-		t.Fatalf("resolve llm observability config: %v", err)
-	}
-	if cfg.Langfuse.Host != DefaultLangfuseHost {
-		t.Fatalf("langfuse host = %q, want %q", cfg.Langfuse.Host, DefaultLangfuseHost)
-	}
-	if cfg.Enabled || cfg.Backend != LLMObservabilityBackendNoop {
-		t.Fatalf("default llm observability should stay disabled noop: %+v", cfg)
-	}
-}
-
-func TestResolveLLMObservabilityLangfuseHostCanBeOverridden(t *testing.T) {
-	t.Setenv("LANGFUSE_HOST", "https://langfuse.override.local")
-	t.Setenv("LANGFUSE_BASE_URL", "")
-
-	cfg, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
-	if err != nil {
-		t.Fatalf("resolve llm observability config: %v", err)
-	}
-	if cfg.Langfuse.Host != "https://langfuse.override.local" {
-		t.Fatalf("langfuse host = %q, want env override", cfg.Langfuse.Host)
-	}
-}
-
-func TestResolveLLMObservabilityCanEnableLangfuseFromEnv(t *testing.T) {
-	t.Setenv("LLM_OBSERVABILITY_ENABLED", "true")
-	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuse")
-	t.Setenv("LLM_OBSERVABILITY_CAPTURE_OUTPUT", "true")
-	t.Setenv("LLM_OBSERVABILITY_MAX_OUTPUT_BYTES", "4096")
-	t.Setenv("LANGFUSE_HOST", "")
-	t.Setenv("LANGFUSE_BASE_URL", "")
-	t.Setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-unit-test")
-	t.Setenv("LANGFUSE_SECRET_KEY", "sk-lf-unit-test")
-
-	cfg, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
-	if err != nil {
-		t.Fatalf("resolve llm observability config: %v", err)
-	}
-	if !cfg.Enabled || cfg.Backend != LLMObservabilityBackendLangfuse {
-		t.Fatalf("llm observability should enable langfuse from env: %+v", cfg)
-	}
-	if !cfg.CaptureOutput || cfg.MaxOutputBytes != 4096 {
-		t.Fatalf("capture output settings should resolve from env: %+v", cfg)
-	}
-	if cfg.Langfuse.Host != DefaultLangfuseHost ||
-		cfg.Langfuse.PublicKey != "pk-lf-unit-test" ||
-		cfg.Langfuse.SecretKey != "sk-lf-unit-test" {
-		t.Fatalf("langfuse env config mismatch: %+v", cfg.Langfuse)
-	}
-}
-
-func TestResolveLLMObservabilityRejectsUnsupportedBackend(t *testing.T) {
-	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuze")
-
-	_, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
-	if err == nil || !strings.Contains(err.Error(), "unsupported llm observability backend") {
-		t.Fatalf("expected unsupported backend error, got %v", err)
-	}
-}
-
-func TestResolveGatewayWSConfigDefaultsAreProductionSafe(t *testing.T) {
-	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "")
-	t.Setenv("GATEWAY_WS_ALLOW_QUERY_TOKEN", "")
-	t.Setenv("GATEWAY_WS_PING_INTERVAL_SECONDS", "")
-	t.Setenv("GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS", "")
-	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND", "")
-	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST", "")
-
-	cfg, err := ResolveGatewayWSConfig(GatewayWSConfig{})
-	if err != nil {
-		t.Fatalf("resolve gateway ws config: %v", err)
-	}
-	if len(cfg.AllowedOrigins) != 0 {
-		t.Fatalf("allowed origins should default empty same-origin policy, got %+v", cfg.AllowedOrigins)
-	}
-	if cfg.AllowQueryToken {
-		t.Fatal("query-token auth should be disabled by default")
-	}
-	if cfg.PingIntervalSeconds != 30 || cfg.HeartbeatTimeoutSeconds != 75 {
-		t.Fatalf("gateway ws heartbeat defaults mismatch: %+v", cfg)
-	}
-	if cfg.CommandRateLimitPerSecond != 20 || cfg.CommandRateLimitBurst != 40 {
-		t.Fatalf("gateway ws rate limit defaults mismatch: %+v", cfg)
-	}
-}
-
-func TestResolveGatewayWSConfigFromEnv(t *testing.T) {
-	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "https://app.example.com, http://127.0.0.1:5173/")
-	t.Setenv("GATEWAY_WS_ALLOW_QUERY_TOKEN", "true")
-	t.Setenv("GATEWAY_WS_PING_INTERVAL_SECONDS", "15")
-	t.Setenv("GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS", "45")
-	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND", "11")
-	t.Setenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST", "13")
-
-	cfg, err := ResolveGatewayWSConfig(GatewayWSConfig{})
-	if err != nil {
-		t.Fatalf("resolve gateway ws env config: %v", err)
-	}
-	if len(cfg.AllowedOrigins) != 2 || cfg.AllowedOrigins[0] != "https://app.example.com" || cfg.AllowedOrigins[1] != "http://127.0.0.1:5173" {
-		t.Fatalf("env allowed origins mismatch: %+v", cfg.AllowedOrigins)
-	}
-	if !cfg.AllowQueryToken || cfg.PingIntervalSeconds != 15 || cfg.HeartbeatTimeoutSeconds != 45 {
-		t.Fatalf("env heartbeat/auth mismatch: %+v", cfg)
-	}
-	if cfg.CommandRateLimitPerSecond != 11 || cfg.CommandRateLimitBurst != 13 {
-		t.Fatalf("env rate limit mismatch: %+v", cfg)
-	}
-}
-
-func TestResolveGatewayWSConfigRejectsWildcardOrigin(t *testing.T) {
-	t.Setenv("GATEWAY_WS_ALLOWED_ORIGINS", "")
-
-	_, err := ResolveGatewayWSConfig(GatewayWSConfig{AllowedOrigins: []string{"*"}})
-	if err == nil {
-		t.Fatal("expected wildcard allowed origin to be rejected")
-	}
-}
-
 func TestResolvePythonExecutorConfigDefaultsDisabled(t *testing.T) {
 	clearPythonExecutorEnv(t)
 
@@ -236,47 +110,6 @@ func TestResolvePythonExecutorConfigRequiresK8SNamespaceAndImage(t *testing.T) {
 	}
 	if cfg.Backend != PythonExecutorBackendK8S || cfg.K8S.Namespace != "agent-python-sandbox" || cfg.K8S.Image == "" {
 		t.Fatalf("k8s python executor config mismatch: %+v", cfg)
-	}
-}
-
-func TestResolveDeepSeekConfigUsesDefaultsWithoutKey(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "")
-	t.Setenv("DEEPSEEK_BASE_URL", "")
-	t.Setenv("DEEPSEEK_MODEL", "")
-
-	cfg := ResolveDeepSeekConfig(DeepSeekConfig{})
-	if cfg.APIKey != "" {
-		t.Fatalf("deepseek api key should remain empty when env is unset")
-	}
-	if cfg.BaseURL != DefaultDeepSeekBaseURL {
-		t.Fatalf("deepseek base url = %q, want %q", cfg.BaseURL, DefaultDeepSeekBaseURL)
-	}
-	if cfg.Model != DefaultDeepSeekModel {
-		t.Fatalf("deepseek model = %q, want %q", cfg.Model, DefaultDeepSeekModel)
-	}
-}
-
-func TestValidateDeepSeekConfigRequiresAPIKey(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "")
-	t.Setenv("DEEPSEEK_BASE_URL", "")
-	t.Setenv("DEEPSEEK_MODEL", "")
-
-	cfg := ResolveDeepSeekConfig(DeepSeekConfig{})
-	err := ValidateDeepSeekConfig(cfg)
-	if !errors.Is(err, ErrDeepSeekAPIKeyMissing) {
-		t.Fatalf("validate deepseek config error = %v, want %v", err, ErrDeepSeekAPIKeyMissing)
-	}
-}
-
-func TestValidateDeepSeekConfigRejectsPlaceholderAPIKey(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "replace-with-local-deepseek-api-key")
-	t.Setenv("DEEPSEEK_BASE_URL", "")
-	t.Setenv("DEEPSEEK_MODEL", "")
-
-	cfg := ResolveDeepSeekConfig(DeepSeekConfig{})
-	err := ValidateDeepSeekConfig(cfg)
-	if !errors.Is(err, ErrDeepSeekAPIKeyPlaceholder) {
-		t.Fatalf("validate deepseek config error = %v, want %v", err, ErrDeepSeekAPIKeyPlaceholder)
 	}
 }
 

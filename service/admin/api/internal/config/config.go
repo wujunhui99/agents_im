@@ -23,6 +23,6 @@ type Config struct {
 	// auth-rpc 设登录凭据；跨域写不进 admin-rpc。
 	UserRPC zrpc.RpcClientConf
 	AuthRPC zrpc.RpcClientConf
-	// AdminBootstrap：admin-api 启动时幂等确保后台管理员账号和首次登录凭据。
-	AdminBootstrap appconfig.AdminBootstrapConfig `json:",optional"`
+	// AdminBootstrap：admin-api 启动时幂等确保后台管理员账号和首次登录凭据（#663：本域属主）。
+	AdminBootstrap AdminBootstrapConfig `json:",optional"`
 }

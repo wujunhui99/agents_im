@@ -9,9 +9,10 @@ import (
 
 	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/pkg/config"
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registrytest"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
@@ -95,7 +96,7 @@ func TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting(t *
 		nil,
 		nil,
 		nil,
-		config.DefaultJWTAuthConfig(),
+		appconfig.DefaultJWTAuthConfig(),
 	)
 	if err := ConfigureConversationAIHosting(serviceContext, config.DeepSeekConfig{}, config.LLMObservabilityConfig{}); err != nil {
 		t.Fatalf("configure conversation AI hosting: %v", err)
