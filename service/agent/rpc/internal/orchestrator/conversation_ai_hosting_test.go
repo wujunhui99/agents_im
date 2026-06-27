@@ -12,6 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
@@ -21,7 +22,7 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
-	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	agentRepo := agentlogictest.NewMemoryAgentStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
@@ -103,7 +104,7 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
-	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
@@ -253,7 +254,7 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
-	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
@@ -349,7 +350,7 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
-	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
