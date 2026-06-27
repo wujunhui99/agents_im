@@ -5,12 +5,11 @@ import (
 	"net/url"
 	"os"
 	"strings"
-
-	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 )
 
 // Gateway WebSocket / 下行推送 gRPC 配置（#663：从 pkg/config 搬到 msggateway 域属主，
-// 仅本服务消费）。通用 env 解析复用 pkg/config 导出的 FirstNonEmpty/ResolveBool/ResolveInt(64)。
+// 仅本服务消费）。#664：标量字段的默认值/env 覆盖改用 go-zero struct tag（default=/env=），
+// 在 conf.MustLoad 时声明式生效，不再手写 Resolve。两处例外见 NormalizeGatewayWSConfig。
 const (
 	defaultGatewayWSPingSeconds      = 30
 	defaultGatewayWSHeartbeatSeconds = 75
@@ -19,12 +18,14 @@ const (
 )
 
 type GatewayWSConfig struct {
-	AllowedOrigins            []string
-	AllowQueryToken           bool
-	PingIntervalSeconds       int64
-	HeartbeatTimeoutSeconds   int64
-	CommandRateLimitPerSecond int
-	CommandRateLimitBurst     int
+	// AllowedOrigins 是切片且与浏览器 Origin header（外部输入）做相等匹配，go-zero env
+	// tag 只支持标量，无法表达；故保留手写 env 读取 + 归一化（见 NormalizeGatewayWSConfig）。
+	AllowedOrigins            []string `json:",optional"`
+	AllowQueryToken           bool     `json:",optional,env=GATEWAY_WS_ALLOW_QUERY_TOKEN"`
+	PingIntervalSeconds       int64    `json:",default=30,env=GATEWAY_WS_PING_INTERVAL_SECONDS"`
+	HeartbeatTimeoutSeconds   int64    `json:",default=75,env=GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS"`
+	CommandRateLimitPerSecond int      `json:",default=20,env=GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND"`
+	CommandRateLimitBurst     int      `json:",default=40,env=GATEWAY_WS_COMMAND_RATE_LIMIT_BURST"`
 }
 
 type GatewayGRPCConfig struct {
@@ -32,6 +33,8 @@ type GatewayGRPCConfig struct {
 	ListenOn string
 }
 
+// DefaultGatewayWSConfig 仅供未走 conf.MustLoad 的运行时兜底使用（server.pingInterval/
+// heartbeatTimeout 在字段为零时回落到这里），生产路径的默认值由 struct tag 在 load 时填充。
 func DefaultGatewayWSConfig() GatewayWSConfig {
 	return GatewayWSConfig{
 		AllowedOrigins:            nil,
@@ -43,10 +46,17 @@ func DefaultGatewayWSConfig() GatewayWSConfig {
 	}
 }
 
-func ResolveGatewayWSConfig(cfg GatewayWSConfig) (GatewayWSConfig, error) {
+// NormalizeGatewayWSConfig 处理两处 tag 无法表达、必须保留的逻辑：
+//  1. AllowedOrigins 归一化（保留例外）：与浏览器发来的 Origin header（外部输入）做相等匹配，
+//     config 侧必须与运行时 normalizeRequestOrigin 产出同一规范形，否则合法来源静默匹配失败。
+//     env GATEWAY_WS_ALLOWED_ORIGINS（逗号分隔）在 yaml 未配置时兜底。
+//  2. ping/heartbeat 跨字段约束改 fail-fast（保留例外）：配错（ping ≥ heartbeat）会让每条 WS
+//     连接周期性闪断且无信号，故显式报错而非静默改写。标量默认值/env 覆盖已由 struct tag 在
+//     conf.MustLoad 时生效，这里不再重复解析。
+func NormalizeGatewayWSConfig(cfg GatewayWSConfig) (GatewayWSConfig, error) {
 	origins := cfg.AllowedOrigins
 	if len(origins) == 0 {
-		origins = originListFromValue(appconfig.FirstNonEmpty(os.Getenv("GATEWAY_WS_ALLOWED_ORIGINS"), os.Getenv("AGENTS_IM_GATEWAY_WS_ALLOWED_ORIGINS")))
+		origins = originListFromValue(os.Getenv("GATEWAY_WS_ALLOWED_ORIGINS"))
 	}
 	normalizedOrigins := make([]string, 0, len(origins))
 	seenOrigins := make(map[string]struct{}, len(origins))
@@ -66,50 +76,10 @@ func ResolveGatewayWSConfig(cfg GatewayWSConfig) (GatewayWSConfig, error) {
 	}
 	cfg.AllowedOrigins = normalizedOrigins
 
-	allowQueryToken, err := appconfig.ResolveBool(cfg.AllowQueryToken, os.Getenv("GATEWAY_WS_ALLOW_QUERY_TOKEN"), os.Getenv("AGENTS_IM_GATEWAY_WS_ALLOW_QUERY_TOKEN"))
-	if err != nil {
-		return cfg, err
+	if cfg.PingIntervalSeconds > 0 && cfg.HeartbeatTimeoutSeconds > 0 &&
+		cfg.PingIntervalSeconds >= cfg.HeartbeatTimeoutSeconds {
+		return cfg, fmt.Errorf("gateway websocket ping interval (%ds) must be smaller than heartbeat timeout (%ds)", cfg.PingIntervalSeconds, cfg.HeartbeatTimeoutSeconds)
 	}
-	cfg.AllowQueryToken = allowQueryToken
-
-	pingInterval, err := appconfig.ResolveInt64(cfg.PingIntervalSeconds, os.Getenv("GATEWAY_WS_PING_INTERVAL_SECONDS"), os.Getenv("AGENTS_IM_GATEWAY_WS_PING_INTERVAL_SECONDS"))
-	if err != nil {
-		return cfg, err
-	}
-	if pingInterval <= 0 {
-		pingInterval = defaultGatewayWSPingSeconds
-	}
-	cfg.PingIntervalSeconds = pingInterval
-
-	heartbeatTimeout, err := appconfig.ResolveInt64(cfg.HeartbeatTimeoutSeconds, os.Getenv("GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS"), os.Getenv("AGENTS_IM_GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS"))
-	if err != nil {
-		return cfg, err
-	}
-	if heartbeatTimeout <= 0 {
-		heartbeatTimeout = defaultGatewayWSHeartbeatSeconds
-	}
-	cfg.HeartbeatTimeoutSeconds = heartbeatTimeout
-	if cfg.PingIntervalSeconds >= cfg.HeartbeatTimeoutSeconds {
-		cfg.PingIntervalSeconds = maxInt64(1, cfg.HeartbeatTimeoutSeconds/2)
-	}
-
-	commandRate, err := appconfig.ResolveInt(cfg.CommandRateLimitPerSecond, os.Getenv("GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND"), os.Getenv("AGENTS_IM_GATEWAY_WS_COMMAND_RATE_LIMIT_PER_SECOND"))
-	if err != nil {
-		return cfg, err
-	}
-	if commandRate <= 0 {
-		commandRate = defaultGatewayWSCommandRate
-	}
-	cfg.CommandRateLimitPerSecond = commandRate
-
-	commandBurst, err := appconfig.ResolveInt(cfg.CommandRateLimitBurst, os.Getenv("GATEWAY_WS_COMMAND_RATE_LIMIT_BURST"), os.Getenv("AGENTS_IM_GATEWAY_WS_COMMAND_RATE_LIMIT_BURST"))
-	if err != nil {
-		return cfg, err
-	}
-	if commandBurst <= 0 {
-		commandBurst = maxInt(defaultGatewayWSCommandBurst, commandRate)
-	}
-	cfg.CommandRateLimitBurst = commandBurst
 	return cfg, nil
 }
 
@@ -148,18 +118,4 @@ func normalizeOrigin(origin string) (string, error) {
 		return "", fmt.Errorf("gateway websocket allowed origin %q is invalid: expected exact scheme://host[:port]", origin)
 	}
 	return strings.ToLower(parsed.Scheme) + "://" + strings.ToLower(parsed.Host), nil
-}
-
-func maxInt(a int, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func maxInt64(a int64, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
 }

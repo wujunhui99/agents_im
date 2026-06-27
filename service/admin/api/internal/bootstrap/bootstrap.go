@@ -17,11 +17,8 @@ import (
 // EnsureAdminAccount ensures the configured admin account exists and has an
 // initial login credential. Existing admin credentials are never overwritten.
 func EnsureAdminAccount(ctx context.Context, cfg commonconfig.AdminBootstrapConfig, users userclient.User, credentials authclient.Auth) (bool, error) {
-	defaults := commonconfig.DefaultAdminBootstrapConfig()
+	// 默认值由 struct tag 在 conf.MustLoad 时填充（#664）；此处只去空白并判 disabled。
 	identifier := strings.TrimSpace(cfg.Identifier)
-	if identifier == "" {
-		identifier = defaults.Identifier
-	}
 	password := cfg.Password
 	if identifier == "" || strings.TrimSpace(password) == "" {
 		return false, nil
@@ -34,9 +31,6 @@ func EnsureAdminAccount(ctx context.Context, cfg commonconfig.AdminBootstrapConf
 	}
 
 	displayName := strings.TrimSpace(cfg.DisplayName)
-	if displayName == "" {
-		displayName = defaults.DisplayName
-	}
 	if displayName == "" {
 		displayName = identifier
 	}

@@ -24,5 +24,6 @@ type Config struct {
 	UserRPC zrpc.RpcClientConf
 	AuthRPC zrpc.RpcClientConf
 	// AdminBootstrap：admin-api 启动时幂等确保后台管理员账号和首次登录凭据（#663：本域属主）。
-	AdminBootstrap AdminBootstrapConfig `json:",optional"`
+	// #664：不标 optional，让 go-zero 在 yaml 缺整块时仍下钻填子字段 tag 默认值（env 裸名覆盖）。
+	AdminBootstrap AdminBootstrapConfig
 }

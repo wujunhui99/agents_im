@@ -10,7 +10,7 @@ import (
 )
 
 func NewChatModel(ctx context.Context, cfg appconfig.DeepSeekConfig) (einomodel.ToolCallingChatModel, error) {
-	cfg = appconfig.ResolveDeepSeekConfig(cfg)
+	// cfg 已在 ServiceContext 经 conf.MustLoad 由 struct tag 填好默认值/env（#664），此处只校验。
 	if err := appconfig.ValidateDeepSeekConfig(cfg); err != nil {
 		return nil, err
 	}

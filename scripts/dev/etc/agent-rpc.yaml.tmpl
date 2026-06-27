@@ -6,10 +6,8 @@ Telemetry:
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}
   Sampler: 1.0
   Batcher: otlpgrpc
-DeepSeek:
-  APIKey: ${DEEPSEEK_API_KEY}
-  BaseURL: ${DEEPSEEK_BASE_URL}
-  Model: ${DEEPSEEK_MODEL}
+# DeepSeek 默认值/env 由 struct tag 声明（#664）：APIKey←env DEEPSEEK_API_KEY，
+# BaseURL/Model 缺省走 tag default、env DEEPSEEK_BASE_URL/MODEL 覆盖；整块从 yaml 删除。
 PythonExecutor:
   Backend: disabled
 MsgRPC:

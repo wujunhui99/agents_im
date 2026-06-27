@@ -112,7 +112,6 @@ type heartbeatData struct {
 
 func NewServer(auth config.JWTAuthConfig, backend MessageBackend, opts ...ServerOption) *Server {
 	auth = normalizeAuth(auth)
-	wsConfig, wsConfigErr := gwconfig.ResolveGatewayWSConfig(gwconfig.GatewayWSConfig{})
 
 	server := &Server{
 		auth:         auth,
@@ -122,8 +121,9 @@ func NewServer(auth config.JWTAuthConfig, backend MessageBackend, opts ...Server
 		presence:     presence.NewMemoryStore(),
 		presenceTTL:  presence.HeartbeatTTL(config.DefaultPresenceConfig()),
 		instanceID:   defaultGatewayInstanceID(),
-		wsConfig:     wsConfig,
-		configErr:    wsConfigErr,
+		// 标量默认值由 go-zero tag 在 conf.MustLoad 时填充并经 WithGatewayWSConfig 传入；
+		// 未走该 option 的路径（测试/默认构造）回落到 DefaultGatewayWSConfig 兜底。
+		wsConfig: gwconfig.DefaultGatewayWSConfig(),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -173,7 +173,7 @@ func WithGatewayWSConfig(wsConfig gwconfig.GatewayWSConfig) ServerOption {
 }
 
 func (s *Server) configureWebSocket() {
-	resolved, err := gwconfig.ResolveGatewayWSConfig(s.wsConfig)
+	resolved, err := gwconfig.NormalizeGatewayWSConfig(s.wsConfig)
 	if err != nil {
 		s.configErr = err
 		s.origins = nil

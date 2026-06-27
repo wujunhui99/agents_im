@@ -27,20 +27,9 @@ Telemetry:
   Sampler: 1.0
   Batcher: otlpgrpc
 
-# AI 托管运行时（随 agent 域归位迁入，#340）。
-DeepSeek:
-  APIKey: ${DEEPSEEK_API_KEY}
-  BaseURL: ${DEEPSEEK_BASE_URL}
-  Model: ${DEEPSEEK_MODEL}
-LLMObservability:
-  Enabled: false
-  Backend: ${LLM_OBSERVABILITY_BACKEND}
-  CaptureOutput: false
-  MaxOutputBytes: 2048
-  Langfuse:
-    Host: ${LANGFUSE_HOST}
-    PublicKey: ${LANGFUSE_PUBLIC_KEY}
-    SecretKey: ${LANGFUSE_SECRET_KEY}
+# AI 托管运行时（随 agent 域归位迁入，#340）。#664：DeepSeek/LLMObservability 的默认值/env
+# 覆盖改由 struct tag 声明（env 裸名 DEEPSEEK_*/LLM_OBSERVABILITY_*/LANGFUSE_*，由 configmap/secret
+# 注入），整块从 yaml 删除，避免空 ${VAR} 压掉 tag default。
 PythonExecutor:
   Backend: ${PYTHON_EXECUTOR_BACKEND}
   DefaultTimeoutSeconds: ${PYTHON_EXECUTOR_DEFAULT_TIMEOUT_SECONDS}
