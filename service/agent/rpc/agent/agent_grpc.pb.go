@@ -29,6 +29,13 @@ const (
 	Agent_GetAgentDefinition_FullMethodName          = "/agent.v1.Agent/GetAgentDefinition"
 	Agent_UpdateAgentDefinition_FullMethodName       = "/agent.v1.Agent/UpdateAgentDefinition"
 	Agent_EnsureDefaultAssistant_FullMethodName      = "/agent.v1.Agent/EnsureDefaultAssistant"
+	Agent_ListAgentRuns_FullMethodName               = "/agent.v1.Agent/ListAgentRuns"
+	Agent_CountAgentRuns_FullMethodName              = "/agent.v1.Agent/CountAgentRuns"
+	Agent_GetAgentRun_FullMethodName                 = "/agent.v1.Agent/GetAgentRun"
+	Agent_GetAgentRunByTraceID_FullMethodName        = "/agent.v1.Agent/GetAgentRunByTraceID"
+	Agent_ListAgentToolCallsByRunID_FullMethodName   = "/agent.v1.Agent/ListAgentToolCallsByRunID"
+	Agent_ListAgentFileReadsByRunID_FullMethodName   = "/agent.v1.Agent/ListAgentFileReadsByRunID"
+	Agent_ListAgentPythonExecsByRunID_FullMethodName = "/agent.v1.Agent/ListAgentPythonExecsByRunID"
 )
 
 // AgentClient is the client API for Agent service.
@@ -55,6 +62,17 @@ type AgentClient interface {
 	// EnsureDefaultAssistant 幂等装配默认助手的 agent 域部分（agent 行 + 提示词 + 工具绑定）。
 	// 由 user-rpc 装配编排调用（账号属 user 域已建，好友由 user-rpc 经 friends-rpc 建）。
 	EnsureDefaultAssistant(ctx context.Context, in *EnsureDefaultAssistantRequest, opts ...grpc.CallOption) (*EnsureDefaultAssistantResponse, error)
+	// ---- agent 审计只读面（#616：admin-rpc traces/dashboard 经此读，脱 internal/repository agent_audit）----
+	// agent 审计四表（agent_runs/tool_calls/file_reads/python_execs）是 agent 域自有 append-only 数据，
+	// 写路径在 agent-rpc orchestrator，只读 owner API 在此供 admin-rpc BFF 聚合 traces/dashboard。
+	// summary jsonb 经 *_summary_json 串行携带；时间为 RFC3339Nano（零值空串）。
+	ListAgentRuns(ctx context.Context, in *ListAgentRunsRequest, opts ...grpc.CallOption) (*ListAgentRunsResponse, error)
+	CountAgentRuns(ctx context.Context, in *CountAgentRunsRequest, opts ...grpc.CallOption) (*CountAgentRunsResponse, error)
+	GetAgentRun(ctx context.Context, in *GetAgentRunRequest, opts ...grpc.CallOption) (*AgentRunAudit, error)
+	GetAgentRunByTraceID(ctx context.Context, in *GetAgentRunByTraceIDRequest, opts ...grpc.CallOption) (*AgentRunAudit, error)
+	ListAgentToolCallsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentToolCallsResponse, error)
+	ListAgentFileReadsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentFileReadsResponse, error)
+	ListAgentPythonExecsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentPythonExecsResponse, error)
 }
 
 type agentClient struct {
@@ -165,6 +183,76 @@ func (c *agentClient) EnsureDefaultAssistant(ctx context.Context, in *EnsureDefa
 	return out, nil
 }
 
+func (c *agentClient) ListAgentRuns(ctx context.Context, in *ListAgentRunsRequest, opts ...grpc.CallOption) (*ListAgentRunsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentRunsResponse)
+	err := c.cc.Invoke(ctx, Agent_ListAgentRuns_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) CountAgentRuns(ctx context.Context, in *CountAgentRunsRequest, opts ...grpc.CallOption) (*CountAgentRunsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CountAgentRunsResponse)
+	err := c.cc.Invoke(ctx, Agent_CountAgentRuns_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) GetAgentRun(ctx context.Context, in *GetAgentRunRequest, opts ...grpc.CallOption) (*AgentRunAudit, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentRunAudit)
+	err := c.cc.Invoke(ctx, Agent_GetAgentRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) GetAgentRunByTraceID(ctx context.Context, in *GetAgentRunByTraceIDRequest, opts ...grpc.CallOption) (*AgentRunAudit, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentRunAudit)
+	err := c.cc.Invoke(ctx, Agent_GetAgentRunByTraceID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) ListAgentToolCallsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentToolCallsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentToolCallsResponse)
+	err := c.cc.Invoke(ctx, Agent_ListAgentToolCallsByRunID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) ListAgentFileReadsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentFileReadsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentFileReadsResponse)
+	err := c.cc.Invoke(ctx, Agent_ListAgentFileReadsByRunID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) ListAgentPythonExecsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentPythonExecsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentPythonExecsResponse)
+	err := c.cc.Invoke(ctx, Agent_ListAgentPythonExecsByRunID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServer is the server API for Agent service.
 // All implementations must embed UnimplementedAgentServer
 // for forward compatibility.
@@ -189,6 +277,17 @@ type AgentServer interface {
 	// EnsureDefaultAssistant 幂等装配默认助手的 agent 域部分（agent 行 + 提示词 + 工具绑定）。
 	// 由 user-rpc 装配编排调用（账号属 user 域已建，好友由 user-rpc 经 friends-rpc 建）。
 	EnsureDefaultAssistant(context.Context, *EnsureDefaultAssistantRequest) (*EnsureDefaultAssistantResponse, error)
+	// ---- agent 审计只读面（#616：admin-rpc traces/dashboard 经此读，脱 internal/repository agent_audit）----
+	// agent 审计四表（agent_runs/tool_calls/file_reads/python_execs）是 agent 域自有 append-only 数据，
+	// 写路径在 agent-rpc orchestrator，只读 owner API 在此供 admin-rpc BFF 聚合 traces/dashboard。
+	// summary jsonb 经 *_summary_json 串行携带；时间为 RFC3339Nano（零值空串）。
+	ListAgentRuns(context.Context, *ListAgentRunsRequest) (*ListAgentRunsResponse, error)
+	CountAgentRuns(context.Context, *CountAgentRunsRequest) (*CountAgentRunsResponse, error)
+	GetAgentRun(context.Context, *GetAgentRunRequest) (*AgentRunAudit, error)
+	GetAgentRunByTraceID(context.Context, *GetAgentRunByTraceIDRequest) (*AgentRunAudit, error)
+	ListAgentToolCallsByRunID(context.Context, *ListAuditByRunIDRequest) (*ListAgentToolCallsResponse, error)
+	ListAgentFileReadsByRunID(context.Context, *ListAuditByRunIDRequest) (*ListAgentFileReadsResponse, error)
+	ListAgentPythonExecsByRunID(context.Context, *ListAuditByRunIDRequest) (*ListAgentPythonExecsResponse, error)
 	mustEmbedUnimplementedAgentServer()
 }
 
@@ -228,6 +327,27 @@ func (UnimplementedAgentServer) UpdateAgentDefinition(context.Context, *UpdateAg
 }
 func (UnimplementedAgentServer) EnsureDefaultAssistant(context.Context, *EnsureDefaultAssistantRequest) (*EnsureDefaultAssistantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EnsureDefaultAssistant not implemented")
+}
+func (UnimplementedAgentServer) ListAgentRuns(context.Context, *ListAgentRunsRequest) (*ListAgentRunsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentRuns not implemented")
+}
+func (UnimplementedAgentServer) CountAgentRuns(context.Context, *CountAgentRunsRequest) (*CountAgentRunsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CountAgentRuns not implemented")
+}
+func (UnimplementedAgentServer) GetAgentRun(context.Context, *GetAgentRunRequest) (*AgentRunAudit, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAgentRun not implemented")
+}
+func (UnimplementedAgentServer) GetAgentRunByTraceID(context.Context, *GetAgentRunByTraceIDRequest) (*AgentRunAudit, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAgentRunByTraceID not implemented")
+}
+func (UnimplementedAgentServer) ListAgentToolCallsByRunID(context.Context, *ListAuditByRunIDRequest) (*ListAgentToolCallsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentToolCallsByRunID not implemented")
+}
+func (UnimplementedAgentServer) ListAgentFileReadsByRunID(context.Context, *ListAuditByRunIDRequest) (*ListAgentFileReadsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentFileReadsByRunID not implemented")
+}
+func (UnimplementedAgentServer) ListAgentPythonExecsByRunID(context.Context, *ListAuditByRunIDRequest) (*ListAgentPythonExecsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentPythonExecsByRunID not implemented")
 }
 func (UnimplementedAgentServer) mustEmbedUnimplementedAgentServer() {}
 func (UnimplementedAgentServer) testEmbeddedByValue()               {}
@@ -430,6 +550,132 @@ func _Agent_EnsureDefaultAssistant_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agent_ListAgentRuns_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentRunsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).ListAgentRuns(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_ListAgentRuns_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).ListAgentRuns(ctx, req.(*ListAgentRunsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_CountAgentRuns_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountAgentRunsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).CountAgentRuns(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_CountAgentRuns_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).CountAgentRuns(ctx, req.(*CountAgentRunsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_GetAgentRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAgentRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).GetAgentRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_GetAgentRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).GetAgentRun(ctx, req.(*GetAgentRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_GetAgentRunByTraceID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAgentRunByTraceIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).GetAgentRunByTraceID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_GetAgentRunByTraceID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).GetAgentRunByTraceID(ctx, req.(*GetAgentRunByTraceIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_ListAgentToolCallsByRunID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAuditByRunIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).ListAgentToolCallsByRunID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_ListAgentToolCallsByRunID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).ListAgentToolCallsByRunID(ctx, req.(*ListAuditByRunIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_ListAgentFileReadsByRunID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAuditByRunIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).ListAgentFileReadsByRunID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_ListAgentFileReadsByRunID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).ListAgentFileReadsByRunID(ctx, req.(*ListAuditByRunIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_ListAgentPythonExecsByRunID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAuditByRunIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).ListAgentPythonExecsByRunID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_ListAgentPythonExecsByRunID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).ListAgentPythonExecsByRunID(ctx, req.(*ListAuditByRunIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Agent_ServiceDesc is the grpc.ServiceDesc for Agent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -476,6 +722,34 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EnsureDefaultAssistant",
 			Handler:    _Agent_EnsureDefaultAssistant_Handler,
+		},
+		{
+			MethodName: "ListAgentRuns",
+			Handler:    _Agent_ListAgentRuns_Handler,
+		},
+		{
+			MethodName: "CountAgentRuns",
+			Handler:    _Agent_CountAgentRuns_Handler,
+		},
+		{
+			MethodName: "GetAgentRun",
+			Handler:    _Agent_GetAgentRun_Handler,
+		},
+		{
+			MethodName: "GetAgentRunByTraceID",
+			Handler:    _Agent_GetAgentRunByTraceID_Handler,
+		},
+		{
+			MethodName: "ListAgentToolCallsByRunID",
+			Handler:    _Agent_ListAgentToolCallsByRunID_Handler,
+		},
+		{
+			MethodName: "ListAgentFileReadsByRunID",
+			Handler:    _Agent_ListAgentFileReadsByRunID_Handler,
+		},
+		{
+			MethodName: "ListAgentPythonExecsByRunID",
+			Handler:    _Agent_ListAgentPythonExecsByRunID_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

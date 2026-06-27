@@ -1,4 +1,4 @@
-package repository
+package agaudit
 
 import (
 	"context"
@@ -13,47 +13,50 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
-var _ AgentAuditRepository = (*MemoryAgentAuditRepository)(nil)
-
-type MemoryAgentAuditRepository struct {
+// MemoryStore 是 Store 的内存实现（单测 / demo fixture）。append-only：行写后不可改，重复主键
+// 返回 AlreadyExists；子表写入要求 run 已存在（FK 语义）。
+type MemoryStore struct {
 	mu          sync.RWMutex
 	runs        map[string]agentaudit.AgentRun
 	toolCalls   map[string]agentaudit.AgentToolCall
 	fileReads   map[string]agentaudit.AgentFileRead
 	pythonExecs map[string]agentaudit.AgentPythonExec
 	now         func() time.Time
-	newID       func(prefix string) (string, error)
+	newID       func() (string, error)
 }
 
-func NewMemoryAgentAuditRepository() *MemoryAgentAuditRepository {
-	return &MemoryAgentAuditRepository{
+var _ Store = (*MemoryStore)(nil)
+
+// NewMemoryStore 构建空的内存审计 Store。
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{
 		runs:        make(map[string]agentaudit.AgentRun),
 		toolCalls:   make(map[string]agentaudit.AgentToolCall),
 		fileReads:   make(map[string]agentaudit.AgentFileRead),
 		pythonExecs: make(map[string]agentaudit.AgentPythonExec),
 		now:         time.Now,
-		newID:       newAuditID,
+		newID:       newMemoryAuditID,
 	}
 }
 
-func (r *MemoryAgentAuditRepository) CreateAgentRun(_ context.Context, input agentaudit.CreateRunInput) (agentaudit.AgentRun, error) {
+func (s *MemoryStore) CreateAgentRun(_ context.Context, input agentaudit.CreateRunInput) (agentaudit.AgentRun, error) {
 	normalized, err := agentaudit.NormalizeCreateRunInput(input)
 	if err != nil {
 		return agentaudit.AgentRun{}, err
 	}
 	if normalized.RunID == "" {
-		normalized.RunID, err = r.newID("run")
+		normalized.RunID, err = s.newID()
 		if err != nil {
 			return agentaudit.AgentRun{}, err
 		}
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.runs[normalized.RunID]; exists {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.runs[normalized.RunID]; exists {
 		return agentaudit.AgentRun{}, apperror.AlreadyExists("agent run audit already exists")
 	}
-	now := r.now().UTC()
+	now := s.now().UTC()
 	run := agentaudit.AgentRun{
 		RunID:            normalized.RunID,
 		AgentID:          normalized.AgentID,
@@ -68,41 +71,41 @@ func (r *MemoryAgentAuditRepository) CreateAgentRun(_ context.Context, input age
 		ErrorMessage:     normalized.ErrorMessage,
 		TraceID:          normalized.TraceID,
 		RequestID:        normalized.RequestID,
-		StartedAt:        defaultAuditTime(normalized.StartedAt, now),
+		StartedAt:        memoryAuditTime(normalized.StartedAt, now),
 		FinishedAt:       normalized.FinishedAt,
 		CreatedAt:        now,
 	}
-	r.runs[run.RunID] = run.Clone()
+	s.runs[run.RunID] = run.Clone()
 	return run.Clone(), nil
 }
 
-func (r *MemoryAgentAuditRepository) GetAgentRun(_ context.Context, runID string) (agentaudit.AgentRun, error) {
+func (s *MemoryStore) GetAgentRun(_ context.Context, runID string) (agentaudit.AgentRun, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return agentaudit.AgentRun{}, apperror.InvalidArgument("run_id is required")
 	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	run, exists := r.runs[runID]
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	run, exists := s.runs[runID]
 	if !exists {
 		return agentaudit.AgentRun{}, apperror.NotFound("agent run audit not found")
 	}
 	return run.Clone(), nil
 }
 
-func (r *MemoryAgentAuditRepository) ListAgentRuns(_ context.Context, filter AgentRunFilter) ([]agentaudit.AgentRun, error) {
-	limit := normalizeAdminLimit(filter.Limit, 20, 100)
+func (s *MemoryStore) ListAgentRuns(_ context.Context, filter RunFilter) ([]agentaudit.AgentRun, error) {
+	limit := normalizeAgentAuditLimit(filter.Limit, 20, 100)
 	offset := filter.Offset
 	if offset < 0 {
 		offset = 0
 	}
 	status := strings.TrimSpace(filter.Status)
 
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	runs := make([]agentaudit.AgentRun, 0, len(r.runs))
-	for _, run := range r.runs {
+	runs := make([]agentaudit.AgentRun, 0, len(s.runs))
+	for _, run := range s.runs {
 		if status != "" && string(run.Status) != status {
 			continue
 		}
@@ -124,17 +127,17 @@ func (r *MemoryAgentAuditRepository) ListAgentRuns(_ context.Context, filter Age
 	return runs, nil
 }
 
-func (r *MemoryAgentAuditRepository) GetAgentRunByTraceID(_ context.Context, traceID string) (agentaudit.AgentRun, error) {
+func (s *MemoryStore) GetAgentRunByTraceID(_ context.Context, traceID string) (agentaudit.AgentRun, error) {
 	traceID = strings.TrimSpace(traceID)
 	if traceID == "" {
 		return agentaudit.AgentRun{}, apperror.InvalidArgument("trace_id is required")
 	}
 
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	var matches []agentaudit.AgentRun
-	for _, run := range r.runs {
+	for _, run := range s.runs {
 		if run.TraceID == traceID {
 			matches = append(matches, run.Clone())
 		}
@@ -151,13 +154,13 @@ func (r *MemoryAgentAuditRepository) GetAgentRunByTraceID(_ context.Context, tra
 	return matches[0].Clone(), nil
 }
 
-func (r *MemoryAgentAuditRepository) CountAgentRuns(_ context.Context, status string) (int64, error) {
+func (s *MemoryStore) CountAgentRuns(_ context.Context, status string) (int64, error) {
 	status = strings.TrimSpace(status)
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	var count int64
-	for _, run := range r.runs {
+	for _, run := range s.runs {
 		if status == "" || string(run.Status) == status {
 			count++
 		}
@@ -165,27 +168,27 @@ func (r *MemoryAgentAuditRepository) CountAgentRuns(_ context.Context, status st
 	return count, nil
 }
 
-func (r *MemoryAgentAuditRepository) CreateAgentToolCall(_ context.Context, input agentaudit.CreateToolCallInput) (agentaudit.AgentToolCall, error) {
+func (s *MemoryStore) CreateAgentToolCall(_ context.Context, input agentaudit.CreateToolCallInput) (agentaudit.AgentToolCall, error) {
 	normalized, err := agentaudit.NormalizeCreateToolCallInput(input)
 	if err != nil {
 		return agentaudit.AgentToolCall{}, err
 	}
 	if normalized.ToolCallID == "" {
-		normalized.ToolCallID, err = r.newID("tool_call")
+		normalized.ToolCallID, err = s.newID()
 		if err != nil {
 			return agentaudit.AgentToolCall{}, err
 		}
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.runs[normalized.RunID]; !exists {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.runs[normalized.RunID]; !exists {
 		return agentaudit.AgentToolCall{}, apperror.NotFound("agent run audit not found")
 	}
-	if _, exists := r.toolCalls[normalized.ToolCallID]; exists {
+	if _, exists := s.toolCalls[normalized.ToolCallID]; exists {
 		return agentaudit.AgentToolCall{}, apperror.AlreadyExists("agent tool call audit already exists")
 	}
-	now := r.now().UTC()
+	now := s.now().UTC()
 	call := agentaudit.AgentToolCall{
 		ToolCallID:    normalized.ToolCallID,
 		RunID:         normalized.RunID,
@@ -200,40 +203,40 @@ func (r *MemoryAgentAuditRepository) CreateAgentToolCall(_ context.Context, inpu
 		ErrorMessage:  normalized.ErrorMessage,
 		TraceID:       normalized.TraceID,
 		RequestID:     normalized.RequestID,
-		StartedAt:     defaultAuditTime(normalized.StartedAt, now),
+		StartedAt:     memoryAuditTime(normalized.StartedAt, now),
 		FinishedAt:    normalized.FinishedAt,
 		CreatedAt:     now,
 	}
-	r.toolCalls[call.ToolCallID] = call.Clone()
+	s.toolCalls[call.ToolCallID] = call.Clone()
 	return call.Clone(), nil
 }
 
-func (r *MemoryAgentAuditRepository) GetAgentToolCall(_ context.Context, toolCallID string) (agentaudit.AgentToolCall, error) {
+func (s *MemoryStore) GetAgentToolCall(_ context.Context, toolCallID string) (agentaudit.AgentToolCall, error) {
 	toolCallID = strings.TrimSpace(toolCallID)
 	if toolCallID == "" {
 		return agentaudit.AgentToolCall{}, apperror.InvalidArgument("tool_call_id is required")
 	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	call, exists := r.toolCalls[toolCallID]
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	call, exists := s.toolCalls[toolCallID]
 	if !exists {
 		return agentaudit.AgentToolCall{}, apperror.NotFound("agent tool call audit not found")
 	}
 	return call.Clone(), nil
 }
 
-func (r *MemoryAgentAuditRepository) ListAgentToolCallsByRunID(_ context.Context, runID string) ([]agentaudit.AgentToolCall, error) {
+func (s *MemoryStore) ListAgentToolCallsByRunID(_ context.Context, runID string) ([]agentaudit.AgentToolCall, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return nil, apperror.InvalidArgument("run_id is required")
 	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if _, exists := r.runs[runID]; !exists {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if _, exists := s.runs[runID]; !exists {
 		return nil, apperror.NotFound("agent run audit not found")
 	}
 	calls := make([]agentaudit.AgentToolCall, 0)
-	for _, call := range r.toolCalls {
+	for _, call := range s.toolCalls {
 		if call.RunID == runID {
 			calls = append(calls, call.Clone())
 		}
@@ -247,27 +250,27 @@ func (r *MemoryAgentAuditRepository) ListAgentToolCallsByRunID(_ context.Context
 	return calls, nil
 }
 
-func (r *MemoryAgentAuditRepository) CreateAgentFileRead(_ context.Context, input agentaudit.CreateFileReadInput) (agentaudit.AgentFileRead, error) {
+func (s *MemoryStore) CreateAgentFileRead(_ context.Context, input agentaudit.CreateFileReadInput) (agentaudit.AgentFileRead, error) {
 	normalized, err := agentaudit.NormalizeCreateFileReadInput(input)
 	if err != nil {
 		return agentaudit.AgentFileRead{}, err
 	}
 	if normalized.FileReadID == "" {
-		normalized.FileReadID, err = r.newID("file_read")
+		normalized.FileReadID, err = s.newID()
 		if err != nil {
 			return agentaudit.AgentFileRead{}, err
 		}
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.runs[normalized.RunID]; !exists {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.runs[normalized.RunID]; !exists {
 		return agentaudit.AgentFileRead{}, apperror.NotFound("agent run audit not found")
 	}
-	if _, exists := r.fileReads[normalized.FileReadID]; exists {
+	if _, exists := s.fileReads[normalized.FileReadID]; exists {
 		return agentaudit.AgentFileRead{}, apperror.AlreadyExists("agent file read audit already exists")
 	}
-	now := r.now().UTC()
+	now := s.now().UTC()
 	read := agentaudit.AgentFileRead{
 		FileReadID:     normalized.FileReadID,
 		RunID:          normalized.RunID,
@@ -283,40 +286,40 @@ func (r *MemoryAgentAuditRepository) CreateAgentFileRead(_ context.Context, inpu
 		ErrorMessage:   normalized.ErrorMessage,
 		TraceID:        normalized.TraceID,
 		RequestID:      normalized.RequestID,
-		StartedAt:      defaultAuditTime(normalized.StartedAt, now),
+		StartedAt:      memoryAuditTime(normalized.StartedAt, now),
 		FinishedAt:     normalized.FinishedAt,
 		CreatedAt:      now,
 	}
-	r.fileReads[read.FileReadID] = read.Clone()
+	s.fileReads[read.FileReadID] = read.Clone()
 	return read.Clone(), nil
 }
 
-func (r *MemoryAgentAuditRepository) GetAgentFileRead(_ context.Context, fileReadID string) (agentaudit.AgentFileRead, error) {
+func (s *MemoryStore) GetAgentFileRead(_ context.Context, fileReadID string) (agentaudit.AgentFileRead, error) {
 	fileReadID = strings.TrimSpace(fileReadID)
 	if fileReadID == "" {
 		return agentaudit.AgentFileRead{}, apperror.InvalidArgument("file_read_id is required")
 	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	read, exists := r.fileReads[fileReadID]
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	read, exists := s.fileReads[fileReadID]
 	if !exists {
 		return agentaudit.AgentFileRead{}, apperror.NotFound("agent file read audit not found")
 	}
 	return read.Clone(), nil
 }
 
-func (r *MemoryAgentAuditRepository) ListAgentFileReadsByRunID(_ context.Context, runID string) ([]agentaudit.AgentFileRead, error) {
+func (s *MemoryStore) ListAgentFileReadsByRunID(_ context.Context, runID string) ([]agentaudit.AgentFileRead, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return nil, apperror.InvalidArgument("run_id is required")
 	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if _, exists := r.runs[runID]; !exists {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if _, exists := s.runs[runID]; !exists {
 		return nil, apperror.NotFound("agent run audit not found")
 	}
 	reads := make([]agentaudit.AgentFileRead, 0)
-	for _, read := range r.fileReads {
+	for _, read := range s.fileReads {
 		if read.RunID == runID {
 			reads = append(reads, read.Clone())
 		}
@@ -330,27 +333,27 @@ func (r *MemoryAgentAuditRepository) ListAgentFileReadsByRunID(_ context.Context
 	return reads, nil
 }
 
-func (r *MemoryAgentAuditRepository) CreateAgentPythonExec(_ context.Context, input agentaudit.CreatePythonExecInput) (agentaudit.AgentPythonExec, error) {
+func (s *MemoryStore) CreateAgentPythonExec(_ context.Context, input agentaudit.CreatePythonExecInput) (agentaudit.AgentPythonExec, error) {
 	normalized, err := agentaudit.NormalizeCreatePythonExecInput(input)
 	if err != nil {
 		return agentaudit.AgentPythonExec{}, err
 	}
 	if normalized.PythonExecID == "" {
-		normalized.PythonExecID, err = r.newID("python_exec")
+		normalized.PythonExecID, err = s.newID()
 		if err != nil {
 			return agentaudit.AgentPythonExec{}, err
 		}
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.runs[normalized.RunID]; !exists {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.runs[normalized.RunID]; !exists {
 		return agentaudit.AgentPythonExec{}, apperror.NotFound("agent run audit not found")
 	}
-	if _, exists := r.pythonExecs[normalized.PythonExecID]; exists {
+	if _, exists := s.pythonExecs[normalized.PythonExecID]; exists {
 		return agentaudit.AgentPythonExec{}, apperror.AlreadyExists("agent python exec audit already exists")
 	}
-	now := r.now().UTC()
+	now := s.now().UTC()
 	exec := agentaudit.AgentPythonExec{
 		PythonExecID:     normalized.PythonExecID,
 		RunID:            normalized.RunID,
@@ -366,40 +369,40 @@ func (r *MemoryAgentAuditRepository) CreateAgentPythonExec(_ context.Context, in
 		ErrorMessage:     normalized.ErrorMessage,
 		TraceID:          normalized.TraceID,
 		RequestID:        normalized.RequestID,
-		StartedAt:        defaultAuditTime(normalized.StartedAt, now),
+		StartedAt:        memoryAuditTime(normalized.StartedAt, now),
 		FinishedAt:       normalized.FinishedAt,
 		CreatedAt:        now,
 	}
-	r.pythonExecs[exec.PythonExecID] = exec.Clone()
+	s.pythonExecs[exec.PythonExecID] = exec.Clone()
 	return exec.Clone(), nil
 }
 
-func (r *MemoryAgentAuditRepository) GetAgentPythonExec(_ context.Context, pythonExecID string) (agentaudit.AgentPythonExec, error) {
+func (s *MemoryStore) GetAgentPythonExec(_ context.Context, pythonExecID string) (agentaudit.AgentPythonExec, error) {
 	pythonExecID = strings.TrimSpace(pythonExecID)
 	if pythonExecID == "" {
 		return agentaudit.AgentPythonExec{}, apperror.InvalidArgument("python_exec_id is required")
 	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	exec, exists := r.pythonExecs[pythonExecID]
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	exec, exists := s.pythonExecs[pythonExecID]
 	if !exists {
 		return agentaudit.AgentPythonExec{}, apperror.NotFound("agent python exec audit not found")
 	}
 	return exec.Clone(), nil
 }
 
-func (r *MemoryAgentAuditRepository) ListAgentPythonExecsByRunID(_ context.Context, runID string) ([]agentaudit.AgentPythonExec, error) {
+func (s *MemoryStore) ListAgentPythonExecsByRunID(_ context.Context, runID string) ([]agentaudit.AgentPythonExec, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return nil, apperror.InvalidArgument("run_id is required")
 	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if _, exists := r.runs[runID]; !exists {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if _, exists := s.runs[runID]; !exists {
 		return nil, apperror.NotFound("agent run audit not found")
 	}
 	execs := make([]agentaudit.AgentPythonExec, 0)
-	for _, exec := range r.pythonExecs {
+	for _, exec := range s.pythonExecs {
 		if exec.RunID == runID {
 			execs = append(execs, exec.Clone())
 		}
@@ -413,17 +416,27 @@ func (r *MemoryAgentAuditRepository) ListAgentPythonExecsByRunID(_ context.Conte
 	return execs, nil
 }
 
-func defaultAuditTime(value time.Time, fallback time.Time) time.Time {
+func normalizeAgentAuditLimit(value int, fallback int, max int) int {
+	if value <= 0 {
+		return fallback
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+func memoryAuditTime(value time.Time, fallback time.Time) time.Time {
 	if value.IsZero() {
 		return fallback
 	}
 	return value.UTC()
 }
 
-func newAuditID(prefix string) (string, error) {
+func newMemoryAuditID() (string, error) {
 	var raw [16]byte
 	if _, err := rand.Read(raw[:]); err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(prefix) + "_" + hex.EncodeToString(raw[:]), nil
+	return hex.EncodeToString(raw[:]), nil
 }

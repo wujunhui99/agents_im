@@ -2,14 +2,20 @@ Name: admin-rpc
 ListenOn: 0.0.0.0:9097
 
 # admin-rpc 数据层：task_reports 走 goctl model（Postgres-only）；
-# friendships/messages/agent_audits/feedback 跨域只读经 internal/repository
-# （accounts 账号读已切 user-rpc，见下 UserRPC）。
+# friendships/messages/feedback 跨域只读经 internal/repository
+# （accounts 账号读已切 user-rpc；agent_audits traces/dashboard 已切 agent-rpc，见下 UserRPC/AgentRPC）。
 DataSource: ${DATABASE_URL}
 
 # UserRPC：跨域账号只读(用户详情/搜索/计数)经属主 user-rpc（gate #550，脱 internal/repository accountRepo 的 avatar string scan）。
 UserRPC:
   Endpoints:
     - user-rpc:9090
+  Timeout: 5000
+
+# AgentRPC：agent 审计 traces/dashboard 只读经属主 agent-rpc gRPC（#616，脱 internal/repository agent_audit 直读）。
+AgentRPC:
+  Endpoints:
+    - agent-rpc:9099
   Timeout: 5000
 
 # go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。

@@ -17,18 +17,32 @@ type (
 	AgentDefinition                    = agent.AgentDefinition
 	AgentDefinitionResponse            = agent.AgentDefinitionResponse
 	AgentEntity                        = agent.AgentEntity
+	AgentFileReadAudit                 = agent.AgentFileReadAudit
 	AgentPromptDefinition              = agent.AgentPromptDefinition
+	AgentPythonExecAudit               = agent.AgentPythonExecAudit
 	AgentResponse                      = agent.AgentResponse
+	AgentRunAudit                      = agent.AgentRunAudit
+	AgentToolCallAudit                 = agent.AgentToolCallAudit
 	AgentToolDefinition                = agent.AgentToolDefinition
 	ConversationAIHostingState         = agent.ConversationAIHostingState
+	CountAgentRunsRequest              = agent.CountAgentRunsRequest
+	CountAgentRunsResponse             = agent.CountAgentRunsResponse
 	CreateAgentRequest                 = agent.CreateAgentRequest
 	EnsureDefaultAssistantRequest      = agent.EnsureDefaultAssistantRequest
 	EnsureDefaultAssistantResponse     = agent.EnsureDefaultAssistantResponse
 	GetAgentDefinitionRequest          = agent.GetAgentDefinitionRequest
 	GetAgentRequest                    = agent.GetAgentRequest
+	GetAgentRunByTraceIDRequest        = agent.GetAgentRunByTraceIDRequest
+	GetAgentRunRequest                 = agent.GetAgentRunRequest
 	GetConversationAIHostingRequest    = agent.GetConversationAIHostingRequest
+	ListAgentFileReadsResponse         = agent.ListAgentFileReadsResponse
+	ListAgentPythonExecsResponse       = agent.ListAgentPythonExecsResponse
+	ListAgentRunsRequest               = agent.ListAgentRunsRequest
+	ListAgentRunsResponse              = agent.ListAgentRunsResponse
+	ListAgentToolCallsResponse         = agent.ListAgentToolCallsResponse
 	ListAgentsRequest                  = agent.ListAgentsRequest
 	ListAgentsResponse                 = agent.ListAgentsResponse
+	ListAuditByRunIDRequest            = agent.ListAuditByRunIDRequest
 	UpdateAgentDefinitionRequest       = agent.UpdateAgentDefinitionRequest
 	UpdateAgentRequest                 = agent.UpdateAgentRequest
 	UpdateAgentStatusRequest           = agent.UpdateAgentStatusRequest
@@ -49,6 +63,14 @@ type (
 		UpdateAgentDefinition(ctx context.Context, in *UpdateAgentDefinitionRequest, opts ...grpc.CallOption) (*AgentDefinitionResponse, error)
 		// EnsureDefaultAssistant 幂等装配默认助手的 agent 域部分（agent 行 + 提示词 + 工具绑定）。
 		EnsureDefaultAssistant(ctx context.Context, in *EnsureDefaultAssistantRequest, opts ...grpc.CallOption) (*EnsureDefaultAssistantResponse, error)
+		// ---- agent 审计只读面（#616：admin-rpc traces/dashboard 经此读，脱 internal/repository agent_audit）----
+		ListAgentRuns(ctx context.Context, in *ListAgentRunsRequest, opts ...grpc.CallOption) (*ListAgentRunsResponse, error)
+		CountAgentRuns(ctx context.Context, in *CountAgentRunsRequest, opts ...grpc.CallOption) (*CountAgentRunsResponse, error)
+		GetAgentRun(ctx context.Context, in *GetAgentRunRequest, opts ...grpc.CallOption) (*AgentRunAudit, error)
+		GetAgentRunByTraceID(ctx context.Context, in *GetAgentRunByTraceIDRequest, opts ...grpc.CallOption) (*AgentRunAudit, error)
+		ListAgentToolCallsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentToolCallsResponse, error)
+		ListAgentFileReadsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentFileReadsResponse, error)
+		ListAgentPythonExecsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentPythonExecsResponse, error)
 	}
 
 	defaultAgent struct {
@@ -114,4 +136,40 @@ func (m *defaultAgent) UpdateAgentDefinition(ctx context.Context, in *UpdateAgen
 func (m *defaultAgent) EnsureDefaultAssistant(ctx context.Context, in *EnsureDefaultAssistantRequest, opts ...grpc.CallOption) (*EnsureDefaultAssistantResponse, error) {
 	client := agent.NewAgentClient(m.cli.Conn())
 	return client.EnsureDefaultAssistant(ctx, in, opts...)
+}
+
+// ---- agent 审计只读面（#616：admin-rpc traces/dashboard 经此读，脱 internal/repository agent_audit）----
+func (m *defaultAgent) ListAgentRuns(ctx context.Context, in *ListAgentRunsRequest, opts ...grpc.CallOption) (*ListAgentRunsResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.ListAgentRuns(ctx, in, opts...)
+}
+
+func (m *defaultAgent) CountAgentRuns(ctx context.Context, in *CountAgentRunsRequest, opts ...grpc.CallOption) (*CountAgentRunsResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.CountAgentRuns(ctx, in, opts...)
+}
+
+func (m *defaultAgent) GetAgentRun(ctx context.Context, in *GetAgentRunRequest, opts ...grpc.CallOption) (*AgentRunAudit, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.GetAgentRun(ctx, in, opts...)
+}
+
+func (m *defaultAgent) GetAgentRunByTraceID(ctx context.Context, in *GetAgentRunByTraceIDRequest, opts ...grpc.CallOption) (*AgentRunAudit, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.GetAgentRunByTraceID(ctx, in, opts...)
+}
+
+func (m *defaultAgent) ListAgentToolCallsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentToolCallsResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.ListAgentToolCallsByRunID(ctx, in, opts...)
+}
+
+func (m *defaultAgent) ListAgentFileReadsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentFileReadsResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.ListAgentFileReadsByRunID(ctx, in, opts...)
+}
+
+func (m *defaultAgent) ListAgentPythonExecsByRunID(ctx context.Context, in *ListAuditByRunIDRequest, opts ...grpc.CallOption) (*ListAgentPythonExecsResponse, error) {
+	client := agent.NewAgentClient(m.cli.Conn())
+	return client.ListAgentPythonExecsByRunID(ctx, in, opts...)
 }

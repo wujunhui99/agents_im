@@ -7,6 +7,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/agentclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -29,11 +30,12 @@ type ServiceContext struct {
 
 	TaskReportModel model.TaskReportsModel
 
-	UserRPC     userclient.User
-	Friends     repository.FriendshipRepository
-	Messages    repository.AdminMessageRepository
-	AgentAudits repository.AdminAgentAuditRepository
-	Feedback    repository.FeedbackRepository
+	UserRPC  userclient.User
+	Friends  repository.FriendshipRepository
+	Messages repository.AdminMessageRepository
+	// AgentRPC：agent 审计 traces/dashboard 只读经属主 agent-rpc gRPC（#616，脱 internal/repository agent_audit）。
+	AgentRPC agentclient.Agent
+	Feedback repository.FeedbackRepository
 
 	MessageCreatedHook msglogic.MessageCreatedHook
 }
@@ -51,6 +53,16 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 	userRPC := userclient.NewUser(userRPCClient)
 
+	// agent 审计 traces/dashboard 只读经属主 agent-rpc gRPC（#616，脱 internal/repository agent_audit 直读）。
+	if !hasRPCClientConfig(c.AgentRPC) {
+		log.Fatalf("admin-rpc requires agent rpc client config (AgentRPC)")
+	}
+	agentRPCClient, err := zrpc.NewClient(c.AgentRPC)
+	if err != nil {
+		log.Fatalf("build agent rpc client: %v", err)
+	}
+	agentRPC := agentclient.NewAgent(agentRPCClient)
+
 	// friendships 跨域只读（无 avatar，非 #550 blocker）仍走 internal/repository。
 	accounts, err := repository.NewPostgresRepository(c.DataSource)
 	if err != nil {
@@ -59,10 +71,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	messages, err := repository.NewPostgresMessageRepository(c.DataSource)
 	if err != nil {
 		log.Fatalf("build message repository: %v", err)
-	}
-	agentAudits, err := repository.NewPostgresAgentAuditRepository(c.DataSource)
-	if err != nil {
-		log.Fatalf("build agent audit repository: %v", err)
 	}
 	feedback, err := repository.NewPostgresFeedbackRepository(c.DataSource)
 	if err != nil {
@@ -75,7 +83,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		UserRPC:         userRPC,
 		Friends:         accounts,
 		Messages:        messages,
-		AgentAudits:     agentAudits,
+		AgentRPC:        agentRPC,
 		Feedback:        feedback,
 	}
 }

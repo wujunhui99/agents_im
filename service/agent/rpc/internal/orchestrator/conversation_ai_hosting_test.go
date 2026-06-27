@@ -12,6 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
@@ -25,7 +26,7 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	agentRepo := agentlogictest.NewMemoryAgentStore()
-	auditRepo := repository.NewMemoryAgentAuditRepository()
+	auditStore := agaudit.NewMemoryStore()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
@@ -57,7 +58,7 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return hostedRuntimeRequest(trigger), nil
 		}),
-		Audit:  logic.NewAgentAuditLogic(auditRepo),
+		Audit:  agaudit.NewRunRecorder(auditStore),
 		Writer: writer,
 	})
 	if err != nil {
@@ -106,7 +107,7 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
-	auditRepo := repository.NewMemoryAgentAuditRepository()
+	auditStore := agaudit.NewMemoryStore()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
@@ -134,7 +135,7 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return hostedRuntimeRequest(trigger), nil
 		}),
-		Audit:  logic.NewAgentAuditLogic(auditRepo),
+		Audit:  agaudit.NewRunRecorder(auditStore),
 		Writer: writer,
 		Now: func() time.Time {
 			return time.Unix(200, 0)
@@ -256,7 +257,7 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
-	auditRepo := repository.NewMemoryAgentAuditRepository()
+	auditStore := agaudit.NewMemoryStore()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
@@ -274,7 +275,7 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return hostedRuntimeRequest(trigger), nil
 		}),
-		Audit:  logic.NewAgentAuditLogic(auditRepo),
+		Audit:  agaudit.NewRunRecorder(auditStore),
 		Writer: writer,
 	})
 	if err != nil {
@@ -352,7 +353,7 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
 	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
-	auditRepo := repository.NewMemoryAgentAuditRepository()
+	auditStore := agaudit.NewMemoryStore()
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
@@ -365,7 +366,7 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return hostedRuntimeRequest(trigger), nil
 		}),
-		Audit:  logic.NewAgentAuditLogic(auditRepo),
+		Audit:  agaudit.NewRunRecorder(auditStore),
 		Writer: writer,
 	})
 	if err != nil {
@@ -404,7 +405,7 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 		t.Fatalf("send should not be blocked by missing provider, got: %v", err)
 	}
 
-	run := waitForAgentRunStatus(t, auditRepo, "run_hosted_1", agentaudit.StatusFailed)
+	run := waitForAgentRunStatus(t, auditStore, "run_hosted_1", agentaudit.StatusFailed)
 	if !strings.Contains(run.ErrorMessage, missingProviderErr.Error()) {
 		t.Fatalf("agent run error = %q, want missing provider", run.ErrorMessage)
 	}
@@ -461,7 +462,7 @@ func waitForPulledMessageCount(t *testing.T, messageLogic *logic.MessageLogic, u
 	}
 }
 
-func waitForAgentRunStatus(t *testing.T, repo *repository.MemoryAgentAuditRepository, runID string, status agentaudit.Status) agentaudit.AgentRun {
+func waitForAgentRunStatus(t *testing.T, repo *agaudit.MemoryStore, runID string, status agentaudit.Status) agentaudit.AgentRun {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for {

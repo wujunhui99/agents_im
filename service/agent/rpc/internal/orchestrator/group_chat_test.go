@@ -10,6 +10,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
@@ -172,8 +173,8 @@ func newGroupAgentHarness(t *testing.T, activeMemberIDs []string) *groupAgentHar
 	groups := newAgentIMTestGroupMemberLister("grp_agent_chat", activeMemberIDs)
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, groups, nil)
 	hostingRepo := &recordingAgentHostingRepository{inner: aghosting.NewMemoryStore()}
-	auditRepo := repository.NewMemoryAgentAuditRepository()
-	auditLogic := logic.NewAgentAuditLogic(auditRepo)
+	auditStore := agaudit.NewMemoryStore()
+	auditRecorder := agaudit.NewRunRecorder(auditStore)
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
@@ -199,7 +200,7 @@ func newGroupAgentHarness(t *testing.T, activeMemberIDs []string) *groupAgentHar
 		RequestBuilder: runtimeRequestBuilderFunc(func(_ context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
 			return groupRuntimeRequest(trigger), nil
 		}),
-		Audit:  auditLogic,
+		Audit:  auditRecorder,
 		Writer: writer,
 		Now: func() time.Time {
 			return time.Unix(300, 0)
