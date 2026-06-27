@@ -31,9 +31,7 @@ type ServiceContext struct {
 	MessageLogic     *logic.MessageLogic
 	AgentMessageHook logic.MessageCreatedHook
 	AIHostingLogic   *convhosting.ConversationAIHostingLogic
-	FeedbackLogic    *logic.FeedbackLogic
 	MessageRepo      repository.MessageRepository
-	FeedbackRepo     repository.FeedbackRepository
 	AgentHostingRepo aghosting.Store
 	AIHostingStore   convhosting.Store
 	GroupMembers     logic.GroupMemberLister
@@ -81,16 +79,13 @@ func NewServiceContextWithMediaValidator(repo repository.MessageRepository, medi
 	if mediaValidator == nil {
 		mediaValidator = allowAllMessageMediaValidator{}
 	}
-	feedbackRepo := repository.NewMemoryFeedbackRepository()
 	agentHostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	return &ServiceContext{
 		AuthRuntime:      common.NewAuthRuntime(auth),
 		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaValidator),
 		AIHostingLogic:   convhosting.NewConversationAIHostingLogic(aiHostingStore),
-		FeedbackLogic:    logic.NewFeedbackLogic(feedbackRepo),
 		MessageRepo:      repo,
-		FeedbackRepo:     feedbackRepo,
 		AgentHostingRepo: agentHostingRepo,
 		AIHostingStore:   aiHostingStore,
 		GroupMembers:     groups,
