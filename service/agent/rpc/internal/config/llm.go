@@ -15,8 +15,15 @@ const (
 	LLMObservabilityBackendLangfuse = "langfuse"
 
 	DefaultDeepSeekBaseURL = "https://api.deepseek.com"
-	DefaultDeepSeekModel   = "deepseek-v4-pro"
-	DefaultLangfuseHost    = "https://langfuse.agenticim.xyz"
+	// deepseek-v4-flash：相比 v4-pro 显著降本，作为 AI 托管助手默认模型。
+	DefaultDeepSeekModel = "deepseek-v4-flash"
+	DefaultLangfuseHost  = "https://langfuse.agenticim.xyz"
+
+	// 思考模式开关取值（对齐 DeepSeek thinking.type）。
+	DeepSeekThinkingEnabled  = "enabled"
+	DeepSeekThinkingDisabled = "disabled"
+	// 默认走非思考模式：降本 + 避免思考模式下只回 reasoning 导致空回复。
+	DefaultDeepSeekThinking = DeepSeekThinkingDisabled
 )
 
 var ErrDeepSeekAPIKeyMissing = errors.New("deepseek API key is required: set DEEPSEEK_API_KEY")
@@ -25,7 +32,10 @@ var ErrDeepSeekAPIKeyPlaceholder = errors.New("deepseek API key is a placeholder
 type DeepSeekConfig struct {
 	APIKey  string `json:",optional,env=DEEPSEEK_API_KEY"`
 	BaseURL string `json:",default=https://api.deepseek.com,env=DEEPSEEK_BASE_URL"`
-	Model   string `json:",default=deepseek-v4-pro,env=DEEPSEEK_MODEL"`
+	Model   string `json:",default=deepseek-v4-flash,env=DEEPSEEK_MODEL"`
+	// Thinking 显式控制思考模式：disabled=非思考（默认，降本），enabled=思考。
+	// 留空/默认即非思考，等价于上游 thinking:{type:"disabled"}。
+	Thinking string `json:",default=disabled,options=enabled|disabled,env=DEEPSEEK_THINKING"`
 }
 
 type LLMObservabilityConfig struct {

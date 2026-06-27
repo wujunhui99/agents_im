@@ -112,6 +112,15 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 		conversation = append(conversation, runtimeConversationMessage(message, trigger.AgentUserID))
 	}
 
+	// 实时 Kafka 触发链路（consumer.agentTriggerFromJudged）只携带路由/溯源元数据，prompt
+	// 正文按设计由本构建器从消息历史回填。trigger.PromptText 为空时，用触发消息（history 中
+	// seq==triggerSeq / server_msg_id 命中的那条）的文本兜底；否则 NormalizeRunRequest 会以
+	// "prompt_text is required" 失败，对用户表现为兜底文案“服务暂时不可用”。
+	promptText := strings.TrimSpace(trigger.PromptText)
+	if promptText == "" {
+		promptText = triggerMessageText(recent, trigger.TriggerMessageID, triggerSeq)
+	}
+
 	return agentruntime.RunRequest{
 		RequestID:          trigger.RequestID,
 		EventID:            trigger.EventID,
@@ -124,7 +133,7 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 		ConversationType:   trigger.ConversationType,
 		TriggerMessageID:   trigger.TriggerMessageID,
 		TriggerSeq:         trigger.TriggerSeq,
-		PromptText:         trigger.PromptText,
+		PromptText:         promptText,
 		ReplyToMessageID:   trigger.ReplyToMessageID,
 		SourceAgentRunID:   trigger.SourceAgentRunID,
 		SourceAgentUserID:  trigger.SourceAgentUserID,
@@ -160,6 +169,21 @@ func runtimeConversationMessage(message logic.Message, hostedOwnerID string) age
 		AgentRunID:  message.AgentRunID,
 		CreatedAtMs: message.CreatedAt,
 	}
+}
+
+// triggerMessageText 从已加载的最近消息里取出触发消息正文：优先按 server_msg_id 命中，
+// 退而按 seq 命中（asc 排序下通常是末条）。返回解码后的纯文本（与历史/LLM 上下文一致）。
+func triggerMessageText(recent []logic.Message, triggerMessageID string, triggerSeq int64) string {
+	triggerMessageID = strings.TrimSpace(triggerMessageID)
+	for _, message := range recent {
+		if triggerMessageID != "" && strings.TrimSpace(message.ServerMsgID) == triggerMessageID {
+			return hostingRuntimeText(message)
+		}
+		if triggerSeq > 0 && message.Seq == triggerSeq {
+			return hostingRuntimeText(message)
+		}
+	}
+	return ""
 }
 
 func hostingRuntimeText(message logic.Message) string {

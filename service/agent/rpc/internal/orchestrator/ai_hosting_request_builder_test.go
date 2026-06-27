@@ -81,6 +81,62 @@ func TestConversationAIHostingRuntimeRequestBuilderUsesBoundedRecentMessages(t *
 	}
 }
 
+// TestBuilderHydratesPromptTextFromTriggerMessage 锁定实时 Kafka 触发链路回归：
+// consumer.agentTriggerFromJudged 只携带路由元数据、不带 PromptText，构建器须从消息历史
+// 回填触发消息正文。回填前 NormalizeRunRequest 会以 "prompt_text is required" 失败，对用户
+// 表现为兜底文案“服务暂时不可用”（trace 排查实证）。
+func TestBuilderHydratesPromptTextFromTriggerMessage(t *testing.T) {
+	ctx := context.Background()
+	messageRepo := repository.NewMemoryMessageRepository()
+	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
+	conversationID := repository.SingleConversationID("agent_acc", "usr_peer")
+	sent, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
+		SenderID:    "usr_peer",
+		ReceiverID:  "agent_acc",
+		ChatType:    logic.MessageChatTypeSingle,
+		ClientMsgID: "kafka-trigger-msg",
+		ContentType: logic.MessageContentTypeText,
+		Content:     "111",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
+		MessageRepository: messageRepo,
+		DeepSeek:          config.DeepSeekConfig{Model: "deepseek-test"},
+	})
+	// 镜像 agentTriggerFromJudged 的输出：无 PromptText / 无 SourceMessageText。
+	trigger := AgentTrigger{
+		RequestID:          "evt-1:agent_acc",
+		EventID:            "evt-1",
+		TriggerType:        TriggerTypeUserPrivateMessage,
+		AgentUserID:        "agent_acc",
+		RequestingUserID:   "usr_peer",
+		ConversationID:     conversationID,
+		ConversationType:   ConversationTypeSingle,
+		TriggerMessageID:   sent.Message.ServerMsgID,
+		TriggerSeq:         sent.Message.Seq,
+		ReplyToMessageID:   sent.Message.ServerMsgID,
+		SourceMessageID:    sent.Message.ServerMsgID,
+		SourceMessageSeq:   sent.Message.Seq,
+		SourceContentType:  logic.MessageContentTypeText,
+		TargetAgentUserIDs: []string{"agent_acc"},
+	}
+	req, err := builder.BuildRuntimeRequest(ctx, trigger)
+	if err != nil {
+		t.Fatalf("build runtime request: %v", err)
+	}
+	if req.PromptText != "111" {
+		t.Fatalf("prompt_text = %q, want hydrated trigger message %q", req.PromptText, "111")
+	}
+	// 回填后整条链路（含 NormalizeRunRequest + trigger 一致性校验）必须通过——这正是修复前
+	// 失败为 runtime_request_invalid: prompt_text is required 的地方。
+	if _, err := normalizeRuntimeRequestForTrigger(req, trigger); err != nil {
+		t.Fatalf("normalize runtime request for trigger: %v", err)
+	}
+}
+
 func TestConversationAIHostingRuntimeRequestBuilderRejectsNonSingleConversation(t *testing.T) {
 	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
 		MessageRepository: repository.NewMemoryMessageRepository(),
