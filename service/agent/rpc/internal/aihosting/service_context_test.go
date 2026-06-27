@@ -12,6 +12,7 @@ import (
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registrytest"
@@ -219,7 +220,7 @@ func completeAIHostingServiceContext() *ServiceContext {
 	return &ServiceContext{
 		MessageLogic:     business.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil),
 		MessageRepo:      messageRepo,
-		AgentHostingRepo: repository.NewMemoryAgentConversationHostingRepository(),
+		AgentHostingRepo: aghosting.NewMemoryStore(),
 		AIHostingStore:   aiHostingStore,
 		AIHostingLogic:   convhosting.NewConversationAIHostingLogic(aiHostingStore),
 		AgentAuditRepo:   agentAuditRepo,

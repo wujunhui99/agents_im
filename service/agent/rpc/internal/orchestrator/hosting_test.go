@@ -8,6 +8,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 
@@ -15,7 +16,7 @@ func TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates
 	ctx := context.Background()
 	messageRepo := repository.NewMemoryMessageRepository()
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
-	hostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	hostingRepo := aghosting.NewMemoryStore()
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	auditLogic := logic.NewAgentAuditLogic(auditRepo)
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
@@ -51,7 +52,7 @@ func TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates
 	if err != nil {
 		t.Fatalf("new hosting service: %v", err)
 	}
-	if _, err := hostingRepo.UpsertAgentConversationHosting(ctx, repository.AgentConversationHosting{
+	if _, err := hostingRepo.UpsertAgentConversationHosting(ctx, aghosting.AgentConversationHosting{
 		ConversationID: repository.SingleConversationID("usr_1", "agent_1"),
 		AgentAccountID: "agent_1",
 		Enabled:        true,

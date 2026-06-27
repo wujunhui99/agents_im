@@ -81,17 +81,6 @@ func NewAgentAuditRepositoryForStorage(driver string, dataSource string) (AgentA
 	return NewPostgresAgentAuditRepository(appconfig.ResolveDataSource(dataSource))
 }
 
-func NewAgentConversationHostingRepositoryForStorage(driver string, dataSource string) (AgentConversationHostingRepository, error) {
-	storageDriver, err := repositoryStorageDriver(driver)
-	if err != nil {
-		return nil, err
-	}
-	if storageDriver == appconfig.StorageDriverMemory {
-		return NewMemoryAgentConversationHostingRepository(), nil
-	}
-	return NewPostgresAgentConversationHostingRepository(appconfig.ResolveDataSource(dataSource))
-}
-
 func repositoryStorageDriver(driver string) (string, error) {
 	storageDriver := appconfig.ResolveStorageDriver(driver)
 	switch storageDriver {

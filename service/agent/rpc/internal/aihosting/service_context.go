@@ -16,6 +16,7 @@ import (
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	agentim "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
@@ -32,7 +33,7 @@ type ServiceContext struct {
 	FeedbackLogic    *logic.FeedbackLogic
 	MessageRepo      repository.MessageRepository
 	FeedbackRepo     repository.FeedbackRepository
-	AgentHostingRepo repository.AgentConversationHostingRepository
+	AgentHostingRepo aghosting.Store
 	AIHostingStore   convhosting.Store
 	GroupMembers     logic.GroupMemberLister
 	AgentAuditLogic  *logic.AgentAuditLogic
@@ -79,7 +80,7 @@ func NewServiceContextWithMediaValidator(repo repository.MessageRepository, medi
 		mediaValidator = allowAllMessageMediaValidator{}
 	}
 	feedbackRepo := repository.NewMemoryFeedbackRepository()
-	agentHostingRepo := repository.NewMemoryAgentConversationHostingRepository()
+	agentHostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{

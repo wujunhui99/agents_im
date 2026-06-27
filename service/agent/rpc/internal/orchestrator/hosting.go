@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -62,7 +62,7 @@ func (r AgentRepositoryAccountResolver) AgentRepository() AgentReader {
 }
 
 type ConversationHostingConfig struct {
-	Repository           repository.AgentConversationHostingRepository
+	Repository           aghosting.Store
 	AIHostingStore       convhosting.Store
 	Runner               AgentTriggerRunner
 	AgentAccountResolver AgentAccountResolver
@@ -73,7 +73,7 @@ type ConversationHostingConfig struct {
 }
 
 type ConversationHostingService struct {
-	repo          repository.AgentConversationHostingRepository
+	repo          aghosting.Store
 	aiHostingRepo convhosting.Store
 	runner        AgentTriggerRunner
 	agentResolver AgentAccountResolver
@@ -245,7 +245,7 @@ func (s *ConversationHostingService) acceptAndScheduleTrigger(ctx context.Contex
 		return s.recordRejectedTrigger(ctx, trigger, err)
 	}
 
-	started, err := s.repo.TryStartAgentTrigger(ctx, repository.AgentTriggerStartInput{
+	started, err := s.repo.TryStartAgentTrigger(ctx, aghosting.AgentTriggerStartInput{
 		IdempotencyKey:     trigger.RequestID,
 		ConversationID:     trigger.ConversationID,
 		AgentAccountID:     trigger.AgentUserID,
@@ -261,9 +261,9 @@ func (s *ConversationHostingService) acceptAndScheduleTrigger(ctx context.Contex
 	}
 
 	if err := s.markTriggerRead(ctx, trigger); err != nil {
-		finishErr := s.repo.FinishAgentTrigger(ctx, repository.AgentTriggerFinishInput{
+		finishErr := s.repo.FinishAgentTrigger(ctx, aghosting.AgentTriggerFinishInput{
 			IdempotencyKey: trigger.RequestID,
-			Status:         repository.AgentTriggerStatusFailed,
+			Status:         aghosting.AgentTriggerStatusFailed,
 			ErrorMessage:   err.Error(),
 		})
 		if finishErr != nil {
@@ -303,7 +303,7 @@ func (s *ConversationHostingService) validateTriggerAuthorization(ctx context.Co
 }
 
 func (s *ConversationHostingService) recordRejectedTrigger(ctx context.Context, trigger AgentTrigger, cause error) (bool, error) {
-	started, err := s.repo.TryStartAgentTrigger(ctx, repository.AgentTriggerStartInput{
+	started, err := s.repo.TryStartAgentTrigger(ctx, aghosting.AgentTriggerStartInput{
 		IdempotencyKey:     trigger.RequestID,
 		ConversationID:     trigger.ConversationID,
 		AgentAccountID:     trigger.AgentUserID,
@@ -317,9 +317,9 @@ func (s *ConversationHostingService) recordRejectedTrigger(ctx context.Context, 
 	if !started {
 		return false, nil
 	}
-	if err := s.repo.FinishAgentTrigger(ctx, repository.AgentTriggerFinishInput{
+	if err := s.repo.FinishAgentTrigger(ctx, aghosting.AgentTriggerFinishInput{
 		IdempotencyKey: trigger.RequestID,
-		Status:         repository.AgentTriggerStatusFailed,
+		Status:         aghosting.AgentTriggerStatusFailed,
 		ErrorMessage:   cause.Error(),
 	}); err != nil {
 		return false, errors.Join(cause, fmt.Errorf("record rejected agent trigger: %w", err))
@@ -354,7 +354,7 @@ func (s *ConversationHostingService) runAcceptedTriggerAsync(trigger AgentTrigge
 }
 
 func (s *ConversationHostingService) triggerRunningTTL() time.Duration {
-	ttl := repository.DefaultAgentTriggerRunningTTL
+	ttl := aghosting.DefaultAgentTriggerRunningTTL
 	if s == nil {
 		return ttl
 	}
@@ -371,9 +371,9 @@ func (s *ConversationHostingService) triggerRunningTTL() time.Duration {
 func (s *ConversationHostingService) runAcceptedTrigger(ctx context.Context, trigger AgentTrigger) (AgentResponseResult, error) {
 	run, err := s.runner.Run(ctx, trigger)
 	if err != nil {
-		finishErr := s.repo.FinishAgentTrigger(ctx, repository.AgentTriggerFinishInput{
+		finishErr := s.repo.FinishAgentTrigger(ctx, aghosting.AgentTriggerFinishInput{
 			IdempotencyKey: trigger.RequestID,
-			Status:         repository.AgentTriggerStatusFailed,
+			Status:         aghosting.AgentTriggerStatusFailed,
 			ErrorMessage:   err.Error(),
 		})
 		if finishErr != nil {
@@ -381,9 +381,9 @@ func (s *ConversationHostingService) runAcceptedTrigger(ctx context.Context, tri
 		}
 		return AgentResponseResult{}, err
 	}
-	if err := s.repo.FinishAgentTrigger(ctx, repository.AgentTriggerFinishInput{
+	if err := s.repo.FinishAgentTrigger(ctx, aghosting.AgentTriggerFinishInput{
 		IdempotencyKey:      trigger.RequestID,
-		Status:              repository.AgentTriggerStatusSucceeded,
+		Status:              aghosting.AgentTriggerStatusSucceeded,
 		ResponseServerMsgID: run.Response.Message.ServerMsgID,
 	}); err != nil {
 		return AgentResponseResult{}, err

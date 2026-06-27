@@ -10,6 +10,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 
@@ -145,7 +146,7 @@ func TestGroupNonMemberAgentTargetRecordsFailureWithoutRunningAgent(t *testing.T
 	}
 
 	finish := h.hostingRepo.requireFinish(t, "evt_group_nonmember_agent_1:agent_1")
-	if finish.Status != repository.AgentTriggerStatusFailed {
+	if finish.Status != aghosting.AgentTriggerStatusFailed {
 		t.Fatalf("non-member trigger status = %q, want failed", finish.Status)
 	}
 	if !strings.Contains(finish.ErrorMessage, "target agent is not an active group member") {
@@ -170,7 +171,7 @@ func newGroupAgentHarness(t *testing.T, activeMemberIDs []string) *groupAgentHar
 	messageRepo := repository.NewMemoryMessageRepository()
 	groups := newAgentIMTestGroupMemberLister("grp_agent_chat", activeMemberIDs)
 	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, groups, nil)
-	hostingRepo := &recordingAgentHostingRepository{inner: repository.NewMemoryAgentConversationHostingRepository()}
+	hostingRepo := &recordingAgentHostingRepository{inner: aghosting.NewMemoryStore()}
 	auditRepo := repository.NewMemoryAgentAuditRepository()
 	auditLogic := logic.NewAgentAuditLogic(auditRepo)
 	writer, err := NewMessageServiceResponseWriter(messageLogic)
@@ -330,22 +331,22 @@ func (l *agentIMTestGroupMemberLister) ListMembers(_ context.Context, req logic.
 }
 
 type recordingAgentHostingRepository struct {
-	inner *repository.MemoryAgentConversationHostingRepository
+	inner *aghosting.MemoryStore
 	mu    sync.Mutex
 
-	starts   []repository.AgentTriggerStartInput
-	finishes []repository.AgentTriggerFinishInput
+	starts   []aghosting.AgentTriggerStartInput
+	finishes []aghosting.AgentTriggerFinishInput
 }
 
-func (r *recordingAgentHostingRepository) UpsertAgentConversationHosting(ctx context.Context, hosting repository.AgentConversationHosting) (repository.AgentConversationHosting, error) {
+func (r *recordingAgentHostingRepository) UpsertAgentConversationHosting(ctx context.Context, hosting aghosting.AgentConversationHosting) (aghosting.AgentConversationHosting, error) {
 	return r.inner.UpsertAgentConversationHosting(ctx, hosting)
 }
 
-func (r *recordingAgentHostingRepository) GetAgentConversationHosting(ctx context.Context, conversationID string) (repository.AgentConversationHosting, error) {
+func (r *recordingAgentHostingRepository) GetAgentConversationHosting(ctx context.Context, conversationID string) (aghosting.AgentConversationHosting, error) {
 	return r.inner.GetAgentConversationHosting(ctx, conversationID)
 }
 
-func (r *recordingAgentHostingRepository) TryStartAgentTrigger(ctx context.Context, input repository.AgentTriggerStartInput) (bool, error) {
+func (r *recordingAgentHostingRepository) TryStartAgentTrigger(ctx context.Context, input aghosting.AgentTriggerStartInput) (bool, error) {
 	started, err := r.inner.TryStartAgentTrigger(ctx, input)
 	r.mu.Lock()
 	r.starts = append(r.starts, input)
@@ -353,7 +354,7 @@ func (r *recordingAgentHostingRepository) TryStartAgentTrigger(ctx context.Conte
 	return started, err
 }
 
-func (r *recordingAgentHostingRepository) FinishAgentTrigger(ctx context.Context, input repository.AgentTriggerFinishInput) error {
+func (r *recordingAgentHostingRepository) FinishAgentTrigger(ctx context.Context, input aghosting.AgentTriggerFinishInput) error {
 	err := r.inner.FinishAgentTrigger(ctx, input)
 	r.mu.Lock()
 	r.finishes = append(r.finishes, input)
@@ -361,7 +362,7 @@ func (r *recordingAgentHostingRepository) FinishAgentTrigger(ctx context.Context
 	return err
 }
 
-func (r *recordingAgentHostingRepository) requireFinish(t *testing.T, idempotencyKey string) repository.AgentTriggerFinishInput {
+func (r *recordingAgentHostingRepository) requireFinish(t *testing.T, idempotencyKey string) aghosting.AgentTriggerFinishInput {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for {

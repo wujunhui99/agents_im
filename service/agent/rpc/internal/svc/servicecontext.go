@@ -13,6 +13,7 @@ import (
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aihosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/consumer"
@@ -134,10 +135,9 @@ func buildHostingRuntime(c config.Config, responseSender orchestrator.MessageSen
 		log.Fatalf("build groups repository: %v", err)
 	}
 	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
-	agentHostingRepo, err := repository.NewAgentConversationHostingRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build agent hosting repository: %v", err)
-	}
+	// agent_conversation_hosting + agent_trigger_idempotency 数据层已脱 internal/repository，
+	// 改 agent 自有 goctl model Store（#670，从 #616 拆出）。
+	agentHostingStore := aghosting.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
 	// conversation_ai_hosting 数据层已脱 internal/repository，改 agent 自有 goctl model（AG-6 ① / D13）。
 	aiHostingStore := convhosting.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
 	agentAuditRepo, err := repository.NewAgentAuditRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
@@ -159,7 +159,7 @@ func buildHostingRuntime(c config.Config, responseSender orchestrator.MessageSen
 	// 附件校验在 agent 写回路径不可达（AI 回复经 imadapter→msg-rpc，由 msg-rpc 校验）；
 	// MessageLogic 在本进程只作运行时数据层（历史读）与被覆盖的 fallback sender，传 nil 用放行 fixture。
 	hostingCtx := aihosting.NewServiceContextWithMediaValidator(messageRepo, nil, nil, groupsLogic, appconfig.DefaultJWTAuthConfig())
-	hostingCtx.AgentHostingRepo = agentHostingRepo
+	hostingCtx.AgentHostingRepo = agentHostingStore
 	hostingCtx.AIHostingStore = aiHostingStore
 	// AgentResolver / 请求构建器读 agents 表改 agent 自有 goctl AgentStore（#606，脱 internal）。
 	hostingCtx.AgentResolver = orchestrator.NewAgentRepositoryAccountResolver(agentStore)
