@@ -73,7 +73,7 @@ func (r *DeepSeekRuntime) Run(ctx context.Context, req agentruntime.RunRequest) 
 	if normalized.TraceID == "" {
 		normalized.TraceID = observability.TraceIDFromContext(ctx)
 	}
-	cfg := config.ResolveDeepSeekConfig(r.cfg)
+	cfg := r.cfg // 已在 ServiceContext 经 conf.MustLoad 由 struct tag 填好默认值/env（#664）。
 	if strings.TrimSpace(normalized.Agent.Model.Model) != "" {
 		cfg.Model = normalized.Agent.Model.Model
 	}

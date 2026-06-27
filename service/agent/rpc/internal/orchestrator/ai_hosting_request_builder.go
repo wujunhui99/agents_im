@@ -176,7 +176,7 @@ func hostingRuntimeText(message logic.Message) string {
 }
 
 func (b *ConversationAIHostingRuntimeRequestBuilder) agentRuntimeConfig(ctx context.Context, agentUserID string) (agentruntime.AgentConfig, error) {
-	cfg := config.ResolveDeepSeekConfig(b.deepSeek)
+	cfg := b.deepSeek // 已在 ServiceContext 经 conf.MustLoad 由 struct tag 填好默认值/env（#664）。
 	agentConfig := agentruntime.AgentConfig{
 		AgentID:     "ai-hosting:" + agentUserID,
 		AgentUserID: agentUserID,

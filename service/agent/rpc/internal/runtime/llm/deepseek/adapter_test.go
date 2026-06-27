@@ -12,11 +12,9 @@ import (
 	appconfig "github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 )
 
+// #664：DeepSeek 配置默认值/env 已在 ServiceContext load 时由 struct tag 解析，NewChatModel
+// 只校验传入的已解析 config，故这些用例直接传字面 config 而非依赖 env 解析。
 func TestNewChatModelFailsWhenAPIKeyMissing(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "")
-	t.Setenv("DEEPSEEK_BASE_URL", "")
-	t.Setenv("DEEPSEEK_MODEL", "")
-
 	_, err := NewChatModel(context.Background(), appconfig.DeepSeekConfig{})
 	if !errors.Is(err, appconfig.ErrDeepSeekAPIKeyMissing) {
 		t.Fatalf("NewChatModel error = %v, want %v", err, appconfig.ErrDeepSeekAPIKeyMissing)
@@ -24,21 +22,13 @@ func TestNewChatModelFailsWhenAPIKeyMissing(t *testing.T) {
 }
 
 func TestNewChatModelFailsWhenAPIKeyIsPlaceholder(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "replace-with-local-deepseek-api-key")
-	t.Setenv("DEEPSEEK_BASE_URL", "")
-	t.Setenv("DEEPSEEK_MODEL", "")
-
-	_, err := NewChatModel(context.Background(), appconfig.DeepSeekConfig{})
+	_, err := NewChatModel(context.Background(), appconfig.DeepSeekConfig{APIKey: "replace-with-local-deepseek-api-key"})
 	if !errors.Is(err, appconfig.ErrDeepSeekAPIKeyPlaceholder) {
 		t.Fatalf("NewChatModel error = %v, want %v", err, appconfig.ErrDeepSeekAPIKeyPlaceholder)
 	}
 }
 
 func TestNewChatModelConstructsWithExplicitConfig(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "")
-	t.Setenv("DEEPSEEK_BASE_URL", "")
-	t.Setenv("DEEPSEEK_MODEL", "")
-
 	cm, err := NewChatModel(context.Background(), appconfig.DeepSeekConfig{
 		APIKey:  "unit-test-deepseek-api-key",
 		BaseURL: appconfig.DefaultDeepSeekBaseURL,
@@ -60,7 +50,11 @@ func TestLiveDeepSeekGenerate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
-	cm, err := NewChatModel(ctx, appconfig.DeepSeekConfig{})
+	cm, err := NewChatModel(ctx, appconfig.DeepSeekConfig{
+		APIKey:  os.Getenv("DEEPSEEK_API_KEY"),
+		BaseURL: appconfig.DefaultDeepSeekBaseURL,
+		Model:   appconfig.DefaultDeepSeekModel,
+	})
 	if err != nil {
 		t.Fatalf("NewChatModel: %v", err)
 	}

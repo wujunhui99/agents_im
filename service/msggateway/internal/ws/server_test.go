@@ -265,8 +265,8 @@ func TestWebSocketHeartbeatTimeoutUnregistersPresence(t *testing.T) {
 		WithPresenceStore(store),
 		WithPresenceTTL(5*time.Second),
 		WithGatewayWSConfig(gwconfig.GatewayWSConfig{
-			PingIntervalSeconds:       30,
-			HeartbeatTimeoutSeconds:   1,
+			PingIntervalSeconds:       1,
+			HeartbeatTimeoutSeconds:   2,
 			CommandRateLimitPerSecond: 100,
 			CommandRateLimitBurst:     100,
 		}),

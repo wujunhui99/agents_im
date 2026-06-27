@@ -2,85 +2,28 @@ package config
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/zeromicro/go-zero/core/conf"
 )
 
-func TestResolveLLMObservabilityDefaultsLangfuseHost(t *testing.T) {
-	t.Setenv("LANGFUSE_HOST", "")
-	t.Setenv("LANGFUSE_BASE_URL", "")
-	t.Setenv("LANGFUSE_PUBLIC_KEY", "")
-	t.Setenv("LANGFUSE_SECRET_KEY", "")
-
-	cfg, err := ResolveLLMObservabilityConfig(LLMObservabilityConfig{})
-	if err != nil {
-		t.Fatalf("resolve llm observability config: %v", err)
+// loadLLMObservability/loadDeepSeek 走 go-zero conf 加载路径（生产 conf.MustLoad 同款），
+// 验证 default=/options= struct tag 的声明式行为。
+func loadDeepSeek(t *testing.T, yaml string) DeepSeekConfig {
+	t.Helper()
+	var cfg DeepSeekConfig
+	if err := conf.LoadFromYamlBytes([]byte(yaml), &cfg); err != nil {
+		t.Fatalf("load deepseek config: %v", err)
 	}
-	if cfg.Langfuse.Host != DefaultLangfuseHost {
-		t.Fatalf("langfuse host = %q, want %q", cfg.Langfuse.Host, DefaultLangfuseHost)
-	}
-	if cfg.Enabled || cfg.Backend != LLMObservabilityBackendNoop {
-		t.Fatalf("default llm observability should stay disabled noop: %+v", cfg)
-	}
+	return cfg
 }
 
-func TestResolveLLMObservabilityLangfuseHostCanBeOverridden(t *testing.T) {
-	t.Setenv("LANGFUSE_HOST", "https://langfuse.override.local")
-	t.Setenv("LANGFUSE_BASE_URL", "")
-
-	cfg, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
-	if err != nil {
-		t.Fatalf("resolve llm observability config: %v", err)
-	}
-	if cfg.Langfuse.Host != "https://langfuse.override.local" {
-		t.Fatalf("langfuse host = %q, want env override", cfg.Langfuse.Host)
-	}
-}
-
-func TestResolveLLMObservabilityCanEnableLangfuseFromEnv(t *testing.T) {
-	t.Setenv("LLM_OBSERVABILITY_ENABLED", "true")
-	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuse")
-	t.Setenv("LLM_OBSERVABILITY_CAPTURE_OUTPUT", "true")
-	t.Setenv("LLM_OBSERVABILITY_MAX_OUTPUT_BYTES", "4096")
-	t.Setenv("LANGFUSE_HOST", "")
-	t.Setenv("LANGFUSE_BASE_URL", "")
-	t.Setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-unit-test")
-	t.Setenv("LANGFUSE_SECRET_KEY", "sk-lf-unit-test")
-
-	cfg, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
-	if err != nil {
-		t.Fatalf("resolve llm observability config: %v", err)
-	}
-	if !cfg.Enabled || cfg.Backend != LLMObservabilityBackendLangfuse {
-		t.Fatalf("llm observability should enable langfuse from env: %+v", cfg)
-	}
-	if !cfg.CaptureOutput || cfg.MaxOutputBytes != 4096 {
-		t.Fatalf("capture output settings should resolve from env: %+v", cfg)
-	}
-	if cfg.Langfuse.Host != DefaultLangfuseHost ||
-		cfg.Langfuse.PublicKey != "pk-lf-unit-test" ||
-		cfg.Langfuse.SecretKey != "sk-lf-unit-test" {
-		t.Fatalf("langfuse env config mismatch: %+v", cfg.Langfuse)
-	}
-}
-
-func TestResolveLLMObservabilityRejectsUnsupportedBackend(t *testing.T) {
-	t.Setenv("LLM_OBSERVABILITY_BACKEND", "langfuze")
-
-	_, err := ResolveLLMObservabilityConfig(DefaultLLMObservabilityConfig())
-	if err == nil || !strings.Contains(err.Error(), "unsupported llm observability backend") {
-		t.Fatalf("expected unsupported backend error, got %v", err)
-	}
-}
-
-func TestResolveDeepSeekConfigUsesDefaultsWithoutKey(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "")
-	t.Setenv("DEEPSEEK_BASE_URL", "")
-	t.Setenv("DEEPSEEK_MODEL", "")
-
-	cfg := ResolveDeepSeekConfig(DeepSeekConfig{})
+func TestDeepSeekConfigTagDefaults(t *testing.T) {
+	cfg := loadDeepSeek(t, "{}\n")
 	if cfg.APIKey != "" {
-		t.Fatalf("deepseek api key should remain empty when env is unset")
+		t.Fatalf("deepseek api key should remain empty without yaml/env, got %q", cfg.APIKey)
 	}
 	if cfg.BaseURL != DefaultDeepSeekBaseURL {
 		t.Fatalf("deepseek base url = %q, want %q", cfg.BaseURL, DefaultDeepSeekBaseURL)
@@ -90,25 +33,81 @@ func TestResolveDeepSeekConfigUsesDefaultsWithoutKey(t *testing.T) {
 	}
 }
 
-func TestValidateDeepSeekConfigRequiresAPIKey(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "")
-	t.Setenv("DEEPSEEK_BASE_URL", "")
-	t.Setenv("DEEPSEEK_MODEL", "")
+func TestLLMObservabilityTagDefaults(t *testing.T) {
+	var cfg LLMObservabilityConfig
+	if err := conf.LoadFromYamlBytes([]byte("{}\n"), &cfg); err != nil {
+		t.Fatalf("load llm observability config: %v", err)
+	}
+	if cfg.Enabled || cfg.CaptureOutput {
+		t.Fatalf("llm observability should stay disabled by default: %+v", cfg)
+	}
+	if cfg.Backend != LLMObservabilityBackendNoop {
+		t.Fatalf("llm observability backend = %q, want %q", cfg.Backend, LLMObservabilityBackendNoop)
+	}
+	if cfg.MaxOutputBytes != 2048 {
+		t.Fatalf("llm observability max output bytes = %d, want 2048", cfg.MaxOutputBytes)
+	}
+	if cfg.Langfuse.Host != DefaultLangfuseHost {
+		t.Fatalf("langfuse host = %q, want %q", cfg.Langfuse.Host, DefaultLangfuseHost)
+	}
+}
 
-	cfg := ResolveDeepSeekConfig(DeepSeekConfig{})
-	err := ValidateDeepSeekConfig(cfg)
+func TestLLMObservabilityRejectsUnsupportedBackend(t *testing.T) {
+	var cfg LLMObservabilityConfig
+	err := conf.LoadFromYamlBytes([]byte("Backend: langfuze\n"), &cfg)
+	if err == nil {
+		t.Fatal("expected options= validation to reject unsupported backend")
+	}
+}
+
+// TestLLMObservabilityEnvTagsUseBareNames 锁定 #664 决策1：env 只 wire 裸名，不再有
+// AGENTS_IM_*/LLM_OBS_* 别名。env 覆盖语义由 go-zero 内置（proc.Env 进程级缓存使跨用例
+// t.Setenv 不可靠，故用反射核对 tag 字面量）。
+func TestLLMObservabilityEnvTagsUseBareNames(t *testing.T) {
+	assertEnvTag(t, reflect.TypeOf(LLMObservabilityConfig{}), map[string]string{
+		"Enabled":        "LLM_OBSERVABILITY_ENABLED",
+		"Backend":        "LLM_OBSERVABILITY_BACKEND",
+		"CaptureOutput":  "LLM_OBSERVABILITY_CAPTURE_OUTPUT",
+		"MaxOutputBytes": "LLM_OBSERVABILITY_MAX_OUTPUT_BYTES",
+	})
+	assertEnvTag(t, reflect.TypeOf(LangfuseObservabilityConfig{}), map[string]string{
+		"Host":      "LANGFUSE_HOST",
+		"PublicKey": "LANGFUSE_PUBLIC_KEY",
+		"SecretKey": "LANGFUSE_SECRET_KEY",
+	})
+	assertEnvTag(t, reflect.TypeOf(DeepSeekConfig{}), map[string]string{
+		"APIKey":  "DEEPSEEK_API_KEY",
+		"BaseURL": "DEEPSEEK_BASE_URL",
+		"Model":   "DEEPSEEK_MODEL",
+	})
+}
+
+func assertEnvTag(t *testing.T, typ reflect.Type, wantEnv map[string]string) {
+	t.Helper()
+	for field, env := range wantEnv {
+		f, ok := typ.FieldByName(field)
+		if !ok {
+			t.Fatalf("%s field %s missing", typ.Name(), field)
+		}
+		tag := f.Tag.Get("json")
+		if !strings.Contains(tag, "env="+env) {
+			t.Fatalf("%s.%s json tag %q missing env=%s", typ.Name(), field, tag, env)
+		}
+		if strings.Contains(tag, "AGENTS_IM_") || strings.Contains(tag, "_OBS_") || strings.Contains(tag, "LANGFUSE_BASE_URL") {
+			t.Fatalf("%s.%s json tag %q must not keep legacy alias", typ.Name(), field, tag)
+		}
+	}
+}
+
+func TestValidateDeepSeekConfigRequiresAPIKey(t *testing.T) {
+	err := ValidateDeepSeekConfig(DeepSeekConfig{BaseURL: DefaultDeepSeekBaseURL, Model: DefaultDeepSeekModel})
 	if !errors.Is(err, ErrDeepSeekAPIKeyMissing) {
 		t.Fatalf("validate deepseek config error = %v, want %v", err, ErrDeepSeekAPIKeyMissing)
 	}
 }
 
 func TestValidateDeepSeekConfigRejectsPlaceholderAPIKey(t *testing.T) {
-	t.Setenv("DEEPSEEK_API_KEY", "replace-with-local-deepseek-api-key")
-	t.Setenv("DEEPSEEK_BASE_URL", "")
-	t.Setenv("DEEPSEEK_MODEL", "")
-
-	cfg := ResolveDeepSeekConfig(DeepSeekConfig{})
-	err := ValidateDeepSeekConfig(cfg)
+	err := ValidateDeepSeekConfig(DeepSeekConfig{APIKey: "replace-with-local-deepseek-api-key"})
 	if !errors.Is(err, ErrDeepSeekAPIKeyPlaceholder) {
 		t.Fatalf("validate deepseek config error = %v, want %v", err, ErrDeepSeekAPIKeyPlaceholder)
 	}

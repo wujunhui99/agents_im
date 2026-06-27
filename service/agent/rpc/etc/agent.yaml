@@ -22,12 +22,9 @@ FriendsRPC:
     - 127.0.0.1:9092
   Timeout: 5000
 
-DeepSeek:
-  APIKey: ${DEEPSEEK_API_KEY}
-  BaseURL: ${DEEPSEEK_BASE_URL}
-  Model: ${DEEPSEEK_MODEL}
-LLMObservability:
-  Enabled: false
+# DeepSeek / LLMObservability 的默认值/env 覆盖由 struct tag 声明（#664）：
+# APIKey←env DEEPSEEK_API_KEY；BaseURL/Model 缺省走 tag default，env DEEPSEEK_BASE_URL/MODEL 覆盖。
+# Backend 缺省 noop，env LLM_OBSERVABILITY_BACKEND 覆盖。整块从 yaml 删除，避免空 ${VAR} 压掉 default。
 PythonExecutor:
   Backend: disabled
 
