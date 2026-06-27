@@ -12,6 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/internal/repository"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aihosting"
@@ -140,10 +141,9 @@ func buildHostingRuntime(c config.Config, responseSender orchestrator.MessageSen
 	agentHostingStore := aghosting.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
 	// conversation_ai_hosting 数据层已脱 internal/repository，改 agent 自有 goctl model（AG-6 ① / D13）。
 	aiHostingStore := convhosting.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
-	agentAuditRepo, err := repository.NewAgentAuditRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build agent audit repository: %v", err)
-	}
+	// agent 审计四表（agent_runs/tool_calls/file_reads/python_execs）数据层已脱 internal/repository，
+	// 改 agent 自有 goctl model Store（#616，从 #344/#394 拆出）。
+	agentAuditStore := agaudit.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
 	var pythonExecutorClient pythonexec.KubernetesSandboxClient
 	if c.PythonExecutor.Backend == appconfig.PythonExecutorBackendK8S {
 		pythonExecutorClient, err = pythonexec.NewInClusterKubernetesSandboxClient()
@@ -164,8 +164,7 @@ func buildHostingRuntime(c config.Config, responseSender orchestrator.MessageSen
 	// AgentResolver / 请求构建器读 agents 表改 agent 自有 goctl AgentStore（#606，脱 internal）。
 	hostingCtx.AgentResolver = orchestrator.NewAgentRepositoryAccountResolver(agentStore)
 	hostingCtx.AIHostingLogic = convhosting.NewConversationAIHostingLogic(aiHostingStore).WithAgentAccountResolver(hostingCtx.AgentResolver)
-	hostingCtx.AgentAuditRepo = agentAuditRepo
-	hostingCtx.AgentAuditLogic = business.NewAgentAuditLogic(agentAuditRepo)
+	hostingCtx.AgentAudit = agentAuditStore
 	// 注册表只读路径（runtime tool 解析 + 请求构建）改 agent 自有 goctl Store（#605/#606）。
 	hostingCtx.AgentRegistryReader = registryStore
 	// agent.create 工具处理器：agent 自有 agentlogic assembly（goctl + user-rpc/friends-rpc 端口，#606）。

@@ -16,6 +16,7 @@ import (
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
@@ -36,9 +37,10 @@ type ServiceContext struct {
 	AgentHostingRepo aghosting.Store
 	AIHostingStore   convhosting.Store
 	GroupMembers     logic.GroupMemberLister
-	AgentAuditLogic  *logic.AgentAuditLogic
-	AgentAuditRepo   repository.AgentAuditRepository
-	AgentResolver    convhosting.AgentAccountExistenceChecker
+	// AgentAudit 是 agent 自有 goctl 审计数据层（agent_runs/tool_calls/file_reads/python_execs），
+	// 取代 internal/{logic.AgentAuditLogic, repository.AgentAuditRepository}（#616 脱 internal）。
+	AgentAudit    agaudit.Store
+	AgentResolver convhosting.AgentAccountExistenceChecker
 	// AgentRegistryReader 是 agent 自有 goctl 注册表只读 Store,喂 runtime tool 解析 + 请求
 	// 构建器(#605:读路径已脱 internal/repository)。
 	AgentRegistryReader registry.Reader
@@ -82,7 +84,6 @@ func NewServiceContextWithMediaValidator(repo repository.MessageRepository, medi
 	feedbackRepo := repository.NewMemoryFeedbackRepository()
 	agentHostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
-	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	return &ServiceContext{
 		AuthRuntime:      common.NewAuthRuntime(auth),
 		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaValidator),
@@ -93,8 +94,7 @@ func NewServiceContextWithMediaValidator(repo repository.MessageRepository, medi
 		AgentHostingRepo: agentHostingRepo,
 		AIHostingStore:   aiHostingStore,
 		GroupMembers:     groups,
-		AgentAuditLogic:  logic.NewAgentAuditLogic(agentAuditRepo),
-		AgentAuditRepo:   agentAuditRepo,
+		AgentAudit:       agaudit.NewMemoryStore(),
 	}
 }
 
@@ -127,11 +127,8 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	if ctx.AgentResolver != nil {
 		ctx.AIHostingLogic.WithAgentAccountResolver(ctx.AgentResolver)
 	}
-	if ctx.AgentAuditRepo == nil {
-		return apperror.Internal("agent audit repository is not configured")
-	}
-	if ctx.AgentAuditLogic == nil {
-		ctx.AgentAuditLogic = logic.NewAgentAuditLogic(ctx.AgentAuditRepo)
+	if ctx.AgentAudit == nil {
+		return apperror.Internal("agent audit store is not configured")
 	}
 	var responseSender agentim.MessageSender = ctx.MessageLogic
 	if ctx.AgentResponseSender != nil {
@@ -171,7 +168,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 			DeepSeek:          opts.DeepSeek,
 			MaxRecentMessages: 30,
 		}),
-		Audit:                ctx.AgentAuditLogic,
+		Audit:                agaudit.NewRunRecorder(ctx.AgentAudit),
 		Writer:               writer,
 		LLMObservabilitySink: llmObsSink,
 	})

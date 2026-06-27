@@ -1317,6 +1317,1135 @@ func (x *ConversationAIHostingState) GetSummaryEnabled() bool {
 	return false
 }
 
+// ---- agent 审计（只读 owner API；id 为 string，summary jsonb 用 *_summary_json 串行，时间 RFC3339Nano）----
+type AgentRunAudit struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	RunId             string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	AgentId           string                 `protobuf:"bytes,2,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ConversationId    string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	TriggerMessageId  string                 `protobuf:"bytes,4,opt,name=trigger_message_id,json=triggerMessageId,proto3" json:"trigger_message_id,omitempty"`
+	RequestingUserId  string                 `protobuf:"bytes,5,opt,name=requesting_user_id,json=requestingUserId,proto3" json:"requesting_user_id,omitempty"`
+	Status            string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	InputSummaryJson  string                 `protobuf:"bytes,7,opt,name=input_summary_json,json=inputSummaryJson,proto3" json:"input_summary_json,omitempty"`
+	OutputSummaryJson string                 `protobuf:"bytes,8,opt,name=output_summary_json,json=outputSummaryJson,proto3" json:"output_summary_json,omitempty"`
+	OutputMessageId   string                 `protobuf:"bytes,9,opt,name=output_message_id,json=outputMessageId,proto3" json:"output_message_id,omitempty"`
+	ErrorCode         string                 `protobuf:"bytes,10,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage      string                 `protobuf:"bytes,11,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	TraceId           string                 `protobuf:"bytes,12,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId         string                 `protobuf:"bytes,13,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	StartedAt         string                 `protobuf:"bytes,14,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt        string                 `protobuf:"bytes,15,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	CreatedAt         string                 `protobuf:"bytes,16,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AgentRunAudit) Reset() {
+	*x = AgentRunAudit{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentRunAudit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentRunAudit) ProtoMessage() {}
+
+func (x *AgentRunAudit) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentRunAudit.ProtoReflect.Descriptor instead.
+func (*AgentRunAudit) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *AgentRunAudit) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetTriggerMessageId() string {
+	if x != nil {
+		return x.TriggerMessageId
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetRequestingUserId() string {
+	if x != nil {
+		return x.RequestingUserId
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetInputSummaryJson() string {
+	if x != nil {
+		return x.InputSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetOutputSummaryJson() string {
+	if x != nil {
+		return x.OutputSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetOutputMessageId() string {
+	if x != nil {
+		return x.OutputMessageId
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetStartedAt() string {
+	if x != nil {
+		return x.StartedAt
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetFinishedAt() string {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return ""
+}
+
+func (x *AgentRunAudit) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+type AgentToolCallAudit struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ToolCallId        string                 `protobuf:"bytes,1,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
+	RunId             string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	AgentId           string                 `protobuf:"bytes,3,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ToolId            string                 `protobuf:"bytes,4,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
+	ToolName          string                 `protobuf:"bytes,5,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	Status            string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	InputSummaryJson  string                 `protobuf:"bytes,7,opt,name=input_summary_json,json=inputSummaryJson,proto3" json:"input_summary_json,omitempty"`
+	OutputSummaryJson string                 `protobuf:"bytes,8,opt,name=output_summary_json,json=outputSummaryJson,proto3" json:"output_summary_json,omitempty"`
+	DurationMs        int64                  `protobuf:"varint,9,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	ErrorCode         string                 `protobuf:"bytes,10,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage      string                 `protobuf:"bytes,11,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	TraceId           string                 `protobuf:"bytes,12,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId         string                 `protobuf:"bytes,13,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	StartedAt         string                 `protobuf:"bytes,14,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt        string                 `protobuf:"bytes,15,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	CreatedAt         string                 `protobuf:"bytes,16,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AgentToolCallAudit) Reset() {
+	*x = AgentToolCallAudit{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentToolCallAudit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentToolCallAudit) ProtoMessage() {}
+
+func (x *AgentToolCallAudit) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentToolCallAudit.ProtoReflect.Descriptor instead.
+func (*AgentToolCallAudit) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *AgentToolCallAudit) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetToolId() string {
+	if x != nil {
+		return x.ToolId
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetInputSummaryJson() string {
+	if x != nil {
+		return x.InputSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetOutputSummaryJson() string {
+	if x != nil {
+		return x.OutputSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetDurationMs() int64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *AgentToolCallAudit) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetStartedAt() string {
+	if x != nil {
+		return x.StartedAt
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetFinishedAt() string {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return ""
+}
+
+func (x *AgentToolCallAudit) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+type AgentFileReadAudit struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	FileReadId         string                 `protobuf:"bytes,1,opt,name=file_read_id,json=fileReadId,proto3" json:"file_read_id,omitempty"`
+	RunId              string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	AgentId            string                 `protobuf:"bytes,3,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	SkillId            string                 `protobuf:"bytes,4,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	FileId             string                 `protobuf:"bytes,5,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	ObjectKey          string                 `protobuf:"bytes,6,opt,name=object_key,json=objectKey,proto3" json:"object_key,omitempty"`
+	Sha256             string                 `protobuf:"bytes,7,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	Status             string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
+	ByteCount          int64                  `protobuf:"varint,9,opt,name=byte_count,json=byteCount,proto3" json:"byte_count,omitempty"`
+	ContentSummaryJson string                 `protobuf:"bytes,10,opt,name=content_summary_json,json=contentSummaryJson,proto3" json:"content_summary_json,omitempty"`
+	ErrorCode          string                 `protobuf:"bytes,11,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage       string                 `protobuf:"bytes,12,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	TraceId            string                 `protobuf:"bytes,13,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId          string                 `protobuf:"bytes,14,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	StartedAt          string                 `protobuf:"bytes,15,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt         string                 `protobuf:"bytes,16,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	CreatedAt          string                 `protobuf:"bytes,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AgentFileReadAudit) Reset() {
+	*x = AgentFileReadAudit{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentFileReadAudit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentFileReadAudit) ProtoMessage() {}
+
+func (x *AgentFileReadAudit) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentFileReadAudit.ProtoReflect.Descriptor instead.
+func (*AgentFileReadAudit) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *AgentFileReadAudit) GetFileReadId() string {
+	if x != nil {
+		return x.FileReadId
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetObjectKey() string {
+	if x != nil {
+		return x.ObjectKey
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetByteCount() int64 {
+	if x != nil {
+		return x.ByteCount
+	}
+	return 0
+}
+
+func (x *AgentFileReadAudit) GetContentSummaryJson() string {
+	if x != nil {
+		return x.ContentSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetStartedAt() string {
+	if x != nil {
+		return x.StartedAt
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetFinishedAt() string {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return ""
+}
+
+func (x *AgentFileReadAudit) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+type AgentPythonExecAudit struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PythonExecId        string                 `protobuf:"bytes,1,opt,name=python_exec_id,json=pythonExecId,proto3" json:"python_exec_id,omitempty"`
+	RunId               string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	AgentId             string                 `protobuf:"bytes,3,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	SandboxRequestId    string                 `protobuf:"bytes,4,opt,name=sandbox_request_id,json=sandboxRequestId,proto3" json:"sandbox_request_id,omitempty"`
+	Status              string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	CodeSummaryJson     string                 `protobuf:"bytes,6,opt,name=code_summary_json,json=codeSummaryJson,proto3" json:"code_summary_json,omitempty"`
+	ResourceSummaryJson string                 `protobuf:"bytes,7,opt,name=resource_summary_json,json=resourceSummaryJson,proto3" json:"resource_summary_json,omitempty"`
+	StdoutSummaryJson   string                 `protobuf:"bytes,8,opt,name=stdout_summary_json,json=stdoutSummaryJson,proto3" json:"stdout_summary_json,omitempty"`
+	StderrSummaryJson   string                 `protobuf:"bytes,9,opt,name=stderr_summary_json,json=stderrSummaryJson,proto3" json:"stderr_summary_json,omitempty"`
+	ResultSummaryJson   string                 `protobuf:"bytes,10,opt,name=result_summary_json,json=resultSummaryJson,proto3" json:"result_summary_json,omitempty"`
+	ErrorCode           string                 `protobuf:"bytes,11,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage        string                 `protobuf:"bytes,12,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	TraceId             string                 `protobuf:"bytes,13,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId           string                 `protobuf:"bytes,14,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	StartedAt           string                 `protobuf:"bytes,15,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt          string                 `protobuf:"bytes,16,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	CreatedAt           string                 `protobuf:"bytes,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *AgentPythonExecAudit) Reset() {
+	*x = AgentPythonExecAudit{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentPythonExecAudit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentPythonExecAudit) ProtoMessage() {}
+
+func (x *AgentPythonExecAudit) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentPythonExecAudit.ProtoReflect.Descriptor instead.
+func (*AgentPythonExecAudit) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *AgentPythonExecAudit) GetPythonExecId() string {
+	if x != nil {
+		return x.PythonExecId
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetSandboxRequestId() string {
+	if x != nil {
+		return x.SandboxRequestId
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetCodeSummaryJson() string {
+	if x != nil {
+		return x.CodeSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetResourceSummaryJson() string {
+	if x != nil {
+		return x.ResourceSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetStdoutSummaryJson() string {
+	if x != nil {
+		return x.StdoutSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetStderrSummaryJson() string {
+	if x != nil {
+		return x.StderrSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetResultSummaryJson() string {
+	if x != nil {
+		return x.ResultSummaryJson
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetStartedAt() string {
+	if x != nil {
+		return x.StartedAt
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetFinishedAt() string {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return ""
+}
+
+func (x *AgentPythonExecAudit) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+type ListAgentRunsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Limit         int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int64                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentRunsRequest) Reset() {
+	*x = ListAgentRunsRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentRunsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentRunsRequest) ProtoMessage() {}
+
+func (x *ListAgentRunsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentRunsRequest.ProtoReflect.Descriptor instead.
+func (*ListAgentRunsRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ListAgentRunsRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ListAgentRunsRequest) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListAgentRunsRequest) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+type ListAgentRunsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Runs          []*AgentRunAudit       `protobuf:"bytes,1,rep,name=runs,proto3" json:"runs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentRunsResponse) Reset() {
+	*x = ListAgentRunsResponse{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentRunsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentRunsResponse) ProtoMessage() {}
+
+func (x *ListAgentRunsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentRunsResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentRunsResponse) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListAgentRunsResponse) GetRuns() []*AgentRunAudit {
+	if x != nil {
+		return x.Runs
+	}
+	return nil
+}
+
+type CountAgentRunsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CountAgentRunsRequest) Reset() {
+	*x = CountAgentRunsRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountAgentRunsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountAgentRunsRequest) ProtoMessage() {}
+
+func (x *CountAgentRunsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountAgentRunsRequest.ProtoReflect.Descriptor instead.
+func (*CountAgentRunsRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *CountAgentRunsRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type CountAgentRunsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Count         int64                  `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CountAgentRunsResponse) Reset() {
+	*x = CountAgentRunsResponse{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountAgentRunsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountAgentRunsResponse) ProtoMessage() {}
+
+func (x *CountAgentRunsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountAgentRunsResponse.ProtoReflect.Descriptor instead.
+func (*CountAgentRunsResponse) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *CountAgentRunsResponse) GetCount() int64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+type GetAgentRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAgentRunRequest) Reset() {
+	*x = GetAgentRunRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAgentRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAgentRunRequest) ProtoMessage() {}
+
+func (x *GetAgentRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAgentRunRequest.ProtoReflect.Descriptor instead.
+func (*GetAgentRunRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *GetAgentRunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+type GetAgentRunByTraceIDRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TraceId       string                 `protobuf:"bytes,1,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAgentRunByTraceIDRequest) Reset() {
+	*x = GetAgentRunByTraceIDRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAgentRunByTraceIDRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAgentRunByTraceIDRequest) ProtoMessage() {}
+
+func (x *GetAgentRunByTraceIDRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAgentRunByTraceIDRequest.ProtoReflect.Descriptor instead.
+func (*GetAgentRunByTraceIDRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *GetAgentRunByTraceIDRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+type ListAuditByRunIDRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuditByRunIDRequest) Reset() {
+	*x = ListAuditByRunIDRequest{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuditByRunIDRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuditByRunIDRequest) ProtoMessage() {}
+
+func (x *ListAuditByRunIDRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuditByRunIDRequest.ProtoReflect.Descriptor instead.
+func (*ListAuditByRunIDRequest) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ListAuditByRunIDRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+type ListAgentToolCallsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ToolCalls     []*AgentToolCallAudit  `protobuf:"bytes,1,rep,name=tool_calls,json=toolCalls,proto3" json:"tool_calls,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentToolCallsResponse) Reset() {
+	*x = ListAgentToolCallsResponse{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentToolCallsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentToolCallsResponse) ProtoMessage() {}
+
+func (x *ListAgentToolCallsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentToolCallsResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentToolCallsResponse) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ListAgentToolCallsResponse) GetToolCalls() []*AgentToolCallAudit {
+	if x != nil {
+		return x.ToolCalls
+	}
+	return nil
+}
+
+type ListAgentFileReadsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileReads     []*AgentFileReadAudit  `protobuf:"bytes,1,rep,name=file_reads,json=fileReads,proto3" json:"file_reads,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentFileReadsResponse) Reset() {
+	*x = ListAgentFileReadsResponse{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentFileReadsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentFileReadsResponse) ProtoMessage() {}
+
+func (x *ListAgentFileReadsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentFileReadsResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentFileReadsResponse) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ListAgentFileReadsResponse) GetFileReads() []*AgentFileReadAudit {
+	if x != nil {
+		return x.FileReads
+	}
+	return nil
+}
+
+type ListAgentPythonExecsResponse struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	PythonExecs   []*AgentPythonExecAudit `protobuf:"bytes,1,rep,name=python_execs,json=pythonExecs,proto3" json:"python_execs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentPythonExecsResponse) Reset() {
+	*x = ListAgentPythonExecsResponse{}
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentPythonExecsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentPythonExecsResponse) ProtoMessage() {}
+
+func (x *ListAgentPythonExecsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_agent_rpc_agent_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentPythonExecsResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentPythonExecsResponse) Descriptor() ([]byte, []int) {
+	return file_service_agent_rpc_agent_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ListAgentPythonExecsResponse) GetPythonExecs() []*AgentPythonExecAudit {
+	if x != nil {
+		return x.PythonExecs
+	}
+	return nil
+}
+
 var File_service_agent_rpc_agent_proto protoreflect.FileDescriptor
 
 const file_service_agent_rpc_agent_proto_rawDesc = "" +
@@ -1438,7 +2567,130 @@ const file_service_agent_rpc_agent_proto_rawDesc = "" +
 	"\fpeer_enabled\x18\x05 \x01(\bR\vpeerEnabled\x12-\n" +
 	"\x12unavailable_reason\x18\x06 \x01(\tR\x11unavailableReason\x12.\n" +
 	"\x13max_recent_messages\x18\a \x01(\x03R\x11maxRecentMessages\x12'\n" +
-	"\x0fsummary_enabled\x18\b \x01(\bR\x0esummaryEnabled2\xfd\x06\n" +
+	"\x0fsummary_enabled\x18\b \x01(\bR\x0esummaryEnabled\"\xc5\x04\n" +
+	"\rAgentRunAudit\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x19\n" +
+	"\bagent_id\x18\x02 \x01(\tR\aagentId\x12'\n" +
+	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12,\n" +
+	"\x12trigger_message_id\x18\x04 \x01(\tR\x10triggerMessageId\x12,\n" +
+	"\x12requesting_user_id\x18\x05 \x01(\tR\x10requestingUserId\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12,\n" +
+	"\x12input_summary_json\x18\a \x01(\tR\x10inputSummaryJson\x12.\n" +
+	"\x13output_summary_json\x18\b \x01(\tR\x11outputSummaryJson\x12*\n" +
+	"\x11output_message_id\x18\t \x01(\tR\x0foutputMessageId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\n" +
+	" \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\v \x01(\tR\ferrorMessage\x12\x19\n" +
+	"\btrace_id\x18\f \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\r \x01(\tR\trequestId\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\x0e \x01(\tR\tstartedAt\x12\x1f\n" +
+	"\vfinished_at\x18\x0f \x01(\tR\n" +
+	"finishedAt\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x10 \x01(\tR\tcreatedAt\"\x92\x04\n" +
+	"\x12AgentToolCallAudit\x12 \n" +
+	"\ftool_call_id\x18\x01 \x01(\tR\n" +
+	"toolCallId\x12\x15\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x19\n" +
+	"\bagent_id\x18\x03 \x01(\tR\aagentId\x12\x17\n" +
+	"\atool_id\x18\x04 \x01(\tR\x06toolId\x12\x1b\n" +
+	"\ttool_name\x18\x05 \x01(\tR\btoolName\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12,\n" +
+	"\x12input_summary_json\x18\a \x01(\tR\x10inputSummaryJson\x12.\n" +
+	"\x13output_summary_json\x18\b \x01(\tR\x11outputSummaryJson\x12\x1f\n" +
+	"\vduration_ms\x18\t \x01(\x03R\n" +
+	"durationMs\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\n" +
+	" \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\v \x01(\tR\ferrorMessage\x12\x19\n" +
+	"\btrace_id\x18\f \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\r \x01(\tR\trequestId\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\x0e \x01(\tR\tstartedAt\x12\x1f\n" +
+	"\vfinished_at\x18\x0f \x01(\tR\n" +
+	"finishedAt\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x10 \x01(\tR\tcreatedAt\"\x99\x04\n" +
+	"\x12AgentFileReadAudit\x12 \n" +
+	"\ffile_read_id\x18\x01 \x01(\tR\n" +
+	"fileReadId\x12\x15\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x19\n" +
+	"\bagent_id\x18\x03 \x01(\tR\aagentId\x12\x19\n" +
+	"\bskill_id\x18\x04 \x01(\tR\askillId\x12\x17\n" +
+	"\afile_id\x18\x05 \x01(\tR\x06fileId\x12\x1d\n" +
+	"\n" +
+	"object_key\x18\x06 \x01(\tR\tobjectKey\x12\x16\n" +
+	"\x06sha256\x18\a \x01(\tR\x06sha256\x12\x16\n" +
+	"\x06status\x18\b \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"byte_count\x18\t \x01(\x03R\tbyteCount\x120\n" +
+	"\x14content_summary_json\x18\n" +
+	" \x01(\tR\x12contentSummaryJson\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\v \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\f \x01(\tR\ferrorMessage\x12\x19\n" +
+	"\btrace_id\x18\r \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x0e \x01(\tR\trequestId\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\x0f \x01(\tR\tstartedAt\x12\x1f\n" +
+	"\vfinished_at\x18\x10 \x01(\tR\n" +
+	"finishedAt\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x11 \x01(\tR\tcreatedAt\"\x81\x05\n" +
+	"\x14AgentPythonExecAudit\x12$\n" +
+	"\x0epython_exec_id\x18\x01 \x01(\tR\fpythonExecId\x12\x15\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x19\n" +
+	"\bagent_id\x18\x03 \x01(\tR\aagentId\x12,\n" +
+	"\x12sandbox_request_id\x18\x04 \x01(\tR\x10sandboxRequestId\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12*\n" +
+	"\x11code_summary_json\x18\x06 \x01(\tR\x0fcodeSummaryJson\x122\n" +
+	"\x15resource_summary_json\x18\a \x01(\tR\x13resourceSummaryJson\x12.\n" +
+	"\x13stdout_summary_json\x18\b \x01(\tR\x11stdoutSummaryJson\x12.\n" +
+	"\x13stderr_summary_json\x18\t \x01(\tR\x11stderrSummaryJson\x12.\n" +
+	"\x13result_summary_json\x18\n" +
+	" \x01(\tR\x11resultSummaryJson\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\v \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\f \x01(\tR\ferrorMessage\x12\x19\n" +
+	"\btrace_id\x18\r \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x0e \x01(\tR\trequestId\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\x0f \x01(\tR\tstartedAt\x12\x1f\n" +
+	"\vfinished_at\x18\x10 \x01(\tR\n" +
+	"finishedAt\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x11 \x01(\tR\tcreatedAt\"\\\n" +
+	"\x14ListAgentRunsRequest\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x03R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x03 \x01(\x03R\x06offset\"D\n" +
+	"\x15ListAgentRunsResponse\x12+\n" +
+	"\x04runs\x18\x01 \x03(\v2\x17.agent.v1.AgentRunAuditR\x04runs\"/\n" +
+	"\x15CountAgentRunsRequest\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\".\n" +
+	"\x16CountAgentRunsResponse\x12\x14\n" +
+	"\x05count\x18\x01 \x01(\x03R\x05count\"+\n" +
+	"\x12GetAgentRunRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\"8\n" +
+	"\x1bGetAgentRunByTraceIDRequest\x12\x19\n" +
+	"\btrace_id\x18\x01 \x01(\tR\atraceId\"0\n" +
+	"\x17ListAuditByRunIDRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\"Y\n" +
+	"\x1aListAgentToolCallsResponse\x12;\n" +
+	"\n" +
+	"tool_calls\x18\x01 \x03(\v2\x1c.agent.v1.AgentToolCallAuditR\ttoolCalls\"Y\n" +
+	"\x1aListAgentFileReadsResponse\x12;\n" +
+	"\n" +
+	"file_reads\x18\x01 \x03(\v2\x1c.agent.v1.AgentFileReadAuditR\tfileReads\"a\n" +
+	"\x1cListAgentPythonExecsResponse\x12A\n" +
+	"\fpython_execs\x18\x01 \x03(\v2\x1e.agent.v1.AgentPythonExecAuditR\vpythonExecs2\xf8\v\n" +
 	"\x05Agent\x12k\n" +
 	"\x18GetConversationAIHosting\x12).agent.v1.GetConversationAIHostingRequest\x1a$.agent.v1.ConversationAIHostingState\x12q\n" +
 	"\x1bUpdateConversationAIHosting\x12,.agent.v1.UpdateConversationAIHostingRequest\x1a$.agent.v1.ConversationAIHostingState\x12D\n" +
@@ -1450,7 +2702,14 @@ const file_service_agent_rpc_agent_proto_rawDesc = "" +
 	"\x11UpdateAgentStatus\x12\".agent.v1.UpdateAgentStatusRequest\x1a\x17.agent.v1.AgentResponse\x12\\\n" +
 	"\x12GetAgentDefinition\x12#.agent.v1.GetAgentDefinitionRequest\x1a!.agent.v1.AgentDefinitionResponse\x12b\n" +
 	"\x15UpdateAgentDefinition\x12&.agent.v1.UpdateAgentDefinitionRequest\x1a!.agent.v1.AgentDefinitionResponse\x12k\n" +
-	"\x16EnsureDefaultAssistant\x12'.agent.v1.EnsureDefaultAssistantRequest\x1a(.agent.v1.EnsureDefaultAssistantResponseB9Z7github.com/wujunhui99/agents_im/service/agent/rpc/agentb\x06proto3"
+	"\x16EnsureDefaultAssistant\x12'.agent.v1.EnsureDefaultAssistantRequest\x1a(.agent.v1.EnsureDefaultAssistantResponse\x12P\n" +
+	"\rListAgentRuns\x12\x1e.agent.v1.ListAgentRunsRequest\x1a\x1f.agent.v1.ListAgentRunsResponse\x12S\n" +
+	"\x0eCountAgentRuns\x12\x1f.agent.v1.CountAgentRunsRequest\x1a .agent.v1.CountAgentRunsResponse\x12D\n" +
+	"\vGetAgentRun\x12\x1c.agent.v1.GetAgentRunRequest\x1a\x17.agent.v1.AgentRunAudit\x12V\n" +
+	"\x14GetAgentRunByTraceID\x12%.agent.v1.GetAgentRunByTraceIDRequest\x1a\x17.agent.v1.AgentRunAudit\x12d\n" +
+	"\x19ListAgentToolCallsByRunID\x12!.agent.v1.ListAuditByRunIDRequest\x1a$.agent.v1.ListAgentToolCallsResponse\x12d\n" +
+	"\x19ListAgentFileReadsByRunID\x12!.agent.v1.ListAuditByRunIDRequest\x1a$.agent.v1.ListAgentFileReadsResponse\x12h\n" +
+	"\x1bListAgentPythonExecsByRunID\x12!.agent.v1.ListAuditByRunIDRequest\x1a&.agent.v1.ListAgentPythonExecsResponseB9Z7github.com/wujunhui99/agents_im/service/agent/rpc/agentb\x06proto3"
 
 var (
 	file_service_agent_rpc_agent_proto_rawDescOnce sync.Once
@@ -1464,7 +2723,7 @@ func file_service_agent_rpc_agent_proto_rawDescGZIP() []byte {
 	return file_service_agent_rpc_agent_proto_rawDescData
 }
 
-var file_service_agent_rpc_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_service_agent_rpc_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_service_agent_rpc_agent_proto_goTypes = []any{
 	(*AgentEntity)(nil),                        // 0: agent.v1.AgentEntity
 	(*CreateAgentRequest)(nil),                 // 1: agent.v1.CreateAgentRequest
@@ -1485,6 +2744,20 @@ var file_service_agent_rpc_agent_proto_goTypes = []any{
 	(*GetConversationAIHostingRequest)(nil),    // 16: agent.v1.GetConversationAIHostingRequest
 	(*UpdateConversationAIHostingRequest)(nil), // 17: agent.v1.UpdateConversationAIHostingRequest
 	(*ConversationAIHostingState)(nil),         // 18: agent.v1.ConversationAIHostingState
+	(*AgentRunAudit)(nil),                      // 19: agent.v1.AgentRunAudit
+	(*AgentToolCallAudit)(nil),                 // 20: agent.v1.AgentToolCallAudit
+	(*AgentFileReadAudit)(nil),                 // 21: agent.v1.AgentFileReadAudit
+	(*AgentPythonExecAudit)(nil),               // 22: agent.v1.AgentPythonExecAudit
+	(*ListAgentRunsRequest)(nil),               // 23: agent.v1.ListAgentRunsRequest
+	(*ListAgentRunsResponse)(nil),              // 24: agent.v1.ListAgentRunsResponse
+	(*CountAgentRunsRequest)(nil),              // 25: agent.v1.CountAgentRunsRequest
+	(*CountAgentRunsResponse)(nil),             // 26: agent.v1.CountAgentRunsResponse
+	(*GetAgentRunRequest)(nil),                 // 27: agent.v1.GetAgentRunRequest
+	(*GetAgentRunByTraceIDRequest)(nil),        // 28: agent.v1.GetAgentRunByTraceIDRequest
+	(*ListAuditByRunIDRequest)(nil),            // 29: agent.v1.ListAuditByRunIDRequest
+	(*ListAgentToolCallsResponse)(nil),         // 30: agent.v1.ListAgentToolCallsResponse
+	(*ListAgentFileReadsResponse)(nil),         // 31: agent.v1.ListAgentFileReadsResponse
+	(*ListAgentPythonExecsResponse)(nil),       // 32: agent.v1.ListAgentPythonExecsResponse
 }
 var file_service_agent_rpc_agent_proto_depIdxs = []int32{
 	0,  // 0: agent.v1.AgentResponse.agent:type_name -> agent.v1.AgentEntity
@@ -1493,31 +2766,49 @@ var file_service_agent_rpc_agent_proto_depIdxs = []int32{
 	8,  // 3: agent.v1.AgentDefinition.system_prompt:type_name -> agent.v1.AgentPromptDefinition
 	9,  // 4: agent.v1.AgentDefinition.tools:type_name -> agent.v1.AgentToolDefinition
 	10, // 5: agent.v1.AgentDefinitionResponse.definition:type_name -> agent.v1.AgentDefinition
-	16, // 6: agent.v1.Agent.GetConversationAIHosting:input_type -> agent.v1.GetConversationAIHostingRequest
-	17, // 7: agent.v1.Agent.UpdateConversationAIHosting:input_type -> agent.v1.UpdateConversationAIHostingRequest
-	1,  // 8: agent.v1.Agent.CreateAgent:input_type -> agent.v1.CreateAgentRequest
-	3,  // 9: agent.v1.Agent.GetAgent:input_type -> agent.v1.GetAgentRequest
-	4,  // 10: agent.v1.Agent.ListAgents:input_type -> agent.v1.ListAgentsRequest
-	6,  // 11: agent.v1.Agent.UpdateAgent:input_type -> agent.v1.UpdateAgentRequest
-	7,  // 12: agent.v1.Agent.UpdateAgentStatus:input_type -> agent.v1.UpdateAgentStatusRequest
-	11, // 13: agent.v1.Agent.GetAgentDefinition:input_type -> agent.v1.GetAgentDefinitionRequest
-	12, // 14: agent.v1.Agent.UpdateAgentDefinition:input_type -> agent.v1.UpdateAgentDefinitionRequest
-	14, // 15: agent.v1.Agent.EnsureDefaultAssistant:input_type -> agent.v1.EnsureDefaultAssistantRequest
-	18, // 16: agent.v1.Agent.GetConversationAIHosting:output_type -> agent.v1.ConversationAIHostingState
-	18, // 17: agent.v1.Agent.UpdateConversationAIHosting:output_type -> agent.v1.ConversationAIHostingState
-	2,  // 18: agent.v1.Agent.CreateAgent:output_type -> agent.v1.AgentResponse
-	2,  // 19: agent.v1.Agent.GetAgent:output_type -> agent.v1.AgentResponse
-	5,  // 20: agent.v1.Agent.ListAgents:output_type -> agent.v1.ListAgentsResponse
-	2,  // 21: agent.v1.Agent.UpdateAgent:output_type -> agent.v1.AgentResponse
-	2,  // 22: agent.v1.Agent.UpdateAgentStatus:output_type -> agent.v1.AgentResponse
-	13, // 23: agent.v1.Agent.GetAgentDefinition:output_type -> agent.v1.AgentDefinitionResponse
-	13, // 24: agent.v1.Agent.UpdateAgentDefinition:output_type -> agent.v1.AgentDefinitionResponse
-	15, // 25: agent.v1.Agent.EnsureDefaultAssistant:output_type -> agent.v1.EnsureDefaultAssistantResponse
-	16, // [16:26] is the sub-list for method output_type
-	6,  // [6:16] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	19, // 6: agent.v1.ListAgentRunsResponse.runs:type_name -> agent.v1.AgentRunAudit
+	20, // 7: agent.v1.ListAgentToolCallsResponse.tool_calls:type_name -> agent.v1.AgentToolCallAudit
+	21, // 8: agent.v1.ListAgentFileReadsResponse.file_reads:type_name -> agent.v1.AgentFileReadAudit
+	22, // 9: agent.v1.ListAgentPythonExecsResponse.python_execs:type_name -> agent.v1.AgentPythonExecAudit
+	16, // 10: agent.v1.Agent.GetConversationAIHosting:input_type -> agent.v1.GetConversationAIHostingRequest
+	17, // 11: agent.v1.Agent.UpdateConversationAIHosting:input_type -> agent.v1.UpdateConversationAIHostingRequest
+	1,  // 12: agent.v1.Agent.CreateAgent:input_type -> agent.v1.CreateAgentRequest
+	3,  // 13: agent.v1.Agent.GetAgent:input_type -> agent.v1.GetAgentRequest
+	4,  // 14: agent.v1.Agent.ListAgents:input_type -> agent.v1.ListAgentsRequest
+	6,  // 15: agent.v1.Agent.UpdateAgent:input_type -> agent.v1.UpdateAgentRequest
+	7,  // 16: agent.v1.Agent.UpdateAgentStatus:input_type -> agent.v1.UpdateAgentStatusRequest
+	11, // 17: agent.v1.Agent.GetAgentDefinition:input_type -> agent.v1.GetAgentDefinitionRequest
+	12, // 18: agent.v1.Agent.UpdateAgentDefinition:input_type -> agent.v1.UpdateAgentDefinitionRequest
+	14, // 19: agent.v1.Agent.EnsureDefaultAssistant:input_type -> agent.v1.EnsureDefaultAssistantRequest
+	23, // 20: agent.v1.Agent.ListAgentRuns:input_type -> agent.v1.ListAgentRunsRequest
+	25, // 21: agent.v1.Agent.CountAgentRuns:input_type -> agent.v1.CountAgentRunsRequest
+	27, // 22: agent.v1.Agent.GetAgentRun:input_type -> agent.v1.GetAgentRunRequest
+	28, // 23: agent.v1.Agent.GetAgentRunByTraceID:input_type -> agent.v1.GetAgentRunByTraceIDRequest
+	29, // 24: agent.v1.Agent.ListAgentToolCallsByRunID:input_type -> agent.v1.ListAuditByRunIDRequest
+	29, // 25: agent.v1.Agent.ListAgentFileReadsByRunID:input_type -> agent.v1.ListAuditByRunIDRequest
+	29, // 26: agent.v1.Agent.ListAgentPythonExecsByRunID:input_type -> agent.v1.ListAuditByRunIDRequest
+	18, // 27: agent.v1.Agent.GetConversationAIHosting:output_type -> agent.v1.ConversationAIHostingState
+	18, // 28: agent.v1.Agent.UpdateConversationAIHosting:output_type -> agent.v1.ConversationAIHostingState
+	2,  // 29: agent.v1.Agent.CreateAgent:output_type -> agent.v1.AgentResponse
+	2,  // 30: agent.v1.Agent.GetAgent:output_type -> agent.v1.AgentResponse
+	5,  // 31: agent.v1.Agent.ListAgents:output_type -> agent.v1.ListAgentsResponse
+	2,  // 32: agent.v1.Agent.UpdateAgent:output_type -> agent.v1.AgentResponse
+	2,  // 33: agent.v1.Agent.UpdateAgentStatus:output_type -> agent.v1.AgentResponse
+	13, // 34: agent.v1.Agent.GetAgentDefinition:output_type -> agent.v1.AgentDefinitionResponse
+	13, // 35: agent.v1.Agent.UpdateAgentDefinition:output_type -> agent.v1.AgentDefinitionResponse
+	15, // 36: agent.v1.Agent.EnsureDefaultAssistant:output_type -> agent.v1.EnsureDefaultAssistantResponse
+	24, // 37: agent.v1.Agent.ListAgentRuns:output_type -> agent.v1.ListAgentRunsResponse
+	26, // 38: agent.v1.Agent.CountAgentRuns:output_type -> agent.v1.CountAgentRunsResponse
+	19, // 39: agent.v1.Agent.GetAgentRun:output_type -> agent.v1.AgentRunAudit
+	19, // 40: agent.v1.Agent.GetAgentRunByTraceID:output_type -> agent.v1.AgentRunAudit
+	30, // 41: agent.v1.Agent.ListAgentToolCallsByRunID:output_type -> agent.v1.ListAgentToolCallsResponse
+	31, // 42: agent.v1.Agent.ListAgentFileReadsByRunID:output_type -> agent.v1.ListAgentFileReadsResponse
+	32, // 43: agent.v1.Agent.ListAgentPythonExecsByRunID:output_type -> agent.v1.ListAgentPythonExecsResponse
+	27, // [27:44] is the sub-list for method output_type
+	10, // [10:27] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_service_agent_rpc_agent_proto_init() }
@@ -1532,7 +2823,7 @@ func file_service_agent_rpc_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_agent_rpc_agent_proto_rawDesc), len(file_service_agent_rpc_agent_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

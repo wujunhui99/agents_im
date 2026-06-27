@@ -12,6 +12,7 @@ import (
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
@@ -70,10 +71,10 @@ func TestConfigureConversationAIHostingFailsOnMissingRequiredDependencies(t *tes
 			name: "missing agent audit repository",
 			ctx: func() *ServiceContext {
 				ctx := completeAIHostingServiceContext()
-				ctx.AgentAuditRepo = nil
+				ctx.AgentAudit = nil
 				return ctx
 			}(),
-			wantErr: "agent audit repository is not configured",
+			wantErr: "agent audit store is not configured",
 		},
 	}
 
@@ -140,7 +141,7 @@ func TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting(t *
 		t.Fatalf("hosted owner read state = %+v, want hasReadSeq %d unread 0", state, trigger.Message.Seq)
 	}
 
-	waitForAgentAuditRuns(t, serviceContext.AgentAuditRepo, 1)
+	waitForAgentAuditRuns(t, serviceContext.AgentAudit, 1)
 }
 
 func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testing.T) {
@@ -215,7 +216,6 @@ func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testin
 
 func completeAIHostingServiceContext() *ServiceContext {
 	messageRepo := repository.NewMemoryMessageRepository()
-	agentAuditRepo := repository.NewMemoryAgentAuditRepository()
 	aiHostingStore := convhosting.NewMemoryStore()
 	return &ServiceContext{
 		MessageLogic:     business.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil),
@@ -223,8 +223,7 @@ func completeAIHostingServiceContext() *ServiceContext {
 		AgentHostingRepo: aghosting.NewMemoryStore(),
 		AIHostingStore:   aiHostingStore,
 		AIHostingLogic:   convhosting.NewConversationAIHostingLogic(aiHostingStore),
-		AgentAuditRepo:   agentAuditRepo,
-		AgentAuditLogic:  business.NewAgentAuditLogic(agentAuditRepo),
+		AgentAudit:       agaudit.NewMemoryStore(),
 	}
 }
 
@@ -244,9 +243,9 @@ func (e *recordingPythonExecutor) Execute(_ context.Context, req pythonexec.Requ
 	return e.resp, nil
 }
 
-func waitForAgentAuditRuns(t *testing.T, repo repository.AgentAuditRepository, want int64) {
+func waitForAgentAuditRuns(t *testing.T, store agaudit.Store, want int64) {
 	t.Helper()
-	counter, ok := repo.(interface {
+	counter, ok := store.(interface {
 		CountAgentRuns(context.Context, string) (int64, error)
 	})
 	if !ok {

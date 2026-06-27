@@ -6,13 +6,13 @@ import (
 )
 
 func TestRepositoryForStorageRequiresExplicitSupportedDriver(t *testing.T) {
-	if _, err := NewAgentAuditRepositoryForStorage("sqlite", ""); err == nil || !strings.Contains(err.Error(), "unsupported storage driver") {
-		t.Fatalf("unsupported agent audit repository driver error = %v, want explicit unsupported driver error", err)
+	if _, err := NewMessageRepositoryForStorage("sqlite", ""); err == nil || !strings.Contains(err.Error(), "unsupported storage driver") {
+		t.Fatalf("unsupported repository driver error = %v, want explicit unsupported driver error", err)
 	}
 }
 
 func TestRepositoryForStorageAllowsExplicitMemoryDriver(t *testing.T) {
-	if _, err := NewAgentAuditRepositoryForStorage("memory", ""); err != nil {
-		t.Fatalf("explicit memory agent audit repository: %v", err)
+	if _, err := NewMessageRepositoryForStorage("memory", ""); err != nil {
+		t.Fatalf("explicit memory repository: %v", err)
 	}
 }

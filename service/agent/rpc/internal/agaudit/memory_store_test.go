@@ -1,4 +1,4 @@
-package repository
+package agaudit
 
 import (
 	"context"
@@ -9,13 +9,13 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
-func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) {
+func TestMemoryStoreAppendOnlyCreateListGetByRunID(t *testing.T) {
 	ctx := context.Background()
-	repo := NewMemoryAgentAuditRepository()
+	store := NewMemoryStore()
 	startedAt := time.Date(2026, 4, 30, 10, 0, 0, 0, time.UTC)
 	finishedAt := startedAt.Add(2 * time.Second)
 
-	run, err := repo.CreateAgentRun(ctx, agentaudit.CreateRunInput{
+	run, err := store.CreateAgentRun(ctx, agentaudit.CreateRunInput{
 		RunID:            "run_audit_1",
 		AgentID:          "agent_1",
 		ConversationID:   "single:usr_1:agent_1",
@@ -42,7 +42,7 @@ func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) 
 		t.Fatalf("run input token was not redacted: %+v", run.InputSummary)
 	}
 
-	if _, err := repo.CreateAgentRun(ctx, agentaudit.CreateRunInput{
+	if _, err := store.CreateAgentRun(ctx, agentaudit.CreateRunInput{
 		RunID:   run.RunID,
 		AgentID: "agent_1",
 		Status:  agentaudit.StatusStarted,
@@ -52,7 +52,7 @@ func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) 
 		t.Fatalf("duplicate run id should be already exists, got %v", err)
 	}
 
-	toolCall, err := repo.CreateAgentToolCall(ctx, agentaudit.CreateToolCallInput{
+	toolCall, err := store.CreateAgentToolCall(ctx, agentaudit.CreateToolCallInput{
 		ToolCallID: "tool_call_1",
 		RunID:      run.RunID,
 		AgentID:    run.AgentID,
@@ -76,7 +76,7 @@ func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) 
 		t.Fatalf("tool call token was not redacted: %+v", toolCall.InputSummary)
 	}
 
-	if _, err := repo.CreateAgentFileRead(ctx, agentaudit.CreateFileReadInput{
+	if _, err := store.CreateAgentFileRead(ctx, agentaudit.CreateFileReadInput{
 		FileReadID:     "file_read_1",
 		RunID:          run.RunID,
 		AgentID:        run.AgentID,
@@ -95,7 +95,7 @@ func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) 
 		t.Fatalf("create file read: %v", err)
 	}
 
-	pythonExec, err := repo.CreateAgentPythonExec(ctx, agentaudit.CreatePythonExecInput{
+	pythonExec, err := store.CreateAgentPythonExec(ctx, agentaudit.CreatePythonExecInput{
 		PythonExecID:     "python_exec_1",
 		RunID:            run.RunID,
 		AgentID:          run.AgentID,
@@ -120,7 +120,7 @@ func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) 
 		t.Fatalf("code summary should not be raw error text")
 	}
 
-	loadedRun, err := repo.GetAgentRun(ctx, run.RunID)
+	loadedRun, err := store.GetAgentRun(ctx, run.RunID)
 	if err != nil {
 		t.Fatalf("get run: %v", err)
 	}
@@ -128,14 +128,24 @@ func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) 
 		t.Fatalf("loaded run mismatch: %+v", loadedRun)
 	}
 
-	toolCalls, err := repo.ListAgentToolCallsByRunID(ctx, run.RunID)
+	if byTrace, err := store.GetAgentRunByTraceID(ctx, "trace_1"); err != nil || byTrace.RunID != run.RunID {
+		t.Fatalf("get run by trace = %+v err=%v", byTrace, err)
+	}
+	if count, err := store.CountAgentRuns(ctx, ""); err != nil || count != 1 {
+		t.Fatalf("count runs = (%d, %v), want (1, nil)", count, err)
+	}
+	if runs, err := store.ListAgentRuns(ctx, RunFilter{}); err != nil || len(runs) != 1 {
+		t.Fatalf("list runs len = %d err=%v, want 1", len(runs), err)
+	}
+
+	toolCalls, err := store.ListAgentToolCallsByRunID(ctx, run.RunID)
 	if err != nil {
 		t.Fatalf("list tool calls: %v", err)
 	}
 	if len(toolCalls) != 1 || toolCalls[0].ToolCallID != toolCall.ToolCallID {
 		t.Fatalf("tool calls by run mismatch: %+v", toolCalls)
 	}
-	loadedToolCall, err := repo.GetAgentToolCall(ctx, toolCall.ToolCallID)
+	loadedToolCall, err := store.GetAgentToolCall(ctx, toolCall.ToolCallID)
 	if err != nil {
 		t.Fatalf("get tool call: %v", err)
 	}
@@ -143,7 +153,7 @@ func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) 
 		t.Fatalf("loaded tool call run mismatch: %+v", loadedToolCall)
 	}
 
-	fileReads, err := repo.ListAgentFileReadsByRunID(ctx, run.RunID)
+	fileReads, err := store.ListAgentFileReadsByRunID(ctx, run.RunID)
 	if err != nil {
 		t.Fatalf("list file reads: %v", err)
 	}
@@ -151,7 +161,7 @@ func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) 
 		t.Fatalf("file reads by run mismatch: %+v", fileReads)
 	}
 
-	pythonExecs, err := repo.ListAgentPythonExecsByRunID(ctx, run.RunID)
+	pythonExecs, err := store.ListAgentPythonExecsByRunID(ctx, run.RunID)
 	if err != nil {
 		t.Fatalf("list python execs: %v", err)
 	}
@@ -160,11 +170,11 @@ func TestMemoryAgentAuditRepositoryAppendOnlyCreateListGetByRunID(t *testing.T) 
 	}
 }
 
-func TestMemoryAgentAuditRepositoryRequiresExistingRunForChildren(t *testing.T) {
-	repo := NewMemoryAgentAuditRepository()
+func TestMemoryStoreRequiresExistingRunForChildren(t *testing.T) {
+	store := NewMemoryStore()
 	ctx := context.Background()
 
-	if _, err := repo.CreateAgentToolCall(ctx, agentaudit.CreateToolCallInput{
+	if _, err := store.CreateAgentToolCall(ctx, agentaudit.CreateToolCallInput{
 		RunID:    "missing_run",
 		AgentID:  "agent_1",
 		ToolName: "skill.read_file",
@@ -173,5 +183,9 @@ func TestMemoryAgentAuditRepositoryRequiresExistingRunForChildren(t *testing.T) 
 		t.Fatal("tool call with missing run should fail")
 	} else if appErr := apperror.From(err); appErr.Code != apperror.CodeNotFound {
 		t.Fatalf("missing run should be not found, got %v", err)
+	}
+
+	if _, err := store.ListAgentToolCallsByRunID(ctx, "missing_run"); apperror.From(err).Code != apperror.CodeNotFound {
+		t.Fatalf("list children for missing run should be not found, got %v", err)
 	}
 }

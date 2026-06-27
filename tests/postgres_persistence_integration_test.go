@@ -15,7 +15,6 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
 )
@@ -325,62 +324,8 @@ func TestPostgresMessageRepositoryConcurrentOrdering(t *testing.T) {
 	}
 }
 
-func TestPostgresAgentAuditRepositoryAppendOnlyAndRedaction(t *testing.T) {
-	ctx := context.Background()
-	dsn := integrationPostgresDSN(t)
-	migrateAndCleanPostgres(t, ctx, dsn)
-
-	audit, err := repository.NewPostgresAgentAuditRepository(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	run, err := audit.CreateAgentRun(ctx, agentaudit.CreateRunInput{
-		// 迁移 013 后 run_id/agent_id/tool_call_id 均为 bigint，必须传数字串。
-		RunID:          "910001",
-		AgentID:        "910002",
-		ConversationID: "single:usr_pg_1:agent_pg_1",
-		Status:         agentaudit.StatusSucceeded,
-		InputSummary: agentaudit.Summary{
-			"prompt":       "hello",
-			"access_token": "must-not-leak",
-		},
-		TraceID:   "trace_pg_1",
-		RequestID: "req_pg_1",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if run.InputSummary["access_token"] != agentaudit.RedactedValue {
-		t.Fatalf("postgres run summary did not redact token: %+v", run.InputSummary)
-	}
-
-	if _, err := audit.CreateAgentToolCall(ctx, agentaudit.CreateToolCallInput{
-		ToolCallID: "910003",
-		RunID:      run.RunID,
-		AgentID:    run.AgentID,
-		ToolName:   "im.get_conversation_context",
-		Status:     agentaudit.StatusSucceeded,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	toolCalls, err := audit.ListAgentToolCallsByRunID(ctx, run.RunID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(toolCalls) != 1 || toolCalls[0].ToolCallID != "910003" {
-		t.Fatalf("postgres tool calls mismatch: %+v", toolCalls)
-	}
-
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if _, err := db.ExecContext(ctx, `update agent_runs set status = 'failed' where run_id = $1`, run.RunID); err == nil {
-		t.Fatal("expected append-only trigger to reject update")
-	}
-}
+// agent 审计四表的 Postgres 集成测试已随 #616 迁至属主
+// service/agent/rpc/internal/agaudit/model_store_integration_test.go（goctl model store）。
 
 func integrationPostgresDSN(t *testing.T) string {
 	t.Helper()

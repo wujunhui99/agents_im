@@ -27,6 +27,18 @@ service Agent {
   // EnsureDefaultAssistant 幂等装配默认助手的 agent 域部分（agent 行 + 提示词 + 工具绑定）。
   // 由 user-rpc 装配编排调用（账号属 user 域已建，好友由 user-rpc 经 friends-rpc 建）。
   rpc EnsureDefaultAssistant(EnsureDefaultAssistantRequest) returns (EnsureDefaultAssistantResponse);
+
+  // ---- agent 审计只读面（#616：admin-rpc traces/dashboard 经此读，脱 internal/repository agent_audit）----
+  // agent 审计四表（agent_runs/tool_calls/file_reads/python_execs）是 agent 域自有 append-only 数据，
+  // 写路径在 agent-rpc orchestrator，只读 owner API 在此供 admin-rpc BFF 聚合 traces/dashboard。
+  // summary jsonb 经 *_summary_json 串行携带；时间为 RFC3339Nano（零值空串）。
+  rpc ListAgentRuns(ListAgentRunsRequest) returns (ListAgentRunsResponse);
+  rpc CountAgentRuns(CountAgentRunsRequest) returns (CountAgentRunsResponse);
+  rpc GetAgentRun(GetAgentRunRequest) returns (AgentRunAudit);
+  rpc GetAgentRunByTraceID(GetAgentRunByTraceIDRequest) returns (AgentRunAudit);
+  rpc ListAgentToolCallsByRunID(ListAuditByRunIDRequest) returns (ListAgentToolCallsResponse);
+  rpc ListAgentFileReadsByRunID(ListAuditByRunIDRequest) returns (ListAgentFileReadsResponse);
+  rpc ListAgentPythonExecsByRunID(ListAuditByRunIDRequest) returns (ListAgentPythonExecsResponse);
 }
 
 // ---- agent CRUD ----
@@ -164,4 +176,125 @@ message ConversationAIHostingState {
   string unavailable_reason = 6;
   int64 max_recent_messages = 7;
   bool summary_enabled = 8;
+}
+
+// ---- agent 审计（只读 owner API；id 为 string，summary jsonb 用 *_summary_json 串行，时间 RFC3339Nano）----
+message AgentRunAudit {
+  string run_id = 1;
+  string agent_id = 2;
+  string conversation_id = 3;
+  string trigger_message_id = 4;
+  string requesting_user_id = 5;
+  string status = 6;
+  string input_summary_json = 7;
+  string output_summary_json = 8;
+  string output_message_id = 9;
+  string error_code = 10;
+  string error_message = 11;
+  string trace_id = 12;
+  string request_id = 13;
+  string started_at = 14;
+  string finished_at = 15;
+  string created_at = 16;
+}
+
+message AgentToolCallAudit {
+  string tool_call_id = 1;
+  string run_id = 2;
+  string agent_id = 3;
+  string tool_id = 4;
+  string tool_name = 5;
+  string status = 6;
+  string input_summary_json = 7;
+  string output_summary_json = 8;
+  int64 duration_ms = 9;
+  string error_code = 10;
+  string error_message = 11;
+  string trace_id = 12;
+  string request_id = 13;
+  string started_at = 14;
+  string finished_at = 15;
+  string created_at = 16;
+}
+
+message AgentFileReadAudit {
+  string file_read_id = 1;
+  string run_id = 2;
+  string agent_id = 3;
+  string skill_id = 4;
+  string file_id = 5;
+  string object_key = 6;
+  string sha256 = 7;
+  string status = 8;
+  int64 byte_count = 9;
+  string content_summary_json = 10;
+  string error_code = 11;
+  string error_message = 12;
+  string trace_id = 13;
+  string request_id = 14;
+  string started_at = 15;
+  string finished_at = 16;
+  string created_at = 17;
+}
+
+message AgentPythonExecAudit {
+  string python_exec_id = 1;
+  string run_id = 2;
+  string agent_id = 3;
+  string sandbox_request_id = 4;
+  string status = 5;
+  string code_summary_json = 6;
+  string resource_summary_json = 7;
+  string stdout_summary_json = 8;
+  string stderr_summary_json = 9;
+  string result_summary_json = 10;
+  string error_code = 11;
+  string error_message = 12;
+  string trace_id = 13;
+  string request_id = 14;
+  string started_at = 15;
+  string finished_at = 16;
+  string created_at = 17;
+}
+
+message ListAgentRunsRequest {
+  string status = 1;
+  int64 limit = 2;
+  int64 offset = 3;
+}
+
+message ListAgentRunsResponse {
+  repeated AgentRunAudit runs = 1;
+}
+
+message CountAgentRunsRequest {
+  string status = 1;
+}
+
+message CountAgentRunsResponse {
+  int64 count = 1;
+}
+
+message GetAgentRunRequest {
+  string run_id = 1;
+}
+
+message GetAgentRunByTraceIDRequest {
+  string trace_id = 1;
+}
+
+message ListAuditByRunIDRequest {
+  string run_id = 1;
+}
+
+message ListAgentToolCallsResponse {
+  repeated AgentToolCallAudit tool_calls = 1;
+}
+
+message ListAgentFileReadsResponse {
+  repeated AgentFileReadAudit file_reads = 1;
+}
+
+message ListAgentPythonExecsResponse {
+  repeated AgentPythonExecAudit python_execs = 1;
 }
