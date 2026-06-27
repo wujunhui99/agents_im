@@ -31,18 +31,12 @@ case "${1:-}" in
     fi
     if [[ "${2:-}" == "deployment" || "${2:-}" == "deploy" ]]; then
       service="${3:-}"
-      case "${service}" in
-        msg-api) echo 'ghcr.io/wujunhui99/agents_im/backend:new-message-sha' ;;
-        web) echo 'ghcr.io/wujunhui99/agents_im/web:new-web-sha' ;;
-        user-rpc) echo 'ghcr.io/wujunhui99/agents_im/user-rpc:stable-backend' ;;
-        auth-rpc) echo 'ghcr.io/wujunhui99/agents_im/auth-rpc:stable-backend' ;;
-        friends-rpc) echo 'ghcr.io/wujunhui99/agents_im/friends-rpc:stable-backend' ;;
-        groups-rpc) echo 'ghcr.io/wujunhui99/agents_im/groups-rpc:stable-backend' ;;
-        msg-rpc) echo 'ghcr.io/wujunhui99/agents_im/msg-rpc:stable-backend' ;;
-        third-rpc) echo 'ghcr.io/wujunhui99/agents_im/third-rpc:stable-backend' ;;
-        web) echo 'ghcr.io/wujunhui99/agents_im/web:old-web' ;;
-        *) echo "ghcr.io/wujunhui99/agents_im/${service}:stable-backend" ;;
-      esac
+      release_image="ghcr.io/wujunhui99/agents_im/${service}:${IMAGE_TAG:-}"
+      if [[ -n "${IMAGE_TAG:-}" ]] && grep -Fq "image: ${release_image}" "${log}"; then
+        echo "${release_image}"
+      else
+        echo "ghcr.io/wujunhui99/agents_im/${service}:stable-backend"
+      fi
       exit 0
     fi
     if [[ "${2:-}" == "pods" && " ${*} " == *" -o json "* ]]; then
@@ -56,10 +50,10 @@ case "${1:-}" in
       done
       service="${selector#app=}"
       image="ghcr.io/wujunhui99/agents_im/${service}:stable-backend"
-      case "${service}" in
-        web) image='ghcr.io/wujunhui99/agents_im/web:new-web-sha' ;;
-        msg-api) image='ghcr.io/wujunhui99/agents_im/backend:new-message-sha' ;;
-      esac
+      release_image="ghcr.io/wujunhui99/agents_im/${service}:${IMAGE_TAG:-}"
+      if [[ -n "${IMAGE_TAG:-}" ]] && grep -Fq "image: ${release_image}" "${log}"; then
+        image="${release_image}"
+      fi
       cat <<JSON
 {"items":[{"metadata":{"name":"${service}-pod"},"status":{"phase":"Running","containerStatuses":[{"name":"${service}","ready":true,"imageID":"ghcr.io/wujunhui99/agents_im/${service}@sha256:testdigest"}]},"spec":{"containers":[{"name":"${service}","image":"${image}"}]}}]}
 JSON
@@ -123,6 +117,18 @@ spec:
       containers:
         - image: ghcr.io/wujunhui99/agents_im/media-rpc:__IMAGE_TAG_REQUIRED__
           name: media-rpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: groups-rpc
+  namespace: agents-im
+spec:
+  template:
+    spec:
+      containers:
+        - image: ghcr.io/wujunhui99/agents_im/groups-rpc:__IMAGE_TAG_REQUIRED__
+          name: groups-rpc
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -281,8 +287,8 @@ if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/web:new-web-sha" "${CALL_LOG}
   exit 1
 fi
 
-if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/user-rpc:stable-backend" "${CALL_LOG}"; then
-  echo "expected non-selected application Deployment to keep the captured current image" >&2
+if grep -Fq "  name: user-rpc" "${CALL_LOG}"; then
+  echo "expected web-only deploy not to re-apply non-selected application Deployments" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
@@ -429,8 +435,8 @@ if grep -Fq "jsonpath={.data.DATABASE_URL}" "${CALL_LOG}"; then
   exit 1
 fi
 
-if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/backend:new-message-sha" "${CALL_LOG}"; then
-  echo "expected msg-api image to be rendered to the unified backend release tag when explicit DATABASE_URL is provided" >&2
+if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/msg-api:new-message-sha" "${CALL_LOG}"; then
+  echo "expected msg-api image to use its service-specific immutable release tag" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
@@ -452,6 +458,38 @@ if grep -Fq "user-rpc=new-message-sha" "${CALL_LOG}"; then
   cat "${CALL_LOG}" >&2
   exit 1
 fi
+
+# Application Recreate rollouts must run in dependency waves: provider RPCs,
+# then user-rpc, then API/worker services. Each wave is rendered independently
+# so the full manifest apply cannot start every application at once.
+: >"${CALL_LOG}"
+FAKE_KUBECTL_LOG="${CALL_LOG}" \
+NAMESPACE=agents-im \
+KUBECTL="${FAKE_KUBECTL}" \
+SKIP_MIGRATIONS=true \
+IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
+IMAGE_TAG=wave-sha \
+IMAGE_SERVICES="media-rpc user-rpc msg-api" \
+ROLLOUT_SERVICES="media-rpc user-rpc msg-api" \
+"${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-waves.out
+
+provider_line="$(grep -nF "rollout status deployment/media-rpc --timeout=180s" "${CALL_LOG}" | cut -d: -f1)"
+account_line="$(grep -nF "rollout status deployment/user-rpc --timeout=180s" "${CALL_LOG}" | cut -d: -f1)"
+application_line="$(grep -nF "rollout status deployment/msg-api --timeout=180s" "${CALL_LOG}" | cut -d: -f1)"
+if [[ -z "${provider_line}" || -z "${account_line}" || -z "${application_line}" ]] || \
+  ! ((provider_line < account_line && account_line < application_line)); then
+  echo "expected provider, account, and application rollout waves in dependency order" >&2
+  cat "${CALL_LOG}" >&2
+  exit 1
+fi
+
+for service in media-rpc user-rpc msg-api; do
+  if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/${service}:wave-sha" "${CALL_LOG}"; then
+    echo "expected ${service} wave to apply its service-specific image" >&2
+    cat "${CALL_LOG}" >&2
+    exit 1
+  fi
+done
 
 # Deploys that update images must provide an immutable image tag.
 : >"${CALL_LOG}"

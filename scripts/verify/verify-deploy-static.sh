@@ -479,8 +479,12 @@ for service in sorted(backend):
     if not container:
         print(f"deploy/k8s/deployments.yaml: Deployment/{service} missing container {service}", file=sys.stderr)
         sys.exit(1)
-    if container.get("command") != [f"/app/bin/{service}"]:
-        print(f"deploy/k8s/deployments.yaml: Deployment/{service} must command /app/bin/{service}", file=sys.stderr)
+    if container.get("command") is not None:
+        print(f"deploy/k8s/deployments.yaml: Deployment/{service} must use the per-service image entrypoint", file=sys.stderr)
+        sys.exit(1)
+    expected_image = f"ghcr.io/wujunhui99/agents_im/{service}:__IMAGE_TAG_REQUIRED__"
+    if container.get("image") != expected_image:
+        print(f"deploy/k8s/deployments.yaml: Deployment/{service} must use {expected_image}", file=sys.stderr)
         sys.exit(1)
 PY
 
@@ -488,8 +492,31 @@ if grep -q 'RESTART_ROLLOUT=' scripts/ci/drone-deploy.sh; then
   echo "drone-deploy.sh must not force RESTART_ROLLOUT for every deploy" >&2
   exit 1
 fi
-if ! grep -q 'BACKEND_IMAGE_NAME' scripts/deploy-k3s.sh || ! grep -q 'image_for_service' scripts/deploy-k3s.sh; then
-  echo "deploy-k3s.sh must render selected backend services to the unified backend image" >&2
+if grep -q 'BACKEND_IMAGE_NAME' scripts/deploy-k3s.sh || ! grep -q 'image_for_service' scripts/deploy-k3s.sh; then
+  echo "deploy-k3s.sh must render selected services to service-specific images" >&2
+  exit 1
+fi
+if ! grep -q 'ROLLOUT_PROVIDER_WAVE' scripts/deploy-k3s.sh || \
+  ! grep -q 'DEPLOY_ROLLOUT_PARALLELISM' scripts/deploy-k3s.sh || \
+  ! grep -q 'run_rollout_wave providers' scripts/deploy-k3s.sh; then
+  echo "deploy-k3s.sh must apply Recreate deployments in dependency waves" >&2
+  exit 1
+fi
+if ! grep -q 'ARG SERVICE' Dockerfile || ! grep -q 'COPY --from=backend-builder /out/service /app/service' Dockerfile; then
+  echo "Dockerfile must build one service binary per backend image" >&2
+  exit 1
+fi
+if grep -q 'build_units_for_services' scripts/ci/drone-build-images.sh || ! grep -q -- '--build-arg "SERVICE=' scripts/ci/drone-build-images.sh; then
+  echo "drone-build-images.sh must build detector-selected backend services individually" >&2
+  exit 1
+fi
+if ! grep -q -- '--buildkitd-config "${buildkit_config}"' scripts/ci/drone-build-images.sh || \
+  ! grep -q 'maxUsedSpace = "20GB"' scripts/ci/buildkitd.toml; then
+  echo "persistent Drone BuildKit must use the bounded GC configuration" >&2
+  exit 1
+fi
+if [[ "$(grep -c 'DRONE_EXPORT_BACKEND_CACHE: "false"' .drone.yml)" -lt 2 ]]; then
+  echo "Drone backend builds must rely on the persistent local builder instead of exporting registry cache on the hot path" >&2
   exit 1
 fi
 

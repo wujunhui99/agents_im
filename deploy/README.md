@@ -34,7 +34,9 @@ ADMIN_BOOTSTRAP_PASSWORD='[REDACTED]' ./scripts/bootstrap-server.sh
 2. `devops-lab`：`devops` 分支用于构建/渲染部署计划验证。
 3. `deploy-main`：`main` push 触发 detect -> build images -> deploy -> notify -> prune。
 
-`deploy-main` 使用 `DRONE_DEPLOY_LOCAL=1`：Drone runner 容器通过 host volume 访问 `/opt/agents-im` 和 `/etc/rancher/k3s/k3s.yaml`，把仓库同步到 `/opt/agents-im/repo` 后在 runner host 上调用 `scripts/ci/drone-deploy.sh` 与 `scripts/deploy-k3s.sh`。当前主路径不是 SSH 同步部署；`scripts/ci/drone-deploy.sh` 里保留的 SSH 分支只作兼容备用。
+`deploy-main` 使用 `DRONE_DEPLOY_LOCAL=1`：Drone runner 容器通过 host volume 访问 `/opt/agents-im` 和 `/etc/rancher/k3s/k3s.yaml`，把仓库同步到 `/opt/agents-im/repo` 后在 runner host 上调用 `scripts/ci/drone-deploy.sh` 与 `scripts/deploy-k3s.sh`。历史 SSH 同步分支已经退役。
+
+后端构建按 detector 选中的服务发布 `<service>:<sha>`，每个镜像只包含一个 Go binary；4 核 runner 默认最多并行 4 个 build。BuildKit builder/Go cache 在宿主持久化；`main` 热路径不导出 backend `mode=max` registry cache。部署使用 `Recreate`，但按 provider RPC → `user-rpc` → API/worker 分波次渲染、应用并等待，每批默认最多 4 个（`DEPLOY_ROLLOUT_PARALLELISM`），避免单节点同时拉取全部镜像以及启动依赖竞态。
 
 必须存在的 Drone secret 名称：
 

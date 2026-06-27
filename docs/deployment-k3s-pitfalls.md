@@ -86,7 +86,8 @@ Current mitigation:
 
 - `scripts/deploy-k3s.sh` renders `deploy/k8s`, substitutes safe immutable application image tags before apply, and still applies Deployment spec/config changes.
 - It uses `${IMAGE_TAG}` only for selected services and keeps currently deployed images for non-selected services.
-- Backend Deployments now point selected services at one immutable `ghcr.io/wujunhui99/agents_im/backend:${IMAGE_TAG}` image; each Deployment chooses its own binary with `command: ["/app/bin/<service>"]`. The web Deployment still uses `web:${IMAGE_TAG}`.
+- Each selected backend Deployment uses its own immutable `ghcr.io/wujunhui99/agents_im/<service>:${IMAGE_TAG}` image containing only `/app/service`; the web Deployment uses `web:${IMAGE_TAG}`.
+- Shared/infra resources are applied first without application Deployments. Selected application Deployments are then rendered and applied in dependency waves (provider RPCs, `user-rpc`, APIs/workers), with at most four concurrent rollouts per batch, so `Recreate` cannot start every image pull and dependency-sensitive process simultaneously.
 - It does not run post-apply `kubectl set image`; image safety is handled in the rendered manifest before apply.
 - Business Deployment manifest images use a placeholder tag instead of a mutable tag, and `scripts/test-no-latest-images.sh` prevents runtime `:latest` usage from returning.
 - `scripts/test-deploy-k3s.sh` has regression coverage for web-only and config-only deploys.
@@ -96,6 +97,22 @@ Verification:
 ```bash
 bash scripts/test-deploy-k3s.sh
 bash scripts/test-no-latest-images.sh
+```
+
+## Pitfall: registry cache export can make hot builds slower
+
+The Drone runner uses a persistent BuildKit container and volume. Go module and build cache mounts therefore survive between builds without uploading a `mode=max` cache to GHCR. Exporting backend registry caches on every `main` build added roughly one minute to the measured hot path while duplicating large snapshots.
+
+Current policy:
+
+- build only detector-selected service images, with bounded parallelism;
+- keep `DRONE_EXPORT_BACKEND_CACHE=false` on `deploy-main`;
+- retain registry cache import as cold-runner assistance and keep web cache export enabled;
+- create the persistent builder with `scripts/ci/buildkitd.toml`: prefer recent cache mounts, cap total BuildKit use near 20GB, and target 30GB free disk;
+- inspect BuildKit disk usage during maintenance; buildkitd applies the configured GC policies automatically.
+
+```bash
+docker exec buildx_buildkit_agents-im-drone-builder0 buildctl du
 ```
 
 ## Pitfall: config-only deploys still restart services
