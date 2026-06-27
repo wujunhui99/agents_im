@@ -259,7 +259,9 @@ steps:
       GHCR_TOKEN:
         from_secret: ghcr_token
       IMAGE_REGISTRY: ghcr.io/wujunhui99/agents_im
-      DRONE_EXPORT_BACKEND_CACHE: "true"
+      # The persistent buildx builder keeps Go module/build caches locally.
+      # Exporting 20 mode=max backend caches added ~60s to the hot path (#673).
+      DRONE_EXPORT_BACKEND_CACHE: "false"
       DRONE_EXPORT_WEB_CACHE: "true"
     commands:
       - apk add --no-cache bash python3

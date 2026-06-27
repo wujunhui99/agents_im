@@ -16,12 +16,13 @@ registry="${IMAGE_REGISTRY:-ghcr.io/wujunhui99/agents_im}"
 commit_sha="${DRONE_COMMIT_SHA}"
 cache_tag="${DRONE_BUILD_CACHE_TAG:-buildcache}"
 cache_scope="${DRONE_BUILD_CACHE_SCOPE:-shared}"
-build_parallelism="${DRONE_IMAGE_BUILD_PARALLELISM:-3}"
+build_parallelism="${DRONE_IMAGE_BUILD_PARALLELISM:-4}"
 force_all_images="${DRONE_IMAGE_BUILD_FORCE_ALL:-false}"
 build_only="${DRONE_IMAGE_BUILD_ONLY:-false}"
 branch="${DRONE_BRANCH:-}"
 export_backend_cache="${DRONE_EXPORT_BACKEND_CACHE:-false}"
 export_web_cache="${DRONE_EXPORT_WEB_CACHE:-true}"
+buildkit_config="${DRONE_BUILDKITD_CONFIG:-scripts/ci/buildkitd.toml}"
 
 source scripts/services.sh
 mapfile -t backend_service_names < <(services_backend_names)
@@ -53,7 +54,12 @@ fi
 
 builder="agents-im-drone-builder"
 if ! docker buildx inspect "${builder}" >/dev/null 2>&1; then
-  docker buildx create --name "${builder}" --driver docker-container --use
+  test -f "${buildkit_config}"
+  docker buildx create \
+    --name "${builder}" \
+    --driver docker-container \
+    --buildkitd-config "${buildkit_config}" \
+    --use
 else
   docker buildx use "${builder}"
 fi
@@ -82,39 +88,6 @@ declare -A service_pid=()
 declare -A service_status=()
 declare -A service_duration=()
 
-is_backend_service() {
-  local service="$1"
-  local known
-  for known in "${backend_service_names[@]}"; do
-    if [[ "${known}" == "${service}" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
-build_units_for_services() {
-  local has_backend=false
-  local has_web=false
-  local service
-  for service in "$@"; do
-    if [[ "${service}" == "${web_service}" ]]; then
-      has_web=true
-    elif is_backend_service "${service}"; then
-      has_backend=true
-    else
-      echo "unknown image service: ${service}" >&2
-      return 1
-    fi
-  done
-  if [[ "${has_backend}" == "true" ]]; then
-    printf '%s\n' backend
-  fi
-  if [[ "${has_web}" == "true" ]]; then
-    printf '%s\n' "${web_service}"
-  fi
-}
-
 service_target() {
   local service="$1"
   if [[ "${service}" == "web" ]]; then
@@ -128,8 +101,6 @@ service_cache_name() {
   local service="$1"
   if [[ "${service}" == "web" ]]; then
     echo "web"
-  elif [[ "${service}" == "backend" ]]; then
-    echo "backend"
   else
     echo "backend-${service}"
   fi
@@ -152,6 +123,11 @@ run_build() {
   cache_name="$(service_cache_name "${service}")"
   cache_ref="${registry}/cache:${cache_scope}-${cache_name}-${cache_tag}"
 
+  local -a build_args=()
+  if [[ "${target}" == "backend" ]]; then
+    build_args=(--build-arg "SERVICE=${service}")
+  fi
+
   local -a cache_to_args=()
   if [[ "${export_cache}" == "true" ]]; then
     cache_to_args=(--cache-to "type=registry,ref=${cache_ref},mode=max,image-manifest=true,oci-mediatypes=true")
@@ -162,6 +138,7 @@ run_build() {
   docker buildx build \
     --builder "${builder}" \
     --target "${target}" \
+    "${build_args[@]}" \
     --cache-from "type=registry,ref=${cache_ref}" \
     "${cache_to_args[@]}" \
     --tag "${registry}/${service}:${commit_sha}" \
@@ -228,15 +205,12 @@ run_batch() {
 
 wall_start_epoch="$(date +%s)"
 echo "Image build services: ${services[*]}"
-build_units_output="$(build_units_for_services "${services[@]}")"
-mapfile -t build_units <<< "${build_units_output}"
-echo "Image build units: ${build_units[*]}"
 echo "Image build parallelism: ${build_parallelism}"
 
 echo "Backend cache export enabled: ${export_backend_cache}"
 echo "Web cache export enabled: ${export_web_cache}"
-echo "Building images with parallelism ${build_parallelism}: ${build_units[*]}"
-run_batch "${build_units[@]}"
+echo "Building images with parallelism ${build_parallelism}: ${services[*]}"
+run_batch "${services[@]}"
 
 wall_end_epoch="$(date +%s)"
 wall_duration="$((wall_end_epoch - wall_start_epoch))"
@@ -244,7 +218,7 @@ wall_duration="$((wall_end_epoch - wall_start_epoch))"
 if ((${#completed_services[@]} > 0)); then
   echo "Image build duration summary:"
   total_duration=0
-  for service in "${build_units[@]}"; do
+  for service in "${services[@]}"; do
     if [[ -n "${service_duration[${service}]:-}" ]]; then
       service_names+=("${service}")
       service_durations+=("${service_duration[${service}]}")
@@ -252,7 +226,7 @@ if ((${#completed_services[@]} > 0)); then
       total_duration="$((total_duration + service_duration[${service}]))"
     fi
   done
-  echo "Total image build unit duration: ${total_duration}s"
+  echo "Total per-service image build duration: ${total_duration}s"
   echo "Total image build wall-clock duration: ${wall_duration}s"
 fi
 

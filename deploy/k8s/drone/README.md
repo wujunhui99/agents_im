@@ -15,3 +15,7 @@ Drone server + docker runner 跑在 k3s `drone` namespace（2026-06-10 服务器
   会当成监听端口配置而启动失败 —— deployment 已设 `enableServiceLinks: false`。
 - 仓库激活后必须设 `trusted=true`（host volume 需要），repo secrets：`ghcr_username`、
   `ghcr_token`、`telegram_bot_token`、`telegram_chat_id`。
+- backend/web 构建共用宿主持久的 `agents-im-drone-builder`。新建 builder 时必须传
+  `scripts/ci/buildkitd.toml`，将 BuildKit 总占用限制在约 20GB、目标空闲空间设为 30GB，
+  同时优先保留 7 天内使用过的 Go/npm cache mount。修改该配置后需在无构建运行时重建
+  builder 容器（保留同名 state volume），否则运行中的 buildkitd 不会热加载配置。

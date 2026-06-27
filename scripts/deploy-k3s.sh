@@ -4,7 +4,6 @@ set -euo pipefail
 NAMESPACE="${NAMESPACE:-agents-im}"
 IMAGE_REGISTRY="${IMAGE_REGISTRY:-ghcr.io/wujunhui99/agents_im}"
 IMAGE_TAG="${IMAGE_TAG:-}"
-BACKEND_IMAGE_NAME="${BACKEND_IMAGE_NAME:-backend}"
 MANIFEST_DIR="${MANIFEST_DIR:-deploy/k8s}"
 KUBECTL="${KUBECTL:-kubectl}"
 GHCR_USERNAME="${GHCR_USERNAME:-}"
@@ -16,6 +15,7 @@ ROLLOUT_SERVICES="${ROLLOUT_SERVICES:-}"
 RESTART_SERVICES="${RESTART_SERVICES:-}"
 RESTART_ROLLOUT="${RESTART_ROLLOUT:-false}"
 RENDER_ONLY="${RENDER_ONLY:-false}"
+ROLLOUT_PARALLELISM="${DEPLOY_ROLLOUT_PARALLELISM:-4}"
 
 # Service registry comes from scripts/services.json (single source of truth),
 # shared with detect-deploy-changes.py and dev-up.sh.
@@ -23,6 +23,14 @@ source "$(dirname "${BASH_SOURCE[0]}")/services.sh"
 WEB_DEPLOYMENT="$(services_web_name)"
 mapfile -t IMAGE_DEPLOYMENTS < <(services_backend_names; printf '%s\n' "${WEB_DEPLOYMENT}")
 mapfile -t RESTARTABLE_DEPLOYMENTS < <(printf '%s\n' "${IMAGE_DEPLOYMENTS[@]}"; services_infra_names)
+
+# Recreate rollouts must respect startup dependencies. user-rpc performs a
+# startup backfill through agent-rpc, while APIs/workers depend on RPCs. Keep
+# independent provider RPCs parallel, then user-rpc, then all remaining apps.
+ROLLOUT_PROVIDER_WAVE=(
+  auth-rpc friends-rpc groups-rpc msg-rpc agent-rpc third-rpc media-rpc admin-rpc
+)
+ROLLOUT_ACCOUNT_WAVE=(user-rpc)
 
 require() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -128,11 +136,7 @@ current_image_for() {
 
 image_for_service() {
   local service="$1"
-  if [[ "${service}" == "${WEB_DEPLOYMENT}" ]]; then
-    printf '%s/%s:%s\n' "${IMAGE_REGISTRY}" "${service}" "${IMAGE_TAG}"
-  else
-    printf '%s/%s:%s\n' "${IMAGE_REGISTRY}" "${BACKEND_IMAGE_NAME}" "${IMAGE_TAG}"
-  fi
+  printf '%s/%s:%s\n' "${IMAGE_REGISTRY}" "${service}" "${IMAGE_TAG}"
 }
 
 build_image_overrides() {
@@ -157,14 +161,26 @@ build_image_overrides() {
 
 apply_rendered_manifests() {
   local image_overrides="$1"
+  local app_deployment_mode="${2:-all}"
+  local selected_app_deployments="${3:-}"
   local app_deployments
   app_deployments="$(printf '%s\n' "${IMAGE_DEPLOYMENTS[@]}")"
-  ${KUBECTL} kustomize "${MANIFEST_DIR}" | APP_DEPLOYMENT_NAMES="${app_deployments}" IMAGE_OVERRIDES="${image_overrides}" python3 -c '
+  ${KUBECTL} kustomize "${MANIFEST_DIR}" | \
+    APP_DEPLOYMENT_NAMES="${app_deployments}" \
+    APP_DEPLOYMENT_MODE="${app_deployment_mode}" \
+    SELECTED_APP_DEPLOYMENTS="${selected_app_deployments}" \
+    IMAGE_OVERRIDES="${image_overrides}" \
+    python3 -c '
 import os
 import re
 import sys
 
 app_deployments = set(os.environ.get("APP_DEPLOYMENT_NAMES", "").splitlines())
+app_deployment_mode = os.environ.get("APP_DEPLOYMENT_MODE", "all")
+selected_app_deployments = set(os.environ.get("SELECTED_APP_DEPLOYMENTS", "").splitlines())
+if app_deployment_mode not in {"all", "exclude", "only"}:
+    print(f"unknown APP_DEPLOYMENT_MODE={app_deployment_mode}", file=sys.stderr)
+    sys.exit(1)
 overrides = {}
 for line in os.environ.get("IMAGE_OVERRIDES", "").splitlines():
     if "=" in line:
@@ -173,13 +189,23 @@ for line in os.environ.get("IMAGE_OVERRIDES", "").splitlines():
 text = sys.stdin.read()
 docs = re.split(r"(?m)^---\s*$", text)
 kept = []
+seen_selected_app_deployments = set()
 for doc in docs:
     if not doc.strip():
         continue
     kind_match = re.search(r"(?m)^kind:\s*Deployment\s*$", doc)
     name_match = re.search(r"(?m)^metadata:\s*$.*?^  name:\s*([^\s#]+)", doc, re.S)
     name = name_match.group(1) if name_match else ""
-    if kind_match and name in app_deployments:
+    is_app_deployment = bool(kind_match and name in app_deployments)
+    if app_deployment_mode == "exclude" and is_app_deployment:
+        continue
+    if app_deployment_mode == "only" and (
+        not is_app_deployment or name not in selected_app_deployments
+    ):
+        continue
+    if is_app_deployment:
+        if name in selected_app_deployments:
+            seen_selected_app_deployments.add(name)
         image = overrides.get(name)
         if not image:
             print(f"missing safe image override for Deployment/{name}; refusing to render/apply", file=sys.stderr)
@@ -189,6 +215,11 @@ for doc in docs:
             print(f"Deployment/{name} did not contain exactly one replaceable image field", file=sys.stderr)
             sys.exit(1)
     kept.append(doc.strip() + "\n")
+if app_deployment_mode == "only":
+    missing = selected_app_deployments - seen_selected_app_deployments
+    if missing:
+        print(f"selected application Deployments missing from render: {sorted(missing)}", file=sys.stderr)
+        sys.exit(1)
 if kept:
     rendered = "---\n" + "---\n".join(kept)
     if "__IMAGE_TAG_REQUIRED__" in rendered or re.search(r"(?m)^\s*image:\s*\S+:latest\s*$", rendered):
@@ -196,6 +227,58 @@ if kept:
         sys.exit(1)
     sys.stdout.write(rendered)
 '
+}
+
+run_rollout_wave() {
+  local wave_name="$1"
+  local image_overrides="$2"
+  local selected_images_name="$3"
+  local restart_services_name="$4"
+  shift 4
+  local -n selected_images_ref="${selected_images_name}"
+  local -n restart_services_ref="${restart_services_name}"
+  local services=("$@")
+  local service app_selection pid offset=0 batch_number=0
+
+  ((${#services[@]} > 0)) || return 0
+  while ((offset < ${#services[@]})); do
+    local batch=("${services[@]:offset:ROLLOUT_PARALLELISM}")
+    local app_services=()
+    local -a rollout_pids=()
+    batch_number=$((batch_number + 1))
+    echo "Starting rollout wave ${wave_name}.${batch_number}: ${batch[*]}"
+
+    for service in "${batch[@]}"; do
+      if known_service "${service}" "${IMAGE_DEPLOYMENTS[@]}"; then
+        app_services+=("${service}")
+      fi
+    done
+    if ((${#app_services[@]} > 0)); then
+      app_selection="$(printf '%s\n' "${app_services[@]}")"
+      apply_rendered_manifests "${image_overrides}" only "${app_selection}" | ${KUBECTL} apply -f -
+    fi
+
+    for service in "${batch[@]}"; do
+      if array_contains "${service}" "${restart_services_ref[@]}" && \
+        ! array_contains "${service}" "${selected_images_ref[@]}"; then
+        ${KUBECTL} -n "${NAMESPACE}" rollout restart "deployment/${service}"
+      fi
+    done
+
+    for service in "${batch[@]}"; do
+      ${KUBECTL} -n "${NAMESPACE}" rollout status "deployment/${service}" --timeout=180s &
+      rollout_pids+=("$!")
+    done
+    local rollout_failed=0
+    for pid in "${rollout_pids[@]}"; do
+      wait "${pid}" || rollout_failed=1
+    done
+    if ((rollout_failed)); then
+      echo "Rollout wave ${wave_name}.${batch_number} failed." >&2
+      return 1
+    fi
+    offset=$((offset + ROLLOUT_PARALLELISM))
+  done
 }
 
 unique_services() {
@@ -338,7 +421,10 @@ apply_manifests() {
   ensure_secret
   ensure_image_pull_secret
   cleanup_obsolete_resources
-  apply_rendered_manifests "${image_overrides}" | ${KUBECTL} apply -f -
+  # Shared and infrastructure resources are safe to apply immediately. App
+  # Deployments are applied below in dependency waves so their Recreate
+  # strategy cannot trigger a pull storm or startup dependency race.
+  apply_rendered_manifests "${image_overrides}" exclude | ${KUBECTL} apply -f -
 
   if bool_true "${SKIP_SET_IMAGE}"; then
     echo "Skipping image updates; rendered manifest preserves currently deployed image tags."
@@ -348,27 +434,37 @@ apply_manifests() {
     while IFS= read -r service; do
       [[ -z "${service}" ]] && continue
       restart_rollout_services+=("${service}")
-      ${KUBECTL} -n "${NAMESPACE}" rollout restart "deployment/${service}"
     done < <(restart_services)
   fi
 
+  local -a rollout_wait_services=()
   mapfile -t rollout_wait_services < <(
     unique_services "${selected_image_services[@]}" "${restart_rollout_services[@]:-}"
   )
-  local -a rollout_pids=()
+  local -a provider_wave=()
+  local -a account_wave=()
+  local -a application_wave=()
+  local service
+  for service in "${ROLLOUT_PROVIDER_WAVE[@]}"; do
+    if array_contains "${service}" "${rollout_wait_services[@]}"; then
+      provider_wave+=("${service}")
+    fi
+  done
+  for service in "${ROLLOUT_ACCOUNT_WAVE[@]}"; do
+    if array_contains "${service}" "${rollout_wait_services[@]}"; then
+      account_wave+=("${service}")
+    fi
+  done
   for service in "${rollout_wait_services[@]}"; do
-    [[ -z "${service}" ]] && continue
-    ${KUBECTL} -n "${NAMESPACE}" rollout status "deployment/${service}" --timeout=180s &
-    rollout_pids+=("$!")
+    if ! array_contains "${service}" "${provider_wave[@]}" && \
+      ! array_contains "${service}" "${account_wave[@]}"; then
+      application_wave+=("${service}")
+    fi
   done
-  local rollout_failed=0
-  for pid in "${rollout_pids[@]}"; do
-    wait "${pid}" || rollout_failed=1
-  done
-  if ((rollout_failed)); then
-    echo "One or more rollout status checks failed." >&2
-    exit 1
-  fi
+
+  run_rollout_wave providers "${image_overrides}" selected_image_services restart_rollout_services "${provider_wave[@]}"
+  run_rollout_wave account "${image_overrides}" selected_image_services restart_rollout_services "${account_wave[@]}"
+  run_rollout_wave applications "${image_overrides}" selected_image_services restart_rollout_services "${application_wave[@]}"
 
   if ((${#selected_image_services[@]} > 0)); then
     verify_deployed_images "${selected_image_services[@]}"
@@ -388,6 +484,10 @@ main() {
   fi
   require "${KUBECTL}"
   require python3
+  if ! [[ "${ROLLOUT_PARALLELISM}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "DEPLOY_ROLLOUT_PARALLELISM must be a positive integer; got ${ROLLOUT_PARALLELISM}." >&2
+    exit 1
+  fi
   if ! bool_true "${SKIP_MIGRATIONS}"; then
     require psql
   fi

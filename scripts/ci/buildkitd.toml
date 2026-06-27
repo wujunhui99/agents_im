@@ -1,0 +1,19 @@
+[worker.oci]
+  gc = true
+  # Preserve hot Go/npm cache mounts, but do not let BuildKit consume most of
+  # the single-node system disk. The host currently has an 89GB root volume.
+  reservedSpace = "8GB"
+  maxUsedSpace = "20GB"
+  minFreeSpace = "30GB"
+
+  [[worker.oci.gcpolicy]]
+    filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+    keepDuration = "168h"
+    reservedSpace = "4GB"
+    maxUsedSpace = "8GB"
+
+  [[worker.oci.gcpolicy]]
+    all = true
+    reservedSpace = "8GB"
+    maxUsedSpace = "20GB"
+    minFreeSpace = "30GB"
