@@ -4,11 +4,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
+	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/feedbackstore"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -40,7 +40,7 @@ func (l *ListFeedbackLogic) ListFeedback(in *admin.FeedbackListRequest) (*admin.
 		}
 		status = parsed
 	}
-	items, err := l.svcCtx.Feedback.ListFeedback(l.ctx, repository.FeedbackListFilter{
+	items, err := l.svcCtx.Feedback.ListFeedback(l.ctx, feedbackstore.ListFilter{
 		Status: status,
 		Limit:  normalizeAdminLimit(int(in.GetLimit()), 50, 200),
 		Offset: int(in.GetOffset()),
