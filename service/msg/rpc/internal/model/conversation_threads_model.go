@@ -27,6 +27,18 @@ type (
 		UpdateAfterMessage(ctx context.Context, conversationID, serverMsgID string, seq int64, sendTime time.Time) error
 		// GetMaxSeq 读取会话 max_seq；会话不存在返回 ErrNotFound。
 		GetMaxSeq(ctx context.Context, conversationID string) (int64, error)
+		// CountConversations 返回会话总数（admin dashboard 只读，#618）。
+		CountConversations(ctx context.Context) (int64, error)
+		// ListRecentConversations 按最近活跃倒序返回会话概要（admin dashboard 只读，#618）。
+		// 末条消息由调用方按 last_message_id 补全（保持本 model 不跨表）。
+		ListRecentConversations(ctx context.Context, limit int) ([]RecentConversation, error)
+	}
+
+	// RecentConversation 是 admin dashboard 最近会话列表的投影行（#618）。
+	RecentConversation struct {
+		ConversationID string `db:"conversation_id"`
+		MaxSeq         int64  `db:"max_seq"`
+		LastMessageID  string `db:"last_message_id"`
 	}
 
 	// UpsertConversationParams 描述会话的不变属性（用于首次创建行）。
@@ -110,4 +122,32 @@ func (m *customConversationThreadsModel) GetMaxSeq(ctx context.Context, conversa
 	var maxSeq int64
 	err := m.conn.QueryRowCtx(ctx, &maxSeq, `select max_seq from conversation_threads where conversation_id = $1`, conversationID)
 	return maxSeq, err
+}
+
+func (m *customConversationThreadsModel) CountConversations(ctx context.Context) (int64, error) {
+	var count int64
+	err := m.conn.QueryRowCtx(ctx, &count, `select count(*) from conversation_threads`)
+	return count, err
+}
+
+func (m *customConversationThreadsModel) ListRecentConversations(ctx context.Context, limit int) ([]RecentConversation, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	var rows []RecentConversation
+	err := m.conn.QueryRowsCtx(ctx, &rows, `
+select conversation_id,
+       max_seq,
+       coalesce(last_message_id, '') as last_message_id
+from conversation_threads
+order by coalesce(last_message_at, updated_at) desc, conversation_id asc
+limit $1
+`, limit)
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
 }

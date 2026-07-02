@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v5.29.3
-// source: service/msg/rpc/msg.proto
+// source: msg.proto
 
 package msg
 
@@ -19,19 +19,23 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Msg_SendMessage_FullMethodName               = "/msg.v1.Msg/SendMessage"
-	Msg_AppendStreamMessage_FullMethodName       = "/msg.v1.Msg/AppendStreamMessage"
-	Msg_PullMessages_FullMethodName              = "/msg.v1.Msg/PullMessages"
-	Msg_GetLastMessageByConvs_FullMethodName     = "/msg.v1.Msg/GetLastMessageByConvs"
-	Msg_GetConversationsSeqState_FullMethodName  = "/msg.v1.Msg/GetConversationsSeqState"
-	Msg_GetMaxSeqs_FullMethodName                = "/msg.v1.Msg/GetMaxSeqs"
-	Msg_GetHasReadSeqs_FullMethodName            = "/msg.v1.Msg/GetHasReadSeqs"
-	Msg_MarkConversationAsRead_FullMethodName    = "/msg.v1.Msg/MarkConversationAsRead"
-	Msg_GetMessageRef_FullMethodName             = "/msg.v1.Msg/GetMessageRef"
-	Msg_RevokeMessage_FullMethodName             = "/msg.v1.Msg/RevokeMessage"
-	Msg_DeleteMessages_FullMethodName            = "/msg.v1.Msg/DeleteMessages"
-	Msg_ClearConversationMessages_FullMethodName = "/msg.v1.Msg/ClearConversationMessages"
-	Msg_GetServerTime_FullMethodName             = "/msg.v1.Msg/GetServerTime"
+	Msg_SendMessage_FullMethodName                  = "/msg.v1.Msg/SendMessage"
+	Msg_AppendStreamMessage_FullMethodName          = "/msg.v1.Msg/AppendStreamMessage"
+	Msg_PullMessages_FullMethodName                 = "/msg.v1.Msg/PullMessages"
+	Msg_GetLastMessageByConvs_FullMethodName        = "/msg.v1.Msg/GetLastMessageByConvs"
+	Msg_GetConversationsSeqState_FullMethodName     = "/msg.v1.Msg/GetConversationsSeqState"
+	Msg_GetMaxSeqs_FullMethodName                   = "/msg.v1.Msg/GetMaxSeqs"
+	Msg_GetHasReadSeqs_FullMethodName               = "/msg.v1.Msg/GetHasReadSeqs"
+	Msg_MarkConversationAsRead_FullMethodName       = "/msg.v1.Msg/MarkConversationAsRead"
+	Msg_GetMessageRef_FullMethodName                = "/msg.v1.Msg/GetMessageRef"
+	Msg_RevokeMessage_FullMethodName                = "/msg.v1.Msg/RevokeMessage"
+	Msg_DeleteMessages_FullMethodName               = "/msg.v1.Msg/DeleteMessages"
+	Msg_ClearConversationMessages_FullMethodName    = "/msg.v1.Msg/ClearConversationMessages"
+	Msg_GetServerTime_FullMethodName                = "/msg.v1.Msg/GetServerTime"
+	Msg_AdminGetConversationMessages_FullMethodName = "/msg.v1.Msg/AdminGetConversationMessages"
+	Msg_AdminReplayAgentMessage_FullMethodName      = "/msg.v1.Msg/AdminReplayAgentMessage"
+	Msg_AdminGetMessageStats_FullMethodName         = "/msg.v1.Msg/AdminGetMessageStats"
+	Msg_AdminListRecentConversations_FullMethodName = "/msg.v1.Msg/AdminListRecentConversations"
 )
 
 // MsgClient is the client API for Msg service.
@@ -63,6 +67,15 @@ type MsgClient interface {
 	ClearConversationMessages(ctx context.Context, in *ClearConversationMessagesRequest, opts ...grpc.CallOption) (*ClearConversationMessagesResponse, error)
 	// 时间（stub）
 	GetServerTime(ctx context.Context, in *GetServerTimeRequest, opts ...grpc.CallOption) (*GetServerTimeResponse, error)
+	// 管理后台只读/运维面（#618）：admin-rpc 跨域只读经属主 msg-rpc，脱 internal/repository
+	// AdminMessageRepository 直读。AdminGetConversationMessages 是**无成员裁剪**的会话原始读
+	// （管理员视角，区别于 PullMessages 的用户可见边界）；AdminReplayAgentMessage 由消息属主
+	// 侧重放触发（重新 publish agent.trigger.v1），幂等收敛在 agent_triggers 台账。
+	AdminGetConversationMessages(ctx context.Context, in *AdminGetConversationMessagesRequest, opts ...grpc.CallOption) (*AdminGetConversationMessagesResponse, error)
+	AdminReplayAgentMessage(ctx context.Context, in *AdminReplayAgentMessageRequest, opts ...grpc.CallOption) (*AdminReplayAgentMessageResponse, error)
+	// 后台仪表盘：全域消息/会话总量 + 最近活跃会话概要。
+	AdminGetMessageStats(ctx context.Context, in *AdminGetMessageStatsRequest, opts ...grpc.CallOption) (*AdminGetMessageStatsResponse, error)
+	AdminListRecentConversations(ctx context.Context, in *AdminListRecentConversationsRequest, opts ...grpc.CallOption) (*AdminListRecentConversationsResponse, error)
 }
 
 type msgClient struct {
@@ -203,6 +216,46 @@ func (c *msgClient) GetServerTime(ctx context.Context, in *GetServerTimeRequest,
 	return out, nil
 }
 
+func (c *msgClient) AdminGetConversationMessages(ctx context.Context, in *AdminGetConversationMessagesRequest, opts ...grpc.CallOption) (*AdminGetConversationMessagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AdminGetConversationMessagesResponse)
+	err := c.cc.Invoke(ctx, Msg_AdminGetConversationMessages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) AdminReplayAgentMessage(ctx context.Context, in *AdminReplayAgentMessageRequest, opts ...grpc.CallOption) (*AdminReplayAgentMessageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AdminReplayAgentMessageResponse)
+	err := c.cc.Invoke(ctx, Msg_AdminReplayAgentMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) AdminGetMessageStats(ctx context.Context, in *AdminGetMessageStatsRequest, opts ...grpc.CallOption) (*AdminGetMessageStatsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AdminGetMessageStatsResponse)
+	err := c.cc.Invoke(ctx, Msg_AdminGetMessageStats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) AdminListRecentConversations(ctx context.Context, in *AdminListRecentConversationsRequest, opts ...grpc.CallOption) (*AdminListRecentConversationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AdminListRecentConversationsResponse)
+	err := c.cc.Invoke(ctx, Msg_AdminListRecentConversations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 // All implementations must embed UnimplementedMsgServer
 // for forward compatibility.
@@ -232,6 +285,15 @@ type MsgServer interface {
 	ClearConversationMessages(context.Context, *ClearConversationMessagesRequest) (*ClearConversationMessagesResponse, error)
 	// 时间（stub）
 	GetServerTime(context.Context, *GetServerTimeRequest) (*GetServerTimeResponse, error)
+	// 管理后台只读/运维面（#618）：admin-rpc 跨域只读经属主 msg-rpc，脱 internal/repository
+	// AdminMessageRepository 直读。AdminGetConversationMessages 是**无成员裁剪**的会话原始读
+	// （管理员视角，区别于 PullMessages 的用户可见边界）；AdminReplayAgentMessage 由消息属主
+	// 侧重放触发（重新 publish agent.trigger.v1），幂等收敛在 agent_triggers 台账。
+	AdminGetConversationMessages(context.Context, *AdminGetConversationMessagesRequest) (*AdminGetConversationMessagesResponse, error)
+	AdminReplayAgentMessage(context.Context, *AdminReplayAgentMessageRequest) (*AdminReplayAgentMessageResponse, error)
+	// 后台仪表盘：全域消息/会话总量 + 最近活跃会话概要。
+	AdminGetMessageStats(context.Context, *AdminGetMessageStatsRequest) (*AdminGetMessageStatsResponse, error)
+	AdminListRecentConversations(context.Context, *AdminListRecentConversationsRequest) (*AdminListRecentConversationsResponse, error)
 	mustEmbedUnimplementedMsgServer()
 }
 
@@ -280,6 +342,18 @@ func (UnimplementedMsgServer) ClearConversationMessages(context.Context, *ClearC
 }
 func (UnimplementedMsgServer) GetServerTime(context.Context, *GetServerTimeRequest) (*GetServerTimeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetServerTime not implemented")
+}
+func (UnimplementedMsgServer) AdminGetConversationMessages(context.Context, *AdminGetConversationMessagesRequest) (*AdminGetConversationMessagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AdminGetConversationMessages not implemented")
+}
+func (UnimplementedMsgServer) AdminReplayAgentMessage(context.Context, *AdminReplayAgentMessageRequest) (*AdminReplayAgentMessageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AdminReplayAgentMessage not implemented")
+}
+func (UnimplementedMsgServer) AdminGetMessageStats(context.Context, *AdminGetMessageStatsRequest) (*AdminGetMessageStatsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AdminGetMessageStats not implemented")
+}
+func (UnimplementedMsgServer) AdminListRecentConversations(context.Context, *AdminListRecentConversationsRequest) (*AdminListRecentConversationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AdminListRecentConversations not implemented")
 }
 func (UnimplementedMsgServer) mustEmbedUnimplementedMsgServer() {}
 func (UnimplementedMsgServer) testEmbeddedByValue()             {}
@@ -536,6 +610,78 @@ func _Msg_GetServerTime_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_AdminGetConversationMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AdminGetConversationMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).AdminGetConversationMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_AdminGetConversationMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).AdminGetConversationMessages(ctx, req.(*AdminGetConversationMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_AdminReplayAgentMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AdminReplayAgentMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).AdminReplayAgentMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_AdminReplayAgentMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).AdminReplayAgentMessage(ctx, req.(*AdminReplayAgentMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_AdminGetMessageStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AdminGetMessageStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).AdminGetMessageStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_AdminGetMessageStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).AdminGetMessageStats(ctx, req.(*AdminGetMessageStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_AdminListRecentConversations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AdminListRecentConversationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).AdminListRecentConversations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_AdminListRecentConversations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).AdminListRecentConversations(ctx, req.(*AdminListRecentConversationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Msg_ServiceDesc is the grpc.ServiceDesc for Msg service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -595,7 +741,23 @@ var Msg_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetServerTime",
 			Handler:    _Msg_GetServerTime_Handler,
 		},
+		{
+			MethodName: "AdminGetConversationMessages",
+			Handler:    _Msg_AdminGetConversationMessages_Handler,
+		},
+		{
+			MethodName: "AdminReplayAgentMessage",
+			Handler:    _Msg_AdminReplayAgentMessage_Handler,
+		},
+		{
+			MethodName: "AdminGetMessageStats",
+			Handler:    _Msg_AdminGetMessageStats_Handler,
+		},
+		{
+			MethodName: "AdminListRecentConversations",
+			Handler:    _Msg_AdminListRecentConversations_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "service/msg/rpc/msg.proto",
+	Metadata: "msg.proto",
 }

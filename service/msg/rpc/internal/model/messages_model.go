@@ -27,6 +27,8 @@ type (
 		InsertReturning(ctx context.Context, data *Messages) (*Messages, error)
 		// GetMessagesInRange 按 seq 区间分页拉取，返回 (消息, isEnd, nextSeq)。
 		GetMessagesInRange(ctx context.Context, conversationID string, fromSeq, toSeq, maxSeq int64, limit int, order string) ([]*Messages, bool, int64, error)
+		// CountMessages 返回消息总数（admin dashboard 只读，#618）。
+		CountMessages(ctx context.Context) (int64, error)
 	}
 
 	customMessagesModel struct {
@@ -43,6 +45,12 @@ func NewMessagesModel(conn sqlx.SqlConn) MessagesModel {
 
 func (m *customMessagesModel) WithSession(session sqlx.Session) MessagesModel {
 	return NewMessagesModel(sqlx.NewSqlConnFromSession(session))
+}
+
+func (m *customMessagesModel) CountMessages(ctx context.Context) (int64, error) {
+	var count int64
+	err := m.conn.QueryRowCtx(ctx, &count, fmt.Sprintf(`select count(*) from %s`, m.table))
+	return count, err
 }
 
 func (m *customMessagesModel) Transact(ctx context.Context, fn func(ctx context.Context, session sqlx.Session) error) error {

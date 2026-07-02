@@ -5,10 +5,11 @@ import (
 	"strings"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
+	friendspb "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
+	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -87,9 +88,6 @@ func NewGetUserFriendsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Ge
 }
 
 func (l *GetUserFriendsLogic) GetUserFriends(in *admin.UserFriendsRequest) (*admin.UserFriendsResponse, error) {
-	if l.svcCtx.UserRPC == nil || l.svcCtx.Friends == nil {
-		return nil, rpcerror.ToStatus(apperror.Internal("admin friend repositories are not configured"))
-	}
 	accountID, err := validateRequiredAdminID(in.GetAccountId(), "account_id", adminAccountIDMaxLen)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
@@ -97,21 +95,24 @@ func (l *GetUserFriendsLogic) GetUserFriends(in *admin.UserFriendsRequest) (*adm
 	if _, err := l.svcCtx.UserRPC.GetUserByID(l.ctx, &userpb.GetUserByIDRequest{UserId: accountID}); err != nil {
 		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
-	friendships, err := l.svcCtx.Friends.ListFriends(l.ctx, accountID)
+	// 好友关系只读经属主 friends-rpc（#618，脱 internal/repository FriendshipRepository）；
+	// 好友资料由 admin 再聚合属主 user-rpc 补全（friends-rpc 是叶子，不跨域取资料）。
+	friendsResp, err := l.svcCtx.FriendsRPC.ListFriends(l.ctx, &friendspb.ListFriendsRequest{UserId: accountID})
 	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
+	friendships := friendsResp.GetFriends()
 	out := make([]*admin.AdminFriend, 0, len(friendships))
 	for _, friendship := range friendships {
 		view := &admin.AdminFriend{
-			UserId:    friendship.UserID,
-			FriendId:  friendship.FriendID,
-			Status:    friendship.Status,
-			IsFriend:  friendship.Status == model.FriendshipStatusAccepted,
-			CreatedAt: formatAdminTime(friendship.CreatedAt),
-			UpdatedAt: formatAdminTime(friendship.UpdatedAt),
+			UserId:    friendship.GetUserId(),
+			FriendId:  friendship.GetFriendId(),
+			Status:    friendship.GetStatus(),
+			IsFriend:  friendship.GetIsFriend(),
+			CreatedAt: friendship.GetCreatedAt(),
+			UpdatedAt: friendship.GetUpdatedAt(),
 		}
-		friend, err := l.svcCtx.UserRPC.GetUserByID(l.ctx, &userpb.GetUserByIDRequest{UserId: friendship.FriendID})
+		friend, err := l.svcCtx.UserRPC.GetUserByID(l.ctx, &userpb.GetUserByIDRequest{UserId: friendship.GetFriendId()})
 		if err != nil {
 			return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 		}
@@ -134,9 +135,6 @@ func NewGetUserConversationsLogic(ctx context.Context, svcCtx *svc.ServiceContex
 }
 
 func (l *GetUserConversationsLogic) GetUserConversations(in *admin.UserConversationsRequest) (*admin.UserConversationsResponse, error) {
-	if l.svcCtx.UserRPC == nil || l.svcCtx.Messages == nil {
-		return nil, rpcerror.ToStatus(apperror.Internal("admin conversation repositories are not configured"))
-	}
 	accountID, err := validateRequiredAdminID(in.GetAccountId(), "account_id", adminAccountIDMaxLen)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
@@ -144,9 +142,10 @@ func (l *GetUserConversationsLogic) GetUserConversations(in *admin.UserConversat
 	if _, err := l.svcCtx.UserRPC.GetUserByID(l.ctx, &userpb.GetUserByIDRequest{UserId: accountID}); err != nil {
 		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
-	states, err := l.svcCtx.Messages.GetConversationSeqStates(l.ctx, accountID, nil)
+	// 用户会话 seq 视图经属主 msg-rpc（#618，脱 internal/repository）：空 conversation_ids 取该用户全部会话。
+	statesResp, err := l.svcCtx.MsgRPC.GetConversationsSeqState(l.ctx, &msgpb.GetConversationsSeqStateRequest{UserId: accountID})
 	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
-	return &admin.UserConversationsResponse{Conversations: adminConversationsPB(states)}, nil
+	return &admin.UserConversationsResponse{Conversations: adminConversationsPB(statesResp.GetStates())}, nil
 }

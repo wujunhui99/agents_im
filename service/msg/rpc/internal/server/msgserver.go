@@ -94,3 +94,24 @@ func (s *MsgServer) GetServerTime(ctx context.Context, in *msg.GetServerTimeRequ
 	l := logic.NewGetServerTimeLogic(ctx, s.svcCtx)
 	return l.GetServerTime(in)
 }
+
+// Admin 只读/运维面（#618）
+func (s *MsgServer) AdminGetConversationMessages(ctx context.Context, in *msg.AdminGetConversationMessagesRequest) (*msg.AdminGetConversationMessagesResponse, error) {
+	l := logic.NewAdminGetConversationMessagesLogic(ctx, s.svcCtx)
+	return l.AdminGetConversationMessages(in)
+}
+
+func (s *MsgServer) AdminReplayAgentMessage(ctx context.Context, in *msg.AdminReplayAgentMessageRequest) (*msg.AdminReplayAgentMessageResponse, error) {
+	l := logic.NewAdminReplayAgentMessageLogic(ctx, s.svcCtx)
+	return l.AdminReplayAgentMessage(in)
+}
+
+func (s *MsgServer) AdminGetMessageStats(ctx context.Context, in *msg.AdminGetMessageStatsRequest) (*msg.AdminGetMessageStatsResponse, error) {
+	l := logic.NewAdminGetMessageStatsLogic(ctx, s.svcCtx)
+	return l.AdminGetMessageStats(in)
+}
+
+func (s *MsgServer) AdminListRecentConversations(ctx context.Context, in *msg.AdminListRecentConversationsRequest) (*msg.AdminListRecentConversationsResponse, error) {
+	l := logic.NewAdminListRecentConversationsLogic(ctx, s.svcCtx)
+	return l.AdminListRecentConversations(in)
+}

@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/observability"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	dbmodel "github.com/wujunhui99/agents_im/service/admin/rpc/internal/model"
+	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -45,29 +45,34 @@ func adminUserPB(u *userpb.UserEntity) *admin.AdminUser {
 	}
 }
 
-func adminMessagePB(message repository.Message) *admin.AdminMessage {
+// adminMessagePB 把属主 msg-rpc 的 pb Message 转成 admin.AdminMessage（内容做敏感词脱敏）。
+// SendTime/CreatedAt 已是 UnixMilli（与旧 repository.Message 一致），直接透传。
+func adminMessagePB(message *msgpb.Message) *admin.AdminMessage {
+	if message == nil {
+		return nil
+	}
 	return &admin.AdminMessage{
-		ServerMsgId:           message.ServerMsgID,
-		ClientMsgId:           message.ClientMsgID,
-		ConversationId:        message.ConversationID,
-		Seq:                   message.Seq,
-		SenderId:              message.SenderID,
-		ReceiverId:            message.ReceiverID,
-		GroupId:               message.GroupID,
-		ChatType:              message.ChatType,
-		ContentType:           message.ContentType,
-		Content:               sanitizeAdminText(message.Content),
-		MessageOrigin:         message.MessageOrigin,
-		AgentAccountId:        message.AgentAccountID,
-		TriggerServerMsgId:    message.TriggerServerMsgID,
-		AgentRunId:            message.AgentRunID,
-		AllowRecursiveTrigger: message.AllowRecursiveTrigger,
-		SendTime:              message.SendTime,
-		CreatedAt:             message.CreatedAt,
+		ServerMsgId:           message.GetServerMsgId(),
+		ClientMsgId:           message.GetClientMsgId(),
+		ConversationId:        message.GetConversationId(),
+		Seq:                   message.GetSeq(),
+		SenderId:              message.GetSenderId(),
+		ReceiverId:            message.GetReceiverId(),
+		GroupId:               message.GetGroupId(),
+		ChatType:              message.GetChatType(),
+		ContentType:           message.GetContentType(),
+		Content:               sanitizeAdminText(message.GetContent()),
+		MessageOrigin:         message.GetMessageOrigin(),
+		AgentAccountId:        message.GetAgentAccountId(),
+		TriggerServerMsgId:    message.GetTriggerServerMsgId(),
+		AgentRunId:            message.GetAgentRunId(),
+		AllowRecursiveTrigger: message.GetAllowRecursiveTrigger(),
+		SendTime:              message.GetSendTime(),
+		CreatedAt:             message.GetCreatedAt(),
 	}
 }
 
-func adminMessagesPB(messages []repository.Message) []*admin.AdminMessage {
+func adminMessagesPB(messages []*msgpb.Message) []*admin.AdminMessage {
 	out := make([]*admin.AdminMessage, 0, len(messages))
 	for _, message := range messages {
 		out = append(out, adminMessagePB(message))
@@ -75,18 +80,18 @@ func adminMessagesPB(messages []repository.Message) []*admin.AdminMessage {
 	return out
 }
 
-func adminConversationsPB(states []repository.ConversationSeqState) []*admin.AdminConversation {
+func adminConversationsPB(states []*msgpb.ConversationSeqState) []*admin.AdminConversation {
 	out := make([]*admin.AdminConversation, 0, len(states))
 	for _, state := range states {
 		conversation := &admin.AdminConversation{
-			ConversationId: state.ConversationID,
-			MaxSeq:         state.MaxSeq,
-			HasReadSeq:     state.HasReadSeq,
-			UnreadCount:    state.UnreadCount,
-			MaxSeqTime:     state.MaxSeqTime,
+			ConversationId: state.GetConversationId(),
+			MaxSeq:         state.GetMaxSeq(),
+			HasReadSeq:     state.GetHasReadSeq(),
+			UnreadCount:    state.GetUnreadCount(),
+			MaxSeqTime:     state.GetMaxSeqTime(),
 		}
-		if state.LastMessage != nil {
-			conversation.LastMessage = adminMessagePB(*state.LastMessage)
+		if state.GetLastMessage() != nil {
+			conversation.LastMessage = adminMessagePB(state.GetLastMessage())
 		}
 		out = append(out, conversation)
 	}
