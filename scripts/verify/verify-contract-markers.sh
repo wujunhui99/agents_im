@@ -227,10 +227,11 @@ assert_present "-q" internal/logic -- \
 assert_present "-qF" db/migrations/001_init_postgres.sql -- \
   "create table if not exists accounts" "create table if not exists profiles" \
   "account_id text primary key" "account_type smallint not null default 1"
-rg -q "NewGroupsRepositoryForStorage" service/msg/rpc/internal/svc/servicecontext.go
-rg -q "NewMessageLogicWithMediaValidator" service/agent/rpc/internal/aihosting/service_context.go
-# AI 托管运行时的 message 历史读数据层随 agent 域归位（#340）。
-rg -q "NewMessageRepositoryForStorage" service/agent/rpc/internal/svc/servicecontext.go
+# #617：msg-rpc 群成员鉴权、agent-rpc runtime message 历史/已读读改走 owner gRPC
+# （msg-rpc PullMessages·MarkConversationAsRead、groups-rpc ListMembers），脱 internal 直读。
+rg -q "groupsrpc.NewClient" service/msg/rpc/internal/svc/servicecontext.go
+rg -q "MessageHistory" service/agent/rpc/internal/aihosting/service_context.go
+rg -q "msgrpc.NewMessageHistory" service/agent/rpc/internal/svc/servicecontext.go
 assert_present "-q" db/migrations/001_init_postgres.sql -- \
   "accounts" "profiles" "auth_credentials" "friendships" "groups" "group_members" \
   "media_objects" "messages" "conversation_threads" "user_conversation_states" "message_outbox"
