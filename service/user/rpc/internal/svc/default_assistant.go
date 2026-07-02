@@ -3,7 +3,6 @@ package svc
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
@@ -33,7 +32,7 @@ type assistantAccounts interface {
 	Create(ctx context.Context, account model.User) (model.User, error)
 	ListByAccountType(ctx context.Context, accountType model.AccountType) ([]model.User, error)
 	RenameIdentifier(ctx context.Context, fromIdentifier, toIdentifier string) (model.User, error)
-	UpdateProfile(ctx context.Context, accountID string, patch repository.AccountProfilePatch) (model.User, error)
+	UpdateProfile(ctx context.Context, accountID string, patch AccountProfilePatch) (model.User, error)
 }
 
 type defaultAssistantProvisioner struct {
@@ -149,7 +148,7 @@ func (p *defaultAssistantProvisioner) ensureAssistantProfile(ctx context.Context
 	}
 	displayName := defaultAssistantDisplayName
 	name := defaultAssistantIdentifier
-	return p.accounts.UpdateProfile(ctx, account.AccountID, repository.AccountProfilePatch{
+	return p.accounts.UpdateProfile(ctx, account.AccountID, AccountProfilePatch{
 		DisplayName: &displayName,
 		Name:        &name,
 	})

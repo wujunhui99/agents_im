@@ -26,14 +26,18 @@ assert_present "-q" service/msg/api/msg.api -- \
 # --- message ordering contract (schema + code + tests, backend & web) ---
 assert_present "-q" db/migrations/001_init_postgres.sql -- \
   "messages_conversation_seq_uniq" "messages_sender_client_msg_uniq" "conversation_threads"
+# 消息存储契约随 msg 域迁入属主 service/msg/rpc（goctl model + logic）；顶层 internal/repository
+# 已随 #618 退役删除。seq 分配（FOR UPDATE 串行化）在 conversation_threads_model，幂等键
+# （sender_account_id, client_msg_id）在 messages_model。
 assert_present "-q" \
-  internal/repository/postgres_message.go \
+  service/msg/rpc/internal/model/conversation_threads_model.go \
+  service/msg/rpc/internal/model/messages_model.go \
   web/src/features/messages/MessagesPage.tsx \
   web/src/features/messages/utils/messageOrdering.ts \
   web/src/features/messages/utils/conversationUtils.ts -- \
-  "for update" "existingMessageForIdempotency" "orderedChatMessages" "conversationHasInFlightSend"
-assert_present "-q" internal/repository/message_repository_contract_test.go web/src/features/messages/MessagesPage.test.tsx -- \
-  "concurrent same conversation sends allocate contiguous seqs" "last message state follows max seq" \
+  "for update" "FindBySenderClient" "orderedChatMessages" "conversationHasInFlightSend"
+assert_present "-q" service/msg/rpc/internal/logic/roundtrip_integration_test.go web/src/features/messages/MessagesPage.test.tsx -- \
+  "TestSingleTextReadPathRoundtrip" "HasReadSeq" \
   "renders shuffled server messages by authoritative seq" "one in-flight send per conversation"
 
 # --- proto rpc/message surface ---
@@ -53,13 +57,13 @@ assert_present "-q" service/third/rpc/mail.proto -- \
   "map<string, string> template_data" "string provider_request_id" "string provider_message_id"
 
 # --- agent conversation hosting contract ---
-assert_present "-q" service/msg/rpc/msg.proto db/migrations/003_agent_conversation_hosting.sql internal/repository/message_repository.go pkg/messaging/event.go -- \
+assert_present "-q" service/msg/rpc/msg.proto db/migrations/003_agent_conversation_hosting.sql service/msg/rpc/internal/model/messages_model.go pkg/messaging/event.go -- \
   "message_origin" "agent_account_id" "trigger_server_msg_id" "agent_run_id" "allow_recursive_trigger"
 assert_present "-q" service/msg/api/msg.api web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx -- \
   "messageOrigin" "agentAccountId" "triggerServerMsgId" "agentRunId" "allowRecursiveTrigger"
 # AI 托管编排已迁出至属主 service/agent/rpc/internal/{orchestrator,aihosting}（#340）；
 # 进程内 MessageCreatedHook/SetMessageCreatedHook 随 internal/logic 删（#618，触发改经 Kafka agent.trigger.v1）。
-assert_present "-q" service/agent/rpc/internal/orchestrator service/agent/rpc/internal/aihosting internal/repository db/migrations/003_agent_conversation_hosting.sql -- \
+assert_present "-q" service/agent/rpc/internal/orchestrator service/agent/rpc/internal/aihosting db/migrations/003_agent_conversation_hosting.sql -- \
   "message.created:" "NewConversationHostingService" "OnMessageCreated" \
   "TryStartAgentTrigger" "FinishAgentTrigger" "agent_conversation_hosting" "agent_trigger_idempotency" \
   "MessageServiceResponseWriter" "SendMessage\(ctx"
@@ -169,10 +173,12 @@ assert_present "-q" service/msggateway/gateway.proto service/msggateway/internal
   "service GatewayService" "BatchPushOneMsg" "type Server struct" "PushToConversation" "delivery.Event"
 rg -q "GatewayGRPC" pkg/config/config.go etc/msggateway.yaml
 
-assert_present "-q" internal/repository db/migrations/001_init_postgres.sql -- \
-  "DeliveryRecipientUserIDs" "message_outbox"
+# 推送 fanout recipient 计算随写链路 Kafka 化迁至 msgtransfer（deriveReceiverIDs）；
+# 顶层 internal/repository DeliveryRecipientUserIDs 已随 #618 退役删除。
+assert_present "-q" service/msgtransfer/internal/chain/handler.go db/migrations/001_init_postgres.sql -- \
+  "deriveReceiverIDs" "message_outbox"
 forbid_match "removed message V2 table still referenced: message_idempotency_keys" \
-  -q "message_idempotency_keys" db/migrations/001_init_postgres.sql internal/repository --glob '*.go'
+  -q "message_idempotency_keys" db/migrations/001_init_postgres.sql service pkg --glob '*.go'
 
 assert_present "-q" service/msggateway/internal/ws pkg/gateway/delivery pkg/presence -- \
   "WithPresenceStore" "WithPresenceTTL" "WithInstanceID" "RegisterConnection" "Heartbeat" "UnregisterConnection" \
@@ -244,15 +250,14 @@ rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/s3.go
 rg -q "NewMediaObjectsModel" service/media/rpc/internal/svc/service_context.go
 rg -q "ValidateMessageMedia" service/msg/rpc/internal/svc/media_validator.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql
-rg -q "NewPostgresRepository" internal/repository/postgres_common.go
-rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
-rg -q "NewPostgresMessageRepository" internal/repository/postgres_message.go
+# 顶层 internal/repository 的 monolith postgres 构造器（NewPostgres{,Groups,Message}Repository）
+# 已随 #618 退役删除；数据层现由各 service/<domain>/rpc/internal/model goctl model 承接。
 rg -q "docker compose" scripts/migrate-postgres.sh
 
 # --- outbox 退役（03 §9 B3b）：写链路唯一原语 = Kafka，message_outbox 表保留 90 天观察 ---
 assert_present "-q" db/migrations/001_init_postgres.sql -- "message_outbox"
 forbid_match "retired outbox write path resurrected (03 §9 B3b)" \
-  -q "insertMessageOutboxEvent|OutboxRepository|outboxpublisher" internal service --glob '*.go'
+  -q "insertMessageOutboxEvent|OutboxRepository|outboxpublisher" service pkg --glob '*.go'
 
 # --- observability code surface ---
 assert_present "-q" pkg/health pkg/observability -- \

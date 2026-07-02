@@ -3,7 +3,7 @@ package svc
 import (
 	"errors"
 
-	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
+	"github.com/wujunhui99/agents_im/pkg/authruntime"
 	"github.com/wujunhui99/agents_im/pkg/middleware"
 	apiconfig "github.com/wujunhui99/agents_im/service/agent/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/agentclient"
@@ -17,7 +17,7 @@ var ErrAgentRPCConfigRequired = errors.New("agent-api requires agent rpc client 
 // ServiceContext 是 agent-api（纯 BFF，#606）的运行时上下文：只持有鉴权运行时 + agent-rpc 客户端，
 // 不再持有 in-process 业务逻辑或数据层句柄（agent 域真相在 agent-rpc）。
 type ServiceContext struct {
-	common.AuthRuntime
+	authruntime.AuthRuntime
 	Config   apiconfig.Config
 	AgentRPC agentclient.Agent
 }
@@ -31,7 +31,7 @@ func NewServiceContextFromConfig(c apiconfig.Config) (*ServiceContext, error) {
 		return nil, err
 	}
 	serviceContext := &ServiceContext{
-		AuthRuntime: common.NewAuthRuntime(c.Auth),
+		AuthRuntime: authruntime.NewAuthRuntime(c.Auth),
 		Config:      c,
 		AgentRPC:    agentclient.NewAgent(agentRPCClient),
 	}

@@ -3,13 +3,13 @@
 // （04-agent AG-2/AG-3，D15 step ④，#340）迁入属主 service/agent/rpc——配合 trigger.Judge
 // 终判 + imadapter gRPC 写回，取代 msg-rpc 内进程托管。message 历史读 / 已读推进 / 群成员鉴权
 // 均经 owner gRPC（msg-rpc PullMessages·MarkConversationAsRead、groups-rpc ListMembers，#617），
-// 不再 in-process 读 internal message/groups。仍 import 的 internal/servicecontext/common
-// （AuthRuntime）是 auth keystone 例外，待 #618 迁 pkg/ 后清。
+// 不再 in-process 读 internal message/groups。共享鉴权运行时（AuthRuntime）随顶层 internal/
+// 退役迁至 pkg/authruntime（#618）。
 package aihosting
 
 import (
-	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/authruntime"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
@@ -24,7 +24,7 @@ import (
 )
 
 type ServiceContext struct {
-	common.AuthRuntime
+	authruntime.AuthRuntime
 	AIHostingLogic *convhosting.ConversationAIHostingLogic
 	// MessageHistory 读会话最近历史喂请求构建器；ReadAdvancer 推进已读——均经 msg-rpc gRPC（#617）。
 	MessageHistory   agentim.MessageHistoryReader
@@ -69,7 +69,7 @@ type ConversationAIHostingRuntimeOptions struct {
 func NewServiceContext(auth appconfig.JWTAuthConfig) *ServiceContext {
 	aiHostingStore := convhosting.NewMemoryStore()
 	return &ServiceContext{
-		AuthRuntime:      common.NewAuthRuntime(auth),
+		AuthRuntime:      authruntime.NewAuthRuntime(auth),
 		AIHostingLogic:   convhosting.NewConversationAIHostingLogic(aiHostingStore),
 		AgentHostingRepo: aghosting.NewMemoryStore(),
 		AIHostingStore:   aiHostingStore,

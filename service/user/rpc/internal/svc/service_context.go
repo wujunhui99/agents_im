@@ -57,7 +57,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 
 	// 默认助手账号读写经 user-rpc 自有 goctl model（bigint-safe，gate #550）；agent 域装配 + 好友建立
 	// 经 agent-rpc / friends-rpc（#606，脱 internal/repository agent registry 写与 EnsureAcceptedFriendship）。
-	accountRepo := newAssistantAccountRepo(accountsModel, profilesModel, nil)
+	accountRepo := newAssistantAccountRepo(accountsModel, profilesModel)
 	provisioner := newDefaultAssistantProvisioner(accountRepo, agentclient.NewAgent(agentRPCClient), friendsclient.NewFriends(friendsRPCClient))
 	if _, err := provisioner.Backfill(context.Background()); err != nil {
 		log.Fatalf("backfill default assistant: %v", err)

@@ -77,21 +77,20 @@ class DetectDeployChangesTest(unittest.TestCase):
         self.assertEqual(out["web_required"], "true")
         self.assertEqual(out["migration_required"], "true")
 
-    def test_shared_internal_package_uses_import_graph(self):
+    def test_shared_pkg_package_uses_import_graph(self):
         # Shared packages are routed by go list -deps when the package is present;
         # this keeps deploys narrower than the old fail-safe all-backends path.
-        # #617: msg-rpc/agent-rpc no longer import internal/repository (runtime
-        # message/groups reads go through owner gRPC).
-        # #618: admin-rpc dropped internal/repository too (messages/friends reads
-        # + AI replay go through owner msg/friends-rpc), so only user-rpc still
-        # depends on internal/repository (assistant account, part 3 pending).
-        out = self.detect(["internal/repository/message_memory.go"])
+        # #618 retired the top-level internal/ god-package; shared code now lives in
+        # pkg/. pkg/authruntime (the AuthRuntime moved out of internal/servicecontext/
+        # common) is imported only by agent-api + agent-rpc, so a change there must
+        # route to exactly those two and no other backend.
+        out = self.detect(["pkg/authruntime/auth.go"])
         self.assertEqual(out["build_required"], "true")
-        self.assertIn("user-rpc", out["backend_services"])
+        self.assertIn("agent-api", out["backend_services"])
+        self.assertIn("agent-rpc", out["backend_services"])
+        self.assertNotIn("user-rpc", out["backend_services"])
         self.assertNotIn("admin-rpc", out["backend_services"])
         self.assertNotIn("msg-rpc", out["backend_services"])
-        self.assertNotIn("agent-rpc", out["backend_services"])
-        self.assertNotIn("user-api", out["backend_services"])
         self.assertNotIn("msg-api", out["backend_services"])
 
     def test_go_test_files_do_not_deploy(self):

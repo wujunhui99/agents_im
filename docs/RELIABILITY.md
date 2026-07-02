@@ -43,7 +43,7 @@ if err != nil {
 当前基线已将以下生产启动路径从 `Must*` 初始化迁移为 `New*` + `log.Fatalf(...)`：
 
 - REST/API 服务入口：`service/user/api/user.go`、`service/friends/api/friends.go`、`service/auth/api/auth.go`、`service/agent/api/agent.go`、`service/groups/api/groups.go`、`service/media/api/media.go`、`service/admin/api/admin.go`、`service/msg/api/msg.go`、`service/msggateway/msggateway.go`
-- RPC service context：`service/user/rpc/internal/svc/service_context.go`、`service/auth/rpc/internal/svc/service_context.go`、`service/friends/rpc/internal/svc/service_context.go`、`service/groups/rpc/internal/svc/service_context.go`、`service/media/rpc/internal/svc/service_context.go`、`service/admin/rpc/internal/svc/service_context.go`、`service/third/rpc/internal/svc/service_context.go`、`internal/rpcgen/message/internal/svc/service_context.go`
+- RPC service context：`service/user/rpc/internal/svc/service_context.go`、`service/auth/rpc/internal/svc/service_context.go`、`service/friends/rpc/internal/svc/service_context.go`、`service/groups/rpc/internal/svc/service_context.go`、`service/media/rpc/internal/svc/service_context.go`、`service/admin/rpc/internal/svc/service_context.go`、`service/third/rpc/internal/svc/service_context.go`
 - Gateway presence 初始化：`presence.NewStore(cfg.Presence, cfg.Redis)`，Redis presence 配置错误或初始化失败时必须以清晰启动错误退出。
 
 以下不再使用的 panic 型 helper 已从生产初始化路径删除：
@@ -57,7 +57,9 @@ if err != nil {
 - `repository.MustAgentRegistryRepositoryForStorage`
 - `auth/repository.MustRepositoryForStorage`
 
-`internal/repository`、`internal/auth/repository` 和 `internal/presence` 应继续提供可返回 `error` 的 `New*` 构造函数。新增生产入口或 service context 时，应复用这些构造函数并添加具体错误上下文，不应重新引入 panic 型 repository/presence 初始化 helper。
+> 注：顶层 `internal/`（含旧 `internal/repository`、`internal/auth/repository`、`internal/presence` 与上面的 `repository.Must*` helper）已随 #618 退役删除；数据层现由各 `service/<domain>/rpc/internal/model` goctl model 承接。下述原则对新代码仍然适用。
+
+数据层与 presence 构造函数应返回 `error`（`New*` 形态）。新增生产入口或 service context 时，应复用这些构造函数并添加具体错误上下文，不应重新引入 panic 型（`Must*`）初始化 helper。
 
 对应修复提交：`58cc0a6 Avoid panic-based service initialization`。该修复不改变业务逻辑、API 契约、数据库结构或前端行为；主要提升启动失败可观测性和可维护性。
 

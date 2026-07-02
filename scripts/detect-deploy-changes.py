@@ -76,9 +76,9 @@ FLAT_SERVICE_DIRS = {
 
 # message-api 已退役（#463）：REST 入口归 service/msg/api。AI 托管运行时 + 开关 CRUD
 # #340 起整体迁出至属主 service/agent/rpc（trigger/runtime/hosting/orchestrator/imadapter），
-# 由下方 service/<domain>/<kind> 通用规则精确路由到 agent-rpc / msg-rpc，无需 internal 前缀特例。
+# 由下方 service/<domain>/<kind> 通用规则精确路由到 agent-rpc / msg-rpc。顶层 internal/ 已随
+# #618 退役，不再有 internal/ 前缀特例。
 INTERNAL_DOMAIN_SERVICE_PREFIXES = {
-    "internal/handler/admin/": ["admin-api"],
     # service/admin/{api,rpc}/** 由 service/<domain>/<kind> 通用规则精确路由；
     # 这里兜底任何 service/admin/ 顶层散文件，两者都重建。
     "service/admin/": ["admin-api", "admin-rpc"],
@@ -386,17 +386,8 @@ def classify_path(path: str, selection: DeploySelection) -> None:
             selection.add_backends(services)
             return
 
-    if path.startswith("internal/rpcgen/"):
-        selection.add_all_backends()
-        return
-
-    if path.startswith("internal/"):
-        # Shared internal packages (model/repository/config/response/auth/etc.) can
-        # be imported by multiple APIs, RPCs, workers, or migrations. Keep those
-        # conservative while domain-specific handler/logic/servicecontext paths
-        # above remain selective.
-        selection.add_all_backends()
-        return
+    # 顶层 internal/（monolith god-package）已随 #618 退役删除；共享代码全在 pkg/ 或
+    # service/<domain>/**，由上方 go list -deps 导入图与前缀规则精确路由，无需 internal/ 特例。
 
     if path.startswith("db/migrations/") or path == "scripts/migrate-postgres.sh":
         selection.require_migration()
