@@ -237,7 +237,7 @@ agents_im/
 ### Stage 5 — 收尾验证
 17. `internal/` 顶层目录被删除（`ls internal/ 2>/dev/null` 无输出）。
 18. `api/`、`proto/`、`rpcgen/` 顶层无残留。
-19. CI 加 lint：禁止顶层 `internal/`、`api/`、`proto/` 出现（可用 `scripts/verify-static.sh` 加一段）。
+19. CI 加 lint：禁止顶层 `internal/`、`api/`、`proto/` 出现。✅ 已落地 `scripts/verify/verify-layout.sh`（§6 A–D：顶层 god-package、残留 import、`pkg/→service/` 单向、service 入口在本包），由 `scripts/verify-static.sh` 编排进后端 CI。
 
 ---
 

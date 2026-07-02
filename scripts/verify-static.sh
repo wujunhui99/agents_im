@@ -4,6 +4,7 @@
 # Preflight (required files + shell syntax) then runs the themed gates under
 # scripts/verify/. Each gate is also runnable standalone:
 #   scripts/verify/verify-security-static.sh    secrets / key material / auth-leak
+#   scripts/verify/verify-layout.sh             target-layout / no top-level god-packages
 #   scripts/verify/verify-gozero-boundaries.sh  go-zero layering boundaries
 #   scripts/verify/verify-contract-markers.sh   API/proto/schema/code contract surface
 #   scripts/verify/verify-deploy-static.sh      deploy / CI / middleware / k8s config
@@ -59,12 +60,14 @@ syntax_check \
   scripts/verify-static.sh \
   scripts/verify/lib.sh \
   scripts/verify/verify-security-static.sh \
+  scripts/verify/verify-layout.sh \
   scripts/verify/verify-gozero-boundaries.sh \
   scripts/verify/verify-contract-markers.sh \
   scripts/verify/verify-deploy-static.sh \
   scripts/verify/verify-frontend-static.sh
 
 bash "${SCRIPT_DIR}/verify/verify-security-static.sh"
+bash "${SCRIPT_DIR}/verify/verify-layout.sh"
 bash "${SCRIPT_DIR}/verify/verify-gozero-boundaries.sh"
 bash "${SCRIPT_DIR}/verify/verify-contract-markers.sh"
 bash "${SCRIPT_DIR}/verify/verify-deploy-static.sh"
