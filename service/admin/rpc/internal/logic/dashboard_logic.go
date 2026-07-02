@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/agent"
+	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -26,22 +26,18 @@ func NewGetDashboardLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetD
 
 // GetDashboard 汇总跨域总量 + 最近 LLM trace + 最近会话状态。
 func (l *GetDashboardLogic) GetDashboard(in *admin.DashboardRequest) (*admin.DashboardResponse, error) {
-	if l.svcCtx.UserRPC == nil || l.svcCtx.Messages == nil || l.svcCtx.AgentRPC == nil {
-		return nil, rpcerror.ToStatus(apperror.Internal("admin repositories are not configured"))
-	}
 	usersResp, err := l.svcCtx.UserRPC.CountAccounts(l.ctx, &userpb.CountAccountsRequest{})
 	if err != nil {
 		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
 	users := usersResp.GetCount()
-	conversations, err := l.svcCtx.Messages.CountConversations(l.ctx)
+	// 消息/会话总量经属主 msg-rpc（#618，脱 internal/repository AdminMessageRepository）。
+	statsResp, err := l.svcCtx.MsgRPC.AdminGetMessageStats(l.ctx, &msgpb.AdminGetMessageStatsRequest{})
 	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
-	messages, err := l.svcCtx.Messages.CountMessages(l.ctx)
-	if err != nil {
-		return nil, rpcerror.ToStatus(err)
-	}
+	conversations := statsResp.GetConversationCount()
+	messages := statsResp.GetMessageCount()
 	aiRunsResp, err := l.svcCtx.AgentRPC.CountAgentRuns(l.ctx, &agent.CountAgentRunsRequest{})
 	if err != nil {
 		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
@@ -61,9 +57,9 @@ func (l *GetDashboardLogic) GetDashboard(in *admin.DashboardRequest) (*admin.Das
 	for _, run := range runsResp.GetRuns() {
 		traces = append(traces, adminTracePB(agentRunFromPB(run)))
 	}
-	recentStates, err := l.svcCtx.Messages.ListRecentConversationStates(l.ctx, limit)
+	recentResp, err := l.svcCtx.MsgRPC.AdminListRecentConversations(l.ctx, &msgpb.AdminListRecentConversationsRequest{Limit: int32(limit)})
 	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
 	return &admin.DashboardResponse{
 		Totals: &admin.AdminDashboardTotals{
@@ -74,6 +70,6 @@ func (l *GetDashboardLogic) GetDashboard(in *admin.DashboardRequest) (*admin.Das
 			FailedAiRuns:  failedRuns,
 		},
 		RecentTraces:        traces,
-		RecentConversations: adminConversationsPB(recentStates),
+		RecentConversations: adminConversationsPB(recentResp.GetStates()),
 	}, nil
 }

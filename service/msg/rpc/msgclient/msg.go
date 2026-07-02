@@ -14,34 +14,42 @@ import (
 )
 
 type (
-	AppendStreamMessageRequest        = msg.AppendStreamMessageRequest
-	AppendStreamMessageResponse       = msg.AppendStreamMessageResponse
-	ClearConversationMessagesRequest  = msg.ClearConversationMessagesRequest
-	ClearConversationMessagesResponse = msg.ClearConversationMessagesResponse
-	ConversationSeqState              = msg.ConversationSeqState
-	DeleteMessagesRequest             = msg.DeleteMessagesRequest
-	DeleteMessagesResponse            = msg.DeleteMessagesResponse
-	GetConversationsSeqStateRequest   = msg.GetConversationsSeqStateRequest
-	GetConversationsSeqStateResponse  = msg.GetConversationsSeqStateResponse
-	GetHasReadSeqsRequest             = msg.GetHasReadSeqsRequest
-	GetHasReadSeqsResponse            = msg.GetHasReadSeqsResponse
-	GetLastMessageByConvsRequest      = msg.GetLastMessageByConvsRequest
-	GetLastMessageByConvsResponse     = msg.GetLastMessageByConvsResponse
-	GetMaxSeqsRequest                 = msg.GetMaxSeqsRequest
-	GetMaxSeqsResponse                = msg.GetMaxSeqsResponse
-	GetMessageRefRequest              = msg.GetMessageRefRequest
-	GetMessageRefResponse             = msg.GetMessageRefResponse
-	GetServerTimeRequest              = msg.GetServerTimeRequest
-	GetServerTimeResponse             = msg.GetServerTimeResponse
-	MarkConversationAsReadRequest     = msg.MarkConversationAsReadRequest
-	MarkConversationAsReadResponse    = msg.MarkConversationAsReadResponse
-	Message                           = msg.Message
-	PullMessagesRequest               = msg.PullMessagesRequest
-	PullMessagesResponse              = msg.PullMessagesResponse
-	RevokeMessageRequest              = msg.RevokeMessageRequest
-	RevokeMessageResponse             = msg.RevokeMessageResponse
-	SendMessageRequest                = msg.SendMessageRequest
-	SendMessageResponse               = msg.SendMessageResponse
+	AdminGetConversationMessagesRequest  = msg.AdminGetConversationMessagesRequest
+	AdminGetConversationMessagesResponse = msg.AdminGetConversationMessagesResponse
+	AdminGetMessageStatsRequest          = msg.AdminGetMessageStatsRequest
+	AdminGetMessageStatsResponse         = msg.AdminGetMessageStatsResponse
+	AdminListRecentConversationsRequest  = msg.AdminListRecentConversationsRequest
+	AdminListRecentConversationsResponse = msg.AdminListRecentConversationsResponse
+	AdminReplayAgentMessageRequest       = msg.AdminReplayAgentMessageRequest
+	AdminReplayAgentMessageResponse      = msg.AdminReplayAgentMessageResponse
+	AppendStreamMessageRequest           = msg.AppendStreamMessageRequest
+	AppendStreamMessageResponse          = msg.AppendStreamMessageResponse
+	ClearConversationMessagesRequest     = msg.ClearConversationMessagesRequest
+	ClearConversationMessagesResponse    = msg.ClearConversationMessagesResponse
+	ConversationSeqState                 = msg.ConversationSeqState
+	DeleteMessagesRequest                = msg.DeleteMessagesRequest
+	DeleteMessagesResponse               = msg.DeleteMessagesResponse
+	GetConversationsSeqStateRequest      = msg.GetConversationsSeqStateRequest
+	GetConversationsSeqStateResponse     = msg.GetConversationsSeqStateResponse
+	GetHasReadSeqsRequest                = msg.GetHasReadSeqsRequest
+	GetHasReadSeqsResponse               = msg.GetHasReadSeqsResponse
+	GetLastMessageByConvsRequest         = msg.GetLastMessageByConvsRequest
+	GetLastMessageByConvsResponse        = msg.GetLastMessageByConvsResponse
+	GetMaxSeqsRequest                    = msg.GetMaxSeqsRequest
+	GetMaxSeqsResponse                   = msg.GetMaxSeqsResponse
+	GetMessageRefRequest                 = msg.GetMessageRefRequest
+	GetMessageRefResponse                = msg.GetMessageRefResponse
+	GetServerTimeRequest                 = msg.GetServerTimeRequest
+	GetServerTimeResponse                = msg.GetServerTimeResponse
+	MarkConversationAsReadRequest        = msg.MarkConversationAsReadRequest
+	MarkConversationAsReadResponse       = msg.MarkConversationAsReadResponse
+	Message                              = msg.Message
+	PullMessagesRequest                  = msg.PullMessagesRequest
+	PullMessagesResponse                 = msg.PullMessagesResponse
+	RevokeMessageRequest                 = msg.RevokeMessageRequest
+	RevokeMessageResponse                = msg.RevokeMessageResponse
+	SendMessageRequest                   = msg.SendMessageRequest
+	SendMessageResponse                  = msg.SendMessageResponse
 
 	Msg interface {
 		// 写
@@ -64,6 +72,11 @@ type (
 		ClearConversationMessages(ctx context.Context, in *ClearConversationMessagesRequest, opts ...grpc.CallOption) (*ClearConversationMessagesResponse, error)
 		// 时间（stub）
 		GetServerTime(ctx context.Context, in *GetServerTimeRequest, opts ...grpc.CallOption) (*GetServerTimeResponse, error)
+		// Admin 只读/运维面（#618）
+		AdminGetConversationMessages(ctx context.Context, in *AdminGetConversationMessagesRequest, opts ...grpc.CallOption) (*AdminGetConversationMessagesResponse, error)
+		AdminReplayAgentMessage(ctx context.Context, in *AdminReplayAgentMessageRequest, opts ...grpc.CallOption) (*AdminReplayAgentMessageResponse, error)
+		AdminGetMessageStats(ctx context.Context, in *AdminGetMessageStatsRequest, opts ...grpc.CallOption) (*AdminGetMessageStatsResponse, error)
+		AdminListRecentConversations(ctx context.Context, in *AdminListRecentConversationsRequest, opts ...grpc.CallOption) (*AdminListRecentConversationsResponse, error)
 	}
 
 	defaultMsg struct {
@@ -147,4 +160,25 @@ func (m *defaultMsg) ClearConversationMessages(ctx context.Context, in *ClearCon
 func (m *defaultMsg) GetServerTime(ctx context.Context, in *GetServerTimeRequest, opts ...grpc.CallOption) (*GetServerTimeResponse, error) {
 	client := msg.NewMsgClient(m.cli.Conn())
 	return client.GetServerTime(ctx, in, opts...)
+}
+
+// Admin 只读/运维面（#618）
+func (m *defaultMsg) AdminGetConversationMessages(ctx context.Context, in *AdminGetConversationMessagesRequest, opts ...grpc.CallOption) (*AdminGetConversationMessagesResponse, error) {
+	client := msg.NewMsgClient(m.cli.Conn())
+	return client.AdminGetConversationMessages(ctx, in, opts...)
+}
+
+func (m *defaultMsg) AdminReplayAgentMessage(ctx context.Context, in *AdminReplayAgentMessageRequest, opts ...grpc.CallOption) (*AdminReplayAgentMessageResponse, error) {
+	client := msg.NewMsgClient(m.cli.Conn())
+	return client.AdminReplayAgentMessage(ctx, in, opts...)
+}
+
+func (m *defaultMsg) AdminGetMessageStats(ctx context.Context, in *AdminGetMessageStatsRequest, opts ...grpc.CallOption) (*AdminGetMessageStatsResponse, error) {
+	client := msg.NewMsgClient(m.cli.Conn())
+	return client.AdminGetMessageStats(ctx, in, opts...)
+}
+
+func (m *defaultMsg) AdminListRecentConversations(ctx context.Context, in *AdminListRecentConversationsRequest, opts ...grpc.CallOption) (*AdminListRecentConversationsResponse, error) {
+	client := msg.NewMsgClient(m.cli.Conn())
+	return client.AdminListRecentConversations(ctx, in, opts...)
 }

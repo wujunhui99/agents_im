@@ -36,6 +36,16 @@ service Msg {
   // 时间（stub）
   rpc GetServerTime(GetServerTimeRequest) returns (GetServerTimeResponse);
 
+  // 管理后台只读/运维面（#618）：admin-rpc 跨域只读经属主 msg-rpc，脱 internal/repository
+  // AdminMessageRepository 直读。AdminGetConversationMessages 是**无成员裁剪**的会话原始读
+  // （管理员视角，区别于 PullMessages 的用户可见边界）；AdminReplayAgentMessage 由消息属主
+  // 侧重放触发（重新 publish agent.trigger.v1），幂等收敛在 agent_triggers 台账。
+  rpc AdminGetConversationMessages(AdminGetConversationMessagesRequest) returns (AdminGetConversationMessagesResponse);
+  rpc AdminReplayAgentMessage(AdminReplayAgentMessageRequest) returns (AdminReplayAgentMessageResponse);
+  // 后台仪表盘：全域消息/会话总量 + 最近活跃会话概要。
+  rpc AdminGetMessageStats(AdminGetMessageStatsRequest) returns (AdminGetMessageStatsResponse);
+  rpc AdminListRecentConversations(AdminListRecentConversationsRequest) returns (AdminListRecentConversationsResponse);
+
   // AI 托管开关已迁出至属主 agent-rpc（#340，agent.proto Agent.Get/UpdateConversationAIHosting）。
 }
 
@@ -225,4 +235,52 @@ message GetServerTimeRequest {}
 
 message GetServerTimeResponse {
   int64 server_time = 1;
+}
+
+// ---- Admin 只读/运维面（#618）----
+// AdminGetConversationMessages：管理员按 seq 区间原始读某会话消息（无成员裁剪，区别于 PullMessages）。
+message AdminGetConversationMessagesRequest {
+  string conversation_id = 1;
+  int64 from_seq = 2;
+  int64 to_seq = 3;
+  int32 limit = 4;
+  string order = 5;
+}
+
+message AdminGetConversationMessagesResponse {
+  repeated Message messages = 1;
+  bool is_end = 2;
+  int64 next_seq = 3;
+}
+
+// AdminReplayAgentMessage：重放一条人类消息以重新触发 agent（属主侧重发 agent.trigger.v1）。
+message AdminReplayAgentMessageRequest {
+  string conversation_id = 1;
+  string server_msg_id = 2;
+}
+
+message AdminReplayAgentMessageResponse {
+  string conversation_id = 1;
+  string server_msg_id = 2;
+  bool triggered = 3;
+  bool skipped = 4;
+  string reason = 5;
+  Message message = 6;
+}
+
+// AdminGetMessageStats：后台仪表盘全域总量。
+message AdminGetMessageStatsRequest {}
+
+message AdminGetMessageStatsResponse {
+  int64 message_count = 1;
+  int64 conversation_count = 2;
+}
+
+// AdminListRecentConversations：后台仪表盘最近活跃会话概要（含末条消息）。
+message AdminListRecentConversationsRequest {
+  int32 limit = 1;
+}
+
+message AdminListRecentConversationsResponse {
+  repeated ConversationSeqState states = 1;
 }

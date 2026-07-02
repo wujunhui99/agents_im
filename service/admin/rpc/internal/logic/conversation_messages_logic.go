@@ -2,13 +2,11 @@ package logic
 
 import (
 	"context"
-	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
+	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -24,27 +22,27 @@ func NewGetConversationMessagesLogic(ctx context.Context, svcCtx *svc.ServiceCon
 }
 
 // GetConversationMessages 按 seq 区间分页拉取某会话消息（管理员视角，内容脱敏）。
+// 会话消息原始读经属主 msg-rpc.AdminGetConversationMessages（#618，脱 internal/repository）；
+// 区间/limit/order 归一化由 msg-rpc 侧统一处理。
 func (l *GetConversationMessagesLogic) GetConversationMessages(in *admin.ConversationMessagesRequest) (*admin.ConversationMessagesResponse, error) {
-	if l.svcCtx.Messages == nil {
-		return nil, rpcerror.ToStatus(apperror.Internal("admin message repository is not configured"))
-	}
 	conversationID, err := validateRequiredAdminID(in.GetConversationId(), "conversation_id", 256)
 	if err != nil {
 		return nil, rpcerror.ToStatus(err)
 	}
-	limit := normalizeAdminLimit(int(in.GetLimit()), 50, 500)
-	order := strings.ToLower(strings.TrimSpace(in.GetOrder()))
-	if order == "" {
-		order = repository.MessageStorageOrderAsc
-	}
-	messages, isEnd, nextSeq, err := l.svcCtx.Messages.GetMessages(l.ctx, conversationID, in.GetFromSeq(), in.GetToSeq(), limit, order)
+	resp, err := l.svcCtx.MsgRPC.AdminGetConversationMessages(l.ctx, &msgpb.AdminGetConversationMessagesRequest{
+		ConversationId: conversationID,
+		FromSeq:        in.GetFromSeq(),
+		ToSeq:          in.GetToSeq(),
+		Limit:          in.GetLimit(),
+		Order:          in.GetOrder(),
+	})
 	if err != nil {
-		return nil, rpcerror.ToStatus(err)
+		return nil, rpcerror.ToStatus(rpcerror.FromStatus(err))
 	}
 	return &admin.ConversationMessagesResponse{
 		ConversationId: conversationID,
-		Messages:       adminMessagesPB(messages),
-		IsEnd:          isEnd,
-		NextSeq:        nextSeq,
+		Messages:       adminMessagesPB(resp.GetMessages()),
+		IsEnd:          resp.GetIsEnd(),
+		NextSeq:        resp.GetNextSeq(),
 	}, nil
 }
