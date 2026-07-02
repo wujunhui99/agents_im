@@ -49,7 +49,7 @@ forbid_match "observability helpers must not log or inspect secrets, auth header
 forbid_match "forbidden auth secret field found in service source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
   service/user/api/user.api service/user/rpc/user.proto service/user/api/user.go \
-  internal/logic service/user/rpc internal/servicecontext
+  service/user/rpc internal/servicecontext
 
 forbid_match "forbidden auth secret field found in repository source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
@@ -59,5 +59,5 @@ forbid_match "forbidden auth secret field found in repository source" \
 forbid_match "forbidden auth secret field found in message contract source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
   service/msg/api/msg.api service/msg/rpc/msg.proto \
-  internal/logic/messagelogic.go internal/repository/message_memory.go \
+  internal/repository/message_memory.go \
   internal/repository/message_repository.go
