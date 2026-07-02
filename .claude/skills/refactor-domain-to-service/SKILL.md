@@ -5,8 +5,12 @@ description: 把一个业务域从顶层 internal monolith（god-package interna
 
 # 退役 internal 业务域 → service/\<domain\>
 
+> **状态（#618 起）：顶层 `internal/` 已全退役删除。** 目标已达成，仓库内无任何 `internal/logic`
+> / `internal/repository` / `internal/servicecontext` 可迁。本 skill 现作为**微服务化迁移的模式参考**
+> 保留（goctl 数据层 + BFF 聚合 + 单向叶子依赖）；下文对 `internal/*` god-package 的描述均为历史语境。
+
 把单个域（user/friends/agent/...）的业务真相从共享 `internal/logic` god-package + `internal/repository`
-退役到它的 owner service，让该域真相只留在 `service/<domain>/{rpc,api}`。最终目的：**删掉顶层 `internal/`**。
+退役到它的 owner service，让该域真相只留在 `service/<domain>/{rpc,api}`。最终目的：**删掉顶层 `internal/`**（已于 #618 完成）。
 
 - **rpc** = 业务真相 + 自有数据层（goctl model），不依赖 `internal/`。
 - **api** = BFF 聚合层，调一个或多个 rpc；**rpc 之间不互调**，跨域数据在 api 聚合。
