@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
@@ -33,7 +32,7 @@ func TestAgentRunOrchestratorSuccessWritesAuditedResponse(t *testing.T) {
 	}
 	writer := &recordingAgentResponseWriter{
 		result: AgentResponseResult{
-			Message: logic.Message{
+			Message: Message{
 				ServerMsgID:    "msg_agent_1",
 				ConversationID: "single:agent_1:user_1",
 				Seq:            9,
@@ -107,7 +106,7 @@ func TestAgentRunOrchestratorRuntimeFailureRecordsFailedAuditAndNotifiesUser(t *
 	}
 	writer := &recordingAgentResponseWriter{
 		result: AgentResponseResult{
-			Message: logic.Message{
+			Message: Message{
 				ServerMsgID:    "msg_failure_notice_1",
 				ConversationID: "single:agent_1:user_1",
 				Seq:            9,
@@ -162,7 +161,7 @@ func TestAgentRunOrchestratorRequiresPolicyForRecursiveResponse(t *testing.T) {
 	}
 	writer := &recordingAgentResponseWriter{
 		result: AgentResponseResult{
-			Message: logic.Message{
+			Message: Message{
 				ServerMsgID:    "msg_agent_1",
 				ConversationID: "single:agent_1:user_1",
 				Seq:            9,

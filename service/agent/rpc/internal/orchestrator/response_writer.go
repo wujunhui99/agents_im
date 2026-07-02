@@ -4,15 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
 type MessageSender interface {
-	SendMessage(ctx context.Context, req logic.SendMessageRequest) (logic.SendMessageResponse, error)
+	SendMessage(ctx context.Context, req SendMessageRequest) (SendMessageResponse, error)
 }
-
-var _ MessageSender = (*logic.MessageLogic)(nil)
 
 type ResponseWriter interface {
 	WriteAgentResponse(ctx context.Context, req AgentResponseRequest) (AgentResponseResult, error)
@@ -37,7 +34,7 @@ type AgentResponseRequest struct {
 }
 
 type AgentResponseResult struct {
-	Message      logic.Message        `json:"message"`
+	Message      Message        `json:"message"`
 	Deduplicated bool                 `json:"deduplicated"`
 	Metadata     AgentMessageMetadata `json:"metadata"`
 }
@@ -77,36 +74,36 @@ func (w *MessageServiceResponseWriter) WriteAgentResponse(ctx context.Context, r
 	}, nil
 }
 
-func normalizeAgentResponseRequest(req AgentResponseRequest) (logic.SendMessageRequest, AgentMessageMetadata, string, error) {
+func normalizeAgentResponseRequest(req AgentResponseRequest) (SendMessageRequest, AgentMessageMetadata, string, error) {
 	requestID, err := normalizeRequired(req.RequestID, "request_id")
 	if err != nil {
-		return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", err
+		return SendMessageRequest{}, AgentMessageMetadata{}, "", err
 	}
 	agentUserID, err := normalizeRequired(req.AgentUserID, "agent_user_id")
 	if err != nil {
-		return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", err
+		return SendMessageRequest{}, AgentMessageMetadata{}, "", err
 	}
 	agentRunID, err := normalizeRequired(req.AgentRunID, "agent_run_id")
 	if err != nil {
-		return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", err
+		return SendMessageRequest{}, AgentMessageMetadata{}, "", err
 	}
 	conversationType, err := normalizeConversationType(req.ConversationType)
 	if err != nil {
-		return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", err
+		return SendMessageRequest{}, AgentMessageMetadata{}, "", err
 	}
 	text, err := normalizeAgentResponseText(req.Text)
 	if err != nil {
-		return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", err
+		return SendMessageRequest{}, AgentMessageMetadata{}, "", err
 	}
 	expectedConversationID := normalizeOptional(req.ConversationID)
 
-	sendReq := logic.SendMessageRequest{
+	sendReq := SendMessageRequest{
 		SenderID:              agentUserID,
 		ChatType:              conversationType,
 		ClientMsgID:           requestID,
-		ContentType:           logic.MessageContentTypeText,
+		ContentType:           MessageContentTypeText,
 		Content:               text,
-		MessageOrigin:         logic.MessageOriginAI,
+		MessageOrigin:         MessageOriginAI,
 		AgentAccountID:        agentUserID,
 		AgentRunID:            agentRunID,
 		AllowRecursiveTrigger: req.AllowRecursiveTrigger,
@@ -115,19 +112,19 @@ func normalizeAgentResponseRequest(req AgentResponseRequest) (logic.SendMessageR
 	case ConversationTypeSingle:
 		receiverUserID, err := normalizeRequired(req.ReceiverUserID, "receiver_user_id")
 		if err != nil {
-			return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", err
+			return SendMessageRequest{}, AgentMessageMetadata{}, "", err
 		}
 		if normalizeOptional(req.GroupID) != "" {
-			return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", apperror.InvalidArgument("group_id must be empty for single response")
+			return SendMessageRequest{}, AgentMessageMetadata{}, "", apperror.InvalidArgument("group_id must be empty for single response")
 		}
 		sendReq.ReceiverID = receiverUserID
 	case ConversationTypeGroup:
 		groupID, err := normalizeRequired(req.GroupID, "group_id")
 		if err != nil {
-			return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", err
+			return SendMessageRequest{}, AgentMessageMetadata{}, "", err
 		}
 		if normalizeOptional(req.ReceiverUserID) != "" {
-			return logic.SendMessageRequest{}, AgentMessageMetadata{}, "", apperror.InvalidArgument("receiver_user_id must be empty for group response")
+			return SendMessageRequest{}, AgentMessageMetadata{}, "", apperror.InvalidArgument("receiver_user_id must be empty for group response")
 		}
 		sendReq.GroupID = groupID
 	}
@@ -144,7 +141,7 @@ func normalizeAgentResponseRequest(req AgentResponseRequest) (logic.SendMessageR
 	}, expectedConversationID, nil
 }
 
-func validateMessageServiceResponse(resp logic.SendMessageResponse, req logic.SendMessageRequest, expectedConversationID string) error {
+func validateMessageServiceResponse(resp SendMessageResponse, req SendMessageRequest, expectedConversationID string) error {
 	message := resp.Message
 	if message.ServerMsgID == "" {
 		return apperror.Internal("message service returned empty server_msg_id")
@@ -166,7 +163,7 @@ func validateMessageServiceResponse(resp logic.SendMessageResponse, req logic.Se
 	if message.ChatType != req.ChatType {
 		return apperror.Internal("message service returned mismatched chat_type")
 	}
-	if message.MessageOrigin != logic.MessageOriginAI {
+	if message.MessageOrigin != MessageOriginAI {
 		return apperror.Internal("message service returned non-ai origin for agent response")
 	}
 	if message.AgentAccountID != req.AgentAccountID {

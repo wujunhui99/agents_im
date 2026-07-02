@@ -7,8 +7,6 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogictest"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registrytest"
@@ -17,9 +15,8 @@ import (
 
 func TestConversationAIHostingRuntimeRequestBuilderUsesBoundedRecentMessages(t *testing.T) {
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
-	conversationID := repository.SingleConversationID("usr_a", "usr_b")
+	im := newFakeIM()
+	conversationID := singleConvID("usr_a", "usr_b")
 	clearTask := "你能帮我对比一下 Python 和 Go 语言的性能吗？"
 	for seq := 1; seq <= 5; seq++ {
 		sender, receiver := "usr_a", "usr_b"
@@ -30,20 +27,19 @@ func TestConversationAIHostingRuntimeRequestBuilderUsesBoundedRecentMessages(t *
 		if seq == 5 {
 			content = clearTask
 		}
-		if _, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-			SenderID:    sender,
-			ReceiverID:  receiver,
-			ChatType:    logic.MessageChatTypeSingle,
-			ClientMsgID: "seed-context-" + string(rune('0'+seq)),
-			ContentType: logic.MessageContentTypeText,
-			Content:     content,
-		}); err != nil {
-			t.Fatalf("seed message %d: %v", seq, err)
-		}
+		im.appendHuman(Message{
+			ConversationID: conversationID,
+			ClientMsgID:    "seed-context-" + string(rune('0'+seq)),
+			SenderID:       sender,
+			ReceiverID:     receiver,
+			ChatType:       MessageChatTypeSingle,
+			ContentType:    MessageContentTypeText,
+			Content:        content,
+		})
 	}
 
 	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
-		MessageRepository: messageRepo,
+		MessageHistory:    im,
 		DeepSeek:          config.DeepSeekConfig{Model: "deepseek-test"},
 		MaxRecentMessages: 3,
 	})
@@ -62,7 +58,7 @@ func TestConversationAIHostingRuntimeRequestBuilderUsesBoundedRecentMessages(t *
 		SourceMessageID:   "msg_5",
 		SourceMessageSeq:  5,
 		SourceMessageText: clearTask,
-		SourceContentType: logic.MessageContentTypeText,
+		SourceContentType: MessageContentTypeText,
 	})
 	if err != nil {
 		t.Fatalf("build runtime request: %v", err)
@@ -87,24 +83,21 @@ func TestConversationAIHostingRuntimeRequestBuilderUsesBoundedRecentMessages(t *
 // 表现为兜底文案“服务暂时不可用”（trace 排查实证）。
 func TestBuilderHydratesPromptTextFromTriggerMessage(t *testing.T) {
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
-	conversationID := repository.SingleConversationID("agent_acc", "usr_peer")
-	sent, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-		SenderID:    "usr_peer",
-		ReceiverID:  "agent_acc",
-		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "kafka-trigger-msg",
-		ContentType: logic.MessageContentTypeText,
-		Content:     "111",
+	im := newFakeIM()
+	conversationID := singleConvID("agent_acc", "usr_peer")
+	sent := im.appendHuman(Message{
+		ConversationID: conversationID,
+		ClientMsgID:    "kafka-trigger-msg",
+		SenderID:       "usr_peer",
+		ReceiverID:     "agent_acc",
+		ChatType:       MessageChatTypeSingle,
+		ContentType:    MessageContentTypeText,
+		Content:        "111",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
-		MessageRepository: messageRepo,
-		DeepSeek:          config.DeepSeekConfig{Model: "deepseek-test"},
+		MessageHistory: im,
+		DeepSeek:       config.DeepSeekConfig{Model: "deepseek-test"},
 	})
 	// 镜像 agentTriggerFromJudged 的输出：无 PromptText / 无 SourceMessageText。
 	trigger := AgentTrigger{
@@ -115,12 +108,12 @@ func TestBuilderHydratesPromptTextFromTriggerMessage(t *testing.T) {
 		RequestingUserID:   "usr_peer",
 		ConversationID:     conversationID,
 		ConversationType:   ConversationTypeSingle,
-		TriggerMessageID:   sent.Message.ServerMsgID,
-		TriggerSeq:         sent.Message.Seq,
-		ReplyToMessageID:   sent.Message.ServerMsgID,
-		SourceMessageID:    sent.Message.ServerMsgID,
-		SourceMessageSeq:   sent.Message.Seq,
-		SourceContentType:  logic.MessageContentTypeText,
+		TriggerMessageID:   sent.ServerMsgID,
+		TriggerSeq:         sent.Seq,
+		ReplyToMessageID:   sent.ServerMsgID,
+		SourceMessageID:    sent.ServerMsgID,
+		SourceMessageSeq:   sent.Seq,
+		SourceContentType:  MessageContentTypeText,
 		TargetAgentUserIDs: []string{"agent_acc"},
 	}
 	req, err := builder.BuildRuntimeRequest(ctx, trigger)
@@ -139,7 +132,7 @@ func TestBuilderHydratesPromptTextFromTriggerMessage(t *testing.T) {
 
 func TestConversationAIHostingRuntimeRequestBuilderRejectsNonSingleConversation(t *testing.T) {
 	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
-		MessageRepository: repository.NewMemoryMessageRepository(),
+		MessageHistory: newFakeIM(),
 	})
 	_, err := builder.BuildRuntimeRequest(context.Background(), AgentTrigger{
 		ConversationType: ConversationTypeGroup,
@@ -151,8 +144,7 @@ func TestConversationAIHostingRuntimeRequestBuilderRejectsNonSingleConversation(
 
 func TestBuilderUsesStoredAgentProfileWhenTriggerTargetsAgentAccount(t *testing.T) {
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
+	im := newFakeIM()
 	agentRepo := agentlogictest.NewMemoryAgentStore()
 	agent, err := agentRepo.CreateAgent(ctx, model.Agent{
 		AgentID:     "agent_default_assistant",
@@ -165,20 +157,19 @@ func TestBuilderUsesStoredAgentProfileWhenTriggerTargetsAgentAccount(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	conversationID := repository.SingleConversationID("agent_creator", "usr_new")
-	if _, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-		SenderID:    "usr_new",
-		ReceiverID:  "agent_creator",
-		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "agent-creator-profile-msg",
-		ContentType: logic.MessageContentTypeText,
-		Content:     "你能做什么？",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	conversationID := singleConvID("agent_creator", "usr_new")
+	im.appendHuman(Message{
+		ConversationID: conversationID,
+		ClientMsgID:    "agent-creator-profile-msg",
+		SenderID:       "usr_new",
+		ReceiverID:     "agent_creator",
+		ChatType:       MessageChatTypeSingle,
+		ContentType:    MessageContentTypeText,
+		Content:        "你能做什么？",
+	})
 
 	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
-		MessageRepository: messageRepo,
+		MessageHistory:    im,
 		AgentRepository:   agentRepo,
 		DeepSeek:          config.DeepSeekConfig{Model: "deepseek-test"},
 		MaxRecentMessages: 3,
@@ -198,7 +189,7 @@ func TestBuilderUsesStoredAgentProfileWhenTriggerTargetsAgentAccount(t *testing.
 		SourceMessageID:    "msg_000001",
 		SourceMessageSeq:   1,
 		SourceMessageText:  "你能做什么？",
-		SourceContentType:  logic.MessageContentTypeText,
+		SourceContentType:  MessageContentTypeText,
 		TargetAgentUserIDs: []string{"agent_creator"},
 	})
 	if err != nil {
@@ -211,7 +202,7 @@ func TestBuilderUsesStoredAgentProfileWhenTriggerTargetsAgentAccount(t *testing.
 
 func TestBuilderUsesStoredAgentRuntimeDefinition(t *testing.T) {
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
+	im := newFakeIM()
 	agentRepo := agentlogictest.NewMemoryAgentStore()
 	registry := registrytest.NewMemoryStore()
 	agent, err := agentRepo.CreateAgent(ctx, model.Agent{
@@ -259,23 +250,21 @@ func TestBuilderUsesStoredAgentRuntimeDefinition(t *testing.T) {
 	if _, _, err := registry.BindTool(ctx, model.AgentToolBinding{AgentID: agent.AgentID, ToolID: tool.ToolID, CreatedBy: "usr_owner"}); err != nil {
 		t.Fatal(err)
 	}
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
-	conversationID := repository.SingleConversationID("agent_runtime_account", "usr_peer")
-	if _, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-		SenderID:    "usr_peer",
-		ReceiverID:  "agent_runtime_account",
-		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "runtime-definition-msg",
-		ContentType: logic.MessageContentTypeText,
-		Content:     "hello runtime agent",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	conversationID := singleConvID("agent_runtime_account", "usr_peer")
+	im.appendHuman(Message{
+		ConversationID: conversationID,
+		ClientMsgID:    "runtime-definition-msg",
+		SenderID:       "usr_peer",
+		ReceiverID:     "agent_runtime_account",
+		ChatType:       MessageChatTypeSingle,
+		ContentType:    MessageContentTypeText,
+		Content:        "hello runtime agent",
+	})
 	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
-		MessageRepository: messageRepo,
-		AgentRepository:   agentRepo,
-		AgentRegistry:     registry,
-		DeepSeek:          config.DeepSeekConfig{Model: "deepseek-test"},
+		MessageHistory:  im,
+		AgentRepository: agentRepo,
+		AgentRegistry:   registry,
+		DeepSeek:        config.DeepSeekConfig{Model: "deepseek-test"},
 	})
 	req, err := builder.BuildRuntimeRequest(ctx, AgentTrigger{
 		RequestID:          "message.created:runtime-definition-msg:agent_runtime_account",
@@ -288,7 +277,7 @@ func TestBuilderUsesStoredAgentRuntimeDefinition(t *testing.T) {
 		TriggerMessageID:   "msg_runtime_definition",
 		TriggerSeq:         1,
 		SourceMessageSeq:   1,
-		SourceContentType:  logic.MessageContentTypeText,
+		SourceContentType:  MessageContentTypeText,
 		TargetAgentUserIDs: []string{"agent_runtime_account"},
 	})
 	if err != nil {

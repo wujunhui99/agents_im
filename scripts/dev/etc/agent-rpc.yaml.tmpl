@@ -23,6 +23,11 @@ FriendsRPC:
   Endpoints:
     - 127.0.0.1:${FRIENDS_RPC_PORT}
   Timeout: 5000
+# AI 托管 runtime 群成员鉴权经属主 groups-rpc ListMembers（#617，单向叶子，不成环）。
+GroupsRPC:
+  Endpoints:
+    - 127.0.0.1:${GROUPS_RPC_PORT}
+  Timeout: 5000
 Kafka:
   Brokers: ${KAFKA_BROKERS}
   Group: agent-trigger

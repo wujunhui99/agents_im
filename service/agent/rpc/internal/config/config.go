@@ -11,8 +11,8 @@ import (
 type Config struct {
 	zrpc.RpcServerConf
 
-	// DataSource 是 agent 域数据层（keystone internal/repository：agent registry /
-	// audit / hosting / conv_hosting / messages 历史读）。Postgres-only。
+	// DataSource 是 agent 域自有数据层（goctl model：agent registry / audit / hosting /
+	// conv_hosting）。跨域 message 历史读经 msg-rpc gRPC（#617）。Postgres-only。
 	DataSource string `json:",optional"`
 
 	// MsgRPC：AI 回复写回经属主 msg-rpc gRPC SendMessage（imadapter，D15 step ④）。
@@ -25,6 +25,10 @@ type Config struct {
 	// FriendsRPC：agent-create 工具路径建好友经属主 friends-rpc EnsureFriendship（#606，
 	// 取代 internal/repository.EnsureAcceptedFriendship；单向叶子调用，不成环）。
 	FriendsRPC zrpc.RpcClientConf `json:",optional"`
+
+	// GroupsRPC：AI 托管 runtime 群成员鉴权经属主 groups-rpc ListMembers（#617，取代
+	// internal GroupsLogic 直读；单向叶子调用，不成环）。
+	GroupsRPC zrpc.RpcClientConf `json:",optional"`
 
 	// DeepSeek / LLMObservability / PythonExecutor：runtime 与工具配置。
 	// DeepSeek/LLMObservability 已搬到本域（#663），#664 改 struct tag 声明式默认值/env：

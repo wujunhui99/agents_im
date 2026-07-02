@@ -14,6 +14,10 @@ type Config struct {
 	// （#533，脱 internal/mediavalidate 直读 media_objects）。
 	MediaRPC zrpc.RpcClientConf `json:",optional"`
 
+	// GroupsRPC：群成员鉴权（读访问控制 + SendMessage 写路径群成员解析）经属主
+	// groups-rpc ListMembers（#617，脱 internal GroupsLogic 直读；单向叶子调用，不成环）。
+	GroupsRPC zrpc.RpcClientConf `json:",optional"`
+
 	// AI 托管（运行时 + 开关 CRUD）已整体迁出至属主 agent-rpc（#340，D15 step ④）：
 	// msg-rpc 不再持 UserRPC/DeepSeek/LLMObservability/PythonExecutor 等 agent 运行时配置。
 

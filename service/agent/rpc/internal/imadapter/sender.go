@@ -15,7 +15,7 @@ import (
 
 	"github.com/zeromicro/go-zero/zrpc"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
 )
@@ -35,7 +35,7 @@ func NewMsgRPCSender(cli zrpc.Client) *MsgRPCSender {
 
 // SendMessage satisfies orchestrator.MessageSender: business request → pb →
 // msg-rpc gRPC SendMessage → business response.
-func (s *MsgRPCSender) SendMessage(ctx context.Context, req business.SendMessageRequest) (business.SendMessageResponse, error) {
+func (s *MsgRPCSender) SendMessage(ctx context.Context, req orchestrator.SendMessageRequest) (orchestrator.SendMessageResponse, error) {
 	resp, err := s.client.SendMessage(ctx, &msg.SendMessageRequest{
 		SenderId:              req.SenderID,
 		ReceiverId:            req.ReceiverID,
@@ -51,19 +51,19 @@ func (s *MsgRPCSender) SendMessage(ctx context.Context, req business.SendMessage
 		AllowRecursiveTrigger: req.AllowRecursiveTrigger,
 	})
 	if err != nil {
-		return business.SendMessageResponse{}, err
+		return orchestrator.SendMessageResponse{}, err
 	}
-	return business.SendMessageResponse{
+	return orchestrator.SendMessageResponse{
 		Message:      businessMessageFromPB(resp.GetMessage()),
 		Deduplicated: resp.GetDeduplicated(),
 	}, nil
 }
 
-func businessMessageFromPB(m *msg.Message) business.Message {
+func businessMessageFromPB(m *msg.Message) orchestrator.Message {
 	if m == nil {
-		return business.Message{}
+		return orchestrator.Message{}
 	}
-	return business.Message{
+	return orchestrator.Message{
 		ServerMsgID:           m.GetServerMsgId(),
 		ClientMsgID:           m.GetClientMsgId(),
 		ConversationID:        m.GetConversationId(),

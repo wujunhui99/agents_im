@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
+	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/groupsrpc"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
@@ -109,12 +109,12 @@ func (l *SendMessageLogic) normalize(in *msg.SendMessageRequest) (normalizedSend
 	return ns, nil
 }
 
-// resolveGroupParticipants 解析群成员并校验发送者在群内（keystone 例外：调 internal GroupsLogic）。
+// resolveGroupParticipants 解析群成员并校验发送者在群内（经 groups-rpc ListMembers，#617）。
 func (l *SendMessageLogic) resolveGroupParticipants(groupID, senderID string) ([]string, error) {
 	if l.svcCtx.Groups == nil {
 		return nil, apperror.Internal("group membership validator is not configured")
 	}
-	members, err := l.svcCtx.Groups.ListMembers(l.ctx, business.ListMembersRequest{
+	members, err := l.svcCtx.Groups.ListMembers(l.ctx, groupsrpc.ListMembersRequest{
 		GroupID:         groupID,
 		RequesterUserID: senderID,
 	})

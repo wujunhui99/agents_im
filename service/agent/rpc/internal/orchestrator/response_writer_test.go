@@ -6,23 +6,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 )
 
 func TestResponseWriterUsesMessageSenderSeam(t *testing.T) {
 	sender := &recordingMessageSender{
-		resp: logic.SendMessageResponse{
-			Message: logic.Message{
+		resp: SendMessageResponse{
+			Message: Message{
 				ServerMsgID:        "msg_agent_1",
 				ConversationID:     "single:agent_1:user_1",
 				Seq:                8,
 				SenderID:           "agent_1",
 				ReceiverID:         "user_1",
-				ChatType:           logic.MessageChatTypeSingle,
-				ContentType:        logic.MessageContentTypeText,
+				ChatType:           MessageChatTypeSingle,
+				ContentType:        MessageContentTypeText,
 				Content:            "answer",
-				MessageOrigin:      logic.MessageOriginAI,
+				MessageOrigin:      MessageOriginAI,
 				AgentAccountID:     "agent_1",
 				TriggerServerMsgID: "msg_user_1",
 				AgentRunID:         "run_1",
@@ -52,16 +51,16 @@ func TestResponseWriterUsesMessageSenderSeam(t *testing.T) {
 	if sender.lastReq.SenderID != "agent_1" || sender.lastReq.ReceiverID != "user_1" {
 		t.Fatalf("unexpected message request participants: %+v", sender.lastReq)
 	}
-	if sender.lastReq.ChatType != logic.MessageChatTypeSingle {
+	if sender.lastReq.ChatType != MessageChatTypeSingle {
 		t.Fatalf("chat type = %q", sender.lastReq.ChatType)
 	}
 	if sender.lastReq.ClientMsgID != "agent-run-1-response" {
 		t.Fatalf("client msg id = %q", sender.lastReq.ClientMsgID)
 	}
-	if sender.lastReq.ContentType != logic.MessageContentTypeText || sender.lastReq.Content != "answer" {
+	if sender.lastReq.ContentType != MessageContentTypeText || sender.lastReq.Content != "answer" {
 		t.Fatalf("unexpected content request: %+v", sender.lastReq)
 	}
-	if sender.lastReq.MessageOrigin != logic.MessageOriginAI ||
+	if sender.lastReq.MessageOrigin != MessageOriginAI ||
 		sender.lastReq.AgentAccountID != "agent_1" ||
 		sender.lastReq.TriggerServerMsgID != "msg_user_1" ||
 		sender.lastReq.AgentRunID != "run_1" {
@@ -78,17 +77,17 @@ func TestResponseWriterUsesMessageSenderSeam(t *testing.T) {
 func TestResponseWriterAllowsLongLLMTextResponses(t *testing.T) {
 	longText := strings.Repeat("Go 和 Python 的区别在于运行时、类型系统和并发模型。", 30)
 	sender := &recordingMessageSender{
-		resp: logic.SendMessageResponse{
-			Message: logic.Message{
+		resp: SendMessageResponse{
+			Message: Message{
 				ServerMsgID:        "msg_agent_long",
 				ConversationID:     "single:agent_1:user_1",
 				Seq:                9,
 				SenderID:           "agent_1",
 				ReceiverID:         "user_1",
-				ChatType:           logic.MessageChatTypeSingle,
-				ContentType:        logic.MessageContentTypeText,
+				ChatType:           MessageChatTypeSingle,
+				ContentType:        MessageContentTypeText,
 				Content:            longText,
-				MessageOrigin:      logic.MessageOriginAI,
+				MessageOrigin:      MessageOriginAI,
 				AgentAccountID:     "agent_1",
 				TriggerServerMsgID: "msg_user_long",
 				AgentRunID:         "run_long",
@@ -193,16 +192,16 @@ func TestResponseWriterRejectsInvalidGroupResponseWithoutCallingSender(t *testin
 
 type recordingMessageSender struct {
 	calls   int
-	lastReq logic.SendMessageRequest
-	resp    logic.SendMessageResponse
+	lastReq SendMessageRequest
+	resp    SendMessageResponse
 	err     error
 }
 
-func (s *recordingMessageSender) SendMessage(_ context.Context, req logic.SendMessageRequest) (logic.SendMessageResponse, error) {
+func (s *recordingMessageSender) SendMessage(_ context.Context, req SendMessageRequest) (SendMessageResponse, error) {
 	s.calls++
 	s.lastReq = req
 	if s.err != nil {
-		return logic.SendMessageResponse{}, s.err
+		return SendMessageResponse{}, s.err
 	}
 	return s.resp, nil
 }

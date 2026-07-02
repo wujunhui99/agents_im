@@ -19,6 +19,11 @@ FriendsRPC:
   Endpoints:
     - friends-rpc:9092
   Timeout: 5000
+# AI 托管 runtime 群成员鉴权经属主 groups-rpc ListMembers（#617，单向叶子，不成环）。
+GroupsRPC:
+  Endpoints:
+    - groups-rpc:9103
+  Timeout: 5000
 
 # go-zero 自带 tracing：endpoint 由 OTLP collector 注入（空则关闭）。
 Telemetry:

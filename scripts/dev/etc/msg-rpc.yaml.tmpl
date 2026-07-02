@@ -10,6 +10,11 @@ MediaRPC:
   Endpoints:
     - 127.0.0.1:${MEDIA_RPC_PORT}
   Timeout: 5000
+# GroupsRPC：群成员鉴权经属主 groups-rpc ListMembers（#617，单向叶子，不成环）。
+GroupsRPC:
+  Endpoints:
+    - 127.0.0.1:${GROUPS_RPC_PORT}
+  Timeout: 5000
 Kafka:
   Enabled: true
   Brokers: ${KAFKA_BROKERS}

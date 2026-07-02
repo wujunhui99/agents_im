@@ -7,9 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
-	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
@@ -22,7 +19,7 @@ func TestGroupExplicitTargetAgentCreatesOneRunAndMessageServiceReply(t *testing.
 	human := h.sendGroupHuman(t, "client-group-target", "@agent_1 summarize this")
 	result, err := h.hosting.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
 		EventID:               "evt_group_target_1",
-		Message:               human.Message,
+		Message:               human,
 		TargetAgentAccountIDs: []string{"agent_1"},
 	})
 	if err != nil {
@@ -32,28 +29,25 @@ func TestGroupExplicitTargetAgentCreatesOneRunAndMessageServiceReply(t *testing.
 		t.Fatalf("targeted group message did not trigger agent: %+v", result)
 	}
 
-	pulled := waitForPulledMessageCount(t, h.messageLogic, "usr_peer", human.Message.ConversationID, 2)
+	messages := waitForConversationCount(t, h.im, human.ConversationID, 2)
 	if calls := h.runtimeCallCount(); calls != 1 {
 		t.Fatalf("runtime calls = %d, want 1", calls)
 	}
-	if len(pulled.Messages) != 2 {
-		t.Fatalf("group timeline length = %d, want human + ai", len(pulled.Messages))
-	}
 
-	aiMessage := pulled.Messages[1]
-	if aiMessage.MessageOrigin != logic.MessageOriginAI {
+	aiMessage := messages[1]
+	if aiMessage.MessageOrigin != MessageOriginAI {
 		t.Fatalf("group agent response origin = %q, want ai: %+v", aiMessage.MessageOrigin, aiMessage)
 	}
 	if aiMessage.SenderID != "agent_1" || aiMessage.AgentAccountID != "agent_1" {
 		t.Fatalf("group agent response sender metadata mismatch: %+v", aiMessage)
 	}
-	if aiMessage.ChatType != logic.MessageChatTypeGroup || aiMessage.GroupID != "grp_agent_chat" {
+	if aiMessage.ChatType != MessageChatTypeGroup || aiMessage.GroupID != "grp_agent_chat" {
 		t.Fatalf("group agent response target mismatch: %+v", aiMessage)
 	}
-	if aiMessage.Seq != human.Message.Seq+1 {
-		t.Fatalf("group agent response seq = %d, want %d", aiMessage.Seq, human.Message.Seq+1)
+	if aiMessage.Seq != human.Seq+1 {
+		t.Fatalf("group agent response seq = %d, want %d", aiMessage.Seq, human.Seq+1)
 	}
-	if aiMessage.TriggerServerMsgID != human.Message.ServerMsgID || aiMessage.AgentRunID == "" {
+	if aiMessage.TriggerServerMsgID != human.ServerMsgID || aiMessage.AgentRunID == "" {
 		t.Fatalf("group agent response trigger metadata mismatch: %+v", aiMessage)
 	}
 	if aiMessage.AllowRecursiveTrigger {
@@ -68,7 +62,7 @@ func TestGroupMessageWithoutExplicitTargetDoesNotTriggerAgentNoise(t *testing.T)
 	human := h.sendGroupHuman(t, "client-group-chatter", "plain group chatter")
 	result, err := h.hosting.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
 		EventID: "evt_group_chatter_1",
-		Message: human.Message,
+		Message: human,
 	})
 	if err != nil {
 		t.Fatalf("handle untargeted group message: %v", err)
@@ -80,18 +74,8 @@ func TestGroupMessageWithoutExplicitTargetDoesNotTriggerAgentNoise(t *testing.T)
 		t.Fatalf("runtime calls = %d, want 0", calls)
 	}
 
-	pulled, err := h.messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
-		UserID:         "usr_peer",
-		ConversationID: human.Message.ConversationID,
-		FromSeq:        1,
-		Limit:          10,
-		Order:          "asc",
-	})
-	if err != nil {
-		t.Fatalf("pull group chatter: %v", err)
-	}
-	if len(pulled.Messages) != 1 {
-		t.Fatalf("untargeted group chatter produced agent noise: %+v", pulled.Messages)
+	if got := h.im.messages(human.ConversationID); len(got) != 1 {
+		t.Fatalf("untargeted group chatter produced agent noise: %+v", got)
 	}
 }
 
@@ -102,13 +86,13 @@ func TestGroupAIReplyDoesNotTriggerAnotherAgentByDefault(t *testing.T) {
 	human := h.sendGroupHuman(t, "client-group-loop-human", "@agent_1 answer")
 	if _, err := h.hosting.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
 		EventID:               "evt_group_loop_human_1",
-		Message:               human.Message,
+		Message:               human,
 		TargetAgentAccountIDs: []string{"agent_1"},
 	}); err != nil {
 		t.Fatalf("handle initial group target: %v", err)
 	}
-	pulled := waitForPulledMessageCount(t, h.messageLogic, "usr_peer", human.Message.ConversationID, 2)
-	aiMessage := pulled.Messages[1]
+	messages := waitForConversationCount(t, h.im, human.ConversationID, 2)
+	aiMessage := messages[1]
 
 	result, err := h.hosting.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
 		EventID:               "evt_group_loop_ai_1",
@@ -133,7 +117,7 @@ func TestGroupNonMemberAgentTargetRecordsFailureWithoutRunningAgent(t *testing.T
 	human := h.sendGroupHuman(t, "client-group-nonmember-agent", "@agent_1 summarize")
 	result, err := h.hosting.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
 		EventID:               "evt_group_nonmember_agent_1",
-		Message:               human.Message,
+		Message:               human,
 		TargetAgentAccountIDs: []string{"agent_1"},
 	})
 	if err != nil {
@@ -156,10 +140,9 @@ func TestGroupNonMemberAgentTargetRecordsFailureWithoutRunningAgent(t *testing.T
 }
 
 type groupAgentHarness struct {
-	messageRepo  *repository.MemoryMessageRepository
-	messageLogic *logic.MessageLogic
-	hostingRepo  *recordingAgentHostingRepository
-	hosting      *ConversationHostingService
+	im          *fakeIM
+	hostingRepo *recordingAgentHostingRepository
+	hosting     *ConversationHostingService
 
 	mu              sync.Mutex
 	runtimeCalls    int
@@ -169,21 +152,19 @@ type groupAgentHarness struct {
 func newGroupAgentHarness(t *testing.T, activeMemberIDs []string) *groupAgentHarness {
 	t.Helper()
 
-	messageRepo := repository.NewMemoryMessageRepository()
-	groups := newAgentIMTestGroupMemberLister("grp_agent_chat", activeMemberIDs)
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, groups, nil)
+	im := newFakeIM()
+	groups := newStubGroupMembers("grp_agent_chat", activeMemberIDs)
 	hostingRepo := &recordingAgentHostingRepository{inner: aghosting.NewMemoryStore()}
 	auditStore := agaudit.NewMemoryStore()
 	auditRecorder := agaudit.NewRunRecorder(auditStore)
-	writer, err := NewMessageServiceResponseWriter(messageLogic)
+	writer, err := NewMessageServiceResponseWriter(im)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
 	}
 
 	h := &groupAgentHarness{
-		messageRepo:  messageRepo,
-		messageLogic: messageLogic,
-		hostingRepo:  hostingRepo,
+		im:          im,
+		hostingRepo: hostingRepo,
 	}
 	runtime := runtimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
 		h.mu.Lock()
@@ -221,21 +202,18 @@ func newGroupAgentHarness(t *testing.T, activeMemberIDs []string) *groupAgentHar
 	return h
 }
 
-func (h *groupAgentHarness) sendGroupHuman(t *testing.T, clientMsgID string, text string) logic.SendMessageResponse {
+func (h *groupAgentHarness) sendGroupHuman(t *testing.T, clientMsgID string, text string) Message {
 	t.Helper()
-
-	resp, err := h.messageLogic.SendMessage(context.Background(), logic.SendMessageRequest{
-		SenderID:    "usr_sender",
-		GroupID:     "grp_agent_chat",
-		ChatType:    logic.MessageChatTypeGroup,
-		ClientMsgID: clientMsgID,
-		ContentType: logic.MessageContentTypeText,
-		Content:     text,
+	return h.im.appendHuman(Message{
+		ConversationID: groupConvID("grp_agent_chat"),
+		ClientMsgID:    clientMsgID,
+		SenderID:       "usr_sender",
+		GroupID:        "grp_agent_chat",
+		ChatType:       MessageChatTypeGroup,
+		ContentType:    MessageContentTypeText,
+		Content:        text,
+		MessageOrigin:  MessageOriginHuman,
 	})
-	if err != nil {
-		t.Fatalf("send group human message: %v", err)
-	}
-	return resp
 }
 
 func (h *groupAgentHarness) runtimeCallCount() int {
@@ -291,44 +269,6 @@ func groupRuntimeRequest(trigger AgentTrigger) agentruntime.RunRequest {
 			Text:        trigger.SourceMessageText,
 		}},
 	}
-}
-
-type agentIMTestGroupMemberLister struct {
-	groupID string
-	members []logic.GroupMemberInfo
-}
-
-func newAgentIMTestGroupMemberLister(groupID string, activeMemberIDs []string) *agentIMTestGroupMemberLister {
-	members := make([]logic.GroupMemberInfo, 0, len(activeMemberIDs))
-	for _, userID := range activeMemberIDs {
-		members = append(members, logic.GroupMemberInfo{
-			GroupID: groupID,
-			UserID:  userID,
-			State:   "active",
-			Role:    "member",
-		})
-	}
-	return &agentIMTestGroupMemberLister{groupID: groupID, members: members}
-}
-
-func (l *agentIMTestGroupMemberLister) ListMembers(_ context.Context, req logic.ListMembersRequest) (logic.ListMembersResponse, error) {
-	if strings.TrimSpace(req.GroupID) != l.groupID {
-		return logic.ListMembersResponse{}, nil
-	}
-	members := append([]logic.GroupMemberInfo(nil), l.members...)
-	if strings.TrimSpace(req.RequesterUserID) != "" {
-		active := false
-		for _, member := range members {
-			if member.UserID == req.RequesterUserID && (member.State == "" || member.State == "active") {
-				active = true
-				break
-			}
-		}
-		if !active {
-			return logic.ListMembersResponse{}, apperror.Forbidden("requester is not a group member")
-		}
-	}
-	return logic.ListMembersResponse{GroupID: req.GroupID, Members: members}, nil
 }
 
 type recordingAgentHostingRepository struct {

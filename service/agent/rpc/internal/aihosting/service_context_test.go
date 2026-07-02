@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
@@ -16,6 +15,7 @@ import (
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
+	agentim "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registrytest"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 )
@@ -32,22 +32,13 @@ func TestConfigureConversationAIHostingFailsOnMissingRequiredDependencies(t *tes
 			wantErr: "message service context is not configured",
 		},
 		{
-			name: "missing message logic",
+			name: "missing message history reader",
 			ctx: func() *ServiceContext {
 				ctx := completeAIHostingServiceContext()
-				ctx.MessageLogic = nil
+				ctx.MessageHistory = nil
 				return ctx
 			}(),
-			wantErr: "message logic is not configured",
-		},
-		{
-			name: "missing message repository",
-			ctx: func() *ServiceContext {
-				ctx := completeAIHostingServiceContext()
-				ctx.MessageRepo = nil
-				return ctx
-			}(),
-			wantErr: "message repository is not configured",
+			wantErr: "message history reader is not configured",
 		},
 		{
 			name: "missing agent hosting repository",
@@ -76,6 +67,15 @@ func TestConfigureConversationAIHostingFailsOnMissingRequiredDependencies(t *tes
 			}(),
 			wantErr: "agent audit store is not configured",
 		},
+		{
+			name: "missing agent response sender",
+			ctx: func() *ServiceContext {
+				ctx := completeAIHostingServiceContext()
+				ctx.AgentResponseSender = nil
+				return ctx
+			}(),
+			wantErr: "agent response sender is not configured",
+		},
 	}
 
 	for _, tt := range tests {
@@ -88,23 +88,24 @@ func TestConfigureConversationAIHostingFailsOnMissingRequiredDependencies(t *tes
 	}
 }
 
+// TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting 验证 Configure 装配出的
+// HostingService 对直聊 AI 托管触发：先经注入的 gRPC 读端口（ReadAdvancer）同步推进已读，再异步跑 run
+// （#617：已读经 msg-rpc MarkConversationAsRead，本测用 fake 替身）。
 func TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting(t *testing.T) {
 	t.Setenv("DEEPSEEK_API_KEY", "")
 
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
-	serviceContext := NewServiceContextWithMediaValidator(
-		messageRepo,
-		nil,
-		nil,
-		nil,
-		appconfig.DefaultJWTAuthConfig(),
-	)
+	conversationID := singleTestConvID("usr_hosted_owner", "usr_peer")
+	history := &fakeMessageHistory{}
+	reads := newFakeReadAdvancer()
+	serviceContext := NewServiceContext(appconfig.DefaultJWTAuthConfig())
+	serviceContext.MessageHistory = history
+	serviceContext.ReadAdvancer = reads
+	serviceContext.AgentResponseSender = &fakeSender{}
 	if err := ConfigureConversationAIHosting(serviceContext, config.DeepSeekConfig{}, config.LLMObservabilityConfig{}); err != nil {
 		t.Fatalf("configure conversation AI hosting: %v", err)
 	}
 
-	conversationID := repository.SingleConversationID("usr_hosted_owner", "usr_peer")
 	if _, err := serviceContext.AIHostingStore.SetConversationAIHostingEnabled(ctx, convhosting.Update{
 		OwnerAccountID:    "usr_hosted_owner",
 		ConversationID:    conversationID,
@@ -114,33 +115,30 @@ func TestConfigureConversationAIHostingWiresReadMarkerForDirectChatAIHosting(t *
 		t.Fatalf("enable conversation AI hosting: %v", err)
 	}
 
-	trigger, err := serviceContext.MessageLogic.SendMessage(ctx, business.SendMessageRequest{
-		SenderID:    "usr_peer",
-		ReceiverID:  "usr_hosted_owner",
-		ChatType:    business.MessageChatTypeSingle,
-		ClientMsgID: "client-prod-config-read-marker",
-		ContentType: business.MessageContentTypeText,
-		Content:     "hello from peer",
-	})
-	if err != nil {
-		t.Fatalf("send hosted trigger: %v", err)
+	trigger := agentim.Message{
+		ServerMsgID:    "srv_hosted_trigger",
+		ClientMsgID:    "client-prod-config-read-marker",
+		ConversationID: conversationID,
+		Seq:            7,
+		SenderID:       "usr_peer",
+		ReceiverID:     "usr_hosted_owner",
+		ChatType:       agentim.MessageChatTypeSingle,
+		ContentType:    agentim.MessageContentTypeText,
+		Content:        "hello from peer",
+		MessageOrigin:  agentim.MessageOriginHuman,
+	}
+	if _, err := serviceContext.HostingService.HandleMessageCreated(ctx, agentim.ConversationHostingMessageCreatedInput{
+		EventID: "evt_prod_config_read_marker",
+		Message: trigger,
+	}); err != nil {
+		t.Fatalf("handle hosted trigger: %v", err)
 	}
 
-	seqs, err := serviceContext.MessageLogic.GetConversationSeqs(ctx, business.GetConversationSeqsRequest{
-		UserID:          "usr_hosted_owner",
-		ConversationIDs: []string{conversationID},
-	})
-	if err != nil {
-		t.Fatalf("get hosted owner seqs: %v", err)
+	// 已读在跑 run 前就应同步推进到触发消息 seq（经注入的 ReadAdvancer）。
+	if got := reads.readSeq("usr_hosted_owner", conversationID); got != trigger.Seq {
+		t.Fatalf("hosted owner read seq = %d, want %d", got, trigger.Seq)
 	}
-	if len(seqs.States) != 1 {
-		t.Fatalf("seq states = %+v, want one state", seqs.States)
-	}
-	state := seqs.States[0]
-	if state.HasReadSeq != trigger.Message.Seq || state.UnreadCount != 0 {
-		t.Fatalf("hosted owner read state = %+v, want hasReadSeq %d unread 0", state, trigger.Message.Seq)
-	}
-
+	// run 被调度并落审计（DEEPSEEK_API_KEY 缺失下会失败，但审计仍记录一条 run）。
 	waitForAgentAuditRuns(t, serviceContext.AgentAudit, 1)
 }
 
@@ -215,16 +213,91 @@ func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testin
 }
 
 func completeAIHostingServiceContext() *ServiceContext {
-	messageRepo := repository.NewMemoryMessageRepository()
 	aiHostingStore := convhosting.NewMemoryStore()
 	return &ServiceContext{
-		MessageLogic:     business.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil),
-		MessageRepo:      messageRepo,
-		AgentHostingRepo: aghosting.NewMemoryStore(),
-		AIHostingStore:   aiHostingStore,
-		AIHostingLogic:   convhosting.NewConversationAIHostingLogic(aiHostingStore),
-		AgentAudit:       agaudit.NewMemoryStore(),
+		MessageHistory:      &fakeMessageHistory{},
+		ReadAdvancer:        newFakeReadAdvancer(),
+		AgentResponseSender: &fakeSender{},
+		AgentHostingRepo:    aghosting.NewMemoryStore(),
+		AIHostingStore:      aiHostingStore,
+		AIHostingLogic:      convhosting.NewConversationAIHostingLogic(aiHostingStore),
+		AgentAudit:          agaudit.NewMemoryStore(),
 	}
+}
+
+// singleTestConvID 复刻 single:<lower>:<higher> 会话 id 约定。
+func singleTestConvID(a, b string) string {
+	if a <= b {
+		return "single:" + a + ":" + b
+	}
+	return "single:" + b + ":" + a
+}
+
+// fakeMessageHistory / fakeReadAdvancer / fakeSender 是 runtime 跨域读写端口的进程内替身
+// （生产由 msgrpc 适配器经 msg-rpc gRPC 承接，#617）。
+type fakeMessageHistory struct {
+	msgs []agentim.Message
+}
+
+func (f *fakeMessageHistory) GetRecentMessages(context.Context, agentim.RecentMessagesRequest) ([]agentim.Message, error) {
+	return append([]agentim.Message(nil), f.msgs...), nil
+}
+
+type fakeReadAdvancer struct {
+	mu    sync.Mutex
+	reads map[string]int64
+}
+
+func newFakeReadAdvancer() *fakeReadAdvancer {
+	return &fakeReadAdvancer{reads: map[string]int64{}}
+}
+
+func (f *fakeReadAdvancer) MarkConversationRead(_ context.Context, accountID, conversationID string, seq int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	key := accountID + "|" + conversationID
+	if seq > f.reads[key] {
+		f.reads[key] = seq
+	}
+	return nil
+}
+
+func (f *fakeReadAdvancer) readSeq(accountID, conversationID string) int64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reads[accountID+"|"+conversationID]
+}
+
+type fakeSender struct {
+	mu   sync.Mutex
+	sent []agentim.SendMessageRequest
+}
+
+func (f *fakeSender) SendMessage(_ context.Context, req agentim.SendMessageRequest) (agentim.SendMessageResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, req)
+	convID := singleTestConvID(req.SenderID, req.ReceiverID)
+	if req.ChatType == agentim.MessageChatTypeGroup {
+		convID = "group:" + req.GroupID
+	}
+	return agentim.SendMessageResponse{Message: agentim.Message{
+		ServerMsgID:           "srv_" + req.ClientMsgID,
+		ClientMsgID:           req.ClientMsgID,
+		ConversationID:        convID,
+		Seq:                   1,
+		SenderID:              req.SenderID,
+		ReceiverID:            req.ReceiverID,
+		GroupID:               req.GroupID,
+		ChatType:              req.ChatType,
+		ContentType:           req.ContentType,
+		Content:               req.Content,
+		MessageOrigin:         req.MessageOrigin,
+		AgentAccountID:        req.AgentAccountID,
+		TriggerServerMsgID:    req.TriggerServerMsgID,
+		AgentRunID:            req.AgentRunID,
+		AllowRecursiveTrigger: req.AllowRecursiveTrigger,
+	}}, nil
 }
 
 type recordingPythonExecutor struct {

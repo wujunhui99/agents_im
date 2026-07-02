@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	"github.com/wujunhui99/agents_im/pkg/model"
@@ -32,7 +30,7 @@ type AgentRegistryReader interface {
 }
 
 type ConversationAIHostingRuntimeRequestBuilderConfig struct {
-	MessageRepository repository.MessageRepository
+	MessageHistory    MessageHistoryReader
 	HostingStore      convhosting.Store
 	AgentRepository   AgentReader
 	AgentRegistry     AgentRegistryReader
@@ -41,7 +39,7 @@ type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 }
 
 type ConversationAIHostingRuntimeRequestBuilder struct {
-	messageRepo       repository.MessageRepository
+	messageHistory    MessageHistoryReader
 	hostingStore      convhosting.Store
 	agentRepo         AgentReader
 	agentRegistry     AgentRegistryReader
@@ -55,7 +53,7 @@ func NewConversationAIHostingRuntimeRequestBuilder(cfg ConversationAIHostingRunt
 		maxRecent = defaultAIHostingRecentMessages
 	}
 	return &ConversationAIHostingRuntimeRequestBuilder{
-		messageRepo:       cfg.MessageRepository,
+		messageHistory:    cfg.MessageHistory,
 		hostingStore:      cfg.HostingStore,
 		agentRepo:         cfg.AgentRepository,
 		agentRegistry:     cfg.AgentRegistry,
@@ -65,8 +63,8 @@ func NewConversationAIHostingRuntimeRequestBuilder(cfg ConversationAIHostingRunt
 }
 
 func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
-	if b == nil || b.messageRepo == nil {
-		return agentruntime.RunRequest{}, apperror.Internal("message repository is not configured")
+	if b == nil || b.messageHistory == nil {
+		return agentruntime.RunRequest{}, apperror.Internal("message history reader is not configured")
 	}
 	if trigger.ConversationType != ConversationTypeSingle {
 		return agentruntime.RunRequest{}, apperror.InvalidArgument("AI hosting V1 only supports direct conversations")
@@ -102,7 +100,14 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 	if fromSeq < 1 {
 		fromSeq = 1
 	}
-	recent, _, _, err := b.messageRepo.GetMessages(ctx, trigger.ConversationID, fromSeq, triggerSeq, maxRecent, "asc")
+	recent, err := b.messageHistory.GetRecentMessages(ctx, RecentMessagesRequest{
+		UserID:         trigger.AgentUserID,
+		ConversationID: trigger.ConversationID,
+		FromSeq:        fromSeq,
+		ToSeq:          triggerSeq,
+		Limit:          maxRecent,
+		Order:          "asc",
+	})
 	if err != nil {
 		return agentruntime.RunRequest{}, err
 	}
@@ -154,7 +159,7 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 	}, nil
 }
 
-func runtimeConversationMessage(message logic.Message, hostedOwnerID string) agentruntime.ConversationMessage {
+func runtimeConversationMessage(message Message, hostedOwnerID string) agentruntime.ConversationMessage {
 	senderType := agentruntime.SenderTypeUser
 	if message.SenderID == hostedOwnerID {
 		senderType = agentruntime.SenderTypeAgent
@@ -173,7 +178,7 @@ func runtimeConversationMessage(message logic.Message, hostedOwnerID string) age
 
 // triggerMessageText 从已加载的最近消息里取出触发消息正文：优先按 server_msg_id 命中，
 // 退而按 seq 命中（asc 排序下通常是末条）。返回解码后的纯文本（与历史/LLM 上下文一致）。
-func triggerMessageText(recent []logic.Message, triggerMessageID string, triggerSeq int64) string {
+func triggerMessageText(recent []Message, triggerMessageID string, triggerSeq int64) string {
 	triggerMessageID = strings.TrimSpace(triggerMessageID)
 	for _, message := range recent {
 		if triggerMessageID != "" && strings.TrimSpace(message.ServerMsgID) == triggerMessageID {
@@ -186,13 +191,13 @@ func triggerMessageText(recent []logic.Message, triggerMessageID string, trigger
 	return ""
 }
 
-func hostingRuntimeText(message logic.Message) string {
+func hostingRuntimeText(message Message) string {
 	switch message.ContentType {
-	case logic.MessageContentTypeText:
+	case MessageContentTypeText:
 		return strings.TrimSpace(message.Content)
-	case logic.MessageContentTypeImage:
+	case MessageContentTypeImage:
 		return "[图片消息]"
-	case logic.MessageContentTypeFile:
+	case MessageContentTypeFile:
 		return "[文件消息]"
 	default:
 		return "[非文本消息]"

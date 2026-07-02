@@ -1,16 +1,13 @@
 // Package aihosting 装配 agent-rpc worker 的 AI 托管运行时（ServiceContext +
 // ConfigureConversationAIHosting）。原寄居 msg-rpc（#463/#341），随 agent 域迁移
 // （04-agent AG-2/AG-3，D15 step ④，#340）迁入属主 service/agent/rpc——配合 trigger.Judge
-// 终判 + imadapter gRPC 写回，取代 msg-rpc 内进程托管。仍 import 的 internal/{logic,
-// repository,servicecontext/common}（MessageLogic / AI runtime 数据层）是 keystone 例外，
-// 待 internal/ 完全退役后清理。
+// 终判 + imadapter gRPC 写回，取代 msg-rpc 内进程托管。message 历史读 / 已读推进 / 群成员鉴权
+// 均经 owner gRPC（msg-rpc PullMessages·MarkConversationAsRead、groups-rpc ListMembers，#617），
+// 不再 in-process 读 internal message/groups。仍 import 的 internal/servicecontext/common
+// （AuthRuntime）是 auth keystone 例外，待 #618 迁 pkg/ 后清。
 package aihosting
 
 import (
-	"context"
-
-	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/internal/servicecontext/common"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
@@ -28,13 +25,14 @@ import (
 
 type ServiceContext struct {
 	common.AuthRuntime
-	MessageLogic     *logic.MessageLogic
-	AgentMessageHook logic.MessageCreatedHook
-	AIHostingLogic   *convhosting.ConversationAIHostingLogic
-	MessageRepo      repository.MessageRepository
+	AIHostingLogic *convhosting.ConversationAIHostingLogic
+	// MessageHistory 读会话最近历史喂请求构建器；ReadAdvancer 推进已读——均经 msg-rpc gRPC（#617）。
+	MessageHistory   agentim.MessageHistoryReader
+	ReadAdvancer     agentim.ConversationReadAdvancer
 	AgentHostingRepo aghosting.Store
 	AIHostingStore   convhosting.Store
-	GroupMembers     logic.GroupMemberLister
+	// GroupMembers 群成员鉴权经 groups-rpc gRPC ListMembers（#617，脱 internal GroupsLogic）。
+	GroupMembers agentim.GroupMemberLister
 	// AgentAudit 是 agent 自有 goctl 审计数据层（agent_runs/tool_calls/file_reads/python_execs），
 	// 取代 internal/{logic.AgentAuditLogic, repository.AgentAuditRepository}（#616 脱 internal）。
 	AgentAudit    agaudit.Store
@@ -65,30 +63,16 @@ type ConversationAIHostingRuntimeOptions struct {
 	AgentCreate runtimetools.AgentCreateHandler
 }
 
-// allowAllMessageMediaValidator 是内存/单测 fixture：不接 media-rpc 时放行附件校验。
-// 真实链路（msg-rpc）注入 media-rpc 校验器，绝不用本类型（#533）。
-type allowAllMessageMediaValidator struct{}
-
-func (allowAllMessageMediaValidator) ValidateMessageMedia(context.Context, string, string, string) error {
-	return nil
-}
-
-// NewServiceContextWithMediaValidator 用调用方注入的 media 校验器装配（#533：附件校验经 media-rpc，
-// 不再由本包直读 media_objects）。validator 为 nil 时回退放行校验器（仅内存/单测语义）。
-func NewServiceContextWithMediaValidator(repo repository.MessageRepository, mediaValidator logic.MessageMediaValidator, userExists logic.UserExistenceChecker, groups logic.GroupMemberLister, auth appconfig.JWTAuthConfig) *ServiceContext {
-	if mediaValidator == nil {
-		mediaValidator = allowAllMessageMediaValidator{}
-	}
-	agentHostingRepo := aghosting.NewMemoryStore()
+// NewServiceContext 装配 AI 托管运行时的基础上下文：默认内存托管/审计 Store + AuthRuntime。
+// 跨域读端口（MessageHistory / ReadAdvancer / GroupMembers，经 msg-rpc / groups-rpc gRPC，#617）
+// 与 AI 写回通道（AgentResponseSender，imadapter）由调用方（svc / 单测 fake）注入。
+func NewServiceContext(auth appconfig.JWTAuthConfig) *ServiceContext {
 	aiHostingStore := convhosting.NewMemoryStore()
 	return &ServiceContext{
 		AuthRuntime:      common.NewAuthRuntime(auth),
-		MessageLogic:     logic.NewMessageLogicWithMediaValidator(repo, userExists, groups, mediaValidator),
 		AIHostingLogic:   convhosting.NewConversationAIHostingLogic(aiHostingStore),
-		MessageRepo:      repo,
-		AgentHostingRepo: agentHostingRepo,
+		AgentHostingRepo: aghosting.NewMemoryStore(),
 		AIHostingStore:   aiHostingStore,
-		GroupMembers:     groups,
 		AgentAudit:       agaudit.NewMemoryStore(),
 	}
 }
@@ -125,11 +109,10 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	if ctx.AgentAudit == nil {
 		return apperror.Internal("agent audit store is not configured")
 	}
-	var responseSender agentim.MessageSender = ctx.MessageLogic
-	if ctx.AgentResponseSender != nil {
-		responseSender = ctx.AgentResponseSender
+	if ctx.AgentResponseSender == nil {
+		return apperror.Internal("agent response sender is not configured")
 	}
-	writer, err := agentim.NewMessageServiceResponseWriter(responseSender)
+	writer, err := agentim.NewMessageServiceResponseWriter(ctx.AgentResponseSender)
 	if err != nil {
 		return err
 	}
@@ -156,7 +139,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	orchestrator, err := agentim.NewAgentRunOrchestrator(agentim.AgentRunOrchestratorConfig{
 		Runtime: einoruntime.NewDeepSeekRuntime(opts.DeepSeek, runtimeOptions...),
 		RequestBuilder: agentim.NewConversationAIHostingRuntimeRequestBuilder(agentim.ConversationAIHostingRuntimeRequestBuilderConfig{
-			MessageRepository: ctx.MessageRepo,
+			MessageHistory:    ctx.MessageHistory,
 			HostingStore:      ctx.AIHostingStore,
 			AgentRepository:   agentRepositoryFromResolver(ctx.AgentResolver),
 			AgentRegistry:     opts.AgentRegistryReader,
@@ -170,20 +153,22 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	if err != nil {
 		return err
 	}
+	var readMarker agentim.AgentTriggerReadMarker
+	if ctx.ReadAdvancer != nil {
+		readMarker = agentim.NewConversationReadMarker(ctx.ReadAdvancer)
+	}
 	hosting, err := agentim.NewConversationHostingService(agentim.ConversationHostingConfig{
 		Repository:           ctx.AgentHostingRepo,
 		AIHostingStore:       ctx.AIHostingStore,
 		Runner:               orchestrator,
 		AgentAccountResolver: ctx.AgentResolver,
 		GroupMembers:         ctx.GroupMembers,
-		ReadMarker:           agentim.NewMessageRepositoryReadMarker(ctx.MessageRepo),
+		ReadMarker:           readMarker,
 	})
 	if err != nil {
 		return err
 	}
-	ctx.AgentMessageHook = hosting
 	ctx.HostingService = hosting
-	ctx.MessageLogic.SetMessageCreatedHook(hosting)
 	return nil
 }
 
@@ -200,11 +185,8 @@ func validateConversationAIHostingDependencies(ctx *ServiceContext) error {
 	if ctx == nil {
 		return apperror.Internal("message service context is not configured")
 	}
-	if ctx.MessageLogic == nil {
-		return apperror.Internal("message logic is not configured")
-	}
-	if ctx.MessageRepo == nil {
-		return apperror.Internal("message repository is not configured")
+	if ctx.MessageHistory == nil {
+		return apperror.Internal("message history reader is not configured")
 	}
 	return nil
 }
