@@ -8,8 +8,6 @@ import (
 
 	"github.com/zeromicro/go-zero/zrpc"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
@@ -21,12 +19,15 @@ import (
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/hosting"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/imadapter"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/msgrpc"
 	orchestrator "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/trigger"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/userrpc"
 	friendsclient "github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
+	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
+	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 )
 
@@ -62,6 +63,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if !hasRPCClientConfig(c.FriendsRPC) {
 		log.Fatalf("agent-rpc requires friends rpc client config (FriendsRPC) for agent-create friendship")
 	}
+	if !hasRPCClientConfig(c.GroupsRPC) {
+		log.Fatalf("agent-rpc requires groups rpc client config (GroupsRPC) for runtime group membership auth")
+	}
 
 	msgRPCClient, err := zrpc.NewClient(c.MsgRPC)
 	if err != nil {
@@ -74,6 +78,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	friendsRPCClient, err := zrpc.NewClient(c.FriendsRPC)
 	if err != nil {
 		log.Fatalf("build friends rpc client: %v", err)
+	}
+	groupsRPCClient, err := zrpc.NewClient(c.GroupsRPC)
+	if err != nil {
+		log.Fatalf("build groups rpc client: %v", err)
 	}
 
 	ds := appconfig.ResolveDataSource(c.DataSource)
@@ -93,7 +101,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	})
 	provisioner := agentlogic.NewDefaultAssistantProvisioner(agentStore, registryStore)
 
-	hostingCtx := buildHostingRuntime(c, imadapter.NewMsgRPCSender(msgRPCClient), agentStore, registryStore, assembly)
+	// 跨域 runtime 读端口（#617）：历史/已读经 msg-rpc、群成员鉴权经 groups-rpc（单向叶子，不成环）。
+	msgRPC := msgclient.NewMsg(msgRPCClient)
+	groupsRPC := groupsclient.NewGroups(groupsRPCClient)
+	hostingCtx := buildHostingRuntime(c, imadapter.NewMsgRPCSender(msgRPCClient), msgRPC, groupsRPC, agentStore, registryStore, assembly)
 
 	// trigger.Judge 终判第 3 步（hosting 查询）直接读 agent 域 conversation_ai_hosting
 	// （hosting.Store over agent 自有 convhosting.Store / goctl model；AG-6 ① 已脱 internal）。
@@ -123,19 +134,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 }
 
 // buildHostingRuntime 装配 AI 托管运行时（runtime + request builder + audit + 写回 + CHS）。
-// agent 域读路径（agents/registry）走自有 goctl store；agent.create 工具处理器由本域 agentlogic
-// assembly（goctl + user-rpc/friends-rpc 端口）装配注入。仍用 internal/{logic,repository} 的是 AI
-// runtime keystone（messages / 群成员鉴权 / agent hosting+audit 数据层），待 message 迁移清。
-func buildHostingRuntime(c config.Config, responseSender orchestrator.MessageSender, agentStore agentlogic.AgentStore, registryStore *registry.Store, assembly *agentlogic.AgentAssemblyLogic) *aihosting.ServiceContext {
-	messageRepo, err := repository.NewMessageRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build message repository: %v", err)
-	}
-	groupsRepo, err := repository.NewGroupsRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build groups repository: %v", err)
-	}
-	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
+// agent 域读路径（agents/registry）走自有 goctl store；跨域 runtime 读（message 历史/已读、群成员
+// 鉴权）经 owner gRPC（msg-rpc PullMessages·MarkConversationAsRead、groups-rpc ListMembers，#617）；
+// agent.create 工具处理器由本域 agentlogic assembly（goctl + user-rpc/friends-rpc 端口）装配注入。
+func buildHostingRuntime(c config.Config, responseSender orchestrator.MessageSender, msgRPC msgclient.Msg, groupsRPC groupsclient.Groups, agentStore agentlogic.AgentStore, registryStore *registry.Store, assembly *agentlogic.AgentAssemblyLogic) *aihosting.ServiceContext {
 	// agent_conversation_hosting + agent_trigger_idempotency 数据层已脱 internal/repository，
 	// 改 agent 自有 goctl model Store（#670，从 #616 拆出）。
 	agentHostingStore := aghosting.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
@@ -146,19 +148,22 @@ func buildHostingRuntime(c config.Config, responseSender orchestrator.MessageSen
 	agentAuditStore := agaudit.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
 	var pythonExecutorClient pythonexec.KubernetesSandboxClient
 	if c.PythonExecutor.Backend == appconfig.PythonExecutorBackendK8S {
-		pythonExecutorClient, err = pythonexec.NewInClusterKubernetesSandboxClient()
+		client, err := pythonexec.NewInClusterKubernetesSandboxClient()
 		if err != nil {
 			log.Fatalf("build python executor kubernetes client: %v", err)
 		}
+		pythonExecutorClient = client
 	}
 	pythonExecutor, err := pythonexec.NewExecutorFromConfig(c.PythonExecutor, pythonExecutorClient)
 	if err != nil {
 		log.Fatalf("build python executor: %v", err)
 	}
 
-	// 附件校验在 agent 写回路径不可达（AI 回复经 imadapter→msg-rpc，由 msg-rpc 校验）；
-	// MessageLogic 在本进程只作运行时数据层（历史读）与被覆盖的 fallback sender，传 nil 用放行 fixture。
-	hostingCtx := aihosting.NewServiceContextWithMediaValidator(messageRepo, nil, nil, groupsLogic, appconfig.DefaultJWTAuthConfig())
+	hostingCtx := aihosting.NewServiceContext(appconfig.DefaultJWTAuthConfig())
+	// 跨域 runtime 读端口（#617）：历史/已读经 msg-rpc、群成员鉴权经 groups-rpc（单向叶子，不成环）。
+	hostingCtx.MessageHistory = msgrpc.NewMessageHistory(msgRPC)
+	hostingCtx.ReadAdvancer = msgrpc.NewReadAdvancer(msgRPC)
+	hostingCtx.GroupMembers = msgrpc.NewGroupMembers(groupsRPC)
 	hostingCtx.AgentHostingRepo = agentHostingStore
 	hostingCtx.AIHostingStore = aiHostingStore
 	// AgentResolver / 请求构建器读 agents 表改 agent 自有 goctl AgentStore（#606，脱 internal）。

@@ -62,8 +62,10 @@ assert_present "-q" internal/logic/messagelogic.go service/agent/rpc/internal/or
   "MessageCreatedHook" "SetMessageCreatedHook" "message.created:" "NewConversationHostingService" "OnMessageCreated" \
   "TryStartAgentTrigger" "FinishAgentTrigger" "agent_conversation_hosting" "agent_trigger_idempotency" \
   "MessageServiceResponseWriter" "SendMessage\(ctx"
+# #617：agent-rpc 托管测试改由 HandleMessageCreated 驱动（不再走 internal MessageLogic 的
+# SetMessageCreatedHook 进程内钩子；runtime message/groups 读经 owner gRPC + fake 替身）。
 assert_present "-q" service/agent/rpc/internal/orchestrator/hosting_test.go web/src/features/messages/MessagesPage.test.tsx -- \
-  "TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates" "SetMessageCreatedHook" \
+  "TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates" "HandleMessageCreated" \
   "AI Agent" "messageOrigin: 'ai'" "deterministic-test"
 forbid_match "agent orchestrator must write responses through MessageLogic/Message Service, not message repository or direct DB insert" \
   -n "CreateMessageIdempotent|insert into messages|insertMessage" service/agent/rpc/internal/orchestrator --glob '*.go'
@@ -225,10 +227,11 @@ assert_present "-q" internal/logic -- \
 assert_present "-qF" db/migrations/001_init_postgres.sql -- \
   "create table if not exists accounts" "create table if not exists profiles" \
   "account_id text primary key" "account_type smallint not null default 1"
-rg -q "NewGroupsRepositoryForStorage" service/msg/rpc/internal/svc/servicecontext.go
-rg -q "NewMessageLogicWithMediaValidator" service/agent/rpc/internal/aihosting/service_context.go
-# AI 托管运行时的 message 历史读数据层随 agent 域归位（#340）。
-rg -q "NewMessageRepositoryForStorage" service/agent/rpc/internal/svc/servicecontext.go
+# #617：msg-rpc 群成员鉴权、agent-rpc runtime message 历史/已读读改走 owner gRPC
+# （msg-rpc PullMessages·MarkConversationAsRead、groups-rpc ListMembers），脱 internal 直读。
+rg -q "groupsrpc.NewClient" service/msg/rpc/internal/svc/servicecontext.go
+rg -q "MessageHistory" service/agent/rpc/internal/aihosting/service_context.go
+rg -q "msgrpc.NewMessageHistory" service/agent/rpc/internal/svc/servicecontext.go
 assert_present "-q" db/migrations/001_init_postgres.sql -- \
   "accounts" "profiles" "auth_credentials" "friendships" "groups" "group_members" \
   "media_objects" "messages" "conversation_threads" "user_conversation_states" "message_outbox"

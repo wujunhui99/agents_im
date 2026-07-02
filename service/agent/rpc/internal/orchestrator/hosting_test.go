@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
@@ -15,12 +13,11 @@ import (
 
 func TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates(t *testing.T) {
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
+	im := newFakeIM()
 	hostingRepo := aghosting.NewMemoryStore()
 	auditStore := agaudit.NewMemoryStore()
 	auditRecorder := agaudit.NewRunRecorder(auditStore)
-	writer, err := NewMessageServiceResponseWriter(messageLogic)
+	writer, err := NewMessageServiceResponseWriter(im)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
 	}
@@ -53,73 +50,55 @@ func TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates
 	if err != nil {
 		t.Fatalf("new hosting service: %v", err)
 	}
+	conversationID := singleConvID("usr_1", "agent_1")
 	if _, err := hostingRepo.UpsertAgentConversationHosting(ctx, aghosting.AgentConversationHosting{
-		ConversationID: repository.SingleConversationID("usr_1", "agent_1"),
+		ConversationID: conversationID,
 		AgentAccountID: "agent_1",
 		Enabled:        true,
 	}); err != nil {
 		t.Fatalf("upsert hosting config: %v", err)
 	}
-	messageLogic.SetMessageCreatedHook(hosting)
 
-	human, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-		SenderID:    "usr_1",
-		ReceiverID:  "agent_1",
-		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "client-hosting-human",
-		ContentType: logic.MessageContentTypeText,
-		Content:     "hello",
+	human := im.appendHuman(Message{
+		ConversationID: conversationID,
+		ClientMsgID:    "client-hosting-human",
+		SenderID:       "usr_1",
+		ReceiverID:     "agent_1",
+		ChatType:       MessageChatTypeSingle,
+		ContentType:    MessageContentTypeText,
+		Content:        "hello",
+		MessageOrigin:  MessageOriginHuman,
 	})
-	if err != nil {
-		t.Fatalf("send human trigger: %v", err)
+	triggerInput := ConversationHostingMessageCreatedInput{EventID: "evt_hosting_1", Message: human}
+	if _, err := hosting.HandleMessageCreated(ctx, triggerInput); err != nil {
+		t.Fatalf("handle human trigger: %v", err)
 	}
 
-	pulled := waitForPulledMessageCount(t, messageLogic, "usr_1", human.Message.ConversationID, 2)
+	messages := waitForConversationCount(t, im, conversationID, 2)
 	if runtimeCalls != 1 {
 		t.Fatalf("runtime calls = %d, want 1", runtimeCalls)
 	}
-	if len(pulled.Messages) != 2 {
-		t.Fatalf("got %d messages, want human + ai: %+v", len(pulled.Messages), pulled.Messages)
-	}
-	aiMessage := pulled.Messages[1]
-	if aiMessage.MessageOrigin != logic.MessageOriginAI {
+	aiMessage := messages[1]
+	if aiMessage.MessageOrigin != MessageOriginAI {
 		t.Fatalf("expected ai response message: %+v", aiMessage)
 	}
-	if aiMessage.AgentAccountID != "agent_1" ||
-		aiMessage.TriggerServerMsgID != human.Message.ServerMsgID {
+	if aiMessage.AgentAccountID != "agent_1" || aiMessage.TriggerServerMsgID != human.ServerMsgID {
 		t.Fatalf("ai response did not preserve agent trigger metadata: %+v", aiMessage)
 	}
 
-	duplicate, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-		SenderID:    "usr_1",
-		ReceiverID:  "agent_1",
-		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "client-hosting-human",
-		ContentType: logic.MessageContentTypeText,
-		Content:     "hello",
-	})
+	// 重复投递同一事件（相同 EventID → 相同 trigger 幂等键）不得再触发一次 run/回复。
+	duplicate, err := hosting.HandleMessageCreated(ctx, triggerInput)
 	if err != nil {
-		t.Fatalf("send duplicate human trigger: %v", err)
+		t.Fatalf("handle duplicate human trigger: %v", err)
 	}
-	if !duplicate.Deduplicated {
-		t.Fatalf("duplicate message was not deduplicated: %+v", duplicate)
+	if duplicate.Triggered {
+		t.Fatalf("duplicate trigger scheduled another run: %+v", duplicate)
 	}
 	if runtimeCalls != 1 {
 		t.Fatalf("duplicate trigger called runtime: %d", runtimeCalls)
 	}
-
-	afterDuplicate, err := messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
-		UserID:         "usr_1",
-		ConversationID: human.Message.ConversationID,
-		FromSeq:        1,
-		Limit:          10,
-		Order:          "asc",
-	})
-	if err != nil {
-		t.Fatalf("pull hosted conversation after duplicate: %v", err)
-	}
-	if len(afterDuplicate.Messages) != 2 {
-		t.Fatalf("duplicate trigger produced another response: %+v", afterDuplicate.Messages)
+	if got := im.messages(conversationID); len(got) != 2 {
+		t.Fatalf("duplicate trigger produced another response: %+v", got)
 	}
 
 	aiResult, err := hosting.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
@@ -137,7 +116,7 @@ func TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates
 	if err != nil {
 		t.Fatalf("load agent run audit: %v", err)
 	}
-	if run.Status != agentaudit.StatusSucceeded || run.TriggerMessageID != human.Message.ServerMsgID {
+	if run.Status != agentaudit.StatusSucceeded || run.TriggerMessageID != human.ServerMsgID {
 		t.Fatalf("agent audit mismatch: %+v", run)
 	}
 }

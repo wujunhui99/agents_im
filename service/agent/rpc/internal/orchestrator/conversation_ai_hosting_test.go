@@ -8,8 +8,6 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogictest"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
@@ -21,13 +19,12 @@ import (
 
 func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
+	im := newFakeIM()
 	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	agentRepo := agentlogictest.NewMemoryAgentStore()
 	auditStore := agaudit.NewMemoryStore()
-	writer, err := NewMessageServiceResponseWriter(messageLogic)
+	writer, err := NewMessageServiceResponseWriter(im)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
 	}
@@ -73,56 +70,55 @@ func TestPrivateAgentChatTriggersAgentReply(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new hosting: %v", err)
 	}
-	messageLogic.SetMessageCreatedHook(hosting)
 
-	conversationID := repository.SingleConversationID("usr_new", "agent_creator")
-	trigger, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-		SenderID:    "usr_new",
-		ReceiverID:  "agent_creator",
-		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "ask-agent-creator",
-		ContentType: logic.MessageContentTypeText,
-		Content:     "你是谁？",
+	conversationID := singleConvID("usr_new", "agent_creator")
+	human := im.appendHuman(Message{
+		ConversationID: conversationID,
+		ClientMsgID:    "ask-agent-creator",
+		SenderID:       "usr_new",
+		ReceiverID:     "agent_creator",
+		ChatType:       MessageChatTypeSingle,
+		ContentType:    MessageContentTypeText,
+		Content:        "你是谁？",
+		MessageOrigin:  MessageOriginHuman,
 	})
-	if err != nil {
-		t.Fatalf("send private agent message: %v", err)
+	if _, err := hosting.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
+		EventID: "evt_private_agent_1",
+		Message: human,
+	}); err != nil {
+		t.Fatalf("handle private agent message: %v", err)
 	}
 
-	pulled := waitForPulledMessageCount(t, messageLogic, "usr_new", conversationID, 2)
+	messages := waitForConversationCount(t, im, conversationID, 2)
 	if runtimeCalls != 1 {
 		t.Fatalf("runtime calls = %d, want 1", runtimeCalls)
 	}
-	reply := pulled.Messages[1]
-	if reply.MessageOrigin != logic.MessageOriginAI || reply.SenderID != "agent_creator" || reply.AgentAccountID != "agent_creator" {
+	reply := messages[1]
+	if reply.MessageOrigin != MessageOriginAI || reply.SenderID != "agent_creator" || reply.AgentAccountID != "agent_creator" {
 		t.Fatalf("reply did not use agent_creator ai metadata: %+v", reply)
 	}
-	if reply.ReceiverID != "usr_new" || reply.TriggerServerMsgID != trigger.Message.ServerMsgID {
-		t.Fatalf("reply routing/trigger metadata mismatch: trigger=%+v reply=%+v", trigger.Message, reply)
+	if reply.ReceiverID != "usr_new" || reply.TriggerServerMsgID != human.ServerMsgID {
+		t.Fatalf("reply routing/trigger metadata mismatch: trigger=%+v reply=%+v", human, reply)
 	}
 }
 
 func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t *testing.T) {
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
+	im := newFakeIM()
 	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	auditStore := agaudit.NewMemoryStore()
-	writer, err := NewMessageServiceResponseWriter(messageLogic)
+	writer, err := NewMessageServiceResponseWriter(im)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
 	}
 
 	runtimeCalls := 0
-	runtimeStarted := make(chan struct{})
 	releaseRuntime := make(chan struct{})
 	runtime := runtimeFunc(func(_ context.Context, req agentruntime.RunRequest) (agentruntime.RunResult, error) {
 		runtimeCalls++
-		if runtimeCalls == 1 {
-			close(runtimeStarted)
-		}
 		if req.AgentUserID != "usr_a" || req.RequestingUserID != "usr_b" {
-			t.Fatalf("runtime request used wrong hosting owner/requester: %+v", req)
+			t.Errorf("runtime request used wrong hosting owner/requester: %+v", req)
 		}
 		<-releaseRuntime
 		return agentruntime.RunResult{
@@ -148,14 +144,13 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 		Repository:     hostingRepo,
 		AIHostingStore: aiHostingStore,
 		Runner:         orchestrator,
-		ReadMarker:     NewMessageRepositoryReadMarker(messageRepo),
+		ReadMarker:     NewConversationReadMarker(im),
 	})
 	if err != nil {
 		t.Fatalf("new hosting: %v", err)
 	}
-	messageLogic.SetMessageCreatedHook(hosting)
 
-	conversationID := repository.SingleConversationID("usr_a", "usr_b")
+	conversationID := singleConvID("usr_a", "usr_b")
 	if _, err := aiHostingStore.SetConversationAIHostingEnabled(ctx, convhosting.Update{
 		OwnerAccountID:    "usr_a",
 		ConversationID:    conversationID,
@@ -165,100 +160,58 @@ func TestConversationAIHostingSlowGenerationDoesNotBlockSendAndMarksReadFirst(t 
 		t.Fatalf("enable AI hosting: %v", err)
 	}
 
-	type sendResult struct {
-		resp logic.SendMessageResponse
-		err  error
-	}
-	sendDone := make(chan sendResult, 1)
-	go func() {
-		resp, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-			SenderID:    "usr_b",
-			ReceiverID:  "usr_a",
-			ChatType:    logic.MessageChatTypeSingle,
-			ClientMsgID: "human-peer-trigger",
-			ContentType: logic.MessageContentTypeText,
-			Content:     "你好",
-		})
-		sendDone <- sendResult{resp: resp, err: err}
-	}()
-
-	select {
-	case <-runtimeStarted:
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("runtime did not start")
-	}
-
-	var trigger logic.SendMessageResponse
-	select {
-	case result := <-sendDone:
-		if result.err != nil {
-			close(releaseRuntime)
-			t.Fatalf("send peer human trigger: %v", result.err)
-		}
-		trigger = result.resp
-	case <-time.After(50 * time.Millisecond):
-		close(releaseRuntime)
-		result := <-sendDone
-		if result.err != nil {
-			t.Fatalf("send waited for AI generation and then failed: %v", result.err)
-		}
-		t.Fatalf("send waited for AI generation; response arrived only after release: %+v", result.resp.Message)
-	}
-
-	ownerSeqs, err := messageLogic.GetConversationSeqs(ctx, logic.GetConversationSeqsRequest{
-		UserID:          "usr_a",
-		ConversationIDs: []string{conversationID},
-	})
-	if err != nil {
-		close(releaseRuntime)
-		t.Fatalf("get owner conversation seqs before AI completion: %v", err)
-	}
-	if len(ownerSeqs.States) != 1 || ownerSeqs.States[0].HasReadSeq != trigger.Message.Seq || ownerSeqs.States[0].UnreadCount != 0 {
-		close(releaseRuntime)
-		t.Fatalf("hosted owner read state before AI completion = %+v, want hasReadSeq %d unread 0", ownerSeqs.States, trigger.Message.Seq)
-	}
-
-	pulled, err := messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
-		UserID:         "usr_b",
+	human := im.appendHuman(Message{
 		ConversationID: conversationID,
-		FromSeq:        1,
-		Limit:          10,
-		Order:          "asc",
+		ClientMsgID:    "human-peer-trigger",
+		SenderID:       "usr_b",
+		ReceiverID:     "usr_a",
+		ChatType:       MessageChatTypeSingle,
+		ContentType:    MessageContentTypeText,
+		Content:        "你好",
+		MessageOrigin:  MessageOriginHuman,
 	})
-	if err != nil {
-		t.Fatalf("pull messages: %v", err)
-	}
-	if len(pulled.Messages) != 1 {
+
+	// HandleMessageCreated 同步完成幂等占位 + 已读推进后即返回，AI 生成在后台异步进行（不阻塞）。
+	if _, err := hosting.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
+		EventID: "evt_slow_gen_1",
+		Message: human,
+	}); err != nil {
 		close(releaseRuntime)
-		t.Fatalf("messages before AI completion = %+v, want only human trigger", pulled.Messages)
+		t.Fatalf("handle hosted trigger: %v", err)
+	}
+
+	// 已读在 AI 生成前就应推进到触发消息 seq。
+	if got := im.readSeq("usr_a", conversationID); got != human.Seq {
+		close(releaseRuntime)
+		t.Fatalf("hosted owner read seq before AI completion = %d, want %d", got, human.Seq)
+	}
+	// AI 生成尚被阻塞，会话里只应有人类触发消息。
+	if got := im.messages(conversationID); len(got) != 1 {
+		close(releaseRuntime)
+		t.Fatalf("messages before AI completion = %+v, want only human trigger", got)
 	}
 
 	close(releaseRuntime)
-	pulled = waitForPulledMessageCount(t, messageLogic, "usr_b", conversationID, 2)
-
+	messages := waitForConversationCount(t, im, conversationID, 2)
 	if runtimeCalls != 1 {
 		t.Fatalf("runtime calls = %d, want 1", runtimeCalls)
 	}
-	reply := pulled.Messages[1]
-	if reply.MessageOrigin != logic.MessageOriginAI || reply.SenderID != "usr_a" || reply.AgentAccountID != "usr_a" {
+	reply := messages[1]
+	if reply.MessageOrigin != MessageOriginAI || reply.SenderID != "usr_a" || reply.AgentAccountID != "usr_a" {
 		t.Fatalf("reply did not use hosted owner ai metadata: %+v", reply)
 	}
-	if reply.TriggerServerMsgID != trigger.Message.ServerMsgID {
-		t.Fatalf("reply trigger metadata = %q, want %q", reply.TriggerServerMsgID, trigger.Message.ServerMsgID)
-	}
-	if runtimeCalls != 1 {
-		t.Fatalf("ai reply recursively triggered runtime: %d", runtimeCalls)
+	if reply.TriggerServerMsgID != human.ServerMsgID {
+		t.Fatalf("reply trigger metadata = %q, want %q", reply.TriggerServerMsgID, human.ServerMsgID)
 	}
 }
 
 func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *testing.T) {
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
+	im := newFakeIM()
 	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	auditStore := agaudit.NewMemoryStore()
-	writer, err := NewMessageServiceResponseWriter(messageLogic)
+	writer, err := NewMessageServiceResponseWriter(im)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
 	}
@@ -285,14 +238,13 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 		Repository:     hostingRepo,
 		AIHostingStore: aiHostingStore,
 		Runner:         orchestrator,
-		ReadMarker:     NewMessageRepositoryReadMarker(messageRepo),
+		ReadMarker:     NewConversationReadMarker(im),
 	})
 	if err != nil {
 		t.Fatalf("new hosting: %v", err)
 	}
-	messageLogic.SetMessageCreatedHook(hosting)
 
-	conversationID := repository.SingleConversationID("usr_a", "usr_b")
+	conversationID := singleConvID("usr_a", "usr_b")
 	if _, err := aiHostingStore.SetConversationAIHostingEnabled(ctx, convhosting.Update{
 		OwnerAccountID:    "usr_a",
 		ConversationID:    conversationID,
@@ -302,59 +254,55 @@ func TestConversationAIHostingDuplicateTriggerDoesNotQueueDuplicateReply(t *test
 		t.Fatalf("enable AI hosting: %v", err)
 	}
 
-	first, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-		SenderID:    "usr_b",
-		ReceiverID:  "usr_a",
-		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "human-peer-trigger",
-		ContentType: logic.MessageContentTypeText,
-		Content:     "你好",
+	human := im.appendHuman(Message{
+		ConversationID: conversationID,
+		ClientMsgID:    "human-peer-trigger",
+		SenderID:       "usr_b",
+		ReceiverID:     "usr_a",
+		ChatType:       MessageChatTypeSingle,
+		ContentType:    MessageContentTypeText,
+		Content:        "你好",
+		MessageOrigin:  MessageOriginHuman,
 	})
+	// 同一事件（相同 EventID → 相同 trigger 幂等键）重复投递，只应调度一次 run。
+	triggerInput := ConversationHostingMessageCreatedInput{EventID: "evt_dup_1", Message: human}
+	if _, err := hosting.HandleMessageCreated(ctx, triggerInput); err != nil {
+		close(releaseRuntime)
+		t.Fatalf("handle first trigger: %v", err)
+	}
+	dup, err := hosting.HandleMessageCreated(ctx, triggerInput)
 	if err != nil {
 		close(releaseRuntime)
-		t.Fatalf("send first trigger: %v", err)
+		t.Fatalf("handle duplicate trigger: %v", err)
 	}
-	duplicate, err := messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-		SenderID:    "usr_b",
-		ReceiverID:  "usr_a",
-		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "human-peer-trigger",
-		ContentType: logic.MessageContentTypeText,
-		Content:     "你好",
-	})
-	if err != nil {
+	if dup.Triggered {
 		close(releaseRuntime)
-		t.Fatalf("send duplicate trigger: %v", err)
-	}
-	if !duplicate.Deduplicated || duplicate.Message.ServerMsgID != first.Message.ServerMsgID {
-		close(releaseRuntime)
-		t.Fatalf("duplicate send mismatch: first=%+v duplicate=%+v", first, duplicate)
+		t.Fatalf("duplicate trigger scheduled another run: %+v", dup)
 	}
 
 	close(releaseRuntime)
-	pulled := waitForPulledMessageCount(t, messageLogic, "usr_b", conversationID, 2)
+	messages := waitForConversationCount(t, im, conversationID, 2)
 	if runtimeCalls != 1 {
 		t.Fatalf("runtime calls = %d, want 1", runtimeCalls)
 	}
 	aiReplies := 0
-	for _, message := range pulled.Messages {
-		if message.MessageOrigin == logic.MessageOriginAI {
+	for _, message := range messages {
+		if message.MessageOrigin == MessageOriginAI {
 			aiReplies++
 		}
 	}
 	if aiReplies != 1 {
-		t.Fatalf("ai replies = %d, messages=%+v", aiReplies, pulled.Messages)
+		t.Fatalf("ai replies = %d, messages=%+v", aiReplies, messages)
 	}
 }
 
 func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifiesUser(t *testing.T) {
 	ctx := context.Background()
-	messageRepo := repository.NewMemoryMessageRepository()
-	messageLogic := logic.NewMessageLogicWithMediaValidator(messageRepo, nil, nil, nil)
+	im := newFakeIM()
 	hostingRepo := aghosting.NewMemoryStore()
 	aiHostingStore := convhosting.NewMemoryStore()
 	auditStore := agaudit.NewMemoryStore()
-	writer, err := NewMessageServiceResponseWriter(messageLogic)
+	writer, err := NewMessageServiceResponseWriter(im)
 	if err != nil {
 		t.Fatalf("new response writer: %v", err)
 	}
@@ -376,14 +324,13 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 		Repository:     hostingRepo,
 		AIHostingStore: aiHostingStore,
 		Runner:         orchestrator,
-		ReadMarker:     NewMessageRepositoryReadMarker(messageRepo),
+		ReadMarker:     NewConversationReadMarker(im),
 	})
 	if err != nil {
 		t.Fatalf("new hosting: %v", err)
 	}
-	messageLogic.SetMessageCreatedHook(hosting)
 
-	conversationID := repository.SingleConversationID("usr_a", "usr_b")
+	conversationID := singleConvID("usr_a", "usr_b")
 	if _, err := aiHostingStore.SetConversationAIHostingEnabled(ctx, convhosting.Update{
 		OwnerAccountID:    "usr_a",
 		ConversationID:    conversationID,
@@ -393,16 +340,21 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 		t.Fatalf("enable AI hosting: %v", err)
 	}
 
-	_, err = messageLogic.SendMessage(ctx, logic.SendMessageRequest{
-		SenderID:    "usr_b",
-		ReceiverID:  "usr_a",
-		ChatType:    logic.MessageChatTypeSingle,
-		ClientMsgID: "human-trigger-missing-provider",
-		ContentType: logic.MessageContentTypeText,
-		Content:     "需要托管回复",
+	im.appendHuman(Message{
+		ConversationID: conversationID,
+		ClientMsgID:    "human-trigger-missing-provider",
+		SenderID:       "usr_b",
+		ReceiverID:     "usr_a",
+		ChatType:       MessageChatTypeSingle,
+		ContentType:    MessageContentTypeText,
+		Content:        "需要托管回复",
+		MessageOrigin:  MessageOriginHuman,
 	})
-	if err != nil {
-		t.Fatalf("send should not be blocked by missing provider, got: %v", err)
+	if _, err := hosting.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
+		EventID: "evt_missing_provider_1",
+		Message: im.messages(conversationID)[0],
+	}); err != nil {
+		t.Fatalf("handle should not be blocked by missing provider, got: %v", err)
 	}
 
 	run := waitForAgentRunStatus(t, auditStore, "run_hosted_1", agentaudit.StatusFailed)
@@ -410,24 +362,12 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 		t.Fatalf("agent run error = %q, want missing provider", run.ErrorMessage)
 	}
 
-	pulled, pullErr := messageLogic.PullMessages(ctx, logic.PullMessagesRequest{
-		UserID:         "usr_b",
-		ConversationID: conversationID,
-		FromSeq:        1,
-		Limit:          10,
-		Order:          "asc",
-	})
-	if pullErr != nil {
-		t.Fatalf("pull after provider failure: %v", pullErr)
+	messages := waitForConversationCount(t, im, conversationID, 2)
+	if strings.Contains(messages[0].Content, "AI reply") {
+		t.Fatalf("human message content was replaced by fake text: %+v", messages[0])
 	}
-	if len(pulled.Messages) != 2 {
-		t.Fatalf("provider failure messages = %+v, want original human message plus user-visible failure notice", pulled.Messages)
-	}
-	if strings.Contains(pulled.Messages[0].Content, "AI reply") {
-		t.Fatalf("human message content was replaced by fake text: %+v", pulled.Messages[0])
-	}
-	failureNotice := pulled.Messages[1]
-	if failureNotice.MessageOrigin != logic.MessageOriginAI || failureNotice.AgentAccountID != "usr_a" || failureNotice.TriggerServerMsgID == "" {
+	failureNotice := messages[1]
+	if failureNotice.MessageOrigin != MessageOriginAI || failureNotice.AgentAccountID != "usr_a" || failureNotice.TriggerServerMsgID == "" {
 		t.Fatalf("failure notice metadata mismatch: %+v", failureNotice)
 	}
 	if !strings.Contains(failureNotice.Content, "AI 助手这次处理失败") || !strings.Contains(failureNotice.Content, "模型或工具权限配置不可用") {
@@ -435,30 +375,6 @@ func TestConversationAIHostingMissingProviderDoesNotBlockOriginalSendAndNotifies
 	}
 	if strings.Contains(failureNotice.Content, "DEEPSEEK_API_KEY") || strings.Contains(failureNotice.Content, missingProviderErr.Error()) {
 		t.Fatalf("failure notice leaked internal provider configuration: %q", failureNotice.Content)
-	}
-}
-
-func waitForPulledMessageCount(t *testing.T, messageLogic *logic.MessageLogic, userID string, conversationID string, want int) logic.PullMessagesResponse {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		pulled, err := messageLogic.PullMessages(context.Background(), logic.PullMessagesRequest{
-			UserID:         userID,
-			ConversationID: conversationID,
-			FromSeq:        1,
-			Limit:          10,
-			Order:          "asc",
-		})
-		if err == nil && len(pulled.Messages) == want {
-			return pulled
-		}
-		if time.Now().After(deadline) {
-			if err != nil {
-				t.Fatalf("pull messages waiting for %d messages: %v", want, err)
-			}
-			t.Fatalf("timed out waiting for %d messages", want)
-		}
-		time.Sleep(10 * time.Millisecond)
 	}
 }
 

@@ -80,12 +80,15 @@ class DetectDeployChangesTest(unittest.TestCase):
     def test_shared_internal_package_uses_import_graph(self):
         # Shared packages are routed by go list -deps when the package is present;
         # this keeps deploys narrower than the old fail-safe all-backends path.
+        # #617: msg-rpc/agent-rpc no longer import internal/repository (runtime
+        # message/groups reads go through owner gRPC); only user-rpc + admin-rpc
+        # still depend on internal/repository, so the graph must narrow to them.
         out = self.detect(["internal/repository/message_memory.go"])
         self.assertEqual(out["build_required"], "true")
         self.assertIn("user-rpc", out["backend_services"])
-        self.assertIn("msg-rpc", out["backend_services"])
-        self.assertIn("agent-rpc", out["backend_services"])
         self.assertIn("admin-rpc", out["backend_services"])
+        self.assertNotIn("msg-rpc", out["backend_services"])
+        self.assertNotIn("agent-rpc", out["backend_services"])
         self.assertNotIn("user-api", out["backend_services"])
         self.assertNotIn("msg-api", out["backend_services"])
 

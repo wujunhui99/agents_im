@@ -15,6 +15,12 @@ MediaRPC:
     - 127.0.0.1:9096
   Timeout: 5000
 
+# GroupsRPC：群成员鉴权经属主 groups-rpc ListMembers（#617，单向叶子，不成环）。
+GroupsRPC:
+  Endpoints:
+    - 127.0.0.1:9093
+  Timeout: 5000
+
 # go-zero 自带 tracing：本地上报到 docker-compose 的 tempo（OTLP gRPC）。
 Telemetry:
   Name: msg-rpc

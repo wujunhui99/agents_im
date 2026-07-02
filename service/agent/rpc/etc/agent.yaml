@@ -21,6 +21,11 @@ FriendsRPC:
   Endpoints:
     - 127.0.0.1:9092
   Timeout: 5000
+# AI 托管 runtime 群成员鉴权经属主 groups-rpc ListMembers（#617，单向叶子，不成环）。
+GroupsRPC:
+  Endpoints:
+    - 127.0.0.1:9093
+  Timeout: 5000
 
 # DeepSeek / LLMObservability 的默认值/env 覆盖由 struct tag 声明（#664）：
 # APIKey←env DEEPSEEK_API_KEY；BaseURL/Model 缺省走 tag default，env DEEPSEEK_BASE_URL/MODEL 覆盖。

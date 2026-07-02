@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
@@ -66,7 +65,7 @@ type ConversationHostingConfig struct {
 	AIHostingStore       convhosting.Store
 	Runner               AgentTriggerRunner
 	AgentAccountResolver AgentAccountResolver
-	GroupMembers         logic.GroupMemberLister
+	GroupMembers         GroupMemberLister
 	ReadMarker           AgentTriggerReadMarker
 	TriggerPolicy        TriggerPolicy
 	RunTimeout           time.Duration
@@ -77,7 +76,7 @@ type ConversationHostingService struct {
 	aiHostingRepo convhosting.Store
 	runner        AgentTriggerRunner
 	agentResolver AgentAccountResolver
-	groupMembers  logic.GroupMemberLister
+	groupMembers  GroupMemberLister
 	readMarker    AgentTriggerReadMarker
 	policy        TriggerPolicy
 	runTimeout    time.Duration
@@ -87,7 +86,7 @@ type ConversationHostingMessageCreatedInput struct {
 	EventID               string
 	OperationID           string
 	TraceID               string
-	Message               logic.Message
+	Message               Message
 	TargetAgentAccountIDs []string
 }
 
@@ -133,10 +132,10 @@ func (s *ConversationHostingService) HandleMessageCreated(ctx context.Context, i
 	if input.Message.ServerMsgID == "" {
 		return ConversationHostingResult{}, apperror.InvalidArgument("server_msg_id is required")
 	}
-	if input.Message.MessageOrigin == logic.MessageOriginSystem {
+	if input.Message.MessageOrigin == MessageOriginSystem {
 		return ConversationHostingResult{}, nil
 	}
-	if input.Message.MessageOrigin == logic.MessageOriginAI && !input.Message.AllowRecursiveTrigger {
+	if input.Message.MessageOrigin == MessageOriginAI && !input.Message.AllowRecursiveTrigger {
 		return ConversationHostingResult{}, nil
 	}
 
@@ -195,7 +194,7 @@ func (s *ConversationHostingService) HandleMessageCreated(ctx context.Context, i
 	return result, nil
 }
 
-func (s *ConversationHostingService) OnMessageCreated(ctx context.Context, input logic.MessageCreatedHookInput) error {
+func (s *ConversationHostingService) OnMessageCreated(ctx context.Context, input MessageCreatedHookInput) error {
 	_, err := s.HandleMessageCreated(ctx, ConversationHostingMessageCreatedInput{
 		EventID:               input.EventID,
 		OperationID:           input.OperationID,
@@ -209,7 +208,7 @@ func (s *ConversationHostingService) OnMessageCreated(ctx context.Context, input
 func (s *ConversationHostingService) targetAgentAccountIDs(ctx context.Context, input ConversationHostingMessageCreatedInput) ([]string, TriggerPolicy, error) {
 	targets := uniqueNonEmptyIDs(input.TargetAgentAccountIDs)
 	policy := s.policy
-	if input.Message.MessageOrigin == logic.MessageOriginHuman && input.Message.ChatType == logic.MessageChatTypeSingle && s.aiHostingRepo != nil {
+	if input.Message.MessageOrigin == MessageOriginHuman && input.Message.ChatType == MessageChatTypeSingle && s.aiHostingRepo != nil {
 		hosting, err := s.aiHostingRepo.GetEnabledConversationAIHosting(ctx, input.Message.ConversationID)
 		if err != nil && apperror.From(err).Code != apperror.CodeNotFound {
 			return nil, TriggerPolicy{}, err
@@ -228,7 +227,7 @@ func (s *ConversationHostingService) targetAgentAccountIDs(ctx context.Context, 
 			policy.AllowAgentMessageRecursion = true
 		}
 	}
-	if input.Message.ChatType == logic.MessageChatTypeSingle && input.Message.ReceiverID != "" && s.agentResolver != nil {
+	if input.Message.ChatType == MessageChatTypeSingle && input.Message.ReceiverID != "" && s.agentResolver != nil {
 		active, err := s.agentResolver.IsActiveAgentAccount(ctx, input.Message.ReceiverID)
 		if err != nil {
 			return nil, TriggerPolicy{}, err
@@ -287,7 +286,7 @@ func (s *ConversationHostingService) validateTriggerAuthorization(ctx context.Co
 	if err != nil {
 		return err
 	}
-	members, err := s.groupMembers.ListMembers(ctx, logic.ListMembersRequest{
+	members, err := s.groupMembers.ListMembers(ctx, ListMembersRequest{
 		GroupID:         groupID,
 		RequesterUserID: trigger.RequestingUserID,
 	})
@@ -391,15 +390,15 @@ func (s *ConversationHostingService) runAcceptedTrigger(ctx context.Context, tri
 	return run.Response, nil
 }
 
-func senderTypeForMessage(message logic.Message) string {
-	if message.MessageOrigin == logic.MessageOriginAI {
+func senderTypeForMessage(message Message) string {
+	if message.MessageOrigin == MessageOriginAI {
 		return SenderTypeAgent
 	}
 	return SenderTypeUser
 }
 
-func groupAtUserIDs(message logic.Message, targetAgentIDs []string) []string {
-	if message.ChatType != logic.MessageChatTypeGroup {
+func groupAtUserIDs(message Message, targetAgentIDs []string) []string {
+	if message.ChatType != MessageChatTypeGroup {
 		return nil
 	}
 	return append([]string(nil), targetAgentIDs...)

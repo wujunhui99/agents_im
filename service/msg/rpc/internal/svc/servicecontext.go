@@ -7,13 +7,13 @@ import (
 	"strconv"
 	"strings"
 
-	business "github.com/wujunhui99/agents_im/internal/logic"
-	"github.com/wujunhui99/agents_im/internal/repository"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
+	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
 	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/config"
+	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/groupsrpc"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -49,10 +49,10 @@ type ServiceContext struct {
 	// MsgIDGen 发 message_id 雪花 bigint（EPIC #527 §0：HintBits=1 区分单/群，含机器位防同毫秒碰撞）。
 	MsgIDGen *idgen.RoutedFlake
 
-	// 跨域 keystone 例外：SendMessage 写路径需要 inline 鉴权（群成员解析 + 媒体校验），
-	// 无法干净 BFF 化，暂依赖 internal（待 groups/media 完全 BFF/rpc 化后删）。
-	Groups business.GroupMemberLister
-	Media  business.MessageMediaValidator
+	// 跨域鉴权：群成员解析经属主 groups-rpc（#617）、附件校验经属主 media-rpc（#533）。
+	// 均为单向叶子调用（msg-rpc → groups/media-rpc），不成环。
+	Groups groupsrpc.GroupMemberLister
+	Media  MessageMediaValidator
 
 	// Kafka 写路径（03 §9 B2/B3b）：SendMessage 只 publish msg.toTransfer.v1。
 	// B3b 起旧 PG 同步写路径已退役，Kafka 是唯一写链路（缺配置启动失败）。
@@ -71,11 +71,16 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		log.Fatalf("build message id generator: %v", err)
 	}
 
-	groupsRepo, err := repository.NewGroupsRepositoryForStorage(appconfig.StorageDriverPostgres, c.DataSource)
-	if err != nil {
-		log.Fatalf("build groups repository: %v", err)
+	// 群成员鉴权经属主 groups-rpc ListMembers（#617，脱 internal GroupsLogic 直读 groups 表；
+	// 单向叶子调用，不成环）。
+	if !hasRPCClientConfig(c.GroupsRPC) {
+		log.Fatalf("msg-rpc requires groups rpc client config (GroupsRPC)")
 	}
-	groupsLogic := business.NewGroupsLogic(groupsRepo, nil)
+	groupsRPCClient, err := zrpc.NewClient(c.GroupsRPC)
+	if err != nil {
+		log.Fatalf("build groups rpc client: %v", err)
+	}
+	groupsClient := groupsrpc.NewClient(groupsclient.NewGroups(groupsRPCClient))
 
 	// 图片/文件附件校验经属主 media-rpc（#533，脱 internal/mediavalidate 直读 media_objects）。
 	if !hasRPCClientConfig(c.MediaRPC) {
@@ -99,7 +104,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		MsgIDGen:     msgIDGen,
 		Threads:      model.NewConversationThreadsModel(conn),
 		States:       model.NewUserConversationStatesModel(conn),
-		Groups:       groupsLogic,
+		Groups:       groupsClient,
 		Media:        mediaValidator,
 		KafkaBrokers: kafkaBrokers,
 		Producer:     producer,

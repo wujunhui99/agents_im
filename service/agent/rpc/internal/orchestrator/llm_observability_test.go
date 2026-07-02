@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/logic"
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/llmobs"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
@@ -43,7 +42,7 @@ func TestAgentRunOrchestratorEmitsLLMObservabilityMetadata(t *testing.T) {
 	}
 	writer := &recordingAgentResponseWriter{
 		result: AgentResponseResult{
-			Message: logic.Message{
+			Message: Message{
 				ServerMsgID:    "msg_agent_obs_1",
 				ConversationID: trigger.ConversationID,
 				Seq:            8,
