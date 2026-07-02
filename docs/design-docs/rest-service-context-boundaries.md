@@ -1,6 +1,13 @@
 # REST/Gateway ServiceContext Boundaries
 
-状态：Implemented
+状态：Superseded（历史存档）
+
+> **已过时（#618）**：本文描述的是早期 REST monolith 的 `internal/servicecontext/**` 边界划分。
+> 该 monolith 已随微服务化完全退役——顶层 `internal/`（含 `internal/servicecontext/{auth,user,friends,groups,message,common}`、
+> `internal/handler`、`internal/logic`、`internal/svc`、`internal/rpcgen`）于 #618 删除。现每个服务的运行时上下文
+> 独立位于 `service/<domain>/{api,rpc}/internal/svc`，跨域数据经 BFF/属主 rpc 聚合（见 `ARCHITECTURE.md`
+> 与 `.claude/skills/refactor-domain-to-service`）；共享鉴权运行时 `AuthRuntime` 位于 `pkg/authruntime`。
+> 下文仅作历史记录保留。
 
 ## 背景
 

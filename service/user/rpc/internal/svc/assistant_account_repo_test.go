@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	sharemodel "github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
@@ -134,7 +133,7 @@ func newFakeRepo() (*assistantAccountRepo, *fakeAccountStore, *fakeAccountsModel
 	store := &fakeAccountStore{byID: map[string]*model.AccountProfile{}}
 	accounts := &fakeAccountsModel{store: store}
 	profiles := &fakeProfilesModel{store: store}
-	repo := newAssistantAccountRepo(accounts, profiles, repository.FriendshipRepository(nil))
+	repo := newAssistantAccountRepo(accounts, profiles)
 	return repo, store, accounts
 }
 
@@ -212,7 +211,7 @@ func TestAssistantAccountRepoRenameAndUpdate(t *testing.T) {
 	}
 
 	dn := "AI 助手"
-	updated, err := repo.UpdateProfile(ctx, "a1", repository.AccountProfilePatch{DisplayName: &dn})
+	updated, err := repo.UpdateProfile(ctx, "a1", AccountProfilePatch{DisplayName: &dn})
 	if err != nil {
 		t.Fatalf("UpdateProfile: %v", err)
 	}

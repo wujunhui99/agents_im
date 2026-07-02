@@ -1,8 +1,8 @@
 Name: admin-rpc
 ListenOn: 0.0.0.0:9097
 
-# admin-rpc 数据层：task_reports 走 goctl model（Postgres-only）；
-# accounts/friendships/messages/agent_audits/feedback 跨域只读经 internal/repository。
+# admin-rpc 数据层：task_reports + feedback 走 admin goctl model（Postgres-only）；
+# 其余跨域只读全部经属主 rpc（user/agent/msg/friends），已脱顶层 internal/repository（#618）。
 DataSource: ${DATABASE_URL}
 
 Telemetry:

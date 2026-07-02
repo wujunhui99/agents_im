@@ -25,18 +25,18 @@ fi
 # Production Go code must not directly execute shell/python commands.
 forbid_match "production Go code must not directly execute shell or python commands" \
   -n '"os/exec"|exec\.Command|CommandContext\(|"(/bin/bash|/bin/sh|bash|sh|python|python3)"' \
-  service/msggateway service/msgtransfer service/push internal --glob '*.go' --glob '!*_test.go'
+  service/msggateway service/msgtransfer service/push --glob '*.go' --glob '!*_test.go'
 
 # Header-based current-user auth is forbidden; tests must use Bearer JWT or an explicit reject helper.
 forbid_match "production API/code still contains header-based current user auth" \
-  -n "X-User-Id|CurrentUserID|currentUserID" internal service/msggateway service/msgtransfer service/msg service/agent
+  -n "X-User-Id|CurrentUserID|currentUserID" service/msggateway service/msgtransfer service/msg service/agent
 
-legacy_x_user_id_sets="$(rg -n 'Header\.Set\("X-User-Id"' tests internal || true)"
+legacy_x_user_id_sets="$(rg -n 'Header\.Set\("X-User-Id"' tests || true)"
 if [[ -n "$legacy_x_user_id_sets" ]]; then
   disallowed_legacy_x_user_id_sets="$(printf '%s\n' "$legacy_x_user_id_sets" | rg -v 'legacy X-User-Id rejection helper' || true)"
   if [[ -n "$disallowed_legacy_x_user_id_sets" ]]; then
     printf '%s\n' "$disallowed_legacy_x_user_id_sets" >&2
-    echo "legacy X-User-Id header writes in tests/internal must use Authorization Bearer JWT or an explicit rejection helper/comment" >&2
+    echo "legacy X-User-Id header writes in tests must use Authorization Bearer JWT or an explicit rejection helper/comment" >&2
     exit 1
   fi
 fi
@@ -45,19 +45,19 @@ fi
 forbid_match "observability helpers must not log or inspect secrets, auth headers, bodies, or query strings" \
   -n "RequestURI|RawQuery|DumpRequest|Authorization|password|token" pkg/observability
 
-# Forbidden auth-secret fields must not leak into service / repository / message-contract source.
+# Forbidden auth-secret fields must not leak into service / data-layer / message-contract source.
+# 顶层 internal/{servicecontext,repository} 已随 #618 退役；共享鉴权运行时在 pkg/authruntime，
+# 数据层在各 service/<domain>/rpc/internal/model（goctl）。
 forbid_match "forbidden auth secret field found in service source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
   service/user/api/user.api service/user/rpc/user.proto service/user/api/user.go \
-  service/user/rpc internal/servicecontext
+  service/user/rpc pkg/authruntime
 
-forbid_match "forbidden auth secret field found in repository source" \
+forbid_match "forbidden auth secret field found in data-layer source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
-  internal/repository \
-  --glob '!postgres_account_profiles_test.go'
+  service/user/rpc/internal/model service/msg/rpc/internal/model
 
 forbid_match "forbidden auth secret field found in message contract source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
   service/msg/api/msg.api service/msg/rpc/msg.proto \
-  internal/repository/message_memory.go \
-  internal/repository/message_repository.go
+  service/msg/rpc/internal/model/messages_model.go

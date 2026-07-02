@@ -421,21 +421,11 @@ Storage implementation is acceptable when these checks pass:
 - mark-as-read with a lower seq does not reduce `has_read_seq`;
 - static verification confirms storage docs are present.
 
-Repository contract tests live in `internal/repository` and run against memory by default:
+Message storage now lives in the owning `service/msg/rpc` (goctl `internal/model` + `internal/logic`); the old top-level `internal/repository` contract suite was retired together with the monolith `internal/` package (#618). Message seq/read/roundtrip behaviour is covered by the msg-rpc logic tests:
 
 ```bash
-go test ./internal/repository
+go test ./service/msg/rpc/...
 ```
-
-PostgreSQL contract tests are opt-in so ordinary local tests do not require middleware. Use a disposable development database with migrations allowed:
-
-```bash
-AGENTS_IM_TEST_POSTGRES_CONTRACT=1 \
-DATABASE_URL=postgres://agents_im:agents_im_dev_password@localhost:5432/agents_im?sslmode=disable \
-go test ./internal/repository
-```
-
-`AGENTS_IM_POSTGRES_DSN` may be used instead of `DATABASE_URL`. The opt-in test applies `db/migrations/*.sql` and uses unique message IDs rather than truncating existing data.
 
 ## Risks and Tradeoffs
 

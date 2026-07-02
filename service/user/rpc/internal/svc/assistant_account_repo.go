@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wujunhui99/agents_im/internal/repository"
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	sharemodel "github.com/wujunhui99/agents_im/pkg/model"
@@ -16,27 +15,28 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
-// assistantAccountRepo 是 gate #550 的第 3 处（最后一处）存活 avatar 读路径切割：
-// 默认助手 provisioner（keystone agent 域写，寄居 internal/logic）期望注入一个
-// repository.Repository，旧实现整块走 internal/repository——其 accounts⋈profiles 读写都
-// 把 profiles.avatar_media_id scan 进 Go string，列改 bigint 后 pgx v5 严格类型会 runtime 失败。
-//
-// 本适配器把其中「账号读写」改由 user-rpc 自有 goctl model（AccountsModel/ProfilesModel）承接——
-// 这些 model 由 #550 随列变更一并 goctl 重生（string→int64），故 bigint 化后仍正确。好友方法
-// （friendships 表无 avatar，非 #550 blocker）经内嵌 FriendshipRepository 委托回 internal postgres
-// repo；agent provisioner 的 agent/registry 写仍由 internal/repository 承接（agent keystone，
-// 无 avatar），待 agent 域迁移后彻底删（继 #551 auth、#553 agent-api、#555 msg-rpc、#589 media）。
+// AccountProfilePatch 是账号资料的可选字段补丁（user 域本地，脱 internal/repository，#618 顶层
+// internal/ 退役）。原 repository.AccountProfilePatch 随 internal/ 删除，本地承接。
+type AccountProfilePatch struct {
+	DisplayName *string
+	Name        *string
+	Gender      *string
+	BirthDate   *string
+	Region      *string
+}
+
+// assistantAccountRepo 是默认助手账号读写适配器（gate #550 avatar bigint 化的最后切割处）：
+// 账号读写由 user-rpc 自有 goctl model（AccountsModel/ProfilesModel）承接——这些 model 随 #550
+// 列变更一并 goctl 重生（avatar_media_id string→int64），故 bigint 化后仍正确。好友/agent 装配
+// 分别经 friends-rpc / agent-rpc（#606），已无 internal/repository 依赖（#618 顶层 internal/ 退役）。
 type assistantAccountRepo struct {
-	repository.FriendshipRepository
 	accounts model.AccountsModel
 	profiles model.ProfilesModel
 }
 
-var _ repository.Repository = (*assistantAccountRepo)(nil)
-
-// newAssistantAccountRepo 组合 user-rpc 自有账号 model 与内部好友 repo 委托。
-func newAssistantAccountRepo(accounts model.AccountsModel, profiles model.ProfilesModel, friendships repository.FriendshipRepository) *assistantAccountRepo {
-	return &assistantAccountRepo{FriendshipRepository: friendships, accounts: accounts, profiles: profiles}
+// newAssistantAccountRepo 组合 user-rpc 自有账号 model。
+func newAssistantAccountRepo(accounts model.AccountsModel, profiles model.ProfilesModel) *assistantAccountRepo {
+	return &assistantAccountRepo{accounts: accounts, profiles: profiles}
 }
 
 func (r *assistantAccountRepo) Create(ctx context.Context, account sharemodel.User) (sharemodel.User, error) {
@@ -151,7 +151,7 @@ func (r *assistantAccountRepo) RenameIdentifier(ctx context.Context, fromIdentif
 	return toShareUser(ap), nil
 }
 
-func (r *assistantAccountRepo) UpdateProfile(ctx context.Context, accountID string, patch repository.AccountProfilePatch) (sharemodel.User, error) {
+func (r *assistantAccountRepo) UpdateProfile(ctx context.Context, accountID string, patch AccountProfilePatch) (sharemodel.User, error) {
 	if err := r.profiles.UpdateProfileFields(ctx, accountID, toModelProfilePatch(patch)); err != nil {
 		return sharemodel.User{}, mapAssistantWriteError(err)
 	}
@@ -213,7 +213,7 @@ func toShareUser(ap *model.AccountProfile) sharemodel.User {
 	)
 }
 
-func toModelProfilePatch(patch repository.AccountProfilePatch) model.ProfilePatch {
+func toModelProfilePatch(patch AccountProfilePatch) model.ProfilePatch {
 	out := model.ProfilePatch{
 		DisplayName: patch.DisplayName,
 		Name:        patch.Name,

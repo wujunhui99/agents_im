@@ -13,9 +13,10 @@ import (
 
 func TestProductionGoCodeDoesNotExposeShellOrDirectPythonExecution(t *testing.T) {
 	root := repositoryRoot(t)
+	// 顶层 internal/ 已随 #618 退役删除；生产业务代码现全在 service/ 下（sanctioned 的
+	// python 执行器隔离在 pkg/pythonexec，不在扫描范围）。
 	productionRoots := []string{
 		filepath.Join(root, "service"),
-		filepath.Join(root, "internal"),
 	}
 
 	for _, productionRoot := range productionRoots {
