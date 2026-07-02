@@ -62,8 +62,10 @@ assert_present "-q" internal/logic/messagelogic.go service/agent/rpc/internal/or
   "MessageCreatedHook" "SetMessageCreatedHook" "message.created:" "NewConversationHostingService" "OnMessageCreated" \
   "TryStartAgentTrigger" "FinishAgentTrigger" "agent_conversation_hosting" "agent_trigger_idempotency" \
   "MessageServiceResponseWriter" "SendMessage\(ctx"
+# #617：agent-rpc 托管测试改由 HandleMessageCreated 驱动（不再走 internal MessageLogic 的
+# SetMessageCreatedHook 进程内钩子；runtime message/groups 读经 owner gRPC + fake 替身）。
 assert_present "-q" service/agent/rpc/internal/orchestrator/hosting_test.go web/src/features/messages/MessagesPage.test.tsx -- \
-  "TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates" "SetMessageCreatedHook" \
+  "TestConversationHostingWritesAIResponseThroughMessageServiceAndDeduplicates" "HandleMessageCreated" \
   "AI Agent" "messageOrigin: 'ai'" "deterministic-test"
 forbid_match "agent orchestrator must write responses through MessageLogic/Message Service, not message repository or direct DB insert" \
   -n "CreateMessageIdempotent|insert into messages|insertMessage" service/agent/rpc/internal/orchestrator --glob '*.go'
