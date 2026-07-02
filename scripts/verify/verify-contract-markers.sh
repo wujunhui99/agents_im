@@ -57,9 +57,10 @@ assert_present "-q" service/msg/rpc/msg.proto db/migrations/003_agent_conversati
   "message_origin" "agent_account_id" "trigger_server_msg_id" "agent_run_id" "allow_recursive_trigger"
 assert_present "-q" service/msg/api/msg.api web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx -- \
   "messageOrigin" "agentAccountId" "triggerServerMsgId" "agentRunId" "allowRecursiveTrigger"
-# AI 托管编排已迁出至属主 service/agent/rpc/internal/{orchestrator,aihosting}（#340）。
-assert_present "-q" internal/logic/messagelogic.go service/agent/rpc/internal/orchestrator service/agent/rpc/internal/aihosting internal/repository db/migrations/003_agent_conversation_hosting.sql -- \
-  "MessageCreatedHook" "SetMessageCreatedHook" "message.created:" "NewConversationHostingService" "OnMessageCreated" \
+# AI 托管编排已迁出至属主 service/agent/rpc/internal/{orchestrator,aihosting}（#340）；
+# 进程内 MessageCreatedHook/SetMessageCreatedHook 随 internal/logic 删（#618，触发改经 Kafka agent.trigger.v1）。
+assert_present "-q" service/agent/rpc/internal/orchestrator service/agent/rpc/internal/aihosting internal/repository db/migrations/003_agent_conversation_hosting.sql -- \
+  "message.created:" "NewConversationHostingService" "OnMessageCreated" \
   "TryStartAgentTrigger" "FinishAgentTrigger" "agent_conversation_hosting" "agent_trigger_idempotency" \
   "MessageServiceResponseWriter" "SendMessage\(ctx"
 # #617：agent-rpc 托管测试改由 HandleMessageCreated 驱动（不再走 internal MessageLogic 的
@@ -216,12 +217,11 @@ rg -q "ExistsByIdentifier" service/auth/rpc/internal/logic
 rg -q "CreateUser" service/auth/rpc/internal/logic
 rg -q "PasswordHash" service/auth/rpc/internal/model/auth_credentials_model.go
 
-# --- social MVP authorization contract ---
-assert_present "-q" internal -- \
+# --- social MVP authorization contract（#617/#618：发送/群鉴权迁 msg-rpc/groups-rpc，脱 internal；
+#     群发活跃成员 recipient/visibility 覆盖由 msg-rpc + msgtransfer fanout 单测承接）---
+assert_present "-q" pkg/rpcerror service/msg/rpc/internal/logic service/groups/rpc/internal/logic -- \
   "CodeForbidden" "sender is not a group member" "group membership validator is not configured" \
   "group owner cannot leave as the only active member"
-assert_present "-q" internal/logic -- \
-  "TestGroupSendUsesActiveParticipantsForRecipientsAndVisibility" "client-group-active" "usr_left"
 
 # --- account/persistence schema & storage wiring ---
 assert_present "-qF" db/migrations/001_init_postgres.sql -- \
@@ -242,7 +242,7 @@ rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/s3.go
 # media 对象存储数据层已迁 service/media（media-rpc goctl MediaObjectsModel + objectstorage），
 # 内部 internal/repository media 工厂已退役（#609）。
 rg -q "NewMediaObjectsModel" service/media/rpc/internal/svc/service_context.go
-rg -q "ValidateMessageMedia" internal/logic/messagelogic.go
+rg -q "ValidateMessageMedia" service/msg/rpc/internal/svc/media_validator.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql
 rg -q "NewPostgresRepository" internal/repository/postgres_common.go
 rg -q "NewPostgresGroupsRepository" internal/repository/postgres_groups.go
@@ -265,8 +265,9 @@ for api_main in service/agent/api/agent.go; do
 done
 assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/msggateway/msggateway.go service/msgtransfer/msgtransfer.go service/push/push.go -- \
   "/readyz" "/metrics" "ReadinessHandler" "MetricsHandler"
-assert_present "-q" internal/logic/messagelogic.go service/msggateway/internal/ws -- \
-  "RecordMessageSend" "RecordDeliveryAttempt" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"
+# RecordMessageSend 随退役 monolith（internal/logic）删——Kafka 写路径的发送计数待重接（不在 #618 范围）。
+assert_present "-q" service/msggateway/internal/ws -- \
+  "RecordDeliveryAttempt" "SetWebSocketConnections" "RecordWebSocketConnectionEvent"
 # push 在线/离线投递指标（03 §9 C2-C3）。
 assert_present "-q" service/push/internal/pusher pkg/observability/metrics.go -- \
   "RecordPushOnline" "RecordPushOffline" "agents_im_push_online_total" "agents_im_push_offline_total"

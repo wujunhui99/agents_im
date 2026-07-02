@@ -32,14 +32,7 @@ if [[ -d internal/auth/svc ]]; then
   exit 1
 fi
 
-aggregate_gozero_logic_files="$(find internal/logic -path '*/gozero_logic.go' -type f -print || true)"
-if [[ -n "${aggregate_gozero_logic_files}" ]]; then
-  echo "go-zero REST adapter logic must use goctl-style per-operation *_logic.go files, not aggregate gozero_logic.go files:" >&2
-  echo "${aggregate_gozero_logic_files}" >&2
-  exit 1
-fi
-
-root_svc_import_files="$(rg -l '"github.com/wujunhui99/agents_im/internal/svc"' service/msggateway service/msgtransfer service/push internal/logic tests --glob '*.go' || true)"
+root_svc_import_files="$(rg -l '"github.com/wujunhui99/agents_im/internal/svc"' service/msggateway service/msgtransfer service/push tests --glob '*.go' || true)"
 if [[ -n "${root_svc_import_files}" ]]; then
   echo "core REST, gateway, and tests must not import legacy root internal/svc:" >&2
   echo "${root_svc_import_files}" >&2

@@ -23,10 +23,10 @@
 | media | 部分 | ✅ #433 写入脱；下载鉴权 keystone 暂留 |
 | admin | 部分 | ✅ #448 task_reports 脱；跨域只读 keystone 暂留 |
 | auth | 否 | ✅ #563 数据层脱 internal（goctl）+ 去 adapter 直调 user-rpc/mail-rpc；会话 Redis（#435）|
-| user | 部分 | ✅ #452 数据层脱；助手开通 #606 改 agent-rpc/friends-rpc 编排（头像校验 #533 已切 media-rpc）；剩 `internal/logic.UserLogic` 喂 groups keystone |
+| user | 部分 | ✅ #452 数据层脱；助手开通 #606 改 agent-rpc/friends-rpc 编排（头像校验 #533 已切 media-rpc）；`internal/logic.UserLogic` 已随 #618 删（无 live 依赖），剩 `internal/repository` 助手账号读（part3） |
 | msg-rpc | 是（脱 internal）| ✅ #457 PR1 + #463 goctl 数据层；**#617 群成员鉴权切 groups-rpc gRPC**（`internal/groupsrpc` adapter），msg-rpc 已 **零 internal import**（媒体附件校验 #533 已切 media-rpc）|
 | msg-api | 否（纯 BFF）| ✅ #463 已切流：7 路由 BFF over gRPC（4 消息→msg-rpc、ai-hosting×2→msg-rpc、feedback→admin-rpc）|
-| msggateway/transfer | 是 | 🟡 keystone 收敛中；message-api/message-rpc 已退役（#463=A1+A2 合并）；A3 ✅ #492（gateway 切 msg-rpc gRPC 并改名 msggateway，ws/contract 迁出 internal）；A4 进行中：#341 把 `servicecontext/message` 重定位出 internal→`service/msg/rpc/internal/aihosting`，`internal/logic` 消息域 + repository 仍是 keystone（AI runtime 消费），待 agent 迁移整套删（与 B1 协同）|
+| msggateway/transfer | 是 | 🟡 keystone 收敛中；message-api/message-rpc 已退役（#463=A1+A2 合并）；A3 ✅ #492（gateway 切 msg-rpc gRPC 并改名 msggateway，ws/contract 迁出 internal）；A4 进行中：#341 把 `servicecontext/message` 重定位出 internal→`service/msg/rpc/internal/aihosting`；`internal/logic` 消息域已随 #618 删（#617 后 AI runtime 不再消费），剩 `internal/repository` 消息部分（part4）|
 
 ## groups-rpc 本次操作（PR #415，issue #415）
 
@@ -91,6 +91,7 @@
 
 > 逐域迁移台账，一域一行：路线 / owner 落点 / 数据层 / PR / 退役欠下的尾巴。新域完成后追加一行，只此一处（不在 skill 维护）。
 > **全局收尾**：顶层 `internal/` 完全退役以 message/gateway/transfer（[`07-message-rpc-redesign`](../07-message-rpc-redesign.md)）为最后一公里；auth 数据层（credentials/email_verification）从 `internal/repository` 切到 `rpc/internal/model` 待独立 PR；user 数据层已脱（#452），头像校验 #533 已切 media-rpc，仅剩助手开通一处 keystone 跨域例外随 agent 迁移后删。
+> **#618（`internal/logic` god-package 整体删除）**：#617 把 AI runtime 的消息/群成员读切到 msg/groups-rpc、#681 把 admin 切到 msg/friends-rpc 后，`internal/logic`（`messagelogic`/`groupslogic`/`userlogic`）已无任何 live service 依赖，仅剩一个测退役 monolith 的 `tests/message_service_test.go`（对应覆盖已由 msg-rpc 单测 + `internal/repository` 契约测承接）→ 连同该测**整包删除**。剩余 `internal/`：`internal/repository`（user-rpc 助手账号 + message/groups 读，part3/4）、`internal/servicecontext/common`（`AuthRuntime`，agent-api/aihosting 引用，auth 收尾）。
 
 | 域 | 路线 | owner 落点 | 数据层 | PR | 剩余 / 后续 |
 |----|------|-----------|--------|----|-----------|
