@@ -34,7 +34,7 @@ type AgentResponseRequest struct {
 }
 
 type AgentResponseResult struct {
-	Message      Message        `json:"message"`
+	Message      Message              `json:"message"`
 	Deduplicated bool                 `json:"deduplicated"`
 	Metadata     AgentMessageMetadata `json:"metadata"`
 }
