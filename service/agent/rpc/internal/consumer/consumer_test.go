@@ -80,7 +80,7 @@ func TestHandleBatchSchedulesAgentInboxTrigger(t *testing.T) {
 		t.Fatalf("new judge: %v", err)
 	}
 	scheduler := &recordingScheduler{}
-	pipeline, err := New(judge, scheduler)
+	pipeline, err := New(judge, scheduler, nil)
 	if err != nil {
 		t.Fatalf("new consumer: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestHandleBatchSchedulesAgentInboxTrigger(t *testing.T) {
 func TestHandleBatchSkipsMalformedAndNonTriggering(t *testing.T) {
 	judge, _ := trigger.NewJudge(testHostingStore{})
 	scheduler := &recordingScheduler{}
-	pipeline, err := New(judge, scheduler)
+	pipeline, err := New(judge, scheduler, nil)
 	if err != nil {
 		t.Fatalf("new consumer: %v", err)
 	}

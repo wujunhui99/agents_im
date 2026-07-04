@@ -145,6 +145,15 @@ Response data:
 
 托管回复 runtime request 只能包含 bounded recent messages，当前实现最多取最近 30 条，并携带 `summary_used=false` 占位；不能把全量历史、token 或 provider secret 写入日志或响应。开发初期暂不把 Agent audit 作为合规审计系统处理：运行记录可以保留调试所需的触发输入/模型输出摘要，后续进入正式审计阶段时再收紧脱敏、保留周期和访问控制。缺少 DeepSeek provider/model 配置时 production runtime fail closed，触发记录为失败，不创建硬编码或 fake AI 消息。
 
+## 直连 Agent 私聊 Conversation Store（#686）
+
+直连 agent 私聊（收信方为 active agent 账号、single 会话，judge `KindAgentInbox`）的上下文改由 agent 域**自有** conversation store 承载，**不再**每次触发同步调 msg-rpc `PullMessages` 拉历史；托管（human-human 被托管）与群聊仍走旧 msg-rpc 历史路径。
+
+- **表**：`agent_private_conversations`（migration 026）。一会话一行，`rounds`(jsonb) 保留**最多 16 轮**（=16 次 agent 回复）的 `(user 批次, assistant 回复)` 对，滚动裁剪最旧轮；`pending`(jsonb) 暂存未消费的 user 消息；`last_consumed_seq` 做冪等；`state`(idle/running)+`running_until` 租约做合流闸门。数据源为 Kafka：`agent.trigger.v1` 消费直写，consumer group offset 即 durable log，无需 msg-rpc 回补。
+- **合流（coalescing）**：AI 回复在途（`state=running`）时用户追发的多条消息只累积到 `pending`；一轮把该会话所有未消费 user 消息**改行合并成一条 user 输入**一起回复（不逐条回复），跑完再检查 `pending`——有残留则续跑一轮，否则落 `idle`（`orchestrator.PrivateChatCoalescer`）。run 失败时消费该批（`DiscardPending`，失败提示已直接回发用户）避免对同一失败批无限重试。
+- **Prompt 形状**：`system + rounds 展开的 user/assistant 严格交互历史 + 当轮合并后的 user 批次`（`buildFromPrivConv`），连续 user 合并成单条、不下发连续同 role。
+- **冪等**：私聊由 store 的 `last_consumed_seq` + running 闸门保证，取代 `agent_triggers` 台账（后者仍服务托管/群聊）。AI 回复经 Kafka 回流被 judge 递归闸门丢弃、不入 store，assistant 历史由 `CommitRound` 落库。
+
 ## 失败优先
 
 - 未配置 repository、runner、Message Service writer 或 runtime builder 时返回明确错误。

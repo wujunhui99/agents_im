@@ -9,7 +9,9 @@ package consumer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -26,16 +28,24 @@ type Scheduler interface {
 	ScheduleTrigger(ctx context.Context, trigger orchestrator.AgentTrigger) (bool, error)
 }
 
+// Coalescer 承接直连 agent 私聊（KindAgentInbox·single，#686）：入站消息落 agent 自有 conversation
+// store 并合流回复，取代 ScheduleTrigger 的 per-event 立即执行。*orchestrator.PrivateChatCoalescer
+// 实现它。nil 时私聊回退 Scheduler（旧 msg-rpc 历史路径），保持行为不变。
+type Coalescer interface {
+	OnUserMessage(ctx context.Context, base orchestrator.AgentTrigger, message orchestrator.PrivateUserMessage) error
+}
+
 type Consumer struct {
 	judge     *trigger.Judge
 	scheduler Scheduler
+	coalescer Coalescer
 }
 
-func New(judge *trigger.Judge, scheduler Scheduler) (*Consumer, error) {
+func New(judge *trigger.Judge, scheduler Scheduler, coalescer Coalescer) (*Consumer, error) {
 	if judge == nil || scheduler == nil {
 		return nil, fmt.Errorf("agent consumer requires judge and scheduler")
 	}
-	return &Consumer{judge: judge, scheduler: scheduler}, nil
+	return &Consumer{judge: judge, scheduler: scheduler, coalescer: coalescer}, nil
 }
 
 // HandleBatch is the kgo poll callback: returning nil commits offsets.
@@ -69,12 +79,52 @@ func (c *Consumer) handleEvent(ctx context.Context, event messaging.MessageEvent
 				trig.Kind, trig.AgentAccountID, trig.Event.EventID, err)
 			continue
 		}
+		// 直连 agent 私聊（KindAgentInbox·single）：走 conversation store 合流器（#686），入站消息
+		// 直写 store、合流回复，不再 per-event 立即 ScheduleTrigger、也不同步调 msg-rpc 拉历史。
+		// 托管/群聊仍走 ScheduleTrigger（agent_triggers 台账 + msg-rpc 历史）。coalescer nil 时回退。
+		if c.coalescer != nil && trig.Kind == trigger.KindAgentInbox && agentTrigger.ConversationType == orchestrator.ConversationTypeSingle {
+			message := orchestrator.PrivateUserMessage{
+				Seq:         trig.Event.Seq,
+				ServerMsgID: trig.Event.ServerMsgID,
+				Text:        decodeMessageText(trig.Event.Payload.ContentType, trig.Event.Payload.Content),
+				CreatedAtMs: trig.Event.CreatedAt,
+			}
+			if err := c.coalescer.OnUserMessage(ctx, agentTrigger, message); err != nil {
+				logx.WithContext(ctx).Errorf("agent: coalesce failed agent=%q event_id=%q: %v",
+					trig.AgentAccountID, trig.Event.EventID, err)
+			}
+			continue
+		}
 		if _, err := c.scheduler.ScheduleTrigger(ctx, agentTrigger); err != nil {
 			logx.WithContext(ctx).Errorf("agent: schedule failed kind=%s agent=%q event_id=%q: %v",
 				trig.Kind, trig.AgentAccountID, trig.Event.EventID, err)
 			continue
 		}
 	}
+}
+
+// decodeMessageText 把 Kafka 事件 payload 的 content（text 存成 {"text":...}）还原成纯文本，
+// 喂 conversation store 的 pending。非文本消息给占位符（与 msg-rpc 历史路径 hostingRuntimeText
+// 一致），保证合流后当轮 user 输入非空。
+func decodeMessageText(contentType string, raw json.RawMessage) string {
+	switch strings.TrimSpace(contentType) {
+	case orchestrator.MessageContentTypeImage:
+		return "[图片消息]"
+	case orchestrator.MessageContentTypeFile:
+		return "[文件消息]"
+	}
+	var body struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &body); err == nil {
+		if text := strings.TrimSpace(body.Text); text != "" {
+			return text
+		}
+	}
+	if text := strings.TrimSpace(string(raw)); text != "" {
+		return text
+	}
+	return "[非文本消息]"
 }
 
 // agentTriggerFromJudged maps a judged trigger.Trigger (recursion gate /

@@ -80,6 +80,10 @@ type AgentTrigger struct {
 	SourceMessageText  string   `json:"source_message_text,omitempty"`
 	SourceContentType  string   `json:"source_content_type,omitempty"`
 	TargetAgentUserIDs []string `json:"target_agent_user_ids,omitempty"`
+	// PrivateConvContext 标记本触发走 agent 私聊 conversation store（privconv，#686）：请求构建器
+	// 从 store rounds 取历史、以 PromptText（合流后的当轮 user 批次）为当前消息，不再同步调
+	// msg-rpc 拉历史。仅直连 agent 私聊（KindAgentInbox·single）置真；托管/群聊仍走旧 msg-rpc 路径。
+	PrivateConvContext bool `json:"private_conv_context,omitempty"`
 }
 
 type AdminManualRunRequest struct {
