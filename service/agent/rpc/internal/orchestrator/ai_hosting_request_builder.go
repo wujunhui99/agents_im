@@ -10,6 +10,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/privconv"
 	agentruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime"
 )
 
@@ -36,6 +37,9 @@ type ConversationAIHostingRuntimeRequestBuilderConfig struct {
 	AgentRegistry     AgentRegistryReader
 	DeepSeek          config.DeepSeekConfig
 	MaxRecentMessages int
+	// PrivConvStore 供直连 agent 私聊（PrivateConvContext=true）从 agent 自有 conversation store
+	// 取历史（rounds），替代 msg-rpc PullMessages（#686）。nil 时私聊触发回退旧 msg-rpc 路径。
+	PrivConvStore privconv.Store
 }
 
 type ConversationAIHostingRuntimeRequestBuilder struct {
@@ -45,6 +49,7 @@ type ConversationAIHostingRuntimeRequestBuilder struct {
 	agentRegistry     AgentRegistryReader
 	deepSeek          config.DeepSeekConfig
 	maxRecentMessages int
+	privConvStore     privconv.Store
 }
 
 func NewConversationAIHostingRuntimeRequestBuilder(cfg ConversationAIHostingRuntimeRequestBuilderConfig) *ConversationAIHostingRuntimeRequestBuilder {
@@ -59,15 +64,24 @@ func NewConversationAIHostingRuntimeRequestBuilder(cfg ConversationAIHostingRunt
 		agentRegistry:     cfg.AgentRegistry,
 		deepSeek:          cfg.DeepSeek,
 		maxRecentMessages: maxRecent,
+		privConvStore:     cfg.PrivConvStore,
 	}
 }
 
 func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
-	if b == nil || b.messageHistory == nil {
-		return agentruntime.RunRequest{}, apperror.Internal("message history reader is not configured")
+	if b == nil {
+		return agentruntime.RunRequest{}, apperror.Internal("request builder is not configured")
 	}
 	if trigger.ConversationType != ConversationTypeSingle {
 		return agentruntime.RunRequest{}, apperror.InvalidArgument("AI hosting V1 only supports direct conversations")
+	}
+	// 直连 agent 私聊（#686）：历史来自 agent 自有 conversation store（rounds），当轮 user 批次由
+	// PromptText 承载（consumer 合流已合并），全程不调 msg-rpc。
+	if trigger.PrivateConvContext && b.privConvStore != nil {
+		return b.buildFromPrivConv(ctx, trigger)
+	}
+	if b.messageHistory == nil {
+		return agentruntime.RunRequest{}, apperror.Internal("message history reader is not configured")
 	}
 
 	maxRecent := b.maxRecentMessages
@@ -155,6 +169,83 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 			"summary_placeholder":  "true",
 			"recent_message_count": strconv.Itoa(len(conversation)),
 			"max_recent_messages":  strconv.Itoa(maxRecent),
+		},
+	}, nil
+}
+
+// buildFromPrivConv 用 agent 自有 conversation store 组装私聊 RunRequest（#686）：rounds 展开成
+// user/assistant 交互历史（每轮 user 批次改行合并成一条 user），当轮待回复消息由 PromptText 承载
+// （consumer 合流已把多条追击消息合并进 PromptText）。全程不调 msg-rpc。
+func (b *ConversationAIHostingRuntimeRequestBuilder) buildFromPrivConv(ctx context.Context, trigger AgentTrigger) (agentruntime.RunRequest, error) {
+	promptText := strings.TrimSpace(trigger.PromptText)
+	if promptText == "" {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("prompt_text is required for private conversation context")
+	}
+	if trigger.TriggerSeq <= 0 {
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("trigger seq is required")
+	}
+	agentConfig, err := b.agentRuntimeConfig(ctx, trigger.AgentUserID)
+	if err != nil {
+		return agentruntime.RunRequest{}, err
+	}
+	snapshot, err := b.privConvStore.Load(ctx, trigger.ConversationID)
+	if err != nil && apperror.From(err).Code != apperror.CodeNotFound {
+		return agentruntime.RunRequest{}, err
+	}
+
+	conversation := make([]agentruntime.ConversationMessage, 0, len(snapshot.Rounds)*2)
+	for _, round := range snapshot.Rounds {
+		if userText := strings.TrimSpace(strings.Join(round.User, "\n")); userText != "" {
+			conversation = append(conversation, agentruntime.ConversationMessage{
+				Seq:         round.SeqFrom,
+				SenderID:    trigger.RequestingUserID,
+				SenderType:  agentruntime.SenderTypeUser,
+				ContentType: agentruntime.ContentTypeText,
+				Text:        userText,
+			})
+		}
+		if assistantText := strings.TrimSpace(round.Assistant); assistantText != "" {
+			conversation = append(conversation, agentruntime.ConversationMessage{
+				Seq:         round.SeqTo,
+				SenderID:    trigger.AgentUserID,
+				SenderType:  agentruntime.SenderTypeAgent,
+				ContentType: agentruntime.ContentTypeText,
+				Text:        assistantText,
+				AgentRunID:  round.AgentRunID,
+			})
+		}
+	}
+
+	return agentruntime.RunRequest{
+		RequestID:          trigger.RequestID,
+		EventID:            trigger.EventID,
+		OperationID:        trigger.OperationID,
+		TraceID:            trigger.TraceID,
+		TriggerType:        trigger.TriggerType,
+		AgentUserID:        trigger.AgentUserID,
+		RequestingUserID:   trigger.RequestingUserID,
+		ConversationID:     trigger.ConversationID,
+		ConversationType:   trigger.ConversationType,
+		TriggerMessageID:   trigger.TriggerMessageID,
+		TriggerSeq:         trigger.TriggerSeq,
+		PromptText:         promptText,
+		ReplyToMessageID:   trigger.ReplyToMessageID,
+		SourceAgentRunID:   trigger.SourceAgentRunID,
+		SourceAgentUserID:  trigger.SourceAgentUserID,
+		SourceMessageID:    trigger.SourceMessageID,
+		SourceMessageSeq:   trigger.SourceMessageSeq,
+		SourceMessageText:  trigger.SourceMessageText,
+		SourceContentType:  trigger.SourceContentType,
+		TargetAgentUserIDs: append([]string(nil), trigger.TargetAgentUserIDs...),
+		Agent:              agentConfig,
+		Conversation:       conversation,
+		Metadata: map[string]string{
+			"runtime_mode":         llmobs.RuntimeModeAIHostingAutoReply,
+			"summary_used":         "false",
+			"summary_placeholder":  "true",
+			"private_conv_context": "true",
+			"recent_round_count":   strconv.Itoa(len(snapshot.Rounds)),
+			"recent_message_count": strconv.Itoa(len(conversation)),
 		},
 	}, nil
 }

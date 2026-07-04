@@ -21,6 +21,7 @@ import (
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/imadapter"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/msgrpc"
 	orchestrator "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/privconv"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/trigger"
@@ -116,7 +117,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		log.Fatalf("build trigger judge: %v", err)
 	}
-	triggerConsumer, err := consumer.New(judge, hostingCtx.HostingService)
+	triggerConsumer, err := consumer.New(judge, hostingCtx.HostingService, privateCoalescer(hostingCtx))
 	if err != nil {
 		log.Fatalf("build trigger consumer: %v", err)
 	}
@@ -177,6 +178,9 @@ func buildHostingRuntime(c config.Config, responseSender orchestrator.MessageSen
 	hostingCtx.PythonExecutor = pythonExecutor
 	// AI 写回经 msg-rpc gRPC SendMessage（imadapter），AI 消息走与人类消息相同的 Kafka 链路。
 	hostingCtx.AgentResponseSender = responseSender
+	// 直连 agent 私聊 conversation store（#686）：Kafka 消费直写、作为私聊历史/合流唯一源，
+	// ConfigureConversationAIHosting 据此装配请求构建器（读 store）与合流器 PrivateCoalescer。
+	hostingCtx.PrivConvStore = privconv.NewModelStore(appconfig.ResolveDataSource(c.DataSource))
 	if err := aihosting.ConfigureConversationAIHosting(hostingCtx, c.DeepSeek, c.LLMObservability); err != nil {
 		log.Fatalf("configure AI conversation hosting: %v", err)
 	}
@@ -229,6 +233,15 @@ func resolveKafkaBrokers(c config.Config) []string {
 // hasRPCClientConfig 判断 zrpc 客户端是否已配置（target / endpoints / etcd 任一）。
 func hasRPCClientConfig(conf zrpc.RpcClientConf) bool {
 	return conf.Target != "" || len(conf.Endpoints) > 0 || (len(conf.Etcd.Hosts) > 0 && conf.Etcd.Key != "")
+}
+
+// privateCoalescer 返回 hostingCtx 装配的私聊合流器作为 consumer.Coalescer；未装配（PrivConvStore
+// 为 nil）时返回 nil 接口，consumer 私聊回退 ScheduleTrigger。显式判 nil 避免 typed-nil 接口陷阱。
+func privateCoalescer(hostingCtx *aihosting.ServiceContext) consumer.Coalescer {
+	if hostingCtx == nil || hostingCtx.PrivateCoalescer == nil {
+		return nil
+	}
+	return hostingCtx.PrivateCoalescer
 }
 
 func firstNonEmpty(values ...string) string {

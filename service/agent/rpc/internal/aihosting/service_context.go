@@ -18,6 +18,7 @@ import (
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/convhosting"
 	agentim "github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
+	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/privconv"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/registry"
 	einoruntime "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/eino"
 	runtimetools "github.com/wujunhui99/agents_im/service/agent/rpc/internal/runtime/tools"
@@ -51,6 +52,12 @@ type ServiceContext struct {
 	// HostingService 是 ConfigureConversationAIHosting 装配出的具体托管服务（CHS）。
 	// agent-rpc 的 trigger 消费者用它 ScheduleTrigger（幂等 + 已读推进 + 异步 run + 写回）。
 	HostingService *agentim.ConversationHostingService
+	// PrivConvStore 是 agent 私聊 conversation store（#686）：直连 agent 私聊的历史/合流唯一源。
+	// 由 svc 注入（生产为 goctl model store）；nil 时私聊回退旧 msg-rpc 历史路径。
+	PrivConvStore privconv.Store
+	// PrivateCoalescer 是直连 agent 私聊的合流调度器（#686），由 ConfigureConversationAIHosting
+	// 在 PrivConvStore 非 nil 时装配；agent-rpc 消费者用它取代私聊的 ScheduleTrigger。
+	PrivateCoalescer *agentim.PrivateChatCoalescer
 }
 
 type ConversationAIHostingRuntimeOptions struct {
@@ -145,6 +152,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 			AgentRegistry:     opts.AgentRegistryReader,
 			DeepSeek:          opts.DeepSeek,
 			MaxRecentMessages: 30,
+			PrivConvStore:     ctx.PrivConvStore,
 		}),
 		Audit:                agaudit.NewRunRecorder(ctx.AgentAudit),
 		Writer:               writer,
@@ -169,6 +177,21 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 		return err
 	}
 	ctx.HostingService = hosting
+
+	// 直连 agent 私聊合流器（#686）：conversation store 非 nil 时装配，复用同一 runner（LLM +
+	// 审计 + 写回）。私聊历史/合流走 store，不再经 msg-rpc ScheduleTrigger 的 per-event 路径。
+	if ctx.PrivConvStore != nil {
+		coalescer, err := agentim.NewPrivateChatCoalescer(agentim.PrivateChatCoalescerConfig{
+			Store:      ctx.PrivConvStore,
+			Runner:     orchestrator,
+			ReadMarker: readMarker,
+			MaxRounds:  privconv.DefaultMaxRounds,
+		})
+		if err != nil {
+			return err
+		}
+		ctx.PrivateCoalescer = coalescer
+	}
 	return nil
 }
 

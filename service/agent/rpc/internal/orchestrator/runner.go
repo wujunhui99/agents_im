@@ -39,6 +39,9 @@ type AgentRunOrchestrator struct {
 type AgentRunOrchestratorResult struct {
 	AuditRun agentaudit.AgentRun
 	Response AgentResponseResult
+	// FinalText 是本轮 LLM 产出的回复正文（已 TrimSpace）。私聊合流（privconv）用它把这一轮的
+	// assistant 回复写进 conversation store 的 rounds；失败路径为空。
+	FinalText string
 }
 
 type AgentRunOrchestratorConfig struct {
@@ -217,8 +220,9 @@ func (o *AgentRunOrchestrator) Run(ctx context.Context, trigger AgentTrigger) (A
 	o.observeLLMRun(ctx, llmObsSucceededFromResult(normalized, runtimeReq, runtimeResult, response, startedAt, finishedAt))
 
 	return AgentRunOrchestratorResult{
-		AuditRun: auditRun,
-		Response: response,
+		AuditRun:  auditRun,
+		Response:  response,
+		FinalText: finalText,
 	}, nil
 }
 
