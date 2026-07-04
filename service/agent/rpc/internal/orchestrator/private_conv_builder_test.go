@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
@@ -22,6 +23,9 @@ func (s stubPrivConvStore) CommitRound(context.Context, privconv.CommitRoundInpu
 }
 func (s stubPrivConvStore) DiscardPending(context.Context, privconv.DiscardPendingInput) (bool, error) {
 	return false, nil
+}
+func (s stubPrivConvStore) ApplySummary(context.Context, privconv.ApplySummaryInput) error {
+	return nil
 }
 func (s stubPrivConvStore) Load(context.Context, string) (privconv.Snapshot, error) {
 	return s.snapshot, nil
@@ -88,5 +92,44 @@ func TestBuildRuntimeRequestFromPrivConv(t *testing.T) {
 	// 全程未触碰 msg-rpc（messageHistory 为 nil 也不 panic/报错）。
 	if req.TriggerSeq != 5 || req.TriggerMessageID != "m5" {
 		t.Fatalf("trigger passthrough mismatch: seq=%d msg=%q", req.TriggerSeq, req.TriggerMessageID)
+	}
+}
+
+// 长期记忆 + 用户画像注入 system 段（#688）：非空时以 [长期记忆]/[用户画像] 段拼进 prompt.Content。
+func TestBuildRuntimeRequestInjectsMemoryAndProfile(t *testing.T) {
+	store := stubPrivConvStore{snapshot: privconv.Snapshot{
+		Rounds:         []privconv.Round{{User: []string{"继续"}, Assistant: "好的", SeqFrom: 40, SeqTo: 40}},
+		LongTermMemory: "用户在做一个 IM 项目，已完成私聊合流。",
+		UserProfile:    "用户是后端工程师，偏好简洁中文回复。",
+	}}
+	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
+		DeepSeek:      config.DeepSeekConfig{Model: "deepseek-chat"},
+		PrivConvStore: store,
+	})
+	trigger := AgentTrigger{
+		RequestID:          "evt-x:agent:b41",
+		TriggerType:        TriggerTypeUserPrivateMessage,
+		AgentUserID:        "agent",
+		RequestingUserID:   "peer",
+		ConversationID:     "single:peer:agent",
+		ConversationType:   ConversationTypeSingle,
+		TriggerMessageID:   "m41",
+		TriggerSeq:         41,
+		PromptText:         "接着上次的",
+		PrivateConvContext: true,
+	}
+	req, err := builder.BuildRuntimeRequest(context.Background(), trigger)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	sys := req.Agent.Prompt.Content
+	if !strings.Contains(sys, "[长期记忆]") || !strings.Contains(sys, "用户在做一个 IM 项目") {
+		t.Fatalf("system prompt missing long-term memory: %q", sys)
+	}
+	if !strings.Contains(sys, "[用户画像]") || !strings.Contains(sys, "后端工程师") {
+		t.Fatalf("system prompt missing user profile: %q", sys)
+	}
+	if req.Metadata["summary_used"] != "true" || req.Metadata["user_profile_used"] != "true" {
+		t.Fatalf("metadata flags wrong: %+v", req.Metadata)
 	}
 }

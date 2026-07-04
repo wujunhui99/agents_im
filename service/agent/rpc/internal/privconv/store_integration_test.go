@@ -112,8 +112,9 @@ func TestPostgresPrivConvStore(t *testing.T) {
 		t.Fatalf("rounds after second commit = %d, want 2", len(snap.Rounds))
 	}
 
-	// 16 轮滚动裁剪：继续收束到 >16 轮，最旧被丢弃。
-	for i := 6; i <= 40; i++ {
+	// CommitRound 安全上限裁剪（#688：阈值改摘要后，DefaultMaxRounds 仅作防膨胀兜底）：
+	// 收束到 >DefaultMaxRounds 轮，最旧被丢弃、只留最近 DefaultMaxRounds 轮。
+	for i := 6; i <= 60; i++ {
 		if _, err := store.AppendUserMessage(ctx, appended(int64(i), fmt.Sprintf("m%d", i))); err != nil {
 			// running 时不 fired 也 OK；这里只是喂 pending 再收束。
 			t.Fatalf("append seq %d: %v", i, err)
@@ -129,10 +130,10 @@ func TestPostgresPrivConvStore(t *testing.T) {
 	}
 	snap, _ = store.Load(ctx, conversationID)
 	if len(snap.Rounds) != privconv.DefaultMaxRounds {
-		t.Fatalf("rounds after 40 = %d, want %d (trimmed)", len(snap.Rounds), privconv.DefaultMaxRounds)
+		t.Fatalf("rounds after 60 = %d, want %d (safety-trimmed)", len(snap.Rounds), privconv.DefaultMaxRounds)
 	}
-	if snap.Rounds[len(snap.Rounds)-1].Assistant != "a40" {
-		t.Fatalf("newest kept round = %q, want a40", snap.Rounds[len(snap.Rounds)-1].Assistant)
+	if snap.Rounds[len(snap.Rounds)-1].Assistant != "a60" {
+		t.Fatalf("newest kept round = %q, want a60", snap.Rounds[len(snap.Rounds)-1].Assistant)
 	}
 
 	// 缺失会话 → NotFound。
@@ -141,5 +142,70 @@ func TestPostgresPrivConvStore(t *testing.T) {
 	}
 	if _, err := store.CommitRound(ctx, privconv.CommitRoundInput{ConversationID: conversationID + ":missing", ConsumedUpToSeq: 1}); apperror.From(err).Code != apperror.CodeNotFound {
 		t.Fatalf("missing commit error = %v, want not found", err)
+	}
+}
+
+// TestPostgresPrivConvApplySummary 验证 ApplySummary（#688）：写入 long_term_memory/user_profile，
+// 移除已摘要轮（seq_to<=cutoff）、保留后续轮，并按字符数截断。需已迁移 027 的 PG。
+func TestPostgresPrivConvApplySummary(t *testing.T) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = os.Getenv("AGENTS_IM_POSTGRES_DSN")
+	}
+	if dsn == "" {
+		t.Skip("DATABASE_URL or AGENTS_IM_POSTGRES_DSN is required for privconv integration tests")
+	}
+	ctx := context.Background()
+	store := privconv.NewModelStore(dsn)
+	uniq := time.Now().UnixNano()
+	agentID := fmt.Sprintf("2%d", uniq)
+	peerID := fmt.Sprintf("1%d", uniq)
+	conversationID := fmt.Sprintf("single:%s:%s", peerID, agentID)
+
+	// 攒够 20 轮：逐条 append + commit。
+	for i := 1; i <= privconv.SummarizeThreshold; i++ {
+		if _, err := store.AppendUserMessage(ctx, privconv.AppendUserMessageInput{
+			ConversationID: conversationID, AgentAccountID: agentID, PeerAccountID: peerID,
+			Message:    privconv.PendingMessage{Seq: int64(i), Text: fmt.Sprintf("u%d", i), ServerMsgID: fmt.Sprintf("m%d", i)},
+			RunningTTL: 2 * time.Minute,
+		}); err != nil {
+			t.Fatalf("append %d: %v", i, err)
+		}
+		if _, err := store.CommitRound(ctx, privconv.CommitRoundInput{
+			ConversationID:  conversationID,
+			Round:           privconv.Round{User: []string{fmt.Sprintf("u%d", i)}, Assistant: fmt.Sprintf("a%d", i), SeqFrom: int64(i), SeqTo: int64(i)},
+			ConsumedUpToSeq: int64(i), RunningTTL: 2 * time.Minute,
+		}); err != nil {
+			t.Fatalf("commit %d: %v", i, err)
+		}
+	}
+	snap, _ := store.Load(ctx, conversationID)
+	if len(snap.Rounds) != privconv.SummarizeThreshold {
+		t.Fatalf("seeded rounds=%d, want %d", len(snap.Rounds), privconv.SummarizeThreshold)
+	}
+
+	// 摘要前 18 轮（cutoff=第18轮 seq_to=18），保留后 2 轮 + 写记忆/画像；记忆超长按字符截断。
+	longMem := ""
+	for i := 0; i < privconv.MaxMemoryChars+500; i++ {
+		longMem += "记"
+	}
+	cutoff := snap.Rounds[len(snap.Rounds)-privconv.KeepRoundsAfterSummary-1].SeqTo
+	if err := store.ApplySummary(ctx, privconv.ApplySummaryInput{
+		ConversationID: conversationID, LongTermMemory: longMem, UserProfile: "用户是工程师", CutoffSeq: cutoff,
+	}); err != nil {
+		t.Fatalf("apply summary: %v", err)
+	}
+	snap, _ = store.Load(ctx, conversationID)
+	if len(snap.Rounds) != privconv.KeepRoundsAfterSummary {
+		t.Fatalf("rounds after summary=%d, want %d", len(snap.Rounds), privconv.KeepRoundsAfterSummary)
+	}
+	if snap.Rounds[len(snap.Rounds)-1].Assistant != fmt.Sprintf("a%d", privconv.SummarizeThreshold) {
+		t.Fatalf("newest kept round=%q", snap.Rounds[len(snap.Rounds)-1].Assistant)
+	}
+	if got := len([]rune(snap.LongTermMemory)); got != privconv.MaxMemoryChars {
+		t.Fatalf("memory not truncated to %d chars, got %d", privconv.MaxMemoryChars, got)
+	}
+	if snap.UserProfile != "用户是工程师" {
+		t.Fatalf("user_profile mismatch: %q", snap.UserProfile)
 	}
 }

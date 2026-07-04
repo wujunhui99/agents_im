@@ -185,7 +185,11 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 			Store:      ctx.PrivConvStore,
 			Runner:     orchestrator,
 			ReadMarker: readMarker,
-			MaxRounds:  privconv.DefaultMaxRounds,
+			// 长期记忆 + 用户画像摘要（#688）：rounds 攒到阈值时把早期轮折进长期记忆、留后 2 轮。
+			Summarizer:         einoruntime.NewDeepSeekSummarizer(opts.DeepSeek),
+			MaxRounds:          privconv.DefaultMaxRounds,
+			SummarizeThreshold: privconv.SummarizeThreshold,
+			KeepRounds:         privconv.KeepRoundsAfterSummary,
 		})
 		if err != nil {
 			return err

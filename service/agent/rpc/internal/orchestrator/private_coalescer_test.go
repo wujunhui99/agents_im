@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -13,13 +14,16 @@ import (
 // fakePrivConvStore 是 privconv.Store 的内存实现，镜像真实合流状态机语义（idle→running 闸门、
 // pending 累积、CommitRound 清消费+16轮裁剪、DiscardPending 清消费不落轮），供合流器白盒测试。
 type fakePrivConvStore struct {
-	mu           sync.Mutex
-	rounds       []privconv.Round
-	pending      []privconv.PendingMessage
-	state        string
-	lastSeq      int64
-	commitCalls  int
-	discardCalls int
+	mu             sync.Mutex
+	rounds         []privconv.Round
+	pending        []privconv.PendingMessage
+	state          string
+	lastSeq        int64
+	commitCalls    int
+	discardCalls   int
+	summaryCalls   int
+	longTermMemory string
+	userProfile    string
 	// onLoad 在每次 Load 后回调，用来模拟"run 在途时又来消息"。
 	onLoad func(s *fakePrivConvStore)
 }
@@ -46,9 +50,11 @@ func (s *fakePrivConvStore) AppendUserMessage(_ context.Context, in privconv.App
 func (s *fakePrivConvStore) Load(_ context.Context, _ string) (privconv.Snapshot, error) {
 	s.mu.Lock()
 	snap := privconv.Snapshot{
-		Rounds:  append([]privconv.Round(nil), s.rounds...),
-		Pending: append([]privconv.PendingMessage(nil), s.pending...),
-		State:   s.state,
+		Rounds:         append([]privconv.Round(nil), s.rounds...),
+		Pending:        append([]privconv.PendingMessage(nil), s.pending...),
+		State:          s.state,
+		LongTermMemory: s.longTermMemory,
+		UserProfile:    s.userProfile,
 	}
 	cb := s.onLoad
 	s.mu.Unlock()
@@ -76,6 +82,24 @@ func (s *fakePrivConvStore) DiscardPending(_ context.Context, in privconv.Discar
 	s.discardCalls++
 	s.dropConsumedLocked(in.ConsumedUpToSeq)
 	return len(s.pending) > 0, nil
+}
+
+func (s *fakePrivConvStore) ApplySummary(_ context.Context, in privconv.ApplySummaryInput) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.summaryCalls++
+	s.longTermMemory = in.LongTermMemory
+	s.userProfile = in.UserProfile
+	if in.CutoffSeq > 0 {
+		kept := make([]privconv.Round, 0, len(s.rounds))
+		for _, r := range s.rounds {
+			if r.SeqTo > in.CutoffSeq {
+				kept = append(kept, r)
+			}
+		}
+		s.rounds = kept
+	}
+	return nil
 }
 
 func (s *fakePrivConvStore) dropConsumedLocked(consumedUpToSeq int64) {
@@ -257,5 +281,120 @@ func TestPrivateCoalescerFiredGate(t *testing.T) {
 	f2, _ := store.AppendUserMessage(ctx, privconv.AppendUserMessageInput{ConversationID: "c", AgentAccountID: "a", PeerAccountID: "p", Message: privconv.PendingMessage{Seq: 2, Text: "b"}})
 	if !f1 || f2 {
 		t.Fatalf("fired gate wrong: f1=%v f2=%v, want true/false", f1, f2)
+	}
+}
+
+// fakeSummarizer 记录调用并返回脚本化的记忆/画像（或错误）。
+type fakeSummarizer struct {
+	calls      int
+	lastRounds int
+	memory     string
+	profile    string
+	err        error
+}
+
+func (f *fakeSummarizer) Summarize(_ context.Context, in SummarizeInput) (SummarizeResult, error) {
+	f.calls++
+	f.lastRounds = len(in.Rounds)
+	if f.err != nil {
+		return SummarizeResult{}, f.err
+	}
+	return SummarizeResult{Memory: f.memory, Profile: f.profile}, nil
+}
+
+func seedRounds(store *fakePrivConvStore, n int) {
+	for i := 1; i <= n; i++ {
+		store.rounds = append(store.rounds, privconv.Round{
+			User: []string{fmt.Sprintf("u%d", i)}, Assistant: fmt.Sprintf("a%d", i),
+			SeqFrom: int64(i), SeqTo: int64(i),
+		})
+	}
+	store.state = "running"
+	store.lastSeq = int64(n)
+}
+
+func newSummarizingCoalescer(t *testing.T, store *fakePrivConvStore, sum ConversationSummarizer) *PrivateChatCoalescer {
+	t.Helper()
+	c, err := NewPrivateChatCoalescer(PrivateChatCoalescerConfig{
+		Store:      store,
+		Runner:     &recordingRunner{reply: func(AgentTrigger) (string, error) { return "x", nil }},
+		Summarizer: sum,
+	})
+	if err != nil {
+		t.Fatalf("new coalescer: %v", err)
+	}
+	return c
+}
+
+// 达阈值（20 轮）触发摘要：折叠前 18 轮进长期记忆/用户画像，保留后 2 轮。
+func TestPrivateCoalescerSummarizesAtThreshold(t *testing.T) {
+	store := newFakePrivConvStore()
+	seedRounds(store, privconv.SummarizeThreshold) // 20 轮
+	sum := &fakeSummarizer{memory: "压缩后的长期记忆", profile: "用户画像X"}
+	c := newSummarizingCoalescer(t, store, sum)
+
+	c.maybeSummarize("single:peer:agent")
+
+	if sum.calls != 1 {
+		t.Fatalf("summarizer calls=%d, want 1", sum.calls)
+	}
+	if sum.lastRounds != privconv.SummarizeThreshold-privconv.KeepRoundsAfterSummary {
+		t.Fatalf("folded rounds=%d, want %d", sum.lastRounds, privconv.SummarizeThreshold-privconv.KeepRoundsAfterSummary)
+	}
+	if store.summaryCalls != 1 {
+		t.Fatalf("ApplySummary calls=%d, want 1", store.summaryCalls)
+	}
+	if len(store.rounds) != privconv.KeepRoundsAfterSummary {
+		t.Fatalf("rounds after summary=%d, want %d", len(store.rounds), privconv.KeepRoundsAfterSummary)
+	}
+	if store.rounds[0].Assistant != "a19" || store.rounds[1].Assistant != "a20" {
+		t.Fatalf("kept rounds not the last 2: %+v", store.rounds)
+	}
+	if store.longTermMemory != "压缩后的长期记忆" || store.userProfile != "用户画像X" {
+		t.Fatalf("memory/profile not applied: mem=%q prof=%q", store.longTermMemory, store.userProfile)
+	}
+}
+
+// 未达阈值不摘要。
+func TestPrivateCoalescerNoSummaryBelowThreshold(t *testing.T) {
+	store := newFakePrivConvStore()
+	seedRounds(store, privconv.SummarizeThreshold-1) // 19 轮
+	sum := &fakeSummarizer{memory: "m"}
+	c := newSummarizingCoalescer(t, store, sum)
+	c.maybeSummarize("single:peer:agent")
+	if sum.calls != 0 || store.summaryCalls != 0 {
+		t.Fatalf("should not summarize below threshold: sum=%d apply=%d", sum.calls, store.summaryCalls)
+	}
+	if len(store.rounds) != privconv.SummarizeThreshold-1 {
+		t.Fatalf("rounds changed unexpectedly: %d", len(store.rounds))
+	}
+}
+
+// 摘要失败降级：不 ApplySummary、不丢轮，留待下次触发。
+func TestPrivateCoalescerSummaryFailureIsGraceful(t *testing.T) {
+	store := newFakePrivConvStore()
+	seedRounds(store, privconv.SummarizeThreshold)
+	sum := &fakeSummarizer{err: errors.New("llm down")}
+	c := newSummarizingCoalescer(t, store, sum)
+	c.maybeSummarize("single:peer:agent")
+	if sum.calls != 1 {
+		t.Fatalf("summarizer should be called once, got %d", sum.calls)
+	}
+	if store.summaryCalls != 0 {
+		t.Fatalf("failed summary must not ApplySummary, got %d", store.summaryCalls)
+	}
+	if len(store.rounds) != privconv.SummarizeThreshold {
+		t.Fatalf("rounds must stay intact on failure, got %d", len(store.rounds))
+	}
+}
+
+// summarizer 为 nil 时不摘要（退回 CommitRound 安全裁剪）。
+func TestPrivateCoalescerNoSummarizerConfigured(t *testing.T) {
+	store := newFakePrivConvStore()
+	seedRounds(store, privconv.SummarizeThreshold+5)
+	c := newCoalescer(t, store, &recordingRunner{reply: func(AgentTrigger) (string, error) { return "x", nil }})
+	c.maybeSummarize("single:peer:agent")
+	if store.summaryCalls != 0 {
+		t.Fatalf("nil summarizer must not ApplySummary, got %d", store.summaryCalls)
 	}
 }

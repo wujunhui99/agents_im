@@ -50,6 +50,8 @@ type (
 		Version         int64        `db:"version"`
 		CreatedAt       time.Time    `db:"created_at"`
 		UpdatedAt       time.Time    `db:"updated_at"`
+		LongTermMemory  string       `db:"long_term_memory"`
+		UserProfile     string       `db:"user_profile"`
 	}
 )
 
@@ -95,14 +97,14 @@ func (m *defaultAgentPrivateConversationsModel) FindOneByConversationId(ctx cont
 }
 
 func (m *defaultAgentPrivateConversationsModel) Insert(ctx context.Context, data *AgentPrivateConversations) (sql.Result, error) {
-	query := fmt.Sprintf("insert into %s (%s) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)", m.table, agentPrivateConversationsRowsExpectAutoSet)
-	ret, err := m.conn.ExecCtx(ctx, query, data.ConversationId, data.AgentAccountId, data.PeerAccountId, data.Rounds, data.Pending, data.LastConsumedSeq, data.State, data.RunningUntil, data.Version)
+	query := fmt.Sprintf("insert into %s (%s) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", m.table, agentPrivateConversationsRowsExpectAutoSet)
+	ret, err := m.conn.ExecCtx(ctx, query, data.ConversationId, data.AgentAccountId, data.PeerAccountId, data.Rounds, data.Pending, data.LastConsumedSeq, data.State, data.RunningUntil, data.Version, data.LongTermMemory, data.UserProfile)
 	return ret, err
 }
 
 func (m *defaultAgentPrivateConversationsModel) Update(ctx context.Context, newData *AgentPrivateConversations) error {
 	query := fmt.Sprintf("update %s set %s where id = $1", m.table, agentPrivateConversationsRowsWithPlaceHolder)
-	_, err := m.conn.ExecCtx(ctx, query, newData.Id, newData.ConversationId, newData.AgentAccountId, newData.PeerAccountId, newData.Rounds, newData.Pending, newData.LastConsumedSeq, newData.State, newData.RunningUntil, newData.Version)
+	_, err := m.conn.ExecCtx(ctx, query, newData.Id, newData.ConversationId, newData.AgentAccountId, newData.PeerAccountId, newData.Rounds, newData.Pending, newData.LastConsumedSeq, newData.State, newData.RunningUntil, newData.Version, newData.LongTermMemory, newData.UserProfile)
 	return err
 }
 

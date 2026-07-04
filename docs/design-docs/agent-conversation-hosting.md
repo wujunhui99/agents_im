@@ -149,10 +149,18 @@ Response data:
 
 直连 agent 私聊（收信方为 active agent 账号、single 会话，judge `KindAgentInbox`）的上下文改由 agent 域**自有** conversation store 承载，**不再**每次触发同步调 msg-rpc `PullMessages` 拉历史；托管（human-human 被托管）与群聊仍走旧 msg-rpc 历史路径。
 
-- **表**：`agent_private_conversations`（migration 026）。一会话一行，`rounds`(jsonb) 保留**最多 16 轮**（=16 次 agent 回复）的 `(user 批次, assistant 回复)` 对，滚动裁剪最旧轮；`pending`(jsonb) 暂存未消费的 user 消息；`last_consumed_seq` 做冪等；`state`(idle/running)+`running_until` 租约做合流闸门。数据源为 Kafka：`agent.trigger.v1` 消费直写，consumer group offset 即 durable log，无需 msg-rpc 回补。
+- **表**：`agent_private_conversations`（migration 026）。一会话一行，`rounds`(jsonb) 保存 `(user 批次, assistant 回复)` 对（攒到 20 轮触发摘要，见下节）；`pending`(jsonb) 暂存未消费的 user 消息；`last_consumed_seq` 做冪等；`state`(idle/running)+`running_until` 租约做合流闸门。数据源为 Kafka：`agent.trigger.v1` 消费直写，consumer group offset 即 durable log，无需 msg-rpc 回补。
 - **合流（coalescing）**：AI 回复在途（`state=running`）时用户追发的多条消息只累积到 `pending`；一轮把该会话所有未消费 user 消息**改行合并成一条 user 输入**一起回复（不逐条回复），跑完再检查 `pending`——有残留则续跑一轮，否则落 `idle`（`orchestrator.PrivateChatCoalescer`）。run 失败时消费该批（`DiscardPending`，失败提示已直接回发用户）避免对同一失败批无限重试。
 - **Prompt 形状**：`system + rounds 展开的 user/assistant 严格交互历史 + 当轮合并后的 user 批次`（`buildFromPrivConv`），连续 user 合并成单条、不下发连续同 role。
 - **冪等**：私聊由 store 的 `last_consumed_seq` + running 闸门保证，取代 `agent_triggers` 台账（后者仍服务托管/群聊）。AI 回复经 Kafka 回流被 judge 递归闸门丢弃、不入 store，assistant 历史由 `CommitRound` 落库。
+
+### 长期记忆 + 用户画像（#688）
+
+`rounds` 从"硬砍 16 轮"改为"**攒到 20 轮触发摘要**"（`privconv.SummarizeThreshold`）：把最早的 18 轮折进 **长期记忆**、保留后 2 轮（`KeepRoundsAfterSummary`）保证连续性。`agent_private_conversations` 加两列 `long_term_memory` / `user_profile`（migration 027）。
+
+- **摘要**：`orchestrator.PrivateChatCoalescer.maybeSummarize` 在每轮 `CommitRound` 后于 running 锁内**串行**触发（无并发）。`ConversationSummarizer`（DeepSeek 实现 `eino.DeepSeekSummarizer`）把「旧长期记忆 + 旧用户画像 + 被折叠的轮」重摘要成新的 `long_term_memory`（≤4096 字符，允许丢弃旧信息）与 `user_profile`（≤2048 字符，抽取用户个人信息增量更新），经 `store.ApplySummary` 落库并移除已摘要轮（`seq_to<=cutoff`），保留后续轮（后 2 轮 + 摘要期间新增轮）。
+- **降级**：摘要 LLM 失败 / 产物为空 → 记日志、不 `ApplySummary`、不丢轮，留待下次触发；`CommitRound` 的 `DefaultMaxRounds`(40) 仅作防膨胀安全兜底。
+- **注入**：请求构建器 `buildFromPrivConv` 把非空 `long_term_memory` / `user_profile` 以 `[长期记忆]` / `[用户画像]` 段拼进 system prompt，再接近 2 轮交互历史 + 当轮合并 user。
 
 ## 失败优先
 

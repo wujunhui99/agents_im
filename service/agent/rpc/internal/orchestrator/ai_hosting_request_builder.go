@@ -193,6 +193,10 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) buildFromPrivConv(ctx conte
 		return agentruntime.RunRequest{}, err
 	}
 
+	// 长期记忆 + 用户画像注入 system 段（#688）：达阈值摘要后，被折叠的早期轮浓缩在这里，
+	// rounds 只留近 KeepRoundsAfterSummary 轮。
+	agentConfig.Prompt.Content = injectMemoryProfile(agentConfig.Prompt.Content, snapshot.LongTermMemory, snapshot.UserProfile)
+
 	conversation := make([]agentruntime.ConversationMessage, 0, len(snapshot.Rounds)*2)
 	for _, round := range snapshot.Rounds {
 		if userText := strings.TrimSpace(strings.Join(round.User, "\n")); userText != "" {
@@ -241,13 +245,28 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) buildFromPrivConv(ctx conte
 		Conversation:       conversation,
 		Metadata: map[string]string{
 			"runtime_mode":         llmobs.RuntimeModeAIHostingAutoReply,
-			"summary_used":         "false",
-			"summary_placeholder":  "true",
+			"summary_used":         strconv.FormatBool(strings.TrimSpace(snapshot.LongTermMemory) != ""),
+			"user_profile_used":    strconv.FormatBool(strings.TrimSpace(snapshot.UserProfile) != ""),
 			"private_conv_context": "true",
 			"recent_round_count":   strconv.Itoa(len(snapshot.Rounds)),
 			"recent_message_count": strconv.Itoa(len(conversation)),
 		},
 	}, nil
+}
+
+// injectMemoryProfile 把非空的长期记忆 / 用户画像作为上下文段拼进 system prompt（#688）。
+func injectMemoryProfile(prompt, longTermMemory, userProfile string) string {
+	var b strings.Builder
+	b.WriteString(prompt)
+	if m := strings.TrimSpace(longTermMemory); m != "" {
+		b.WriteString("\n\n[长期记忆]\n")
+		b.WriteString(m)
+	}
+	if p := strings.TrimSpace(userProfile); p != "" {
+		b.WriteString("\n\n[用户画像]\n")
+		b.WriteString(p)
+	}
+	return b.String()
 }
 
 func runtimeConversationMessage(message Message, hostedOwnerID string) agentruntime.ConversationMessage {
