@@ -23,17 +23,31 @@ import (
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/model"
 )
 
-// DefaultMaxRounds 是私聊上下文保留的最大轮数（=最多 16 次 agent 回复），超出滚动丢弃最旧轮。
-const DefaultMaxRounds = 16
+const (
+	// SummarizeThreshold：rounds 攒到该轮数触发摘要（#688）——把前 rounds-KeepRoundsAfterSummary 轮
+	// 折进 long_term_memory，保留后 KeepRoundsAfterSummary 轮保证对话连续性。
+	SummarizeThreshold = 20
+	// KeepRoundsAfterSummary：摘要后保留的近 N 轮（连续性窗口）。
+	KeepRoundsAfterSummary = 2
+	// MaxMemoryChars：long_term_memory 上限（字符数，非字节），每次摘要须精简到此以内。
+	MaxMemoryChars = 4096
+	// MaxUserProfileChars：user_profile 上限（字符数）。
+	MaxUserProfileChars = 2048
+
+	// DefaultMaxRounds：CommitRound 的安全裁剪上限（远高于 SummarizeThreshold）。摘要正常时 rounds
+	// 折到 KeepRoundsAfterSummary 不会触顶；仅当未配置 summarizer / 摘要持续失败时兜底防无限膨胀。
+	DefaultMaxRounds = 40
+)
 
 // Round 是一轮 (user 批次 → assistant 回复)。User 保留合流前的多条原文（组装 prompt 时改行合并成
 // 一条 user 消息，保持 user/assistant 严格交互）。
 type Round struct {
-	User       []string `json:"user"`
-	Assistant  string   `json:"assistant"`
-	SeqFrom    int64    `json:"seq_from,omitempty"`
-	SeqTo      int64    `json:"seq_to,omitempty"`
-	AgentRunID string   `json:"agent_run_id,omitempty"`
+	User      []string `json:"user"`
+	Assistant string   `json:"assistant"`
+	// SeqFrom/SeqTo 不加 omitempty：ApplySummary 按 seq_to 过滤已摘要轮，需保证该键始终序列化。
+	SeqFrom    int64  `json:"seq_from"`
+	SeqTo      int64  `json:"seq_to"`
+	AgentRunID string `json:"agent_run_id,omitempty"`
 }
 
 // PendingMessage 是尚未被 agent 消费的一条 user 消息。
@@ -52,6 +66,18 @@ type Snapshot struct {
 	Rounds         []Round
 	Pending        []PendingMessage
 	State          string
+	// LongTermMemory/UserProfile：达阈值摘要后折进的长期记忆与用户画像（#688），组 prompt 时注入 system 段。
+	LongTermMemory string
+	UserProfile    string
+}
+
+// ApplySummaryInput 见 Store.ApplySummary。
+type ApplySummaryInput struct {
+	ConversationID string
+	LongTermMemory string
+	UserProfile    string
+	// CutoffSeq：seq_to<=CutoffSeq 的轮被移除（已折进 LongTermMemory），保留后续轮。<=0 时不删轮。
+	CutoffSeq int64
 }
 
 // AppendUserMessageInput 见 Store.AppendUserMessage。
@@ -77,6 +103,7 @@ type Store interface {
 	AppendUserMessage(ctx context.Context, in AppendUserMessageInput) (fired bool, err error)
 	CommitRound(ctx context.Context, in CommitRoundInput) (morePending bool, err error)
 	DiscardPending(ctx context.Context, in DiscardPendingInput) (morePending bool, err error)
+	ApplySummary(ctx context.Context, in ApplySummaryInput) error
 	Load(ctx context.Context, conversationID string) (Snapshot, error)
 }
 
@@ -173,6 +200,33 @@ func (s *ModelStore) DiscardPending(ctx context.Context, in DiscardPendingInput)
 	return morePending, nil
 }
 
+func (s *ModelStore) ApplySummary(ctx context.Context, in ApplySummaryInput) error {
+	if err := validateID(in.ConversationID, "conversation_id"); err != nil {
+		return err
+	}
+	memory := truncateChars(in.LongTermMemory, MaxMemoryChars)
+	profile := truncateChars(in.UserProfile, MaxUserProfileChars)
+	if err := s.rows.ApplySummary(ctx, in.ConversationID, memory, profile, in.CutoffSeq); err != nil {
+		if err == model.ErrNotFound {
+			return apperror.NotFound("agent private conversation not found")
+		}
+		return err
+	}
+	return nil
+}
+
+// truncateChars 按字符数（rune）截断，保护 long_term_memory / user_profile 的存储上限。
+func truncateChars(s string, maxChars int) string {
+	if maxChars <= 0 {
+		return ""
+	}
+	r := []rune(s)
+	if len(r) <= maxChars {
+		return s
+	}
+	return string(r[:maxChars])
+}
+
 // MergeTexts 把一批 user 消息按 seq 顺序的文本用改行合并成一条 user 输入（合流后的当轮 prompt）。
 // 空白项跳过；用于组装"多条追击消息一起回复"的单条 user turn。
 func MergeTexts(messages []PendingMessage) string {
@@ -211,6 +265,8 @@ func (s *ModelStore) Load(ctx context.Context, conversationID string) (Snapshot,
 		Rounds:         rounds,
 		Pending:        pending,
 		State:          row.State,
+		LongTermMemory: row.LongTermMemory,
+		UserProfile:    row.UserProfile,
 	}, nil
 }
 

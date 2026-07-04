@@ -40,6 +40,11 @@ type (
 		// 但**不**往 rounds 追加轮次——用于一轮 run 失败时消费掉该批 user 消息（避免对同一失败批
 		// 无限重试），失败提示已由 runner 直接发回用户，故不落 assistant 历史。返回 morePending。
 		DiscardPending(ctx context.Context, conversationID string, consumedUpToSeq int64, runningTTLMillis int64) (bool, error)
+
+		// ApplySummary 落一次摘要（#688）：写入新 long_term_memory / user_profile，并从 rounds 移除
+		// 已被摘要的轮（seq_to<=cutoffSeq），保留后续轮（近 2 轮 + 摘要期间新增的轮）。state/pending/
+		// running 不动（摘要在 running 锁内串行）。cutoffSeq<=0 时不删任何轮（仅更新记忆/画像）。
+		ApplySummary(ctx context.Context, conversationID, longTermMemory, userProfile string, cutoffSeq int64) error
 	}
 
 	// AppendPendingInput 见 AppendPending。
@@ -206,4 +211,30 @@ returning state = `+"'"+AgentPrivateConversationStateRunning+"'"+`
 		return false, err
 	}
 	return morePending, nil
+}
+
+func (m *customAgentPrivateConversationsModel) ApplySummary(ctx context.Context, conversationID, longTermMemory, userProfile string, cutoffSeq int64) error {
+	result, err := m.conn.ExecCtx(ctx, "update "+m.table+`
+set long_term_memory = $2,
+    user_profile = $3,
+    rounds = coalesce((
+      select jsonb_agg(elem order by ord)
+      from jsonb_array_elements(rounds) with ordinality as x(elem, ord)
+      where $4 <= 0 or (elem->>'seq_to')::bigint > $4
+    ), '[]'::jsonb),
+    version = version + 1,
+    updated_at = now()
+where conversation_id = $1
+`, conversationID, longTermMemory, userProfile, cutoffSeq)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

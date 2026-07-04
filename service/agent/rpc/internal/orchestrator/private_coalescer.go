@@ -20,12 +20,15 @@ import (
 // 与旧 ConversationHostingService.ScheduleTrigger 的分工：私聊直连走本合流器（store 提供冪等 +
 // 合流 + 历史），托管/群聊仍走 ScheduleTrigger（agent_triggers 台账 + msg-rpc 历史）。
 type PrivateChatCoalescer struct {
-	store      privconv.Store
-	runner     AgentTriggerRunner
-	readMarker AgentTriggerReadMarker
-	maxRounds  int
-	runTimeout time.Duration
-	runningTTL time.Duration
+	store              privconv.Store
+	runner             AgentTriggerRunner
+	readMarker         AgentTriggerReadMarker
+	summarizer         ConversationSummarizer
+	maxRounds          int
+	summarizeThreshold int
+	keepRounds         int
+	runTimeout         time.Duration
+	runningTTL         time.Duration
 }
 
 // PrivateChatCoalescerConfig 见 NewPrivateChatCoalescer。
@@ -33,8 +36,13 @@ type PrivateChatCoalescerConfig struct {
 	Store      privconv.Store
 	Runner     AgentTriggerRunner
 	ReadMarker AgentTriggerReadMarker
-	MaxRounds  int
-	RunTimeout time.Duration
+	// Summarizer 可空：非空时 rounds 攒到 SummarizeThreshold 触发长期记忆/用户画像摘要（#688）；
+	// 空则退回 CommitRound 的安全上限裁剪（MaxRounds）。
+	Summarizer         ConversationSummarizer
+	MaxRounds          int
+	SummarizeThreshold int
+	KeepRounds         int
+	RunTimeout         time.Duration
 }
 
 // PrivateUserMessage 是一条入站私聊 user 消息（consumer 从 Kafka 事件解码后传入）。
@@ -56,17 +64,28 @@ func NewPrivateChatCoalescer(config PrivateChatCoalescerConfig) (*PrivateChatCoa
 	if maxRounds <= 0 {
 		maxRounds = privconv.DefaultMaxRounds
 	}
+	threshold := config.SummarizeThreshold
+	if threshold <= 0 {
+		threshold = privconv.SummarizeThreshold
+	}
+	keepRounds := config.KeepRounds
+	if keepRounds <= 0 {
+		keepRounds = privconv.KeepRoundsAfterSummary
+	}
 	runTimeout := config.RunTimeout
 	if runTimeout <= 0 {
 		runTimeout = defaultAsyncTriggerRunTimeout
 	}
 	return &PrivateChatCoalescer{
-		store:      config.Store,
-		runner:     config.Runner,
-		readMarker: config.ReadMarker,
-		maxRounds:  maxRounds,
-		runTimeout: runTimeout,
-		runningTTL: runTimeout + time.Minute,
+		store:              config.Store,
+		runner:             config.Runner,
+		readMarker:         config.ReadMarker,
+		summarizer:         config.Summarizer,
+		maxRounds:          maxRounds,
+		summarizeThreshold: threshold,
+		keepRounds:         keepRounds,
+		runTimeout:         runTimeout,
+		runningTTL:         runTimeout + time.Minute,
 	}, nil
 }
 
@@ -190,9 +209,70 @@ func (c *PrivateChatCoalescer) drive(base AgentTrigger) error {
 		if err != nil {
 			return err
 		}
+
+		// 达阈值则在 running 锁内同步摘要：把最早的 rounds 折进长期记忆/用户画像、保留后 keepRounds 轮
+		// （#688）。摘要失败不阻断对话（记日志、留待下次触发），rounds 由 CommitRound 安全上限兜底。
+		c.maybeSummarize(base.ConversationID)
+
 		if !more {
 			return nil
 		}
+	}
+}
+
+// maybeSummarize 在 rounds 攒到阈值时触发一次重摘要：折叠 rounds[:len-keepRounds]（保留后 keepRounds
+// 轮的连续性窗口），把「旧记忆 + 旧画像 + 被折叠的轮」重摘要成新长期记忆/用户画像并 ApplySummary。
+// 串行于 run loop（running 锁内），故摘要期间该会话不会有并发 CommitRound。
+func (c *PrivateChatCoalescer) maybeSummarize(conversationID string) {
+	if c.summarizer == nil {
+		return
+	}
+	snapshot, err := c.load(conversationID)
+	if err != nil {
+		logx.Errorf("private chat summarize load failed conversation_id=%q: %v", conversationID, err)
+		return
+	}
+	if len(snapshot.Rounds) < c.summarizeThreshold {
+		return
+	}
+	keep := c.keepRounds
+	if keep < 0 {
+		keep = 0
+	}
+	if keep >= len(snapshot.Rounds) {
+		return
+	}
+	toSummarize := snapshot.Rounds[:len(snapshot.Rounds)-keep]
+	cutoffSeq := toSummarize[len(toSummarize)-1].SeqTo
+
+	sumCtx, cancel := context.WithTimeout(context.Background(), c.runTimeout)
+	defer cancel()
+	result, err := c.summarizer.Summarize(sumCtx, SummarizeInput{
+		ExistingMemory:  snapshot.LongTermMemory,
+		ExistingProfile: snapshot.UserProfile,
+		Rounds:          toSummarize,
+		MaxMemoryChars:  privconv.MaxMemoryChars,
+		MaxProfileChars: privconv.MaxUserProfileChars,
+	})
+	if err != nil {
+		logx.Errorf("private chat summarize failed conversation_id=%q rounds=%d: %v",
+			conversationID, len(toSummarize), err)
+		return
+	}
+	memory := strings.TrimSpace(result.Memory)
+	if memory == "" {
+		// 摘要产物为空视为无效，保留旧记忆与全部轮（下次触发再试），不推进 cutoff。
+		logx.Errorf("private chat summarize returned empty memory conversation_id=%q", conversationID)
+		return
+	}
+	if err := c.store.ApplySummary(sumCtx, privconv.ApplySummaryInput{
+		ConversationID: conversationID,
+		LongTermMemory: memory,
+		UserProfile:    strings.TrimSpace(result.Profile),
+		CutoffSeq:      cutoffSeq,
+	}); err != nil {
+		logx.Errorf("private chat apply summary failed conversation_id=%q cutoff_seq=%d: %v",
+			conversationID, cutoffSeq, err)
 	}
 }
 
