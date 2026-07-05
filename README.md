@@ -1,40 +1,56 @@
 # agents_im
 
-`agents_im` 是一个面向 IM + Agent 场景的实时聊天系统。项目以 Go 微服务为主体，提供用户、认证、好友、群聊、消息、WebSocket Gateway、Message Transfer、Agent 管理与 Agent runtime 基础能力，并配套 React/Vite 前端。
+`agents_im` 是一个把「实时 IM」和「AI Agent」揉在一起的开源聊天系统：既是一个微信风格的即时通讯应用，又是一个可以让 AI 助手像真人一样加入单聊、群聊、@互动的 Agent 平台。后端是一套 Go 微服务（账号、认证、好友、群聊、消息、WebSocket 网关、媒体、Agent runtime），前端是一套 React/Vite 的移动端 IM 界面。
+
+> 🌐 **在线体验**：https://agenticim.xyz — 注册即可和默认 AI 助手聊天。
+> 💬 用得不爽 / 想要某个功能？欢迎在 App 内「发现 → 反馈」直接提，或到 GitHub 提 Issue。
 
 ## 核心能力
 
-- 用户资料与账号注册登录
-- JWT 鉴权
-- 好友关系管理
-- 群聊与群成员管理
-- 单聊 / 群聊消息存储、会话 seq、已读状态
-- WebSocket 长连接、心跳、消息发送、离线补偿和在线推送
-- PostgreSQL transactional outbox 消息事件基础（fanout 直读 outbox，无独立消息中间件）
-- Redis presence 在线状态基础
-- Agent profile 管理、Agent-IM 写回契约、Eino/DeepSeek runtime adapter 基线
-- React/Vite 前端四 tab 方向：消息、联系人、发现、我的
+### 💬 即时通讯（IM）
+
+- 账号注册登录、个人资料、头像
+- JWT 鉴权 + 活跃会话（按设备）管理
+- 好友申请、通过、备注、好友列表
+- 建群、群成员管理、群聊
+- 单聊 / 群聊消息：持久化、会话 seq 有序、幂等、已读回执与未读数
+- WebSocket 长连接：心跳保活、实时推送、断线重连、离线消息补偿
+- 图片 / 文件等媒体消息：上传、下载、鉴权（独立 media 服务）
+- 消息事件走 Kafka（Redpanda）链路做 fanout 与投递
+
+### 🤖 AI Agent
+
+- Agent 作为一种账号类型，可以像普通成员一样进入单聊 / 群聊
+- 私聊 AI 助手：多轮对话、上下文记忆、多条追击消息合并回复
+- 群聊 @Agent 触发，带循环预防（Agent 消息默认不再触发 Agent）
+- 可组装的 Agent：系统提示词（可版本化）、工具（MCP / 本地 / 内置）、技能包（Skill）、模型配置
+- 受限 Python 执行契约、工具调用与文件读取全链路审计（append-only）
+- LLM runtime 基线：CloudWeGo Eino + DeepSeek ChatModel adapter
+
+### 🛠️ 产品与体验
+
+- 移动端四 tab：消息、联系人、发现、我的
+- App 内用户反馈入口（问题反馈 / 体验建议 / 功能想法，支持截图）
+- 管理后台（Admin Console）：管理 prompts、tools、skills、agents
 
 ## 技术栈
 
 - 后端：Go、go-zero、gRPC、WebSocket
 - 前端：React、Vite、TypeScript、Vitest
-- 存储：PostgreSQL、Redis
-- 消息：PostgreSQL transactional outbox（无独立消息中间件）
+- 存储：PostgreSQL、Redis、RustFS（S3 兼容对象存储，存媒体与 skill 文件）
+- 消息：Kafka / Redpanda 事件链路
 - Agent：CloudWeGo Eino、DeepSeek ChatModel adapter
-- 可观测性：Prometheus text metrics、trace/request id 基础
+- 可观测性：Prometheus metrics、OpenTelemetry trace/request id、Langfuse
 - CI/CD：Drone、GHCR、k3s、Docker Compose
 
 ## 仓库结构
 
 ```text
-api/                 go-zero REST API 定义
-service/             各微服务入口与实现（user/auth/friends/groups/agent/msg API、RPC、msggateway、msgtransfer），main 在 service/<...> 目录
-config / etc/        本地和服务配置
-internal/            核心业务逻辑、仓储、网关、Agent runtime、transfer worker 等（消息域 REST/RPC 已迁 service/msg）
-db/migrations/       PostgreSQL schema 迁移
-proto/               gRPC proto 和生成代码
-scripts/             本地启动、迁移、demo data、静态验证脚本
+service/             各微服务入口与实现，每个域含 api(BFF) 与 rpc（user/auth/friends/groups/agent/msg/media、msggateway 等），main 在 service/<...>/cmd 或 service 目录
+pkg/                 跨服务共享代码（authruntime、中间件等；顶层 internal/ 已于 #618 退役删除）
+etc/                 各服务本地和生产配置
+db/migrations/       PostgreSQL schema 迁移（append-only，已发布不可变）
+scripts/             本地启动、迁移、demo data、静态验证与 CI 脚本
 tests/               跨服务契约和 MVP smoke 测试
 web/                 React/Vite 前端
 docs/                架构、产品规格、设计文档、执行计划和开发文档
@@ -199,7 +215,7 @@ Live DeepSeek smoke test 需要显式 opt-in：
 
 ```bash
 set -a; . ./.env; set +a
-RUN_LIVE_DEEPSEEK_TESTS=1 PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./internal/agentruntime/llm/deepseek -run TestLiveDeepSeekGenerate -count=1 -v
+RUN_LIVE_DEEPSEEK_TESTS=1 PATH=/tmp/go/bin:$HOME/go/bin:$PATH go test ./service/agent/rpc/internal/runtime/llm/deepseek -run TestLiveDeepSeekGenerate -count=1 -v
 ```
 
 不要在日志、文档或提交中打印真实 API key。
