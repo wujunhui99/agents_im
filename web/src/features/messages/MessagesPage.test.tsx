@@ -589,7 +589,7 @@ describe('MessagesPage real API mode', () => {
     await user.click(screen.getByRole('button', { name: '发送' }));
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalled());
-    const request = sendMessage.mock.calls[0][0] as SendMessageRequest;
+    const request = sendMessage.mock.calls[0][0] as Extract<SendMessageRequest, { chatType: 'group' }>;
     expect(request.groupId).toBe(groupId);
     expect(request.chatType).toBe('group');
     expect(request.contentType).toBe('at');
