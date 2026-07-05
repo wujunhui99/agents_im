@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react';
 import { Check, ChevronRight, Megaphone, Search, Tag, UserPlus, UsersRound } from 'lucide-react';
 import type { ContactsApi, Friendship, FriendRequestDecisionData } from '../api/contacts';
 import { createContactsApi } from '../api/contacts';
@@ -219,7 +219,9 @@ function ContactsPage({
     void loadGroups();
   }
 
-  function toggleSelectedGroupMember(userId: string) {
+  // useCallback 稳定引用：群名 keystroke 时该 handler 不变，配合 memo 的 GroupMemberRow
+  // 短路掉 200 行成员的重渲染（用 functional setState，无外部依赖）。
+  const toggleSelectedGroupMember = useCallback((userId: string) => {
     setSelectedGroupMemberIds((current) => {
       const next = new Set(current);
       if (next.has(userId)) {
@@ -229,7 +231,7 @@ function ContactsPage({
       }
       return next;
     });
-  }
+  }, []);
 
   function selectAllGroupMembers() {
     setSelectedGroupMemberIds(new Set(friends.map((friend) => friend.userId)));
@@ -444,6 +446,32 @@ function ContactEntryButton({ entry, onClick }: { entry: ContactEntry; onClick?:
   );
 }
 
+// GroupMemberRow 用 memo 包裹：群名输入等父层重渲染时，只要 friend / selected / onToggle
+// 引用不变（onToggle 由父层 useCallback 稳定），memo 短路掉该行的重渲染——避免 200 行成员
+// 在每次群名 keystroke 时整体 reconcile（jsdom 下的 CPU 热点，曾致 CI 偶发超时）。
+const GroupMemberRow = memo(function GroupMemberRow({
+  friend,
+  selected,
+  onToggle,
+}: {
+  friend: Friend;
+  selected: boolean;
+  onToggle: (userId: string) => void;
+}) {
+  return (
+    <label className="group-member-option">
+      <input
+        type="checkbox"
+        aria-label={`选择 ${friend.name}`}
+        checked={selected}
+        onChange={() => onToggle(friend.userId)}
+      />
+      <span>选择 {friend.name}</span>
+      {friend.identifier ? <small>{friend.identifier}</small> : null}
+    </label>
+  );
+});
+
 function GroupChatPanel({
   friends,
   groups,
@@ -500,16 +528,12 @@ function GroupChatPanel({
         <div className="group-select-list" aria-label="选择群成员">
           {friends.length === 0 ? <p className="empty-state">暂无可选好友</p> : null}
           {friends.map((friend) => (
-            <label className="group-member-option" key={friend.userId}>
-              <input
-                type="checkbox"
-                aria-label={`选择 ${friend.name}`}
-                checked={selectedMemberIds.has(friend.userId)}
-                onChange={() => onToggleMember(friend.userId)}
-              />
-              <span>选择 {friend.name}</span>
-              {friend.identifier ? <small>{friend.identifier}</small> : null}
-            </label>
+            <GroupMemberRow
+              key={friend.userId}
+              friend={friend}
+              selected={selectedMemberIds.has(friend.userId)}
+              onToggle={onToggleMember}
+            />
           ))}
         </div>
       </section>
