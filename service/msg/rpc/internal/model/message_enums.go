@@ -19,6 +19,10 @@ const (
 	ContentTypeText  = "text"
 	ContentTypeImage = "image"
 	ContentTypeFile  = "file"
+	// ContentTypeAt is an @-mention message (OpenIM AtText): content is JSON
+	// {"text":..,"atUserList":[..],..}. The at-user list drives group-chat agent
+	// wakeups (only @-ed agents run).
+	ContentTypeAt = "at"
 
 	MessageOriginHuman  = "human"
 	MessageOriginAI     = "ai"
@@ -35,6 +39,8 @@ const (
 	ContentTypeTextValue  int64 = 1
 	ContentTypeImageValue int64 = 2
 	ContentTypeFileValue  int64 = 3
+	// ContentTypeAtValue mirrors OpenIM's AtText content type code (106).
+	ContentTypeAtValue int64 = 106
 
 	MessageOriginHumanValue  int64 = 1
 	MessageOriginAIValue     int64 = 2
@@ -79,8 +85,10 @@ func ContentTypeValue(contentType string) (int64, error) {
 		return ContentTypeImageValue, nil
 	case ContentTypeFile:
 		return ContentTypeFileValue, nil
+	case ContentTypeAt:
+		return ContentTypeAtValue, nil
 	default:
-		return 0, apperror.InvalidArgument("content_type must be text, image, or file")
+		return 0, apperror.InvalidArgument("content_type must be text, image, file, or at")
 	}
 }
 
@@ -92,6 +100,8 @@ func ContentTypeString(value int64) string {
 		return ContentTypeImage
 	case ContentTypeFileValue:
 		return ContentTypeFile
+	case ContentTypeAtValue:
+		return ContentTypeAt
 	default:
 		return strconv.FormatInt(value, 10)
 	}

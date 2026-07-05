@@ -5,9 +5,10 @@ import { Avatar } from '../../../components/ui/Avatar';
 import { Button } from '../../../components/ui/Button';
 import { MessageBubble } from '../../../components/ui/MessageBubble';
 import type { ChatMessage, Conversation } from '../../../models/messages';
-import type { AIHostingPanelState, AttachmentKind, MediaDownloadHandler } from '../types';
+import type { AIHostingPanelState, AttachmentKind, MediaDownloadHandler, MentionTarget } from '../types';
 import { authoritativeSeq, formatMessageDate, formatMessageTime, orderedChatMessages, shouldRenderDateSeparator } from '../utils/messageOrdering';
 import { messageDisplayText } from '../utils/mediaUtils';
+import { parseAtMessagePayload } from '../utils/atMessage';
 import { conversationSupportsAIHosting } from '../utils/conversationUtils';
 import { AIHostingControl } from './AIHostingControl';
 import { FileMessageBubble, ImageMessageBubble } from './MessageBubbles';
@@ -64,7 +65,40 @@ function renderMessageContent(message: ChatMessage): ReactNode {
       </span>
     );
   }
+  if (message.contentType === 'at') {
+    return renderAtMessageContent(message.content);
+  }
   return message.content;
+}
+
+// renderAtMessageContent 解析 `at` content 并把展示文本里被 @ 的昵称高亮。解析失败回退原文。
+function renderAtMessageContent(content: string): ReactNode {
+  const payload = parseAtMessagePayload(content);
+  if (!payload) return content;
+  const nicknames = (payload.atUsersInfo ?? [])
+    .map((info) => info.groupNickname?.trim())
+    .filter((name): name is string => !!name);
+  if (nicknames.length === 0) return payload.text;
+  // 按 @昵称 token 切分文本，命中的 token 包一层高亮 span。
+  const pattern = new RegExp(`(@(?:${nicknames.map(escapeRegExp).join('|')}))`, 'g');
+  const segments = payload.text.split(pattern);
+  return (
+    <>
+      {segments.map((segment, index) =>
+        index % 2 === 1 ? (
+          <span key={index} className="message-mention">
+            {segment}
+          </span>
+        ) : (
+          <Fragment key={index}>{segment}</Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function messageAriaLabel(message: ChatMessage) {
@@ -97,11 +131,12 @@ export function ChatWindow({
   aiHosting,
   onToggleAIHosting,
   onRetryAIHosting,
+  currentUserId,
 }: {
   conversation: Conversation;
   onBack: () => void;
   onOpenGroupManagement?: () => void;
-  onSend: (content: string) => void;
+  onSend: (content: string, mentions: MentionTarget[]) => void;
   onSendAttachment: (file: File, kind: AttachmentKind) => void;
   mediaApi: MediaApi;
   downloadMedia: MediaDownloadHandler;
@@ -111,8 +146,16 @@ export function ChatWindow({
   aiHosting?: AIHostingPanelState;
   onToggleAIHosting: (enabled: boolean) => void;
   onRetryAIHosting: () => void;
+  currentUserId: string;
 }) {
   const sortedMessages = useMemo(() => orderedChatMessages(conversation.messages), [conversation.messages]);
+  // 群聊 @ 候选：成员显示名（排除自己）；单聊为空 → 不启用 @ 选择。
+  const mentionCandidates = useMemo(() => {
+    if (conversation.chatType !== 'group') return [];
+    return Object.entries(conversation.groupMemberDisplayNames ?? {})
+      .filter(([userId]) => userId !== currentUserId)
+      .map(([userId, displayName]) => ({ userId, displayName }));
+  }, [conversation.chatType, conversation.groupMemberDisplayNames, currentUserId]);
   const messageThreadRef = useRef<HTMLDivElement>(null);
   const latestMessage = sortedMessages[sortedMessages.length - 1];
   const latestMessageScrollKey = latestMessage
@@ -208,7 +251,12 @@ export function ChatWindow({
           </Fragment>
         ))}
       </div>
-      <SendMessageComposer onSend={onSend} onSendAttachment={onSendAttachment} sending={sending} />
+      <SendMessageComposer
+        onSend={onSend}
+        onSendAttachment={onSendAttachment}
+        sending={sending}
+        mentionCandidates={mentionCandidates}
+      />
     </section>
   );
 }

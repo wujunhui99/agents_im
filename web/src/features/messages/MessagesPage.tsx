@@ -8,8 +8,9 @@ import { createUserApi } from '../../api/user';
 import { createMessageWebSocketClient } from '../../api/websocketClient';
 import { uploadFileToMedia } from '../../utils/mediaTransfer';
 import { UNKNOWN_CONTACT_LABEL } from '../../utils/profileDisplay';
-import type { AIHostingPanelState, AttachmentKind, MessagesPageProps } from './types';
+import type { AIHostingPanelState, AttachmentKind, MentionTarget, MessagesPageProps } from './types';
 import { FALLBACK_CONTENT_TYPE, FILE_MAX_BYTES, IMAGE_MAX_BYTES } from './types';
+import { buildAtMessageContent } from './utils/atMessage';
 import { ChatWindow } from './components/ChatWindow';
 import { ConversationList } from './components/ConversationList';
 import { GroupManagementPanel } from './components/GroupManagementPanel';
@@ -308,10 +309,15 @@ export function MessagesPage({
     }
   }
 
-  function handleSend(content: string) {
+  function handleSend(content: string, mentions: MentionTarget[] = []) {
     if (!selectedConversation) return;
     if (conversationHasInFlightSend(selectedConversation)) { setStatus('上一条消息发送中'); return; }
-    const pending = createPendingMessage(selectedConversation, { contentType: 'text', content }, currentUserId);
+    // 群聊里选了 @ 成员 → 发 `at` 消息（content 为 {text, atUserList, ...} JSON），否则纯文本。
+    const messageInput =
+      selectedConversation.chatType === 'group' && mentions.length > 0
+        ? { contentType: 'at' as const, content: buildAtMessageContent(content, mentions) }
+        : { contentType: 'text' as const, content };
+    const pending = createPendingMessage(selectedConversation, messageInput, currentUserId);
     setItems((current) => appendMessage(current, selectedConversation.id, pending));
     void Promise.resolve()
       .then(() => sendMessageWithApi(messageApi, pending))
@@ -421,6 +427,7 @@ export function MessagesPage({
         aiHosting={selectedAIHosting}
         onToggleAIHosting={(enabled) => toggleAIHosting(selectedConversation.id, enabled)}
         onRetryAIHosting={() => retryAIHosting(selectedConversation.id)}
+        currentUserId={currentUserId}
       />
     );
   }

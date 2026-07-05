@@ -70,8 +70,23 @@ func (j *Judge) Evaluate(ctx context.Context, event messaging.MessageEvent) ([]T
 	triggered := make([]Trigger, 0, 2)
 	seen := make(map[string]struct{}, 2)
 
+	// In a group chat an agent runs ONLY when it is explicitly @-mentioned
+	// (payload.at_user_ids, populated by msg-rpc from an `at` message). This is
+	// what keeps a group with several agent members from waking every agent on
+	// every message — a plain group message @-mentions nobody and triggers no
+	// agent inbox. Single chats ignore the at-set (the agent is the sole
+	// recipient). Only agent recipients are gated; @-ing a human is a no-op here.
+	var atSet map[string]struct{}
+	if event.ChatType == messaging.ChatTypeGroup {
+		atSet = make(map[string]struct{}, len(event.Payload.AtUserIDs))
+		for _, id := range event.Payload.AtUserIDs {
+			atSet[id] = struct{}{}
+		}
+	}
+
 	// Step 2 — agent inbox: any recipient whose account id carries the agent
 	// type bits (D16) gets a run. The sender never triggers on its own message.
+	// In a group the recipient must also be @-mentioned (atSet).
 	for _, id := range recipientCandidates(event) {
 		if id == event.SenderID {
 			continue
@@ -81,6 +96,11 @@ func (j *Judge) Evaluate(ctx context.Context, event messaging.MessageEvent) ([]T
 		}
 		if !idgen.IsAgentAccountID(id) {
 			continue
+		}
+		if atSet != nil {
+			if _, mentioned := atSet[id]; !mentioned {
+				continue
+			}
 		}
 		seen[id] = struct{}{}
 		triggered = append(triggered, Trigger{Kind: KindAgentInbox, AgentAccountID: id, Event: event})

@@ -7,7 +7,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function parseMessageContentType(contentType: string): MessageContentType {
-  return contentType === 'image' || contentType === 'file' ? contentType : 'text';
+  return contentType === 'image' || contentType === 'file' || contentType === 'at' ? contentType : 'text';
 }
 
 export function normalizeMessageContent(contentType: ServerMessage['contentType'], content: string) {

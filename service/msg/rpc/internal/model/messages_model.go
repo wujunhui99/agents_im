@@ -137,8 +137,13 @@ func MessageSendTime(m *Messages) int64 {
 	return m.ServerReceivedAt.UTC().UnixMilli()
 }
 
-// DecodeMessageContent 还原存库 jsonb（text 消息存成 {"text":...}）为对外 content 字符串。
-func DecodeMessageContent(content string) string {
+// DecodeMessageContent 还原存库 jsonb 为对外 content 字符串。text 存成 {"text":...}
+// 需拆包成纯文本；image/file/at 等结构化 content 原样透传（at 需保留 atUserList 供前端
+// 渲染 @ 高亮，不能被 {"text":...} 拆包逻辑吃掉）。
+func DecodeMessageContent(contentType int64, content string) string {
+	if contentType != ContentTypeTextValue {
+		return content
+	}
 	var textBody struct {
 		Text string `json:"text"`
 	}

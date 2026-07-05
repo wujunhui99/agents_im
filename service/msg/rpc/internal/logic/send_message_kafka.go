@@ -61,6 +61,7 @@ func (l *SendMessageLogic) sendDirectKafka(ns normalizedSend, payloadHash string
 			AgentRunID:            ns.AgentRunID,
 			AllowRecursiveTrigger: ns.AllowRecursiveTrigger,
 			VisibleUserIDs:        visible,
+			AtUserIDs:             extractAtUserIDs(ns.ContentType, ns.Content),
 			PayloadHash:           payloadHash,
 			SendTime:              now.UnixMilli(),
 			TraceID:               trace.TraceID,

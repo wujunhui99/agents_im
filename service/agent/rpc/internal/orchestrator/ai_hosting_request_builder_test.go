@@ -130,15 +130,72 @@ func TestBuilderHydratesPromptTextFromTriggerMessage(t *testing.T) {
 	}
 }
 
-func TestConversationAIHostingRuntimeRequestBuilderRejectsNonSingleConversation(t *testing.T) {
+func TestConversationAIHostingRuntimeRequestBuilderRejectsUnknownConversationType(t *testing.T) {
 	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
 		MessageHistory: newFakeIM(),
 	})
 	_, err := builder.BuildRuntimeRequest(context.Background(), AgentTrigger{
-		ConversationType: ConversationTypeGroup,
+		ConversationType: "broadcast",
 	})
-	if err == nil || !strings.Contains(err.Error(), "direct conversations") {
-		t.Fatalf("BuildRuntimeRequest error = %v, want direct conversation rejection", err)
+	if err == nil || !strings.Contains(err.Error(), "conversation type must be single or group") {
+		t.Fatalf("BuildRuntimeRequest error = %v, want unknown-conversation-type rejection", err)
+	}
+}
+
+// TestBuilderSupportsGroupMentionWithAtContent 锁定群聊 @ 唤醒的构建器打通：群 `at` 消息
+// 触发时，构建器从群历史回填 prompt（解出 at content 的展示文本，而非整段 JSON），并用群场景
+// 兜底 system prompt。修复前群会话被硬拒绝（"AI hosting V1 only supports direct conversations"）。
+func TestBuilderSupportsGroupMentionWithAtContent(t *testing.T) {
+	ctx := context.Background()
+	im := newFakeIM()
+	conversationID := groupConvID("grp_team")
+	atContent := `{"text":"@小助手 帮我总结一下","atUserList":["agent_acc"]}`
+	sent := im.appendHuman(Message{
+		ConversationID: conversationID,
+		ClientMsgID:    "group-at-trigger",
+		SenderID:       "usr_peer",
+		GroupID:        "grp_team",
+		ChatType:       MessageChatTypeGroup,
+		ContentType:    MessageContentTypeAt,
+		Content:        atContent,
+	})
+
+	builder := NewConversationAIHostingRuntimeRequestBuilder(ConversationAIHostingRuntimeRequestBuilderConfig{
+		MessageHistory: im,
+		DeepSeek:       config.DeepSeekConfig{Model: "deepseek-test"},
+	})
+	// 镜像 agentTriggerFromJudged 的输出：无 PromptText，群会话，目标是被 @ 的 agent。
+	trigger := AgentTrigger{
+		RequestID:          "evt-g:agent_acc",
+		EventID:            "evt-g",
+		TriggerType:        TriggerTypeGroupMention,
+		AgentUserID:        "agent_acc",
+		RequestingUserID:   "usr_peer",
+		ConversationID:     conversationID,
+		ConversationType:   ConversationTypeGroup,
+		TriggerMessageID:   sent.ServerMsgID,
+		TriggerSeq:         sent.Seq,
+		ReplyToMessageID:   sent.ServerMsgID,
+		SourceMessageID:    sent.ServerMsgID,
+		SourceMessageSeq:   sent.Seq,
+		SourceContentType:  MessageContentTypeAt,
+		TargetAgentUserIDs: []string{"agent_acc"},
+	}
+	req, err := builder.BuildRuntimeRequest(ctx, trigger)
+	if err != nil {
+		t.Fatalf("build group runtime request: %v", err)
+	}
+	if req.PromptText != "@小助手 帮我总结一下" {
+		t.Fatalf("prompt_text = %q, want at-content display text", req.PromptText)
+	}
+	if len(req.Conversation) != 1 || req.Conversation[0].Text != "@小助手 帮我总结一下" {
+		t.Fatalf("conversation history = %+v, want decoded at text", req.Conversation)
+	}
+	if !strings.Contains(req.Agent.Prompt.Content, "群聊") {
+		t.Fatalf("group default system prompt = %q, want group-mention prompt", req.Agent.Prompt.Content)
+	}
+	if _, err := normalizeRuntimeRequestForTrigger(req, trigger); err != nil {
+		t.Fatalf("normalize runtime request for trigger: %v", err)
 	}
 }
 
