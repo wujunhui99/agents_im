@@ -100,8 +100,6 @@
 
 .md-message-bubble-text-with-status {
   min-width: 96px;
-  padding-right: 92px;
-  padding-bottom: 16px;
 }
 
 .md-message-bubble-outgoing p {
@@ -110,11 +108,10 @@
 }
 
 .md-message-bubble-metadata {
-  position: absolute;
-  right: 10px;
-  bottom: 6px;
-  display: inline-flex;
+  display: flex;
+  justify-content: flex-end;
   align-items: center;
+  margin-top: 4px;
 }
 
 .message-origin-ai .md-message-bubble p {
