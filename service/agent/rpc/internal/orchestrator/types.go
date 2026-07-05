@@ -15,6 +15,7 @@ const (
 	MessageContentTypeText  = "text"
 	MessageContentTypeImage = "image"
 	MessageContentTypeFile  = "file"
+	MessageContentTypeAt    = "at"
 
 	MessageOriginHuman  = "human"
 	MessageOriginAI     = "ai"

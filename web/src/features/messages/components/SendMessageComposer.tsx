@@ -1,26 +1,57 @@
 import { FileText, Image as ImageIcon, SendHorizontal } from 'lucide-react';
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { TextField } from '../../../components/ui/TextField';
-import type { AttachmentKind } from '../types';
+import type { AttachmentKind, MentionTarget } from '../types';
+
+type MemberOption = { userId: string; displayName: string };
 
 export function SendMessageComposer({
   onSend,
   onSendAttachment,
   sending,
+  mentionCandidates = [],
 }: {
-  onSend: (content: string) => void;
+  onSend: (content: string, mentions: MentionTarget[]) => void;
   onSendAttachment: (file: File, kind: AttachmentKind) => void;
   sending: boolean;
+  // 群成员候选（已排除自己）；非群聊传空数组 → 不启用 @ 选择。
+  mentionCandidates?: MemberOption[];
 }) {
   const [draft, setDraft] = useState('');
+  // 已选中的 @ 成员（可能有重复的 displayName，发送时按文本里是否仍存在 @token 过滤）。
+  const [selectedMentions, setSelectedMentions] = useState<MentionTarget[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const trimmedDraft = draft.trim();
+
+  const atEnabled = mentionCandidates.length > 0;
+
+  // 发送时保留仍在文本里的 @token 对应的成员（用户删了 @xxx 就不再唤醒）。
+  const activeMentions = useMemo(() => {
+    return selectedMentions.filter((mention) => draft.includes(`@${mention.displayName}`));
+  }, [selectedMentions, draft]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sending || !trimmedDraft) return;
-    onSend(trimmedDraft);
+    onSend(trimmedDraft, activeMentions);
     setDraft('');
+    setSelectedMentions([]);
+    setPickerOpen(false);
+  }
+
+  function handleDraftChange(value: string) {
+    setDraft(value);
+    if (!atEnabled) return;
+    // 末字符是 @ 时弹出成员选择。
+    setPickerOpen(value.endsWith('@'));
+  }
+
+  function handlePickMember(member: MemberOption) {
+    // 把光标处的触发 @ 替换成 "@昵称 "，并记录被 @ 成员。
+    setDraft((current) => `${current.endsWith('@') ? current.slice(0, -1) : current}@${member.displayName} `);
+    setSelectedMentions((current) => [...current, { userId: member.userId, displayName: member.displayName }]);
+    setPickerOpen(false);
   }
 
   function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>, kind: AttachmentKind) {
@@ -55,15 +86,34 @@ export function SendMessageComposer({
           onChange={(event) => handleAttachmentChange(event, 'file')}
         />
       </label>
-      <TextField
-        label="输入消息"
-        hideLabel
-        value={draft}
-        placeholder="输入消息"
-        disabled={sending}
-        onChange={(event) => setDraft(event.target.value)}
-        fieldClassName="message-composer-field"
-      />
+      <div className="message-composer-input">
+        {pickerOpen && atEnabled ? (
+          <ul className="mention-picker" role="listbox" aria-label="选择要提醒的成员">
+            {mentionCandidates.map((member) => (
+              <li key={member.userId}>
+                <button
+                  type="button"
+                  className="mention-picker-option"
+                  role="option"
+                  aria-selected={false}
+                  onClick={() => handlePickMember(member)}
+                >
+                  @{member.displayName}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <TextField
+          label="输入消息"
+          hideLabel
+          value={draft}
+          placeholder={atEnabled ? '输入消息，@ 提醒群成员' : '输入消息'}
+          disabled={sending}
+          onChange={(event) => handleDraftChange(event.target.value)}
+          fieldClassName="message-composer-field"
+        />
+      </div>
       <Button className="message-send-button" type="submit" disabled={sending || !trimmedDraft}>
         <SendHorizontal size={17} />
         <span>{sending ? '发送中' : '发送'}</span>

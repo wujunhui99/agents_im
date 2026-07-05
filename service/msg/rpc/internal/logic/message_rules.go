@@ -162,9 +162,85 @@ func normalizeMessageContent(ctx context.Context, media mediaValidator, senderID
 			return "", "", err
 		}
 		return contentType, content, nil
+	case model.ContentTypeAt:
+		content := strings.TrimSpace(rawContent)
+		if content == "" {
+			return "", "", apperror.InvalidArgument("content is required")
+		}
+		if len([]rune(content)) > 8192 {
+			return "", "", apperror.InvalidArgument("content must be 8192 characters or fewer")
+		}
+		if _, err := parseAtContent(content); err != nil {
+			return "", "", err
+		}
+		return contentType, content, nil
 	default:
-		return "", "", apperror.InvalidArgument("content_type must be text, image, or file")
+		return "", "", apperror.InvalidArgument("content_type must be text, image, file, or at")
 	}
+}
+
+const maxAtUserCount = 50
+
+// atMessageContent 是 `at` 消息 content 的入站结构（OpenIM AtText 语义）：真正决定
+// @ 的是 atUserList，text 仅用于展示；atUsersInfo/isAtSelf 由前端携带、后端透传不校验。
+type atMessageContent struct {
+	Text       string   `json:"text"`
+	AtUserList []string `json:"atUserList"`
+}
+
+// parseAtContent 校验并解析 `at` content：text 非空(≤4096 runes)、atUserList 为非空
+// 字符串数组(去空去重、≤maxAtUserCount、每个 ≤128 字符)。返回去重后的被 @ id 列表。
+func parseAtContent(content string) ([]string, error) {
+	if !json.Valid([]byte(content)) {
+		return nil, apperror.InvalidArgument("content must be valid JSON for at messages")
+	}
+	var parsed atMessageContent
+	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		return nil, apperror.InvalidArgument("content must be valid JSON for at messages")
+	}
+	text := strings.TrimSpace(parsed.Text)
+	if text == "" {
+		return nil, apperror.InvalidArgument("at message text is required")
+	}
+	if len([]rune(text)) > 4096 {
+		return nil, apperror.InvalidArgument("at message text must be 4096 characters or fewer")
+	}
+	ids := make([]string, 0, len(parsed.AtUserList))
+	seen := make(map[string]struct{}, len(parsed.AtUserList))
+	for _, raw := range parsed.AtUserList {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			continue
+		}
+		if len([]rune(id)) > 128 {
+			return nil, apperror.InvalidArgument("atUserList entry must be 128 characters or fewer")
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil, apperror.InvalidArgument("atUserList must contain at least one user id")
+	}
+	if len(ids) > maxAtUserCount {
+		return nil, apperror.InvalidArgument("atUserList must contain 50 user ids or fewer")
+	}
+	return ids, nil
+}
+
+// extractAtUserIDs 从已校验的 `at` content 里取出被 @ 的 id 列表（供 Kafka 事件 payload
+// AtUserIDs 使用）；非 `at` 或解析失败返回 nil。
+func extractAtUserIDs(contentType, content string) []string {
+	if contentType != model.ContentTypeAt {
+		return nil
+	}
+	ids, err := parseAtContent(content)
+	if err != nil {
+		return nil
+	}
+	return ids
 }
 
 // applyMessageOriginMetadata 校验/规范化 message_origin + agent 元数据，移植自 messagelogic.go。

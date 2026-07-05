@@ -64,6 +64,12 @@ type MessageEventPayload struct {
 	// exist (visibility), resolved by msg-rpc at send time. Required for
 	// message.submitted; carried through to msg.toPostgres.v1.
 	VisibleUserIDs []string `json:"visible_user_ids,omitempty"`
+	// AtUserIDs are the account ids explicitly @-mentioned by an `at` content-type
+	// message (OpenIM AtText semantics: mentions live in the payload, not parsed
+	// from text). msg-rpc extracts them from content.atUserList at send time; the
+	// agent trigger judge uses them to gate group-chat agent wakeups — only @-ed
+	// agents run. Empty for non-`at` messages.
+	AtUserIDs []string `json:"at_user_ids,omitempty"`
 	// PayloadHash is msg-rpc's idempotency-conflict fingerprint, persisted to
 	// messages.payload_hash so PG-path dedup semantics survive the Kafka path.
 	PayloadHash string `json:"payload_hash,omitempty"`
@@ -153,6 +159,9 @@ func (p MessageEventPayload) Clone() MessageEventPayload {
 	}
 	if p.VisibleUserIDs != nil {
 		p.VisibleUserIDs = append([]string(nil), p.VisibleUserIDs...)
+	}
+	if p.AtUserIDs != nil {
+		p.AtUserIDs = append([]string(nil), p.AtUserIDs...)
 	}
 	if p.Content != nil {
 		p.Content = append(json.RawMessage(nil), p.Content...)

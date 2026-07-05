@@ -94,10 +94,13 @@ The canonical Go contract is [`../../internal/messaging/event.go`](../../interna
     "trigger_server_msg_id": "",
     "agent_run_id": "",
     "allow_recursive_trigger": false,
+    "at_user_ids": [],
     "trace_id": "trace_..."
   }
 }
 ```
+
+`at_user_ids` carries the account ids explicitly @-mentioned by an `at` content-type message (OpenIM AtText semantics — mentions live in the payload, not parsed from text). msg-rpc extracts them from `content.atUserList` at send time. The agent trigger judge uses it to gate group-chat agent wakeups: in a group an agent runs only when it is @-mentioned; a plain group message wakes no agent.
 
 Canonical top-level fields:
 

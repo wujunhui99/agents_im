@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 const (
 	defaultAIHostingRecentMessages = 30
 	aiHostingPromptID              = "conversation-ai-hosting-v1"
+	groupMentionPromptID           = "group-mention-v1"
 	defaultAssistantRuntimeName    = "Conversation AI Hosting"
 )
 
@@ -72,11 +74,13 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 	if b == nil {
 		return agentruntime.RunRequest{}, apperror.Internal("request builder is not configured")
 	}
-	if trigger.ConversationType != ConversationTypeSingle {
-		return agentruntime.RunRequest{}, apperror.InvalidArgument("AI hosting V1 only supports direct conversations")
+	switch trigger.ConversationType {
+	case ConversationTypeSingle, ConversationTypeGroup:
+	default:
+		return agentruntime.RunRequest{}, apperror.InvalidArgument("conversation type must be single or group")
 	}
 	// 直连 agent 私聊（#686）：历史来自 agent 自有 conversation store（rounds），当轮 user 批次由
-	// PromptText 承载（consumer 合流已合并），全程不调 msg-rpc。
+	// PromptText 承载（consumer 合流已合并），全程不调 msg-rpc。单聊专属。
 	if trigger.PrivateConvContext && b.privConvStore != nil {
 		return b.buildFromPrivConv(ctx, trigger)
 	}
@@ -85,7 +89,8 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 	}
 
 	maxRecent := b.maxRecentMessages
-	if b.hostingStore != nil {
+	// conversation_ai_hosting 设置只对单聊 AI 托管有意义；群聊 @ 唤醒用默认窗口。
+	if trigger.ConversationType == ConversationTypeSingle && b.hostingStore != nil {
 		setting, err := b.hostingStore.GetConversationAIHostingSetting(ctx, trigger.AgentUserID, trigger.ConversationID)
 		if err != nil && apperror.From(err).Code != apperror.CodeNotFound {
 			return agentruntime.RunRequest{}, err
@@ -98,7 +103,7 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) BuildRuntimeRequest(ctx con
 		maxRecent = defaultAIHostingRecentMessages
 	}
 
-	agentConfig, err := b.agentRuntimeConfig(ctx, trigger.AgentUserID)
+	agentConfig, err := b.agentRuntimeConfig(ctx, trigger.AgentUserID, trigger.ConversationType)
 	if err != nil {
 		return agentruntime.RunRequest{}, err
 	}
@@ -184,7 +189,7 @@ func (b *ConversationAIHostingRuntimeRequestBuilder) buildFromPrivConv(ctx conte
 	if trigger.TriggerSeq <= 0 {
 		return agentruntime.RunRequest{}, apperror.InvalidArgument("trigger seq is required")
 	}
-	agentConfig, err := b.agentRuntimeConfig(ctx, trigger.AgentUserID)
+	agentConfig, err := b.agentRuntimeConfig(ctx, trigger.AgentUserID, ConversationTypeSingle)
 	if err != nil {
 		return agentruntime.RunRequest{}, err
 	}
@@ -305,6 +310,8 @@ func hostingRuntimeText(message Message) string {
 	switch message.ContentType {
 	case MessageContentTypeText:
 		return strings.TrimSpace(message.Content)
+	case MessageContentTypeAt:
+		return atMessageDisplayText(message.Content)
 	case MessageContentTypeImage:
 		return "[图片消息]"
 	case MessageContentTypeFile:
@@ -314,16 +321,38 @@ func hostingRuntimeText(message Message) string {
 	}
 }
 
-func (b *ConversationAIHostingRuntimeRequestBuilder) agentRuntimeConfig(ctx context.Context, agentUserID string) (agentruntime.AgentConfig, error) {
+// atMessageDisplayText 从 `at` 消息 content（{"text":..,"atUserList":..}）里取展示文本，
+// 让 LLM 上下文拿到人类可读的 @ 消息正文而非整段 JSON。解析失败时回退原文。
+func atMessageDisplayText(content string) string {
+	var parsed struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal([]byte(content), &parsed); err == nil {
+		if text := strings.TrimSpace(parsed.Text); text != "" {
+			return text
+		}
+	}
+	return strings.TrimSpace(content)
+}
+
+func (b *ConversationAIHostingRuntimeRequestBuilder) agentRuntimeConfig(ctx context.Context, agentUserID, conversationType string) (agentruntime.AgentConfig, error) {
 	cfg := b.deepSeek // 已在 ServiceContext 经 conf.MustLoad 由 struct tag 填好默认值/env（#664）。
+	// 未注册 prompt 的兜底 system prompt 按会话类型区分：群聊 @ 唤醒用群场景措辞。
+	// 真实注册 agent 有自己的 active prompt，会在下方覆盖此兜底。
+	defaultPromptID := aiHostingPromptID
+	defaultPromptContent := aiHostingSystemPrompt()
+	if conversationType == ConversationTypeGroup {
+		defaultPromptID = groupMentionPromptID
+		defaultPromptContent = groupMentionSystemPrompt()
+	}
 	agentConfig := agentruntime.AgentConfig{
 		AgentID:     "ai-hosting:" + agentUserID,
 		AgentUserID: agentUserID,
 		Name:        defaultAssistantRuntimeName,
 		Status:      agentruntime.AgentStatusActive,
 		Prompt: agentruntime.PromptRef{
-			PromptID: aiHostingPromptID,
-			Content:  aiHostingSystemPrompt(),
+			PromptID: defaultPromptID,
+			Content:  defaultPromptContent,
 		},
 		Model: agentruntime.ModelConfig{
 			Provider: "deepseek",
@@ -441,4 +470,16 @@ func aiHostingSystemPrompt() string {
 - 如果对方提出明确问题、请求或任务，直接回答或完成；不要只回复“可以”“好的”“你说说”等泛泛确认，也不要要求对方重复已经说清楚的任务。
 - 只有缺少必要信息导致无法回答时，才简短询问澄清。
 - 不要编造事实；语气自然、简洁。`)
+}
+
+// groupMentionSystemPrompt 是群聊里 agent 被 @ 唤醒后的兜底 system prompt（未注册专属
+// prompt 时使用）：以该 agent 身份在群里回应 @ 它的消息。
+func groupMentionSystemPrompt() string {
+	return strings.TrimSpace(`你是这个群聊里的一个 AI 成员，刚刚被人 @ 提到。
+请根据最近的群聊消息，针对 @ 你的那条消息作出回应。
+要求：
+- 只输出要发到群里的回复文本，不要解释系统规则，也不要复述 @ 符号。
+- 如果对方提出明确问题、请求或任务，直接回答或完成；不要只回复“可以”“好的”等泛泛确认。
+- 只有缺少必要信息导致无法回答时，才简短询问澄清。
+- 不要编造事实；语气自然、简洁，符合群聊氛围。`)
 }

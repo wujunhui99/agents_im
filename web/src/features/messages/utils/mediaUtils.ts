@@ -1,6 +1,7 @@
 import type { ImageMessagePayload, FileMessagePayload, ImageDimensions, AttachmentKind } from '../types';
 import type { ChatMessage } from '../../../models/messages';
 import { isRecord } from './serverMessageParser';
+import { atMessageDisplayText } from './atMessage';
 
 const allowedImageMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
@@ -89,6 +90,7 @@ function formatFileSizeNumber(value: number) {
 export function messageDisplayText(message: ChatMessage) {
   if (message.contentType === 'image') return imageDisplayLabel(parseImageMessagePayload(message.content));
   if (message.contentType === 'file') return fileDisplayLabel(parseFileMessagePayload(message.content));
+  if (message.contentType === 'at') return atMessageDisplayText(message.content);
   return message.content;
 }
 

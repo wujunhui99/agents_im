@@ -32,6 +32,12 @@ export type PendingMessageInput = {
   content: string;
 };
 
+// MentionTarget 是群聊 @ 选中的成员（发送 `at` 消息时用）：userId 决定唤醒，displayName 供展示。
+export type MentionTarget = {
+  userId: string;
+  displayName: string;
+};
+
 export type AIHostingPanelState = {
   state?: AIHostingState;
   loading: boolean;

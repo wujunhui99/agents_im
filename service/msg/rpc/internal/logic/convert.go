@@ -22,7 +22,7 @@ func messageToPB(m *model.Messages) *msg.Message {
 		GroupId:               m.GroupId,
 		ChatType:              model.ConversationTypeString(m.ConversationType),
 		ContentType:           model.ContentTypeString(m.ContentType),
-		Content:               model.DecodeMessageContent(m.Content),
+		Content:               model.DecodeMessageContent(m.ContentType, m.Content),
 		MessageOrigin:         model.MessageOriginString(m.MessageOrigin),
 		AgentAccountId:        m.AgentAccountId,
 		TriggerServerMsgId:    m.TriggerMessageId,

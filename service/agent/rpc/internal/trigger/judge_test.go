@@ -110,10 +110,13 @@ func TestEvaluateGroupMembersDedupAgents(t *testing.T) {
 	userID, agentID, secondAgentID := mintIDs(t)
 	judge, _ := NewJudge(testHostingStore{})
 
+	// Both agents are @-mentioned: both run, deduped across the visibility fanout.
 	event := acceptedEvent(userID, "", messaging.ChatTypeGroup,
 		[]string{userID, agentID, secondAgentID, agentID})
 	event.Payload.GroupID = "grp-1"
 	event.Payload.ReceiverIDs = []string{userID, agentID, secondAgentID}
+	event.Payload.ContentType = "at"
+	event.Payload.AtUserIDs = []string{agentID, secondAgentID}
 
 	got, err := judge.Evaluate(context.Background(), event)
 	if err != nil {
@@ -126,6 +129,67 @@ func TestEvaluateGroupMembersDedupAgents(t *testing.T) {
 		if trig.Kind != KindAgentInbox {
 			t.Fatalf("unexpected kind %q", trig.Kind)
 		}
+	}
+}
+
+func TestEvaluateGroupOnlyMentionedAgentRuns(t *testing.T) {
+	userID, agentID, secondAgentID := mintIDs(t)
+	judge, _ := NewJudge(testHostingStore{})
+
+	// Two agent members, only the first is @-mentioned: only it runs.
+	event := acceptedEvent(userID, "", messaging.ChatTypeGroup,
+		[]string{userID, agentID, secondAgentID})
+	event.Payload.GroupID = "grp-1"
+	event.Payload.ReceiverIDs = []string{userID, agentID, secondAgentID}
+	event.Payload.ContentType = "at"
+	event.Payload.AtUserIDs = []string{agentID}
+
+	got, err := judge.Evaluate(context.Background(), event)
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if len(got) != 1 || got[0].AgentAccountID != agentID {
+		t.Fatalf("expected only mentioned agent %s to run, got %+v", agentID, got)
+	}
+}
+
+func TestEvaluateGroupWithoutMentionRunsNoAgent(t *testing.T) {
+	userID, agentID, secondAgentID := mintIDs(t)
+	judge, _ := NewJudge(testHostingStore{})
+
+	// Plain group message (no @): agent members must stay asleep.
+	event := acceptedEvent(userID, "", messaging.ChatTypeGroup,
+		[]string{userID, agentID, secondAgentID})
+	event.Payload.GroupID = "grp-1"
+	event.Payload.ReceiverIDs = []string{userID, agentID, secondAgentID}
+
+	got, err := judge.Evaluate(context.Background(), event)
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("plain group message must trigger no agent, got %+v", got)
+	}
+}
+
+func TestEvaluateGroupMentionOfNonMemberAgentIgnored(t *testing.T) {
+	userID, agentID, secondAgentID := mintIDs(t)
+	judge, _ := NewJudge(testHostingStore{})
+
+	// @ an agent that is not a group member (not in the visibility fanout): no run.
+	event := acceptedEvent(userID, "", messaging.ChatTypeGroup,
+		[]string{userID, agentID})
+	event.Payload.GroupID = "grp-1"
+	event.Payload.ReceiverIDs = []string{userID, agentID}
+	event.Payload.ContentType = "at"
+	event.Payload.AtUserIDs = []string{secondAgentID}
+
+	got, err := judge.Evaluate(context.Background(), event)
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("mention of non-member agent must not trigger, got %+v", got)
 	}
 }
 

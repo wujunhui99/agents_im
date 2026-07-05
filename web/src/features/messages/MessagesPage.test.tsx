@@ -549,6 +549,90 @@ describe('MessagesPage real API mode', () => {
     );
   });
 
+  it('sends an at-message with atUserList when a group member is @-mentioned', async () => {
+    const user = userEvent.setup();
+    const groupMessage = groupServerMessage({ seq: 1, content: '大家好' });
+    const sendMessage = vi.fn(async (request: SendMessageRequest): Promise<SendMessageResponse> => ({
+      deduplicated: false,
+      message: groupServerMessage({
+        serverMsgId: 'srv_at_reply',
+        clientMsgId: request.clientMsgId,
+        seq: 2,
+        senderId: currentUserId,
+        contentType: request.contentType,
+        content: request.content,
+      }),
+    }));
+    const messageApi = createMessageApi([groupMessage], sendMessage);
+    vi.mocked(messageApi.getConversationSeqs).mockResolvedValueOnce({
+      states: [
+        {
+          conversationId: groupConversationId,
+          maxSeq: 1,
+          hasReadSeq: 0,
+          unreadCount: 1,
+          maxSeqTime: groupMessage.sendTime,
+          lastMessage: groupMessage,
+        },
+      ],
+    });
+    vi.mocked(messageApi.pullMessages).mockResolvedValueOnce({ conversationId: groupConversationId, messages: [groupMessage] });
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} groupsApi={createGroupsApi()} />);
+
+    await user.click(await screen.findByRole('button', { name: /项目群/ }));
+
+    const textbox = await screen.findByRole('textbox', { name: '输入消息' });
+    await user.type(textbox, '@');
+    await user.click(await screen.findByRole('option', { name: '@Bob Lin' }));
+    await user.type(textbox, '帮忙看下');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalled());
+    const request = sendMessage.mock.calls[0][0] as SendMessageRequest;
+    expect(request.groupId).toBe(groupId);
+    expect(request.chatType).toBe('group');
+    expect(request.contentType).toBe('at');
+    const payload = JSON.parse(request.content) as { text: string; atUserList: string[] };
+    expect(payload.atUserList).toEqual([peerUserId]);
+    expect(payload.text).toContain('@Bob Lin');
+    expect(payload.text).toContain('帮忙看下');
+  });
+
+  it('renders an incoming at-message with the mention highlighted', async () => {
+    const user = userEvent.setup();
+    const atContent = JSON.stringify({
+      text: '@Bob Lin 帮我总结一下',
+      atUserList: [peerUserId],
+      atUsersInfo: [{ atUserID: peerUserId, groupNickname: 'Bob Lin' }],
+      isAtSelf: false,
+    });
+    const atMessage = groupServerMessage({ seq: 1, content: atContent, contentType: 'at' });
+    const messageApi = createMessageApi([atMessage]);
+    vi.mocked(messageApi.getConversationSeqs).mockResolvedValueOnce({
+      states: [
+        {
+          conversationId: groupConversationId,
+          maxSeq: 1,
+          hasReadSeq: 0,
+          unreadCount: 1,
+          maxSeqTime: atMessage.sendTime,
+          lastMessage: atMessage,
+        },
+      ],
+    });
+    vi.mocked(messageApi.pullMessages).mockResolvedValueOnce({ conversationId: groupConversationId, messages: [atMessage] });
+
+    render(<MessagesPage currentUserId={currentUserId} messageApi={messageApi} groupsApi={createGroupsApi()} />);
+
+    await user.click(await screen.findByRole('button', { name: /项目群/ }));
+
+    const log = await screen.findByRole('log', { name: '聊天消息' });
+    const mention = within(log).getByText('@Bob Lin');
+    expect(mention).toHaveClass('message-mention');
+    expect(within(log).getByText(/帮我总结一下/)).toBeInTheDocument();
+  });
+
   it('opens group management from the group title with owner edit and kick controls in a member grid', async () => {
     const user = userEvent.setup();
     const groupMessage = groupServerMessage({ seq: 1, content: '大家好' });
