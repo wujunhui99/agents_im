@@ -8,6 +8,9 @@
 package aihosting
 
 import (
+	"strings"
+	"time"
+
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/authruntime"
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
@@ -46,6 +49,9 @@ type ServiceContext struct {
 	// 内存/单测路径留 nil → agent.create 工具不可用。
 	AgentCreate    runtimetools.AgentCreateHandler
 	PythonExecutor pythonexec.Executor
+	// Tavily 是 web.search 联网搜索工具配置（APIKey←env TAVILY_API_KEY）。
+	// APIKey 缺失时 web.search 适配器在 Invoke 期 fail-closed（不打断整个 run）。
+	Tavily config.TavilyConfig
 	// AgentResponseSender 覆盖 AI 写回通道（默认 MessageLogic 直写 PG）。
 	// agent-rpc worker 注入 imadapter.MsgRPCSender（经 msg-rpc gRPC SendMessage 走 Kafka）。
 	AgentResponseSender agentim.MessageSender
@@ -68,6 +74,8 @@ type ConversationAIHostingRuntimeOptions struct {
 	PythonExecutor      pythonexec.Executor
 	// AgentCreate 是 agent.create 工具处理器(agent 自有 agentlogic 装配,由 svc 注入)。
 	AgentCreate runtimetools.AgentCreateHandler
+	// Tavily 是 web.search 联网搜索工具配置(APIKey←env TAVILY_API_KEY)。
+	Tavily config.TavilyConfig
 }
 
 // NewServiceContext 装配 AI 托管运行时的基础上下文：默认内存托管/审计 Store + AuthRuntime。
@@ -93,6 +101,7 @@ func ConfigureConversationAIHosting(ctx *ServiceContext, deepSeek config.DeepSee
 		opts.AgentRegistryReader = ctx.AgentRegistryReader
 		opts.PythonExecutor = ctx.PythonExecutor
 		opts.AgentCreate = ctx.AgentCreate
+		opts.Tavily = ctx.Tavily
 	}
 	return ConfigureConversationAIHostingWithRuntimeOptions(ctx, opts)
 }
@@ -133,7 +142,7 @@ func ConfigureConversationAIHostingWithRuntimeOptions(ctx *ServiceContext, opts 
 	if _, ok := llmObsSink.(*llmobs.LangfuseSink); ok {
 		llmObsSink = llmobs.NewAsyncSink(llmObsSink, llmObsConfig.Backend, 0)
 	}
-	toolProvider, err := newConversationAIHostingToolProviderWithAgentCreate(opts.AgentRegistryReader, opts.PythonExecutor, opts.AgentCreate)
+	toolProvider, err := newConversationAIHostingToolProviderWithAgentCreate(opts.AgentRegistryReader, opts.PythonExecutor, opts.AgentCreate, opts.Tavily)
 	if err != nil {
 		return err
 	}
@@ -232,11 +241,12 @@ func llmObservabilityConfig(obs config.LLMObservabilityConfig) llmobs.Config {
 	}
 }
 
-func newConversationAIHostingToolProviderWithAgentCreate(registryReader runtimetools.Registry, executor pythonexec.Executor, agentCreate runtimetools.AgentCreateHandler) (runtimetools.Provider, error) {
+func newConversationAIHostingToolProviderWithAgentCreate(registryReader runtimetools.Registry, executor pythonexec.Executor, agentCreate runtimetools.AgentCreateHandler, tavily config.TavilyConfig) (runtimetools.Provider, error) {
 	if registryReader == nil {
 		return nil, nil
 	}
 	pythonCatalog := runtimetools.NewDefaultLocalAdapterCatalog(executor)
+	webSearchConfig := webSearchConfigFromTavily(tavily)
 	catalog := runtimetools.AdapterCatalogFunc(func(spec runtimetools.ToolSpec) (runtimetools.ToolAdapter, bool, error) {
 		if runtimetools.IsAgentCreateToolSpec(spec) {
 			if agentCreate == nil {
@@ -248,10 +258,38 @@ func newConversationAIHostingToolProviderWithAgentCreate(registryReader runtimet
 			}
 			return adapter, true, nil
 		}
+		if runtimetools.IsGetCurrentTimeToolSpec(spec) {
+			adapter, err := runtimetools.NewGetCurrentTimeAdapter(spec)
+			if err != nil {
+				return nil, false, err
+			}
+			return adapter, true, nil
+		}
+		if runtimetools.IsWebSearchToolSpec(spec) {
+			// 总是装配适配器（found=true），与 python.execute 一致：APIKey 缺失时在 Invoke 期
+			// fail-closed（Forbidden 可恢复错误喂回模型），避免单个工具缺配置导致整个 agent 的
+			// 工具解析（RequireAdapters）失败、打断 run。
+			adapter, err := runtimetools.NewWebSearchAdapter(spec, webSearchConfig)
+			if err != nil {
+				return nil, false, err
+			}
+			return adapter, true, nil
+		}
 		return pythonCatalog.LookupToolAdapter(spec)
 	})
 	return runtimetools.NewResolver(
 		registryReader,
 		runtimetools.WithAdapterCatalog(catalog),
 	)
+}
+
+// webSearchConfigFromTavily 把 agent-rpc 的 TavilyConfig 映射为 web.search 适配器配置。
+func webSearchConfigFromTavily(tavily config.TavilyConfig) runtimetools.WebSearchConfig {
+	return runtimetools.WebSearchConfig{
+		APIKey:         strings.TrimSpace(tavily.APIKey),
+		BaseURL:        strings.TrimSpace(tavily.BaseURL),
+		Timeout:        time.Duration(tavily.TimeoutSeconds) * time.Second,
+		DefaultResults: tavily.DefaultMaxResults,
+		MaxResults:     tavily.MaxResults,
+	}
 }

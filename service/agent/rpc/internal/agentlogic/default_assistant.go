@@ -15,6 +15,8 @@ const (
 	DefaultAssistantSystemPrompt     = "你是一个通用 AI 助手，回答应准确、简洁、友好。你可以帮助用户解释概念、比较方案、整理信息、生成文本和提供编程/产品建议。不要编造事实；不确定时说明不确定并给出可验证的下一步。当用户明确要求创建新的 Agent 时，可以使用 agent.create 工具创建账号、Agent 配置、系统提示词、允许的低风险工具绑定，并把新 Agent 加为该用户好友。"
 	DefaultAssistantPythonToolName   = model.LocalToolHandlerPythonExecute
 	DefaultAssistantAgentCreateName  = model.LocalToolHandlerAgentCreate
+	DefaultAssistantCurrentTimeName  = model.LocalToolHandlerGetCurrentTime
+	DefaultAssistantWebSearchName    = model.LocalToolHandlerWebSearch
 )
 
 const defaultAssistantPythonToolInputSchema = `{
@@ -107,6 +109,73 @@ const defaultAssistantAgentCreateOutputSchema = `{
   }
 }`
 
+const defaultAssistantCurrentTimeInputSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {}
+}`
+
+const defaultAssistantCurrentTimeOutputSchema = `{
+  "type": "object",
+  "properties": {
+    "year": {"type": "integer"},
+    "month": {"type": "integer"},
+    "day": {"type": "integer"},
+    "timezone": {"type": "string"},
+    "datetime": {"type": "string"},
+    "date": {"type": "string"},
+    "time": {"type": "string"},
+    "weekday": {"type": "string"},
+    "utc_datetime": {"type": "string"},
+    "unix_seconds": {"type": "integer"},
+    "unix_millis": {"type": "integer"},
+    "iso8601": {"type": "string"}
+  }
+}`
+
+const defaultAssistantWebSearchInputSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Search query keywords or question to look up on the web."
+    },
+    "max_results": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Optional maximum number of results to return (default 5)."
+    },
+    "search_depth": {
+      "type": "string",
+      "enum": ["basic", "advanced"],
+      "description": "Optional search depth. basic is faster (default); advanced digs deeper."
+    }
+  },
+  "required": ["query"]
+}`
+
+const defaultAssistantWebSearchOutputSchema = `{
+  "type": "object",
+  "properties": {
+    "query": {"type": "string"},
+    "answer": {"type": "string"},
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string"},
+          "url": {"type": "string"},
+          "content": {"type": "string"},
+          "score": {"type": "number"}
+        }
+      }
+    }
+  }
+}`
+
 // DefaultAssistantProvisioner 装配默认助手的 **agent 域** 部分（agent 行 + 默认提示词 + python/
 // agent.create 工具及其绑定），#606 从 internal/logic.DefaultAssistantProvisioner 拆出。账号属 user 域、
 // 好友属 friends 域，由 user-rpc 装配编排（经 agent-rpc.EnsureDefaultAssistant + friends-rpc）。
@@ -165,6 +234,28 @@ func (p *DefaultAssistantProvisioner) EnsureDefaultAssistant(ctx context.Context
 	if _, _, err := p.registry.BindTool(ctx, model.AgentToolBinding{
 		AgentID:   agent.AgentID,
 		ToolID:    createTool.ToolID,
+		CreatedBy: accountID,
+	}); err != nil {
+		return DefaultAssistantResult{}, err
+	}
+	timeTool, err := p.ensureCurrentTimeTool(ctx, accountID)
+	if err != nil {
+		return DefaultAssistantResult{}, err
+	}
+	if _, _, err := p.registry.BindTool(ctx, model.AgentToolBinding{
+		AgentID:   agent.AgentID,
+		ToolID:    timeTool.ToolID,
+		CreatedBy: accountID,
+	}); err != nil {
+		return DefaultAssistantResult{}, err
+	}
+	webSearchTool, err := p.ensureWebSearchTool(ctx, accountID)
+	if err != nil {
+		return DefaultAssistantResult{}, err
+	}
+	if _, _, err := p.registry.BindTool(ctx, model.AgentToolBinding{
+		AgentID:   agent.AgentID,
+		ToolID:    webSearchTool.ToolID,
 		CreatedBy: accountID,
 	}); err != nil {
 		return DefaultAssistantResult{}, err
@@ -233,6 +324,36 @@ func (p *DefaultAssistantProvisioner) ensurePythonExecuteTool(ctx context.Contex
 		LocalHandlerKey:  model.LocalToolHandlerPythonExecute,
 		InputSchemaJSON:  defaultAssistantPythonToolInputSchema,
 		OutputSchemaJSON: defaultAssistantPythonToolOutputSchema,
+		PermissionLevel:  "restricted",
+		Status:           model.AgentToolStatusActive,
+		AdminConfigured:  true,
+		CreatedBy:        accountID,
+	})
+}
+
+func (p *DefaultAssistantProvisioner) ensureCurrentTimeTool(ctx context.Context, accountID string) (model.AgentTool, error) {
+	return p.registry.UpsertToolByName(ctx, model.AgentTool{
+		Name:             DefaultAssistantCurrentTimeName,
+		Description:      "Return the current time (year/month/day, UTC+8 clock, and Unix timestamp).",
+		ToolType:         model.AgentToolTypeLocal,
+		LocalHandlerKey:  model.LocalToolHandlerGetCurrentTime,
+		InputSchemaJSON:  defaultAssistantCurrentTimeInputSchema,
+		OutputSchemaJSON: defaultAssistantCurrentTimeOutputSchema,
+		PermissionLevel:  "restricted",
+		Status:           model.AgentToolStatusActive,
+		AdminConfigured:  true,
+		CreatedBy:        accountID,
+	})
+}
+
+func (p *DefaultAssistantProvisioner) ensureWebSearchTool(ctx context.Context, accountID string) (model.AgentTool, error) {
+	return p.registry.UpsertToolByName(ctx, model.AgentTool{
+		Name:             DefaultAssistantWebSearchName,
+		Description:      "Search the web through Tavily and return ranked results with an optional answer summary.",
+		ToolType:         model.AgentToolTypeLocal,
+		LocalHandlerKey:  model.LocalToolHandlerWebSearch,
+		InputSchemaJSON:  defaultAssistantWebSearchInputSchema,
+		OutputSchemaJSON: defaultAssistantWebSearchOutputSchema,
 		PermissionLevel:  "restricted",
 		Status:           model.AgentToolStatusActive,
 		AdminConfigured:  true,

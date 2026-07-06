@@ -176,7 +176,7 @@ func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testin
 		},
 	}
 
-	provider, err := newConversationAIHostingToolProviderWithAgentCreate(registryRepo, executor, nil)
+	provider, err := newConversationAIHostingToolProviderWithAgentCreate(registryRepo, executor, nil, config.TavilyConfig{})
 	if err != nil {
 		t.Fatalf("build runtime tool provider: %v", err)
 	}
@@ -209,6 +209,59 @@ func TestConversationAIHostingToolProviderUsesConfiguredPythonExecutor(t *testin
 	}
 	if executor.calls != 1 || !strings.Contains(executor.lastReq.Code, "1 + 1") {
 		t.Fatalf("configured executor was not called correctly: calls=%d req=%+v", executor.calls, executor.lastReq)
+	}
+}
+
+// time.now 与 web.search 即使未配置 Tavily key 也必须解析出适配器，否则默认助手绑定了这些工具后
+// 在无 key 环境（本地/CI）会因 RequireAdapters 解析失败而整体不可用（回归守卫）。
+func TestConversationAIHostingToolProviderResolvesTimeAndWebSearchWithoutTavilyKey(t *testing.T) {
+	ctx := context.Background()
+	registryRepo := registrytest.NewMemoryStore()
+	seed := func(toolID, handlerKey string) {
+		if _, err := registryRepo.RegisterTool(ctx, model.AgentTool{
+			ToolID:           toolID,
+			Name:             handlerKey,
+			ToolType:         model.AgentToolTypeLocal,
+			LocalHandlerKey:  handlerKey,
+			InputSchemaJSON:  `{"type":"object"}`,
+			OutputSchemaJSON: `{"type":"object"}`,
+			PermissionLevel:  "restricted",
+			Status:           model.AgentToolStatusActive,
+			AdminConfigured:  true,
+			CreatedBy:        "agent_creator",
+		}); err != nil {
+			t.Fatalf("register %s: %v", handlerKey, err)
+		}
+		if _, _, err := registryRepo.BindTool(ctx, model.AgentToolBinding{
+			AgentID:   "agent_default_assistant",
+			ToolID:    toolID,
+			CreatedBy: "agent_creator",
+		}); err != nil {
+			t.Fatalf("bind %s: %v", handlerKey, err)
+		}
+	}
+	seed("tool_time_now", model.LocalToolHandlerGetCurrentTime)
+	seed("tool_web_search", model.LocalToolHandlerWebSearch)
+
+	// 无 Tavily key。
+	provider, err := newConversationAIHostingToolProviderWithAgentCreate(registryRepo, nil, nil, config.TavilyConfig{})
+	if err != nil {
+		t.Fatalf("build runtime tool provider: %v", err)
+	}
+	resolved, err := provider.ResolveAgentTools(ctx, runtimetools.ResolveAgentToolsRequest{
+		AgentID:         "agent_default_assistant",
+		RequireAdapters: true,
+	})
+	if err != nil {
+		t.Fatalf("resolve agent tools with unconfigured tavily key must not fail: %v", err)
+	}
+	if len(resolved) != 2 {
+		t.Fatalf("resolved %d tools, want 2", len(resolved))
+	}
+	for _, r := range resolved {
+		if !r.HasAdapter() {
+			t.Fatalf("tool %s resolved without adapter", r.Spec.Name)
+		}
 	}
 }
 

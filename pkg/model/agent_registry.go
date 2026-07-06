@@ -40,6 +40,10 @@ const (
 	LocalToolHandlerSendAgentMessage       = "im.send_agent_message"
 	LocalToolHandlerPythonExecute          = "python.execute"
 	LocalToolHandlerAgentCreate            = "agent.create"
+	// LocalToolHandlerGetCurrentTime 返回当前时间（年/月/日 + UTC+8 + 时间戳），纯本地无网络。
+	LocalToolHandlerGetCurrentTime = "time.now"
+	// LocalToolHandlerWebSearch 经 Tavily 联网搜索，需配置 TAVILY_API_KEY。
+	LocalToolHandlerWebSearch = "web.search"
 )
 
 const (

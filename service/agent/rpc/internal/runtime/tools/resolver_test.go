@@ -252,6 +252,61 @@ func TestResolverAllowsPythonExecuteLocalTool(t *testing.T) {
 	}
 }
 
+func TestResolverAllowsTimeAndWebSearchLocalTools(t *testing.T) {
+	ctx := context.Background()
+	cases := []struct {
+		name       string
+		handlerKey string
+	}{
+		{name: "time.now", handlerKey: model.LocalToolHandlerGetCurrentTime},
+		{name: "web.search", handlerKey: model.LocalToolHandlerWebSearch},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := registrytest.NewMemoryStore()
+			seedLocalHandlerTool(t, ctx, repo, "agent_support", "tool_"+tc.name, tc.handlerKey)
+			resolver := newResolver(t, repo)
+
+			resolved, err := resolver.ResolveTool(ctx, ResolveToolRequest{
+				AgentID: "agent_support",
+				ToolID:  "tool_" + tc.name,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resolved.Spec.Local == nil || resolved.Spec.Local.HandlerKey != tc.handlerKey {
+				t.Fatalf("expected local %s tool spec, got %+v", tc.handlerKey, resolved.Spec)
+			}
+		})
+	}
+}
+
+func seedLocalHandlerTool(t *testing.T, ctx context.Context, repo *registrytest.MemoryStore, agentID string, toolID string, handlerKey string) {
+	t.Helper()
+	_, err := repo.RegisterTool(ctx, model.AgentTool{
+		ToolID:           toolID,
+		Name:             handlerKey,
+		ToolType:         model.AgentToolTypeLocal,
+		LocalHandlerKey:  handlerKey,
+		InputSchemaJSON:  `{"type":"object"}`,
+		OutputSchemaJSON: `{"type":"object"}`,
+		PermissionLevel:  "agent_bound",
+		Status:           model.AgentToolStatusActive,
+		AdminConfigured:  true,
+		CreatedBy:        "usr_admin",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = repo.BindTool(ctx, model.AgentToolBinding{
+		AgentID:   agentID,
+		ToolID:    toolID,
+		CreatedBy: "usr_admin",
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 type seedMCPToolInput struct {
 	AgentID            string
 	ToolID             string

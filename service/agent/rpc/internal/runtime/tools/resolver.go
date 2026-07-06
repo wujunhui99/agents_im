@@ -475,7 +475,9 @@ func allowedLocalHandlerKey(key string) bool {
 		model.LocalToolHandlerReadSkillFile,
 		model.LocalToolHandlerSendAgentMessage,
 		model.LocalToolHandlerPythonExecute,
-		model.LocalToolHandlerAgentCreate:
+		model.LocalToolHandlerAgentCreate,
+		model.LocalToolHandlerGetCurrentTime,
+		model.LocalToolHandlerWebSearch:
 		return true
 	default:
 		return false
