@@ -176,6 +176,8 @@ func buildHostingRuntime(c config.Config, responseSender orchestrator.MessageSen
 	// agent.create 工具处理器：agent 自有 agentlogic assembly（goctl + user-rpc/friends-rpc 端口，#606）。
 	hostingCtx.AgentCreate = newAgentCreateHandler(assembly)
 	hostingCtx.PythonExecutor = pythonExecutor
+	// web.search 联网搜索工具配置（APIKey←env TAVILY_API_KEY）；缺失则工具在 Invoke 期 fail-closed。
+	hostingCtx.Tavily = c.Tavily
 	// AI 写回经 msg-rpc gRPC SendMessage（imadapter），AI 消息走与人类消息相同的 Kafka 链路。
 	hostingCtx.AgentResponseSender = responseSender
 	// 直连 agent 私聊 conversation store（#686）：Kafka 消费直写、作为私聊历史/合流唯一源，

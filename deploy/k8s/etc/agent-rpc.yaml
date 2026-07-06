@@ -33,8 +33,9 @@ Telemetry:
   Batcher: otlpgrpc
 
 # AI 托管运行时（随 agent 域归位迁入，#340）。#664：DeepSeek/LLMObservability 的默认值/env
-# 覆盖改由 struct tag 声明（env 裸名 DEEPSEEK_*/LLM_OBSERVABILITY_*/LANGFUSE_*，由 configmap/secret
-# 注入），整块从 yaml 删除，避免空 ${VAR} 压掉 tag default。
+# 覆盖改由 struct tag 声明（env 裸名 DEEPSEEK_*/LLM_OBSERVABILITY_*/LANGFUSE_*/TAVILY_*，由 configmap/secret
+# 注入），整块从 yaml 删除，避免空 ${VAR} 压掉 tag default。web.search 工具用 Tavily，APIKey←env
+# TAVILY_API_KEY（缺失则工具 fail-closed 不装配）。
 PythonExecutor:
   Backend: ${PYTHON_EXECUTOR_BACKEND}
   DefaultTimeoutSeconds: ${PYTHON_EXECUTOR_DEFAULT_TIMEOUT_SECONDS}

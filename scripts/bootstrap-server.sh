@@ -12,6 +12,7 @@
 #       GHCR_USERNAME / GHCR_TOKEN（read:packages + write:packages）
 #       TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
 #       DEEPSEEK_API_KEY
+#       TAVILY_API_KEY（可选，web.search 联网搜索工具；缺失则该工具 fail-closed 不可用）
 #       TENCENT_SES_SECRET_ID / TENCENT_SES_SECRET_KEY / TENCENT_SES_REGION /
 #         TENCENT_SES_FROM_EMAIL / TENCENT_SES_DEFAULT_TEMPLATE_ID
 #   - ADMIN_BOOTSTRAP_PASSWORD 经环境变量传入（管理后台 admin 账号密码）
@@ -106,6 +107,7 @@ kubectl -n "${NAMESPACE}" create secret generic agents-im-secrets \
   --from-literal=OBJECT_STORAGE_ACCESS_KEY_ID="${OSS_ROOT_USER}" \
   --from-literal=OBJECT_STORAGE_SECRET_ACCESS_KEY="${OSS_ROOT_PASSWORD}" \
   --from-literal=DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:?missing in creds.env}" \
+  --from-literal=TAVILY_API_KEY="${TAVILY_API_KEY:-}" \
   --from-literal=LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY:-}" \
   --from-literal=LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-}" \
   --from-literal=LANGFUSE_DATABASE_URL="${LANGFUSE_DATABASE_URL}" \

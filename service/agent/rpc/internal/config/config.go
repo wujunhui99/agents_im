@@ -38,6 +38,10 @@ type Config struct {
 	LLMObservability LLMObservabilityConfig
 	PythonExecutor   appconfig.PythonExecutorConfig `json:",optional"`
 
+	// Tavily：web.search 联网搜索工具配置（APIKey←env TAVILY_API_KEY）。不标 optional，
+	// 让 go-zero 在 yaml 缺整块时仍下钻填子字段 default/env（与 DeepSeek 同）。
+	Tavily TavilyConfig
+
 	// Kafka：agent.trigger.v1 消费链路（独立 consumer group，与已退役的 msg-rpc
 	// 回流 consumer 隔离）。
 	Kafka KafkaConf `json:",optional"`
