@@ -3,6 +3,11 @@ kind: pipeline
 name: verification
 type: docker
 
+# 抵御到 github.com 的偶发出网超时：clone git 命令失败最多重跑 3 次，
+# 全失败才标记 step failure（build 288 曾因单次 clone 超时挂掉整条流水线，#699）。
+clone:
+  retries: 3
+
 trigger:
   event:
     - pull_request
@@ -150,6 +155,10 @@ kind: pipeline
 name: devops-lab
 type: docker
 
+# 抵御到 github.com 的偶发出网超时：clone git 命令失败最多重跑 3 次（#699）。
+clone:
+  retries: 3
+
 trigger:
   event:
     - push
@@ -235,6 +244,11 @@ volumes:
 kind: pipeline
 name: deploy-main
 type: docker
+
+# 抵御到 github.com 的偶发出网超时：clone git 命令失败最多重跑 3 次，
+# 全失败才标记 step failure（build 288 曾因单次 clone 超时挂掉整条部署，#699）。
+clone:
+  retries: 3
 
 trigger:
   event:
