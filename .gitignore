@@ -16,10 +16,12 @@ web/coverage/
 !/secret/.gitignore
 !/secret/README.md
 !/secret/*.example
-# .claude：忽略本地内容（settings.local.json / .DS_Store / shell / worktrees 等），
-# 仅保留 .claude/skills 共享技能（AGENTS.md 引用，需随仓库追踪）。
+# .claude / .agents：忽略本地内容（settings.local.json / .DS_Store / shell / worktrees 等），
+# 仅保留 skills 共享技能（AGENTS.md 引用，需随仓库追踪）。
 .claude/*
 !.claude/skills/
+.agents/*
+!.agents/skills/
 
 # Python bytecode
 __pycache__/
