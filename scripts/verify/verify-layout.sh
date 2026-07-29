@@ -42,12 +42,36 @@ if [[ -z "${services_out}" ]]; then
   echo "verify-layout: 'make -s services' produced no services to check" >&2
   exit 1
 fi
-while read -r svc_dir; do
-  [[ -n "${svc_dir}" ]] || continue
-  if [[ -z "$(grep -rl '^package main' "${svc_dir}" 2>/dev/null || true)" ]]; then
-    echo "verify-layout: service has no 'package main' entrypoint in its package: ${svc_dir}" >&2
+
+service_count=0
+while IFS= read -r service_line; do
+  [[ -n "${service_line//[[:space:]]/}" ]] || continue
+
+  read -r svc_name svc_dir extra <<<"${service_line}"
+  if [[ -z "${svc_name}" || -z "${svc_dir}" || -n "${extra}" ]]; then
+    echo "verify-layout: malformed 'make -s services' line: ${service_line}" >&2
     exit 1
   fi
-done < <(awk '{print $2}' <<<"${services_out}")
+  if [[ "${svc_dir}" != ./service/* || ! -d "${svc_dir}" ]]; then
+    echo "verify-layout: service package path must be an existing directory under ./service/: ${svc_name} ${svc_dir}" >&2
+    exit 1
+  fi
+
+  service_count=$((service_count + 1))
+  if ! package_name="$(go list -f '{{.Name}}' "${svc_dir}" 2>&1)"; then
+    echo "verify-layout: cannot load service package: ${svc_name} ${svc_dir}" >&2
+    printf '%s\n' "${package_name}" >&2
+    exit 1
+  fi
+  if [[ "${package_name}" != "main" ]]; then
+    echo "verify-layout: service entrypoint package must be 'main': ${svc_name} ${svc_dir} (got ${package_name})" >&2
+    exit 1
+  fi
+done <<<"${services_out}"
+
+if ((service_count == 0)); then
+  echo "verify-layout: 'make -s services' produced no parseable services to check" >&2
+  exit 1
+fi
 
 echo "layout verification passed"

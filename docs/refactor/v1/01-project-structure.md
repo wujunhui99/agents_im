@@ -263,9 +263,13 @@ agents_im/
 # A. 顶层目录干净（含无 cmd/）
 test ! -d internal && test ! -d api && test ! -d proto && test ! -d rpcgen && test ! -d cmd
 
-# B. 入口在 service 包内、无 entry/ 子包
+# B. 入口在 service 包内、无 entry/ 子包；清单中的精确包必须为 main
 ! find service -type d -name entry | grep -q .
-for s in $(make -s services | awk '{print $2}'); do test -n "$(grep -rl '^package main' "$s")" || exit 1; done
+services="$(make -s services)"; test -n "$services"
+while read -r name s extra; do
+  test -n "$name" && test -n "$s" && test -z "$extra" || exit 1
+  test "$(go list -f '{{.Name}}' "$s")" = main || exit 1
+done <<<"$services"
 
 # C. 无残留导入
 ! grep -r '"github.com/wujunhui99/agents_im/internal' --include='*.go' .
