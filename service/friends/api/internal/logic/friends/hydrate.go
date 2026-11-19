@@ -6,7 +6,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/types"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 )
 
 // rfc3339FromUnixMilli 把 user-rpc 的 UnixMilli 时间戳渲染成对外 RFC3339(UTC) 串；0 → 空串

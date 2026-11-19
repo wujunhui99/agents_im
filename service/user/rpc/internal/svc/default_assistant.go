@@ -6,7 +6,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
+	agentpb "github.com/wujunhui99/agents_im_protocol/agent/v1"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/agentclient"
 	friendsclient "github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
 )

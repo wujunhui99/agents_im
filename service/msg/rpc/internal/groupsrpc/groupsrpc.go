@@ -8,7 +8,7 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
+	groupspb "github.com/wujunhui99/agents_im_protocol/groups/v1"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
 )
 

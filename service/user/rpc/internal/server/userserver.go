@@ -9,7 +9,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
-	"github.com/wujunhui99/agents_im/service/user/rpc/user"
+	"github.com/wujunhui99/agents_im_protocol/user/v1"
 )
 
 type UserServer struct {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/media/svc"
-	"github.com/wujunhui99/agents_im/service/resource/rpc/media"
+	"github.com/wujunhui99/agents_im_protocol/media/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

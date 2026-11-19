@@ -7,7 +7,7 @@ package mailclient
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/resource/rpc/mail"
+	"github.com/wujunhui99/agents_im_protocol/mail/v1"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

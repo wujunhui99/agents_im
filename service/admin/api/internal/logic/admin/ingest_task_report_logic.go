@@ -9,7 +9,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/admin/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/admin/api/internal/types"
-	adminpb "github.com/wujunhui99/agents_im/service/admin/rpc/admin"
+	adminpb "github.com/wujunhui99/agents_im_protocol/admin/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

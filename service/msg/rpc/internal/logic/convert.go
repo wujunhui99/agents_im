@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
-	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
+	"github.com/wujunhui99/agents_im_protocol/msg/v1"
 )
 
 // messageToPB 把存库行（goctl Messages）映射成对外 proto Message：int 枚举→string、content 解码、send_time coalesce。

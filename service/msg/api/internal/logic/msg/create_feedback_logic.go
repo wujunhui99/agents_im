@@ -9,7 +9,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	adminpb "github.com/wujunhui99/agents_im/service/admin/rpc/admin"
+	adminpb "github.com/wujunhui99/agents_im_protocol/admin/v1"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/types"
 

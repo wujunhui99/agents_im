@@ -8,7 +8,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/auth/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/auth/api/internal/types"
-	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
+	authpb "github.com/wujunhui99/agents_im_protocol/auth/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

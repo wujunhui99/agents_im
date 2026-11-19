@@ -3,9 +3,9 @@ package msg
 import (
 	"strings"
 
-	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
+	agentpb "github.com/wujunhui99/agents_im_protocol/agent/v1"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/types"
-	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
+	msgpb "github.com/wujunhui99/agents_im_protocol/msg/v1"
 )
 
 // splitCommaQuery 把逗号分隔的 query 参数拆成去空去重前的 id 列表（移植自旧 message-api handler）。

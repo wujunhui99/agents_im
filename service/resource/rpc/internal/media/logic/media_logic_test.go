@@ -13,7 +13,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/objectstorage"
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/media/model"
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/media/svc"
-	"github.com/wujunhui99/agents_im/service/resource/rpc/media"
+	"github.com/wujunhui99/agents_im_protocol/media/v1"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

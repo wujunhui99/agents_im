@@ -15,7 +15,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/media/model"
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/media/svc"
-	mediapb "github.com/wujunhui99/agents_im/service/resource/rpc/media"
+	mediapb "github.com/wujunhui99/agents_im_protocol/media/v1"
 )
 
 // 媒体业务规则：purpose/status 整型(model/vars.go) <-> 字符串契约映射、输入校验（只 validate 不

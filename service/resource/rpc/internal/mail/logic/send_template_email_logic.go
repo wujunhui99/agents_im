@@ -7,7 +7,7 @@ import (
 
 	mailprovider "github.com/wujunhui99/agents_im/service/resource/rpc/internal/mail/provider"
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/mail/svc"
-	mailpb "github.com/wujunhui99/agents_im/service/resource/rpc/mail"
+	mailpb "github.com/wujunhui99/agents_im_protocol/mail/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/grpc/codes"

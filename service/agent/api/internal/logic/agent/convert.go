@@ -3,7 +3,7 @@ package agent
 import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/types"
-	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
+	agentpb "github.com/wujunhui99/agents_im_protocol/agent/v1"
 )
 
 // convert.go 把 agent-rpc 的 proto 响应映射成 agent-api 的 BFF 视图类型（#606：纯 BFF over gRPC）。

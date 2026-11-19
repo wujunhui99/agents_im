@@ -6,7 +6,7 @@ import (
 
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
+	authpb "github.com/wujunhui99/agents_im_protocol/auth/v1"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"

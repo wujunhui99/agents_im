@@ -7,7 +7,7 @@ package mediaclient
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/resource/rpc/media"
+	"github.com/wujunhui99/agents_im_protocol/media/v1"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

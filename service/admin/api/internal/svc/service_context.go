@@ -17,7 +17,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/admin/api/internal/bootstrap"
 	"github.com/wujunhui99/agents_im/service/admin/api/internal/config"
-	adminpb "github.com/wujunhui99/agents_im/service/admin/rpc/admin"
+	adminpb "github.com/wujunhui99/agents_im_protocol/admin/v1"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/adminclient"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/authclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"

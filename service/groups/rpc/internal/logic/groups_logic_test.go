@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	groups "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
+	groups "github.com/wujunhui99/agents_im_protocol/groups/v1"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/svc"
 	"google.golang.org/grpc/codes"

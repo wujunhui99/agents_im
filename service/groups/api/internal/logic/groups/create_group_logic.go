@@ -6,7 +6,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/types"
-	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
+	groupspb "github.com/wujunhui99/agents_im_protocol/groups/v1"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 

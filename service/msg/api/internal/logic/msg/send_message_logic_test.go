@@ -8,7 +8,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/types"
-	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
+	msgpb "github.com/wujunhui99/agents_im_protocol/msg/v1"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
 
 	"google.golang.org/grpc"

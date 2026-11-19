@@ -7,7 +7,7 @@ package agentclient
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/agent/rpc/agent"
+	"github.com/wujunhui99/agents_im_protocol/agent/v1"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

@@ -10,7 +10,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/types"
-	friendspb "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
+	friendspb "github.com/wujunhui99/agents_im_protocol/friends/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

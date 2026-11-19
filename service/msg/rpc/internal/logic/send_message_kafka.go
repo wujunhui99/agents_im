@@ -13,7 +13,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/svc"
-	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
+	"github.com/wujunhui99/agents_im_protocol/msg/v1"
 )
 
 // sendDirectKafka 是 MSG_DIRECT_KAFKA 开启时的写路径（03 §4.2 / §9 B2）：

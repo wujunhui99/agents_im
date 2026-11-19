@@ -7,7 +7,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/agent/api/internal/types"
-	agentpb "github.com/wujunhui99/agents_im/service/agent/rpc/agent"
+	agentpb "github.com/wujunhui99/agents_im_protocol/agent/v1"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 

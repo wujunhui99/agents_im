@@ -6,7 +6,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/user/api/internal/types"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

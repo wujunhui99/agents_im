@@ -9,7 +9,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/mail/logic"
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/mail/svc"
-	"github.com/wujunhui99/agents_im/service/resource/rpc/mail"
+	"github.com/wujunhui99/agents_im_protocol/mail/v1"
 )
 
 type MailServer struct {

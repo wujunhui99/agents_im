@@ -3,7 +3,7 @@ package admin
 import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/admin/api/internal/types"
-	adminpb "github.com/wujunhui99/agents_im/service/admin/rpc/admin"
+	adminpb "github.com/wujunhui99/agents_im_protocol/admin/v1"
 )
 
 // admin-api 是纯 BFF：把 admin-rpc 返回的 pb 转成对外 HTTP 契约类型（internal/types）。

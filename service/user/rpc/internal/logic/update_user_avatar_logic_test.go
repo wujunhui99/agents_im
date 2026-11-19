@@ -6,7 +6,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 )
 
 func newTestSvc(store *fakeStore, prov *fakeProvisioner, val *fakeAvatarValidator) *svc.ServiceContext {

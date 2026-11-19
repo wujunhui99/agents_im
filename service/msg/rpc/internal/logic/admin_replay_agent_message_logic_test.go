@@ -8,7 +8,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/svc"
-	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
+	"github.com/wujunhui99/agents_im_protocol/msg/v1"
 )
 
 // humanTextSingleRow 构造一条发往 agent 账号的人类文本单聊消息（可重放）。

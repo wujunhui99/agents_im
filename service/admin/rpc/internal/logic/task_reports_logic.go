@@ -7,7 +7,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
+	"github.com/wujunhui99/agents_im_protocol/admin/v1"
 	dbmodel "github.com/wujunhui99/agents_im/service/admin/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
 

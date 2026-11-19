@@ -8,7 +8,7 @@ import (
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/mail/config"
 	mailprovider "github.com/wujunhui99/agents_im/service/resource/rpc/internal/mail/provider"
 	"github.com/wujunhui99/agents_im/service/resource/rpc/internal/mail/svc"
-	mailpb "github.com/wujunhui99/agents_im/service/resource/rpc/mail"
+	mailpb "github.com/wujunhui99/agents_im_protocol/mail/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

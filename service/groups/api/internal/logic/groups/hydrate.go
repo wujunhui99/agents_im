@@ -7,8 +7,8 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/svc"
 	"github.com/wujunhui99/agents_im/service/groups/api/internal/types"
-	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	groupspb "github.com/wujunhui99/agents_im_protocol/groups/v1"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 )
 
 // hydrateMember 用 user-rpc 补全单个成员的资料字段（identifier/display_name/name/avatar）。

@@ -5,11 +5,11 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
+	"github.com/wujunhui99/agents_im_protocol/admin/v1"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/agent"
-	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	"github.com/wujunhui99/agents_im_protocol/agent/v1"
+	msgpb "github.com/wujunhui99/agents_im_protocol/msg/v1"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

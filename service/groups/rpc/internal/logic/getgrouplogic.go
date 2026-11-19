@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	groups "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
+	groups "github.com/wujunhui99/agents_im_protocol/groups/v1"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/logx"

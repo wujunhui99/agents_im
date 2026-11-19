@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
+	groupspb "github.com/wujunhui99/agents_im_protocol/groups/v1"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/svc"

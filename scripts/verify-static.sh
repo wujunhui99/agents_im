@@ -32,14 +32,6 @@ required_files=(
   "service/groups/api/groups.api"
   "service/agent/api/agent.api"
   "service/msg/api/msg.api"
-  "service/user/rpc/user.proto"
-  "service/auth/rpc/auth.proto"
-  "service/friends/rpc/friends.proto"
-  "service/groups/rpc/groups.proto"
-  "service/msg/rpc/msg.proto"
-  "service/resource/rpc/mail.proto"
-  "service/resource/rpc/media.proto"
-  "service/msggateway/gateway.proto"
   "etc/msggateway.yaml"
   "etc/msgtransfer.yaml"
   "etc/push.yaml"
@@ -48,6 +40,13 @@ required_files=(
   ".drone.yml"
 )
 require_files "${required_files[@]}"
+
+# Contracts live in a dedicated repo (contract-first). The module requirement is
+# the runtime-critical bit: if it is dropped, every generated client breaks.
+if ! rg -q '^\s*github\.com/wujunhui99/agents_im_protocol v' go.mod; then
+  echo "go.mod must require github.com/wujunhui99/agents_im_protocol" >&2
+  exit 1
+fi
 
 syntax_check \
   scripts/migrate-postgres.sh \

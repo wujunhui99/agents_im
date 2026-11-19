@@ -5,7 +5,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/friends/api/internal/types"
-	friendspb "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
+	friendspb "github.com/wujunhui99/agents_im_protocol/friends/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

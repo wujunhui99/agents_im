@@ -21,7 +21,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/agent"
+	"github.com/wujunhui99/agents_im_protocol/agent/v1"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/svc"

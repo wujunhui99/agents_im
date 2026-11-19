@@ -8,8 +8,8 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	commonconfig "github.com/wujunhui99/agents_im/service/admin/api/internal/config"
-	authpb "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	authpb "github.com/wujunhui99/agents_im_protocol/auth/v1"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 
 	"google.golang.org/grpc"
 )

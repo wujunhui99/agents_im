@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/wujunhui99/agents_im/pkg/gateway/delivery"
-	"github.com/wujunhui99/agents_im/service/msggateway/gatewaypb"
+	gatewaypb "github.com/wujunhui99/agents_im_protocol/gateway/v1"
 )
 
 type fakeConn struct {

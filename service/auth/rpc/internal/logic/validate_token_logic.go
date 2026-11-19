@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
+	auth "github.com/wujunhui99/agents_im_protocol/auth/v1"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/logx"
