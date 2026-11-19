@@ -118,29 +118,23 @@ if ! grep -A2 '^GatewayGRPC:' deploy/k8s/etc/msggateway.yaml | grep -q 'ListenOn
   exit 1
 fi
 
-# --- AuthRPC / ResourceRPC client endpoints in auth configs ---
-python3 - <<'PY'
+# --- apigateway 装配了 AuthRPC（登录/注册）与 auth-rpc 的 ResourceRPC（验证码邮件） ---
+python3 - <<'PY2'
 import sys
 import yaml
 
-for path in (
-    "deploy/k8s/etc/auth-api.yaml",
-    "etc/auth-api.yaml",
-):
-    with open(path, encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    auth_rpc = data.get("AuthRPC")
-    if not isinstance(auth_rpc, dict):
-        print(f"{path}: AuthRPC section is required", file=sys.stderr)
-        sys.exit(1)
-    endpoints = auth_rpc.get("Endpoints")
-    if not isinstance(endpoints, list) or not endpoints:
-        print(f"{path}: AuthRPC.Endpoints must be a non-empty YAML list", file=sys.stderr)
-        sys.exit(1)
-    for index, endpoint in enumerate(endpoints):
-        if not isinstance(endpoint, str) or not endpoint.strip():
-            print(f"{path}: AuthRPC.Endpoints[{index}] must be a non-empty string", file=sys.stderr)
-            sys.exit(1)
+path = "deploy/k8s/etc/apigateway.yaml"
+with open(path, encoding="utf-8") as f:
+    data = yaml.safe_load(f) or {}
+auth_api = data.get("AuthAPI") or {}
+auth_rpc = auth_api.get("AuthRPC")
+if not isinstance(auth_rpc, dict):
+    print(f"{path}: AuthAPI.AuthRPC section is required", file=sys.stderr)
+    sys.exit(1)
+endpoints = auth_rpc.get("Endpoints")
+if not isinstance(endpoints, list) or not endpoints:
+    print(f"{path}: AuthAPI.AuthRPC.Endpoints must be a non-empty YAML list", file=sys.stderr)
+    sys.exit(1)
 
 for path in (
     "deploy/k8s/etc/auth-rpc.yaml",
@@ -160,7 +154,7 @@ for path in (
         if not isinstance(endpoint, str) or not endpoint.strip():
             print(f"{path}: ResourceRPC.Endpoints[{index}] must be a non-empty string", file=sys.stderr)
             sys.exit(1)
-PY
+PY2
 
 # --- production object storage endpoint + env validation ---
 if rg -q 'OBJECT_STORAGE_EXTERNAL_ENDPOINT="?((127\.[0-9.]+|localhost|0\.0\.0\.0|\[?::1\]?)(:[0-9]+)?)"?' scripts/bootstrap-server.sh deploy/k8s/secrets.example.yaml; then
@@ -384,7 +378,7 @@ if "agents-im-observability-basic-auth@kubernetescrd" not in metrics_middlewares
     sys.exit(1)
 
 ms_media_expectations = {
-    "/media": ("media-api", 8089),
+    "/media": ("apigateway", 8080),
     "/agents-im-media": ("agents-im-oss", 9000),
 }
 for path, expected_backend in ms_media_expectations.items():

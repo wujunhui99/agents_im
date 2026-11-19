@@ -2,24 +2,32 @@ import { describe, expect, it } from 'vitest';
 import viteConfig from './vite.config';
 
 describe('Vite local backend proxy', () => {
-  it('proxies every backend contract prefix to its local service port', () => {
+  it('proxies every backend contract prefix to the single gateway', () => {
     const proxy = viteConfig.server?.proxy ?? {};
 
-    expect(proxy['/admin/dashboard']).toMatchObject({ target: 'http://127.0.0.1:8088' });
-    expect(proxy['/admin/llm-traces']).toMatchObject({ target: 'http://127.0.0.1:8088' });
-    expect(proxy['/admin/conversations']).toMatchObject({ target: 'http://127.0.0.1:8088' });
-    expect(proxy['/admin/users']).toMatchObject({ target: 'http://127.0.0.1:8088' });
-    expect(proxy['/api/admin/feedback']).toMatchObject({ target: 'http://127.0.0.1:8088' });
-    expect(proxy['/api/admin/task-reports']).toMatchObject({ target: 'http://127.0.0.1:8088' });
-    expect(proxy['/api/feedback']).toMatchObject({ target: 'http://127.0.0.1:8090' });
-    expect(proxy['/auth']).toMatchObject({ target: 'http://127.0.0.1:8081' });
-    expect(proxy['/me']).toMatchObject({ target: 'http://127.0.0.1:8080' });
-    expect(proxy['/users']).toMatchObject({ target: 'http://127.0.0.1:8080' });
-    expect(proxy['/media']).toMatchObject({ target: 'http://127.0.0.1:8089' });
-    expect(proxy['/friends']).toMatchObject({ target: 'http://127.0.0.1:8082' });
-    expect(proxy['/messages']).toMatchObject({ target: 'http://127.0.0.1:8090' });
-    expect(proxy['/conversations']).toMatchObject({ target: 'http://127.0.0.1:8090' });
-    expect(proxy['/groups']).toMatchObject({ target: 'http://127.0.0.1:8085' });
+    // 单一 HTTP 入口：所有域前缀都指向 apigateway（默认 8080）。
+    for (const prefix of [
+      '/admin/dashboard',
+      '/admin/llm-traces',
+      '/admin/conversations',
+      '/admin/users',
+      '/admin/test-accounts',
+      '/api/admin/feedback',
+      '/api/admin/task-reports',
+      '/api/feedback',
+      '/auth',
+      '/me',
+      '/users',
+      '/accounts',
+      '/media',
+      '/friends',
+      '/messages',
+      '/conversations',
+      '/groups',
+      '/agents',
+    ]) {
+      expect(proxy[prefix]).toMatchObject({ target: 'http://127.0.0.1:8080' });
+    }
     expect(proxy['/ws']).toMatchObject({ target: 'ws://127.0.0.1:8084', ws: true });
   });
 

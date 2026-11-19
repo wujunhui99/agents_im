@@ -12,40 +12,16 @@
   ],
   "backend": [
     {
+      "name": "apigateway",
+      "package": "./service/apigateway"
+    },
+    {
       "name": "resource-rpc",
       "package": "./service/resource/rpc"
     },
     {
-      "name": "user-api",
-      "package": "./service/user/api"
-    },
-    {
-      "name": "auth-api",
-      "package": "./service/auth/api"
-    },
-    {
-      "name": "friends-api",
-      "package": "./service/friends/api"
-    },
-    {
-      "name": "msg-api",
-      "package": "./service/msg/api"
-    },
-    {
       "name": "msggateway",
       "package": "./service/msggateway"
-    },
-    {
-      "name": "groups-api",
-      "package": "./service/groups/api"
-    },
-    {
-      "name": "agent-api",
-      "package": "./service/agent/api"
-    },
-    {
-      "name": "admin-api",
-      "package": "./service/admin/api"
     },
     {
       "name": "msgtransfer",
@@ -78,10 +54,6 @@
     {
       "name": "agent-rpc",
       "package": "./service/agent/rpc"
-    },
-    {
-      "name": "media-api",
-      "package": "./service/media/api"
     },
     {
       "name": "admin-rpc",

@@ -1,0 +1,17 @@
+// Code scaffolded by goctl. Safe to edit.
+// goctl 1.10.1
+
+package config
+
+import (
+	"github.com/zeromicro/go-zero/zrpc"
+)
+
+type Config struct {
+	Auth struct {
+		AccessSecret string
+		AccessExpire int64
+	}
+	// tracing 用 go-zero 自带 Telemetry（ServiceConf 内，由 yaml 配置），不再用 pkg/observability。
+	AuthRPC zrpc.RpcClientConf
+}

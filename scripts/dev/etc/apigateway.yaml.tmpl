@@ -1,0 +1,136 @@
+Name: apigateway
+Host: 127.0.0.1
+Port: ${GATEWAY_HTTP_PORT}
+
+# 单一 HTTP 入口：8 个域在同一个进程内装配（本地 dev）。
+User:
+  Auth:
+    AccessSecret: ${JWT_ACCESS_SECRET}
+    AccessExpire: ${JWT_ACCESS_EXPIRE}
+  UserRPC:
+    Endpoints:
+      - 127.0.0.1:${USER_RPC_PORT}
+    Timeout: 5000
+  Redis:
+    Addr: ${REDIS_ADDR}
+    Password: ${REDIS_PASSWORD}
+    DB: ${REDIS_DB}
+
+AuthAPI:
+  Auth:
+    AccessSecret: ${JWT_ACCESS_SECRET}
+    AccessExpire: ${JWT_ACCESS_EXPIRE}
+  AuthRPC:
+    Endpoints:
+      - 127.0.0.1:${AUTH_RPC_PORT}
+    Timeout: 5000
+
+Friends:
+  Auth:
+    AccessSecret: ${JWT_ACCESS_SECRET}
+    AccessExpire: ${JWT_ACCESS_EXPIRE}
+  FriendsRPC:
+    Endpoints:
+      - 127.0.0.1:${FRIENDS_RPC_PORT}
+    Timeout: 5000
+  UserRPC:
+    Endpoints:
+      - 127.0.0.1:${USER_RPC_PORT}
+    Timeout: 5000
+  Redis:
+    Addr: ${REDIS_ADDR}
+    Password: ${REDIS_PASSWORD}
+    DB: ${REDIS_DB}
+
+Groups:
+  Auth:
+    AccessSecret: ${JWT_ACCESS_SECRET}
+    AccessExpire: ${JWT_ACCESS_EXPIRE}
+  GroupsRPC:
+    Endpoints:
+      - 127.0.0.1:${GROUPS_RPC_PORT}
+    Timeout: 5000
+  UserRPC:
+    Endpoints:
+      - 127.0.0.1:${USER_RPC_PORT}
+    Timeout: 5000
+  Redis:
+    Addr: ${REDIS_ADDR}
+    Password: ${REDIS_PASSWORD}
+    DB: ${REDIS_DB}
+
+Msg:
+  Auth:
+    AccessSecret: ${JWT_ACCESS_SECRET}
+    AccessExpire: ${JWT_ACCESS_EXPIRE}
+  MsgRPC:
+    Endpoints:
+      - 127.0.0.1:${MSG_RPC_PORT}
+    Timeout: 5000
+  AdminRPC:
+    Endpoints:
+      - 127.0.0.1:${ADMIN_RPC_PORT}
+    Timeout: 5000
+  AgentRPC:
+    Endpoints:
+      - 127.0.0.1:${AGENT_RPC_PORT}
+    Timeout: 5000
+  Redis:
+    Addr: ${REDIS_ADDR}
+    Password: ${REDIS_PASSWORD}
+    DB: ${REDIS_DB}
+
+Agent:
+  Auth:
+    AccessSecret: ${JWT_ACCESS_SECRET}
+    AccessExpire: ${JWT_ACCESS_EXPIRE}
+  AgentRPC:
+    Endpoints:
+      - 127.0.0.1:${AGENT_RPC_PORT}
+    Timeout: 5000
+  Redis:
+    Addr: ${REDIS_ADDR}
+    Password: ${REDIS_PASSWORD}
+    DB: ${REDIS_DB}
+
+Admin:
+  Auth:
+    AccessSecret: ${JWT_ACCESS_SECRET}
+    AccessExpire: ${JWT_ACCESS_EXPIRE}
+  AdminRPC:
+    Endpoints:
+      - 127.0.0.1:${ADMIN_RPC_PORT}
+    Timeout: 5000
+  UserRPC:
+    Endpoints:
+      - 127.0.0.1:${USER_RPC_PORT}
+    Timeout: 5000
+  AuthRPC:
+    Endpoints:
+      - 127.0.0.1:${AUTH_RPC_PORT}
+    Timeout: 5000
+  Redis:
+    Addr: ${REDIS_ADDR}
+    Password: ${REDIS_PASSWORD}
+    DB: ${REDIS_DB}
+
+Media:
+  Auth:
+    AccessSecret: ${JWT_ACCESS_SECRET}
+    AccessExpire: ${JWT_ACCESS_EXPIRE}
+  ResourceRPC:
+    Endpoints:
+      - 127.0.0.1:${RESOURCE_RPC_PORT}
+    Timeout: 5000
+  MsgRPC:
+    Endpoints:
+      - 127.0.0.1:${MSG_RPC_PORT}
+    Timeout: 5000
+  FriendsRPC:
+    Endpoints:
+      - 127.0.0.1:${FRIENDS_RPC_PORT}
+    Timeout: 5000
+  GroupsRPC:
+    Endpoints:
+      - 127.0.0.1:${GROUPS_RPC_PORT}
+    Timeout: 5000

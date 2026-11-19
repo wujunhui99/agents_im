@@ -147,15 +147,8 @@ load_env() {
 
   # Service host ports. Exported so the config templates in scripts/dev/etc/ can be
   # rendered with plain ${VAR} expansion (no per-template :- defaults).
-  export USER_API_PORT="${USER_API_PORT:-8080}"
-  export AUTH_API_PORT="${AUTH_API_PORT:-8081}"
-  export FRIENDS_API_PORT="${FRIENDS_API_PORT:-8082}"
+  export GATEWAY_HTTP_PORT="${GATEWAY_HTTP_PORT:-8080}"
   export GATEWAY_WS_PORT="${GATEWAY_WS_PORT:-8084}"
-  export GROUPS_API_PORT="${GROUPS_API_PORT:-8085}"
-  export AGENT_API_PORT="${AGENT_API_PORT:-8086}"
-  export ADMIN_API_PORT="${ADMIN_API_PORT:-8088}"
-  export MEDIA_API_PORT="${MEDIA_API_PORT:-8089}"
-  export MSG_API_PORT="${MSG_API_PORT:-8090}"
   export USER_RPC_PORT="${USER_RPC_PORT:-9090}"
   export AUTH_RPC_PORT="${AUTH_RPC_PORT:-9091}"
   export FRIENDS_RPC_PORT="${FRIENDS_RPC_PORT:-9092}"
@@ -332,31 +325,18 @@ main() {
   # 新账号的助手绑定 + 好友关系由 agent-rpc 消费 user.created.v1 完成（断双向环）。
   start_service "agent-rpc"
   start_service "user-rpc"
-  start_service "user-api"
-  start_service "auth-api"
-  start_service "friends-api"
-  start_service "msg-api"
   start_service "msggateway"
   start_service "msgtransfer"
   start_service "push"
-  start_service "groups-api"
-  start_service "agent-api"
-  start_service "media-api"
-  start_service "admin-api"
+  # 唯一 HTTP 入口：原 8 个 *-api 已合并进 apigateway（所有域名都在 8080）。
+  start_service "apigateway"
 
-  wait_http "user-api" "http://127.0.0.1:${USER_API_PORT:-8080}/healthz"
-  wait_http "auth-api" "http://127.0.0.1:${AUTH_API_PORT:-8081}/healthz"
-  wait_http "friends-api" "http://127.0.0.1:${FRIENDS_API_PORT:-8082}/healthz"
-  wait_http "msg-api" "http://127.0.0.1:${MSG_API_PORT:-8090}/healthz"
+  wait_http "apigateway" "http://127.0.0.1:${GATEWAY_HTTP_PORT:-8080}/healthz"
   wait_http "msggateway" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
   if [[ "${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}" == "true" ]]; then
     wait_http "msgtransfer" "http://127.0.0.1:${MESSAGE_TRANSFER_OBSERVABILITY_PORT}/healthz"
   fi
   wait_http "push" "http://127.0.0.1:${PUSH_OBSERVABILITY_PORT}/healthz"
-  wait_http "groups-api" "http://127.0.0.1:${GROUPS_API_PORT:-8085}/healthz"
-  wait_http "agent-api" "http://127.0.0.1:${AGENT_API_PORT:-8086}/healthz"
-  wait_http "media-api" "http://127.0.0.1:${MEDIA_API_PORT:-8089}/healthz"
-  wait_http "admin-api" "http://127.0.0.1:${ADMIN_API_PORT:-8088}/healthz"
 
   echo "local backend is ready"
 }

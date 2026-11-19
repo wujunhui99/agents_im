@@ -56,122 +56,122 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: auth-api
+                name: apigateway
                 port:
-                  number: 8081
+                  number: 8080
           - path: /me
             pathType: Prefix
             backend:
               service:
-                name: user-api
+                name: apigateway
                 port:
                   number: 8080
           - path: /users
             pathType: Prefix
             backend:
               service:
-                name: user-api
+                name: apigateway
                 port:
                   number: 8080
           - path: /friends
             pathType: Prefix
             backend:
               service:
-                name: friends-api
+                name: apigateway
                 port:
-                  number: 8082
+                  number: 8080
           - path: /messages
             pathType: Prefix
             backend:
               service:
-                name: msg-api
+                name: apigateway
                 port:
-                  number: 8090
+                  number: 8080
           - path: /conversations
             pathType: Prefix
             backend:
               service:
-                name: msg-api
+                name: apigateway
                 port:
-                  number: 8090
+                  number: 8080
           - path: /admin/dashboard
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /admin/llm-traces
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /admin/conversations
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /admin/users
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /admin/test-accounts
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /api/admin/feedback
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /api/admin/task-reports
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /api/feedback
             pathType: Prefix
             backend:
               service:
-                name: msg-api
+                name: apigateway
                 port:
-                  number: 8090
+                  number: 8080
           - path: /groups
             pathType: Prefix
             backend:
               service:
-                name: groups-api
+                name: apigateway
                 port:
-                  number: 8085
+                  number: 8080
           - path: /media
             pathType: Prefix
             backend:
               service:
                 # media-api owns the media object lifecycle (avatar redirect + upload/download).
-                name: media-api
+                name: apigateway
                 port:
-                  number: 8089
+                  number: 8080
           - path: /agents
             pathType: Prefix
             backend:
               service:
-                name: agent-api
+                name: apigateway
                 port:
-                  number: 8086
+                  number: 8080
           - path: /agents-im-media
             pathType: Prefix
             backend:
@@ -200,87 +200,87 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: auth-api
+                name: apigateway
                 port:
-                  number: 8081
+                  number: 8080
           - path: /users
             pathType: Prefix
             backend:
               service:
-                name: user-api
+                name: apigateway
                 port:
                   number: 8080
           - path: /accounts
             pathType: Prefix
             backend:
               service:
-                name: user-api
+                name: apigateway
                 port:
                   number: 8080
           - path: /admin/dashboard
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /admin/llm-traces
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /admin/conversations
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /admin/users
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /admin/test-accounts
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /api/admin/feedback
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /api/admin/task-reports
             pathType: Prefix
             backend:
               service:
-                name: admin-api
+                name: apigateway
                 port:
-                  number: 8088
+                  number: 8080
           - path: /api/feedback
             pathType: Prefix
             backend:
               service:
-                name: msg-api
+                name: apigateway
                 port:
-                  number: 8090
+                  number: 8080
           - path: /media
             pathType: Prefix
             backend:
               service:
                 # media-api owns the media object lifecycle (avatar redirect + upload/download).
-                name: media-api
+                name: apigateway
                 port:
-                  number: 8089
+                  number: 8080
           - path: /agents-im-media
             pathType: Prefix
             backend:

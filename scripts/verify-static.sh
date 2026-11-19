@@ -25,13 +25,13 @@ required_files=(
   #   - verify-deploy-static / migration-immutability / content greps below
   # So we keep ONLY: codegen sources (*.proto, *.api) and runtime configs (etc/*.yaml).
   # Adding a new service? Add its proto/api/etc entries here.
-  "service/media/api/media.api"
-  "service/user/api/user.api"
-  "service/auth/api/auth.api"
-  "service/friends/api/friends.api"
-  "service/groups/api/groups.api"
-  "service/agent/api/agent.api"
-  "service/msg/api/msg.api"
+  "service/apigateway/api/media.api"
+  "service/apigateway/api/user.api"
+  "service/apigateway/api/auth.api"
+  "service/apigateway/api/friends.api"
+  "service/apigateway/api/groups.api"
+  "service/apigateway/api/agent.api"
+  "service/apigateway/api/msg.api"
   "etc/msggateway.yaml"
   "etc/msgtransfer.yaml"
   "etc/push.yaml"

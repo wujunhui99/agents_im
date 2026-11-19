@@ -1,286 +1,4 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: user-api
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: user-api
-  template:
-    metadata:
-      labels:
-        app: user-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8080"
-    spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: user-api
-          image: ghcr.io/wujunhui99/agents_im/user-api:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/user-api.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: http
-              containerPort: 8080
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: auth-api
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: auth-api
-  template:
-    metadata:
-      labels:
-        app: auth-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8081"
-    spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: auth-api
-          image: ghcr.io/wujunhui99/agents_im/auth-api:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/auth-api.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: http
-              containerPort: 8081
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: friends-api
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: friends-api
-  template:
-    metadata:
-      labels:
-        app: friends-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8082"
-    spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: friends-api
-          image: ghcr.io/wujunhui99/agents_im/friends-api:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/friends-api.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: http
-              containerPort: 8082
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: msg-api
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: msg-api
-  template:
-    metadata:
-      labels:
-        app: msg-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8090"
-    spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: msg-api
-          image: ghcr.io/wujunhui99/agents_im/msg-api:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/msg-api.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: http
-              containerPort: 8090
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: admin-api
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: admin-api
-  template:
-    metadata:
-      labels:
-        app: admin-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8088"
-    spec:
-      containers:
-        - name: admin-api
-          image: ghcr.io/wujunhui99/agents_im/admin-api:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/admin-api.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: http
-              containerPort: 8088
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -323,121 +41,6 @@ spec:
               containerPort: 8084
             - name: grpc
               containerPort: 9101
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: groups-api
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: groups-api
-  template:
-    metadata:
-      labels:
-        app: groups-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8085"
-    spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: groups-api
-          image: ghcr.io/wujunhui99/agents_im/groups-api:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/groups-api.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: http
-              containerPort: 8085
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: agent-api
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: agent-api
-  template:
-    metadata:
-      labels:
-        app: agent-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8086"
-    spec:
-      serviceAccountName: python-executor-controller
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: agent-api
-          image: ghcr.io/wujunhui99/agents_im/agent-api:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/agent-api.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: http
-              containerPort: 8091
           livenessProbe:
             httpGet:
               path: /healthz
@@ -969,63 +572,6 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: media-api
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: media-api
-  template:
-    metadata:
-      labels:
-        app: media-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8089"
-    spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: media-api
-          image: ghcr.io/wujunhui99/agents_im/media-api:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/media-api.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: http
-              containerPort: 8089
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
   name: admin-rpc
   namespace: agents-im
 spec:
@@ -1125,6 +671,59 @@ spec:
           readinessProbe:
             tcpSocket:
               port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apigateway
+  namespace: agents-im
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: apigateway
+  template:
+    metadata:
+      labels:
+        app: apigateway
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: apigateway
+          image: ghcr.io/wujunhui99/agents_im/apigateway:__IMAGE_TAG_REQUIRED__
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/apigateway.yaml"]
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
             initialDelaySeconds: 5
             periodSeconds: 10
       volumes:

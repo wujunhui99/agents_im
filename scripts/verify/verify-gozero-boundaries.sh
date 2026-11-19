@@ -73,11 +73,11 @@ forbid_match "rpc service mains must not own business wiring; keep dependencies 
 
 # api services own no data access — they call rpc/BFF instead.
 for api_spec in \
-  "service/user/api:(repository|model|objectstorage|servicecontext/user)" \
-  "service/auth/api:(repository|model|objectstorage|auth/repository|servicecontext/auth)" \
-  "service/groups/api:(repository|model|objectstorage|servicecontext/groups)" \
-  "service/friends/api:(repository|model|objectstorage|servicecontext/friends)" \
-  "service/agent/api:(repository|model|objectstorage|servicecontext/agent)"; do
+  "service/apigateway/internal/user:(repository|model|objectstorage|servicecontext/user)" \
+  "service/apigateway/internal/auth:(repository|model|objectstorage|auth/repository|servicecontext/auth)" \
+  "service/apigateway/internal/groups:(repository|model|objectstorage|servicecontext/groups)" \
+  "service/apigateway/internal/friends:(repository|model|objectstorage|servicecontext/friends)" \
+  "service/apigateway/internal/agent:(repository|model|objectstorage|servicecontext/agent)"; do
   api_dir="${api_spec%%:*}"
   api_pkgs="${api_spec##*:}"
   forbid_match "${api_dir} must not own data access; use RPC/BFF calls" \
@@ -87,10 +87,10 @@ done
 
 # Generated api/rpc logic must not still contain empty scaffold behavior.
 for logic_dir in \
-  service/user/api/internal/logic \
-  service/auth/api/internal/logic \
-  service/friends/api/internal/logic \
-  service/agent/api/internal/logic; do
+  service/apigateway/internal/user/logic \
+  service/apigateway/internal/auth/logic \
+  service/apigateway/internal/friends/logic \
+  service/apigateway/internal/agent/logic; do
   forbid_match "generated API logic still contains empty scaffold behavior: ${logic_dir}" \
     -n "todo: add your logic here|return &.*Response\{\}, nil" "${logic_dir}"
 done
