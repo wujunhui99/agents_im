@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	friends "github.com/wujunhui99/agents_im_protocol/friends/v1"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/svc"
+	friends "github.com/wujunhui99/agents_im_protocol/friends/v1"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

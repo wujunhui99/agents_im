@@ -3,8 +3,8 @@ package logic
 import (
 	"time"
 
-	friends "github.com/wujunhui99/agents_im_protocol/friends/v1"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/model"
+	friends "github.com/wujunhui99/agents_im_protocol/friends/v1"
 )
 
 // toFriendship 把一条 friendships 行转为 rpc Friendship。

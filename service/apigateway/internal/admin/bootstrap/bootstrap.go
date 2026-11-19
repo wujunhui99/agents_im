@@ -8,10 +8,10 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	commonconfig "github.com/wujunhui99/agents_im/service/apigateway/internal/admin/config"
-	authpb "github.com/wujunhui99/agents_im_protocol/auth/v1"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/authclient"
-	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
+	authpb "github.com/wujunhui99/agents_im_protocol/auth/v1"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 )
 
 // EnsureAdminAccount ensures the configured admin account exists and has an

@@ -6,8 +6,8 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	"github.com/wujunhui99/agents_im_protocol/admin/v1"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im_protocol/admin/v1"
 	"github.com/wujunhui99/agents_im_protocol/agent/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"

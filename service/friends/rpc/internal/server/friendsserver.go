@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	friends "github.com/wujunhui99/agents_im_protocol/friends/v1"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/svc"
+	friends "github.com/wujunhui99/agents_im_protocol/friends/v1"
 )
 
 type FriendsServer struct {

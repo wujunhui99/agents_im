@@ -9,9 +9,9 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	agentpb "github.com/wujunhui99/agents_im_protocol/agent/v1"
 	"github.com/wujunhui99/agents_im/service/apigateway/internal/msg/svc"
 	"github.com/wujunhui99/agents_im/service/apigateway/internal/msg/types"
+	agentpb "github.com/wujunhui99/agents_im_protocol/agent/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

@@ -8,8 +8,8 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/gateway"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	msgpb "github.com/wujunhui99/agents_im_protocol/msg/v1"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
+	msgpb "github.com/wujunhui99/agents_im_protocol/msg/v1"
 )
 
 type MsgRPCBackend struct {

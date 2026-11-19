@@ -5,8 +5,8 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/authruntime"
 	"github.com/wujunhui99/agents_im/pkg/middleware"
-	apiconfig "github.com/wujunhui99/agents_im/service/apigateway/internal/agent/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/agentclient"
+	apiconfig "github.com/wujunhui99/agents_im/service/apigateway/internal/agent/config"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 

@@ -9,9 +9,9 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	adminpb "github.com/wujunhui99/agents_im_protocol/admin/v1"
 	"github.com/wujunhui99/agents_im/service/apigateway/internal/msg/svc"
 	"github.com/wujunhui99/agents_im/service/apigateway/internal/msg/types"
+	adminpb "github.com/wujunhui99/agents_im_protocol/admin/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/protobuf/types/known/structpb"

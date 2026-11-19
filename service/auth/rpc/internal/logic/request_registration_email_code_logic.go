@@ -8,9 +8,9 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	auth "github.com/wujunhui99/agents_im_protocol/auth/v1"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
+	auth "github.com/wujunhui99/agents_im_protocol/auth/v1"
 	mailpb "github.com/wujunhui99/agents_im_protocol/mail/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"

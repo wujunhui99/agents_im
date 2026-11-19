@@ -6,8 +6,8 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/apigateway/internal/auth/svc"
 	"github.com/wujunhui99/agents_im/service/apigateway/internal/auth/types"
-	authpb "github.com/wujunhui99/agents_im_protocol/auth/v1"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/authclient"
+	authpb "github.com/wujunhui99/agents_im_protocol/auth/v1"
 	"google.golang.org/grpc"
 )
 

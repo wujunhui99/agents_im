@@ -6,9 +6,9 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	"github.com/wujunhui99/agents_im_protocol/agent/v1"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im_protocol/agent/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

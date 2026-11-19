@@ -6,8 +6,8 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	"github.com/wujunhui99/agents_im_protocol/admin/v1"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im_protocol/admin/v1"
 	friendspb "github.com/wujunhui99/agents_im_protocol/friends/v1"
 	msgpb "github.com/wujunhui99/agents_im_protocol/msg/v1"
 	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"

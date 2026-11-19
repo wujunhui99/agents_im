@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/pkg/auth/token"
-	auth "github.com/wujunhui99/agents_im_protocol/auth/v1"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
+	auth "github.com/wujunhui99/agents_im_protocol/auth/v1"
 )
 
 // issueToken 签发 JWT、写活跃会话，并用属主 user-rpc 返回的资料拼装 AuthResponse。

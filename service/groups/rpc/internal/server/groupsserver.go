@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	groups "github.com/wujunhui99/agents_im_protocol/groups/v1"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/svc"
+	groups "github.com/wujunhui99/agents_im_protocol/groups/v1"
 )
 
 type GroupsServer struct {
