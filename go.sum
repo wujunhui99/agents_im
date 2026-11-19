@@ -268,6 +268,8 @@ github.com/wk8/go-ordered-map/v2 v2.1.8 h1:5h/BUHu93oj4gIdvHHHGsScSTMijfx5PeYkE/
 github.com/wk8/go-ordered-map/v2 v2.1.8/go.mod h1:5nJHM5DyteebpVlHnWMV0rPz6Zp7+xBAnxjb1X5vnTw=
 github.com/wujunhui99/agents_im_protocol v0.2.0 h1:SjvHyux7DWGTR9IkAdn5hJNpDLBxQj+yekaEwEgCuWY=
 github.com/wujunhui99/agents_im_protocol v0.2.0/go.mod h1:9IFkrvlQ/GoosgeBeN2o4T+wtSPw2iRh0cLeq/ht02c=
+github.com/wujunhui99/agents_im_protocol v0.3.0 h1:19HJWgxjX3UnsFoWUtodf3JEVEMidqQED46k4BuKdUs=
+github.com/wujunhui99/agents_im_protocol v0.3.0/go.mod h1:9IFkrvlQ/GoosgeBeN2o4T+wtSPw2iRh0cLeq/ht02c=
 github.com/x-cray/logrus-prefixed-formatter v0.5.2 h1:00txxvfBM9muc0jiLIEAkAcIMJzfthRT6usrui8uGmg=
 github.com/x-cray/logrus-prefixed-formatter v0.5.2/go.mod h1:2duySbKsL6M18s5GU7VPsoEPHyzalCE06qoARUCeBBE=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=

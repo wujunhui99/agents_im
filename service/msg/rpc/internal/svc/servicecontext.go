@@ -11,10 +11,10 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
-	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/groupsrpc"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/zrpc"
 )
@@ -53,6 +53,9 @@ type ServiceContext struct {
 	// 均为单向叶子调用（msg-rpc → groups/media-rpc），不成环。
 	Groups groupsrpc.GroupMemberLister
 	Media  MessageMediaValidator
+	// MediaURLs 批量签发消息附件 presigned URL（读路径，短 TTL；失败时消息不带 URL，
+	// 客户端回退到单条下载端点）。
+	MediaURLs MediaURLSigner
 
 	// Kafka 写路径（03 §9 B2/B3b）：SendMessage 只 publish msg.toTransfer.v1。
 	// B3b 起旧 PG 同步写路径已退役，Kafka 是唯一写链路（缺配置启动失败）。
@@ -90,7 +93,8 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		log.Fatalf("build media rpc client: %v", err)
 	}
-	mediaValidator := newResourceRPCMessageValidator(mediaclient.NewMedia(mediaRPCClient))
+	mediaClient := mediaclient.NewMedia(mediaRPCClient)
+	mediaValidator := newResourceRPCMessageValidator(mediaClient)
 
 	kafkaBrokers := resolveKafkaBrokers(c)
 	producer, err := messaging.NewKafkaProducer(kafkaBrokers)

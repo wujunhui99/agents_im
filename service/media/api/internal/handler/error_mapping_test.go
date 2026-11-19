@@ -39,6 +39,10 @@ func (notFoundMediaClient) GetDownloadURL(context.Context, *mediaclient.GetDownl
 	return nil, status.Error(codes.NotFound, "media object not found")
 }
 
+func (notFoundMediaClient) GetDownloadURLs(context.Context, *mediaclient.GetDownloadURLsRequest, ...grpc.CallOption) (*mediaclient.GetDownloadURLsResponse, error) {
+	return nil, status.Error(codes.NotFound, "media object not found")
+}
+
 func (notFoundMediaClient) GetAvatarDisplayURL(context.Context, *mediaclient.GetAvatarDisplayURLRequest, ...grpc.CallOption) (*mediaclient.GetDownloadURLResponse, error) {
 	return nil, status.Error(codes.NotFound, "media object not found")
 }

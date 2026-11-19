@@ -3,8 +3,8 @@ package msg
 import (
 	"strings"
 
-	agentpb "github.com/wujunhui99/agents_im_protocol/agent/v1"
 	"github.com/wujunhui99/agents_im/service/msg/api/internal/types"
+	agentpb "github.com/wujunhui99/agents_im_protocol/agent/v1"
 	msgpb "github.com/wujunhui99/agents_im_protocol/msg/v1"
 )
 
@@ -43,6 +43,8 @@ func pbToMessage(m *msgpb.Message) types.Message {
 		TriggerServerMsgID:    m.GetTriggerServerMsgId(),
 		AgentRunID:            m.GetAgentRunId(),
 		AllowRecursiveTrigger: m.GetAllowRecursiveTrigger(),
+		MediaURL:              m.GetMediaUrl(),
+		MediaURLExpiresAt:     m.GetMediaUrlExpiresAt(),
 		SendTime:              m.GetSendTime(),
 		CreatedAt:             m.GetCreatedAt(),
 	}

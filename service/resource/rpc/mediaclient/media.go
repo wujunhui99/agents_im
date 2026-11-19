@@ -21,6 +21,8 @@ type (
 	GetAvatarDisplayURLRequest  = media.GetAvatarDisplayURLRequest
 	GetDownloadURLRequest       = media.GetDownloadURLRequest
 	GetDownloadURLResponse      = media.GetDownloadURLResponse
+	GetDownloadURLsRequest      = media.GetDownloadURLsRequest
+	GetDownloadURLsResponse     = media.GetDownloadURLsResponse
 	GetMediaRequest             = media.GetMediaRequest
 	MediaObject                 = media.MediaObject
 	ValidateAvatarMediaRequest  = media.ValidateAvatarMediaRequest
@@ -32,6 +34,7 @@ type (
 		CompleteUpload(ctx context.Context, in *CompleteUploadRequest, opts ...grpc.CallOption) (*CompleteUploadResponse, error)
 		GetMedia(ctx context.Context, in *GetMediaRequest, opts ...grpc.CallOption) (*MediaObject, error)
 		GetDownloadURL(ctx context.Context, in *GetDownloadURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error)
+		GetDownloadURLs(ctx context.Context, in *GetDownloadURLsRequest, opts ...grpc.CallOption) (*GetDownloadURLsResponse, error)
 		GetAvatarDisplayURL(ctx context.Context, in *GetAvatarDisplayURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error)
 		ValidateAvatarMedia(ctx context.Context, in *ValidateAvatarMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error)
 		ValidateMessageMedia(ctx context.Context, in *ValidateMessageMediaRequest, opts ...grpc.CallOption) (*ValidateMediaResponse, error)
@@ -66,6 +69,11 @@ func (m *defaultMedia) GetMedia(ctx context.Context, in *GetMediaRequest, opts .
 func (m *defaultMedia) GetDownloadURL(ctx context.Context, in *GetDownloadURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error) {
 	client := media.NewMediaClient(m.cli.Conn())
 	return client.GetDownloadURL(ctx, in, opts...)
+}
+
+func (m *defaultMedia) GetDownloadURLs(ctx context.Context, in *GetDownloadURLsRequest, opts ...grpc.CallOption) (*GetDownloadURLsResponse, error) {
+	client := media.NewMediaClient(m.cli.Conn())
+	return client.GetDownloadURLs(ctx, in, opts...)
 }
 
 func (m *defaultMedia) GetAvatarDisplayURL(ctx context.Context, in *GetAvatarDisplayURLRequest, opts ...grpc.CallOption) (*GetDownloadURLResponse, error) {

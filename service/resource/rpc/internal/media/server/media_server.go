@@ -43,6 +43,12 @@ func (s *MediaServer) GetDownloadURL(ctx context.Context, in *media.GetDownloadU
 	return l.GetDownloadURL(in)
 }
 
+// GetDownloadURLs 批量签发 presigned GET（消息拉取等属主域一次拿齐附件 URL）。
+func (s *MediaServer) GetDownloadURLs(ctx context.Context, in *media.GetDownloadURLsRequest) (*media.GetDownloadURLsResponse, error) {
+	l := logic.NewGetDownloadURLsLogic(ctx, s.svcCtx)
+	return l.GetDownloadURLs(in)
+}
+
 func (s *MediaServer) GetAvatarDisplayURL(ctx context.Context, in *media.GetAvatarDisplayURLRequest) (*media.GetDownloadURLResponse, error) {
 	l := logic.NewGetAvatarDisplayURLLogic(ctx, s.svcCtx)
 	return l.GetAvatarDisplayURL(in)

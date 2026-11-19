@@ -103,6 +103,8 @@ type Message struct {
 	TriggerServerMsgID    string `json:"triggerServerMsgId,optional"`
 	AgentRunID            string `json:"agentRunId,optional"`
 	AllowRecursiveTrigger bool   `json:"allowRecursiveTrigger,optional"`
+	MediaURL              string `json:"mediaUrl,optional"`
+	MediaURLExpiresAt     int64  `json:"mediaUrlExpiresAt,optional"`
 	SendTime              int64  `json:"sendTime"`
 	CreatedAt             int64  `json:"createdAt"`
 }

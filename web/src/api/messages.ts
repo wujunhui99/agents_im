@@ -17,6 +17,8 @@ export type ServerMessage = {
   triggerServerMsgId?: string;
   agentRunId?: string;
   allowRecursiveTrigger?: boolean;
+  mediaUrl?: string;
+  mediaUrlExpiresAt?: number;
   sendTime: number;
   createdAt: number;
 };

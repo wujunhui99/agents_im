@@ -23,8 +23,12 @@ type Message {
 	TriggerServerMsgID    string `json:"triggerServerMsgId,optional"`
 	AgentRunID            string `json:"agentRunId,optional"`
 	AllowRecursiveTrigger bool   `json:"allowRecursiveTrigger,optional"`
-	SendTime              int64  `json:"sendTime"`
-	CreatedAt             int64  `json:"createdAt"`
+	// MediaURL 是图片/文件附件的短 TTL presigned GET（属主域签发，客户端直连对象存储）。
+	// 为空时客户端回退到 GET /media/{mediaId}/download-url。
+	MediaURL          string `json:"mediaUrl,optional"`
+	MediaURLExpiresAt int64  `json:"mediaUrlExpiresAt,optional"`
+	SendTime          int64  `json:"sendTime"`
+	CreatedAt         int64  `json:"createdAt"`
 }
 
 type ConversationSeqState {

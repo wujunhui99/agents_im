@@ -35,6 +35,10 @@ func (s stubMediaClient) GetDownloadURL(context.Context, *mediaclient.GetDownloa
 	return &mediaclient.GetDownloadURLResponse{}, nil
 }
 
+func (s stubMediaClient) GetDownloadURLs(context.Context, *mediaclient.GetDownloadURLsRequest, ...grpc.CallOption) (*mediaclient.GetDownloadURLsResponse, error) {
+	return &mediaclient.GetDownloadURLsResponse{}, nil
+}
+
 func (s stubMediaClient) GetAvatarDisplayURL(_ context.Context, in *mediaclient.GetAvatarDisplayURLRequest, _ ...grpc.CallOption) (*mediaclient.GetDownloadURLResponse, error) {
 	return &mediaclient.GetDownloadURLResponse{MediaId: in.GetMediaId(), DownloadUrl: s.avatarURL}, nil
 }
