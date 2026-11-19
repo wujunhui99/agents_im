@@ -1,3 +1,8 @@
+> **架构变更（进行中）**：8 个 `*-api` 已合并为单一 `apigateway`，`media-rpc` + `third-rpc`
+> 已合并为 `resource-rpc`，契约迁移到独立仓库 `agents_im_protocol`。本文档描述的旧服务拆分
+> 仅在历史上下文中有效，最新形态见
+> [`docs/design-docs/microservice-gateway-migration.md`](./docs/design-docs/microservice-gateway-migration.md)。
+
 # ARCHITECTURE.md
 
 适用场景：需要理解系统边界、核心模块、数据流或跨服务影响面时先读本文。
