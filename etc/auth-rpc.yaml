@@ -5,9 +5,9 @@ TokenAuth:
   AccessSecret: dev-jwt-secret-change-me
   AccessExpire: 86400
 DataSource: ${DATABASE_URL}
-MailRPC:
+ResourceRPC:
   Endpoints:
-    - 127.0.0.1:9095
+    - 127.0.0.1:9096
   Timeout: 5000
 # UserRPC：注册/登录读用户资料经属主 user-rpc（#551，脱 internal/logic.UserLogic）。
 UserRPC:

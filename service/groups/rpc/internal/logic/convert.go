@@ -3,8 +3,8 @@ package logic
 import (
 	"time"
 
-	groups "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/model"
+	groups "github.com/wujunhui99/agents_im_protocol/groups/v1"
 )
 
 // toGroup 把 groups 行映射为 proto。group 表无 announcement/avatar 列：

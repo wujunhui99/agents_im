@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestAuthRPCConfigExamplesUseMailRPCEndpointLists(t *testing.T) {
+func TestAuthRPCConfigExamplesUseResourceRPCEndpointLists(t *testing.T) {
 	for _, path := range []string{
 		filepath.Join("..", "..", "etc", "auth-rpc.yaml"),
 		filepath.Join("..", "..", "deploy", "k8s", "etc", "auth-rpc.yaml"),
@@ -23,18 +23,18 @@ func TestAuthRPCConfigExamplesUseMailRPCEndpointLists(t *testing.T) {
 			if err := yaml.Unmarshal(raw, &data); err != nil {
 				t.Fatalf("parse config: %v", err)
 			}
-			mailRPC, ok := data["MailRPC"].(map[string]any)
+			resourceRPC, ok := data["ResourceRPC"].(map[string]any)
 			if !ok {
-				t.Fatalf("MailRPC section is required")
+				t.Fatalf("ResourceRPC section is required")
 			}
-			endpoints, ok := mailRPC["Endpoints"].([]any)
+			endpoints, ok := resourceRPC["Endpoints"].([]any)
 			if !ok || len(endpoints) == 0 {
-				t.Fatalf("MailRPC.Endpoints must be a non-empty YAML list")
+				t.Fatalf("ResourceRPC.Endpoints must be a non-empty YAML list")
 			}
 			for i, endpoint := range endpoints {
 				value, ok := endpoint.(string)
 				if !ok || strings.TrimSpace(value) == "" {
-					t.Fatalf("MailRPC.Endpoints[%d] must be a non-empty string", i)
+					t.Fatalf("ResourceRPC.Endpoints[%d] must be a non-empty string", i)
 				}
 			}
 		})

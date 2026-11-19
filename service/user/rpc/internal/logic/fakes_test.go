@@ -250,10 +250,17 @@ func (m *fakeProfilesModel) Delete(context.Context, string) error {
 
 type fakeProvisioner struct {
 	ensuredFor []string
+	types      []string
+	err        error
 }
 
-func (f *fakeProvisioner) EnsureForUser(_ context.Context, accountID string) error {
+// PublishUserCreated 记录 user.created.v1 发布（原 EnsureForUser 的同步编排已改为事件）。
+func (f *fakeProvisioner) PublishUserCreated(_ context.Context, accountID, accountType string) error {
+	if f.err != nil {
+		return f.err
+	}
 	f.ensuredFor = append(f.ensuredFor, accountID)
+	f.types = append(f.types, accountType)
 	return nil
 }
 

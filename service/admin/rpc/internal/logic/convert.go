@@ -13,10 +13,10 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/model"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	dbmodel "github.com/wujunhui99/agents_im/service/admin/rpc/internal/model"
-	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	"github.com/wujunhui99/agents_im_protocol/admin/v1"
+	msgpb "github.com/wujunhui99/agents_im_protocol/msg/v1"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 

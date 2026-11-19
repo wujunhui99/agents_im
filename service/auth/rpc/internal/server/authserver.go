@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im_protocol/auth/v1"
 )
 
 type AuthServer struct {

@@ -40,23 +40,26 @@ if [[ -n "${root_svc_import_files}" ]]; then
 fi
 
 # Generated goctl rpc scaffold must exist for every rpc service.
-rpc_generated_dirs=(
-  "service/user/rpc"
-  "service/auth/rpc"
-  "service/friends/rpc"
-  "service/groups/rpc"
-  "service/msg/rpc"
-  "service/third/rpc"
-)
-for dir in "${rpc_generated_dirs[@]}"; do
-  if [[ ! -d "$dir/internal/server" || ! -d "$dir/internal/logic" || ! -d "$dir/internal/svc" ]]; then
-    echo "missing goctl rpc generated scaffold under: $dir" >&2
-    exit 1
-  fi
-done
+# resource-rpc is a merged binary: it hosts two capability domains (media/mail),
+# each keeping its own generated server/logic/svc triplet.
+check_rpc_scaffold() {
+  local dir="$1"; shift
+  for sub in "$@"; do
+    if [[ ! -d "$dir/internal/$sub" ]]; then
+      echo "missing goctl rpc generated scaffold under: $dir/internal/$sub" >&2
+      exit 1
+    fi
+  done
+}
+check_rpc_scaffold service/user/rpc server logic svc
+check_rpc_scaffold service/auth/rpc server logic svc
+check_rpc_scaffold service/friends/rpc server logic svc
+check_rpc_scaffold service/groups/rpc server logic svc
+check_rpc_scaffold service/msg/rpc server logic svc
+check_rpc_scaffold service/resource/rpc media/server media/logic media/svc mail/server mail/logic mail/svc
 
 # rpc mains must not re-import the old handwritten rpc wrapper.
-for main_file in service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/third/rpc/third.go service/msg/rpc/msg.go; do
+for main_file in service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/resource/rpc/resource.go service/msg/rpc/msg.go; do
   if rg -n '"github.com/wujunhui99/agents_im/internal/(auth/)?rpc"' "$main_file"; then
     echo "rpc entrypoint imports old handwritten rpc wrapper: $main_file" >&2
     exit 1
@@ -66,15 +69,15 @@ done
 # rpc mains must not own business wiring (deps stay behind generated rpc service contexts).
 forbid_match "rpc service mains must not own business wiring; keep dependencies behind generated rpc service contexts" \
   -n '"github.com/wujunhui99/agents_im/internal/(logic|repository|auth/logic|auth/repository)"' \
-  service/msg/rpc/msg.go service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/third/rpc/third.go
+  service/msg/rpc/msg.go service/user/rpc/user.go service/auth/rpc/auth.go service/friends/rpc/friends.go service/groups/rpc/groups.go service/resource/rpc/resource.go
 
 # api services own no data access — they call rpc/BFF instead.
 for api_spec in \
-  "service/user/api:(repository|model|objectstorage|servicecontext/user)" \
-  "service/auth/api:(repository|model|objectstorage|auth/repository|servicecontext/auth)" \
-  "service/groups/api:(repository|model|objectstorage|servicecontext/groups)" \
-  "service/friends/api:(repository|model|objectstorage|servicecontext/friends)" \
-  "service/agent/api:(repository|model|objectstorage|servicecontext/agent)"; do
+  "service/apigateway/internal/user:(repository|model|objectstorage|servicecontext/user)" \
+  "service/apigateway/internal/auth:(repository|model|objectstorage|auth/repository|servicecontext/auth)" \
+  "service/apigateway/internal/groups:(repository|model|objectstorage|servicecontext/groups)" \
+  "service/apigateway/internal/friends:(repository|model|objectstorage|servicecontext/friends)" \
+  "service/apigateway/internal/agent:(repository|model|objectstorage|servicecontext/agent)"; do
   api_dir="${api_spec%%:*}"
   api_pkgs="${api_spec##*:}"
   forbid_match "${api_dir} must not own data access; use RPC/BFF calls" \
@@ -84,16 +87,16 @@ done
 
 # Generated api/rpc logic must not still contain empty scaffold behavior.
 for logic_dir in \
-  service/user/api/internal/logic \
-  service/auth/api/internal/logic \
-  service/friends/api/internal/logic \
-  service/agent/api/internal/logic; do
+  service/apigateway/internal/user/logic \
+  service/apigateway/internal/auth/logic \
+  service/apigateway/internal/friends/logic \
+  service/apigateway/internal/agent/logic; do
   forbid_match "generated API logic still contains empty scaffold behavior: ${logic_dir}" \
     -n "todo: add your logic here|return &.*Response\{\}, nil" "${logic_dir}"
 done
 forbid_match "generated rpc logic still contains empty scaffold behavior" \
   -n "todo: add your logic here|return &.*Response\{\}, nil" \
-  service/user/rpc/internal/logic service/auth/rpc/internal/logic service/third/rpc/internal/logic
+  service/user/rpc/internal/logic service/auth/rpc/internal/logic service/resource/rpc/internal/mail/logic
 
 # rpc logic must be wired through svcCtx markers (logic talks to model/provider via svcCtx).
 rpc_logic_markers=(
@@ -101,7 +104,7 @@ rpc_logic_markers=(
   "service/auth/rpc/internal/logic:Credentials"
   "service/friends/rpc/internal/logic:FriendshipModel"
   "service/msg/rpc/internal/logic:Messages"
-  "service/third/rpc/internal/logic:MailProvider"
+  "service/resource/rpc/internal/mail/logic:MailProvider"
 )
 for logic_spec in "${rpc_logic_markers[@]}"; do
   dir="${logic_spec%%:*}"

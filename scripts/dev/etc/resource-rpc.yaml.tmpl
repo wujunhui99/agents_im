@@ -1,0 +1,28 @@
+Name: resource-rpc
+ListenOn: 127.0.0.1:${RESOURCE_RPC_PORT}
+DataSource: ${DATABASE_URL}
+ObjectStorage:
+  Driver: ${OBJECT_STORAGE_DRIVER}
+  Endpoint: ${OBJECT_STORAGE_ENDPOINT}
+  ExternalEndpoint: ${OBJECT_STORAGE_EXTERNAL_ENDPOINT}
+  Bucket: ${OBJECT_STORAGE_BUCKET}
+  Region: ${OBJECT_STORAGE_REGION}
+  UseSSL: ${OBJECT_STORAGE_USE_SSL}
+  ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
+  AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
+  SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+# 本地不配 SES：字段显式置空以通过 conf 校验，provider 构造失败后 mail 能力降级为
+# FailedPrecondition（media 能力不受影响）。
+TencentSES:
+  SecretID: ${TENCENT_SES_SECRET_ID}
+  SecretKey: ${TENCENT_SES_SECRET_KEY}
+  Region: ${TENCENT_SES_REGION}
+  Endpoint: ${TENCENT_SES_ENDPOINT}
+  FromEmailAddress: ${TENCENT_SES_FROM_EMAIL}
+  DefaultTemplateID: "${TENCENT_SES_DEFAULT_TEMPLATE_ID}"
+
+Telemetry:
+  Name: resource-rpc
+  Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

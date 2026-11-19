@@ -5,7 +5,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/svc"
-	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
+	"github.com/wujunhui99/agents_im_protocol/msg/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -61,5 +61,7 @@ func (l *PullMessagesLogic) PullMessages(in *msg.PullMessagesRequest) (*msg.Pull
 	for _, m := range messages {
 		out = append(out, messageToPB(m))
 	}
+	// 附件 URL 由属主域一次签齐（短 TTL presigned GET，客户端直连 RustFS）。
+	attachMediaURLs(l.ctx, l.svcCtx.MediaURLs, messages, out)
 	return &msg.PullMessagesResponse{Messages: out, IsEnd: isEnd, NextSeq: nextSeq}, nil
 }

@@ -186,3 +186,32 @@ func UnmarshalMessageEvent(data []byte) (MessageEvent, error) {
 	}
 	return event, nil
 }
+
+// UserCreatedEvent is the user.created.v1 payload. Keyed by account_id so the
+// per-account provisioning order is stable within a partition.
+type UserCreatedEvent struct {
+	EventID     string `json:"event_id"`
+	AccountID   string `json:"account_id"`
+	AccountType string `json:"account_type"`
+	CreatedAt   int64  `json:"created_at"`
+}
+
+func (e UserCreatedEvent) PartitionKey() string { return e.AccountID }
+
+func MarshalUserCreatedEvent(event UserCreatedEvent) ([]byte, error) {
+	if event.AccountID == "" {
+		return nil, errors.New("user created event: account_id is required")
+	}
+	return json.Marshal(event)
+}
+
+func UnmarshalUserCreatedEvent(data []byte) (UserCreatedEvent, error) {
+	var event UserCreatedEvent
+	if err := json.Unmarshal(data, &event); err != nil {
+		return UserCreatedEvent{}, err
+	}
+	if event.AccountID == "" {
+		return UserCreatedEvent{}, errors.New("user created event: account_id is required")
+	}
+	return event, nil
+}

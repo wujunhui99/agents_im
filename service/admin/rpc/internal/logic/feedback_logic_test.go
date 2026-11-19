@@ -6,9 +6,9 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/feedbackstore"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im_protocol/admin/v1"
 )
 
 func codeOf(t *testing.T, err error) apperror.Code {

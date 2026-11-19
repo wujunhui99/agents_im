@@ -7,7 +7,7 @@ package adminclient
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/admin/rpc/admin"
+	"github.com/wujunhui99/agents_im_protocol/admin/v1"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

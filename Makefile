@@ -17,8 +17,7 @@ _SERVICES_KV := $(shell python3 -c "import json;print(' '.join('%s=%s'%(s['name'
 BACKEND_SERVICES := $(foreach kv,$(_SERVICES_KV),$(word 1,$(subst =, ,$(kv))))
 $(foreach kv,$(_SERVICES_KV),$(eval PKG_$(word 1,$(subst =, ,$(kv))) := $(word 2,$(subst =, ,$(kv)))))
 
-CFG_media-api        := service/media/api/etc/media-api.yaml
-CFG_media-rpc        := service/media/rpc/etc/media-rpc.yaml
+CFG_resource-rpc     := service/resource/rpc/etc/resource-rpc.yaml
 
 config_for = $(if $(CFG_$(1)),$(CFG_$(1)),etc/$(1).yaml)
 

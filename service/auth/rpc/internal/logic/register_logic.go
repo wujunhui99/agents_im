@@ -8,10 +8,10 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
+	auth "github.com/wujunhui99/agents_im_protocol/auth/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

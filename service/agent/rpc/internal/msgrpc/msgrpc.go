@@ -13,10 +13,10 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/orchestrator"
-	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
-	msgpb "github.com/wujunhui99/agents_im/service/msg/rpc/msg"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
+	groupspb "github.com/wujunhui99/agents_im_protocol/groups/v1"
+	msgpb "github.com/wujunhui99/agents_im_protocol/msg/v1"
 )
 
 // MessageHistory 把 msg-rpc PullMessages 暴露为 orchestrator.MessageHistoryReader。

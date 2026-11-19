@@ -7,7 +7,7 @@ package friendsclient
 import (
 	"context"
 
-	friends "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
+	friends "github.com/wujunhui99/agents_im_protocol/friends/v1"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

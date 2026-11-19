@@ -19,6 +19,16 @@ function mediaDownloadOptions(serverMsgId?: string): GetMediaDownloadURLOptions 
   return msgId ? { msgId } : undefined;
 }
 
+// freshMediaUrl 返回服务端随消息下发的短 TTL presigned URL（属主域签发，客户端直连对象存储）。
+// 留 30s 余量，避免拿到即将过期的地址；没有或过期则回退到 download-url 端点。
+function freshMediaUrl(message: ChatMessage): string | undefined {
+  const url = message.mediaUrl?.trim();
+  if (!url) return undefined;
+  const expiresAt = message.mediaUrlExpiresAt ?? 0;
+  if (expiresAt > 0 && expiresAt - Date.now() < 30_000) return undefined;
+  return url;
+}
+
 export function FileMessageBubble({
   message,
   mediaApi,
@@ -49,6 +59,13 @@ export function FileMessageBubble({
     }
     setDownloading(true);
     setDownloadError('');
+    const cached = freshMediaUrl(message);
+    if (cached) {
+      downloadMedia(cached, filename);
+      onStatus('已获取文件下载链接');
+      setDownloading(false);
+      return;
+    }
     try {
       const result = await mediaApi.getDownloadURL(mediaId, mediaDownloadOptions(message.serverMsgId));
       downloadMedia(result.downloadUrl, filename);
@@ -122,6 +139,13 @@ export function ImageMessageBubble({
       setLoadError('图片信息缺失，无法加载');
       return () => { cancelled = true; };
     }
+    const cached = freshMediaUrl(message);
+    if (cached) {
+      setImageUrl(cached);
+      setLoading(false);
+      setLoadError('');
+      return () => { cancelled = true; };
+    }
     setLoading(true);
     setLoadError('');
     mediaApi
@@ -136,7 +160,7 @@ export function ImageMessageBubble({
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [mediaApi, mediaId, onStatus, serverMsgId]);
+  }, [mediaApi, mediaId, message.mediaUrl, message.mediaUrlExpiresAt, onStatus, serverMsgId]);
 
   async function retryLoad() {
     if (!mediaId || loading) return;

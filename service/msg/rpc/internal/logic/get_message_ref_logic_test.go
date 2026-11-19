@@ -6,7 +6,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/svc"
-	"github.com/wujunhui99/agents_im/service/msg/rpc/msg"
+	"github.com/wujunhui99/agents_im_protocol/msg/v1"
 )
 
 // fakeMessagesModel 嵌入 MessagesModel 接口（nil），只覆写 GetMessageRef 用到的 FindOne；

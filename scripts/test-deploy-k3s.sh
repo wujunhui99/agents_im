@@ -97,26 +97,26 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: msg-api
+  name: apigateway
   namespace: agents-im
 spec:
   template:
     spec:
       containers:
-        - image: ghcr.io/wujunhui99/agents_im/msg-api:__IMAGE_TAG_REQUIRED__
-          name: msg-api
+        - image: ghcr.io/wujunhui99/agents_im/apigateway:__IMAGE_TAG_REQUIRED__
+          name: apigateway
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: media-rpc
+  name: resource-rpc
   namespace: agents-im
 spec:
   template:
     spec:
       containers:
-        - image: ghcr.io/wujunhui99/agents_im/media-rpc:__IMAGE_TAG_REQUIRED__
-          name: media-rpc
+        - image: ghcr.io/wujunhui99/agents_im/resource-rpc:__IMAGE_TAG_REQUIRED__
+          name: resource-rpc
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -205,12 +205,12 @@ fi
 DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --event-name push \
   --ref refs/heads/main \
-  service/msg/api/internal/logic/msg/send_message_logic.go \
+  service/apigateway/internal/msg/logic/msg/send_message_logic.go \
   web/src/api/feedback.ts)"
-if ! grep -Fq "backend_services='[\"msg-api\"]'" <<<"${DETECT_OUTPUT}" || \
+if ! grep -Fq "backend_services='[\"apigateway\"]'" <<<"${DETECT_OUTPUT}" || \
   grep -Fq 'msggateway' <<<"${DETECT_OUTPUT}" || \
   grep -Fq 'user-rpc' <<<"${DETECT_OUTPUT}" || \
-  ! grep -Fq "image_services_space='msg-api web'" <<<"${DETECT_OUTPUT}"; then
+  ! grep -Fq "image_services_space='apigateway web'" <<<"${DETECT_OUTPUT}"; then
   echo "expected API route/web changes to rebuild API backends plus web, not every backend/RPC/worker" >&2
   printf '%s\n' "${DETECT_OUTPUT}" >&2
   exit 1
@@ -233,7 +233,7 @@ DETECT_OUTPUT="$(python3 "${ROOT_DIR}/scripts/detect-deploy-changes.py" \
   --ref refs/heads/main \
   db/migrations/202605260001_example.sql)"
 if ! grep -Fq "migration_required=true" <<<"${DETECT_OUTPUT}" || \
-  ! grep -Fq "backend_services='[\"user-api\",\"auth-api\",\"friends-api\",\"msg-api\",\"msggateway\",\"groups-api\",\"agent-api\",\"admin-api\",\"msgtransfer\",\"push\",\"user-rpc\",\"auth-rpc\",\"friends-rpc\",\"groups-rpc\",\"msg-rpc\",\"agent-rpc\",\"third-rpc\",\"media-api\",\"media-rpc\",\"admin-rpc\"]'" <<<"${DETECT_OUTPUT}"; then
+  ! grep -Fq "backend_services='[\"apigateway\",\"resource-rpc\",\"msggateway\",\"msgtransfer\",\"push\",\"user-rpc\",\"auth-rpc\",\"friends-rpc\",\"groups-rpc\",\"msg-rpc\",\"agent-rpc\",\"admin-rpc\"]'" <<<"${DETECT_OUTPUT}"; then
   echo "expected executable migration changes to require migrations and rebuild all backends" >&2
   printf '%s\n' "${DETECT_OUTPUT}" >&2
   exit 1
@@ -425,8 +425,8 @@ KUBECTL="${FAKE_KUBECTL}" \
 DATABASE_URL=postgres://override-dsn \
 IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
 IMAGE_TAG=new-message-sha \
-IMAGE_SERVICES=msg-api \
-ROLLOUT_SERVICES=msg-api \
+IMAGE_SERVICES=apigateway \
+ROLLOUT_SERVICES=apigateway \
 "${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-explicit-dsn.out
 
 if grep -Fq "jsonpath={.data.DATABASE_URL}" "${CALL_LOG}"; then
@@ -435,8 +435,8 @@ if grep -Fq "jsonpath={.data.DATABASE_URL}" "${CALL_LOG}"; then
   exit 1
 fi
 
-if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/msg-api:new-message-sha" "${CALL_LOG}"; then
-  echo "expected msg-api image to use its service-specific immutable release tag" >&2
+if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/apigateway:new-message-sha" "${CALL_LOG}"; then
+  echo "expected apigateway image to use its service-specific immutable release tag" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
@@ -447,8 +447,8 @@ if grep -Fq "set image deployment/" "${CALL_LOG}"; then
   exit 1
 fi
 
-if ! grep -Fq "get pods -l app=msg-api -o json" "${CALL_LOG}"; then
-  echo "expected msg-api deploy to verify running pod image" >&2
+if ! grep -Fq "get pods -l app=apigateway -o json" "${CALL_LOG}"; then
+  echo "expected apigateway deploy to verify running pod image" >&2
   cat "${CALL_LOG}" >&2
   exit 1
 fi
@@ -469,13 +469,13 @@ KUBECTL="${FAKE_KUBECTL}" \
 SKIP_MIGRATIONS=true \
 IMAGE_REGISTRY=ghcr.io/wujunhui99/agents_im \
 IMAGE_TAG=wave-sha \
-IMAGE_SERVICES="media-rpc user-rpc msg-api" \
-ROLLOUT_SERVICES="media-rpc user-rpc msg-api" \
+IMAGE_SERVICES="resource-rpc user-rpc apigateway" \
+ROLLOUT_SERVICES="resource-rpc user-rpc apigateway" \
 "${ROOT_DIR}/scripts/deploy-k3s.sh" >/tmp/deploy-k3s-test-waves.out
 
-provider_line="$(grep -nF "rollout status deployment/media-rpc --timeout=180s" "${CALL_LOG}" | cut -d: -f1)"
+provider_line="$(grep -nF "rollout status deployment/resource-rpc --timeout=180s" "${CALL_LOG}" | cut -d: -f1)"
 account_line="$(grep -nF "rollout status deployment/user-rpc --timeout=180s" "${CALL_LOG}" | cut -d: -f1)"
-application_line="$(grep -nF "rollout status deployment/msg-api --timeout=180s" "${CALL_LOG}" | cut -d: -f1)"
+application_line="$(grep -nF "rollout status deployment/apigateway --timeout=180s" "${CALL_LOG}" | cut -d: -f1)"
 if [[ -z "${provider_line}" || -z "${account_line}" || -z "${application_line}" ]] || \
   ! ((provider_line < account_line && account_line < application_line)); then
   echo "expected provider, account, and application rollout waves in dependency order" >&2
@@ -483,7 +483,7 @@ if [[ -z "${provider_line}" || -z "${account_line}" || -z "${application_line}" 
   exit 1
 fi
 
-for service in media-rpc user-rpc msg-api; do
+for service in resource-rpc user-rpc apigateway; do
   if ! grep -Fq "image: ghcr.io/wujunhui99/agents_im/${service}:wave-sha" "${CALL_LOG}"; then
     echo "expected ${service} wave to apply its service-specific image" >&2
     cat "${CALL_LOG}" >&2

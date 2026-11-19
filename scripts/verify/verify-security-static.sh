@@ -50,7 +50,7 @@ forbid_match "observability helpers must not log or inspect secrets, auth header
 # 数据层在各 service/<domain>/rpc/internal/model（goctl）。
 forbid_match "forbidden auth secret field found in service source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
-  service/user/api/user.api service/user/rpc/user.proto service/user/api/user.go \
+  service/apigateway/api/user.api service/apigateway/apigateway.go \
   service/user/rpc pkg/authruntime
 
 forbid_match "forbidden auth secret field found in data-layer source" \
@@ -59,5 +59,5 @@ forbid_match "forbidden auth secret field found in data-layer source" \
 
 forbid_match "forbidden auth secret field found in message contract source" \
   -n "password|password_hash|verification_code|oauth_token|credential" \
-  service/msg/api/msg.api service/msg/rpc/msg.proto \
+  service/apigateway/api/msg.api \
   service/msg/rpc/internal/model/messages_model.go

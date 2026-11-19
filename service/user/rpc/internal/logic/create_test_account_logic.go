@@ -9,7 +9,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/svc"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
@@ -90,9 +90,12 @@ func (l *CreateTestAccountLogic) CreateTestAccount(in *userpb.CreateTestAccountR
 		return nil, rpcerror.ToStatus(mapAccountWriteError(err))
 	}
 
-	// keystone：测试账户与 user 一致开通默认助手（agent 域写），便于测试 AI 链路。
-	if err := l.svcCtx.Assistant.EnsureForUser(l.ctx, created.AccountID); err != nil {
-		return nil, rpcerror.ToStatus(err)
+	// 测试账户与 user 一致：发 user.created.v1，由 agent-rpc 完成默认助手绑定 + 好友。
+	// 尽力而为，失败只记日志（账号已创建；消费端幂等）。
+	if l.svcCtx.Events != nil {
+		if err := l.svcCtx.Events.PublishUserCreated(l.ctx, created.AccountID, accountTypeFromDB(created.AccountType)); err != nil {
+			logx.WithContext(l.ctx).Errorf("publish user.created failed account=%s: %v", created.AccountID, err)
+		}
 	}
 
 	return &userpb.CreateTestAccountResponse{User: toUserEntity(created)}, nil

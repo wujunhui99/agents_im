@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/agent/rpc/agent"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/logic"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im_protocol/agent/v1"
 )
 
 type AgentServer struct {

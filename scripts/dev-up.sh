@@ -28,7 +28,7 @@ Options:
   --services-only   Restart only host Go services; skip Docker middleware and migrations.
 	                   Service ports can be overridden with USER_API_PORT, USER_RPC_PORT,
 	                   AUTH_API_PORT, FRIENDS_API_PORT, MSG_API_PORT, GATEWAY_WS_PORT,
-	                   GROUPS_API_PORT, AGENT_API_PORT, MEDIA_API_PORT, MEDIA_RPC_PORT,
+	                   GROUPS_API_PORT, AGENT_API_PORT, MEDIA_API_PORT, RESOURCE_RPC_PORT,
 	                   ADMIN_API_PORT, ADMIN_RPC_PORT, and MESSAGE_TRANSFER_OBSERVABILITY_PORT.
   --no-migrate      Skip PostgreSQL migrations.
   --stop            Stop host Go services started by this script.
@@ -110,6 +110,26 @@ load_env() {
   export OBJECT_STORAGE_REGION="${OBJECT_STORAGE_REGION:-us-east-1}"
   export OBJECT_STORAGE_USE_SSL="${OBJECT_STORAGE_USE_SSL:-false}"
   export OBJECT_STORAGE_EXTERNAL_USE_SSL="${OBJECT_STORAGE_EXTERNAL_USE_SSL:-${OBJECT_STORAGE_USE_SSL}}"
+  export MOCK_SES="${MOCK_SES:-0}"
+  export MOCK_SES_PORT="${MOCK_SES_PORT:-9100}"
+  export MOCK_SES_DIR="${MOCK_SES_DIR:-${STATE_DIR}/mock-ses}"
+  if [[ "${MOCK_SES}" == "1" ]]; then
+    # 本地无云凭据时用 mock SES 跑完整邮件注册流程（仅捕获最后一次 HTTPS 调用）。
+    export TENCENT_SES_SECRET_ID="mock-secret-id"
+    export TENCENT_SES_SECRET_KEY="mock-secret-key"
+    export TENCENT_SES_REGION="ap-hongkong"
+    export TENCENT_SES_ENDPOINT="http://127.0.0.1:${MOCK_SES_PORT}"
+    export TENCENT_SES_FROM_EMAIL="noreply@agenticim.xyz"
+    export TENCENT_SES_DEFAULT_TEMPLATE_ID="177952"
+  else
+    export TENCENT_SES_SECRET_ID="${TENCENT_SES_SECRET_ID:-}"
+    export TENCENT_SES_SECRET_KEY="${TENCENT_SES_SECRET_KEY:-}"
+    export TENCENT_SES_REGION="${TENCENT_SES_REGION:-ap-hongkong}"
+    export TENCENT_SES_ENDPOINT="${TENCENT_SES_ENDPOINT:-https://ses.tencentcloudapi.com}"
+    export TENCENT_SES_FROM_EMAIL="${TENCENT_SES_FROM_EMAIL:-noreply@agenticim.xyz}"
+    export TENCENT_SES_DEFAULT_TEMPLATE_ID="${TENCENT_SES_DEFAULT_TEMPLATE_ID:-177952}"
+  fi
+
   export OBJECT_STORAGE_ACCESS_KEY_ID="${OBJECT_STORAGE_ACCESS_KEY_ID:-${OSS_ROOT_USER}}"
   export OBJECT_STORAGE_SECRET_ACCESS_KEY="${OBJECT_STORAGE_SECRET_ACCESS_KEY:-${OSS_ROOT_PASSWORD}}"
   export DATABASE_URL="${DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable}"
@@ -147,21 +167,13 @@ load_env() {
 
   # Service host ports. Exported so the config templates in scripts/dev/etc/ can be
   # rendered with plain ${VAR} expansion (no per-template :- defaults).
-  export USER_API_PORT="${USER_API_PORT:-8080}"
-  export AUTH_API_PORT="${AUTH_API_PORT:-8081}"
-  export FRIENDS_API_PORT="${FRIENDS_API_PORT:-8082}"
+  export GATEWAY_HTTP_PORT="${GATEWAY_HTTP_PORT:-8080}"
   export GATEWAY_WS_PORT="${GATEWAY_WS_PORT:-8084}"
-  export GROUPS_API_PORT="${GROUPS_API_PORT:-8085}"
-  export AGENT_API_PORT="${AGENT_API_PORT:-8086}"
-  export ADMIN_API_PORT="${ADMIN_API_PORT:-8088}"
-  export MEDIA_API_PORT="${MEDIA_API_PORT:-8089}"
-  export MSG_API_PORT="${MSG_API_PORT:-8090}"
   export USER_RPC_PORT="${USER_RPC_PORT:-9090}"
   export AUTH_RPC_PORT="${AUTH_RPC_PORT:-9091}"
   export FRIENDS_RPC_PORT="${FRIENDS_RPC_PORT:-9092}"
   export GROUPS_RPC_PORT="${GROUPS_RPC_PORT:-9093}"
-  export MAIL_RPC_PORT="${MAIL_RPC_PORT:-9095}"
-  export MEDIA_RPC_PORT="${MEDIA_RPC_PORT:-9096}"
+  export RESOURCE_RPC_PORT="${RESOURCE_RPC_PORT:-9096}"
   export ADMIN_RPC_PORT="${ADMIN_RPC_PORT:-9097}"
   export MSG_RPC_PORT="${MSG_RPC_PORT:-9098}"
   export AGENT_RPC_PORT="${AGENT_RPC_PORT:-9099}"
@@ -224,6 +236,26 @@ wait_for_oss() {
     sleep 1
   done
   echo "object storage (rustfs) did not become ready at ${OBJECT_STORAGE_ENDPOINT}" >&2
+  exit 1
+}
+
+start_mock_ses() {
+  if [[ "${MOCK_SES:-0}" != "1" ]]; then
+    return 0
+  fi
+  mkdir -p "${PID_DIR}" "${LOG_DIR}" "${MOCK_SES_DIR}"
+  python3 "${ROOT_DIR}/scripts/dev/mock_ses.py" --port "${MOCK_SES_PORT}" --out "${MOCK_SES_DIR}" \
+    >"${LOG_DIR}/mock-ses.log" 2>&1 &
+  echo $! >"${PID_DIR}/mock-ses.pid"
+  local attempt
+  for attempt in $(seq 1 50); do
+    if curl -sf "http://127.0.0.1:${MOCK_SES_PORT}/healthz" >/dev/null 2>&1; then
+      echo "mock SES ready: http://127.0.0.1:${MOCK_SES_PORT} (captures -> ${MOCK_SES_DIR})"
+      return 0
+    fi
+    sleep 0.2
+  done
+  echo "mock SES did not become ready on port ${MOCK_SES_PORT}" >&2
   exit 1
 }
 
@@ -305,6 +337,13 @@ main() {
     wait_for_postgres
     require_command curl
     wait_for_oss
+    # RustFS 不自动建桶；有 aws CLI 时幂等创建（已存在时忽略错误），保证本地上传/下载可用。
+    if command -v aws >/dev/null 2>&1; then
+      AWS_ACCESS_KEY_ID="${OBJECT_STORAGE_ACCESS_KEY_ID}" \
+      AWS_SECRET_ACCESS_KEY="${OBJECT_STORAGE_SECRET_ACCESS_KEY}" \
+      AWS_DEFAULT_REGION="${OBJECT_STORAGE_REGION}" \
+        aws --endpoint-url "http://${OBJECT_STORAGE_ENDPOINT}" s3 mb "s3://${OBJECT_STORAGE_BUCKET}" >/dev/null 2>&1 || true
+    fi
   fi
 
   if [[ "${RUN_MIGRATIONS}" -eq 1 ]]; then
@@ -321,44 +360,31 @@ main() {
   require_command python3
 
   stop_services
+  start_mock_ses
   render_configs
-  # media-rpc 先起：user-rpc（头像校验）/msg-rpc（附件校验）的 MediaRPC 客户端依赖它（#533）。
-  start_service "media-rpc"
+  # resource-rpc 先起：user-rpc（头像校验）/msg-rpc（附件校验）的 ResourceRPC 客户端依赖它（#533）。
+  start_service "resource-rpc"
   start_service "groups-rpc"
   start_service "msg-rpc"
   start_service "friends-rpc"
   start_service "admin-rpc"
   start_service "auth-rpc"
-  # agent-rpc / friends-rpc 必须在 user-rpc 之前就绪：user-rpc 启动即 Backfill 默认助手，
-  # 同步调 agent-rpc.EnsureDefaultAssistant + friends-rpc.EnsureFriendship（#606，单向叶子不成环）。
-  # agent-rpc 对 msg-rpc/user-rpc 的客户端是 NonBlock，仅运行时调用，故可先于 user-rpc 起。
+  # user-rpc 启动只 ensure 默认助手「账号」（本地），不再同步调 agent-rpc/friends-rpc；
+  # 新账号的助手绑定 + 好友关系由 agent-rpc 消费 user.created.v1 完成（断双向环）。
   start_service "agent-rpc"
   start_service "user-rpc"
-  start_service "user-api"
-  start_service "auth-api"
-  start_service "friends-api"
-  start_service "msg-api"
   start_service "msggateway"
   start_service "msgtransfer"
   start_service "push"
-  start_service "groups-api"
-  start_service "agent-api"
-  start_service "media-api"
-  start_service "admin-api"
+  # 唯一 HTTP 入口：原 8 个 *-api 已合并进 apigateway（所有域名都在 8080）。
+  start_service "apigateway"
 
-  wait_http "user-api" "http://127.0.0.1:${USER_API_PORT:-8080}/healthz"
-  wait_http "auth-api" "http://127.0.0.1:${AUTH_API_PORT:-8081}/healthz"
-  wait_http "friends-api" "http://127.0.0.1:${FRIENDS_API_PORT:-8082}/healthz"
-  wait_http "msg-api" "http://127.0.0.1:${MSG_API_PORT:-8090}/healthz"
+  wait_http "apigateway" "http://127.0.0.1:${GATEWAY_HTTP_PORT:-8080}/healthz"
   wait_http "msggateway" "http://127.0.0.1:${GATEWAY_WS_PORT:-8084}/healthz"
   if [[ "${MESSAGE_TRANSFER_OBSERVABILITY_ENABLED}" == "true" ]]; then
     wait_http "msgtransfer" "http://127.0.0.1:${MESSAGE_TRANSFER_OBSERVABILITY_PORT}/healthz"
   fi
   wait_http "push" "http://127.0.0.1:${PUSH_OBSERVABILITY_PORT}/healthz"
-  wait_http "groups-api" "http://127.0.0.1:${GROUPS_API_PORT:-8085}/healthz"
-  wait_http "agent-api" "http://127.0.0.1:${AGENT_API_PORT:-8086}/healthz"
-  wait_http "media-api" "http://127.0.0.1:${MEDIA_API_PORT:-8089}/healthz"
-  wait_http "admin-api" "http://127.0.0.1:${ADMIN_API_PORT:-8088}/healthz"
 
   echo "local backend is ready"
 }

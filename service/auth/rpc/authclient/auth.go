@@ -7,7 +7,7 @@ package authclient
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/auth/rpc/auth"
+	"github.com/wujunhui99/agents_im_protocol/auth/v1"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

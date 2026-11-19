@@ -27,7 +27,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/gateway/delivery"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	"github.com/wujunhui99/agents_im/service/msggateway/gatewaypb"
+	gatewaypb "github.com/wujunhui99/agents_im_protocol/gateway/v1"
 )
 
 // dialFunc builds a client for one resolved gateway address (injectable for tests).

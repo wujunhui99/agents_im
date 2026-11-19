@@ -7,17 +7,17 @@ source "${SCRIPT_DIR}/lib.sh"
 cd "$(git rev-parse --show-toplevel)"
 
 # --- REST API route surface ---
-assert_present "-q" service/user/api/user.api -- \
+assert_present "-q" service/apigateway/api/user.api -- \
   "get /me" "patch /me" "post /users" "post /accounts" \
   "get /users/exists" "get /accounts/exists" "get /users/:identifier" "get /accounts/:identifier"
-assert_present "-q" service/auth/api/auth.api -- \
+assert_present "-q" service/apigateway/api/auth.api -- \
   "post /auth/register" "post /auth/login" "post /auth/validate"
-assert_present "-q" service/friends/api/friends.api -- \
+assert_present "-q" service/apigateway/api/friends.api -- \
   "post /friends" "delete /friends/:user_id" "get /friends" "get /friends/:user_id"
-assert_present "-q" service/groups/api/groups.api -- \
+assert_present "-q" service/apigateway/api/groups.api -- \
   "post /groups" "get /groups/:group_id" "post /groups/:group_id/members" \
   "delete /groups/:group_id/members/me" "get /groups/:group_id/members"
-assert_present "-q" service/msg/api/msg.api -- \
+assert_present "-q" service/apigateway/api/msg.api -- \
   "post /messages" "get /conversations/:conversation_id/messages" \
   "get /conversations/seqs" "post /conversations/:conversation_id/read" \
   "get /conversations/:conversation_id/ai-hosting" "put /conversations/:conversation_id/ai-hosting" \
@@ -40,26 +40,10 @@ assert_present "-q" service/msg/rpc/internal/logic/roundtrip_integration_test.go
   "TestSingleTextReadPathRoundtrip" "HasReadSeq" \
   "renders shuffled server messages by authoritative seq" "one in-flight send per conversation"
 
-# --- proto rpc/message surface ---
-assert_present "-q" service/user/rpc/user.proto -- \
-  "rpc CreateUser" "rpc GetUserByIdentifier" "rpc ExistsByIdentifier" "rpc GetUserByID" "rpc UpdateUserProfile" "rpc UpdateUserAvatar"
-assert_present "-q" service/auth/rpc/auth.proto -- \
-  "rpc Register" "rpc Login" "rpc ValidateToken" "rpc ParseToken"
-assert_present "-q" service/friends/rpc/friends.proto -- \
-  "rpc AddFriend" "rpc DeleteFriend" "rpc ListFriends" "rpc GetFriendship"
-assert_present "-q" service/groups/rpc/groups.proto -- \
-  "rpc CreateGroup" "rpc GetGroup" "rpc AddMember" "rpc JoinGroup" "rpc LeaveGroup" "rpc ListMembers"
-assert_present "-q" service/msg/rpc/msg.proto -- \
-  "service Msg" "rpc SendMessage" "rpc PullMessages" "rpc GetConversationsSeqState" \
-  "rpc MarkConversationAsRead" "message Message" "message ConversationSeqState"
-assert_present "-q" service/third/rpc/mail.proto -- \
-  "service Mail" "rpc SendTemplateEmail" "repeated string recipients" \
-  "map<string, string> template_data" "string provider_request_id" "string provider_message_id"
-
 # --- agent conversation hosting contract ---
-assert_present "-q" service/msg/rpc/msg.proto db/migrations/003_agent_conversation_hosting.sql service/msg/rpc/internal/model/messages_model.go pkg/messaging/event.go -- \
+assert_present "-q" db/migrations/003_agent_conversation_hosting.sql service/msg/rpc/internal/model/messages_model.go pkg/messaging/event.go -- \
   "message_origin" "agent_account_id" "trigger_server_msg_id" "agent_run_id" "allow_recursive_trigger"
-assert_present "-q" service/msg/api/msg.api web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx -- \
+assert_present "-q" service/apigateway/api/msg.api web/src/api/messages.ts web/src/models/messages.ts web/src/features/messages/MessagesPage.tsx -- \
   "messageOrigin" "agentAccountId" "triggerServerMsgId" "agentRunId" "allowRecursiveTrigger"
 # AI 托管编排已迁出至属主 service/agent/rpc/internal/{orchestrator,aihosting}（#340）；
 # 进程内 MessageCreatedHook/SetMessageCreatedHook 随 internal/logic 删（#618，触发改经 Kafka agent.trigger.v1）。
@@ -83,7 +67,7 @@ rpc_generated_servers=(
   "service/groups/rpc/internal/server/groupsserver.go:GroupsServer"
   "service/admin/rpc/internal/server/adminserver.go:AdminServer"
   "service/msg/rpc/internal/server/msgserver.go:MsgServer"
-  "service/third/rpc/internal/server/mailserver.go:MailServer"
+  "service/resource/rpc/internal/mail/server/mailserver.go:MailServer"
 )
 for server_spec in "${rpc_generated_servers[@]}"; do
   file="${server_spec%%:*}"
@@ -100,40 +84,28 @@ rpc_generated_entrypoints=(
   "service/groups/rpc/groups.go:RegisterGroupsServer"
   "service/admin/rpc/admin.go:RegisterAdminServer"
   "service/msg/rpc/msg.go:RegisterMsgServer"
-  "service/third/rpc/third.go:RegisterMailServer"
+  "service/resource/rpc/resource.go:RegisterMailServer"
 )
 for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
   rg -q "${entrypoint_spec##*:}" "${entrypoint_spec%%:*}"
 done
 
+# 所有域路由都在唯一的 apigateway 进程里注册（原 8 个 *-api 已合并）。
 api_register_patterns=(
-  "service/user/api/user.go:handler.RegisterHandlers"
-  "service/auth/api/auth.go:handler.RegisterHandlers"
-  "service/friends/api/friends.go:handler.RegisterHandlers"
-  "service/groups/api/groups.go:handler.RegisterHandlers"
-  "service/agent/api/agent.go:handler.RegisterHandlers"
-  "service/admin/api/admin.go:handler.RegisterHandlers"
-  "service/msg/api/msg.go:handler.RegisterHandlers"
+  "service/apigateway/apigateway.go:userhandler.RegisterHandlers"
+  "service/apigateway/apigateway.go:authhandler.RegisterHandlers"
+  "service/apigateway/apigateway.go:friendshandler.RegisterHandlers"
+  "service/apigateway/apigateway.go:groupshandler.RegisterHandlers"
+  "service/apigateway/apigateway.go:agenthandler.RegisterHandlers"
+  "service/apigateway/apigateway.go:adminhandler.RegisterHandlers"
+  "service/apigateway/apigateway.go:msghandler.RegisterHandlers"
+  "service/apigateway/apigateway.go:mediahandler.RegisterHandlers"
 )
 for entry_spec in "${api_register_patterns[@]}"; do
   rg -q "${entry_spec##*:}" "${entry_spec%%:*}"
 done
 
-rpc_generated_proto_files=(
-  "service/user/rpc/user/user.pb.go"
-  "service/user/rpc/user/user_grpc.pb.go"
-  "service/auth/rpc/auth/auth.pb.go"
-  "service/auth/rpc/auth/auth_grpc.pb.go"
-  "service/msg/rpc/msg/msg.pb.go"
-  "service/msg/rpc/msg/msg_grpc.pb.go"
-  "service/third/rpc/mail/mail.pb.go"
-  "service/third/rpc/mail/mail_grpc.pb.go"
-  "service/admin/rpc/admin/admin.pb.go"
-  "service/admin/rpc/admin/admin_grpc.pb.go"
-)
-for file in "${rpc_generated_proto_files[@]}"; do
-  rg -q "Code generated by protoc-gen-go" "$file"
-done
+
 
 # --- gateway / websocket / transfer code surface ---
 assert_present "-q" pkg/gateway/contract.go tests/gateway_contract_test.go -- \
@@ -169,8 +141,8 @@ assert_present "-q" pkg/gateway/delivery service/msggateway/internal/ws -- \
   "type Dispatcher interface" "DeliverToUser" "DeliverToConversation" "EventMessageReceived" "EventMessageDelivered" \
   "StatusOffline" "NewPresenceAwareDeliveryDispatcher" "PushToUser" "PushToConversation" "UserConnections"
 # 下行推送 gRPC 面（03 §6.2）：msggateway 暴露 GatewayService，push 经 headless DNS 广播。
-assert_present "-q" service/msggateway/gateway.proto service/msggateway/internal/grpcserver -- \
-  "service GatewayService" "BatchPushOneMsg" "type Server struct" "PushToConversation" "delivery.Event"
+assert_present "-q" service/msggateway/internal/grpcserver -- \
+  "BatchPushOneMsg" "type Server struct" "PushToConversation" "delivery.Event"
 rg -q "GatewayGRPC" pkg/config/config.go etc/msggateway.yaml
 
 # 推送 fanout recipient 计算随写链路 Kafka 化迁至 msgtransfer（deriveReceiverIDs）；
@@ -199,10 +171,10 @@ assert_present "-q" pkg/messaging/event.go pkg/messaging/event_test.go -- \
   "chat_type" "created_at" "payload" "message.accepted" "message.read"
 
 # --- JWT auth contract ---
-for file in service/user/api/user.api service/friends/api/friends.api service/groups/api/groups.api service/msg/api/msg.api service/media/api/media.api service/agent/api/agent.api; do
+for file in service/apigateway/api/user.api service/apigateway/api/friends.api service/apigateway/api/groups.api service/apigateway/api/msg.api service/apigateway/api/media.api service/apigateway/api/agent.api; do
   rg -q "jwt:\s+Auth" "$file"
 done
-for file in etc/auth-api.yaml etc/user-api.yaml etc/friends-api.yaml etc/groups-api.yaml etc/msg-api.yaml etc/auth-rpc.yaml; do
+for file in service/apigateway/etc/apigateway.yaml etc/auth-rpc.yaml; do
   rg -q "AccessSecret" "$file"
   rg -q "AccessExpire" "$file"
 done
@@ -210,13 +182,13 @@ rg -q "type JWTAuthConfig" pkg/config/config.go
 rg -q "AccessSecret" pkg/config/config.go service/auth/rpc/internal/config/config.go
 rg -q "AccessExpire" pkg/config/config.go service/auth/rpc/internal/config/config.go
 rg -q "user_id" pkg/ctxuser/user.go
-rg -q "ctxuser\.UserID" service/msg/api/internal/logic/msg
-rg -q "sender_id must match authenticated user" service/msg/api/internal/logic/msg/send_message_logic.go
+rg -q "ctxuser\.UserID" service/apigateway/internal/msg/logic/msg
+rg -q "sender_id must match authenticated user" service/apigateway/internal/msg/logic/msg/send_message_logic.go
 # JWT 鉴权契约由各 owner service 测试独立钉住（下方 service/msg/api + service/msggateway，
 # 及 service/auth/rpc auth_flow_test 的 Issue/ValidateToken）；legacy monolith tests/ HTTP helper 已退役（#620）。
 assert_present "-q" service/msggateway/internal/ws -- \
   "invalid token status"
-assert_present "-q" service/msg/api/internal/logic/msg -- \
+assert_present "-q" service/apigateway/internal/msg/logic/msg -- \
   "message sender did not use token user" "TestSendMessageUsesJWTUser" "TestSendMessageRejectsSenderMismatch"
 # auth-rpc 注册/登录直调下游 user-rpc（去 adapter，#563）；凭据数据层落 goctl model。
 rg -q "ExistsByIdentifier" service/auth/rpc/internal/logic
@@ -247,7 +219,7 @@ rg -q "NewStore" pkg/objectstorage/factory.go
 rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/s3.go
 # media 对象存储数据层已迁 service/media（media-rpc goctl MediaObjectsModel + objectstorage），
 # 内部 internal/repository media 工厂已退役（#609）。
-rg -q "NewMediaObjectsModel" service/media/rpc/internal/svc/service_context.go
+rg -q "NewMediaObjectsModel" service/resource/rpc/internal/media/svc/service_context.go
 rg -q "ValidateMessageMedia" service/msg/rpc/internal/svc/media_validator.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql
 # 顶层 internal/repository 的 monolith postgres 构造器（NewPostgres{,Groups,Message}Repository）
@@ -263,12 +235,8 @@ forbid_match "retired outbox write path resurrected (03 §9 B3b)" \
 assert_present "-q" pkg/health pkg/observability -- \
   "StatusReady" "ReadinessHandler" "MetricMessageSends" "MetricDeliveryAttempts" "MetricTransferEvents" \
   "MetricWebSocketCurrent" "TraceMiddleware" "HeaderTraceID"
-# user/auth/friends/groups api migrated to go-zero native Telemetry (yaml ServiceConf.Telemetry);
-# agent-api still uses observability.TraceMiddlewareFunc.
-for api_main in service/agent/api/agent.go; do
-  rg -q "TraceMiddlewareFunc" "$api_main"
-done
-assert_present "-q" service/user/api/user.go service/auth/api/auth.go service/friends/api/friends.go service/groups/api/groups.go service/agent/api/agent.go service/msg/api/msg.go service/msggateway/msggateway.go service/msgtransfer/msgtransfer.go service/push/push.go -- \
+# 所有域共享同一个 apigateway 进程的健康/指标面。
+assert_present "-q" service/apigateway/apigateway.go service/msggateway/msggateway.go service/msgtransfer/msgtransfer.go service/push/push.go -- \
   "/readyz" "/metrics" "ReadinessHandler" "MetricsHandler"
 # RecordMessageSend 随退役 monolith（internal/logic）删——Kafka 写路径的发送计数待重接（不在 #618 范围）。
 assert_present "-q" service/msggateway/internal/ws -- \

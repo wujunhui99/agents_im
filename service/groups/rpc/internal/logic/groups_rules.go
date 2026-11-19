@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"github.com/wujunhui99/agents_im/pkg/apperror"
-	groups "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/model"
+	groups "github.com/wujunhui99/agents_im_protocol/groups/v1"
 )
 
 const maxGroupMembersV1 = 200

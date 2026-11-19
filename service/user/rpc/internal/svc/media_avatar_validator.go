@@ -3,7 +3,7 @@ package svc
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 )
 
 // mediaRPCAvatarValidator 把 AvatarValidator 接口落到 media-rpc 上：头像 media 的存在/归属/
@@ -12,7 +12,7 @@ type mediaRPCAvatarValidator struct {
 	media mediaclient.Media
 }
 
-func newMediaRPCAvatarValidator(media mediaclient.Media) *mediaRPCAvatarValidator {
+func newResourceRPCAvatarValidator(media mediaclient.Media) *mediaRPCAvatarValidator {
 	return &mediaRPCAvatarValidator{media: media}
 }
 

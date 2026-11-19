@@ -1,0 +1,15 @@
+Name: resource-rpc
+ListenOn: 0.0.0.0:9096
+
+DataSource: ${DATABASE_URL}
+
+# 邮件通道（Tencent SES）。未配置凭据时 mail 能力降级为不可用，不影响 media。
+# TencentSES:
+#   SecretID: ${TENCENT_SES_SECRET_ID}
+#   SecretKey: ${TENCENT_SES_SECRET_KEY}
+
+Telemetry:
+  Name: resource-rpc
+  Endpoint: 127.0.0.1:4317
+  Sampler: 1.0
+  Batcher: otlpgrpc

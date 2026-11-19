@@ -7,20 +7,14 @@ JWTAuth:
 DataSource: ${DATABASE_URL}
 
 # MediaRPC：头像 media 校验经属主 media-rpc（#533）。
-MediaRPC:
+ResourceRPC:
   Endpoints:
     - 127.0.0.1:9096
   Timeout: 5000
 
-# 默认助手开通编排（#606）：agent 域装配经 agent-rpc、好友建立经 friends-rpc（单向叶子，不成环）。
-AgentRPC:
-  Endpoints:
-    - 127.0.0.1:9099
-  Timeout: 5000
-FriendsRPC:
-  Endpoints:
-    - 127.0.0.1:9092
-  Timeout: 5000
+# 事件出口：新账号创建后发布 user.created.v1（默认助手绑定/好友由 agent-rpc 消费）。
+Kafka:
+  Brokers: ${KAFKA_BROKERS}
 
 Telemetry:
   Name: user-rpc

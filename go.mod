@@ -3,7 +3,6 @@ module github.com/wujunhui99/agents_im
 go 1.25.0
 
 require (
-	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/cloudwego/eino v0.8.13
 	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.5
 	github.com/eino-contrib/jsonschema v1.0.3
@@ -15,6 +14,7 @@ require (
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/twmb/franz-go v1.21.3
 	github.com/twmb/franz-go/pkg/kadm v1.18.0
+	github.com/wujunhui99/agents_im_protocol v0.3.0
 	github.com/zeromicro/go-zero v1.10.1
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.40.0

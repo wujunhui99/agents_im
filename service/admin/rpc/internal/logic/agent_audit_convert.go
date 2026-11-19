@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/pkg/agentaudit"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/agent"
+	"github.com/wujunhui99/agents_im_protocol/agent/v1"
 )
 
 func agentRunFromPB(run *agent.AgentRunAudit) agentaudit.AgentRun {

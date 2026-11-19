@@ -8,7 +8,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/middleware"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
-	"github.com/wujunhui99/agents_im/service/third/rpc/mailclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mailclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
 
 	"github.com/zeromicro/go-zero/core/stores/postgres"
@@ -45,10 +45,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		log.Fatalf("build user rpc client: %v", err)
 	}
-	if !hasRPCClientConfig(c.MailRPC) {
+	if !hasRPCClientConfig(c.ResourceRPC) {
 		log.Fatalf("mail rpc client config is required")
 	}
-	mailCli, err := zrpc.NewClient(c.MailRPC)
+	mailCli, err := zrpc.NewClient(c.ResourceRPC)
 	if err != nil {
 		log.Fatalf("build mail rpc client: %v", err)
 	}

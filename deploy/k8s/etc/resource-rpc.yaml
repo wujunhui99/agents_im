@@ -1,0 +1,21 @@
+Name: resource-rpc
+ListenOn: 0.0.0.0:9096
+
+DataSource: ${DATABASE_URL}
+
+# 邮件通道（Tencent SES）。未配置凭据时 mail 能力降级为不可用（FailedPrecondition），
+# 不影响 media（对象存储）能力——两者同进程但互不牵连。
+TencentSES:
+  SecretID: ${TENCENT_SES_SECRET_ID}
+  SecretKey: ${TENCENT_SES_SECRET_KEY}
+  Region: ${TENCENT_SES_REGION}
+  Endpoint: https://ses.tencentcloudapi.com
+  FromEmailAddress: ${TENCENT_SES_FROM_EMAIL}
+  DefaultTemplateID: "${TENCENT_SES_DEFAULT_TEMPLATE_ID}"
+
+# go-zero 自带 tracing：endpoint 由 ConfigMap 注入的 AGENTS_IM_OTLP_ENDPOINT 提供（空则关闭）。
+Telemetry:
+  Name: resource-rpc
+  Endpoint: ${AGENTS_IM_OTLP_ENDPOINT}
+  Sampler: 1.0
+  Batcher: otlpgrpc

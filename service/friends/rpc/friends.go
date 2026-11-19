@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	friendspb "github.com/wujunhui99/agents_im/service/friends/rpc/friends"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/internal/svc"
+	friendspb "github.com/wujunhui99/agents_im_protocol/friends/v1"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"

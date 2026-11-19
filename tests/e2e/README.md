@@ -220,3 +220,23 @@ Classifications:
 - `setup-or-harness-failed`
 
 The script redacts tokens, presigned URLs, signatures, download URLs, avatar URLs, object keys, generated account IDs, and media/message IDs from artifacts. Artifacts default to `/tmp/agents-im-avatar-upload-e2e/<timestamp>/`.
+
+## 邮件注册回归（本地 mock SES）
+
+`email_register_login_regression.mjs` 覆盖真实注册链路：`/auth/register/email-code`
+→ auth-rpc 生成验证码 → resource-rpc 邮件通道 → SES 客户端 HTTP 调用（被本地 mock 捕获）
+→ 用捕获到的验证码 `/auth/register` → `/auth/login`。只有最后一步 HTTPS 发送是 mock，
+验证码生成、落库、校验、会话签发都是真实代码。
+
+```bash
+# 1) 带 mock SES 启动本地后端（另起 9100 端口，捕获写入 .dev/mock-ses/requests.jsonl）
+MOCK_SES=1 scripts/dev-up.sh --services-only
+
+# 2) 跑回归
+node tests/e2e/email_register_login_regression.mjs
+# => classification=email-register-login-success
+```
+
+产物默认在 `/tmp/agents-im-email-register-e2e/<timestamp>/report.json`。
+需要接真实腾讯云 SES 时，去掉 `MOCK_SES` 并注入 `TENCENT_SES_*` 环境变量即可，
+本 harness 的断言对真实发送同样成立（验证码改由收件邮箱读取，属于外部步骤）。

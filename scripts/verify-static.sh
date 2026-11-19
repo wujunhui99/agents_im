@@ -25,28 +25,28 @@ required_files=(
   #   - verify-deploy-static / migration-immutability / content greps below
   # So we keep ONLY: codegen sources (*.proto, *.api) and runtime configs (etc/*.yaml).
   # Adding a new service? Add its proto/api/etc entries here.
-  "service/media/api/media.api"
-  "service/user/api/user.api"
-  "service/auth/api/auth.api"
-  "service/friends/api/friends.api"
-  "service/groups/api/groups.api"
-  "service/agent/api/agent.api"
-  "service/msg/api/msg.api"
-  "service/user/rpc/user.proto"
-  "service/auth/rpc/auth.proto"
-  "service/friends/rpc/friends.proto"
-  "service/groups/rpc/groups.proto"
-  "service/msg/rpc/msg.proto"
-  "service/third/rpc/mail.proto"
-  "service/msggateway/gateway.proto"
+  "service/apigateway/api/media.api"
+  "service/apigateway/api/user.api"
+  "service/apigateway/api/auth.api"
+  "service/apigateway/api/friends.api"
+  "service/apigateway/api/groups.api"
+  "service/apigateway/api/agent.api"
+  "service/apigateway/api/msg.api"
   "etc/msggateway.yaml"
   "etc/msgtransfer.yaml"
   "etc/push.yaml"
   "etc/msg-rpc.yaml"
-  "etc/third-rpc.yaml"
+  "service/resource/rpc/etc/resource-rpc.yaml"
   ".drone.yml"
 )
 require_files "${required_files[@]}"
+
+# Contracts live in a dedicated repo (contract-first). The module requirement is
+# the runtime-critical bit: if it is dropped, every generated client breaks.
+if ! rg -q '^\s*github\.com/wujunhui99/agents_im_protocol v' go.mod; then
+  echo "go.mod must require github.com/wujunhui99/agents_im_protocol" >&2
+  exit 1
+fi
 
 syntax_check \
   scripts/migrate-postgres.sh \

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/pkg/auth/token"
-	"github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
+	"github.com/wujunhui99/agents_im_protocol/auth/v1"
 
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"

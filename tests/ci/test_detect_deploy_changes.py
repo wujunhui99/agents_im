@@ -43,11 +43,12 @@ class DetectDeployChangesTest(unittest.TestCase):
         self.assertNotIn("user-api", out["backend_services"])
 
     def test_backend_only_builds_affected_service(self):
-        out = self.detect(["service/user/api/user.go"])
+        # 8 个 *-api 合并进 apigateway 后，任一域 handler 变更只重建这一个入口。
+        out = self.detect(["service/apigateway/internal/user/logic/user/update_user_profile_logic.go"])
         self.assertEqual(out["build_required"], "true")
         self.assertEqual(out["web_required"], "false")
-        self.assertIn("user-api", out["backend_services"])
-        self.assertNotIn("auth-api", out["backend_services"])
+        self.assertIn("apigateway", out["backend_services"])
+        self.assertNotIn("agent-rpc", out["backend_services"])
 
     def test_migration_sets_migration_required(self):
         out = self.detect(["db/migrations/0001_init.sql"])
@@ -55,14 +56,14 @@ class DetectDeployChangesTest(unittest.TestCase):
         self.assertEqual(out["build_required"], "true")
 
     def test_config_only_skips_image_build(self):
-        out = self.detect(["deploy/k8s/etc/user-api.yaml"])
+        out = self.detect(["deploy/k8s/etc/apigateway.yaml"])
         self.assertEqual(out["build_required"], "false")
         self.assertEqual(out["deploy_required"], "true")
         self.assertEqual(out["config_only"], "true")
-        self.assertIn("user-api", out["rollout_services"])
+        self.assertIn("apigateway", out["rollout_services"])
 
     def test_non_release_ref_is_inert(self):
-        out = self.detect(["service/user/api/user.go"], ref="refs/heads/fix/claude/issue-1-x")
+        out = self.detect(["service/apigateway/apigateway.go"], ref="refs/heads/fix/claude/issue-1-x")
         self.assertEqual(out["build_required"], "false")
         self.assertEqual(out["deploy_required"], "false")
 
@@ -86,8 +87,10 @@ class DetectDeployChangesTest(unittest.TestCase):
         # route to exactly those two and no other backend.
         out = self.detect(["pkg/authruntime/auth.go"])
         self.assertEqual(out["build_required"], "true")
-        self.assertIn("agent-api", out["backend_services"])
+        # authruntime 现在只被 agent-rpc 与 apigateway（agent 域）引用。
         self.assertIn("agent-rpc", out["backend_services"])
+        self.assertIn("apigateway", out["backend_services"])
+        self.assertNotIn("msg-rpc", out["backend_services"])
         self.assertNotIn("user-rpc", out["backend_services"])
         self.assertNotIn("admin-rpc", out["backend_services"])
         self.assertNotIn("msg-rpc", out["backend_services"])

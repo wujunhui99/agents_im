@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	adminpb "github.com/wujunhui99/agents_im/service/admin/rpc/admin"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/admin/rpc/internal/svc"
+	adminpb "github.com/wujunhui99/agents_im_protocol/admin/v1"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"

@@ -5,9 +5,9 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	groups "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/internal/svc"
+	groups "github.com/wujunhui99/agents_im_protocol/groups/v1"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"

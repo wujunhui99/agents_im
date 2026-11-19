@@ -8,8 +8,8 @@ import (
 	"context"
 
 	"github.com/wujunhui99/agents_im/pkg/rpcerror"
-	groupspb "github.com/wujunhui99/agents_im/service/groups/rpc/groups"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
+	groupspb "github.com/wujunhui99/agents_im_protocol/groups/v1"
 )
 
 // GroupMemberLister 列群成员做鉴权（本地端口，取代 internal/logic.GroupMemberLister）。

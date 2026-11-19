@@ -1,19 +1,14 @@
 Name: user-rpc
 ListenOn: 127.0.0.1:${USER_RPC_PORT}
 DataSource: ${DATABASE_URL}
-MediaRPC:
+ResourceRPC:
   Endpoints:
-    - 127.0.0.1:${MEDIA_RPC_PORT}
+    - 127.0.0.1:${RESOURCE_RPC_PORT}
   Timeout: 5000
-# 默认助手开通编排（#606）：agent 域装配经 agent-rpc、好友建立经 friends-rpc（单向叶子，不成环）。
-AgentRPC:
-  Endpoints:
-    - 127.0.0.1:${AGENT_RPC_PORT}
-  Timeout: 5000
-FriendsRPC:
-  Endpoints:
-    - 127.0.0.1:${FRIENDS_RPC_PORT}
-  Timeout: 5000
+# 事件出口：新账号创建后发布 user.created.v1（默认助手绑定/好友由 agent-rpc 消费）。
+Kafka:
+  Brokers: ${KAFKA_BROKERS}
+
 Telemetry:
   Name: user-rpc
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}

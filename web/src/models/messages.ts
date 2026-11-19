@@ -23,6 +23,8 @@ export type ChatMessage = {
   triggerServerMsgId?: string;
   agentRunId?: string;
   allowRecursiveTrigger?: boolean;
+  mediaUrl?: string;
+  mediaUrlExpiresAt?: number;
   sendTime: number;
   createdAt?: number;
   direction: MessageDirection;

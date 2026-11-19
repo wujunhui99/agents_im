@@ -1,0 +1,45 @@
+// Code scaffolded by goctl. Safe to edit.
+// goctl 1.10.1
+
+package friends
+
+import (
+	"context"
+
+	"github.com/wujunhui99/agents_im/pkg/apperror"
+	"github.com/wujunhui99/agents_im/pkg/ctxuser"
+	"github.com/wujunhui99/agents_im/service/apigateway/internal/friends/svc"
+	"github.com/wujunhui99/agents_im/service/apigateway/internal/friends/types"
+	friendspb "github.com/wujunhui99/agents_im_protocol/friends/v1"
+
+	"github.com/zeromicro/go-zero/core/logx"
+)
+
+type AcceptFriendRequestLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewAcceptFriendRequestLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AcceptFriendRequestLogic {
+	return &AcceptFriendRequestLogic{Logger: logx.WithContext(ctx), ctx: ctx, svcCtx: svcCtx}
+}
+
+func (l *AcceptFriendRequestLogic) AcceptFriendRequest(req *types.FriendPathReq) (resp *types.FriendRequestDecisionResp, err error) {
+	userID, err := ctxuser.UserID(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := l.svcCtx.FriendsRPC.AcceptFriendRequest(l.ctx, &friendspb.FriendRequestDecisionRequest{UserId: userID, FriendId: req.UserID})
+	if err != nil {
+		return nil, apiError(err)
+	}
+	friendship, err := friendshipFromRPC(result.GetFriendship())
+	if err != nil {
+		return nil, err
+	}
+	if err := hydrateFriendship(l.ctx, l.svcCtx, &friendship, peerIsFriend); err != nil {
+		return nil, err
+	}
+	return &types.FriendRequestDecisionResp{Code: string(apperror.CodeOK), Message: "ok", Data: types.FriendRequestDecisionData{Friendship: friendship, Updated: result.GetUpdated()}}, nil
+}

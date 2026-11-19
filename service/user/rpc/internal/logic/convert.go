@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
-	userpb "github.com/wujunhui99/agents_im/service/user/rpc/user"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 )
 
 func toUserResponse(ap *model.AccountProfile) *userpb.UserResponse {

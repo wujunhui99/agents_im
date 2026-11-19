@@ -18,7 +18,7 @@ TokenAuth:
   AccessSecret: "[REDACTED]"
   AccessExpire: 3600
 DataSource: "[REDACTED]"
-MailRPC:
+ResourceRPC:
   Endpoints:
     - 127.0.0.1:9095
   Timeout: 5000
@@ -37,7 +37,7 @@ MailRPC:
 	if cfg.DataSource == "" {
 		t.Fatalf("storage config mismatch: dataSourceEmpty=%v", cfg.DataSource == "")
 	}
-	if len(cfg.MailRPC.Endpoints) != 1 || cfg.MailRPC.Endpoints[0] != "127.0.0.1:9095" || cfg.MailRPC.Timeout != 5000 {
-		t.Fatalf("mail rpc config mismatch: %+v", cfg.MailRPC)
+	if len(cfg.ResourceRPC.Endpoints) != 1 || cfg.ResourceRPC.Endpoints[0] != "127.0.0.1:9095" || cfg.ResourceRPC.Timeout != 5000 {
+		t.Fatalf("mail rpc config mismatch: %+v", cfg.ResourceRPC)
 	}
 }

@@ -39,6 +39,8 @@ export function serverMessageToChatMessage(message: ServerMessage, currentUserId
     triggerServerMsgId: message.triggerServerMsgId,
     agentRunId: message.agentRunId,
     allowRecursiveTrigger: message.allowRecursiveTrigger,
+    mediaUrl: message.mediaUrl,
+    mediaUrlExpiresAt: message.mediaUrlExpiresAt,
     sendTime: message.sendTime,
     createdAt: message.createdAt,
     direction: message.senderId === currentUserId ? 'outgoing' : 'incoming',

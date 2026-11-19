@@ -21,10 +21,10 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/pkg/observability"
-	"github.com/wujunhui99/agents_im/service/agent/rpc/agent"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/server"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/svc"
+	"github.com/wujunhui99/agents_im_protocol/agent/v1"
 )
 
 func main() {
@@ -36,7 +36,7 @@ func main() {
 	ctx := svc.NewServiceContext(c)
 
 	ensureCtx, cancelEnsure := context.WithTimeout(context.Background(), 30*time.Second)
-	if err := messaging.EnsureTopics(ensureCtx, ctx.KafkaBrokers, messaging.TopicAgentTrigger); err != nil {
+	if err := messaging.EnsureTopics(ensureCtx, ctx.KafkaBrokers, messaging.TopicAgentTrigger, messaging.TopicUserCreated); err != nil {
 		cancelEnsure()
 		log.Fatalf("ensure kafka topics: %v", err)
 	}
@@ -56,6 +56,19 @@ func main() {
 		}
 	}()
 
+	// user.created.v1：新账号的默认助手绑定 + 好友关系（替代 user-rpc 的同步调用）。
+	go func() {
+		kafkaConsumer, err := messaging.NewKafkaConsumer(ctx.KafkaBrokers, messaging.GroupAgentUserCreated, []string{messaging.TopicUserCreated})
+		if err != nil {
+			logx.Errorf("agent user-created consumer not started: %v", err)
+			return
+		}
+		defer kafkaConsumer.Close()
+		if err := kafkaConsumer.Run(consumerCtx, ctx.UserCreated.HandleBatch); err != nil && consumerCtx.Err() == nil {
+			logx.Errorf("agent user-created consumer stopped: %v", err)
+		}
+	}()
+
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		agent.RegisterAgentServer(grpcServer, server.NewAgentServer(ctx))
 
@@ -67,6 +80,7 @@ func main() {
 	s.AddUnaryInterceptors(observability.ErrorLogUnaryServerInterceptor())
 	defer s.Stop()
 
-	fmt.Printf("agent-rpc serving at %s, consuming %s (group=%s)...\n", c.ListenOn, messaging.TopicAgentTrigger, ctx.KafkaGroup)
+	fmt.Printf("agent-rpc serving at %s, consuming %s (group=%s) + %s (group=%s)...\n",
+		c.ListenOn, messaging.TopicAgentTrigger, ctx.KafkaGroup, messaging.TopicUserCreated, messaging.GroupAgentUserCreated)
 	s.Start()
 }
