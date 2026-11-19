@@ -38,3 +38,13 @@ const (
 	// (D15 final judgment lives there; 04-agent §4.2 step ③).
 	GroupAgentService = "agent-trigger"
 )
+
+// TopicUserCreated carries user.created.v1: a new account (user/test) was created
+// and needs its cross-domain provisioning. Consumed by agent-rpc, which owns the
+// default-assistant binding (agent row + friendship). user-rpc only publishes —
+// it never calls agent-rpc/friends-rpc, which is what breaks the historical
+// user <-> agent / user <-> friends call cycles.
+const TopicUserCreated = "user.created.v1"
+
+// GroupAgentUserCreated is agent-rpc's consumer group on user.created.v1.
+const GroupAgentUserCreated = "agent-user-created"

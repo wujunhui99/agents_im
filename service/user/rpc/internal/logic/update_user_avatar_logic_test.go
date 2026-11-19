@@ -13,12 +13,12 @@ func newTestSvc(store *fakeStore, prov *fakeProvisioner, val *fakeAvatarValidato
 	return &svc.ServiceContext{
 		Accounts:        newFakeAccountsModel(store),
 		Profiles:        newFakeProfilesModel(store),
-		Assistant:       prov,
+		Events:          prov,
 		AvatarValidator: val,
 	}
 }
 
-func TestCreateUserPersistsAndProvisionsAssistantForUser(t *testing.T) {
+func TestCreateUserPublishesUserCreatedForUser(t *testing.T) {
 	ctx := context.Background()
 	store := newFakeStore()
 	prov := &fakeProvisioner{}
@@ -44,11 +44,11 @@ func TestCreateUserPersistsAndProvisionsAssistantForUser(t *testing.T) {
 		t.Fatalf("email = %q, want trimmed", got)
 	}
 	if len(prov.ensuredFor) != 1 || prov.ensuredFor[0] != resp.GetUser().GetUserId() {
-		t.Fatalf("expected assistant provisioned once for new user, got %v", prov.ensuredFor)
+		t.Fatalf("expected user.created published once for new user, got %v", prov.ensuredFor)
 	}
 }
 
-func TestCreateUserSkipsAssistantForNonUser(t *testing.T) {
+func TestCreateUserSkipsUserCreatedForAgentAccount(t *testing.T) {
 	ctx := context.Background()
 	store := newFakeStore()
 	prov := &fakeProvisioner{}

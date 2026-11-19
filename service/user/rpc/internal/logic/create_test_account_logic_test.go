@@ -8,7 +8,7 @@ import (
 	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 )
 
-func TestCreateTestAccountCreatesTestTypeAndProvisionsAssistant(t *testing.T) {
+func TestCreateTestAccountCreatesTestTypeAndPublishesUserCreated(t *testing.T) {
 	ctx := context.Background()
 	store := newFakeStore()
 	prov := &fakeProvisioner{}

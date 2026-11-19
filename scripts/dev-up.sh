@@ -328,9 +328,8 @@ main() {
   start_service "friends-rpc"
   start_service "admin-rpc"
   start_service "auth-rpc"
-  # agent-rpc / friends-rpc 必须在 user-rpc 之前就绪：user-rpc 启动即 Backfill 默认助手，
-  # 同步调 agent-rpc.EnsureDefaultAssistant + friends-rpc.EnsureFriendship（#606，单向叶子不成环）。
-  # agent-rpc 对 msg-rpc/user-rpc 的客户端是 NonBlock，仅运行时调用，故可先于 user-rpc 起。
+  # user-rpc 启动只 ensure 默认助手「账号」（本地），不再同步调 agent-rpc/friends-rpc；
+  # 新账号的助手绑定 + 好友关系由 agent-rpc 消费 user.created.v1 完成（断双向环）。
   start_service "agent-rpc"
   start_service "user-rpc"
   start_service "user-api"

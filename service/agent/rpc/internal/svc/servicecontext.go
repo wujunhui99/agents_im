@@ -10,6 +10,7 @@ import (
 
 	appconfig "github.com/wujunhui99/agents_im/pkg/config"
 	"github.com/wujunhui99/agents_im/pkg/pythonexec"
+	"github.com/wujunhui99/agents_im/pkg/rpcerror"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agaudit"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/agentlogic"
 	"github.com/wujunhui99/agents_im/service/agent/rpc/internal/aghosting"
@@ -30,6 +31,7 @@ import (
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/userclient"
+	userpb "github.com/wujunhui99/agents_im_protocol/user/v1"
 )
 
 // ServiceContext 装配 agent-rpc：gRPC 面（agent CRUD + 定义 + 默认助手装配 + AI 托管开关，#606
@@ -38,9 +40,10 @@ import (
 // internal/{logic,repository} 是 AI runtime keystone（MessageLogic / messages / agent hosting+audit
 // 数据层），待 message 迁移（AG-6③）后清。
 type ServiceContext struct {
-	Config   config.Config
-	Hosting  *aihosting.ServiceContext
-	Consumer *consumer.Consumer
+	Config      config.Config
+	Hosting     *aihosting.ServiceContext
+	Consumer    *consumer.Consumer
+	UserCreated *consumer.UserCreatedHandler
 
 	// agent 域业务逻辑（gRPC 面），背靠 agent 自有 goctl 数据层 + 跨域端口。
 	AgentLogic       *agentlogic.AgentLogic
@@ -90,8 +93,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	agentStore := agentlogic.NewAgentStore(ds)
 	registryStore := registry.NewStore(ds)
 	// 跨域端口：账号经 user-rpc、好友经 friends-rpc（单向叶子，不成环）。
-	accountPort := userrpc.NewAccountClient(userclient.NewUser(userRPCClient))
-	friendPort := userrpc.NewFriendClient(friendsclient.NewFriends(friendsRPCClient))
+	userClient := userclient.NewUser(userRPCClient)
+	friendsClient := friendsclient.NewFriends(friendsRPCClient)
+	accountPort := userrpc.NewAccountClient(userClient)
+	friendPort := userrpc.NewFriendClient(friendsClient)
 
 	agentLogic := agentlogic.NewAgentLogic(agentStore, accountPort)
 	assembly := agentlogic.NewAgentAssemblyLogic(agentlogic.AgentAssemblyDependencies{
@@ -101,6 +106,16 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Registry:    registryStore,
 	})
 	provisioner := agentlogic.NewDefaultAssistantProvisioner(agentStore, registryStore)
+
+	// user.created.v1 消费：新账号的默认助手绑定 + 好友关系在此完成（替代 user-rpc 的
+	// 同步调用，断开 user ↔ agent / user ↔ friends 调用环）。
+	userCreatedHandler, err := consumer.NewUserCreatedHandler(provisioner,
+		assistantAccountReader{users: userClient},
+		friendshipEnsurer{friends: friendsClient},
+	)
+	if err != nil {
+		log.Fatalf("build user.created consumer: %v", err)
+	}
 
 	// 跨域 runtime 读端口（#617）：历史/已读经 msg-rpc、群成员鉴权经 groups-rpc（单向叶子，不成环）。
 	msgRPC := msgclient.NewMsg(msgRPCClient)
@@ -126,6 +141,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Config:           c,
 		Hosting:          hostingCtx,
 		Consumer:         triggerConsumer,
+		UserCreated:      userCreatedHandler,
 		AgentLogic:       agentLogic,
 		AgentAssembly:    assembly,
 		AgentProvisioner: provisioner,
@@ -253,4 +269,29 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// assistantAccountReader 经 user-rpc 解析默认助手账号（agent_creator）。
+type assistantAccountReader struct {
+	users userclient.User
+}
+
+func (r assistantAccountReader) AssistantAccountID(ctx context.Context) (string, error) {
+	resp, err := r.users.GetUserByIdentifier(ctx, &userpb.GetUserByIdentifierRequest{Identifier: "agent_creator"})
+	if err != nil {
+		return "", rpcerror.FromStatus(err)
+	}
+	return resp.GetUser().GetUserId(), nil
+}
+
+// friendshipEnsurer 经 friends-rpc 幂等建立好友关系。
+type friendshipEnsurer struct {
+	friends friendsclient.Friends
+}
+
+func (e friendshipEnsurer) EnsureFriendship(ctx context.Context, userID, friendID string) error {
+	if _, err := e.friends.EnsureFriendship(ctx, &friendsclient.EnsureFriendshipRequest{UserId: userID, FriendId: friendID}); err != nil {
+		return rpcerror.FromStatus(err)
+	}
+	return nil
 }

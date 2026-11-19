@@ -3,21 +3,44 @@ package svc
 import (
 	"context"
 	"log"
+	"os"
+	"strings"
+	"time"
 
-	"github.com/wujunhui99/agents_im/service/agent/rpc/agentclient"
-	"github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
+	"github.com/google/uuid"
+	appconfig "github.com/wujunhui99/agents_im/pkg/config"
+	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
 
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/postgres"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
-// DefaultAssistantProvisioner 是「新用户开通默认助手」的跨域编排接口（#606：account=user 域本地、
-// agent 域经 agent-rpc、好友经 friends-rpc）。由 user-rpc 装配，详见 default_assistant.go。
-type DefaultAssistantProvisioner interface {
-	EnsureForUser(ctx context.Context, accountID string) error
+// UserEventPublisher 发布 user.created.v1；agent-rpc 消费后完成默认助手绑定与好友建立。
+// 这是 user-rpc 唯一对外的跨域开通信号（不再同步调用 agent-rpc/friends-rpc）。
+type UserEventPublisher interface {
+	PublishUserCreated(ctx context.Context, accountID, accountType string) error
+}
+
+// kafkaUserEventPublisher 是 UserEventPublisher 的 Kafka 实现。
+type kafkaUserEventPublisher struct {
+	producer *messaging.KafkaProducer
+}
+
+func (p *kafkaUserEventPublisher) PublishUserCreated(ctx context.Context, accountID, accountType string) error {
+	payload, err := messaging.MarshalUserCreatedEvent(messaging.UserCreatedEvent{
+		EventID:     uuid.NewString(),
+		AccountID:   accountID,
+		AccountType: accountType,
+		CreatedAt:   time.Now().Unix(),
+	})
+	if err != nil {
+		return err
+	}
+	return p.producer.Publish(ctx, messaging.TopicUserCreated, accountID, payload)
 }
 
 // AvatarValidator 校验头像 media 的存在/归属/类型（media 域）。#533 起经 media-rpc，
@@ -31,7 +54,7 @@ type ServiceContext struct {
 	Accounts model.AccountsModel
 	Profiles model.ProfilesModel
 
-	Assistant       DefaultAssistantProvisioner
+	Events          UserEventPublisher
 	AvatarValidator AvatarValidator
 }
 
@@ -40,28 +63,23 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	accountsModel := model.NewAccountsModel(conn)
 	profilesModel := model.NewProfilesModel(conn)
 
-	if !hasRPCClientConfig(c.AgentRPC) {
-		log.Fatalf("user-rpc requires agent rpc client config (AgentRPC) for default assistant provisioning")
-	}
-	if !hasRPCClientConfig(c.FriendsRPC) {
-		log.Fatalf("user-rpc requires friends rpc client config (FriendsRPC) for default assistant friendship")
-	}
-	agentRPCClient, err := zrpc.NewClient(c.AgentRPC)
-	if err != nil {
-		log.Fatalf("build agent rpc client: %v", err)
-	}
-	friendsRPCClient, err := zrpc.NewClient(c.FriendsRPC)
-	if err != nil {
-		log.Fatalf("build friends rpc client: %v", err)
+	// 默认助手「账号」由 user 域本地幂等 ensure；agent 域装配 + 好友关系由 agent-rpc
+	// 消费 user.created.v1 完成（user-rpc 不再调用 agent-rpc/friends-rpc）。
+	accountRepo := newAssistantAccountRepo(accountsModel, profilesModel)
+	if _, err := newAssistantAccountEnsurer(accountRepo).Ensure(context.Background()); err != nil {
+		log.Fatalf("ensure default assistant account: %v", err)
 	}
 
-	// 默认助手账号读写经 user-rpc 自有 goctl model（bigint-safe，gate #550）；agent 域装配 + 好友建立
-	// 经 agent-rpc / friends-rpc（#606，脱 internal/repository agent registry 写与 EnsureAcceptedFriendship）。
-	accountRepo := newAssistantAccountRepo(accountsModel, profilesModel)
-	provisioner := newDefaultAssistantProvisioner(accountRepo, agentclient.NewAgent(agentRPCClient), friendsclient.NewFriends(friendsRPCClient))
-	if _, err := provisioner.Backfill(context.Background()); err != nil {
-		log.Fatalf("backfill default assistant: %v", err)
+	// 事件出口：user.created.v1（Kafka 必填，与 msg-rpc 写链路一致）。
+	brokers := appconfig.KafkaBrokerList(firstNonEmpty(strings.TrimSpace(os.ExpandEnv(c.Kafka.Brokers)), os.Getenv("KAFKA_BROKERS")))
+	if len(brokers) == 0 {
+		log.Fatalf("user-rpc requires kafka brokers to publish %s (set KAFKA_BROKERS)", messaging.TopicUserCreated)
 	}
+	producer, err := messaging.NewKafkaProducer(brokers)
+	if err != nil {
+		log.Fatalf("build kafka producer: %v", err)
+	}
+	logx.Infof("user-rpc publishes %s via %v", messaging.TopicUserCreated, brokers)
 
 	// 头像 media 校验经 media-rpc（#533，脱 internal/mediavalidate 直读 media_objects）。
 	mediaCli, err := zrpc.NewClient(c.ResourceRPC)
@@ -73,7 +91,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Config:          c,
 		Accounts:        accountsModel,
 		Profiles:        profilesModel,
-		Assistant:       provisioner,
+		Events:          &kafkaUserEventPublisher{producer: producer},
 		AvatarValidator: newResourceRPCAvatarValidator(mediaclient.NewMedia(mediaCli)),
 	}
 }
@@ -81,4 +99,13 @@ func NewServiceContext(c config.Config) *ServiceContext {
 // hasRPCClientConfig 判断 zrpc 客户端是否已配置（target / endpoints / etcd 任一）。
 func hasRPCClientConfig(conf zrpc.RpcClientConf) bool {
 	return conf.Target != "" || len(conf.Endpoints) > 0 || (len(conf.Etcd.Hosts) > 0 && conf.Etcd.Key != "")
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

@@ -28,6 +28,21 @@ func NewCreateUserLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Create
 	}
 }
 
+// publishUserCreated 是尽力而为的事件发布：账号已落库，发布失败只记录日志，不回滚
+// 注册（重试注册会命中 already_exists，反而丢掉事件）。消费端按 account_id 幂等。
+func (l *CreateUserLogic) publishUserCreated(account *model.AccountProfile) {
+	if account.AccountType != model.AccountTypeUser && account.AccountType != model.AccountTypeTest {
+		return
+	}
+	if l.svcCtx.Events == nil {
+		logx.WithContext(l.ctx).Errorf("user.created not published: event publisher is not configured account=%s", account.AccountID)
+		return
+	}
+	if err := l.svcCtx.Events.PublishUserCreated(l.ctx, account.AccountID, accountTypeFromDB(account.AccountType)); err != nil {
+		logx.WithContext(l.ctx).Errorf("publish user.created failed account=%s: %v", account.AccountID, err)
+	}
+}
+
 func (l *CreateUserLogic) CreateUser(in *userpb.CreateUserRequest) (*userpb.UserResponse, error) {
 	identifier, err := validateIdentifier(in.GetIdentifier())
 	if err != nil {
@@ -97,13 +112,9 @@ func (l *CreateUserLogic) CreateUser(in *userpb.CreateUserRequest) (*userpb.User
 		return nil, rpcerror.ToStatus(mapAccountWriteError(err))
 	}
 
-	// keystone：新建 user 账号后开通默认助手（agent 域写）。仅 account_type=user 触发，
-	// 与 monolith 行为一致；实现内部仍会二次校验。无 agent-rpc 可 BFF，待迁移后删。
-	if created.AccountType == model.AccountTypeUser {
-		if err := l.svcCtx.Assistant.EnsureForUser(l.ctx, created.AccountID); err != nil {
-			return nil, rpcerror.ToStatus(err)
-		}
-	}
+	// 新建账号后发布 user.created.v1：默认助手绑定（agent 域）+ 好友关系由 agent-rpc
+	// 消费事件完成。user-rpc 不再同步调用 agent-rpc/friends-rpc（断调用环）。
+	l.publishUserCreated(created)
 
 	return toUserResponse(created), nil
 }
