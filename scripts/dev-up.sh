@@ -110,6 +110,26 @@ load_env() {
   export OBJECT_STORAGE_REGION="${OBJECT_STORAGE_REGION:-us-east-1}"
   export OBJECT_STORAGE_USE_SSL="${OBJECT_STORAGE_USE_SSL:-false}"
   export OBJECT_STORAGE_EXTERNAL_USE_SSL="${OBJECT_STORAGE_EXTERNAL_USE_SSL:-${OBJECT_STORAGE_USE_SSL}}"
+  export MOCK_SES="${MOCK_SES:-0}"
+  export MOCK_SES_PORT="${MOCK_SES_PORT:-9100}"
+  export MOCK_SES_DIR="${MOCK_SES_DIR:-${STATE_DIR}/mock-ses}"
+  if [[ "${MOCK_SES}" == "1" ]]; then
+    # 本地无云凭据时用 mock SES 跑完整邮件注册流程（仅捕获最后一次 HTTPS 调用）。
+    export TENCENT_SES_SECRET_ID="mock-secret-id"
+    export TENCENT_SES_SECRET_KEY="mock-secret-key"
+    export TENCENT_SES_REGION="ap-hongkong"
+    export TENCENT_SES_ENDPOINT="http://127.0.0.1:${MOCK_SES_PORT}"
+    export TENCENT_SES_FROM_EMAIL="noreply@agenticim.xyz"
+    export TENCENT_SES_DEFAULT_TEMPLATE_ID="177952"
+  else
+    export TENCENT_SES_SECRET_ID="${TENCENT_SES_SECRET_ID:-}"
+    export TENCENT_SES_SECRET_KEY="${TENCENT_SES_SECRET_KEY:-}"
+    export TENCENT_SES_REGION="${TENCENT_SES_REGION:-ap-hongkong}"
+    export TENCENT_SES_ENDPOINT="${TENCENT_SES_ENDPOINT:-https://ses.tencentcloudapi.com}"
+    export TENCENT_SES_FROM_EMAIL="${TENCENT_SES_FROM_EMAIL:-noreply@agenticim.xyz}"
+    export TENCENT_SES_DEFAULT_TEMPLATE_ID="${TENCENT_SES_DEFAULT_TEMPLATE_ID:-177952}"
+  fi
+
   export OBJECT_STORAGE_ACCESS_KEY_ID="${OBJECT_STORAGE_ACCESS_KEY_ID:-${OSS_ROOT_USER}}"
   export OBJECT_STORAGE_SECRET_ACCESS_KEY="${OBJECT_STORAGE_SECRET_ACCESS_KEY:-${OSS_ROOT_PASSWORD}}"
   export DATABASE_URL="${DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable}"
@@ -219,6 +239,26 @@ wait_for_oss() {
   exit 1
 }
 
+start_mock_ses() {
+  if [[ "${MOCK_SES:-0}" != "1" ]]; then
+    return 0
+  fi
+  mkdir -p "${PID_DIR}" "${LOG_DIR}" "${MOCK_SES_DIR}"
+  python3 "${ROOT_DIR}/scripts/dev/mock_ses.py" --port "${MOCK_SES_PORT}" --out "${MOCK_SES_DIR}" \
+    >"${LOG_DIR}/mock-ses.log" 2>&1 &
+  echo $! >"${PID_DIR}/mock-ses.pid"
+  local attempt
+  for attempt in $(seq 1 50); do
+    if curl -sf "http://127.0.0.1:${MOCK_SES_PORT}/healthz" >/dev/null 2>&1; then
+      echo "mock SES ready: http://127.0.0.1:${MOCK_SES_PORT} (captures -> ${MOCK_SES_DIR})"
+      return 0
+    fi
+    sleep 0.2
+  done
+  echo "mock SES did not become ready on port ${MOCK_SES_PORT}" >&2
+  exit 1
+}
+
 render_configs() {
   # Render every dev config from its scripts/dev/etc/<name>.yaml.tmpl template,
   # expanding ${VAR} placeholders from the environment exported by load_env.
@@ -320,6 +360,7 @@ main() {
   require_command python3
 
   stop_services
+  start_mock_ses
   render_configs
   # resource-rpc 先起：user-rpc（头像校验）/msg-rpc（附件校验）的 ResourceRPC 客户端依赖它（#533）。
   start_service "resource-rpc"

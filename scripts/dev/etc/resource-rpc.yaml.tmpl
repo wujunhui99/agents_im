@@ -14,12 +14,12 @@ ObjectStorage:
 # 本地不配 SES：字段显式置空以通过 conf 校验，provider 构造失败后 mail 能力降级为
 # FailedPrecondition（media 能力不受影响）。
 TencentSES:
-  SecretID: ""
-  SecretKey: ""
-  Region: ap-hongkong
-  Endpoint: https://ses.tencentcloudapi.com
-  FromEmailAddress: noreply@agenticim.xyz
-  DefaultTemplateID: "177952"
+  SecretID: ${TENCENT_SES_SECRET_ID}
+  SecretKey: ${TENCENT_SES_SECRET_KEY}
+  Region: ${TENCENT_SES_REGION}
+  Endpoint: ${TENCENT_SES_ENDPOINT}
+  FromEmailAddress: ${TENCENT_SES_FROM_EMAIL}
+  DefaultTemplateID: "${TENCENT_SES_DEFAULT_TEMPLATE_ID}"
 
 Telemetry:
   Name: resource-rpc
