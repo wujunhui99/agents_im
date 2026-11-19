@@ -7,7 +7,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/pkg/types"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/svc"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
@@ -24,7 +24,7 @@ func CompleteUploadHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}
-		resp, err := svcCtx.MediaRPC.CompleteUpload(r.Context(), &mediaclient.CompleteUploadRequest{
+		resp, err := svcCtx.ResourceRPC.CompleteUpload(r.Context(), &mediaclient.CompleteUploadRequest{
 			OwnerUserId: userID,
 			MediaId:     req.MediaID,
 		})

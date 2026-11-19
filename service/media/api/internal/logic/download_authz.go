@@ -12,7 +12,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/apperror"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
 	"google.golang.org/grpc"
 )

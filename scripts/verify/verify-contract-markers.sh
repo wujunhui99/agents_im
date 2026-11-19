@@ -52,7 +52,7 @@ assert_present "-q" service/groups/rpc/groups.proto -- \
 assert_present "-q" service/msg/rpc/msg.proto -- \
   "service Msg" "rpc SendMessage" "rpc PullMessages" "rpc GetConversationsSeqState" \
   "rpc MarkConversationAsRead" "message Message" "message ConversationSeqState"
-assert_present "-q" service/third/rpc/mail.proto -- \
+assert_present "-q" service/resource/rpc/mail.proto -- \
   "service Mail" "rpc SendTemplateEmail" "repeated string recipients" \
   "map<string, string> template_data" "string provider_request_id" "string provider_message_id"
 
@@ -83,7 +83,7 @@ rpc_generated_servers=(
   "service/groups/rpc/internal/server/groupsserver.go:GroupsServer"
   "service/admin/rpc/internal/server/adminserver.go:AdminServer"
   "service/msg/rpc/internal/server/msgserver.go:MsgServer"
-  "service/third/rpc/internal/server/mailserver.go:MailServer"
+  "service/resource/rpc/internal/mail/server/mailserver.go:MailServer"
 )
 for server_spec in "${rpc_generated_servers[@]}"; do
   file="${server_spec%%:*}"
@@ -100,7 +100,7 @@ rpc_generated_entrypoints=(
   "service/groups/rpc/groups.go:RegisterGroupsServer"
   "service/admin/rpc/admin.go:RegisterAdminServer"
   "service/msg/rpc/msg.go:RegisterMsgServer"
-  "service/third/rpc/third.go:RegisterMailServer"
+  "service/resource/rpc/resource.go:RegisterMailServer"
 )
 for entrypoint_spec in "${rpc_generated_entrypoints[@]}"; do
   rg -q "${entrypoint_spec##*:}" "${entrypoint_spec%%:*}"
@@ -126,8 +126,8 @@ rpc_generated_proto_files=(
   "service/auth/rpc/auth/auth_grpc.pb.go"
   "service/msg/rpc/msg/msg.pb.go"
   "service/msg/rpc/msg/msg_grpc.pb.go"
-  "service/third/rpc/mail/mail.pb.go"
-  "service/third/rpc/mail/mail_grpc.pb.go"
+  "service/resource/rpc/mail/mail.pb.go"
+  "service/resource/rpc/mail/mail_grpc.pb.go"
   "service/admin/rpc/admin/admin.pb.go"
   "service/admin/rpc/admin/admin_grpc.pb.go"
 )
@@ -247,7 +247,7 @@ rg -q "NewStore" pkg/objectstorage/factory.go
 rg -q "PresignPut" pkg/objectstorage/store.go pkg/objectstorage/s3.go
 # media 对象存储数据层已迁 service/media（media-rpc goctl MediaObjectsModel + objectstorage），
 # 内部 internal/repository media 工厂已退役（#609）。
-rg -q "NewMediaObjectsModel" service/media/rpc/internal/svc/service_context.go
+rg -q "NewMediaObjectsModel" service/resource/rpc/internal/media/svc/service_context.go
 rg -q "ValidateMessageMedia" service/msg/rpc/internal/svc/media_validator.go
 rg -q "media_objects" db/migrations/001_init_postgres.sql
 # 顶层 internal/repository 的 monolith postgres 构造器（NewPostgres{,Groups,Message}Repository）

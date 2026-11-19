@@ -8,7 +8,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/media/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/svc"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/rest"
 	"google.golang.org/grpc"
@@ -54,7 +54,7 @@ func TestGetAvatarHandlerRedirects(t *testing.T) {
 			AccessSecret string
 			AccessExpire int64
 		}{AccessSecret: "test-secret"}},
-		MediaRPC: stubMediaClient{avatarURL: wantURL},
+		ResourceRPC: stubMediaClient{avatarURL: wantURL},
 	}
 
 	server := rest.MustNewServer(rest.RestConf{

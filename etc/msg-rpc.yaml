@@ -10,7 +10,7 @@ UserRPC:
   Timeout: 5000
 
 # MediaRPC：SendMessage 写路径图片/文件附件校验经属主 media-rpc（#533）。
-MediaRPC:
+ResourceRPC:
   Endpoints:
     - 127.0.0.1:9096
   Timeout: 5000

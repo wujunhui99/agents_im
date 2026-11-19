@@ -28,7 +28,7 @@ Options:
   --services-only   Restart only host Go services; skip Docker middleware and migrations.
 	                   Service ports can be overridden with USER_API_PORT, USER_RPC_PORT,
 	                   AUTH_API_PORT, FRIENDS_API_PORT, MSG_API_PORT, GATEWAY_WS_PORT,
-	                   GROUPS_API_PORT, AGENT_API_PORT, MEDIA_API_PORT, MEDIA_RPC_PORT,
+	                   GROUPS_API_PORT, AGENT_API_PORT, MEDIA_API_PORT, RESOURCE_RPC_PORT,
 	                   ADMIN_API_PORT, ADMIN_RPC_PORT, and MESSAGE_TRANSFER_OBSERVABILITY_PORT.
   --no-migrate      Skip PostgreSQL migrations.
   --stop            Stop host Go services started by this script.
@@ -160,8 +160,7 @@ load_env() {
   export AUTH_RPC_PORT="${AUTH_RPC_PORT:-9091}"
   export FRIENDS_RPC_PORT="${FRIENDS_RPC_PORT:-9092}"
   export GROUPS_RPC_PORT="${GROUPS_RPC_PORT:-9093}"
-  export MAIL_RPC_PORT="${MAIL_RPC_PORT:-9095}"
-  export MEDIA_RPC_PORT="${MEDIA_RPC_PORT:-9096}"
+  export RESOURCE_RPC_PORT="${RESOURCE_RPC_PORT:-9096}"
   export ADMIN_RPC_PORT="${ADMIN_RPC_PORT:-9097}"
   export MSG_RPC_PORT="${MSG_RPC_PORT:-9098}"
   export AGENT_RPC_PORT="${AGENT_RPC_PORT:-9099}"
@@ -322,8 +321,8 @@ main() {
 
   stop_services
   render_configs
-  # media-rpc 先起：user-rpc（头像校验）/msg-rpc（附件校验）的 MediaRPC 客户端依赖它（#533）。
-  start_service "media-rpc"
+  # resource-rpc 先起：user-rpc（头像校验）/msg-rpc（附件校验）的 ResourceRPC 客户端依赖它（#533）。
+  start_service "resource-rpc"
   start_service "groups-rpc"
   start_service "msg-rpc"
   start_service "friends-rpc"

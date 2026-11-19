@@ -6,7 +6,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/service/agent/rpc/agentclient"
 	"github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/user/rpc/internal/model"
 
@@ -64,7 +64,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 
 	// 头像 media 校验经 media-rpc（#533，脱 internal/mediavalidate 直读 media_objects）。
-	mediaCli, err := zrpc.NewClient(c.MediaRPC)
+	mediaCli, err := zrpc.NewClient(c.ResourceRPC)
 	if err != nil {
 		log.Fatalf("build media rpc client: %v", err)
 	}
@@ -74,7 +74,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Accounts:        accountsModel,
 		Profiles:        profilesModel,
 		Assistant:       provisioner,
-		AvatarValidator: newMediaRPCAvatarValidator(mediaclient.NewMedia(mediaCli)),
+		AvatarValidator: newResourceRPCAvatarValidator(mediaclient.NewMedia(mediaCli)),
 	}
 }
 

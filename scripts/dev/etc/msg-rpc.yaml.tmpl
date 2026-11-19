@@ -6,9 +6,9 @@ Telemetry:
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}
   Sampler: 1.0
   Batcher: otlpgrpc
-MediaRPC:
+ResourceRPC:
   Endpoints:
-    - 127.0.0.1:${MEDIA_RPC_PORT}
+    - 127.0.0.1:${RESOURCE_RPC_PORT}
   Timeout: 5000
 # GroupsRPC：群成员鉴权经属主 groups-rpc ListMembers（#617，单向叶子，不成环）。
 GroupsRPC:

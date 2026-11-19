@@ -55,7 +55,7 @@ func registerObservabilityHandlers(server *rest.Server, serviceContext *svc.Serv
 			Handler: health.ReadinessHandler("media-api", func(*http.Request) []health.Check {
 				return []health.Check{
 					componentCheck("auth_config", serviceContext != nil && serviceContext.Config.Auth.AccessSecret != "", "configured"),
-					componentCheck("media_rpc", serviceContext != nil && serviceContext.MediaRPC != nil, "configured"),
+					componentCheck("media_rpc", serviceContext != nil && serviceContext.ResourceRPC != nil, "configured"),
 				}
 			}),
 		},

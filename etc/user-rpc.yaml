@@ -7,7 +7,7 @@ JWTAuth:
 DataSource: ${DATABASE_URL}
 
 # MediaRPC：头像 media 校验经属主 media-rpc（#533）。
-MediaRPC:
+ResourceRPC:
   Endpoints:
     - 127.0.0.1:9096
   Timeout: 5000

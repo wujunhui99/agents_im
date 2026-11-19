@@ -33,8 +33,7 @@ configMapGenerator:
       - etc/groups-rpc.yaml
       - etc/msg-rpc.yaml
       - etc/agent-rpc.yaml
-      - etc/third-rpc.yaml
-      - etc/media-rpc.yaml
+      - etc/resource-rpc.yaml
       - etc/media-api.yaml
       - etc/admin-rpc.yaml
 generatorOptions:

@@ -28,7 +28,7 @@ mapfile -t RESTARTABLE_DEPLOYMENTS < <(printf '%s\n' "${IMAGE_DEPLOYMENTS[@]}"; 
 # startup backfill through agent-rpc, while APIs/workers depend on RPCs. Keep
 # independent provider RPCs parallel, then user-rpc, then all remaining apps.
 ROLLOUT_PROVIDER_WAVE=(
-  auth-rpc friends-rpc groups-rpc msg-rpc agent-rpc third-rpc media-rpc admin-rpc
+  auth-rpc friends-rpc groups-rpc msg-rpc agent-rpc resource-rpc admin-rpc
 )
 ROLLOUT_ACCOUNT_WAVE=(user-rpc)
 

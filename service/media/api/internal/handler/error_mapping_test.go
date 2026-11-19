@@ -10,7 +10,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/response"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/config"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/svc"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
@@ -59,7 +59,7 @@ func TestGetAvatarHandlerMapsRPCNotFoundTo404(t *testing.T) {
 			AccessSecret string
 			AccessExpire int64
 		}{AccessSecret: "test-secret"}},
-		MediaRPC: notFoundMediaClient{},
+		ResourceRPC: notFoundMediaClient{},
 	}
 
 	// Production wires this in media.go; httpx error handler is process-global.

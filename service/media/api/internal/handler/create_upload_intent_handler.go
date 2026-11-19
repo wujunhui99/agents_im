@@ -7,7 +7,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/ctxuser"
 	"github.com/wujunhui99/agents_im/pkg/types"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/svc"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
@@ -25,7 +25,7 @@ func CreateUploadIntentHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}
-		resp, err := svcCtx.MediaRPC.CreateUploadIntent(r.Context(), &mediaclient.CreateUploadIntentRequest{
+		resp, err := svcCtx.ResourceRPC.CreateUploadIntent(r.Context(), &mediaclient.CreateUploadIntentRequest{
 			OwnerUserId: userID,
 			Purpose:     req.Purpose,
 			Filename:    req.Filename,

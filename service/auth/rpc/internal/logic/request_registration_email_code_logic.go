@@ -11,7 +11,7 @@ import (
 	auth "github.com/wujunhui99/agents_im/service/auth/rpc/auth"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/model"
 	"github.com/wujunhui99/agents_im/service/auth/rpc/internal/svc"
-	mailpb "github.com/wujunhui99/agents_im/service/third/rpc/mail"
+	mailpb "github.com/wujunhui99/agents_im/service/resource/rpc/mail"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

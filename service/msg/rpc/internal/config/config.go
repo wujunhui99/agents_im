@@ -10,9 +10,9 @@ type Config struct {
 	// tracing 用 go-zero 自带 Telemetry（在 RpcServerConf.ServiceConf 内，由 yaml 配置）。
 	DataSource string `json:",optional"`
 
-	// MediaRPC：SendMessage 写路径的图片/文件附件校验经属主 media-rpc
+	// ResourceRPC：SendMessage 写路径的图片/文件附件校验经属主 media-rpc
 	// （#533，脱 internal/mediavalidate 直读 media_objects）。
-	MediaRPC zrpc.RpcClientConf `json:",optional"`
+	ResourceRPC zrpc.RpcClientConf `json:",optional"`
 
 	// GroupsRPC：群成员鉴权（读访问控制 + SendMessage 写路径群成员解析）经属主
 	// groups-rpc ListMembers（#617，脱 internal GroupsLogic 直读；单向叶子调用，不成环）。

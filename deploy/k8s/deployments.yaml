@@ -892,57 +892,6 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: third-rpc
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: third-rpc
-  template:
-    metadata:
-      labels:
-        app: third-rpc
-    spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: third-rpc
-          image: ghcr.io/wujunhui99/agents_im/third-rpc:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/third-rpc.yaml"]
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: grpc
-              containerPort: 9095
-          livenessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
   name: agents-im-minio-proxy
   namespace: agents-im
 spec:
@@ -1016,65 +965,6 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: media-rpc
-  namespace: agents-im
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: media-rpc
-  template:
-    metadata:
-      labels:
-        app: media-rpc
-    spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      containers:
-        - name: media-rpc
-          image: ghcr.io/wujunhui99/agents_im/media-rpc:__IMAGE_TAG_REQUIRED__
-          imagePullPolicy: IfNotPresent
-          args: ["-f", "/config/media-rpc.yaml"]
-          env:
-            # RoutedFlake (media_id) 机器号。单副本下常量 "0" 即唯一;media 与
-            # msg 是独立 ID 空间,两者都给 "0" 互不碰撞。
-            # ⚠️ 扩副本(replicas≥2)前必须改为 StatefulSet + 注入 POD_NAME 让
-            #    ResolveMachineID 按 pod ordinal 发号,并删掉本常量,否则多副本
-            #    同毫秒静默撞 ID。见 docs/design-docs/snowflake-id-generation.md。
-            - name: AGENTS_IM_SNOWFLAKE_MACHINE_ID
-              value: "0"
-          envFrom:
-            - configMapRef:
-                name: agents-im-config
-            - secretRef:
-                name: agents-im-secrets
-          volumeMounts:
-            - name: etc-config
-              mountPath: /config
-              readOnly: true
-          ports:
-            - name: grpc
-              containerPort: 9096
-          livenessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: etc-config
-          configMap:
-            name: agents-im-etc
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -1169,6 +1059,64 @@ spec:
           ports:
             - name: grpc
               containerPort: 9097
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: etc-config
+          configMap:
+            name: agents-im-etc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resource-rpc
+  namespace: agents-im
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: resource-rpc
+  template:
+    metadata:
+      labels:
+        app: resource-rpc
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: resource-rpc
+          image: ghcr.io/wujunhui99/agents_im/resource-rpc:__IMAGE_TAG_REQUIRED__
+          imagePullPolicy: IfNotPresent
+          args: ["-f", "/config/resource-rpc.yaml"]
+          env:
+            # RoutedFlake (media_id) 机器号。单副本下常量 "0" 即唯一；media 与 msg 是
+            # 独立 ID 空间，两者都给 "0" 互不碰撞。
+            # ⚠️ 扩副本(replicas≥2)前必须改为 StatefulSet + 注入 POD_NAME 让
+            #    ResolveMachineID 按 pod ordinal 发号，否则多副本同毫秒会静默撞 ID。
+            - name: AGENTS_IM_SNOWFLAKE_MACHINE_ID
+              value: "0"
+          envFrom:
+            - configMapRef:
+                name: agents-im-config
+            - secretRef:
+                name: agents-im-secrets
+          volumeMounts:
+            - name: etc-config
+              mountPath: /config
+              readOnly: true
+          ports:
+            - name: grpc
+              containerPort: 9096
           livenessProbe:
             tcpSocket:
               port: grpc

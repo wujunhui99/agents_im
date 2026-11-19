@@ -3,7 +3,7 @@ package svc
 import (
 	"context"
 
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 )
 
 // MessageMediaValidator 是 image/file 消息的跨域附件校验端口（本地接口，取代
@@ -18,7 +18,7 @@ type mediaRPCMessageValidator struct {
 	media mediaclient.Media
 }
 
-func newMediaRPCMessageValidator(media mediaclient.Media) *mediaRPCMessageValidator {
+func newResourceRPCMessageValidator(media mediaclient.Media) *mediaRPCMessageValidator {
 	return &mediaRPCMessageValidator{media: media}
 }
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/wujunhui99/agents_im/pkg/types"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/svc"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
@@ -18,7 +18,7 @@ func GetAvatarHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}
-		resp, err := svcCtx.MediaRPC.GetAvatarDisplayURL(r.Context(), &mediaclient.GetAvatarDisplayURLRequest{
+		resp, err := svcCtx.ResourceRPC.GetAvatarDisplayURL(r.Context(), &mediaclient.GetAvatarDisplayURLRequest{
 			MediaId: req.MediaID,
 		})
 		if err != nil {

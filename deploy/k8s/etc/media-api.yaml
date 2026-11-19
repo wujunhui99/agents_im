@@ -5,9 +5,9 @@ Port: 8089
 Auth:
   AccessSecret: ${JWT_ACCESS_SECRET}
   AccessExpire: 86400
-MediaRPC:
+ResourceRPC:
   Endpoints:
-    - media-rpc:9096
+    - resource-rpc:9096
   Timeout: 5000
 
 # 下载授权 BFF 聚合（EPIC #527 §4，#532）：链路校验经 msg-rpc，私聊单向好友经 friends-rpc，群成员经 groups-rpc。

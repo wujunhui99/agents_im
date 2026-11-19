@@ -11,7 +11,7 @@ import (
 	"github.com/wujunhui99/agents_im/pkg/idgen"
 	"github.com/wujunhui99/agents_im/pkg/messaging"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/config"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/groupsrpc"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/internal/model"
@@ -83,14 +83,14 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	groupsClient := groupsrpc.NewClient(groupsclient.NewGroups(groupsRPCClient))
 
 	// 图片/文件附件校验经属主 media-rpc（#533，脱 internal/mediavalidate 直读 media_objects）。
-	if !hasRPCClientConfig(c.MediaRPC) {
-		log.Fatalf("msg-rpc requires media rpc client config (MediaRPC)")
+	if !hasRPCClientConfig(c.ResourceRPC) {
+		log.Fatalf("msg-rpc requires media rpc client config (ResourceRPC)")
 	}
-	mediaRPCClient, err := zrpc.NewClient(c.MediaRPC)
+	mediaRPCClient, err := zrpc.NewClient(c.ResourceRPC)
 	if err != nil {
 		log.Fatalf("build media rpc client: %v", err)
 	}
-	mediaValidator := newMediaRPCMessageValidator(mediaclient.NewMedia(mediaRPCClient))
+	mediaValidator := newResourceRPCMessageValidator(mediaclient.NewMedia(mediaRPCClient))
 
 	kafkaBrokers := resolveKafkaBrokers(c)
 	producer, err := messaging.NewKafkaProducer(kafkaBrokers)

@@ -118,7 +118,7 @@ if ! grep -A2 '^GatewayGRPC:' deploy/k8s/etc/msggateway.yaml | grep -q 'ListenOn
   exit 1
 fi
 
-# --- AuthRPC / MailRPC client endpoints in auth configs ---
+# --- AuthRPC / ResourceRPC client endpoints in auth configs ---
 python3 - <<'PY'
 import sys
 import yaml
@@ -148,17 +148,17 @@ for path in (
 ):
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    mail_rpc = data.get("MailRPC")
+    mail_rpc = data.get("ResourceRPC")
     if not isinstance(mail_rpc, dict):
-        print(f"{path}: MailRPC section is required", file=sys.stderr)
+        print(f"{path}: ResourceRPC section is required", file=sys.stderr)
         sys.exit(1)
     endpoints = mail_rpc.get("Endpoints")
     if not isinstance(endpoints, list) or not endpoints:
-        print(f"{path}: MailRPC.Endpoints must be a non-empty YAML list", file=sys.stderr)
+        print(f"{path}: ResourceRPC.Endpoints must be a non-empty YAML list", file=sys.stderr)
         sys.exit(1)
     for index, endpoint in enumerate(endpoints):
         if not isinstance(endpoint, str) or not endpoint.strip():
-            print(f"{path}: MailRPC.Endpoints[{index}] must be a non-empty string", file=sys.stderr)
+            print(f"{path}: ResourceRPC.Endpoints[{index}] must be a non-empty string", file=sys.stderr)
             sys.exit(1)
 PY
 

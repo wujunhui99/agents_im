@@ -6,33 +6,33 @@ import (
 	"github.com/wujunhui99/agents_im/service/friends/rpc/friendsclient"
 	"github.com/wujunhui99/agents_im/service/groups/rpc/groupsclient"
 	"github.com/wujunhui99/agents_im/service/media/api/internal/config"
-	"github.com/wujunhui99/agents_im/service/media/rpc/mediaclient"
+	"github.com/wujunhui99/agents_im/service/resource/rpc/mediaclient"
 	"github.com/wujunhui99/agents_im/service/msg/rpc/msgclient"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
 var (
-	ErrMediaRPCConfigRequired   = errors.New("media rpc client config is required")
+	ErrResourceRPCConfigRequired   = errors.New("media rpc client config is required")
 	ErrMsgRPCConfigRequired     = errors.New("msg rpc client config is required")
 	ErrFriendsRPCConfigRequired = errors.New("friends rpc client config is required")
 	ErrGroupsRPCConfigRequired  = errors.New("groups rpc client config is required")
 )
 
 // ServiceContext 持有 media-api(BFF) 的下游 rpc 客户端。下载授权（EPIC #527 §4，#532）在这一层
-// 聚合：MsgRPC/FriendsRPC/GroupsRPC 做链路校验 + 私聊单向好友 / 群成员判定，再调 MediaRPC 纯签发。
+// 聚合：MsgRPC/FriendsRPC/GroupsRPC 做链路校验 + 私聊单向好友 / 群成员判定，再调 ResourceRPC 纯签发。
 type ServiceContext struct {
 	Config     config.Config
-	MediaRPC   mediaclient.Media
+	ResourceRPC   mediaclient.Media
 	MsgRPC     msgclient.Msg
 	FriendsRPC friendsclient.Friends
 	GroupsRPC  groupsclient.Groups
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
-	if !hasRPCClientConfig(c.MediaRPC) {
-		return nil, ErrMediaRPCConfigRequired
+	if !hasRPCClientConfig(c.ResourceRPC) {
+		return nil, ErrResourceRPCConfigRequired
 	}
-	mediaCli, err := zrpc.NewClient(c.MediaRPC)
+	mediaCli, err := zrpc.NewClient(c.ResourceRPC)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	}
 	return &ServiceContext{
 		Config:     c,
-		MediaRPC:   mediaclient.NewMedia(mediaCli),
+		ResourceRPC:   mediaclient.NewMedia(mediaCli),
 		MsgRPC:     msgclient.NewMsg(msgCli),
 		FriendsRPC: friendsclient.NewFriends(friendsCli),
 		GroupsRPC:  groupsclient.NewGroups(groupsCli),
