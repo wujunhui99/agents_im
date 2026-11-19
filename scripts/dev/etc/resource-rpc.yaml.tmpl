@@ -11,6 +11,16 @@ ObjectStorage:
   ExternalUseSSL: ${OBJECT_STORAGE_EXTERNAL_USE_SSL}
   AccessKeyID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
   SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+# 本地不配 SES：字段显式置空以通过 conf 校验，provider 构造失败后 mail 能力降级为
+# FailedPrecondition（media 能力不受影响）。
+TencentSES:
+  SecretID: ""
+  SecretKey: ""
+  Region: ap-hongkong
+  Endpoint: https://ses.tencentcloudapi.com
+  FromEmailAddress: noreply@agenticim.xyz
+  DefaultTemplateID: "177952"
+
 Telemetry:
   Name: resource-rpc
   Endpoint: 127.0.0.1:${TEMPO_OTLP_GRPC_PORT}

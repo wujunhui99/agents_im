@@ -110,6 +110,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		States:       model.NewUserConversationStatesModel(conn),
 		Groups:       groupsClient,
 		Media:        mediaValidator,
+		MediaURLs:    newMediaURLSigner(mediaClient),
 		KafkaBrokers: kafkaBrokers,
 		Producer:     producer,
 	}

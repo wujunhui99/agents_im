@@ -30,7 +30,7 @@ type kafkaUserEventPublisher struct {
 	producer *messaging.KafkaProducer
 }
 
-func (p *kafkaUserEventPublisher) PublishUserCreated(ctx context.Context, accountID, accountType string) error {
+func (p *kafkaUserEventPublisher) PublishUserCreated(_ context.Context, accountID, accountType string) error {
 	payload, err := messaging.MarshalUserCreatedEvent(messaging.UserCreatedEvent{
 		EventID:     uuid.NewString(),
 		AccountID:   accountID,
@@ -40,7 +40,17 @@ func (p *kafkaUserEventPublisher) PublishUserCreated(ctx context.Context, accoun
 	if err != nil {
 		return err
 	}
-	return p.producer.Publish(ctx, messaging.TopicUserCreated, accountID, payload)
+	// 异步发布：账号已经落库，注册/建号请求不能被 broker 抖动拖住（曾经因为复用请求
+	// context 导致 2s 超时、客户端看到 500 而账号其实已创建）。消费端按 account_id 幂等，
+	// 发布失败只记录日志。
+	go func() {
+		publishCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := p.producer.Publish(publishCtx, messaging.TopicUserCreated, accountID, payload); err != nil {
+			logx.Errorf("publish %s failed account=%s: %v", messaging.TopicUserCreated, accountID, err)
+		}
+	}()
+	return nil
 }
 
 // AvatarValidator 校验头像 media 的存在/归属/类型（media 域）。#533 起经 media-rpc，

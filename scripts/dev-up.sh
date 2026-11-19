@@ -297,6 +297,13 @@ main() {
     wait_for_postgres
     require_command curl
     wait_for_oss
+    # RustFS 不自动建桶；有 aws CLI 时幂等创建（已存在时忽略错误），保证本地上传/下载可用。
+    if command -v aws >/dev/null 2>&1; then
+      AWS_ACCESS_KEY_ID="${OBJECT_STORAGE_ACCESS_KEY_ID}" \
+      AWS_SECRET_ACCESS_KEY="${OBJECT_STORAGE_SECRET_ACCESS_KEY}" \
+      AWS_DEFAULT_REGION="${OBJECT_STORAGE_REGION}" \
+        aws --endpoint-url "http://${OBJECT_STORAGE_ENDPOINT}" s3 mb "s3://${OBJECT_STORAGE_BUCKET}" >/dev/null 2>&1 || true
+    fi
   fi
 
   if [[ "${RUN_MIGRATIONS}" -eq 1 ]]; then

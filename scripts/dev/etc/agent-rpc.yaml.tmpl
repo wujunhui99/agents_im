@@ -10,6 +10,17 @@ Telemetry:
 # BaseURL/Model 缺省走 tag default、env DEEPSEEK_BASE_URL/MODEL 覆盖；整块从 yaml 删除。
 PythonExecutor:
   Backend: disabled
+  DefaultTimeoutSeconds: 10
+  MaxTimeoutSeconds: 30
+  DefaultMemoryMiB: 256
+  MaxMemoryMiB: 256
+  MaxOutputBytes: 65536
+  # K8S 字段为必填（conf 校验）；本地 Backend=disabled 不会真正使用。
+  K8S:
+    Namespace: agents-im
+    Image: ""
+    ServiceAccountName: ""
+    RuntimeClassName: ""
 MsgRPC:
   Endpoints:
     - 127.0.0.1:${MSG_RPC_PORT}

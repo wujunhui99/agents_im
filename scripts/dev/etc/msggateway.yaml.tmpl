@@ -21,7 +21,10 @@ Presence:
   HeartbeatTTLSeconds: ${PRESENCE_TTL_SECONDS}
   KeyPrefix: ${PRESENCE_KEY_PREFIX}
 GatewayWS:
-  AllowedOrigins: ${GATEWAY_WS_ALLOWED_ORIGINS}
+  # 切片字段：go-zero 会把 env 展开后的字符串当 JSON 解析，逗号分隔会失败，故显式列本地 origin。
+  AllowedOrigins:
+    - http://localhost:5173
+    - http://127.0.0.1:5173
   AllowQueryToken: ${GATEWAY_WS_ALLOW_QUERY_TOKEN}
   PingIntervalSeconds: ${GATEWAY_WS_PING_INTERVAL_SECONDS}
   HeartbeatTimeoutSeconds: ${GATEWAY_WS_HEARTBEAT_TIMEOUT_SECONDS}
